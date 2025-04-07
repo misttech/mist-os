@@ -24,14 +24,12 @@ class Struct:
     struct comment #3
     """
 
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     """
     struct member comment #1
 
     struct member comment #3
     """
-    field: int | None
+    field: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Struct"
@@ -50,11 +48,13 @@ class Struct:
             self, "test.doccomments", "test.doccomments/Struct"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "field": None,
+                "field": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 

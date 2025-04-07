@@ -20,9 +20,7 @@ import fidl_test_exampleusing
 
 @dataclass
 class ExampleProtocolMethodRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    arg: fidl_test_exampleusing.Empty | None
+    arg: fidl_test_exampleusing.Empty
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ExampleProtocolMethodRequest"
@@ -45,20 +43,20 @@ class ExampleProtocolMethodRequest:
             "test.placementofattributes/ExampleProtocolMethodRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "arg": None,
+                "arg": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class ExampleStruct:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    member: int | None
+    member: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ExampleStruct"
@@ -79,11 +77,13 @@ class ExampleStruct:
             "test.placementofattributes/ExampleStruct",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "member": None,
+                "member": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 

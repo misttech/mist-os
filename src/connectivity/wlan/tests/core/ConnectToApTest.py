@@ -92,8 +92,7 @@ class ConnectToApTest(base_test.ConnectionBaseTestClass):
                 )
                 bss_description = scan_result.bss_description
                 break
-        if bss_description is None:
-            fail(f"Failed to find SSID: {ssid}")
+        assert bss_description is not None, f"Failed to find SSID: {ssid}"
 
         with ConnectTransactionEventHandler() as ctx:
             txn_queue = ctx.txn_queue

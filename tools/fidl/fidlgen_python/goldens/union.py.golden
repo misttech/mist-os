@@ -18,9 +18,6 @@ add_ir_path(_ir_path)
 
 @dataclass
 class Empty:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-
     __fidl_kind__ = "struct"
     __fidl_type__ = "Empty"
     __fidl_raw_type__ = "test.union/Empty"
@@ -36,6 +33,8 @@ class Empty:
     def encode(self) -> tuple[bytes, list[tuple[int, int, int, int, int]]]:
         return encode_fidl_object(self, "test.union", "test.union/Empty")
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{})
@@ -43,9 +42,7 @@ class Empty:
 
 @dataclass
 class NullableUnionStruct:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    the_union: typing.Optional[Union] | None
+    the_union: typing.Optional[Union]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "NullableUnionStruct"
@@ -64,20 +61,20 @@ class NullableUnionStruct:
             self, "test.union", "test.union/NullableUnionStruct"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "the_union": None,
+                "the_union": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class Pasta:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    sauce: str | None
+    sauce: str
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Pasta"
@@ -94,20 +91,20 @@ class Pasta:
     def encode(self) -> tuple[bytes, list[tuple[int, int, int, int, int]]]:
         return encode_fidl_object(self, "test.union", "test.union/Pasta")
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "sauce": None,
+                "sauce": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class Pizza:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    toppings: typing.Sequence[str] | None
+    toppings: typing.Sequence[str]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Pizza"
@@ -124,20 +121,20 @@ class Pizza:
     def encode(self) -> tuple[bytes, list[tuple[int, int, int, int, int]]]:
         return encode_fidl_object(self, "test.union", "test.union/Pizza")
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "toppings": None,
+                "toppings": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class StructWithNullableUnion:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    x1: typing.Optional[OlderSimpleUnion] | None
+    x1: typing.Optional[OlderSimpleUnion]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "StructWithNullableUnion"
@@ -156,20 +153,20 @@ class StructWithNullableUnion:
             self, "test.union", "test.union/StructWithNullableUnion"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "x1": None,
+                "x1": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    xu: OlderSimpleUnion | None
+    xu: OlderSimpleUnion
 
     __fidl_kind__ = "struct"
     __fidl_type__ = (
@@ -192,20 +189,20 @@ class TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse:
             "test.union/TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "xu": None,
+                "xu": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    xu: StrictBoundedUnion | None
+    xu: StrictBoundedUnion
 
     __fidl_kind__ = "struct"
     __fidl_type__ = (
@@ -228,22 +225,22 @@ class TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse:
             "test.union/TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "xu": None,
+                "xu": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class UnionSandwich:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    a: int | None
-    u: ExplicitFlexibleUnion | None
-    b: int | None
+    a: int
+    u: ExplicitFlexibleUnion
+    b: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "UnionSandwich"
@@ -262,13 +259,15 @@ class UnionSandwich:
             self, "test.union", "test.union/UnionSandwich"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,
-                "u": None,
-                "b": None,
+                "a": None,  # type: ignore[arg-type,unused-ignore]
+                "u": None,  # type: ignore[arg-type,unused-ignore]
+                "b": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 

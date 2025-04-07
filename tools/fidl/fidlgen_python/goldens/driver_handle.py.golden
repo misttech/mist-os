@@ -18,9 +18,7 @@ add_ir_path(_ir_path)
 
 @dataclass
 class ClientEndWrapper:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    value: int | None
+    value: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ClientEndWrapper"
@@ -39,20 +37,20 @@ class ClientEndWrapper:
             self, "test.driverhandle", "test.driverhandle/ClientEndWrapper"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "value": None,
+                "value": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class ServerEndWrapper:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    value: int | None
+    value: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ServerEndWrapper"
@@ -71,10 +69,12 @@ class ServerEndWrapper:
             self, "test.driverhandle", "test.driverhandle/ServerEndWrapper"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "value": None,
+                "value": None,  # type: ignore[arg-type,unused-ignore]
             }
         )

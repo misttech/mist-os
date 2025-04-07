@@ -18,9 +18,7 @@ add_ir_path(_ir_path)
 
 @dataclass
 class ArrayInt16Int8:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    arr: typing.Sequence[Int16Int8] | None
+    arr: typing.Sequence[Int16Int8]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ArrayInt16Int8"
@@ -41,21 +39,21 @@ class ArrayInt16Int8:
             "test.encapsulatedstructs/ArrayInt16Int8",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "arr": None,
+                "arr": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class Int16Int8:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    a: int | None
-    b: int | None
+    a: int
+    b: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Int16Int8"
@@ -76,22 +74,22 @@ class Int16Int8:
             "test.encapsulatedstructs/Int16Int8",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,
-                "b": None,
+                "a": None,  # type: ignore[arg-type,unused-ignore]
+                "b": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class Int8Int32:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    a: int | None
-    b: int | None
+    a: int
+    b: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Int8Int32"
@@ -112,22 +110,22 @@ class Int8Int32:
             "test.encapsulatedstructs/Int8Int32",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,
-                "b": None,
+                "a": None,  # type: ignore[arg-type,unused-ignore]
+                "b": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class NonInlineStructTestStruct:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    element: typing.Optional[Int16Int8] | None
-    h: int | None
+    element: typing.Optional[Int16Int8]
+    h: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "NonInlineStructTestStruct"
@@ -148,23 +146,23 @@ class NonInlineStructTestStruct:
             "test.encapsulatedstructs/NonInlineStructTestStruct",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "element": None,
-                "h": None,
+                "element": None,  # type: ignore[arg-type,unused-ignore]
+                "h": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class StructPaddingTestStruct:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    trailing: Int16Int8 | None
-    inner: Int8Int32 | None
-    array: ArrayInt16Int8 | None
+    trailing: Int16Int8
+    inner: Int8Int32
+    array: ArrayInt16Int8
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "StructPaddingTestStruct"
@@ -185,23 +183,23 @@ class StructPaddingTestStruct:
             "test.encapsulatedstructs/StructPaddingTestStruct",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "trailing": None,
-                "inner": None,
-                "array": None,
+                "trailing": None,  # type: ignore[arg-type,unused-ignore]
+                "inner": None,  # type: ignore[arg-type,unused-ignore]
+                "array": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class TopLevelStruct:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    a: StructPaddingTestStruct | None
-    b: NonInlineStructTestStruct | None
+    a: StructPaddingTestStruct
+    b: NonInlineStructTestStruct
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "TopLevelStruct"
@@ -222,11 +220,13 @@ class TopLevelStruct:
             "test.encapsulatedstructs/TopLevelStruct",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,
-                "b": None,
+                "a": None,  # type: ignore[arg-type,unused-ignore]
+                "b": None,  # type: ignore[arg-type,unused-ignore]
             }
         )

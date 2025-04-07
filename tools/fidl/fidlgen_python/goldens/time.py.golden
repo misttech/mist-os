@@ -18,12 +18,10 @@ add_ir_path(_ir_path)
 
 @dataclass
 class AllInstants:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    monotonic: int | None
-    boot: int | None
-    monotonic_ticks: int | None
-    boot_ticks: int | None
+    monotonic: int
+    boot: int
+    monotonic_ticks: int
+    boot_ticks: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "AllInstants"
@@ -40,14 +38,16 @@ class AllInstants:
     def encode(self) -> tuple[bytes, list[tuple[int, int, int, int, int]]]:
         return encode_fidl_object(self, "test.time", "test.time/AllInstants")
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "monotonic": None,
-                "boot": None,
-                "monotonic_ticks": None,
-                "boot_ticks": None,
+                "monotonic": None,  # type: ignore[arg-type,unused-ignore]
+                "boot": None,  # type: ignore[arg-type,unused-ignore]
+                "monotonic_ticks": None,  # type: ignore[arg-type,unused-ignore]
+                "boot_ticks": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
