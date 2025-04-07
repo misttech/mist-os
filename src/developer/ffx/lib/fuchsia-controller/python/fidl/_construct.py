@@ -7,7 +7,7 @@ import sys
 import typing
 from enum import Enum
 from types import NoneType, UnionType
-from typing import Any, Dict, ForwardRef, Optional, TypeVar, Union
+from typing import Any, ForwardRef, TypeVar, Union
 
 from ._client import EventHandlerBase, FidlClient
 from ._fidl_common import camel_case_to_snake_case
@@ -90,8 +90,6 @@ def make_default_obj_from_ident(ident: str) -> Any:
 
 def unwrap_innermost_type(
     ty: Any,
-    globalns: Optional[Dict[str, Any]] = None,
-    localns: Optional[Dict[str, Any]] = None,
     _original_ty: Any = None,
 ) -> type:
     """Takes a type `ty`, then removes the meta-typing surrounding it.
@@ -131,9 +129,7 @@ def unwrap_innermost_type(
 
         try:
             return unwrap_innermost_type(
-                typing.get_type_hints(_f, globalns=globalns, localns=localns)[
-                    "return"
-                ],
+                typing.get_type_hints(_f)["return"],
                 _original_ty=_original_ty,
             )
         except NameError as e:

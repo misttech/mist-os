@@ -47,23 +47,9 @@ class Construct(unittest.TestCase):
         ty = ForwardRef("IpAddress", module=fnet.__name__)
         self.assertEqual(fnet.IpAddress, unwrap_innermost_type(ty))
 
-    def test_unwrap_fidl_forward_ref_from_globals(self) -> None:
-        ty = ForwardRef("fnet.IpAddress")
-        self.assertEqual(
-            fnet.IpAddress, unwrap_innermost_type(ty, globalns=globals())
-        )
-
-    def test_unwrap_fidl_forward_ref_from_locals(self) -> None:
-        ty = ForwardRef("local_fnet.IpAddress")
-        global fnet
-        local_fnet = fnet
-        self.assertEqual(
-            fnet.IpAddress, unwrap_innermost_type(ty, localns=locals())
-        )
-
     def test_unwrap_inception(self) -> None:
         ty = ForwardRef("tuple[ForwardRef('list[ForwardRef(\"str\")]')]")
-        self.assertEqual(str, unwrap_innermost_type(ty, globalns=globals()))
+        self.assertEqual(str, unwrap_innermost_type(ty))
 
     def test_unwrap_zx_type(self) -> None:
         ty = ForwardRef("zx.handle")
@@ -88,7 +74,6 @@ class Construct(unittest.TestCase):
                 ForwardRef(
                     "tuple[ForwardRef('list[ForwardRef(\"tuple[int, str]\")]')]"
                 ),
-                globalns=globals(),
             )
 
     def test_construct_response_object(self) -> None:
