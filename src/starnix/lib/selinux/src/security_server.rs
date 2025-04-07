@@ -380,18 +380,15 @@ impl SecurityServer {
             FileSystemLabel { sid: fs_sid, scheme: FileSystemLabelingScheme::GenFsCon, mount_sids }
         } else {
             // The name of the filesystem type was not recognized.
-            //
-            // TODO: https://fxbug.dev/363215797 - verify that these defaults are correct.
-            let unrecognized_filesystem_type_sid = SecurityId::initial(InitialSid::File);
-            let unrecognized_filesystem_type_fs_use_type = FsUseType::Xattr;
-
             FileSystemLabel {
-                sid: mount_sids.fs_context.unwrap_or(unrecognized_filesystem_type_sid),
+                sid: mount_sids
+                    .fs_context
+                    .unwrap_or_else(|| SecurityId::initial(InitialSid::Unlabeled)),
                 scheme: FileSystemLabelingScheme::FsUse {
-                    fs_use_type: unrecognized_filesystem_type_fs_use_type,
+                    fs_use_type: FsUseType::Xattr,
                     computed_def_sid: mount_sids
                         .def_context
-                        .unwrap_or(unrecognized_filesystem_type_sid),
+                        .unwrap_or_else(|| SecurityId::initial(InitialSid::File)),
                 },
                 mount_sids,
             }

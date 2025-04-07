@@ -169,6 +169,12 @@ _COMPOSITE_POLICY_PATHS = [
         ],
         "with_additional_domain_policy.pp",
     ),
+    (
+        [
+            "initial_sids_policy.conf",
+        ],
+        "initial_sids_policy.pp",
+    ),
 ]
 
 _HANDLE_UNKNOWN_POLICY_INPUTS = [
