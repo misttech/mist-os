@@ -570,10 +570,9 @@ You may find the following practices helpful for making FIDL calls:
   destroyed after being passed.
 
 - If your driver sends messages formatted as self-defined types in the
-  `.fidl` file, FIDL generates both nature type and wire type based on the
+  `.fidl` file, FIDL generates both natural type and wire type based on the
   definition. However, the wire type is recommended in this case because
-  the wire type is a more stable choice while the nature type is an interim
-  type for [HLCPP][hlcpp].
+  the wire type is a more stable choice.
 
 - FIDL closes its channel if it notices that the endpoints exchanged invalid
   values, which is known as validation error:
@@ -806,7 +805,6 @@ All the **documentation pages** mentioned in this section:
 - [Driver dispatcher and threads][driver-dispatcher]
 - [FIDL attributes][fidl-attributes]
 - [Implement a C++ FIDL server][implement-fidl-server]
-- [HLCPP tutorials][hlcpp]
 - [Define a driver service protocol][driver-service-protocol]
   (from _Expose the driver capabilities_)
 - [Strict vs. Flexible][strict-vs-flexible]
@@ -845,7 +843,6 @@ All the **documentation pages** mentioned in this section:
 [nxpfmac-device-cc]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/device.cc;l=175
 [wlan-device-cc]: https://fuchsia-review.git.corp.google.com/c/fuchsia/+/655947/59/src/connectivity/wlan/drivers/wlanphy/device.cc#145
 [wlan-device-cc-39]: https://fuchsia-review.git.corp.google.com/c/fuchsia/+/660030/39/src/connectivity/wlan/drivers/wlan/device.cc#146
-[hlcpp]: /docs/development/languages/fidl/tutorials/hlcpp/README.md
 [strict-vs-flexible]: /docs/reference/fidl/language/language.md#strict-vs-flexible
 [nxpfmac-device-cc-71]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/device.cc;l=71
 [implement-fidl-server]: /docs/development/languages/fidl/tutorials/cpp/basics/server.md

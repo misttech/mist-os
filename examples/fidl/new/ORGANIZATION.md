@@ -38,7 +38,6 @@ All samples should use the following structure:
     - cpp_natural
     - cpp_wire
     - fidl
-    - hlcpp
     - meta
     - realm
     - rust
@@ -47,7 +46,6 @@ All samples should use the following structure:
     - cpp_natural
     - cpp_wire
     - fidl
-    - hlcpp
     - meta
     - realm
     - rust

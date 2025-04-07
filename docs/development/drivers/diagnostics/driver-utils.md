@@ -90,7 +90,6 @@ call into the FIDL API. For this utilize the FIDL bindings for your language of
 choice, for C++:
 
 * [New C++ bindings](/docs/reference/fidl/bindings/cpp-bindings.md)
-* [HLCPP](/docs/reference/fidl/bindings/hlcpp-bindings.md)
 
 For example for I2C in [i2cutil](/src/devices/i2c/bin) using the new C++ bindings
 we have:

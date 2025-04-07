@@ -10,7 +10,6 @@ group("tests_no_e2e") {
     ":tools",
     "//build/fidl:tests",
     "//examples/fidl:hermetic_tests",
-    "//examples/fidl:host_tests($host_toolchain)",
     "//sdk/ctf/tests/pkg/fidl/cpp:tests",
     "//sdk/lib/fidl/cpp/wire:wire_sdk",
     "//sdk/lib/fidl/hlcpp/fuzzing:tests",

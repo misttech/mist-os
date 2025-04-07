@@ -2,8 +2,7 @@
 
 This section contains reference documentation for working with FIDL in:
 
-* [New C++][cpp-bindings]
-* [C++ - HLCPP][hlcpp-bindings]
+* [C++][cpp-bindings]
 * [Rust][rust-bindings]
 * [Go][go-bindings]
 
@@ -15,7 +14,6 @@ The documentation for each language includes (where available):
   language.
 
 <!-- xrefs -->
-[hlcpp-bindings]: /docs/reference/fidl/bindings/hlcpp-bindings.md
 [rust-bindings]: /docs/reference/fidl/bindings/rust-bindings.md
 [cpp-bindings]: /docs/reference/fidl/bindings/cpp-bindings.md
 [go-bindings]: /docs/reference/fidl/bindings/go-bindings.md

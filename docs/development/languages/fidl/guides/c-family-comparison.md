@@ -176,11 +176,6 @@ Here's the most common way to set up a client:
       <h3>C++ (Wire)</h3>
       <pre class="prettyprint lang-cc">{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/new/canvas/baseline/cpp_wire/client/main.cc" region_tag="connect-protocol" %}</pre>
     </section>
-    <!-- HLCPP -->
-    <section>
-      <h3>HLCPP</h3>
-      <pre class="prettyprint lang-cc">{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/new/canvas/baseline/hlcpp/client/main.cc" region_tag="connect-protocol" %}</pre>
-    </section>
   </devsite-selector>
 </div>
 
@@ -207,16 +202,6 @@ Here's the most common way to implement a server:
     // ...
   }
 };</pre>
-    </section>
-    <!-- HLCPP -->
-    <section>
-      <h3>HLCPP</h3>
-      <pre class="prettyprint lang-cc">{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/new/canvas/baseline/hlcpp/server/main.cc" region_tag="server-impl-short" %}
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/new/canvas/baseline/hlcpp/server/main.cc" region_tag="addline-impl-short" %}
-    // ...
-  }
-};</pre>
-    </section>
   </devsite-selector>
 </div>
 
@@ -294,7 +279,6 @@ Refer to the [New C++ tutorial][cpp-tutorial] to get started.
     are not thread-safe.
 *   Requires C++14 or above.
 
-Refer to the [HLCPP tutorial][hlcpp-tutorial] to get started.
 
 <!-- TODO(https://fxbug.dev/NNNNN): Guide for migrating HLCPP to new C++. -->
 
@@ -335,6 +319,5 @@ Category                           | New C++ with wire types                   |
 <!-- xrefs -->
 [cpp-tutorial]: /docs/development/languages/fidl/tutorials/cpp
 [cpp-prefer-natural]: /docs/development/languages/fidl/tutorials/cpp/README.md#natural_and_wire_domain_objects
-[hlcpp-tutorial]: /docs/development/languages/fidl/tutorials/hlcpp
 [kvstore]: /docs/development/languages/fidl/examples/key_value_store
 [canvas]: /docs/development/languages/fidl/examples/canvas

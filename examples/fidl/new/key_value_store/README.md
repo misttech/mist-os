@@ -10,7 +10,6 @@ Each example should include the following:
 * The [realm][impl-realm] definition for performing end-to-end testing.
 * An [implementation][impl-cpp-natural] of the client and server using the C++ (Natural) bindings.
 * An [implementation][impl-cpp-wire] of the client and server using the C++ (Wire) bindings.
-* An [implementation][impl-hlcpp] of the client and server using the HLCPP bindings.
 * An [implementation][impl-rust] of the client and server using the Rust bindings.
 
 [docs]: /docs/development/languages/fidl/examples/key_value_store/README.md
@@ -18,6 +17,5 @@ Each example should include the following:
 [impl-cpp-natural]: baseline/cpp-natural
 [impl-cpp-wire]: baseline/cpp-wire
 [impl-fidl]: baseline/fidl
-[impl-hlcpp]: baseline/hlcpp
 [impl-rust]: baseline/rust
 [impl-realm]: baseline/realm
