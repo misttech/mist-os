@@ -700,7 +700,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8718292202727232785"`
+**Current value for `target_cpu = "arm64"`:** `"8718246896961825809"`
 
 From //out/not-default/args.gn:10
 
@@ -708,7 +708,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8718292202727232785"`
+**Current value for `target_cpu = "riscv64"`:** `"8718246896961825809"`
 
 From //out/not-default/args.gn:10
 
@@ -716,7 +716,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8718292202727232785"`
+**Current value for `target_cpu = "x64"`:** `"8718246896961825809"`
 
 From //out/not-default/args.gn:10
 
@@ -1074,7 +1074,7 @@ This should never be set as a build argument.
 }
   armv7_unknown_linux_gnueabihf = {
   libclang_rt_profile_a = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.profile.a"
-  libunwind_so = "../../../../out/not-default/libunwind.so"
+  libunwind_so = ""
   resource_dir = "lib/clang/21"
   variants = {
   asan = {
@@ -1106,7 +1106,7 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
