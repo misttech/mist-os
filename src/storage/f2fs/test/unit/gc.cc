@@ -64,6 +64,95 @@ class GcTest : public F2fsFakeDevTestFixture {
   }
 };
 
+TEST_F(GcTest, SsrWithoutGc) {
+  fs_->GetSuperblockInfo().ClearOpt(MountOption::kForceLfs);
+  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  auto file = fbl::RefPtr<File>::Downcast(*std::move(test_file));
+  std::array<uint8_t, kPageSize> buf;
+  size_t num_blocks = 0;
+  size_t out;
+  // Append |file| until the out of space
+  while (true) {
+    zx_status_t ret =
+        FileTester::Write(file.get(), buf.data(), sizeof(buf), num_blocks * sizeof(buf), &out);
+    if (ret == ZX_OK) {
+      LockedPage page;
+      zx_status_t ret = file->GrabLockedPage(num_blocks, &page);
+      ASSERT_EQ(ret, ZX_OK);
+      ASSERT_TRUE(page->IsDirty());
+      ++num_blocks;
+      continue;
+    }
+    ASSERT_EQ(ret, ZX_ERR_NO_SPACE);
+    break;
+  }
+  size_t before = fs_->GetGcRuns();
+  ASSERT_EQ(file->GetSize(), num_blocks * sizeof(buf));
+  file->SyncFile();
+  // 4KiB Rand W. & fsync() for 10 * the size of |file|
+  for (uint32_t j = 0; j < 10; ++j) {
+    srand(j);
+    for (size_t i = 0; i < num_blocks; ++i) {
+      size_t index = rand() % num_blocks;
+      buf[0] = static_cast<uint8_t>(index + j);
+      zx_status_t ret =
+          FileTester::Write(file.get(), buf.data(), sizeof(buf), index * sizeof(buf), &out);
+      ASSERT_EQ(ret, ZX_OK);
+      file->SyncFile();
+      {
+        auto pages = file->FindLockedPages(index, index + 1);
+        ASSERT_EQ(pages.size(), 1U);
+      }
+      ASSERT_EQ(FileTester::Read(file.get(), buf.data(), sizeof(buf), index * sizeof(buf), &out),
+                ZX_OK);
+      ASSERT_EQ(buf[0], static_cast<uint8_t>(index + j)) << index << " of " << num_blocks;
+    }
+  }
+  // GC should not run during the test
+  ASSERT_EQ(before, fs_->GetGcRuns());
+  file->Close();
+}
+
+TEST_F(GcTest, TruncateAndLargeFsync) {
+  fs_->GetSuperblockInfo().ClearOpt(MountOption::kForceLfs);
+  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  auto file = fbl::RefPtr<File>::Downcast(*std::move(test_file));
+  std::array<uint8_t, kPageSize> buf;
+  size_t num_blocks = 0;
+  size_t out;
+  // Append |file| until the out of space
+  while (true) {
+    zx_status_t ret =
+        FileTester::Write(file.get(), buf.data(), sizeof(buf), num_blocks * sizeof(buf), &out);
+    if (ret == ZX_OK) {
+      LockedPage page;
+      zx_status_t ret = file->GrabLockedPage(num_blocks, &page);
+      ASSERT_EQ(ret, ZX_OK);
+      ASSERT_TRUE(page->IsDirty());
+      ++num_blocks;
+      continue;
+    }
+    ASSERT_EQ(ret, ZX_ERR_NO_SPACE);
+    break;
+  }
+  ASSERT_EQ(file->GetSize(), num_blocks * sizeof(buf));
+  file->SyncFile();
+  // 4KiB Rand W. & fsync() for 10 * the size of |file|
+  for (uint32_t j = 1; j <= 10; ++j) {
+    for (size_t i = 0; i < num_blocks; ++i) {
+      zx_status_t ret =
+          FileTester::Write(file.get(), buf.data(), sizeof(buf), i * sizeof(buf), &out);
+      ASSERT_EQ(ret, ZX_OK);
+    }
+    file->Truncate((num_blocks - j) * kBlockSize);
+    file->SyncFile();
+  }
+
+  file->Close();
+}
+
 TEST_F(GcTest, CpError) TA_NO_THREAD_SAFETY_ANALYSIS {
   fs_->GetSuperblockInfo().SetCpFlags(CpFlag::kCpErrorFlag);
   auto result = fs_->StartGc();
@@ -569,7 +658,11 @@ TEST_P(GcTestWithSsrAndLfs, FillAndRemount) {
   // GC ran already.
   victim_or = fs_->GetSegmentManager().GetGcVictim(GcType::kFgGc, CursegType::kNoCheckType);
   ASSERT_TRUE(victim_or.is_ok());
-  ASSERT_NE(before, *victim_or);
+  if (fs_->GetSuperblockInfo().TestOpt(MountOption::kForceLfs)) {
+    ASSERT_NE(before, *victim_or);
+  } else {
+    ASSERT_EQ(before, *victim_or);
+  }
 }
 
 const std::array<bool, 2> kAllocParams = {false, true};

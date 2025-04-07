@@ -35,6 +35,8 @@ zx_status_t F2fs::GetMetaPage(pgoff_t index, LockedPage *out) {
   if (auto status =
           MakeReadOperation(page, safemath::checked_cast<block_t>(index), PageType::kMeta);
       status.is_error()) {
+    FX_LOGS(WARNING) << "GetMetaPage() fails. index: " << index
+                     << zx_status_get_string(status.error_value());
     return status.status_value();
   }
 #if 0  // porting needed
@@ -472,17 +474,6 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
     ClearVnodeSet();
   }
   return ZX_OK;
-}
-
-uint32_t F2fs::GetFreeSectionsForCheckpoint() {
-  uint32_t pages_per_sec =
-      safemath::CheckMul<uint32_t>(kDefaultBlocksPerSegment, superblock_info_->GetSegsPerSec())
-          .ValueOrDie();
-  uint32_t node_secs = CheckedDivRoundUp<uint32_t>(
-      superblock_info_->GetPageCount(CountType::kDirtyNodes), pages_per_sec);
-  uint32_t dent_secs = CheckedDivRoundUp<uint32_t>(
-      superblock_info_->GetPageCount(CountType::kDirtyDents), pages_per_sec);
-  return (node_secs + safemath::CheckMul<uint32_t>(dent_secs, 2)).ValueOrDie();
 }
 
 // Release-acquire ordering between the writeback (loader) and others such as checkpoint and gc.

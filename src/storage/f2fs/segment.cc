@@ -226,6 +226,17 @@ block_t SegmentManager::FreeSegments() {
   return free_info_->free_segments;
 }
 
+block_t SegmentManager::GetSectionCountForCheckpoint() {
+  uint32_t pages_per_sec =
+      safemath::CheckMul<uint32_t>(kDefaultBlocksPerSegment, superblock_info_.GetSegsPerSec())
+          .ValueOrDie();
+  uint32_t node_secs = CheckedDivRoundUp<uint32_t>(
+      superblock_info_.GetPageCount(CountType::kDirtyNodes), pages_per_sec);
+  uint32_t dent_secs = CheckedDivRoundUp<uint32_t>(
+      superblock_info_.GetPageCount(CountType::kDirtyDents), pages_per_sec);
+  return (node_secs + safemath::CheckMul<uint32_t>(dent_secs, 2)).ValueOrDie();
+}
+
 block_t SegmentManager::FreeSections() {
   fs::SharedLock segmap_lock(segmap_lock_);
   return free_info_->free_sections;
@@ -247,7 +258,12 @@ block_t SegmentManager::DirtySegments() {
 }
 
 block_t SegmentManager::ReservedSections() {
-  return reserved_segments_ / superblock_info_.GetSegsPerSec();
+  block_t reserved_sections = reserved_segments_ / superblock_info_.GetSegsPerSec();
+  // We don't need to reserve free sections for the next section of each temperature in ssr mode.
+  if (!superblock_info_.TestOpt(MountOption::kForceLfs)) {
+    return safemath::CheckSub<block_t>(reserved_sections, kNrCursegType).ValueOrDie();
+  }
+  return reserved_sections;
 }
 bool SegmentManager::NeedSSR() { return !superblock_info_.TestOpt(MountOption::kForceLfs); }
 
@@ -413,6 +429,64 @@ bool SegmentManager::SecUsageCheck(unsigned int secno) const {
   return IsCurSec(secno) || cur_victim_sec_ == secno;
 }
 
+zx::result<> SegmentManager::HasEnoughSsrBlocks(size_t needed_blocks) {
+  static constexpr CursegType kNodeTypes[] = {
+      CursegType::kCursegColdNode, CursegType::kCursegWarmNode, CursegType::kCursegHotNode};
+  static constexpr CursegType kDataTypes[] = {
+      CursegType::kCursegHotData, CursegType::kCursegWarmData, CursegType::kCursegColdData};
+  size_t free_segments = FreeSegments();
+  size_t reserved_segments = ReservedSections() * superblock_info_.GetSegsPerSec();
+  if (superblock_info_.TestOpt(MountOption::kForceLfs) || free_segments < reserved_segments) {
+    return zx::error(ZX_ERR_NO_SPACE);
+  }
+  free_segments -= reserved_segments;
+
+  size_t dirty_dir_blocks = superblock_info_.GetPageCount(CountType::kDirtyDents);
+  size_t dirty_node_blocks = superblock_info_.GetPageCount(CountType::kDirtyNodes);
+  size_t additional_needed = 0;
+  fs::SharedLock lock(sentry_lock_);
+  for (CursegType type : kNodeTypes) {
+    size_t available = GetAvailableBlockCountOnCurseg(type);
+    size_t needed = type == CursegType::kCursegHotNode
+                        ? dirty_dir_blocks + dirty_node_blocks + needed_blocks
+                        : dirty_node_blocks + needed_blocks;
+    if (available < needed) {
+      additional_needed = std::max(additional_needed, needed - available);
+    }
+  }
+
+  constexpr bool kIsNode = true;
+  size_t available_blocks = ckpt_invalid_blocks_[kIsNode];
+
+  // Return zx::ok if there is enough space to commit checkpoint in SSR mode after |needed_blocks|
+  // of dirty data pages.
+  if (available_blocks < additional_needed) {
+    size_t needed = CheckedDivRoundUp(additional_needed - available_blocks,
+                                      static_cast<size_t>(kDefaultBlocksPerSegment));
+    if (free_segments < needed) {
+      return zx::error(ZX_ERR_NO_SPACE);
+    }
+    free_segments -= needed;
+  }
+
+  additional_needed = 0;
+  available_blocks = ckpt_invalid_blocks_[!kIsNode] +
+                     free_segments * static_cast<size_t>(kDefaultBlocksPerSegment);
+  for (CursegType type : kDataTypes) {
+    size_t available = GetAvailableBlockCountOnCurseg(type);
+    size_t needed =
+        type == CursegType::kCursegHotData ? needed_blocks + dirty_dir_blocks : needed_blocks;
+    if (available < needed) {
+      additional_needed = std::max(additional_needed, needed - available);
+    }
+  }
+
+  if (additional_needed > available_blocks) {
+    return zx::error(ZX_ERR_NO_SPACE);
+  }
+  return zx::ok();
+}
+
 bool SegmentManager::HasNotEnoughFreeSecs(size_t freed_sections, size_t needed_blocks) {
   if (fs_->IsOnRecovery())
     return false;
@@ -421,12 +495,12 @@ bool SegmentManager::HasNotEnoughFreeSecs(size_t freed_sections, size_t needed_b
                                                            superblock_info_.GetSegsPerSec())
                                   .ValueOrDie();
   size_t needed_sections = CheckedDivRoundUp(needed_blocks, blocks_per_section) +
-                           fs_->GetFreeSectionsForCheckpoint() + ReservedSections();
+                           GetSectionCountForCheckpoint() + ReservedSections();
   return FreeSections() + freed_sections <= needed_sections;
 }
 
 void SegmentManager::LocateDirtySegment(uint32_t segno, DirtyType dirty_type) {
-  // need not be added
+  // The current segments should not belong to dirty_segmap.
   if (IsCurSeg(segno)) {
     return;
   }
@@ -442,10 +516,10 @@ void SegmentManager::LocateDirtySegment(uint32_t segno, DirtyType dirty_type) {
   }
 
   if (dirty_type == DirtyType::kDirty) {
-    dirty_type = static_cast<DirtyType>(sit_info_->sentries[segno].type);
-    if (!dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].GetOne(segno)) {
-      dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].SetOne(segno);
-      ++dirty_info_->nr_dirty[static_cast<int>(dirty_type)];
+    int entry_type = sit_info_->sentries[segno].type;
+    if (!dirty_info_->dirty_segmap[entry_type].GetOne(segno)) {
+      dirty_info_->dirty_segmap[entry_type].SetOne(segno);
+      ++dirty_info_->nr_dirty[entry_type];
     }
   }
 }
@@ -462,10 +536,10 @@ void SegmentManager::RemoveDirtySegment(uint32_t segno, DirtyType dirty_type) {
   }
 
   if (dirty_type == DirtyType::kDirty) {
-    dirty_type = static_cast<DirtyType>(sit_info_->sentries[segno].type);
-    if (dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].GetOne(segno)) {
-      dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].ClearOne(segno);
-      --dirty_info_->nr_dirty[static_cast<int>(dirty_type)];
+    int entry_type = sit_info_->sentries[segno].type;
+    if (dirty_info_->dirty_segmap[entry_type].GetOne(segno)) {
+      dirty_info_->dirty_segmap[entry_type].ClearOne(segno);
+      --dirty_info_->nr_dirty[entry_type];
     }
     if (GetValidBlocks(segno, true) == 0) {
       dirty_info_->victim_secmap.ClearOne(GetSecNo(segno));
@@ -598,10 +672,9 @@ void SegmentManager::UpdateSitEntry(block_t blkaddr, int del) {
   if (del > 0) {
     ZX_ASSERT(!segment_entry.cur_valid_map.GetOne(ToMsbFirst(offset)));
     segment_entry.cur_valid_map.SetOne(ToMsbFirst(offset));
-    // Make sure to use invalid node blocks just once after each checkpoint write and keep node
-    // chain.
-    if (IsNodeSeg(static_cast<CursegType>(segment_entry.type)) &&
-        !segment_entry.ckpt_valid_map.GetOne(ToMsbFirst(offset))) {
+    // We do not allow SSR overwrite. If a fsyncd data block is invalidated and rewritten, it can
+    // cause data corruption when spor happens before checkpoint
+    if (!segment_entry.ckpt_valid_map.GetOne(ToMsbFirst(offset))) {
       segment_entry.ckpt_valid_map.SetOne(ToMsbFirst(offset));
       ++segment_entry.ckpt_valid_blocks;
       --segment_entry.ckpt_invalid_blocks;
@@ -1586,7 +1659,6 @@ zx_status_t SegmentManager::BuildSegmentManager() {
   if (zx_status_t ret = BuildDirtySegmap(); ret != ZX_OK) {
     return ret;
   }
-
   InitMinMaxMtime();
   return ZX_OK;
 }

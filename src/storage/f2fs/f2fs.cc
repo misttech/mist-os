@@ -668,6 +668,9 @@ zx::result<uint32_t> F2fs::StartGc(uint32_t needed) {
       return zx::error(ret);
     }
   }
+  if (segment_manager_->HasEnoughSsrBlocks(needed).is_ok()) {
+    return zx::ok(segment_manager_->FreeSections() - before);
+  }
   // During gc, f2fs::GetGlobalLock() protects filesystem from modification.
   while (segment_manager_->HasNotEnoughFreeSecs(prefree, needed)) {
     if (superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag)) {
@@ -701,6 +704,7 @@ zx::result<uint32_t> F2fs::StartGc(uint32_t needed) {
   if (!sec_freed) {
     return zx::error(ZX_ERR_UNAVAILABLE);
   }
+  num_gc_runs_ += sec_freed;
   return zx::ok(sec_freed);
 }
 

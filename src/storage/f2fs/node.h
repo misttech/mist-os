@@ -125,7 +125,7 @@ class NodeManager {
   // It returns a node page if it succeeds to find one at |path|.
   zx::result<LockedPage> FindLockedDnodePage(NodePath &path);
 
-  void GetNodeInfo(nid_t nid, NodeInfo &out);
+  zx_status_t GetNodeInfo(nid_t nid, NodeInfo &out);
   void SetNodeAddr(NodeInfo &ni, block_t new_blkaddr);
 
   pgoff_t FsyncNodePages(nid_t ino) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
@@ -188,7 +188,7 @@ class NodeManager {
   pgoff_t NextNatAddr(pgoff_t block_addr);
   void SetToNextNat(nid_t start_nid);
 
-  void GetCurrentNatPage(nid_t nid, LockedPage *out);
+  zx::result<LockedPage> GetCurrentNatPage(nid_t nid);
   zx::result<LockedPage> GetNextNatPage(nid_t nid);
   void RaNatPages(nid_t nid);
 

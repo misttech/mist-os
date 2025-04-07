@@ -99,7 +99,6 @@ class F2fs final {
   void WriteOrphanInodes(block_t start_blk);
   zx_status_t GetValidCheckpoint();
   zx_status_t ValidateCheckpoint(block_t cp_addr, uint64_t *version, LockedPage *out);
-  uint32_t GetFreeSectionsForCheckpoint();
 
   void PutSuper();
   void Sync(SyncCallback closure = nullptr) __TA_EXCLUDES(f2fs::GetGlobalLock());
@@ -165,6 +164,10 @@ class F2fs final {
   void ScheduleWritebackAndReclaimPages();
 
   zx::result<uint32_t> StartGc(uint32_t needed = 0) __TA_REQUIRES(f2fs::GetGlobalLock());
+  // It checks if there are enough sections to write |needed| data blocks and a checkpoint pack.
+  // Since it considers space for dirty dir and node pages, |needed| should indicate only data
+  // blocks. If there is not enough space, it does GC or checkpoint writes to secure free or
+  // dirty sections. In addition, it waits for memory reclaim under high memory pressure.
   void BalanceFs(uint32_t needed = 0) __TA_EXCLUDES(f2fs::GetGlobalLock(), writeback_mutex_);
   void AllocateFreeSections(uint32_t needed = 0) __TA_REQUIRES(f2fs::GetGlobalLock());
   bool GetMemoryStatus(MemoryStatus action);
@@ -183,6 +186,7 @@ class F2fs final {
   void ClearVnodeSet() __TA_EXCLUDES(vnode_set_mutex_);
 
   // for tests
+  size_t GetGcRuns() { return num_gc_runs_; }
   bool IsValid() const;
   void SetVfsForTests(std::unique_ptr<PlatformVfs> vfs) { vfs_for_tests_ = std::move(vfs); }
   zx::result<std::unique_ptr<PlatformVfs>> TakeVfsForTests() {
@@ -244,6 +248,7 @@ class F2fs final {
 
   // for unittest
   std::unique_ptr<PlatformVfs> vfs_for_tests_;
+  size_t num_gc_runs_ = 0;  // # of free sections that gc acquires
 };
 
 }  // namespace f2fs
