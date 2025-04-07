@@ -185,13 +185,11 @@ TEST_P(AttrTest, ParentModificationTimeUpdatedCorrectly) {
   ASSERT_EQ(mkdir(parent.c_str(), 0666), 0);
   ASSERT_EQ(mkdir(parent2.c_str(), 0666), 0);
 
-  // Ensure the parent directory's create + modified times
-  // were initialized correctly.
+  // Ensure the parent directory's modified time was initialized correctly.
   struct stat statb;
   ASSERT_EQ(stat(parent.c_str(), &statb), 0);
-  ASSERT_GT(ToNanoSeconds(statb.st_ctim), now);
   ASSERT_GT(ToNanoSeconds(statb.st_mtim), now);
-  now = ToNanoSeconds(statb.st_ctim);
+  now = ToNanoSeconds(statb.st_mtim);
 
   // Create a file in the parent directory
   zx_nanosleep(zx_deadline_after(fs().GetTraits().timestamp_granularity.to_nsecs()));

@@ -446,8 +446,8 @@ zx_status_t stat_impl(const fdio_ptr& io, struct stat* s) {
                                      .content_size = true,
                                      .storage_size = true,
                                      .link_count = true,
-                                     .creation_time = true,
                                      .modification_time = true,
+                                     .change_time = true,
                                  }};
   // TODO(https://fxbug.dev/324111518): Migrate to GetAttributes and remove `zxio_get_posix_mode`.
   const zx_status_t status = io->get_attr(&attr);
@@ -462,8 +462,8 @@ zx_status_t stat_impl(const fdio_ptr& io, struct stat* s) {
   s->st_blksize = VNATTR_BLKSIZE;
   s->st_blocks = static_cast<blkcnt_t>(attr.storage_size) / VNATTR_BLKSIZE;
   s->st_nlink = attr.link_count;
-  s->st_ctim.tv_sec = static_cast<time_t>(attr.creation_time / ZX_SEC(1));
-  s->st_ctim.tv_nsec = static_cast<int64_t>(attr.creation_time % ZX_SEC(1));
+  s->st_ctim.tv_sec = static_cast<time_t>(attr.change_time / ZX_SEC(1));
+  s->st_ctim.tv_nsec = static_cast<int64_t>(attr.change_time % ZX_SEC(1));
   s->st_mtim.tv_sec = static_cast<time_t>(attr.modification_time / ZX_SEC(1));
   s->st_mtim.tv_nsec = static_cast<int64_t>(attr.modification_time % ZX_SEC(1));
   return ZX_OK;
