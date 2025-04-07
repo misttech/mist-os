@@ -28,6 +28,10 @@ LAST_NINJA_TARGETS_FILE = "last_ninja_build_targets.txt"
 # that are transitive inputs for the targets of the last build.
 LAST_NINJA_ARTIFACTS_FILE = "last_ninja_artifacts.txt"
 
+# The name of the file that will contain the cached value of all source files
+# that are transitive inputs for the targets of the last build.
+LAST_NINJA_SOURCES_FILE = "last_ninja_inputs.txt"
+
 
 class NinjaRunner(object):
     """Wrapper class to invoke Ninja, can be overridden for tests."""
@@ -148,24 +152,55 @@ def get_last_build_artifacts(
     if check_output_needs_update(ninja_artifacts_path, ninja_artifacts_deps):
         # Invoke Ninja to regenerate a new set of inputs. Then write results to disk.
         ninja_output = ninja_runner.run_and_extract_output(
-            str(build_dir), ["-t", "inputs"] + last_ninja_targets
+            str(build_dir), ["-t", "outputs"] + last_ninja_targets
         )
-        # Any path that starts with ../ is a source file and can be omitted.
-        # Some input paths do contain spaces are are escaped with (')
-        # as in 'foo bar', so clean that up here..
-        ninja_artifacts = []
-        for line in ninja_output.splitlines():
-            if line[0] == "'":
-                assert (
-                    line[-1] == "'"
-                ), f"Quoted string missing terminator: [{line}]"
-                line = line[1:-1]
-            if not line.startswith("../"):
-                ninja_artifacts.append(line)
-
+        ninja_artifacts = ninja_output.splitlines()
         ninja_artifacts_path.write_text("\n".join(ninja_artifacts))
     else:
         # Read previous results from disk.
         ninja_artifacts = ninja_artifacts_path.read_text().splitlines()
 
     return ninja_artifacts
+
+
+def get_last_build_sources(
+    build_dir: Path, ninja_runner: NinjaRunner
+) -> T.Sequence[str]:
+    """Return the list of all Ninja sources to the last `fx` or `fint` build.
+
+    Args:
+        build_dir: Path to the build directory.
+        ninja_runner: A NinjaRunner instance, used to invoke Ninja if needed.
+    Returns:
+        A list of Ninja input paths, relative to the build directory.
+        Note that they will all start with ../.
+    """
+    last_ninja_targets = get_last_build_targets(build_dir)
+
+    # Determine whether ninja_artifacts.txt needs to be re-generated.
+    # This happens when last_ninja_build_targets.txt is modified, or when
+    # any of the build plan sources (e.g. BUILD.gn files) are modified
+    # since the last call. These are listed in build.ninja.d which starts
+    # with `build.ninja.stamp: ` followed by paths, relative to the
+    # build directory.
+    ninja_sources_path = build_dir / LAST_NINJA_SOURCES_FILE
+    ninja_sources_deps = [get_last_build_targets_path(build_dir)] + [
+        build_dir / dep for dep in get_build_plan_deps(build_dir)
+    ]
+
+    if check_output_needs_update(ninja_sources_path, ninja_sources_deps):
+        # Invoke Ninja to regenerate a new set of sources. Then write results to disk.
+        ninja_output = ninja_runner.run_and_extract_output(
+            str(build_dir),
+            ["-t", "inputs", "--no-shell-escape", "--dependency-order"]
+            + last_ninja_targets,
+        )
+        ninja_sources = [
+            line for line in ninja_output.splitlines() if line.startswith("../")
+        ]
+        ninja_sources_path.write_text("\n".join(ninja_sources))
+    else:
+        # Read previous results from disk.
+        ninja_sources = ninja_sources_path.read_text().splitlines()
+
+    return ninja_sources

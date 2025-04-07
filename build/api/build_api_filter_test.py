@@ -30,7 +30,13 @@ class BuildApiModulesFilterTest(unittest.TestCase):
             "obj/build/images/fuchsia/product_bundle/product_bundle.json",
             "obj/some_prebuilt_package/qux.debug_symbols.json",
         ]
-        module_filter = build_api_filter.BuildApiFilter(ninja_artifacts)
+        ninja_sources = [
+            "../../src/foo.cc",
+            "../../prebuilt/third_party/zoom/bin",
+        ]
+        module_filter = build_api_filter.BuildApiFilter(
+            ninja_artifacts, ninja_sources
+        )
 
         _TEST_CASES = [
             {
@@ -134,6 +140,12 @@ class BuildApiModulesFilterTest(unittest.TestCase):
                             "os": "fuchsia",
                             "label": "//src/subsystem/cranberry:bin(//build/toolchain/fuchsia:x64)",
                         },
+                        {
+                            "debug": "../../prebuilt/third_party/zoom/bin",
+                            "os": "linux",
+                            "cpu": "x64",
+                            "label": "//prebuilt/third_party/zoom(//build/toolchain:host_x64)",
+                        },
                     ],
                     [
                         {
@@ -146,6 +158,12 @@ class BuildApiModulesFilterTest(unittest.TestCase):
                         {
                             "label": "//src/subsystem/qux:qux.prebuilt(//build/toolchain/fuchsia:x64)",
                             "manifest": "obj/some_prebuilt_package/qux.debug_symbols.json",
+                        },
+                        {
+                            "cpu": "x64",
+                            "debug": "../../prebuilt/third_party/zoom/bin",
+                            "label": "//prebuilt/third_party/zoom(//build/toolchain:host_x64)",
+                            "os": "linux",
                         },
                     ],
                 ),

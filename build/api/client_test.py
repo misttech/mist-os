@@ -637,11 +637,11 @@ build all: phony out1 out2 out3
         # Verify that if the file doesn't exist, then the result should
         # correspond to the :default target.
         assert not self._last_targets_path.exists()
-        assert_last_ninja_artifacts_output("input1\nout1\n")
+        assert_last_ninja_artifacts_output("out1\n")
 
         # Change the list of targets.
         self._last_targets_path.write_text("all")
-        assert_last_ninja_artifacts_output("input1\nout1\nout2\nout3\n")
+        assert_last_ninja_artifacts_output("out1\nout2\nout3\n")
 
 
 if __name__ == "__main__":

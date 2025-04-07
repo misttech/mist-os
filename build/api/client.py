@@ -266,10 +266,13 @@ class LastBuildApiFilter(object):
         self._ninja = get_ninja_path(args.fuchsia_dir, args.host_tag)
         ninja_runner = ninja_artifacts.NinjaRunner(self._ninja)
 
-        ninja_artifacts = ninja_artifacts.get_last_build_artifacts(
+        last_build_artifacts = ninja_artifacts.get_last_build_artifacts(
             args.build_dir, ninja_runner
         )
-        self._filter = BuildApiFilter(ninja_artifacts)
+        last_build_sources = ninja_artifacts.get_last_build_sources(
+            args.build_dir, ninja_runner
+        )
+        self._filter = BuildApiFilter(last_build_artifacts, last_build_sources)
 
     @property
     def error(self) -> str:

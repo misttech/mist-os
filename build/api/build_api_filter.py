@@ -11,20 +11,24 @@ import typing as T
 class BuildApiFilter(object):
     """Convenience class used to filter build API module files."""
 
-    def __init__(self, ninja_artifacts: T.Sequence[str]):
+    def __init__(
+        self, ninja_artifacts: T.Sequence[str], ninja_sources: T.Sequence[str]
+    ):
         """Initialization. |ninja_artifacts| is a list of Ninja file paths."""
         self._ninja_artifacts = set(ninja_artifacts)
+        self._ninja_sources = set(ninja_sources)
+        self._ninja_all = self._ninja_artifacts | self._ninja_sources
 
     def _filter_json_scopes(
         self, input_json: T.Any, key_name: str
     ) -> T.List[str]:
         assert isinstance(input_json, list)
-        return [s for s in input_json if s[key_name] in self._ninja_artifacts]
+        return [s for s in input_json if s[key_name] in self._ninja_all]
 
     def _filter_json_path_list(
         self, input_paths: T.Sequence[str]
     ) -> T.Sequence[str]:
-        return [p for p in input_paths if p in self._ninja_artifacts]
+        return [p for p in input_paths if p in self._ninja_all]
 
     def _filter_json_scopes_with_multiple_keys(
         self, input_json: T.Any, key_names: T.Sequence[str]
@@ -34,7 +38,7 @@ class BuildApiFilter(object):
             s
             for s in input_json
             if any(
-                s[key_name] in self._ninja_artifacts
+                s[key_name] in self._ninja_all
                 for key_name in key_names
                 if key_name in s
             )
