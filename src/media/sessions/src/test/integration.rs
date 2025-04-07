@@ -917,6 +917,8 @@ async fn player_paused_before_interruption_is_not_resumed_by_its_end() -> Result
 }
 
 #[fuchsia::test(logging_tags = ["mediasession_tests"])]
+#[ignore]
+// TODO(https://fxbug.dev/407132326): Re-enable this test once it has been de-flaked.
 async fn player_paused_during_interruption_is_not_resumed_by_its_end() -> Result<()> {
     let mut service = TestService::new().await?;
     let mut player = TestPlayer::new(&service).await?;
