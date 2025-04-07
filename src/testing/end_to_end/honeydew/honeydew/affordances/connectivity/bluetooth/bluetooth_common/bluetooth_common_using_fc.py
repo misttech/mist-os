@@ -332,7 +332,7 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
                     res = host.addresses[0]
                     return res.bytes_
         raise bluetooth_errors.BluetoothStateError(
-            "No Bluetooth addresses found on {self._device_name} in FIDL response: {hosts_response}"
+            f"No Bluetooth addresses found on {self._device_name} in FIDL response: {hosts_response}"
         )
 
     def get_connected_devices(self) -> list[str]:
