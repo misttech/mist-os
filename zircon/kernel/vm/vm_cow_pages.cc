@@ -6270,40 +6270,6 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offs
   return ReclaimCounts{};
 }
 
-void VmCowPages::SwapPageInListLocked(uint64_t offset, vm_page_t* old_page, vm_page_t* new_page) {
-  DEBUG_ASSERT(!old_page->object.pin_count);
-  DEBUG_ASSERT(new_page->state() == vm_page_state::OBJECT);
-
-  // unmap before removing old page
-  {
-    __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
-    RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap, &deferred);
-  }
-
-  // The caller is required to have provided us a page that exists, so this can never fail.
-  VmPageOrMarkerRef p = page_list_.LookupMutable(offset);
-  DEBUG_ASSERT(p);
-  DEBUG_ASSERT(p->IsPage());
-
-  CopyPageMetadataForReplacementLocked(new_page, old_page);
-
-  // Add replacement page in place of old page.
-  __UNINITIALIZED auto result = BeginAddPageWithSlotLocked(offset, p, CanOverwriteContent::NonZero);
-  // Absent bugs, BeginAddPageWithSlotLocked() can only return ZX_ERR_NO_MEMORY, but that failure
-  // can only occur if page_list_ had to allocate.  Here, page_list_ hasn't yet had a chance to
-  // clean up any internal structures, so BeginAddPageWithSlotLocked() didn't need to allocate, so
-  // we know that BeginAddPageWithSlotLocked() will succeed.
-  DEBUG_ASSERT(result.is_ok());
-  VmPageOrMarker released_page =
-      CompleteAddPageLocked(*result, VmPageOrMarker::Page(new_page), nullptr);
-  // The page released was the old page.
-  DEBUG_ASSERT(released_page.IsPage() && released_page.Page() == old_page);
-  // Need to take the page out of |released_page| to avoid a [[nodiscard]] error. Since we just
-  // checked that this matches the target page, which is now owned by the caller, this is not
-  // leaking.
-  [[maybe_unused]] vm_page_t* released = released_page.ReleasePage();
-}
-
 zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(VmCowRange range,
                                                         AnonymousPageRequest* page_request,
                                                         uint64_t* non_loaned_len) {
@@ -6376,7 +6342,7 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
   // If not replacing with loaned it is required that a page_request be provided.
   DEBUG_ASSERT(with_loaned || page_request);
 
-  const VmPageOrMarker* p = page_list_.Lookup(offset);
+  VmPageOrMarkerRef p = page_list_.LookupMutable(offset);
   if (!p) {
     return ZX_ERR_NOT_FOUND;
   }
@@ -6397,6 +6363,30 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
     return ZX_ERR_BAD_STATE;
   }
 
+  // unmap before removing old page
+  {
+    __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
+    RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap, &deferred);
+  }
+
+  VmPageOrMarker released_page;
+  auto replace_page_in_list = [&](vm_page_t* new_page) {
+    AssertHeld(lock_ref());
+    DEBUG_ASSERT(new_page->state() == vm_page_state::OBJECT);
+
+    CopyPageMetadataForReplacementLocked(new_page, old_page);
+
+    // Add replacement page in place of old page.
+    __UNINITIALIZED auto result =
+        BeginAddPageWithSlotLocked(offset, p, CanOverwriteContent::NonZero);
+    // Absent bugs, BeginAddPageWithSlotLocked() can only return ZX_ERR_NO_MEMORY, but that failure
+    // can only occur if page_list_ had to allocate.  Here, page_list_ hasn't yet had a chance to
+    // clean up any internal structures, so BeginAddPageWithSlotLocked() didn't need to allocate, so
+    // we know that BeginAddPageWithSlotLocked() will succeed.
+    DEBUG_ASSERT(result.is_ok());
+    released_page = CompleteAddPageLocked(*result, VmPageOrMarker::Page(new_page), nullptr);
+  };
+
   vm_page_t* new_page = nullptr;
   zx_status_t status = ZX_OK;
   if (with_loaned) {
@@ -6406,10 +6396,8 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
     if (is_page_dirty_tracked(old_page) && !is_page_clean(old_page)) {
       return ZX_ERR_BAD_STATE;
     }
-    auto result = AllocLoanedPage([this, offset, old_page](vm_page_t* page) {
-      AssertHeld(lock_ref());
-      SwapPageInListLocked(offset, old_page, page);
-    });
+    auto result =
+        AllocLoanedPage([&replace_page_in_list](vm_page_t* page) { replace_page_in_list(page); });
     status = result.status_value();
     if (result.is_ok()) {
       new_page = *result;
@@ -6417,13 +6405,21 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
   } else {
     status = AllocPage(&new_page, page_request);
     if (status == ZX_OK) {
-      SwapPageInListLocked(offset, old_page, new_page);
+      replace_page_in_list(new_page);
     }
   }
+
   if (status != ZX_OK) {
     return status;
   }
   CopyPageContentsForReplacementLocked(new_page, old_page);
+
+  // Need to take the page out of |released_page| to avoid a [[nodiscard]] error. Since we just
+  // checked that this matches the target page, which is now owned by the caller, this is not
+  // leaking.
+  [[maybe_unused]] vm_page_t* released = released_page.ReleasePage();
+  // The page released was the old page.
+  DEBUG_ASSERT(released == old_page);
 
   RemoveAndFreePageLocked(old_page);
   if (after_page) {

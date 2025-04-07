@@ -1504,13 +1504,6 @@ class VmCowPages final : public VmHierarchyBase,
     return is_source_supplying_specific_physical_pages();
   }
 
-  // Swap an old page for a new page in the page list. The old page must be at offset. The new page
-  // must be in ALLOC state. On return, the old_page is owned by the caller. Typically the caller
-  // will remove the old_page from pmm_page_queues() and free the old_page. The contents of new page
-  // is not modified, and the caller is responsible for filling in the contents.
-  void SwapPageInListLocked(uint64_t offset, vm_page_t* old_page, vm_page_t* new_page)
-      TA_REQ(lock());
-
   // If page is still at offset, replace it with a different page.  If with_loaned is true, replace
   // with a loaned page.  If with_loaned is false, replace with a non-loaned page and a page_request
   // is required to be provided.
