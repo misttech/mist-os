@@ -275,10 +275,18 @@ impl HrTimerManager {
             let guard = self.lock();
             let Some(node) = guard.timer_heap.peek() else {
                 log_warn!("HrTimer manager worker thread woke up with an empty timer heap.");
+                guard
+                    .message_counter
+                    .as_ref()
+                    .map(|c| c.add(-1).expect("Failed to decrement counter"));
                 continue;
             };
             let Some(new_deadline) = guard.current_deadline else {
                 log_warn!("HrTimer manager worker thread woke up without a timer deadline");
+                guard
+                    .message_counter
+                    .as_ref()
+                    .map(|c| c.add(-1).expect("Failed to decrement counter"));
                 continue;
             };
             fuchsia_trace::instant!(
@@ -386,32 +394,25 @@ impl HrTimerManager {
                         continue;
                     }
                 }
-                Ok(Err(e)) => match e {
-                    fta::WakeError::Dropped => {
-                        fuchsia_trace::duration!(c"alarms", c"alarm:drop", "deadline" => new_deadline.into_nanos());
-                        let guard = self.lock();
+                Ok(Err(e)) => {
+                    let guard = self.lock();
+                    guard
+                        .message_counter
+                        .as_ref()
+                        .map(|c| c.add(-1).expect("Failed to decrement counter"));
+                    match e {
+                        fta::WakeError::Dropped => {
+                            fuchsia_trace::duration!(c"alarms", c"alarm:drop", "deadline" => new_deadline.into_nanos());
 
-                        // If we get here, `add_timer` or `remove_timer` have already removed the
-                        // dropped timer from the heap.
-                        if guard.timer_heap.is_empty() {
-                            // Decrement the unhandled message counter if there are no more timers
-                            // to start, since we don't need to wait for the next hanging get.
-                            // Even if the previous timer is an interval, it is stopped
-                            // intentionally.
-                            guard
-                                .message_counter
-                                .as_ref()
-                                .map(|c| c.add(-1).expect("Failed to decrement counter"));
-                        }
-
-                        log_debug!(
-                            "A new HrTimer with \
+                            log_debug!(
+                                "A new HrTimer with \
                                 an earlier deadline has been started. \
                                 This `SetAndWait` attempt is cancelled."
-                        )
+                            )
+                        }
+                        _ => log_error!("Wake::SetAndWait driver error: {e:?}"),
                     }
-                    _ => log_error!("Wake::SetAndWait driver error: {e:?}"),
-                },
+                }
                 Err(e) => log_error!("Wake::SetAndWait fidl error: {e}"),
             }
         }
@@ -935,27 +936,20 @@ mod tests {
     }
 
     #[fuchsia::test(threads = 2)]
-    #[ignore = "See for details: https://fxbug.dev/388833484"]
     async fn hr_timer_manager_wake_proxy_signal() {
         let (hrtimer_manager, message_counter) = init_hr_timer_manager();
 
         let timer = HrTimer::new();
-        let sooner_deadline = zx::BootInstant::from_nanos(1);
-        let later_deadline = zx::BootInstant::from_nanos(2);
+        let sooner_deadline = zx::BootInstant::INFINITE;
+        let later_deadline = zx::BootInstant::from_nanos(1000);
 
         assert_matches!(hrtimer_manager.add_timer(None, &timer, later_deadline), Ok(_));
-        assert_gt!(message_counter.read().expect("Failed to read counter"), 0);
-
-        hrtimer_manager
-            .lock()
-            .message_counter
-            .as_ref()
-            .map(|c| c.add(-1).expect("Failed to decrement counter"));
-        assert_eq!(message_counter.read().expect("Failed to read counter"), 0);
-
-        // Update the only timer.
         assert_matches!(hrtimer_manager.add_timer(None, &timer, sooner_deadline), Ok(_));
-        assert_gt!(message_counter.read().expect("Failed to read counter"), 0);
+
+        // Make sure that the counter goes to zero eventually again.
+        message_counter
+            .wait_handle(zx::Signals::COUNTER_NON_POSITIVE, zx::MonotonicInstant::INFINITE)
+            .expect("infallible");
     }
 
     #[fuchsia::test]
