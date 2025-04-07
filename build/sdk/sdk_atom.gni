@@ -227,10 +227,11 @@ template("sdk_atom") {
         "`${target_label}` of type `${type}` is not allowed to use the \"internal\" SDK category. No new uses are allowed.")
   }
 
-  # Ensure that we only want write `stable` in the manifest for types that
-  # support unstable atoms. For those types, ensure that `meta.stable`is always
+  # For support unstable atoms, ensure that `meta.stable`is always
   # specified and either it is true and an `api` file was specified or the
   # category supports unstable atoms.
+  # `add_stable_true_to_meta_json` represents whether the meta.json
+  # generation script would have written "stable" to the file.
   is_type_supporting_unstable = _types_supporting_unstable_atoms + [ type ] -
                                 [ type ] != _types_supporting_unstable_atoms
   assert(
@@ -241,7 +242,8 @@ template("sdk_atom") {
       # TODO(https://fxbug.dev/372986936): Remove when no more uses.
       assert(category != "internal",
              "Atoms in SDK category '${category}' cannot be `stable`.")
-      add_stable_property = true
+      is_stable = true
+      add_stable_true_to_meta_json = true
 
       # For types that specify stable, ensure the `api` file was specified for stable atoms.
       assert(defined(invoker.api))
@@ -254,11 +256,18 @@ template("sdk_atom") {
               # TODO(https://fxbug.dev/372986936): Remove when no more uses.
               category == "internal",
           "`meta.stable` must be true unless the SDK category ('${category}') is 'partner'.")
-      add_stable_property = false
+      is_stable = false
+      add_stable_true_to_meta_json = false
     }
   } else {
-    add_stable_property = false
+    # Atom types that do not support unstable are always stable, but this is not
+    # reported in their `meta.json` file.
+    is_stable = true
+    add_stable_true_to_meta_json = false
   }
+
+  # TODO(https://fxbug.dev/338009514): Remove when using this value.
+  not_needed([ "add_stable_true_to_meta_json" ])
 
   is_type_not_requiring_compatibility =
       _types_not_requiring_compatibility + [ type ] - [ type ] !=
@@ -493,9 +502,9 @@ template("sdk_atom") {
              "--deps",
            ] + rebase_path(dep_manifests, root_build_dir) + file_args
 
-    if (add_stable_property) {
-      # This is only informational and does not affect the build. It should
-      # match the value in `meta_file_for_idk`.
+    # Record the actual stability state for all atoms. This may not match the
+    # presence of "stable" in `meta_file_for_idk`.
+    if (is_stable) {
       args += [ "--stable" ]
     }
 
