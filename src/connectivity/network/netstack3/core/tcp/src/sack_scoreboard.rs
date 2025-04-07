@@ -10,7 +10,7 @@
 use netstack3_base::{Mss, SackBlocks, SeqNum};
 
 use crate::internal::congestion::DUP_ACK_THRESHOLD;
-use crate::internal::seq_ranges::{SeqRange, SeqRanges};
+use crate::internal::seq_ranges::{FirstHoleResult, SeqRange, SeqRanges};
 
 #[derive(Debug, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
@@ -190,6 +190,22 @@ impl SackScoreboard {
         new
     }
 
+    pub(crate) fn has_sack_info(&self) -> bool {
+        !self.acked_ranges.is_empty()
+    }
+
+    /// Helper to check rule (2) from [RFC 6675 section 5]:
+    ///
+    /// > (2) If DupAcks < DupThresh but IsLost (HighACK + 1) returns true --
+    /// > indicating at least three segments have arrived above the current
+    /// > cumulative acknowledgment point, which is taken to indicate loss -- go
+    /// > to step (4).
+    ///
+    /// [RFC 6675 section 5]: https://datatracker.ietf.org/doc/html/rfc6675#section-4
+    pub(crate) fn is_first_hole_lost(&self) -> bool {
+        self.acked_ranges.iter().next().is_some_and(|range| *range.meta())
+    }
+
     pub(crate) fn pipe(&self) -> u32 {
         self.pipe
     }
@@ -202,6 +218,32 @@ impl SackScoreboard {
     /// date until the next ACK arrives.
     pub(crate) fn increment_pipe(&mut self, value: u32) {
         self.pipe = self.pipe.saturating_add(value);
+    }
+
+    /// Returns the right-side-bounded unsacked range starting at or later than
+    /// `marker`.
+    ///
+    /// Returns `None` if `mark` is not a hole bounded to the right side by a
+    /// received SACK.
+    ///
+    /// Returns a [`SeqRange`] whose metadata is a boolean indicating if this
+    /// range is considered lost.
+    pub(crate) fn first_unsacked_range_from(&self, mark: SeqNum) -> Option<SeqRange<bool>> {
+        let Self { acked_ranges, pipe: _ } = self;
+        match acked_ranges.first_hole_on_or_after(mark) {
+            FirstHoleResult::None => None,
+            FirstHoleResult::Right(right) => SeqRange::new(mark..right.start(), *right.meta()),
+            FirstHoleResult::Both(left, right) => {
+                SeqRange::new(left.end().latest(mark)..right.start(), *right.meta())
+            }
+        }
+    }
+
+    /// Returns the end of the sequence number range in the scoreboard, if there
+    /// are any ranges tracked.
+    pub(crate) fn right_edge(&self) -> Option<SeqNum> {
+        let Self { acked_ranges, pipe: _ } = self;
+        acked_ranges.last().map(|seq_range| seq_range.end())
     }
 
     pub(crate) fn on_retransmission_timeout(&mut self) {
@@ -550,5 +592,47 @@ mod test {
         assert!(!sb.process_ack(ack, snd_nxt, high_rxt, &SackBlocks::default(), TEST_MSS));
         assert_eq!(sb.acked_ranges, SeqRanges::default());
         assert_eq!(sb.pipe, 0);
+    }
+
+    #[test]
+    fn first_unsacked_range_from() {
+        let mut sb = SackScoreboard::default();
+        let ack = SeqNum::new(5);
+        let snd_nxt = SeqNum::new(60);
+        let high_rxt = None;
+        let block1 = 10..20;
+        let block2 = 30..40;
+        let block3 = 50..60;
+        assert!(sb.process_ack(
+            ack,
+            snd_nxt,
+            high_rxt,
+            &testutil::sack_blocks([block1.clone(), block2.clone(), block3.clone()]),
+            TEST_MSS
+        ));
+        assert_eq!(
+            sb.acked_ranges,
+            seq_ranges([(block1.clone(), true), (block2.clone(), false), (block3.clone(), false)])
+        );
+        for high_rxt in u32::from(ack)..u32::from(snd_nxt) {
+            let expect = if high_rxt < block3.start {
+                let lost = high_rxt < block1.start;
+                let (start, end) = if high_rxt < block1.start {
+                    (high_rxt, block1.start)
+                } else if high_rxt < block2.start {
+                    (block1.end.max(high_rxt), block2.start)
+                } else {
+                    (block2.end.max(high_rxt), block3.start)
+                };
+                Some(SeqRange::new(SeqNum::new(start)..SeqNum::new(end), lost).unwrap())
+            } else {
+                None
+            };
+            assert_eq!(
+                sb.first_unsacked_range_from(SeqNum::new(high_rxt)),
+                expect,
+                "high_rxt={high_rxt}"
+            );
+        }
     }
 }

@@ -16,6 +16,15 @@ pub(crate) const DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE: usize = 536;
 pub(crate) const DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE: Mss =
     Mss(core::num::NonZeroU16::new(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE as u16).unwrap());
 
+/// Per [RFC 9293 section 3.7.1]
+///
+/// > [...] or 1220 (1280 - 60) for IPv6.
+///
+/// [RFC 9293 section 3.7.1]: https://datatracker.ietf.org/doc/html/rfc9293#section-3.7.1
+pub(crate) const DEFAULT_IPV6_MAXIMUM_SEGMENT_SIZE_USIZE: usize = 1220;
+pub(crate) const DEFAULT_IPV6_MAXIMUM_SEGMENT_SIZE: Mss =
+    Mss(core::num::NonZeroU16::new(DEFAULT_IPV6_MAXIMUM_SEGMENT_SIZE_USIZE as u16).unwrap());
+
 /// Creates a [`SackBlocks`] from the sequence number ranges represented as
 /// `u32`s.
 pub(crate) fn sack_blocks(iter: impl IntoIterator<Item = Range<u32>>) -> SackBlocks {

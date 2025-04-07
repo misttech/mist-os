@@ -1564,6 +1564,10 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         //         retransmission), if the timer is not running, start it
         //         running so that it will expire after RTO seconds (for the
         //         current value of RTO).
+        //
+        // TODO(https://fxbug.dev/42078221): If this is a SACK recovery
+        // retransmit, RFC 6675 calls that we should rearm the retransmission
+        // timer to avoid spurious RTO.
         match timer {
             Some(SendTimer::Retrans(_)) | Some(SendTimer::ZeroWindowProbe(_)) => {}
             Some(SendTimer::KeepAlive(_)) | Some(SendTimer::SWSProbe { at: _ }) | None => {

@@ -168,6 +168,9 @@ impl<I: Instant> CongestionControl<I> {
         let Self { params, algorithm: _, loss_recovery, sack_scoreboard } = self;
         let high_rxt = loss_recovery.as_ref().and_then(|lr| match lr {
             LossRecovery::FastRecovery(_) => None,
+            LossRecovery::SackRecovery(sack_recovery) => {
+                sack_recovery.recovery.as_ref().map(|r| r.high_rxt)
+            }
         });
         let is_dup_ack =
             sack_scoreboard.process_ack(seg_ack, snd_nxt, high_rxt, seg_sack_blocks, params.mss);
@@ -197,8 +200,7 @@ impl<I: Instant> CongestionControl<I> {
     /// Returns `true` if this ack signals a loss recovery.
     pub(super) fn on_ack(
         &mut self,
-        // TODO(https://fxbug.dev/42078221): Pass this to SACK recovery.
-        _seg_ack: SeqNum,
+        seg_ack: SeqNum,
         bytes_acked: NonZeroU32,
         now: I,
         rtt: Option<Duration>,
@@ -208,6 +210,7 @@ impl<I: Instant> CongestionControl<I> {
         let outcome = match loss_recovery {
             None => LossRecoveryOnAckOutcome::None,
             Some(LossRecovery::FastRecovery(fast_recovery)) => fast_recovery.on_ack(params),
+            Some(LossRecovery::SackRecovery(sack_recovery)) => sack_recovery.on_ack(seg_ack),
         };
 
         let recovered = match outcome {
@@ -232,17 +235,25 @@ impl<I: Instant> CongestionControl<I> {
     /// Called when a duplicate ack is arrived.
     ///
     /// Returns `true` if loss recovery was initiated as a result of this ACK.
-    pub(super) fn on_dup_ack(
-        &mut self,
-        seg_ack: SeqNum,
-        // TODO(https://fxbug.dev/42078221): Pass this to SACK recovery.
-        _snd_nxt: SeqNum,
-    ) -> bool {
-        let Self { params, algorithm, loss_recovery, sack_scoreboard: _ } = self;
+    pub(super) fn on_dup_ack(&mut self, seg_ack: SeqNum, snd_nxt: SeqNum) -> bool {
+        let Self { params, algorithm, loss_recovery, sack_scoreboard } = self;
         match loss_recovery {
             None => {
-                *loss_recovery = Some(LossRecovery::FastRecovery(FastRecovery::new()));
-                false
+                // If we have SACK information, prefer SACK recovery.
+                if sack_scoreboard.has_sack_info() {
+                    let mut sack_recovery = SackRecovery::new();
+                    let started_loss_recovery = sack_recovery
+                        .on_dup_ack(seg_ack, snd_nxt, sack_scoreboard)
+                        .apply(params, algorithm);
+                    *loss_recovery = Some(LossRecovery::SackRecovery(sack_recovery));
+                    started_loss_recovery
+                } else {
+                    *loss_recovery = Some(LossRecovery::FastRecovery(FastRecovery::new()));
+                    false
+                }
+            }
+            Some(LossRecovery::SackRecovery(sack_recovery)) => {
+                sack_recovery.on_dup_ack(seg_ack, snd_nxt, sack_scoreboard).apply(params, algorithm)
             }
             Some(LossRecovery::FastRecovery(fast_recovery)) => {
                 fast_recovery.on_dup_ack(params, algorithm, seg_ack)
@@ -305,6 +316,9 @@ impl<I: Instant> CongestionControl<I> {
         // snd_nxt and mss.
         let high_rxt = loss_recovery.as_ref().and_then(|lr| match lr {
             LossRecovery::FastRecovery(_) => None,
+            LossRecovery::SackRecovery(sack_recovery) => {
+                sack_recovery.recovery.as_ref().map(|r| r.high_rxt)
+            }
         });
         sack_scoreboard.on_mss_update(snd_una, snd_nxt, high_rxt, mss);
     }
@@ -351,9 +365,6 @@ impl<I: Instant> CongestionControl<I> {
         let Self { params, algorithm: _, loss_recovery, sack_scoreboard } = self;
         let cwnd = params.rounded_cwnd();
 
-        // TODO(https://fxbug.dev/42078221): Pass these to SACK recovery.
-        let _ = (snd_una, snd_wnd, available_bytes);
-
         match loss_recovery {
             None => {
                 let pipe = sack_scoreboard.pipe();
@@ -370,11 +381,21 @@ impl<I: Instant> CongestionControl<I> {
             Some(LossRecovery::FastRecovery(fast_recovery)) => {
                 Some(fast_recovery.poll_send(cwnd, sack_scoreboard.pipe(), snd_nxt))
             }
+            Some(LossRecovery::SackRecovery(sack_recovery)) => sack_recovery.poll_send(
+                cwnd,
+                snd_una,
+                snd_nxt,
+                snd_wnd,
+                available_bytes,
+                sack_scoreboard,
+            ),
         }
     }
 }
 
 /// The outcome of [`CongestionControl::poll_send`].
+#[derive(Debug)]
+#[cfg_attr(test, derive(Eq, PartialEq))]
 pub(super) struct CongestionControlSendOutcome {
     /// The next segment to be sent out.
     pub next_seg: SeqNum,
@@ -397,9 +418,11 @@ pub(super) struct CongestionControlSendOutcome {
 #[derive(Debug)]
 pub enum LossRecovery {
     FastRecovery(FastRecovery),
-    // TODO(https://fxbug.dev/42078221): Add SACK based recovery variant.
+    SackRecovery(SackRecovery),
 }
 
+#[derive(Debug)]
+#[cfg_attr(test, derive(Eq, PartialEq))]
 enum LossRecoveryOnAckOutcome {
     None,
     Discard { recovered: bool },
@@ -536,12 +559,368 @@ impl FastRecovery {
     }
 }
 
+/// The state kept by [`SackRecovery`] when we're in a recovery event.
+#[derive(Debug)]
+#[cfg_attr(test, derive(Eq, PartialEq, Copy, Clone))]
+struct SackRecoveryState {
+    /// The sequence number that marks the end of the current loss recovery
+    /// phase.
+    recovery_point: SeqNum,
+    /// The highest retransmitted sequence number during the current loss
+    /// recovery phase.
+    ///
+    /// Tracks the "HighRxt" variable defined in [RFC 6675 section 2].
+    ///
+    /// [RFC 6675 section 2]: https://datatracker.ietf.org/doc/html/rfc6675#section-2
+    high_rxt: SeqNum,
+    /// The highest sequence number that has been optimistically retransmitted.
+    ///
+    /// Tracks the "RescureRxt" variable defined in [RFC 6675 section 2].
+    ///
+    /// [RFC 6675 section 2]: https://datatracker.ietf.org/doc/html/rfc6675#section-2
+    rescue_rxt: Option<SeqNum>,
+}
+
+/// Implements the SACK based recovery from [RFC 6675].
+///
+/// [RFC 6675]: https://datatracker.ietf.org/doc/html/rfc6675
+#[derive(Debug)]
+pub(crate) struct SackRecovery {
+    /// Keeps track of the number of duplicate ACKs received during SACK
+    /// recovery.
+    ///
+    /// Tracks the "DupAcks" variable defined in [RFC 6675 section 2].
+    ///
+    /// [RFC 6675 section 2]: https://datatracker.ietf.org/doc/html/rfc6675#section-2
+    dup_acks: u8,
+    /// Statekeeping for loss recovery.
+    ///
+    /// Set to `Some` when we're in recovery state.
+    recovery: Option<SackRecoveryState>,
+}
+
+impl SackRecovery {
+    fn new() -> Self {
+        Self {
+            // Unlike FastRecovery, we start with zero duplicate ACKs,
+            // congestion control calls on_dup_ack after creation.
+            dup_acks: 0,
+            recovery: None,
+        }
+    }
+
+    fn on_ack(&mut self, seg_ack: SeqNum) -> LossRecoveryOnAckOutcome {
+        let Self { dup_acks, recovery } = self;
+        match recovery {
+            Some(SackRecoveryState { recovery_point, high_rxt: _, rescue_rxt: _ }) => {
+                // From RFC 6675:
+                //  An incoming cumulative ACK for a sequence number greater than
+                //  RecoveryPoint signals the end of loss recovery, and the loss
+                //  recovery phase MUST be terminated.
+                if seg_ack.after_or_eq(*recovery_point) {
+                    LossRecoveryOnAckOutcome::Discard { recovered: true }
+                } else {
+                    // From RFC 6675:
+                    //  If the incoming ACK is a cumulative acknowledgment, the
+                    //  TCP MUST reset DupAcks to zero.
+                    *dup_acks = 0;
+                    LossRecoveryOnAckOutcome::None
+                }
+            }
+            None => {
+                // We're not in loss recovery, we seem to have moved things
+                // forward. Discard loss recovery information.
+                LossRecoveryOnAckOutcome::Discard { recovered: false }
+            }
+        }
+    }
+
+    /// Processes a duplicate acknowledgement.
+    fn on_dup_ack(
+        &mut self,
+        seq_ack: SeqNum,
+        snd_nxt: SeqNum,
+        sack_scoreboard: &SackScoreboard,
+    ) -> SackDupAckOutcome {
+        let Self { dup_acks, recovery } = self;
+        // Already in recovery mode, nothing to do.
+        if recovery.is_some() {
+            return SackDupAckOutcome(false);
+        }
+        *dup_acks += 1;
+        // From RFC 6675:
+        //  (1) If DupAcks >= DupThresh, [...].
+        //  (2) If DupAcks < DupThresh but IsLost (HighACK + 1) returns true
+        //  [...]
+        if *dup_acks >= DUP_ACK_THRESHOLD || sack_scoreboard.is_first_hole_lost() {
+            // Enter loss recovery:
+            //  (4.1) RecoveryPoint = HighData
+            //  When the TCP sender receives a cumulative ACK for this data
+            //  octet, the loss recovery phase is terminated.
+            *recovery = Some(SackRecoveryState {
+                recovery_point: snd_nxt,
+                high_rxt: seq_ack,
+                rescue_rxt: None,
+            });
+            SackDupAckOutcome(true)
+        } else {
+            SackDupAckOutcome(false)
+        }
+    }
+
+    /// SACK recovery based congestion control next segment selection.
+    ///
+    /// Argument semantics are the same as [`CongestionControl::poll_send`].
+    fn poll_send(
+        &mut self,
+        cwnd: CongestionWindow,
+        snd_una: SeqNum,
+        snd_nxt: SeqNum,
+        snd_wnd: WindowSize,
+        available_bytes: usize,
+        sack_scoreboard: &SackScoreboard,
+    ) -> Option<CongestionControlSendOutcome> {
+        let Self { dup_acks: _, recovery } = self;
+
+        let pipe = sack_scoreboard.pipe();
+        let congestion_window = cwnd.cwnd();
+        let available_window = congestion_window.saturating_sub(pipe);
+        // Don't send anything if we can't send at least full MSS, following the
+        // RFC. All outcomes require at least one MSS of available window:
+        //
+        // (3.3) If (cwnd - pipe) >= 1 SMSS [...]
+        // (C) If cwnd - pipe >= 1 SMSS [...]
+        if available_window < cwnd.mss().into() {
+            return None;
+        }
+        let congestion_limit = available_window.min(cwnd.mss().into());
+
+        // If we're not in recovery, use the regular congestion calculation,
+        // adjusting the congestion window with the pipe value.
+        //
+        // From RFC 6675:
+        //
+        //  (3.3) If (cwnd - pipe) >= 1 SMSS, there exists previously unsent
+        //  data, and the receiver's advertised window allows, transmit up
+        //  to 1 SMSS of data starting with the octet HighData+1 and update
+        //  HighData to reflect this transmission, then return to (3.2).
+        let Some(SackRecoveryState { recovery_point, high_rxt, rescue_rxt }) = recovery else {
+            return Some(CongestionControlSendOutcome {
+                next_seg: snd_nxt,
+                congestion_limit,
+                congestion_window,
+                loss_recovery: false,
+            });
+        };
+        // From this point on, everything we send is in loss recovery.
+        let loss_recovery = true;
+
+        // run NextSeg() as defined in RFC 6675.
+
+        // (1) If there exists a smallest unSACKed sequence number 'S2' that
+        //   meets the following three criteria for determining loss, the
+        //   sequence range of one segment of up to SMSS octets starting
+        //   with S2 MUST be returned.
+        //
+        //   (1.a) S2 is greater than HighRxt.
+        //   (1.b) S2 is less than the highest octet covered by any received
+        //         SACK.
+        //   (1.c) IsLost (S2) returns true.
+
+        let first_unsacked_range =
+            sack_scoreboard.first_unsacked_range_from(snd_una.latest(*high_rxt));
+
+        if let Some(first_hole) = &first_unsacked_range {
+            // Meta is the IsLost value.
+            if *first_hole.meta() {
+                let hole_size = first_hole.len();
+                let congestion_limit = congestion_limit.min(hole_size);
+                *high_rxt = first_hole.start() + congestion_limit;
+
+                // If we haven't set RescueRxt yet, set it to prevent eager
+                // rescue. From RFC 6675:
+                //
+                //  Retransmit the first data segment presumed dropped --
+                //  the segment starting with sequence number HighACK + 1.
+                //  To prevent repeated retransmission of the same data or a
+                //  premature rescue retransmission, set both HighRxt and
+                //  RescueRxt to the highest sequence number in the
+                //  retransmitted segment.
+                if rescue_rxt.is_none() {
+                    *rescue_rxt = Some(*high_rxt);
+                }
+
+                return Some(CongestionControlSendOutcome {
+                    next_seg: first_hole.start(),
+                    congestion_limit,
+                    congestion_window,
+                    loss_recovery,
+                });
+            }
+        }
+
+        // Run next rule, from RFC 6675:
+        //
+        // (2) If no sequence number 'S2' per rule (1) exists but there
+        // exists available unsent data and the receiver's advertised window
+        // allows, the sequence range of one segment of up to SMSS octets of
+        // previously unsent data starting with sequence number HighData+1
+        // MUST be returned.
+        let total_sent = u32::try_from(snd_nxt - snd_una).unwrap();
+        if available_bytes > usize::try_from(total_sent).unwrap() && u32::from(snd_wnd) > total_sent
+        {
+            return Some(CongestionControlSendOutcome {
+                next_seg: snd_nxt,
+                // We only need to send out the congestion limit, the window
+                // limit is applied by the sender state machine.
+                congestion_limit,
+                congestion_window,
+                // NB: even though we're sending new bytes, we're still
+                // signaling that we're in loss recovery. Our goal here is
+                // to keep the ACK clock running and prevent an RTO, so we
+                // don't want this segment to be delayed by anything.
+                loss_recovery,
+            });
+        }
+
+        // Run next rule, from RFC 6675:
+        //
+        //  (3) If the conditions for rules (1) and (2) fail, but there
+        //  exists an unSACKed sequence number 'S3' that meets the criteria
+        //  for detecting loss given in steps (1.a) and (1.b) above
+        //  (specifically excluding step (1.c)), then one segment of up to
+        //  SMSS octets starting with S3 SHOULD be returned.
+        if let Some(first_hole) = first_unsacked_range {
+            let hole_size = first_hole.len();
+            let congestion_limit = congestion_limit.min(hole_size);
+            *high_rxt = first_hole.start() + congestion_limit;
+
+            return Some(CongestionControlSendOutcome {
+                next_seg: first_hole.start(),
+                congestion_limit,
+                congestion_window,
+                loss_recovery,
+            });
+        }
+
+        // Run next rule, from RFC 6675:
+        //
+        //  (4) If the conditions for (1), (2), and (3) fail, but there
+        //  exists outstanding unSACKed data, we provide the opportunity for
+        //  a single "rescue" retransmission per entry into loss recovery.
+        //  If HighACK is greater than RescueRxt (or RescueRxt is
+        //  undefined), then one segment of up to SMSS octets that MUST
+        //  include the highest outstanding unSACKed sequence number SHOULD
+        //  be returned, and RescueRxt set to RecoveryPoint. HighRxt MUST
+        //  NOT be updated.
+        if rescue_rxt.is_none_or(|rescue_rxt| snd_una.after_or_eq(rescue_rxt)) {
+            if let Some(right_edge) = sack_scoreboard.right_edge() {
+                let left = right_edge.latest(snd_nxt - congestion_limit);
+                // This can't send any new data, so figure out how much space we
+                // have left. Unwrap is safe here because the right edge of the
+                // scoreboard can't be after snd_nxt.
+                let congestion_limit = u32::try_from(snd_nxt - left).unwrap();
+                if congestion_limit > 0 {
+                    *rescue_rxt = Some(*recovery_point);
+                    return Some(CongestionControlSendOutcome {
+                        next_seg: left,
+                        congestion_limit,
+                        congestion_window,
+                        loss_recovery,
+                    });
+                }
+            }
+        }
+
+        None
+    }
+}
+
+/// The value returned by [`SackRecovery::on_dup_ack`].
+///
+/// It contains a boolean indicating whether loss recovery started due to a
+/// duplicate ACK. [`SackDupAckOutcome::apply`] is used to retrieve the boolean
+/// and notify loss recovery algorithm as needed and update the congestion
+/// parameters.
+///
+/// This is its own type so [`SackRecovery::on_dup_ack`] can be tested in
+/// isolation from [`LossBasedAlgorithm`].
+#[derive(Debug)]
+#[cfg_attr(test, derive(Eq, PartialEq))]
+struct SackDupAckOutcome(bool);
+
+impl SackDupAckOutcome {
+    /// Consumes this outcome, notifying `algorithm` that loss was detected if
+    /// needed.
+    ///
+    /// Returns the inner boolean indicating whether loss recovery started.
+    fn apply<I: Instant>(
+        self,
+        params: &mut CongestionControlParams,
+        algorithm: &mut LossBasedAlgorithm<I>,
+    ) -> bool {
+        let Self(loss_recovery) = self;
+        if loss_recovery {
+            algorithm.on_loss_detected(params);
+        }
+        loss_recovery
+    }
+}
+
 #[cfg(test)]
 mod test {
+    use core::ops::Range;
+
+    use assert_matches::assert_matches;
     use netstack3_base::testutil::FakeInstant;
+    use netstack3_base::SackBlock;
+    use test_case::{test_case, test_matrix};
 
     use super::*;
-    use crate::internal::testutil::{self, DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE};
+    use crate::internal::testutil::{
+        self, DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE, DEFAULT_IPV6_MAXIMUM_SEGMENT_SIZE,
+    };
+
+    const MSS_1: Mss = DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE;
+    const MSS_2: Mss = DEFAULT_IPV6_MAXIMUM_SEGMENT_SIZE;
+
+    enum StartingAck {
+        One,
+        Wraparound,
+        WraparoundAfter(u32),
+    }
+
+    impl StartingAck {
+        fn into_seqnum(self, mss: Mss) -> SeqNum {
+            let mss = u32::from(mss);
+            match self {
+                StartingAck::One => SeqNum::new(1),
+                StartingAck::Wraparound => SeqNum::new((mss / 2).wrapping_sub(mss)),
+                StartingAck::WraparoundAfter(n) => SeqNum::new((mss / 2).wrapping_sub(n * mss)),
+            }
+        }
+    }
+
+    impl<I> CongestionControl<I> {
+        #[track_caller]
+        fn assert_sack_recovery(&mut self) -> &mut SackRecovery {
+            assert_matches!(&mut self.loss_recovery, Some(LossRecovery::SackRecovery(s)) => s)
+        }
+    }
+
+    fn nth_segment_from(base: SeqNum, mss: Mss, n: u32) -> Range<SeqNum> {
+        let mss = u32::from(mss);
+        let start = base + n * mss;
+        Range { start, end: start + mss }
+    }
+
+    fn nth_range(base: SeqNum, mss: Mss, range: Range<u32>) -> Range<SeqNum> {
+        let mss = u32::from(mss);
+        let Range { start, end } = range;
+        let start = base + start * mss;
+        let end = base + end * mss;
+        Range { start, end }
+    }
 
     #[test]
     fn no_recovery_before_reaching_threshold() {
@@ -586,5 +965,646 @@ mod test {
             ),
             Some(true)
         );
+    }
+
+    #[test_case(DUP_ACK_THRESHOLD-1; "no loss")]
+    #[test_case(DUP_ACK_THRESHOLD; "exact threshold")]
+    #[test_case(DUP_ACK_THRESHOLD+1; "over threshold")]
+    fn sack_recovery_enter_exit_loss_dupacks(dup_acks: u8) {
+        let mut congestion_control =
+            CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE);
+        let mss = congestion_control.mss();
+
+        let ack = SeqNum::new(1);
+        let snd_nxt = nth_segment_from(ack, mss, 10).end;
+
+        let expect_recovery =
+            SackRecoveryState { recovery_point: snd_nxt, high_rxt: ack, rescue_rxt: None };
+
+        let mut sack = SackBlock::try_from(nth_segment_from(ack, mss, 1)).unwrap();
+        for n in 1..=dup_acks {
+            assert_eq!(
+                congestion_control.preprocess_ack(ack, snd_nxt, &[sack].into_iter().collect()),
+                Some(true)
+            );
+            assert_eq!(congestion_control.on_dup_ack(ack, snd_nxt), n == DUP_ACK_THRESHOLD);
+            let sack_recovery = congestion_control.assert_sack_recovery();
+            // We stop counting duplicate acks after the threshold.
+            assert_eq!(sack_recovery.dup_acks, n.min(DUP_ACK_THRESHOLD));
+
+            let expect_recovery = (n >= DUP_ACK_THRESHOLD).then(|| expect_recovery.clone());
+            assert_eq!(congestion_control.assert_sack_recovery().recovery, expect_recovery);
+
+            let (start, end) = sack.into_parts();
+            // Don't increase by full MSS to prove that duplicate ACKs alone are
+            // putting us in this state.
+            sack = SackBlock::try_new(start, end + u32::from(mss) / 4).unwrap();
+        }
+
+        let end = sack.right();
+        let bytes_acked = NonZeroU32::new(u32::try_from(end - ack).unwrap()).unwrap();
+        let ack = end;
+        assert_eq!(congestion_control.preprocess_ack(ack, snd_nxt, &SackBlocks::EMPTY), None);
+
+        let now = FakeInstant::default();
+        let rtt = Some(Duration::from_millis(1));
+
+        // A cumulative ACK not covering the recovery point arrives.
+        assert_eq!(congestion_control.on_ack(ack, bytes_acked, now, rtt), false);
+        if dup_acks >= DUP_ACK_THRESHOLD {
+            assert_eq!(congestion_control.assert_sack_recovery().recovery, Some(expect_recovery));
+        } else {
+            assert_matches!(congestion_control.loss_recovery, None);
+        }
+
+        // A cumulative ACK covering the recovery point arrives.
+        let bytes_acked = NonZeroU32::new(u32::try_from(snd_nxt - ack).unwrap()).unwrap();
+        let ack = snd_nxt;
+        assert_eq!(
+            congestion_control.on_ack(ack, bytes_acked, now, rtt),
+            dup_acks >= DUP_ACK_THRESHOLD
+        );
+        assert_matches!(congestion_control.loss_recovery, None);
+
+        // A later cumulative ACK arrives.
+        let snd_nxt = snd_nxt + 20;
+        let ack = ack + 10;
+        assert_eq!(congestion_control.preprocess_ack(ack, snd_nxt, &SackBlocks::EMPTY), None);
+        assert_eq!(congestion_control.on_ack(ack, bytes_acked, now, rtt), false);
+        assert_matches!(congestion_control.loss_recovery, None);
+    }
+
+    #[test]
+    fn sack_recovery_enter_loss_single_dupack() {
+        let mut congestion_control =
+            CongestionControl::<FakeInstant>::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE);
+
+        // SACK can enter recovery after a *single* duplicate ACK provided
+        // enough information is in the scoreboard:
+        let snd_nxt = SeqNum::new(100);
+        let ack = SeqNum::new(0);
+        assert_eq!(
+            congestion_control.preprocess_ack(
+                ack,
+                snd_nxt,
+                &testutil::sack_blocks([5..15, 25..35, 45..55])
+            ),
+            Some(true)
+        );
+        assert_eq!(congestion_control.on_dup_ack(ack, snd_nxt), true);
+        assert_eq!(
+            congestion_control.assert_sack_recovery().recovery,
+            Some(SackRecoveryState { recovery_point: snd_nxt, high_rxt: ack, rescue_rxt: None })
+        );
+    }
+
+    #[test]
+    fn sack_recovery_poll_send_not_recovery() {
+        let mut scoreboard = SackScoreboard::default();
+        let mut recovery = SackRecovery::new();
+        let mss = DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE;
+        let cwnd_mss = 10u32;
+        let cwnd = CongestionWindow::new(cwnd_mss * u32::from(mss), mss);
+        let snd_una = SeqNum::new(1);
+
+        let in_flight = 5u32;
+        let snd_nxt = nth_segment_from(snd_una, mss, in_flight).start;
+
+        // When not in recovery, we delegate all the receiver window calculation
+        // out. Prove that that's the case by telling SACK there's nothing to
+        // send.
+        let snd_wnd = WindowSize::ZERO;
+        let available_bytes = 0;
+
+        let sack_block = SackBlock::try_from(nth_segment_from(snd_una, mss, 1)).unwrap();
+        assert!(scoreboard.process_ack(
+            snd_una,
+            snd_nxt,
+            None,
+            &[sack_block].into_iter().collect(),
+            mss
+        ));
+
+        // With 1 SACK block this is how much window we expect to have available
+        // in multiples of mss.
+        let wnd_used = in_flight - 1;
+        assert_eq!(scoreboard.pipe(), wnd_used * u32::from(mss));
+        let wnd_available = cwnd_mss - wnd_used;
+
+        for i in 0..wnd_available {
+            let snd_nxt = snd_nxt + i * u32::from(mss);
+            assert_eq!(
+                recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+                Some(CongestionControlSendOutcome {
+                    next_seg: snd_nxt,
+                    congestion_limit: mss.into(),
+                    congestion_window: cwnd.cwnd(),
+                    loss_recovery: false
+                })
+            );
+            scoreboard.increment_pipe(mss.into());
+        }
+
+        // Used all of the window.
+        assert_eq!(scoreboard.pipe(), cwnd.cwnd());
+        // Poll send stops this round.
+        assert_eq!(
+            recovery.poll_send(
+                cwnd,
+                snd_una,
+                snd_nxt + (wnd_used + 1) * u32::from(mss),
+                snd_wnd,
+                available_bytes,
+                &scoreboard
+            ),
+            None
+        );
+    }
+
+    #[test_matrix(
+        [MSS_1, MSS_2],
+        [1, 3, 5],
+        [StartingAck::One, StartingAck::Wraparound]
+    )]
+    fn sack_recovery_next_seg_rule_1(mss: Mss, lost_segments: u32, snd_una: StartingAck) {
+        let mut scoreboard = SackScoreboard::default();
+        let mut recovery = SackRecovery::new();
+
+        let snd_una = snd_una.into_seqnum(mss);
+
+        let sacked_segments = u32::from(DUP_ACK_THRESHOLD);
+        let sacked_range = lost_segments..(lost_segments + sacked_segments);
+        let in_flight = sacked_range.end + 5;
+        let snd_nxt = nth_segment_from(snd_una, mss, in_flight).start;
+
+        // Define a congestion window that will only let us fill part of the
+        // lost segments with rule 1.
+        let cwnd_mss = in_flight - sacked_segments - 1;
+        let cwnd = CongestionWindow::new(cwnd_mss * u32::from(mss), mss);
+
+        // Rule 1 should not care about available window size, since it's
+        // retransmitting a lost segment.
+        let snd_wnd = WindowSize::ZERO;
+        let available_bytes = 0;
+
+        let sack_block = SackBlock::try_from(nth_range(snd_una, mss, sacked_range)).unwrap();
+        assert!(scoreboard.process_ack(
+            snd_una,
+            snd_nxt,
+            None,
+            &[sack_block].into_iter().collect(),
+            mss
+        ));
+
+        // Verify that our set up math here is correct, we want recovery to be
+        // able to fill only a part of the hole.
+        assert_eq!(cwnd.cwnd() - scoreboard.pipe(), (lost_segments - 1) * u32::from(mss));
+        // Enter recovery.
+        assert_eq!(recovery.on_dup_ack(snd_una, snd_nxt, &scoreboard), SackDupAckOutcome(true));
+
+        for i in 0..(lost_segments - 1) {
+            let next_seg = snd_una + i * u32::from(mss);
+            assert_eq!(
+                recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+                Some(CongestionControlSendOutcome {
+                    next_seg,
+                    congestion_limit: mss.into(),
+                    congestion_window: cwnd.cwnd(),
+                    loss_recovery: true
+                })
+            );
+            scoreboard.increment_pipe(mss.into());
+            assert_eq!(
+                recovery.recovery,
+                Some(SackRecoveryState {
+                    recovery_point: snd_nxt,
+                    high_rxt: nth_segment_from(snd_una, mss, i).end,
+                    // RescueRxt is always set to the first retransmitted
+                    // segment.
+                    rescue_rxt: Some(snd_una + u32::from(mss)),
+                })
+            );
+        }
+        // Ran out of CWND.
+        assert_eq!(
+            recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+            None
+        );
+    }
+
+    #[test_matrix(
+        [MSS_1, MSS_2],
+        [1, 3, 5],
+        [StartingAck::One, StartingAck::Wraparound]
+    )]
+    fn sack_recovery_next_seg_rule_2(mss: Mss, expect_send: u32, snd_una: StartingAck) {
+        let mut scoreboard = SackScoreboard::default();
+        let mut recovery = SackRecovery::new();
+
+        let snd_una = snd_una.into_seqnum(mss);
+
+        let lost_segments = 1;
+        let sacked_segments = u32::from(DUP_ACK_THRESHOLD);
+        let sacked_range = lost_segments..(lost_segments + sacked_segments);
+        let in_flight = sacked_range.end + 5;
+        let mut snd_nxt = nth_segment_from(snd_una, mss, in_flight).start;
+
+        let sack_block = SackBlock::try_from(nth_range(snd_una, mss, sacked_range)).unwrap();
+        assert!(scoreboard.process_ack(
+            snd_una,
+            snd_nxt,
+            None,
+            &[sack_block].into_iter().collect(),
+            mss
+        ));
+
+        // Define a congestion window that will allow us to send only the
+        // desired segments.
+        let cwnd = CongestionWindow::new(scoreboard.pipe() + expect_send * u32::from(mss), mss);
+        // Enter recovery.
+        assert_eq!(recovery.on_dup_ack(snd_una, snd_nxt, &scoreboard), SackDupAckOutcome(true));
+        // Force HighRxt to the end of the lost block to skip rules 1 and 3.
+        let recovery_state = &mut recovery.recovery.as_mut().unwrap();
+        recovery_state.high_rxt = nth_segment_from(snd_una, mss, lost_segments - 1).end;
+        // Force RecoveryRxt to skip rule 4.
+        recovery_state.rescue_rxt = Some(snd_nxt);
+        let state_snapshot = recovery_state.clone();
+
+        // Available bytes is always counted from SND.UNA.
+        let baseline = u32::try_from(snd_nxt - snd_una).unwrap();
+        // If there is no window or nothing to send, return.
+        for (snd_wnd, available_bytes) in [(0, 0), (1, 0), (0, 1)] {
+            let snd_wnd = WindowSize::from_u32(baseline + snd_wnd).unwrap();
+            let available_bytes = usize::try_from(baseline + available_bytes).unwrap();
+            assert_eq!(
+                recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+                None
+            );
+            assert_eq!(recovery.recovery, Some(state_snapshot));
+        }
+
+        let baseline = baseline + (expect_send - 1) * u32::from(mss) + 1;
+        let snd_wnd = WindowSize::from_u32(baseline).unwrap();
+        let available_bytes = usize::try_from(baseline).unwrap();
+        for _ in 0..expect_send {
+            assert_eq!(
+                recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+                Some(CongestionControlSendOutcome {
+                    next_seg: snd_nxt,
+                    congestion_limit: mss.into(),
+                    congestion_window: cwnd.cwnd(),
+                    loss_recovery: true
+                })
+            );
+            assert_eq!(recovery.recovery, Some(state_snapshot));
+            scoreboard.increment_pipe(mss.into());
+            snd_nxt = snd_nxt + u32::from(mss);
+        }
+        // Ran out of CWND.
+        let snd_wnd = WindowSize::MAX;
+        let available_bytes = usize::MAX;
+        assert_eq!(
+            recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+            None
+        );
+        assert_eq!(recovery.recovery, Some(state_snapshot));
+    }
+
+    #[test_matrix(
+        [MSS_1, MSS_2],
+        [1, 3, 5],
+        [StartingAck::One, StartingAck::Wraparound]
+    )]
+    fn sack_recovery_next_seg_rule_3(mss: Mss, not_lost_segments: u32, snd_una: StartingAck) {
+        let mut scoreboard = SackScoreboard::default();
+        let mut recovery = SackRecovery::new();
+
+        let snd_una = snd_una.into_seqnum(mss);
+
+        let first_lost_block = 1;
+        let first_sacked_segments = u32::from(DUP_ACK_THRESHOLD);
+        let first_sacked_range = first_lost_block..(first_lost_block + first_sacked_segments);
+
+        // "not_lost_segments" segments will not be considered lost by the
+        // scoreboard, but they will not be sacked.
+        let sacked_segments = 1;
+        let sacked_range_start = first_sacked_range.end + not_lost_segments;
+        let sacked_range = sacked_range_start..(sacked_range_start + sacked_segments);
+
+        let in_flight = sacked_range.end + 5;
+        let snd_nxt = nth_segment_from(snd_una, mss, in_flight).start;
+
+        let sack_block1 =
+            SackBlock::try_from(nth_range(snd_una, mss, first_sacked_range.clone())).unwrap();
+        let sack_block2 = SackBlock::try_from(nth_range(snd_una, mss, sacked_range)).unwrap();
+        assert!(scoreboard.process_ack(
+            snd_una,
+            snd_nxt,
+            None,
+            &[sack_block1, sack_block2].into_iter().collect(),
+            mss
+        ));
+
+        // Define a congestion window that will only let us fill part of the
+        // lost segments with rule 3.
+        let expect_send = (not_lost_segments - 1).max(1);
+        let cwnd_mss =
+            in_flight - first_sacked_segments - sacked_segments - first_lost_block + expect_send;
+        let cwnd = CongestionWindow::new(cwnd_mss * u32::from(mss), mss);
+
+        // Rule 3 is only hit if we don't have enough available data to send.
+        let snd_wnd = WindowSize::ZERO;
+        let available_bytes = 0;
+
+        // Verify that our set up math here is correct, we want recovery to be
+        // able to fill only a part of the hole.
+        assert_eq!(cwnd.cwnd() - scoreboard.pipe(), expect_send * u32::from(mss));
+        // Enter recovery.
+        assert_eq!(recovery.on_dup_ack(snd_una, snd_nxt, &scoreboard), SackDupAckOutcome(true));
+        // Poll while we expect to hit rule 1. Don't increment pipe here because
+        // we set up our congestion window to stop only rule 3.
+        for i in 0..first_lost_block {
+            assert_eq!(
+                recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+                Some(CongestionControlSendOutcome {
+                    next_seg: nth_segment_from(snd_una, mss, i).start,
+                    congestion_limit: mss.into(),
+                    congestion_window: cwnd.cwnd(),
+                    loss_recovery: true
+                })
+            );
+        }
+        let expect_recovery = SackRecoveryState {
+            recovery_point: snd_nxt,
+            high_rxt: nth_segment_from(snd_una, mss, first_sacked_range.start).start,
+            rescue_rxt: Some(nth_segment_from(snd_una, mss, 0).end),
+        };
+        assert_eq!(recovery.recovery, Some(expect_recovery));
+
+        for i in 0..expect_send {
+            let next_seg = snd_una + (first_sacked_range.end + i) * u32::from(mss);
+            assert_eq!(
+                recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+                Some(CongestionControlSendOutcome {
+                    next_seg,
+                    congestion_limit: mss.into(),
+                    congestion_window: cwnd.cwnd(),
+                    loss_recovery: true
+                })
+            );
+            scoreboard.increment_pipe(mss.into());
+            assert_eq!(
+                recovery.recovery,
+                Some(SackRecoveryState { high_rxt: next_seg + u32::from(mss), ..expect_recovery })
+            );
+        }
+        // Ran out of CWND.
+        assert_eq!(
+            recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+            None
+        );
+    }
+
+    #[test_matrix(
+        [MSS_1, MSS_2],
+        [0, 1, 3],
+        [StartingAck::One, StartingAck::Wraparound]
+    )]
+    fn sack_recovery_next_seg_rule_4(mss: Mss, right_edge_segments: u32, snd_una: StartingAck) {
+        let mut scoreboard = SackScoreboard::default();
+        let mut recovery = SackRecovery::new();
+
+        let snd_una = snd_una.into_seqnum(mss);
+
+        let lost_segments = 1;
+        let sacked_segments = u32::from(DUP_ACK_THRESHOLD);
+        let sacked_range = lost_segments..(lost_segments + sacked_segments);
+        let in_flight = sacked_range.end + right_edge_segments + 2;
+        let snd_nxt = nth_segment_from(snd_una, mss, in_flight).start;
+
+        // Rule 4 should only be hit if we don't have available data to send.
+        let snd_wnd = WindowSize::ZERO;
+        let available_bytes = 0;
+
+        let sack_block =
+            SackBlock::try_from(nth_range(snd_una, mss, sacked_range.clone())).unwrap();
+        assert!(scoreboard.process_ack(
+            snd_una,
+            snd_nxt,
+            None,
+            &[sack_block].into_iter().collect(),
+            mss
+        ));
+
+        // Define a very large congestion window, given rule 4 should only
+        // retransmit a single segment.
+        let cwnd = CongestionWindow::new((in_flight + 500) * u32::from(mss), mss);
+
+        // Enter recovery.
+        assert_eq!(recovery.on_dup_ack(snd_una, snd_nxt, &scoreboard), SackDupAckOutcome(true));
+        // Send the segments that match rule 1. Don't increment pipe here, we
+        // want to show that rule 4 stops even when cwnd is entirely open.
+        for i in 0..lost_segments {
+            let next_seg = snd_una + i * u32::from(mss);
+            assert_eq!(
+                recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+                Some(CongestionControlSendOutcome {
+                    next_seg,
+                    congestion_limit: mss.into(),
+                    congestion_window: cwnd.cwnd(),
+                    loss_recovery: true
+                })
+            );
+        }
+        let expect_recovery = SackRecoveryState {
+            recovery_point: snd_nxt,
+            high_rxt: nth_segment_from(snd_una, mss, lost_segments).start,
+            // RescueRxt is always set to the first retransmitted
+            // segment.
+            rescue_rxt: Some(nth_segment_from(snd_una, mss, 0).end),
+        };
+        assert_eq!(recovery.recovery, Some(expect_recovery));
+
+        // Rule 4 should only hit after we receive an ACK past the first
+        // RescueRxt value that was set.
+        assert_eq!(
+            recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+            None
+        );
+        // Acknowledge up to the sacked range, with one new sack block.
+        let snd_una = nth_segment_from(snd_una, mss, sacked_range.end).start;
+        let sack_block = SackBlock::try_from(nth_range(snd_una, mss, 1..2)).unwrap();
+        assert!(scoreboard.process_ack(
+            snd_una,
+            snd_nxt,
+            Some(expect_recovery.high_rxt),
+            &[sack_block].into_iter().collect(),
+            mss
+        ));
+        assert_eq!(recovery.on_ack(snd_una), LossRecoveryOnAckOutcome::None);
+        assert_eq!(recovery.recovery, Some(expect_recovery));
+        // Rule 3 will hit once here because we have a single not lost segment.
+        assert_eq!(
+            recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+            Some(CongestionControlSendOutcome {
+                next_seg: snd_una,
+                congestion_limit: mss.into(),
+                congestion_window: cwnd.cwnd(),
+                loss_recovery: true
+            })
+        );
+        let expect_recovery =
+            SackRecoveryState { high_rxt: snd_una + u32::from(mss), ..expect_recovery };
+        assert_eq!(recovery.recovery, Some(expect_recovery));
+
+        // Now we should hit Rule 4, as long as we have unacknowledged data.
+        if right_edge_segments > 0 {
+            assert_eq!(
+                recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+                Some(CongestionControlSendOutcome {
+                    next_seg: snd_nxt - u32::from(mss),
+                    congestion_limit: mss.into(),
+                    congestion_window: cwnd.cwnd(),
+                    loss_recovery: true
+                })
+            );
+            assert_eq!(
+                recovery.recovery,
+                Some(SackRecoveryState {
+                    rescue_rxt: Some(expect_recovery.recovery_point),
+                    ..expect_recovery
+                })
+            );
+        }
+
+        // Once we've done the rescue it can't happen again.
+        assert_eq!(
+            recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+            None
+        );
+    }
+
+    #[test_matrix(
+        [MSS_1, MSS_2],
+        [
+            StartingAck::One,
+            StartingAck::WraparoundAfter(1),
+            StartingAck::WraparoundAfter(2),
+            StartingAck::WraparoundAfter(3),
+            StartingAck::WraparoundAfter(4)
+        ]
+    )]
+    fn sack_recovery_all_rules(mss: Mss, snd_una: StartingAck) {
+        let snd_una = snd_una.into_seqnum(mss);
+
+        // Set up the scoreboard so we have 1 hole considered lost, that is hit
+        // by Rule 1, and another that is not lost, hit by Rule 3.
+        let mut scoreboard = SackScoreboard::default();
+        let first_sacked_range = 1..(u32::from(DUP_ACK_THRESHOLD) + 1);
+        let first_sack_block =
+            SackBlock::try_from(nth_range(snd_una, mss, first_sacked_range.clone())).unwrap();
+
+        let second_sacked_range = (first_sacked_range.end + 1)..(first_sacked_range.end + 2);
+        let second_sack_block =
+            SackBlock::try_from(nth_range(snd_una, mss, second_sacked_range.clone())).unwrap();
+
+        let snd_nxt = nth_segment_from(snd_una, mss, second_sacked_range.end + 1).start;
+
+        // To hit Rule 4 in one run, set up a recovery state that looks
+        // like we've already tried to fill one hole with Rule 1 and
+        // received an ack for it.
+        let high_rxt = snd_una;
+        let rescue_rxt = Some(snd_una);
+
+        assert!(scoreboard.process_ack(
+            snd_una,
+            snd_nxt,
+            Some(high_rxt),
+            &[first_sack_block, second_sack_block].into_iter().collect(),
+            mss
+        ));
+
+        // Create a situation where a single sequential round of calls to
+        // poll_send will hit each rule.
+        let recovery_state = SackRecoveryState { recovery_point: snd_nxt, high_rxt, rescue_rxt };
+        let mut recovery =
+            SackRecovery { dup_acks: DUP_ACK_THRESHOLD, recovery: Some(recovery_state) };
+
+        // Define a congestion window that allows sending a single segment,
+        // we'll not update the pipe variable at each call so we should never
+        // hit the congestion limit.
+        let cwnd = CongestionWindow::new(scoreboard.pipe() + u32::from(mss), mss);
+
+        // Make exactly one segment available in the receiver window and send
+        // buffer so we hit Rule 2 exactly once.
+        let available = u32::try_from(snd_nxt - snd_una).unwrap() + 1;
+        let snd_wnd = WindowSize::from_u32(available).unwrap();
+        let available_bytes = usize::try_from(available).unwrap();
+
+        // Hit Rule 1.
+        assert_eq!(
+            recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+            Some(CongestionControlSendOutcome {
+                next_seg: snd_una,
+                congestion_limit: u32::from(mss),
+                congestion_window: cwnd.cwnd(),
+                loss_recovery: true
+            })
+        );
+        let recovery_state =
+            SackRecoveryState { high_rxt: snd_una + u32::from(mss), ..recovery_state };
+        assert_eq!(recovery.recovery, Some(recovery_state));
+
+        // Hit Rule 2.
+        assert_eq!(
+            recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+            Some(CongestionControlSendOutcome {
+                next_seg: snd_nxt,
+                congestion_limit: u32::from(mss),
+                congestion_window: cwnd.cwnd(),
+                loss_recovery: true
+            })
+        );
+        // snd_nxt should advance.
+        let snd_nxt = snd_nxt + u32::from(mss);
+        // No change to recovery state.
+        assert_eq!(recovery.recovery, Some(recovery_state));
+
+        // Hit Rule 3.
+        assert_eq!(
+            recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+            Some(CongestionControlSendOutcome {
+                next_seg: nth_segment_from(snd_una, mss, first_sacked_range.end).start,
+                congestion_limit: u32::from(mss),
+                congestion_window: cwnd.cwnd(),
+                loss_recovery: true
+            })
+        );
+        let recovery_state = SackRecoveryState {
+            high_rxt: nth_segment_from(snd_una, mss, second_sacked_range.start).start,
+            ..recovery_state
+        };
+        assert_eq!(recovery.recovery, Some(recovery_state));
+
+        // Hit Rule 4.
+        assert_eq!(
+            recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+            Some(CongestionControlSendOutcome {
+                next_seg: snd_nxt - u32::from(mss),
+                congestion_limit: u32::from(mss),
+                congestion_window: cwnd.cwnd(),
+                loss_recovery: true
+            })
+        );
+        let recovery_state =
+            SackRecoveryState { rescue_rxt: Some(recovery_state.recovery_point), ..recovery_state };
+        assert_eq!(recovery.recovery, Some(recovery_state));
+
+        // Hit all the rules. Nothing to send even if we still have cwnd.
+        assert_eq!(
+            recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+            None
+        );
+        assert!(cwnd.cwnd() - scoreboard.pipe() >= u32::from(mss));
     }
 }

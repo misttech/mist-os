@@ -168,10 +168,45 @@ impl<M> SeqRanges<M> {
         let _drain = blocks.drain(0..first_after);
     }
 
+    /// Finds the first hole containing or after the sequence number `marker`.
+    ///
+    /// Returns [`FirstHoleResult::None`] if no hole can be identified, i.e.,
+    /// `marker`` is at or above the highest tracked range.
+    ///
+    /// Returns [`FirstHoleResult::Right`] if the hole is bounded to its
+    /// right side by the first stored sequence range,
+    /// [`FirstHoleResult::Both`] otherwise.
+    pub(crate) fn first_hole_on_or_after(&self, marker: SeqNum) -> FirstHoleResult<'_, M> {
+        let Self { blocks } = self;
+        let first_after = Self::find_first_after(blocks, marker);
+        blocks
+            .get(first_after)
+            .map(|right| {
+                first_after
+                    .checked_sub(1)
+                    .map(|left| FirstHoleResult::Both(&blocks[left], right))
+                    .unwrap_or_else(|| FirstHoleResult::Right(right))
+            })
+            .unwrap_or(FirstHoleResult::None)
+    }
+
+    /// Returns the highest sequence number range stored, if there are any.
+    pub(crate) fn last(&self) -> Option<&SeqRange<M>> {
+        let Self { blocks } = self;
+        blocks.back()
+    }
+
     pub(crate) fn clear(&mut self) {
         let Self { blocks } = self;
         blocks.clear();
     }
+}
+
+#[derive(Debug)]
+pub(crate) enum FirstHoleResult<'a, M> {
+    None,
+    Right(&'a SeqRange<M>),
+    Both(&'a SeqRange<M>, &'a SeqRange<M>),
 }
 
 impl<M: Clone> FromIterator<SeqRange<M>> for SeqRanges<M> {
@@ -402,5 +437,29 @@ mod test {
         sr.iter()
             .map(|seq_range| u32::from(seq_range.start())..u32::from(seq_range.end()))
             .collect()
+    }
+
+    #[test_case(&[], 0 => (None, None))]
+    #[test_case(&[10..20, 30..40], 0 => (None, Some(10)))]
+    #[test_case(&[10..20, 30..40], 10 => (Some(20), Some(30)))]
+    #[test_case(&[10..20, 30..40], 20 => (Some(20), Some(30)))]
+    #[test_case(&[10..20, 30..40], 30 => (None, None))]
+    #[test_case(&[10..20, 30..40], 40 => (None, None))]
+    #[test_case(&[10..20, 30..40, 50..60], 30 => (Some(40), Some(50)))]
+    #[test_case(&[10..20, 30..40, 50..60], 35 => (Some(40), Some(50)))]
+    #[test_case(&[10..20, 30..40, 50..60], 40 => (Some(40), Some(50)))]
+    fn first_hole_on_or_after(ranges: &[Range<u32>], marker: u32) -> (Option<u32>, Option<u32>) {
+        match ranges
+            .into_iter()
+            .cloned()
+            .collect::<SeqRanges<()>>()
+            .first_hole_on_or_after(SeqNum::new(marker))
+        {
+            FirstHoleResult::None => (None, None),
+            FirstHoleResult::Right(right) => (None, Some(u32::from(right.start()))),
+            FirstHoleResult::Both(left, right) => {
+                (Some(u32::from(left.end())), Some(u32::from(right.start())))
+            }
+        }
     }
 }
