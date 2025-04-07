@@ -100,14 +100,14 @@ class {{ .PythonName }}:
         """Returns the response if result does not contain an error. Otherwise, raises an exception."""
         try:
             if hasattr(self, "_framework_err") and self._framework_err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(f"{self.__fidl_raw_type__} error {self._err}")
+                raise AssertionError(f"{self.__fidl_raw_type__} error {self._err}")
         except AttributeError:
             pass
 

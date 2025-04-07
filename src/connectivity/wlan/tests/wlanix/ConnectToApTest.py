@@ -145,7 +145,7 @@ class ConnectToApTest(AsyncAdapter, base_test.ConnectionBaseTestClass):
 
             try:
                 (await supplicant_sta_network_proxy.select()).unwrap()
-            except RuntimeError as e:
+            except AssertionError as e:
                 raise signals.TestFailure(
                     f'Failed to connect to "{ssid}" with {security}'
                 ) from e

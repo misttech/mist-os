@@ -1523,14 +1523,14 @@ class ClosedTargetTwoWayStructPayloadErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -2114,14 +2114,14 @@ class OpenTargetFlexibleTwoWayErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -2237,14 +2237,14 @@ class OpenTargetFlexibleTwoWayFieldsErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -2347,14 +2347,14 @@ class OpenTargetFlexibleTwoWayFieldsResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -2455,14 +2455,14 @@ class OpenTargetFlexibleTwoWayResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -2562,14 +2562,14 @@ class OpenTargetStrictTwoWayErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -2671,14 +2671,14 @@ class OpenTargetStrictTwoWayFieldsErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:

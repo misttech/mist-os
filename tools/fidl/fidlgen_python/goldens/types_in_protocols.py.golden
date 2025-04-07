@@ -665,14 +665,14 @@ class ProtocolErrorArrayBasicResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -775,14 +775,14 @@ class ProtocolErrorArrayCompoundResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -885,14 +885,14 @@ class ProtocolErrorArrayVectorNestedResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -993,14 +993,14 @@ class ProtocolErrorBasicResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -1101,14 +1101,14 @@ class ProtocolErrorCompoundResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -1209,14 +1209,14 @@ class ProtocolErrorResourceResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -1317,14 +1317,14 @@ class ProtocolErrorVectorBasicResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -1427,14 +1427,14 @@ class ProtocolErrorVectorCompoundResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -1537,14 +1537,14 @@ class ProtocolErrorVectorOptionalResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:

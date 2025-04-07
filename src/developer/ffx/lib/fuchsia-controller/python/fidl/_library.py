@@ -612,17 +612,19 @@ def union_type(ir, root_ir) -> type:
                 "_framework_err" in base.__annotations__
                 and self.framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self.framework_err}"
                 )
             if "_err" in base.__annotations__ and self.err is not None:
-                raise RuntimeError(f"{self.__fidl_raw_type__} error {self.err}")
+                raise AssertionError(
+                    f"{self.__fidl_raw_type__} error {self.err}"
+                )
             if (
                 "_response" in base.__annotations__
                 and self.response is not None
             ):
                 return self.response
-            raise RuntimeError(
+            raise AssertionError(
                 f"Failed to unwrap {self.__fidl_raw_type__} with no error or response."
             )
 

@@ -1342,14 +1342,14 @@ class UnknownInteractionsAjarProtocolStrictTwoWayErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -1457,14 +1457,14 @@ class UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -1573,14 +1573,14 @@ class UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -1760,14 +1760,14 @@ class UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -2006,14 +2006,14 @@ class UnknownInteractionsClosedProtocolStrictTwoWayErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -2123,14 +2123,14 @@ class UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -2241,14 +2241,14 @@ class UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -2430,14 +2430,14 @@ class UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -2759,14 +2759,14 @@ class UnknownInteractionsProtocolFlexibleTwoWayErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -2888,14 +2888,14 @@ class UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -3002,14 +3002,14 @@ class UnknownInteractionsProtocolFlexibleTwoWayFieldsResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -3132,14 +3132,14 @@ class UnknownInteractionsProtocolFlexibleTwoWayTableErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -3246,14 +3246,14 @@ class UnknownInteractionsProtocolFlexibleTwoWayTableResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -3445,14 +3445,14 @@ class UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -3628,14 +3628,14 @@ class UnknownInteractionsProtocolFlexibleTwoWayUnionResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -3736,14 +3736,14 @@ class UnknownInteractionsProtocolFlexibleTwoWayResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -3843,14 +3843,14 @@ class UnknownInteractionsProtocolStrictTwoWayErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -3958,14 +3958,14 @@ class UnknownInteractionsProtocolStrictTwoWayFieldsErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -4072,14 +4072,14 @@ class UnknownInteractionsProtocolStrictTwoWayTableErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -4255,14 +4255,14 @@ class UnknownInteractionsProtocolStrictTwoWayUnionErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:

@@ -363,14 +363,14 @@ class MainProtocolTwoWayAnonWithErrorResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -479,14 +479,14 @@ class MainProtocolTwoWayImportWithErrorResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -589,14 +589,14 @@ class MainProtocolTwoWayLocalWithErrorResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
