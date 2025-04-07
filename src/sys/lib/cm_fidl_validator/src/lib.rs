@@ -558,14 +558,51 @@ fn get_dependencies_from_collections<'a>(
     }
 }
 
-fn generate_dependency_graph<'a>(
+fn find_offer_source<'a>(
+    offer: &'a fdecl::Offer,
+    source: &'a fdecl::Ref,
+    source_name: &'a Option<String>,
+    _dictionary: Option<&'a String>,
+) -> Option<DependencyNode<'a>> {
+    match source {
+        fdecl::Ref::Child(fdecl::ChildRef { name, collection }) => {
+            Some(DependencyNode::Child(name, collection.as_ref().map(|s| s.as_str())))
+        }
+        #[cfg(fuchsia_api_level_at_least = "25")]
+        fdecl::Ref::Self_(_) if _dictionary.is_some() => {
+            let root_dict = _dictionary.unwrap().split('/').next().unwrap();
+            Some(DependencyNode::Capability(root_dict))
+        }
+        fdecl::Ref::Self_(_) => {
+            if let Some(source_name) = source_name {
+                #[cfg(fuchsia_api_level_at_least = "25")]
+                if matches!(offer, fdecl::Offer::Dictionary(_)) {
+                    return Some(DependencyNode::Capability(source_name));
+                }
+                if matches!(offer, fdecl::Offer::Storage(_)) {
+                    return Some(DependencyNode::Capability(source_name));
+                }
+            }
+
+            Some(DependencyNode::Self_)
+        }
+        fdecl::Ref::Collection(fdecl::CollectionRef { name }) => {
+            Some(DependencyNode::Collection(name))
+        }
+        fdecl::Ref::Parent(_)
+        | fdecl::Ref::Framework(_)
+        | fdecl::Ref::Capability(_)
+        | fdecl::Ref::VoidType(_) => None,
+        _ => None,
+    }
+}
+
+fn get_dependencies_from_offers<'a>(
     strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
     decl: &'a fdecl::Component,
     dynamic_children: &Vec<(&'a str, &'a str)>,
     dynamic_offers: Option<&'a Vec<fdecl::Offer>>,
 ) {
-    get_dependencies_from_uses(strong_dependencies, decl);
-
     let mut all_offers: Vec<&fdecl::Offer> = vec![];
 
     if let Some(dynamic_offers) = dynamic_offers.as_ref() {
@@ -581,18 +618,48 @@ fn generate_dependency_graph<'a>(
     }
 
     for offer in all_offers {
-        let (_dependency_type, source, _target) = match offer {
-            fdecl::Offer::Protocol(o) => (o.dependency_type, &o.source, &o.target),
-            #[cfg(fuchsia_api_level_at_least = "25")]
-            fdecl::Offer::Dictionary(o) => (o.dependency_type, &o.source, &o.target),
-            fdecl::Offer::Directory(o) => (o.dependency_type, &o.source, &o.target),
-            fdecl::Offer::Service(o) => (None, &o.source, &o.target),
-            fdecl::Offer::Storage(o) => (None, &o.source, &o.target),
-            fdecl::Offer::Runner(o) => (Some(fdecl::DependencyType::Strong), &o.source, &o.target),
-            fdecl::Offer::Resolver(o) => {
-                (Some(fdecl::DependencyType::Strong), &o.source, &o.target)
+        let (_dependency_type, source, _target, _dict) = match offer {
+            fdecl::Offer::Protocol(o) => {
+                (o.dependency_type, &o.source, &o.target, get_source_dictionary!(o))
             }
-            fdecl::Offer::Config(o) => (Some(fdecl::DependencyType::Strong), &o.source, &o.target),
+            #[cfg(fuchsia_api_level_at_least = "25")]
+            fdecl::Offer::Dictionary(o) => {
+                (o.dependency_type, &o.source, &o.target, get_source_dictionary!(o))
+            }
+            fdecl::Offer::Directory(o) => {
+                (o.dependency_type, &o.source, &o.target, get_source_dictionary!(o))
+            }
+            fdecl::Offer::Service(o) => (None, &o.source, &o.target, get_source_dictionary!(o)),
+            fdecl::Offer::Storage(o) => {
+                if let Some(source_ref) = o.source.as_ref() {
+                    if let Some(source_node) =
+                        find_offer_source(offer, source_ref, &o.source_name, None)
+                    {
+                        if let Some(target_node) = ref_to_dependency_node(o.target.as_ref()) {
+                            strong_dependencies.add_edge(source_node, target_node);
+                        }
+                    }
+                }
+                (None, &o.source, &o.target, None::<&String>)
+            }
+            fdecl::Offer::Runner(o) => (
+                Some(fdecl::DependencyType::Strong),
+                &o.source,
+                &o.target,
+                get_source_dictionary!(o),
+            ),
+            fdecl::Offer::Resolver(o) => (
+                Some(fdecl::DependencyType::Strong),
+                &o.source,
+                &o.target,
+                get_source_dictionary!(o),
+            ),
+            fdecl::Offer::Config(o) => (
+                Some(fdecl::DependencyType::Strong),
+                &o.source,
+                &o.target,
+                get_source_dictionary!(o),
+            ),
             _ => continue,
         };
 
@@ -611,7 +678,16 @@ fn generate_dependency_graph<'a>(
             }
         }
     }
+}
 
+fn generate_dependency_graph<'a>(
+    strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
+    decl: &'a fdecl::Component,
+    dynamic_children: &Vec<(&'a str, &'a str)>,
+    dynamic_offers: Option<&'a Vec<fdecl::Offer>>,
+) {
+    get_dependencies_from_uses(strong_dependencies, decl);
+    get_dependencies_from_offers(strong_dependencies, decl, dynamic_children, dynamic_offers);
     get_dependencies_from_capabilities(strong_dependencies, decl);
     get_dependencies_from_environments(strong_dependencies, decl);
     get_dependencies_from_children(strong_dependencies, decl);
@@ -2414,14 +2490,6 @@ impl<'a> ValidationContext<'a> {
                     o.target_name.as_ref(),
                     o.availability.as_ref(),
                     offer_type,
-                );
-                self.add_strong_dep(
-                    self.source_dependency_from_ref(
-                        o.source_name.as_ref(),
-                        None,
-                        o.source.as_ref(),
-                    ),
-                    self.target_dependency_from_ref(o.target.as_ref()),
                 );
             }
             fdecl::Offer::Runner(o) => {
