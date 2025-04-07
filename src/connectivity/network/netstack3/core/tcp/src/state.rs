@@ -30,7 +30,7 @@ use crate::internal::base::{
 };
 use crate::internal::buffer::{Assembler, BufferLimits, IntoBuffers, ReceiveBuffer, SendBuffer};
 use crate::internal::congestion::{
-    CongestionControl, CongestionControlSendOutcome, LossRecoverySegment,
+    CongestionControl, CongestionControlSendOutcome, LossRecoveryMode, LossRecoverySegment,
 };
 use crate::internal::counters::TcpCountersRefs;
 use crate::internal::rtt::{Estimator, Rto, RttSampler};
@@ -1298,16 +1298,6 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         let mut zero_window_probe = false;
         let mut override_sws = false;
 
-        let increment_retransmit_counters = |congestion_control: &CongestionControl<I>| {
-            counters.increment(|c| &c.retransmits);
-            if congestion_control.in_fast_recovery() {
-                counters.increment(|c| &c.fast_retransmits);
-            }
-            if congestion_control.in_slow_start() {
-                counters.increment(|c| &c.slow_start_retransmits);
-            }
-        };
-
         match timer {
             Some(SendTimer::Retrans(retrans_timer)) => {
                 if retrans_timer.at <= now {
@@ -1329,7 +1319,6 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                     *snd_nxt = *snd_una;
                     retrans_timer.backoff(now);
                     counters.increment(|c| &c.timeouts);
-                    increment_retransmit_counters(congestion_control);
                 }
             }
             Some(SendTimer::ZeroWindowProbe(retrans_timer)) => {
@@ -1433,10 +1422,6 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             return None;
         }
 
-        if next_seg.before(*snd_nxt) {
-            increment_retransmit_counters(congestion_control);
-        }
-
         let has_fin = FIN_QUEUED && can_send == available;
         let seg = buffer.peek_with(offset, |readable| {
             let bytes_to_send = u32::min(
@@ -1453,7 +1438,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             //    delayed).
             //  - this is not a loss-recovery frame.
             let loss_recovery_allow_delay = match loss_recovery {
-                LossRecoverySegment::Yes { rearm_retransmit: _ } => false,
+                LossRecoverySegment::Yes { rearm_retransmit: _, mode: _ } => false,
                 LossRecoverySegment::No => true,
             };
             if bytes_to_send < mss && !has_fin && loss_recovery_allow_delay {
@@ -1568,9 +1553,25 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
 
         if seq_max.after(*snd_nxt) {
             *snd_nxt = seq_max;
+        } else {
+            // Anything before SND.NXT is possibly a retransmission caused by
+            // loss recovery.
+            match loss_recovery {
+                LossRecoverySegment::Yes { rearm_retransmit: _, ref mode } => match mode {
+                    LossRecoveryMode::FastRecovery => counters.increment(|c| &c.fast_retransmits),
+                    LossRecoveryMode::SackRecovery => counters.increment(|c| &c.sack_retransmits),
+                },
+                LossRecoverySegment::No => (),
+            }
         }
         if seq_max.after(*snd_max) {
             *snd_max = seq_max;
+        } else {
+            // Anything before SDN.MAX is considered a retransmitted segment.
+            counters.increment(|c| &c.retransmits);
+            if congestion_control.in_slow_start() {
+                counters.increment(|c| &c.slow_start_retransmits);
+            }
         }
         // Per https://tools.ietf.org/html/rfc6298#section-5:
         //   (5.1) Every time a packet containing data is sent (including a
@@ -1582,7 +1583,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 // Loss recovery might have asked us to rearm either way, check
                 // with it.
                 match loss_recovery {
-                    LossRecoverySegment::Yes { rearm_retransmit } => rearm_retransmit,
+                    LossRecoverySegment::Yes { rearm_retransmit, mode: _ } => rearm_retransmit,
                     LossRecoverySegment::No => false,
                 }
             }
@@ -1765,9 +1766,12 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         };
 
         if is_dup_ack {
-            let fast_recovery_initiated = congestion_control.on_dup_ack(seg_ack, *snd_nxt);
-            if fast_recovery_initiated {
-                counters.increment(|c| &c.fast_recovery);
+            counters.increment(|c| &c.dup_acks);
+            let new_loss_recovery = congestion_control.on_dup_ack(seg_ack, *snd_nxt);
+            match new_loss_recovery {
+                Some(LossRecoveryMode::FastRecovery) => counters.increment(|c| &c.fast_recovery),
+                Some(LossRecoveryMode::SackRecovery) => counters.increment(|c| &c.sack_recovery),
+                None => (),
             }
         }
 
@@ -1807,7 +1811,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 ).unwrap_or(u32::MAX),
                 "cwnd" => congestion_control.inspect_cwnd().cwnd(),
                 "ssthresh" => congestion_control.slow_start_threshold(),
-                "fast_recovery" => congestion_control.in_fast_recovery(),
+                "loss_recovery" => congestion_control.inspect_loss_recovery_mode().is_some(),
                 "acked" => data_acked == DataAcked::Yes,
             );
         }
@@ -6210,9 +6214,11 @@ mod test {
         // into the network.
         CounterExpectations::default().assert_counters(&counters);
         dup_ack(b'B', &counters.refs());
-        CounterExpectations { fast_recovery: 0, ..Default::default() }.assert_counters(&counters);
+        CounterExpectations { fast_recovery: 0, dup_acks: 1, ..Default::default() }
+            .assert_counters(&counters);
         dup_ack(b'C', &counters.refs());
-        CounterExpectations { fast_recovery: 0, ..Default::default() }.assert_counters(&counters);
+        CounterExpectations { fast_recovery: 0, dup_acks: 2, ..Default::default() }
+            .assert_counters(&counters);
         // The third dup ack will cause a fast retransmit of the first segment
         // at snd.una.
         dup_ack(b'A', &counters.refs());
@@ -6220,6 +6226,7 @@ mod test {
             retransmits: 1,
             fast_recovery: 1,
             fast_retransmits: 1,
+            dup_acks: 3,
             ..Default::default()
         }
         .assert_counters(&counters);
@@ -6229,6 +6236,7 @@ mod test {
             retransmits: 1,
             fast_recovery: 1,
             fast_retransmits: 1,
+            dup_acks: 4,
             ..Default::default()
         }
         .assert_counters(&counters);
@@ -6252,7 +6260,16 @@ mod test {
             established.snd.congestion_control.inspect_cwnd().cwnd(),
             2 * u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE)
         );
-        assert!(!established.snd.congestion_control.in_fast_recovery());
+        assert_eq!(established.snd.congestion_control.inspect_loss_recovery_mode(), None);
+        CounterExpectations {
+            retransmits: 1,
+            fast_recovery: 1,
+            fast_retransmits: 1,
+            dup_acks: 4,
+            loss_recovered: 1,
+            ..Default::default()
+        }
+        .assert_counters(&counters);
     }
 
     #[test]
@@ -6879,6 +6896,7 @@ mod test {
             timeouts: counters.stack_wide.timeouts.get(),
             retransmits: counters.stack_wide.retransmits.get(),
             slow_start_retransmits: counters.stack_wide.slow_start_retransmits.get(),
+            dup_acks: counters.stack_wide.dup_acks.get(),
             ..Default::default()
         }
         .assert_counters(&counters);
@@ -9017,7 +9035,10 @@ mod test {
         assert_eq!(passive_open, None);
         assert_eq!(data_acked, DataAcked::No);
         assert_eq!(newly_closed, NewlyClosed::No);
-        assert!(state.assert_established().snd.congestion_control.in_fast_recovery());
+        assert_eq!(
+            state.assert_established().snd.congestion_control.inspect_loss_recovery_mode(),
+            Some(LossRecoveryMode::SackRecovery)
+        );
 
         let seg = state
             .poll_send(
@@ -9037,6 +9058,15 @@ mod test {
             Some(SendTimer::Retrans(RetransTimer { at, .. })) => at
         );
         assert!(new_rto > start_rto, "{new_rto:?} > {start_rto:?}");
+
+        CounterExpectations {
+            retransmits: 1,
+            sack_recovery: 1,
+            sack_retransmits: 1,
+            dup_acks: 1,
+            ..Default::default()
+        }
+        .assert_counters(&counters);
     }
 
     // Test a connection that is limited only by a theoretical congestion
@@ -9155,9 +9185,9 @@ mod test {
                 counters.stack_wide.timeouts.get() + counters.stack_wide.loss_recovered.get();
             let congestion_control = &state.assert_established().snd.congestion_control;
             event_count <= CONGESTION_EVENTS
-                // Continue running until we've left fast recovery or slow
+                // Continue running until we've left loss recovery or slow
                 // start.
-                || congestion_control.in_fast_recovery() || congestion_control.in_slow_start()
+                || congestion_control.inspect_loss_recovery_mode().is_some() || congestion_control.in_slow_start()
         };
 
         while continue_running(&mut state) {
@@ -9194,7 +9224,7 @@ mod test {
             let ssthresh = congestion_control.slow_start_threshold();
             let cwnd = congestion_control.inspect_cwnd().cwnd();
             let in_slow_start = congestion_control.in_slow_start();
-            let in_fast_recovery = congestion_control.in_fast_recovery();
+            let in_loss_recovery = congestion_control.inspect_loss_recovery_mode().is_some();
             let pipe = congestion_control.pipe();
             let sent = u32::try_from(pending_segments.len()).unwrap() * u32::from(mss);
 
@@ -9211,7 +9241,7 @@ mod test {
                     sent={sent}, \
                     pipe={pipe}, \
                     in_slow_start={in_slow_start}, \
-                    in_fast_recovery={in_fast_recovery}, \
+                    in_loss_recovery={in_loss_recovery}, \
                     retransmits={}, \
                     fast_retransmits={}, \
                     fast_recovery={}",

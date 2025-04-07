@@ -192,6 +192,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                             PassiveConnectionOpenings: 0u64,
                             ActiveConnectionOpenings: 0u64,
                             FastRecovery: 0u64,
+                            SackRecovery: 0u64,
                             LossRecovered: 0u64,
                             EstablishedClosed: 0u64,
                             EstablishedResets: 0u64,
@@ -201,6 +202,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                                 ResetsReceived: 0u64,
                                 SynsReceived: 0u64,
                                 FinsReceived: 0u64,
+                                DupAcks: 0u64,
                                 "Errors": {
                                     ListenerQueueOverflow: 0u64,
                                     PassiveOpenNoRouteErrors: 0u64,
@@ -214,6 +216,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                                 Timeouts: 0u64,
                                 Retransmits: 0u64,
                                 FastRetransmits: 0u64,
+                                SackRetransmits: 0u64,
                                 SlowStartRetransmits: 0u64,
                                 "Errors": {
                                     SegmentSendErrors: 0u64,
@@ -241,6 +244,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                             PassiveConnectionOpenings: 0u64,
                             ActiveConnectionOpenings: 0u64,
                             FastRecovery: 0u64,
+                            SackRecovery: 0u64,
                             LossRecovered: 0u64,
                             EstablishedClosed: 0u64,
                             EstablishedResets: 0u64,
@@ -250,6 +254,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                                 ResetsReceived: 0u64,
                                 SynsReceived: 0u64,
                                 FinsReceived: 0u64,
+                                DupAcks: 0u64,
                                 "Errors": {
                                     ListenerQueueOverflow: 0u64,
                                     PassiveOpenNoRouteErrors: 0u64,
@@ -263,6 +268,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                                 Timeouts: 0u64,
                                 Retransmits: 0u64,
                                 FastRetransmits: 0u64,
+                                SackRetransmits: 0u64,
                                 SlowStartRetransmits: 0u64,
                                 "Errors": {
                                     SegmentSendErrors: 0u64,
@@ -296,6 +302,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                             PassiveConnectionOpenings: 0u64,
                             ActiveConnectionOpenings: 0u64,
                             FastRecovery: 0u64,
+                            SackRecovery: 0u64,
                             LossRecovered: 0u64,
                             EstablishedClosed: 0u64,
                             EstablishedResets: 0u64,
@@ -305,6 +312,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                                 ResetsReceived: 0u64,
                                 SynsReceived: 0u64,
                                 FinsReceived: 0u64,
+                                DupAcks: 0u64,
                                 "Errors": {
                                     ListenerQueueOverflow: 0u64,
                                     PassiveOpenNoRouteErrors: 0u64,
@@ -318,6 +326,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                                 Timeouts: 0u64,
                                 Retransmits: 0u64,
                                 FastRetransmits: 0u64,
+                                SackRetransmits: 0u64,
                                 SlowStartRetransmits: 0u64,
                                 "Errors": {
                                     SegmentSendErrors: 0u64,
@@ -346,6 +355,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                             PassiveConnectionOpenings: 0u64,
                             ActiveConnectionOpenings: 1u64,
                             FastRecovery: 0u64,
+                            SackRecovery: 0u64,
                             LossRecovered: 0u64,
                             EstablishedClosed: 0u64,
                             EstablishedResets: 0u64,
@@ -355,6 +365,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                                 ResetsReceived: 0u64,
                                 SynsReceived: 0u64,
                                 FinsReceived: 0u64,
+                                DupAcks: 0u64,
                                 "Errors": {
                                     ListenerQueueOverflow: 0u64,
                                     PassiveOpenNoRouteErrors: 0u64,
@@ -368,6 +379,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                                 Timeouts: 0u64,
                                 Retransmits: 0u64,
                                 FastRetransmits: 0u64,
+                                SackRetransmits: 0u64,
                                 SlowStartRetransmits: 0u64,
                                 "Errors": {
                                     SegmentSendErrors: 0u64,
@@ -395,6 +407,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                             PassiveConnectionOpenings: 0u64,
                             ActiveConnectionOpenings: 0u64,
                             FastRecovery: 0u64,
+                            SackRecovery: 0u64,
                             LossRecovered: 0u64,
                             EstablishedClosed: 0u64,
                             EstablishedResets: 0u64,
@@ -404,6 +417,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                                 ResetsReceived: 0u64,
                                 SynsReceived: 0u64,
                                 FinsReceived: 0u64,
+                                DupAcks: 0u64,
                                 "Errors": {
                                     ListenerQueueOverflow: 0u64,
                                     PassiveOpenNoRouteErrors: 0u64,
@@ -417,6 +431,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                                 Timeouts: 0u64,
                                 Retransmits: 0u64,
                                 FastRetransmits: 0u64,
+                                SackRetransmits: 0u64,
                                 SlowStartRetransmits: 0u64,
                                 "Errors": {
                                     SegmentSendErrors: 0u64,
@@ -444,6 +459,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                             PassiveConnectionOpenings: 0u64,
                             ActiveConnectionOpenings: 0u64,
                             FastRecovery: 0u64,
+                            SackRecovery: 0u64,
                             LossRecovered: 0u64,
                             EstablishedClosed: 0u64,
                             EstablishedResets: 0u64,
@@ -453,6 +469,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                                 ResetsReceived: 0u64,
                                 SynsReceived: 0u64,
                                 FinsReceived: 0u64,
+                                DupAcks: 0u64,
                                 "Errors": {
                                     ListenerQueueOverflow: 0u64,
                                     PassiveOpenNoRouteErrors: 0u64,
@@ -466,6 +483,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                                 Timeouts: 0u64,
                                 Retransmits: 0u64,
                                 FastRetransmits: 0u64,
+                                SackRetransmits: 0u64,
                                 SlowStartRetransmits: 0u64,
                                 "Errors": {
                                     SegmentSendErrors: 0u64,
@@ -499,6 +517,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                             PassiveConnectionOpenings: 0u64,
                             ActiveConnectionOpenings: 0u64,
                             FastRecovery: 0u64,
+                            SackRecovery: 0u64,
                             LossRecovered: 0u64,
                             EstablishedClosed: 0u64,
                             EstablishedResets: 0u64,
@@ -508,6 +527,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                                 ResetsReceived: 0u64,
                                 SynsReceived: 0u64,
                                 FinsReceived: 0u64,
+                                DupAcks: 0u64,
                                 "Errors": {
                                     ListenerQueueOverflow: 0u64,
                                     PassiveOpenNoRouteErrors: 0u64,
@@ -521,6 +541,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                                 Timeouts: 0u64,
                                 Retransmits: 0u64,
                                 FastRetransmits: 0u64,
+                                SackRetransmits: 0u64,
                                 SlowStartRetransmits: 0u64,
                                 "Errors": {
                                     SegmentSendErrors: 0u64,
@@ -549,6 +570,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                             PassiveConnectionOpenings: 0u64,
                             ActiveConnectionOpenings: 1u64,
                             FastRecovery: 0u64,
+                            SackRecovery: 0u64,
                             LossRecovered: 0u64,
                             EstablishedClosed: 0u64,
                             EstablishedResets: 0u64,
@@ -558,6 +580,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                                 ResetsReceived: 0u64,
                                 SynsReceived: 0u64,
                                 FinsReceived: 0u64,
+                                DupAcks: 0u64,
                                 "Errors": {
                                     ListenerQueueOverflow: 0u64,
                                     PassiveOpenNoRouteErrors: 0u64,
@@ -571,6 +594,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                                 Timeouts: 0u64,
                                 Retransmits: 0u64,
                                 FastRetransmits: 0u64,
+                                SackRetransmits: 0u64,
                                 SlowStartRetransmits: 0u64,
                                 "Errors": {
                                     SegmentSendErrors: 0u64,
@@ -1767,6 +1791,7 @@ async fn inspect_counters(name: &str) {
                     PassiveConnectionOpenings: 0u64,
                     ActiveConnectionOpenings: 0u64,
                     FastRecovery: 0u64,
+                    SackRecovery: 0u64,
                     LossRecovered: 0u64,
                     EstablishedClosed: 0u64,
                     EstablishedResets: 0u64,
@@ -1777,6 +1802,7 @@ async fn inspect_counters(name: &str) {
                         ResetsReceived: 0u64,
                         SynsReceived: 0u64,
                         FinsReceived: 0u64,
+                        DupAcks: 0u64,
                         "Errors": {
                             ChecksumErrors: 0u64,
                             InvalidIpAddrsReceived: 0u64,
@@ -1794,6 +1820,7 @@ async fn inspect_counters(name: &str) {
                         Timeouts: 0u64,
                         Retransmits: 0u64,
                         FastRetransmits: 0u64,
+                        SackRetransmits: 0u64,
                         SlowStartRetransmits: 0u64,
                         "Errors": {
                             SegmentSendErrors: 0u64,
@@ -1809,6 +1836,7 @@ async fn inspect_counters(name: &str) {
                     PassiveConnectionOpenings: 0u64,
                     ActiveConnectionOpenings: 0u64,
                     FastRecovery: 0u64,
+                    SackRecovery: 0u64,
                     LossRecovered: 0u64,
                     EstablishedClosed: 0u64,
                     EstablishedResets: 0u64,
@@ -1819,6 +1847,7 @@ async fn inspect_counters(name: &str) {
                         ResetsReceived: 0u64,
                         SynsReceived: 0u64,
                         FinsReceived: 0u64,
+                        DupAcks: 0u64,
                         "Errors": {
                             ChecksumErrors: 0u64,
                             InvalidIpAddrsReceived: 0u64,
@@ -1836,6 +1865,7 @@ async fn inspect_counters(name: &str) {
                         Timeouts: 0u64,
                         Retransmits: 0u64,
                         FastRetransmits: 0u64,
+                        SackRetransmits: 0u64,
                         SlowStartRetransmits: 0u64,
                         "Errors": {
                             SegmentSendErrors: 0u64,

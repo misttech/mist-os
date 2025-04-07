@@ -232,8 +232,13 @@ impl<I: Instant> CongestionControl<I> {
 
     /// Called when a duplicate ack is arrived.
     ///
-    /// Returns `true` if loss recovery was initiated as a result of this ACK.
-    pub(super) fn on_dup_ack(&mut self, seg_ack: SeqNum, snd_nxt: SeqNum) -> bool {
+    /// Returns `Some` if loss recovery was initiated as a result of this ACK,
+    /// informing which mode was triggered.
+    pub(super) fn on_dup_ack(
+        &mut self,
+        seg_ack: SeqNum,
+        snd_nxt: SeqNum,
+    ) -> Option<LossRecoveryMode> {
         let Self { params, algorithm, loss_recovery, sack_scoreboard } = self;
         match loss_recovery {
             None => {
@@ -244,18 +249,19 @@ impl<I: Instant> CongestionControl<I> {
                         .on_dup_ack(seg_ack, snd_nxt, sack_scoreboard)
                         .apply(params, algorithm);
                     *loss_recovery = Some(LossRecovery::SackRecovery(sack_recovery));
-                    started_loss_recovery
+                    started_loss_recovery.then_some(LossRecoveryMode::SackRecovery)
                 } else {
                     *loss_recovery = Some(LossRecovery::FastRecovery(FastRecovery::new()));
-                    false
+                    None
                 }
             }
-            Some(LossRecovery::SackRecovery(sack_recovery)) => {
-                sack_recovery.on_dup_ack(seg_ack, snd_nxt, sack_scoreboard).apply(params, algorithm)
-            }
-            Some(LossRecovery::FastRecovery(fast_recovery)) => {
-                fast_recovery.on_dup_ack(params, algorithm, seg_ack)
-            }
+            Some(LossRecovery::SackRecovery(sack_recovery)) => sack_recovery
+                .on_dup_ack(seg_ack, snd_nxt, sack_scoreboard)
+                .apply(params, algorithm)
+                .then_some(LossRecoveryMode::SackRecovery),
+            Some(LossRecovery::FastRecovery(fast_recovery)) => fast_recovery
+                .on_dup_ack(params, algorithm, seg_ack)
+                .then_some(LossRecoveryMode::FastRecovery),
         }
     }
 
@@ -342,9 +348,17 @@ impl<I: Instant> CongestionControl<I> {
         self.params.rounded_cwnd()
     }
 
-    /// Returns true if this [`CongestionControl`] is in fast recovery.
-    pub(super) fn in_fast_recovery(&self) -> bool {
-        self.loss_recovery.is_some()
+    /// Returns the current loss recovery mode, if any.
+    ///
+    /// This method returns the current loss recovery mode.
+    ///
+    /// *NOTE* It's possible for [`CongestionControl`] to return a
+    /// [`LossRecoveryMode`] here even if there was no congestion events. Rely
+    /// on the return values from [`CongestionControl::poll_send`],
+    /// [`CongestionControl::on_dup_ack`] to catch entering into loss recovery
+    /// mode or determining if segments originate from a specific algorithm.
+    pub(super) fn inspect_loss_recovery_mode(&self) -> Option<LossRecoveryMode> {
+        self.loss_recovery.as_ref().map(|lr| lr.mode())
     }
 
     /// Returns true if this [`CongestionControl`] is in slow start.
@@ -428,6 +442,8 @@ pub(super) enum LossRecoverySegment {
         ///
         /// [RFC 6675 section 6]: https://datatracker.ietf.org/doc/html/rfc6675#section-6
         rearm_retransmit: bool,
+        /// The recovery mode that caused this loss recovery segment.
+        mode: LossRecoveryMode,
     },
     /// Indicates the segment is *not* a loss recovery segment.
     No,
@@ -459,6 +475,24 @@ pub(super) struct CongestionControlSendOutcome {
 pub enum LossRecovery {
     FastRecovery(FastRecovery),
     SackRecovery(SackRecovery),
+}
+
+impl LossRecovery {
+    fn mode(&self) -> LossRecoveryMode {
+        match self {
+            LossRecovery::FastRecovery(_) => LossRecoveryMode::FastRecovery,
+            LossRecovery::SackRecovery(_) => LossRecoveryMode::SackRecovery,
+        }
+    }
+}
+
+/// An equivalent to [`LossRecovery`] that simply informs the loss recovery
+/// mode, without carrying state.
+#[derive(Debug)]
+#[cfg_attr(test, derive(Copy, Clone, Eq, PartialEq))]
+pub enum LossRecoveryMode {
+    FastRecovery,
+    SackRecovery,
 }
 
 #[derive(Debug)]
@@ -531,7 +565,14 @@ impl FastRecovery {
             //     [...].
             //
             // So we always set the congestion limit to be just the mss.
-            Some(f) => (f, LossRecoverySegment::Yes { rearm_retransmit: false }, cwnd.mss().into()),
+            Some(f) => (
+                f,
+                LossRecoverySegment::Yes {
+                    rearm_retransmit: false,
+                    mode: LossRecoveryMode::FastRecovery,
+                },
+                cwnd.mss().into(),
+            ),
             // There's no fast retransmit pending, use snd_nxt applying the used
             // congestion window.
             None => (
@@ -893,6 +934,7 @@ impl SackRecovery {
                     congestion_window,
                     loss_recovery: LossRecoverySegment::Yes {
                         rearm_retransmit: rearm_retransmit(first_hole.start()),
+                        mode: LossRecoveryMode::SackRecovery,
                     },
                 });
             }
@@ -918,7 +960,10 @@ impl SackRecovery {
                 // signaling that we're in loss recovery. Our goal here is
                 // to keep the ACK clock running and prevent an RTO, so we
                 // don't want this segment to be delayed by anything.
-                loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: false },
+                loss_recovery: LossRecoverySegment::Yes {
+                    rearm_retransmit: false,
+                    mode: LossRecoveryMode::SackRecovery,
+                },
             });
         }
 
@@ -940,6 +985,7 @@ impl SackRecovery {
                 congestion_window,
                 loss_recovery: LossRecoverySegment::Yes {
                     rearm_retransmit: rearm_retransmit(first_hole.start()),
+                    mode: LossRecoveryMode::SackRecovery,
                 },
             });
         }
@@ -969,7 +1015,10 @@ impl SackRecovery {
                         congestion_window,
                         // NB: Rescue retransmissions can only happen once in
                         // every recovery enter, so always rearm the RTO.
-                        loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: true },
+                        loss_recovery: LossRecoverySegment::Yes {
+                            rearm_retransmit: true,
+                            mode: LossRecoveryMode::SackRecovery,
+                        },
                     });
                 }
             }
@@ -1078,7 +1127,7 @@ mod test {
             CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE);
         let old_cwnd = congestion_control.params.cwnd;
         assert_eq!(congestion_control.params.ssthresh, u32::MAX);
-        assert!(!congestion_control.on_dup_ack(SeqNum::new(0), SeqNum::new(1)));
+        assert_eq!(congestion_control.on_dup_ack(SeqNum::new(0), SeqNum::new(1)), None);
         assert!(!congestion_control.on_ack(
             SeqNum::new(1),
             NonZeroU32::new(1).unwrap(),
@@ -1137,7 +1186,10 @@ mod test {
                 congestion_control.preprocess_ack(ack, snd_nxt, &[sack].into_iter().collect()),
                 Some(true)
             );
-            assert_eq!(congestion_control.on_dup_ack(ack, snd_nxt), n == DUP_ACK_THRESHOLD);
+            assert_eq!(
+                congestion_control.on_dup_ack(ack, snd_nxt),
+                (n == DUP_ACK_THRESHOLD).then_some(LossRecoveryMode::SackRecovery)
+            );
             let sack_recovery = congestion_control.assert_sack_recovery();
             // We stop counting duplicate acks after the threshold.
             assert_eq!(sack_recovery.dup_acks, n.min(DUP_ACK_THRESHOLD));
@@ -1208,7 +1260,10 @@ mod test {
             ),
             Some(true)
         );
-        assert_eq!(congestion_control.on_dup_ack(ack, snd_nxt), true);
+        assert_eq!(
+            congestion_control.on_dup_ack(ack, snd_nxt),
+            Some(LossRecoveryMode::SackRecovery)
+        );
         assert_eq!(
             congestion_control.assert_sack_recovery().recovery,
             SackRecoveryState::InRecovery(SackInRecoveryState {
@@ -1331,7 +1386,10 @@ mod test {
                     next_seg,
                     congestion_limit: mss.into(),
                     congestion_window: cwnd.cwnd(),
-                    loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: true },
+                    loss_recovery: LossRecoverySegment::Yes {
+                        rearm_retransmit: true,
+                        mode: LossRecoveryMode::SackRecovery,
+                    },
                 })
             );
             scoreboard.increment_pipe(mss.into());
@@ -1414,7 +1472,10 @@ mod test {
                     next_seg: snd_nxt,
                     congestion_limit: mss.into(),
                     congestion_window: cwnd.cwnd(),
-                    loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: false },
+                    loss_recovery: LossRecoverySegment::Yes {
+                        rearm_retransmit: false,
+                        mode: LossRecoveryMode::SackRecovery,
+                    },
                 })
             );
             assert_eq!(recovery.recovery, SackRecoveryState::InRecovery(state_snapshot));
@@ -1491,7 +1552,10 @@ mod test {
                     next_seg: nth_segment_from(snd_una, mss, i).start,
                     congestion_limit: mss.into(),
                     congestion_window: cwnd.cwnd(),
-                    loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: true },
+                    loss_recovery: LossRecoverySegment::Yes {
+                        rearm_retransmit: true,
+                        mode: LossRecoveryMode::SackRecovery,
+                    },
                 })
             );
         }
@@ -1510,7 +1574,10 @@ mod test {
                     next_seg,
                     congestion_limit: mss.into(),
                     congestion_window: cwnd.cwnd(),
-                    loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: true },
+                    loss_recovery: LossRecoverySegment::Yes {
+                        rearm_retransmit: true,
+                        mode: LossRecoveryMode::SackRecovery,
+                    },
                 })
             );
             scoreboard.increment_pipe(mss.into());
@@ -1576,7 +1643,10 @@ mod test {
                     next_seg,
                     congestion_limit: mss.into(),
                     congestion_window: cwnd.cwnd(),
-                    loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: true },
+                    loss_recovery: LossRecoverySegment::Yes {
+                        rearm_retransmit: true,
+                        mode: LossRecoveryMode::SackRecovery,
+                    },
                 })
             );
         }
@@ -1614,7 +1684,10 @@ mod test {
                 next_seg: snd_una,
                 congestion_limit: mss.into(),
                 congestion_window: cwnd.cwnd(),
-                loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: true },
+                loss_recovery: LossRecoverySegment::Yes {
+                    rearm_retransmit: true,
+                    mode: LossRecoveryMode::SackRecovery,
+                },
             })
         );
         let expect_recovery =
@@ -1629,7 +1702,10 @@ mod test {
                     next_seg: snd_nxt - u32::from(mss),
                     congestion_limit: mss.into(),
                     congestion_window: cwnd.cwnd(),
-                    loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: true },
+                    loss_recovery: LossRecoverySegment::Yes {
+                        rearm_retransmit: true,
+                        mode: LossRecoveryMode::SackRecovery,
+                    },
                 })
             );
             assert_eq!(
@@ -1714,7 +1790,10 @@ mod test {
                 next_seg: snd_una,
                 congestion_limit: u32::from(mss),
                 congestion_window: cwnd.cwnd(),
-                loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: true },
+                loss_recovery: LossRecoverySegment::Yes {
+                    rearm_retransmit: true,
+                    mode: LossRecoveryMode::SackRecovery,
+                },
             })
         );
         let recovery_state =
@@ -1728,7 +1807,10 @@ mod test {
                 next_seg: snd_nxt,
                 congestion_limit: u32::from(mss),
                 congestion_window: cwnd.cwnd(),
-                loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: false },
+                loss_recovery: LossRecoverySegment::Yes {
+                    rearm_retransmit: false,
+                    mode: LossRecoveryMode::SackRecovery,
+                },
             })
         );
         // snd_nxt should advance.
@@ -1743,7 +1825,10 @@ mod test {
                 next_seg: nth_segment_from(snd_una, mss, first_sacked_range.end).start,
                 congestion_limit: u32::from(mss),
                 congestion_window: cwnd.cwnd(),
-                loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: true },
+                loss_recovery: LossRecoverySegment::Yes {
+                    rearm_retransmit: true,
+                    mode: LossRecoveryMode::SackRecovery,
+                },
             })
         );
         let recovery_state = SackInRecoveryState {
@@ -1759,7 +1844,10 @@ mod test {
                 next_seg: snd_nxt - u32::from(mss),
                 congestion_limit: u32::from(mss),
                 congestion_window: cwnd.cwnd(),
-                loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: true },
+                loss_recovery: LossRecoverySegment::Yes {
+                    rearm_retransmit: true,
+                    mode: LossRecoveryMode::SackRecovery,
+                },
             })
         );
         let recovery_state = SackInRecoveryState {
@@ -1820,7 +1908,7 @@ mod test {
         );
         // Receiving duplicate acks does not enter recovery.
         for _ in 0..DUP_ACK_THRESHOLD {
-            assert!(!congestion_control.on_dup_ack(snd_una, snd_nxt));
+            assert_eq!(congestion_control.on_dup_ack(snd_una, snd_nxt), None);
         }
 
         let now = FakeInstant::default();
@@ -1887,7 +1975,10 @@ mod test {
                 next_seg: nth_segment_from(snd_una, mss, 100).start,
                 congestion_limit: mss.into(),
                 congestion_window: cwnd.cwnd(),
-                loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: false }
+                loss_recovery: LossRecoverySegment::Yes {
+                    rearm_retransmit: false,
+                    mode: LossRecoveryMode::SackRecovery,
+                }
             })
         );
         assert_eq!(
@@ -1896,7 +1987,10 @@ mod test {
                 next_seg: nth_segment_from(snd_una, mss, 110).start,
                 congestion_limit: mss.into(),
                 congestion_window: cwnd.cwnd(),
-                loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: false }
+                loss_recovery: LossRecoverySegment::Yes {
+                    rearm_retransmit: false,
+                    mode: LossRecoveryMode::SackRecovery,
+                }
             })
         );
     }
