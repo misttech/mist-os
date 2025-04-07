@@ -168,9 +168,7 @@ impl<I: Instant> CongestionControl<I> {
         let Self { params, algorithm: _, loss_recovery, sack_scoreboard } = self;
         let high_rxt = loss_recovery.as_ref().and_then(|lr| match lr {
             LossRecovery::FastRecovery(_) => None,
-            LossRecovery::SackRecovery(sack_recovery) => {
-                sack_recovery.recovery.as_ref().map(|r| r.high_rxt)
-            }
+            LossRecovery::SackRecovery(sack_recovery) => sack_recovery.high_rxt(),
         });
         let is_dup_ack =
             sack_scoreboard.process_ack(seg_ack, snd_nxt, high_rxt, seg_sack_blocks, params.mss);
@@ -262,12 +260,21 @@ impl<I: Instant> CongestionControl<I> {
     }
 
     /// Called upon a retransmission timeout.
-    pub(super) fn on_retransmission_timeout(&mut self) {
+    ///
+    /// `snd_nxt` is the value of SND.NXT _before_ it is rewound to SND.UNA as
+    /// part of an RTO.
+    pub(super) fn on_retransmission_timeout(&mut self, snd_nxt: SeqNum) {
         let Self { params, algorithm, loss_recovery, sack_scoreboard } = self;
         sack_scoreboard.on_retransmission_timeout();
-        // TODO(https://fxbug.dev/42078221): Handle SACK retransmission
-        // timeouts.
-        *loss_recovery = None;
+        let discard_loss_recovery = match loss_recovery {
+            None | Some(LossRecovery::FastRecovery(_)) => true,
+            Some(LossRecovery::SackRecovery(sack_recovery)) => {
+                sack_recovery.on_retransmission_timeout(snd_nxt)
+            }
+        };
+        if discard_loss_recovery {
+            *loss_recovery = None;
+        }
         algorithm.on_retransmission_timeout(params);
     }
 
@@ -316,9 +323,7 @@ impl<I: Instant> CongestionControl<I> {
         // snd_nxt and mss.
         let high_rxt = loss_recovery.as_ref().and_then(|lr| match lr {
             LossRecovery::FastRecovery(_) => None,
-            LossRecovery::SackRecovery(sack_recovery) => {
-                sack_recovery.recovery.as_ref().map(|r| r.high_rxt)
-            }
+            LossRecovery::SackRecovery(sack_recovery) => sack_recovery.high_rxt(),
         });
         sack_scoreboard.on_mss_update(snd_una, snd_nxt, high_rxt, mss);
     }
@@ -559,10 +564,22 @@ impl FastRecovery {
     }
 }
 
-/// The state kept by [`SackRecovery`] when we're in a recovery event.
+/// The state kept by [`SackRecovery`] indicating the recovery state.
 #[derive(Debug)]
 #[cfg_attr(test, derive(Eq, PartialEq, Copy, Clone))]
-struct SackRecoveryState {
+enum SackRecoveryState {
+    /// SACK is currently in active recovery.
+    InRecovery(SackInRecoveryState),
+    /// SACK is holding off starting new recovery after an RTO.
+    PostRto { recovery_point: SeqNum },
+    /// SACK is not in active recovery.
+    NotInRecovery,
+}
+
+/// The state kept by [`SackInRecoveryState::InRecovery`].
+#[derive(Debug)]
+#[cfg_attr(test, derive(Eq, PartialEq, Copy, Clone))]
+struct SackInRecoveryState {
     /// The sequence number that marks the end of the current loss recovery
     /// phase.
     recovery_point: SeqNum,
@@ -596,7 +613,7 @@ pub(crate) struct SackRecovery {
     /// Statekeeping for loss recovery.
     ///
     /// Set to `Some` when we're in recovery state.
-    recovery: Option<SackRecoveryState>,
+    recovery: SackRecoveryState,
 }
 
 impl SackRecovery {
@@ -605,14 +622,32 @@ impl SackRecovery {
             // Unlike FastRecovery, we start with zero duplicate ACKs,
             // congestion control calls on_dup_ack after creation.
             dup_acks: 0,
-            recovery: None,
+            recovery: SackRecoveryState::NotInRecovery,
+        }
+    }
+
+    fn high_rxt(&self) -> Option<SeqNum> {
+        match &self.recovery {
+            SackRecoveryState::InRecovery(SackInRecoveryState {
+                recovery_point: _,
+                high_rxt,
+                rescue_rxt: _,
+            }) => Some(*high_rxt),
+            SackRecoveryState::PostRto { recovery_point: _ } | SackRecoveryState::NotInRecovery => {
+                None
+            }
         }
     }
 
     fn on_ack(&mut self, seg_ack: SeqNum) -> LossRecoveryOnAckOutcome {
         let Self { dup_acks, recovery } = self;
         match recovery {
-            Some(SackRecoveryState { recovery_point, high_rxt: _, rescue_rxt: _ }) => {
+            SackRecoveryState::InRecovery(SackInRecoveryState {
+                recovery_point,
+                high_rxt: _,
+                rescue_rxt: _,
+            })
+            | SackRecoveryState::PostRto { recovery_point } => {
                 // From RFC 6675:
                 //  An incoming cumulative ACK for a sequence number greater than
                 //  RecoveryPoint signals the end of loss recovery, and the loss
@@ -627,7 +662,7 @@ impl SackRecovery {
                     LossRecoveryOnAckOutcome::None
                 }
             }
-            None => {
+            SackRecoveryState::NotInRecovery => {
                 // We're not in loss recovery, we seem to have moved things
                 // forward. Discard loss recovery information.
                 LossRecoveryOnAckOutcome::Discard { recovered: false }
@@ -643,9 +678,12 @@ impl SackRecovery {
         sack_scoreboard: &SackScoreboard,
     ) -> SackDupAckOutcome {
         let Self { dup_acks, recovery } = self;
-        // Already in recovery mode, nothing to do.
-        if recovery.is_some() {
-            return SackDupAckOutcome(false);
+        match recovery {
+            SackRecoveryState::InRecovery(_) | SackRecoveryState::PostRto { .. } => {
+                // Already in recovery mode, nothing to do.
+                return SackDupAckOutcome(false);
+            }
+            SackRecoveryState::NotInRecovery => (),
         }
         *dup_acks += 1;
         // From RFC 6675:
@@ -657,7 +695,7 @@ impl SackRecovery {
             //  (4.1) RecoveryPoint = HighData
             //  When the TCP sender receives a cumulative ACK for this data
             //  octet, the loss recovery phase is terminated.
-            *recovery = Some(SackRecoveryState {
+            *recovery = SackRecoveryState::InRecovery(SackInRecoveryState {
                 recovery_point: snd_nxt,
                 high_rxt: seq_ack,
                 rescue_rxt: None,
@@ -665,6 +703,42 @@ impl SackRecovery {
             SackDupAckOutcome(true)
         } else {
             SackDupAckOutcome(false)
+        }
+    }
+
+    /// Updates SACK recovery to account for a retransmission timeout during
+    /// recovery.
+    ///
+    /// From [RFC 6675 section 5.1]:
+    ///
+    /// > If an RTO occurs during loss recovery as specified in this document,
+    /// > RecoveryPoint MUST be set to HighData.  Further, the new value of
+    /// > RecoveryPoint MUST be preserved and the loss recovery algorithm
+    /// > outlined in this document MUST be terminated.  In addition, a new
+    /// > recovery phase (as described in Section 5) MUST NOT be initiated until
+    /// > HighACK is greater than or equal to the new value of RecoveryPoint.
+    ///
+    /// [RFC 6675 section 5.1]: https://datatracker.ietf.org/doc/html/rfc6675#section-5.1
+    ///
+    /// Returns `true` iff we can clear all recovery state due to the timeout.
+    pub(crate) fn on_retransmission_timeout(&mut self, snd_nxt: SeqNum) -> bool {
+        let Self { dup_acks: _, recovery } = self;
+        match recovery {
+            SackRecoveryState::InRecovery(SackInRecoveryState { .. }) => {
+                *recovery = SackRecoveryState::PostRto { recovery_point: snd_nxt };
+                false
+            }
+            SackRecoveryState::PostRto { recovery_point: _ } => {
+                // NB: The RFC is not exactly clear on what to do here, but the
+                // best interpretation is that we should maintain the old
+                // recovery point until we've hit that point and don't update to
+                // the new (assumedly rewound) snd_nxt.
+                false
+            }
+            SackRecoveryState::NotInRecovery => {
+                // Not in recovery we can reset our state.
+                true
+            }
         }
     }
 
@@ -704,13 +778,16 @@ impl SackRecovery {
         //  data, and the receiver's advertised window allows, transmit up
         //  to 1 SMSS of data starting with the octet HighData+1 and update
         //  HighData to reflect this transmission, then return to (3.2).
-        let Some(SackRecoveryState { recovery_point, high_rxt, rescue_rxt }) = recovery else {
-            return Some(CongestionControlSendOutcome {
-                next_seg: snd_nxt,
-                congestion_limit,
-                congestion_window,
-                loss_recovery: false,
-            });
+        let SackInRecoveryState { recovery_point, high_rxt, rescue_rxt } = match recovery {
+            SackRecoveryState::InRecovery(sack_in_recovery_state) => sack_in_recovery_state,
+            SackRecoveryState::PostRto { recovery_point: _ } | SackRecoveryState::NotInRecovery => {
+                return Some(CongestionControlSendOutcome {
+                    next_seg: snd_nxt,
+                    congestion_limit,
+                    congestion_window,
+                    loss_recovery: false,
+                });
+            }
         };
         // From this point on, everything we send is in loss recovery.
         let loss_recovery = true;
@@ -901,6 +978,13 @@ mod test {
         }
     }
 
+    impl SackRecovery {
+        #[track_caller]
+        fn assert_in_recovery(&mut self) -> &mut SackInRecoveryState {
+            assert_matches!(&mut self.recovery, SackRecoveryState::InRecovery(s) => s)
+        }
+    }
+
     impl<I> CongestionControl<I> {
         #[track_caller]
         fn assert_sack_recovery(&mut self) -> &mut SackRecovery {
@@ -979,7 +1063,7 @@ mod test {
         let snd_nxt = nth_segment_from(ack, mss, 10).end;
 
         let expect_recovery =
-            SackRecoveryState { recovery_point: snd_nxt, high_rxt: ack, rescue_rxt: None };
+            SackInRecoveryState { recovery_point: snd_nxt, high_rxt: ack, rescue_rxt: None };
 
         let mut sack = SackBlock::try_from(nth_segment_from(ack, mss, 1)).unwrap();
         for n in 1..=dup_acks {
@@ -992,7 +1076,11 @@ mod test {
             // We stop counting duplicate acks after the threshold.
             assert_eq!(sack_recovery.dup_acks, n.min(DUP_ACK_THRESHOLD));
 
-            let expect_recovery = (n >= DUP_ACK_THRESHOLD).then(|| expect_recovery.clone());
+            let expect_recovery = if n >= DUP_ACK_THRESHOLD {
+                SackRecoveryState::InRecovery(expect_recovery.clone())
+            } else {
+                SackRecoveryState::NotInRecovery
+            };
             assert_eq!(congestion_control.assert_sack_recovery().recovery, expect_recovery);
 
             let (start, end) = sack.into_parts();
@@ -1012,7 +1100,10 @@ mod test {
         // A cumulative ACK not covering the recovery point arrives.
         assert_eq!(congestion_control.on_ack(ack, bytes_acked, now, rtt), false);
         if dup_acks >= DUP_ACK_THRESHOLD {
-            assert_eq!(congestion_control.assert_sack_recovery().recovery, Some(expect_recovery));
+            assert_eq!(
+                congestion_control.assert_sack_recovery().recovery,
+                SackRecoveryState::InRecovery(expect_recovery)
+            );
         } else {
             assert_matches!(congestion_control.loss_recovery, None);
         }
@@ -1054,7 +1145,11 @@ mod test {
         assert_eq!(congestion_control.on_dup_ack(ack, snd_nxt), true);
         assert_eq!(
             congestion_control.assert_sack_recovery().recovery,
-            Some(SackRecoveryState { recovery_point: snd_nxt, high_rxt: ack, rescue_rxt: None })
+            SackRecoveryState::InRecovery(SackInRecoveryState {
+                recovery_point: snd_nxt,
+                high_rxt: ack,
+                rescue_rxt: None
+            })
         );
     }
 
@@ -1176,7 +1271,7 @@ mod test {
             scoreboard.increment_pipe(mss.into());
             assert_eq!(
                 recovery.recovery,
-                Some(SackRecoveryState {
+                SackRecoveryState::InRecovery(SackInRecoveryState {
                     recovery_point: snd_nxt,
                     high_rxt: nth_segment_from(snd_una, mss, i).end,
                     // RescueRxt is always set to the first retransmitted
@@ -1224,7 +1319,7 @@ mod test {
         // Enter recovery.
         assert_eq!(recovery.on_dup_ack(snd_una, snd_nxt, &scoreboard), SackDupAckOutcome(true));
         // Force HighRxt to the end of the lost block to skip rules 1 and 3.
-        let recovery_state = &mut recovery.recovery.as_mut().unwrap();
+        let recovery_state = recovery.assert_in_recovery();
         recovery_state.high_rxt = nth_segment_from(snd_una, mss, lost_segments - 1).end;
         // Force RecoveryRxt to skip rule 4.
         recovery_state.rescue_rxt = Some(snd_nxt);
@@ -1240,7 +1335,7 @@ mod test {
                 recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
                 None
             );
-            assert_eq!(recovery.recovery, Some(state_snapshot));
+            assert_eq!(recovery.recovery, SackRecoveryState::InRecovery(state_snapshot));
         }
 
         let baseline = baseline + (expect_send - 1) * u32::from(mss) + 1;
@@ -1256,7 +1351,7 @@ mod test {
                     loss_recovery: true
                 })
             );
-            assert_eq!(recovery.recovery, Some(state_snapshot));
+            assert_eq!(recovery.recovery, SackRecoveryState::InRecovery(state_snapshot));
             scoreboard.increment_pipe(mss.into());
             snd_nxt = snd_nxt + u32::from(mss);
         }
@@ -1267,7 +1362,7 @@ mod test {
             recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
             None
         );
-        assert_eq!(recovery.recovery, Some(state_snapshot));
+        assert_eq!(recovery.recovery, SackRecoveryState::InRecovery(state_snapshot));
     }
 
     #[test_matrix(
@@ -1334,12 +1429,12 @@ mod test {
                 })
             );
         }
-        let expect_recovery = SackRecoveryState {
+        let expect_recovery = SackInRecoveryState {
             recovery_point: snd_nxt,
             high_rxt: nth_segment_from(snd_una, mss, first_sacked_range.start).start,
             rescue_rxt: Some(nth_segment_from(snd_una, mss, 0).end),
         };
-        assert_eq!(recovery.recovery, Some(expect_recovery));
+        assert_eq!(recovery.recovery, SackRecoveryState::InRecovery(expect_recovery));
 
         for i in 0..expect_send {
             let next_seg = snd_una + (first_sacked_range.end + i) * u32::from(mss);
@@ -1355,7 +1450,10 @@ mod test {
             scoreboard.increment_pipe(mss.into());
             assert_eq!(
                 recovery.recovery,
-                Some(SackRecoveryState { high_rxt: next_seg + u32::from(mss), ..expect_recovery })
+                SackRecoveryState::InRecovery(SackInRecoveryState {
+                    high_rxt: next_seg + u32::from(mss),
+                    ..expect_recovery
+                })
             );
         }
         // Ran out of CWND.
@@ -1416,14 +1514,14 @@ mod test {
                 })
             );
         }
-        let expect_recovery = SackRecoveryState {
+        let expect_recovery = SackInRecoveryState {
             recovery_point: snd_nxt,
             high_rxt: nth_segment_from(snd_una, mss, lost_segments).start,
             // RescueRxt is always set to the first retransmitted
             // segment.
             rescue_rxt: Some(nth_segment_from(snd_una, mss, 0).end),
         };
-        assert_eq!(recovery.recovery, Some(expect_recovery));
+        assert_eq!(recovery.recovery, SackRecoveryState::InRecovery(expect_recovery));
 
         // Rule 4 should only hit after we receive an ACK past the first
         // RescueRxt value that was set.
@@ -1442,7 +1540,7 @@ mod test {
             mss
         ));
         assert_eq!(recovery.on_ack(snd_una), LossRecoveryOnAckOutcome::None);
-        assert_eq!(recovery.recovery, Some(expect_recovery));
+        assert_eq!(recovery.recovery, SackRecoveryState::InRecovery(expect_recovery));
         // Rule 3 will hit once here because we have a single not lost segment.
         assert_eq!(
             recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
@@ -1454,8 +1552,8 @@ mod test {
             })
         );
         let expect_recovery =
-            SackRecoveryState { high_rxt: snd_una + u32::from(mss), ..expect_recovery };
-        assert_eq!(recovery.recovery, Some(expect_recovery));
+            SackInRecoveryState { high_rxt: snd_una + u32::from(mss), ..expect_recovery };
+        assert_eq!(recovery.recovery, SackRecoveryState::InRecovery(expect_recovery));
 
         // Now we should hit Rule 4, as long as we have unacknowledged data.
         if right_edge_segments > 0 {
@@ -1470,7 +1568,7 @@ mod test {
             );
             assert_eq!(
                 recovery.recovery,
-                Some(SackRecoveryState {
+                SackRecoveryState::InRecovery(SackInRecoveryState {
                     rescue_rxt: Some(expect_recovery.recovery_point),
                     ..expect_recovery
                 })
@@ -1526,9 +1624,11 @@ mod test {
 
         // Create a situation where a single sequential round of calls to
         // poll_send will hit each rule.
-        let recovery_state = SackRecoveryState { recovery_point: snd_nxt, high_rxt, rescue_rxt };
-        let mut recovery =
-            SackRecovery { dup_acks: DUP_ACK_THRESHOLD, recovery: Some(recovery_state) };
+        let recovery_state = SackInRecoveryState { recovery_point: snd_nxt, high_rxt, rescue_rxt };
+        let mut recovery = SackRecovery {
+            dup_acks: DUP_ACK_THRESHOLD,
+            recovery: SackRecoveryState::InRecovery(recovery_state),
+        };
 
         // Define a congestion window that allows sending a single segment,
         // we'll not update the pipe variable at each call so we should never
@@ -1552,8 +1652,8 @@ mod test {
             })
         );
         let recovery_state =
-            SackRecoveryState { high_rxt: snd_una + u32::from(mss), ..recovery_state };
-        assert_eq!(recovery.recovery, Some(recovery_state));
+            SackInRecoveryState { high_rxt: snd_una + u32::from(mss), ..recovery_state };
+        assert_eq!(recovery.recovery, SackRecoveryState::InRecovery(recovery_state));
 
         // Hit Rule 2.
         assert_eq!(
@@ -1568,7 +1668,7 @@ mod test {
         // snd_nxt should advance.
         let snd_nxt = snd_nxt + u32::from(mss);
         // No change to recovery state.
-        assert_eq!(recovery.recovery, Some(recovery_state));
+        assert_eq!(recovery.recovery, SackRecoveryState::InRecovery(recovery_state));
 
         // Hit Rule 3.
         assert_eq!(
@@ -1580,11 +1680,11 @@ mod test {
                 loss_recovery: true
             })
         );
-        let recovery_state = SackRecoveryState {
+        let recovery_state = SackInRecoveryState {
             high_rxt: nth_segment_from(snd_una, mss, second_sacked_range.start).start,
             ..recovery_state
         };
-        assert_eq!(recovery.recovery, Some(recovery_state));
+        assert_eq!(recovery.recovery, SackRecoveryState::InRecovery(recovery_state));
 
         // Hit Rule 4.
         assert_eq!(
@@ -1596,9 +1696,11 @@ mod test {
                 loss_recovery: true
             })
         );
-        let recovery_state =
-            SackRecoveryState { rescue_rxt: Some(recovery_state.recovery_point), ..recovery_state };
-        assert_eq!(recovery.recovery, Some(recovery_state));
+        let recovery_state = SackInRecoveryState {
+            rescue_rxt: Some(recovery_state.recovery_point),
+            ..recovery_state
+        };
+        assert_eq!(recovery.recovery, SackRecoveryState::InRecovery(recovery_state));
 
         // Hit all the rules. Nothing to send even if we still have cwnd.
         assert_eq!(
@@ -1606,5 +1708,73 @@ mod test {
             None
         );
         assert!(cwnd.cwnd() - scoreboard.pipe() >= u32::from(mss));
+    }
+
+    #[test]
+    fn sack_rto() {
+        let mss = DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE;
+        let mut congestion_control = CongestionControl::<FakeInstant>::cubic_with_mss(mss);
+
+        let rto_snd_nxt = SeqNum::new(50);
+        // Set ourselves up not in recovery.
+        congestion_control.loss_recovery = Some(LossRecovery::SackRecovery(SackRecovery {
+            dup_acks: DUP_ACK_THRESHOLD - 1,
+            recovery: SackRecoveryState::NotInRecovery,
+        }));
+        congestion_control.on_retransmission_timeout(rto_snd_nxt);
+        assert_matches!(congestion_control.loss_recovery, None);
+
+        // Set ourselves up in loss recovery.
+        congestion_control.loss_recovery = Some(LossRecovery::SackRecovery(SackRecovery {
+            dup_acks: DUP_ACK_THRESHOLD,
+            recovery: SackRecoveryState::InRecovery(SackInRecoveryState {
+                recovery_point: SeqNum::new(10),
+                high_rxt: SeqNum::new(0),
+                rescue_rxt: None,
+            }),
+        }));
+        congestion_control.on_retransmission_timeout(rto_snd_nxt);
+        assert_eq!(
+            congestion_control.assert_sack_recovery().recovery,
+            SackRecoveryState::PostRto { recovery_point: rto_snd_nxt }
+        );
+
+        let snd_una = SeqNum::new(0);
+        let snd_nxt = SeqNum::new(10);
+        // While in RTO held off state, we always send next data as if we were
+        // not in recovery.
+        assert_eq!(
+            congestion_control.poll_send(snd_una, snd_nxt, WindowSize::ZERO, 0),
+            Some(CongestionControlSendOutcome {
+                next_seg: snd_nxt,
+                congestion_limit: u32::from(mss),
+                congestion_window: congestion_control.inspect_cwnd().cwnd(),
+                loss_recovery: false
+            })
+        );
+        // Receiving duplicate acks does not enter recovery.
+        for _ in 0..DUP_ACK_THRESHOLD {
+            assert!(!congestion_control.on_dup_ack(snd_una, snd_nxt));
+        }
+
+        let now = FakeInstant::default();
+        let rtt = Some(Duration::from_millis(1));
+
+        // Receiving an ack before the RTO recovery point does not stop
+        // recovery.
+        let bytes_acked = NonZeroU32::new(u32::try_from(snd_nxt - snd_una).unwrap()).unwrap();
+        let snd_una = snd_nxt;
+        assert!(!congestion_control.on_ack(snd_una, bytes_acked, now, rtt));
+        assert_eq!(
+            congestion_control.assert_sack_recovery().recovery,
+            SackRecoveryState::PostRto { recovery_point: rto_snd_nxt }
+        );
+
+        // Covering the recovery point allows us to discard recovery state.
+        let bytes_acked = NonZeroU32::new(u32::try_from(rto_snd_nxt - snd_una).unwrap()).unwrap();
+        let snd_una = rto_snd_nxt;
+
+        assert!(congestion_control.on_ack(snd_una, bytes_acked, now, rtt));
+        assert_matches!(congestion_control.loss_recovery, None);
     }
 }

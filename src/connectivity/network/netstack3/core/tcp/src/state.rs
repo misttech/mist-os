@@ -1316,9 +1316,12 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                     //         expires after RTO seconds (for the value of
                     //         RTO after the doubling operation outlined in
                     //         5.5).
+
+                    // NB: congestion control needs to know the value of SND.NXT
+                    // before we rewind it.
+                    congestion_control.on_retransmission_timeout(*snd_nxt);
                     *snd_nxt = *snd_una;
                     retrans_timer.backoff(now);
-                    congestion_control.on_retransmission_timeout();
                     counters.increment(|c| &c.timeouts);
                     increment_retransmit_counters(congestion_control);
                 }
