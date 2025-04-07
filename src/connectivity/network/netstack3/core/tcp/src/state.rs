@@ -73,8 +73,12 @@ const SWS_PROBE_TIMEOUT: Duration = Duration::from_millis(100);
 const SWS_BUFFER_FACTOR: u32 = 2;
 
 /// Whether netstack3 senders support receiving selective acks.
-// TODO(https://fxbug.dev/42078221): Tell the peer we can do SACK.
+// TODO(https://fxbug.dev/42078221): Tell the peer we can do SACK even when not
+// in tests.
+#[cfg(not(test))]
 const SACK_PERMITTED: bool = false;
+#[cfg(test)]
+const SACK_PERMITTED: bool = true;
 
 /// A trait abstracting an identifier for a state machine.
 ///
@@ -3907,6 +3911,7 @@ mod test {
             HandshakeOptions {
                 mss: Some(Mss::default::<Ipv4>()),
                 window_scale: Some(WindowScale::default()),
+                sack_permitted: SACK_PERMITTED,
                 ..Default::default()
             }.into()),
         SynRcvd {
@@ -3924,7 +3929,7 @@ mod test {
             smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             rcv_wnd_scale: WindowScale::default(),
             snd_wnd_scale: Some(WindowScale::default()),
-            sack_permitted: SACK_PERMITTED,
+            sack_permitted: false,
         }
     ); "SYN only")]
     #[test_case(
@@ -3980,6 +3985,7 @@ mod test {
                 HandshakeOptions {
                     mss: Some(Mss::default::<Ipv4>()),
                     window_scale: Some(WindowScale::default()),
+                    sack_permitted: SACK_PERMITTED,
                     ..Default::default()
                 }.into()),
             SynRcvd {
@@ -3995,7 +4001,7 @@ mod test {
                 simultaneous_open: None,
                 buffer_sizes: BufferSizes::default(),
                 smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                sack_permitted: SACK_PERMITTED,
+                sack_permitted: false,
                 rcv_wnd_scale: WindowScale::default(),
                 snd_wnd_scale: Some(WindowScale::default()),
             }); "accept syn")]
@@ -4986,8 +4992,9 @@ mod test {
     const BUFFER_SIZE: usize = 16;
     const TEST_BYTES: &[u8] = "Hello".as_bytes();
 
-    #[test]
-    fn established_receive() {
+    #[test_case(true; "sack permitted")]
+    #[test_case(false; "sack not permitted")]
+    fn established_receive(sack_permitted: bool) {
         let clock = FakeInstantCtx::default();
         let counters = FakeTcpCounters::default();
         let mut established = State::Established(Established {
@@ -5020,7 +5027,7 @@ mod test {
                 mss: Mss(NonZeroU16::new(5).unwrap()),
                 wnd_scale: WindowScale::default(),
                 last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
-                sack_permitted: SACK_PERMITTED,
+                sack_permitted,
             }
             .into(),
         });
@@ -5050,22 +5057,32 @@ mod test {
         );
 
         // Receive an out-of-order segment.
+        let segment_start = ISS_2 + 1 + TEST_BYTES.len() * 2;
         assert_eq!(
             established.on_segment_with_default_options::<_, ClientlessBufferProvider>(
-                Segment::data(
-                    ISS_2 + 1 + TEST_BYTES.len() * 2,
-                    ISS_1 + 1,
-                    UnscaledWindowSize::from(0),
-                    TEST_BYTES,
-                ),
+                Segment::data(segment_start, ISS_1 + 1, UnscaledWindowSize::from(0), TEST_BYTES,),
                 clock.now(),
                 &counters.refs()
             ),
             (
-                Some(Segment::ack(
+                Some(Segment::ack_with_options(
                     ISS_1 + 1,
                     ISS_2 + 1 + TEST_BYTES.len(),
                     UnscaledWindowSize::from(u16::try_from(BUFFER_SIZE).unwrap()),
+                    SegmentOptions {
+                        sack_blocks: if sack_permitted {
+                            [SackBlock::try_new(
+                                segment_start,
+                                segment_start + u32::try_from(TEST_BYTES.len()).unwrap(),
+                            )
+                            .unwrap()]
+                            .into_iter()
+                            .collect()
+                        } else {
+                            SackBlocks::default()
+                        }
+                    }
+                    .into()
                 )),
                 None
             ),
@@ -7088,8 +7105,9 @@ mod test {
         assert_eq!(state.poll_send_at(), None);
     }
 
-    #[test]
-    fn immediate_ack_if_out_of_order_or_fin() {
+    #[test_case(true; "sack permitted")]
+    #[test_case(false; "sack not permitted")]
+    fn immediate_ack_if_out_of_order_or_fin(sack_permitted: bool) {
         let clock = FakeInstantCtx::default();
         let counters = FakeTcpCounters::default();
         let socket_options =
@@ -7127,18 +7145,19 @@ mod test {
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
                 last_window_update: (ISS_2 + 1, WindowSize::new(TEST_BYTES.len() + 1).unwrap()),
-                sack_permitted: SACK_PERMITTED,
+                sack_permitted,
             }
             .into(),
         });
         // Upon receiving an out-of-order segment, we should send an ACK
         // immediately.
+        let segment_start = ISS_2 + 2;
         assert_eq!(
             state.on_segment::<_, ClientlessBufferProvider>(
                 &FakeStateMachineDebugId,
                 &counters.refs(),
                 Segment::data(
-                    ISS_2 + 2,
+                    segment_start,
                     ISS_1 + 1,
                     UnscaledWindowSize::from(u16::MAX),
                     &TEST_BYTES[1..]
@@ -7148,10 +7167,24 @@ mod test {
                 false, /* defunct */
             ),
             (
-                Some(Segment::ack(
+                Some(Segment::ack_with_options(
                     ISS_1 + 1,
                     ISS_2 + 1,
-                    UnscaledWindowSize::from(u16::try_from(TEST_BYTES.len() + 1).unwrap())
+                    UnscaledWindowSize::from(u16::try_from(TEST_BYTES.len() + 1).unwrap()),
+                    SegmentOptions {
+                        sack_blocks: if sack_permitted {
+                            [SackBlock::try_new(
+                                segment_start,
+                                segment_start + u32::try_from(TEST_BYTES.len()).unwrap() - 1,
+                            )
+                            .unwrap()]
+                            .into_iter()
+                            .collect()
+                        } else {
+                            SackBlocks::default()
+                        }
+                    }
+                    .into()
                 )),
                 None,
                 DataAcked::No,
