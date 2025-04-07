@@ -1,0 +1,46 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+@available(added=HEAD)
+library fuchsia.hardware.powerlevel;
+
+type PowerLevelError = flexible enum {
+    /// The driver encountered an otherwise unspecified error while performing the operation
+    INTERNAL_ERROR = 1;
+
+    /// The requested operation is not supported.
+    NOT_SUPPORTED = 2;
+
+    /// The method was provided illegal arguments. For example, the power level provided is not
+    /// supported.
+    INVALID_ARGS = 3;
+
+    /// The power level of the device could not be determined because of the state of the hardware.
+    /// Possibly because it has not been configured or because the device is in a state where its
+    /// power level could not be determined.
+    LEVEL_UNKNOWN = 4;
+};
+
+@discoverable
+open protocol PowerLevel {
+    /// Set the power level for this device to a specific value.
+    /// Returns NOT_SUPPORTED if this device does not support setting a power level.
+    /// Returns INVALID_ARGS if the power level requested is not valid.
+    /// Returns INTERNAL_ERROR if the requested power level could not be achieved. In this case the
+    /// final power level of the device is undefined.
+    flexible SetPowerLevel(struct {
+        level uint32;
+    }) -> () error PowerLevelError;
+
+    /// Gets the current power level of the device.
+    /// Returns NOT_SUPPORTED if this device does not support reading the power level.
+    /// Returns LEVEL_UNKNOWN if the current power level could not be determined.
+    /// Returns INTERNAL_ERROR if an internal driver or hardware error occurs.
+    flexible GetPowerLevel() -> (struct {
+        out_level uint32;
+    }) error PowerLevelError;
+};
+
+service PowerLevelService {
+    power_setter client_end:PowerLevel;
+};

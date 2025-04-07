@@ -95,6 +95,7 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.hardware.power.sensor:fuchsia.hardware.power.sensor",
   "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol",
   "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power",
+  "//sdk/fidl/fuchsia.hardware.powerlevel:fuchsia.hardware.powerlevel",
   "//sdk/fidl/fuchsia.hardware.qualcomm.router:fuchsia.hardware.qualcomm.router",
   "//sdk/fidl/fuchsia.hardware.radar:fuchsia.hardware.radar",
   "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers",
