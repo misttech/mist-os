@@ -8,6 +8,7 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/driver/compat/cpp/logging.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/internal/test_environment.h>
@@ -15,7 +16,6 @@
 
 #include <gtest/gtest.h>
 
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace aml_canvas {
@@ -44,16 +44,16 @@ class AmlCanvasDriverTest : public ::testing::Test {
     static constexpr uint64_t kMmioVmoSize = 0x2000;
     ASSERT_OK(zx::vmo::create(kMmioVmoSize, 0, &mmio_vmo));
 
-    fake_pdev::FakePDevFidl::Config config;
+    fdf_fake::FakePDev::Config config;
     config.use_fake_bti = true;
-    config.mmios[0] = fake_pdev::MmioInfo{
-        .vmo = std::move(mmio_vmo),
+    config.mmios[0] = fdf::PDev::MmioInfo{
         .offset = 0,
         .size = kMmioVmoSize,
+        .vmo = std::move(mmio_vmo),
     };
-    fake_pdev_.SyncCall(&fake_pdev::FakePDevFidl::SetConfig, std::move(config));
+    fake_pdev_.SyncCall(&fdf_fake::FakePDev::SetConfig, std::move(config));
 
-    auto instance_handler = fake_pdev_.SyncCall(&fake_pdev::FakePDevFidl::GetInstanceHandler,
+    auto instance_handler = fake_pdev_.SyncCall(&fdf_fake::FakePDev::GetInstanceHandler,
                                                 async_patterns::PassDispatcher);
     test_environment_.SyncCall([&](fdf_testing::internal::TestEnvironment* env) {
       const zx::result result =
@@ -114,8 +114,8 @@ class AmlCanvasDriverTest : public ::testing::Test {
 
   async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
       env_async_dispatcher(), std::in_place, std::string("root")};
-  async_patterns::TestDispatcherBound<fake_pdev::FakePDevFidl> fake_pdev_{env_async_dispatcher(),
-                                                                          std::in_place};
+  async_patterns::TestDispatcherBound<fdf_fake::FakePDev> fake_pdev_{env_async_dispatcher(),
+                                                                     std::in_place};
   async_patterns::TestDispatcherBound<fdf_testing::internal::TestEnvironment> test_environment_{
       env_async_dispatcher(), std::in_place};
 
