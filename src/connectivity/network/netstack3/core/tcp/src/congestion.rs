@@ -287,6 +287,12 @@ impl<I: Instant> CongestionControl<I> {
         self.sack_scoreboard.pipe()
     }
 
+    /// Inflates the congestion window by `value` to facilitate testing.
+    #[cfg(test)]
+    pub(super) fn inflate_cwnd(&mut self, inflation: u32) {
+        self.params.cwnd += inflation;
+    }
+
     pub(super) fn cubic_with_mss(mss: Mss) -> Self {
         Self {
             params: CongestionControlParams::with_mss(mss),
@@ -380,7 +386,7 @@ impl<I: Instant> CongestionControl<I> {
                     next_seg: snd_nxt,
                     congestion_limit,
                     congestion_window,
-                    loss_recovery: false,
+                    loss_recovery: LossRecoverySegment::No,
                 })
             }
             Some(LossRecovery::FastRecovery(fast_recovery)) => {
@@ -396,6 +402,35 @@ impl<I: Instant> CongestionControl<I> {
             ),
         }
     }
+}
+
+/// Indicates whether the segment yielded in [`CongestionControlSendOutcome`] is
+/// a loss recovery segment.
+#[derive(Debug)]
+#[cfg_attr(test, derive(Copy, Clone, Eq, PartialEq))]
+pub(super) enum LossRecoverySegment {
+    /// Indicates the segment is a loss recovery segment.
+    Yes {
+        /// If true, the retransmit timer should be rearmed due to this loss
+        /// recovery segment.
+        ///
+        /// This is used in SACK recovery to prevent RTOs during retransmission,
+        /// from [RFC 6675 section 6]:
+        ///
+        /// > Therefore, we give implementers the latitude to use the standard
+        /// > [RFC6298]-style RTO management or, optionally, a more careful
+        /// > variant that re-arms the RTO timer on each retransmission that is
+        /// > sent during recovery MAY be used.  This provides a more
+        /// > conservative timer than specified in [RFC6298], and so may not
+        /// > always be an attractive alternative.  However, in some cases it
+        /// > may prevent needless retransmissions, go-back-N transmission, and
+        /// > further reduction of the congestion window.
+        ///
+        /// [RFC 6675 section 6]: https://datatracker.ietf.org/doc/html/rfc6675#section-6
+        rearm_retransmit: bool,
+    },
+    /// Indicates the segment is *not* a loss recovery segment.
+    No,
 }
 
 /// The outcome of [`CongestionControl::poll_send`].
@@ -415,8 +450,8 @@ pub(super) struct CongestionControlSendOutcome {
     /// This is the estimated total congestion window, including loss
     /// recovery-based inflation.
     pub congestion_window: u32,
-    /// True if this segment is the outcome of a loss recovery attempt.
-    pub loss_recovery: bool,
+    /// Whether this is a loss recovery segment.
+    pub loss_recovery: LossRecoverySegment,
 }
 
 /// The current loss recovery mode.
@@ -496,12 +531,12 @@ impl FastRecovery {
             //     [...].
             //
             // So we always set the congestion limit to be just the mss.
-            Some(f) => (f, true, cwnd.mss().into()),
+            Some(f) => (f, LossRecoverySegment::Yes { rearm_retransmit: false }, cwnd.mss().into()),
             // There's no fast retransmit pending, use snd_nxt applying the used
             // congestion window.
             None => (
                 snd_nxt,
-                false,
+                LossRecoverySegment::No,
                 congestion_window.saturating_sub(used_congestion_window).min(cwnd.mss().into()),
             ),
         };
@@ -653,7 +688,9 @@ impl SackRecovery {
                 //  RecoveryPoint signals the end of loss recovery, and the loss
                 //  recovery phase MUST be terminated.
                 if seg_ack.after_or_eq(*recovery_point) {
-                    LossRecoveryOnAckOutcome::Discard { recovered: true }
+                    LossRecoveryOnAckOutcome::Discard {
+                        recovered: matches!(recovery, SackRecoveryState::InRecovery(_)),
+                    }
                 } else {
                     // From RFC 6675:
                     //  If the incoming ACK is a cumulative acknowledgment, the
@@ -785,12 +822,35 @@ impl SackRecovery {
                     next_seg: snd_nxt,
                     congestion_limit,
                     congestion_window,
-                    loss_recovery: false,
+                    loss_recovery: LossRecoverySegment::No,
                 });
             }
         };
-        // From this point on, everything we send is in loss recovery.
-        let loss_recovery = true;
+
+        // From RFC 6675 section 6:
+        //
+        //  we give implementers the latitude to use the standard
+        //  [RFC6298]-style RTO management or, optionally, a more careful
+        //  variant that re-arms the RTO timer on each retransmission that is
+        //  sent during recovery MAY be used.  This provides a more conservative
+        //  timer than specified in [RFC6298].
+        //
+        // As a local decision, we only rearm the retransmit timer for rules 1
+        // and 3 (regular retransmissions) when the next segment trying to be
+        // sent out is _before_ the recovery point that initiated this loss
+        // recovery. Given the recovery algorithm greedily keeps sending more
+        // data as long as it's available to keep the ACK clock running, there's
+        // a catastrophic scenario where the data sent past the recovery point
+        // creates new holes in the sack scoreboard that are filled by rules 1
+        // and 3 and rearm the RTO, even if the retransmissions from holes
+        // before RecoveryPoint might be lost themselves. Hence, once the
+        // algorithm has moved past trying to fix things past the RecoveryPoint
+        // we stop rearming the RTO in case the ACK for RecoveryPoint never
+        // arrives.
+        //
+        // Note that rule 4 always rearms the retransmission timer because it
+        // sents only a single segment per entry into recovery.¡
+        let rearm_retransmit = |next_seg: SeqNum| next_seg.before(*recovery_point);
 
         // run NextSeg() as defined in RFC 6675.
 
@@ -831,7 +891,9 @@ impl SackRecovery {
                     next_seg: first_hole.start(),
                     congestion_limit,
                     congestion_window,
-                    loss_recovery,
+                    loss_recovery: LossRecoverySegment::Yes {
+                        rearm_retransmit: rearm_retransmit(first_hole.start()),
+                    },
                 });
             }
         }
@@ -856,7 +918,7 @@ impl SackRecovery {
                 // signaling that we're in loss recovery. Our goal here is
                 // to keep the ACK clock running and prevent an RTO, so we
                 // don't want this segment to be delayed by anything.
-                loss_recovery,
+                loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: false },
             });
         }
 
@@ -876,7 +938,9 @@ impl SackRecovery {
                 next_seg: first_hole.start(),
                 congestion_limit,
                 congestion_window,
-                loss_recovery,
+                loss_recovery: LossRecoverySegment::Yes {
+                    rearm_retransmit: rearm_retransmit(first_hole.start()),
+                },
             });
         }
 
@@ -903,7 +967,9 @@ impl SackRecovery {
                         next_seg: left,
                         congestion_limit,
                         congestion_window,
-                        loss_recovery,
+                        // NB: Rescue retransmissions can only happen once in
+                        // every recovery enter, so always rearm the RTO.
+                        loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: true },
                     });
                 }
             }
@@ -1194,7 +1260,7 @@ mod test {
                     next_seg: snd_nxt,
                     congestion_limit: mss.into(),
                     congestion_window: cwnd.cwnd(),
-                    loss_recovery: false
+                    loss_recovery: LossRecoverySegment::No,
                 })
             );
             scoreboard.increment_pipe(mss.into());
@@ -1265,7 +1331,7 @@ mod test {
                     next_seg,
                     congestion_limit: mss.into(),
                     congestion_window: cwnd.cwnd(),
-                    loss_recovery: true
+                    loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: true },
                 })
             );
             scoreboard.increment_pipe(mss.into());
@@ -1348,7 +1414,7 @@ mod test {
                     next_seg: snd_nxt,
                     congestion_limit: mss.into(),
                     congestion_window: cwnd.cwnd(),
-                    loss_recovery: true
+                    loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: false },
                 })
             );
             assert_eq!(recovery.recovery, SackRecoveryState::InRecovery(state_snapshot));
@@ -1425,7 +1491,7 @@ mod test {
                     next_seg: nth_segment_from(snd_una, mss, i).start,
                     congestion_limit: mss.into(),
                     congestion_window: cwnd.cwnd(),
-                    loss_recovery: true
+                    loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: true },
                 })
             );
         }
@@ -1444,7 +1510,7 @@ mod test {
                     next_seg,
                     congestion_limit: mss.into(),
                     congestion_window: cwnd.cwnd(),
-                    loss_recovery: true
+                    loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: true },
                 })
             );
             scoreboard.increment_pipe(mss.into());
@@ -1510,7 +1576,7 @@ mod test {
                     next_seg,
                     congestion_limit: mss.into(),
                     congestion_window: cwnd.cwnd(),
-                    loss_recovery: true
+                    loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: true },
                 })
             );
         }
@@ -1548,7 +1614,7 @@ mod test {
                 next_seg: snd_una,
                 congestion_limit: mss.into(),
                 congestion_window: cwnd.cwnd(),
-                loss_recovery: true
+                loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: true },
             })
         );
         let expect_recovery =
@@ -1563,7 +1629,7 @@ mod test {
                     next_seg: snd_nxt - u32::from(mss),
                     congestion_limit: mss.into(),
                     congestion_window: cwnd.cwnd(),
-                    loss_recovery: true
+                    loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: true },
                 })
             );
             assert_eq!(
@@ -1648,7 +1714,7 @@ mod test {
                 next_seg: snd_una,
                 congestion_limit: u32::from(mss),
                 congestion_window: cwnd.cwnd(),
-                loss_recovery: true
+                loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: true },
             })
         );
         let recovery_state =
@@ -1662,7 +1728,7 @@ mod test {
                 next_seg: snd_nxt,
                 congestion_limit: u32::from(mss),
                 congestion_window: cwnd.cwnd(),
-                loss_recovery: true
+                loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: false },
             })
         );
         // snd_nxt should advance.
@@ -1677,7 +1743,7 @@ mod test {
                 next_seg: nth_segment_from(snd_una, mss, first_sacked_range.end).start,
                 congestion_limit: u32::from(mss),
                 congestion_window: cwnd.cwnd(),
-                loss_recovery: true
+                loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: true },
             })
         );
         let recovery_state = SackInRecoveryState {
@@ -1693,7 +1759,7 @@ mod test {
                 next_seg: snd_nxt - u32::from(mss),
                 congestion_limit: u32::from(mss),
                 congestion_window: cwnd.cwnd(),
-                loss_recovery: true
+                loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: true },
             })
         );
         let recovery_state = SackInRecoveryState {
@@ -1749,7 +1815,7 @@ mod test {
                 next_seg: snd_nxt,
                 congestion_limit: u32::from(mss),
                 congestion_window: congestion_control.inspect_cwnd().cwnd(),
-                loss_recovery: false
+                loss_recovery: LossRecoverySegment::No,
             })
         );
         // Receiving duplicate acks does not enter recovery.
@@ -1774,7 +1840,64 @@ mod test {
         let bytes_acked = NonZeroU32::new(u32::try_from(rto_snd_nxt - snd_una).unwrap()).unwrap();
         let snd_una = rto_snd_nxt;
 
-        assert!(congestion_control.on_ack(snd_una, bytes_acked, now, rtt));
+        // Not considered a recovery event since RTO is the thing that recovered
+        // us.
+        assert_eq!(congestion_control.on_ack(snd_una, bytes_acked, now, rtt), false);
         assert_matches!(congestion_control.loss_recovery, None);
+    }
+
+    #[test]
+    fn dont_rearm_rto_past_recovery_point() {
+        let mut scoreboard = SackScoreboard::default();
+        let mss = DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE;
+        let snd_una = SeqNum::new(1);
+
+        let recovery_point = nth_segment_from(snd_una, mss, 100).start;
+        let snd_nxt = recovery_point + 100 * u32::from(mss);
+
+        let mut recovery = SackRecovery {
+            dup_acks: DUP_ACK_THRESHOLD,
+            recovery: SackRecoveryState::InRecovery(SackInRecoveryState {
+                recovery_point,
+                high_rxt: recovery_point,
+                rescue_rxt: Some(recovery_point),
+            }),
+        };
+
+        let block1 = nth_range(snd_una, mss, 101..110);
+        let block2 = nth_range(snd_una, mss, 111..112);
+        assert!(scoreboard.process_ack(
+            snd_una,
+            snd_nxt,
+            recovery.high_rxt(),
+            &[SackBlock::try_from(block1).unwrap(), SackBlock::try_from(block2).unwrap()]
+                .into_iter()
+                .collect(),
+            mss,
+        ));
+
+        let cwnd = CongestionWindow::new(u32::MAX, mss);
+
+        let snd_wnd = WindowSize::ZERO;
+        let available_bytes = 0;
+
+        assert_eq!(
+            recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+            Some(CongestionControlSendOutcome {
+                next_seg: nth_segment_from(snd_una, mss, 100).start,
+                congestion_limit: mss.into(),
+                congestion_window: cwnd.cwnd(),
+                loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: false }
+            })
+        );
+        assert_eq!(
+            recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+            Some(CongestionControlSendOutcome {
+                next_seg: nth_segment_from(snd_una, mss, 110).start,
+                congestion_limit: mss.into(),
+                congestion_window: cwnd.cwnd(),
+                loss_recovery: LossRecoverySegment::Yes { rearm_retransmit: false }
+            })
+        );
     }
 }

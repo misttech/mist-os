@@ -29,7 +29,9 @@ use crate::internal::base::{
     BufferSizes, BuffersRefMut, ConnectionError, IcmpErrorResult, KeepAlive, SocketOptions,
 };
 use crate::internal::buffer::{Assembler, BufferLimits, IntoBuffers, ReceiveBuffer, SendBuffer};
-use crate::internal::congestion::{CongestionControl, CongestionControlSendOutcome};
+use crate::internal::congestion::{
+    CongestionControl, CongestionControlSendOutcome, LossRecoverySegment,
+};
 use crate::internal::counters::TcpCountersRefs;
 use crate::internal::rtt::{Estimator, Rto, RttSampler};
 
@@ -1450,7 +1452,11 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             //  - the segment is not a FIN (a FIN segment never needs to be
             //    delayed).
             //  - this is not a loss-recovery frame.
-            if bytes_to_send < mss && !has_fin && !loss_recovery {
+            let loss_recovery_allow_delay = match loss_recovery {
+                LossRecoverySegment::Yes { rearm_retransmit: _ } => false,
+                LossRecoverySegment::No => true,
+            };
+            if bytes_to_send < mss && !has_fin && loss_recovery_allow_delay {
                 if bytes_to_send == 0 {
                     return None;
                 }
@@ -1571,20 +1577,24 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         //         retransmission), if the timer is not running, start it
         //         running so that it will expire after RTO seconds (for the
         //         current value of RTO).
-        //
-        // TODO(https://fxbug.dev/42078221): If this is a SACK recovery
-        // retransmit, RFC 6675 calls that we should rearm the retransmission
-        // timer to avoid spurious RTO.
-        match timer {
-            Some(SendTimer::Retrans(_)) | Some(SendTimer::ZeroWindowProbe(_)) => {}
-            Some(SendTimer::KeepAlive(_)) | Some(SendTimer::SWSProbe { at: _ }) | None => {
-                *timer = Some(SendTimer::Retrans(RetransTimer::new(
-                    now,
-                    rtt_estimator.rto(),
-                    *user_timeout,
-                    DEFAULT_MAX_RETRIES,
-                )))
+        let update_rto = match timer {
+            Some(SendTimer::Retrans(_)) | Some(SendTimer::ZeroWindowProbe(_)) => {
+                // Loss recovery might have asked us to rearm either way, check
+                // with it.
+                match loss_recovery {
+                    LossRecoverySegment::Yes { rearm_retransmit } => rearm_retransmit,
+                    LossRecoverySegment::No => false,
+                }
             }
+            Some(SendTimer::KeepAlive(_)) | Some(SendTimer::SWSProbe { at: _ }) | None => true,
+        };
+        if update_rto {
+            *timer = Some(SendTimer::Retrans(RetransTimer::new(
+                now,
+                rtt_estimator.rto(),
+                *user_timeout,
+                DEFAULT_MAX_RETRIES,
+            )))
         }
         Some(seg)
     }
@@ -8912,6 +8922,121 @@ mod test {
         };
         assert_eq!(seg.len(), u32::try_from(payload.len()).unwrap());
         assert_eq!(seg.header.seq, ack.header.ack.unwrap());
+    }
+
+    #[test]
+    fn sack_recovery_rearms_rto() {
+        let mss = DEVICE_MAXIMUM_SEGMENT_SIZE;
+        let una = ISS_1 + 1;
+        let nxt = una + (u32::from(DUP_ACK_THRESHOLD) + 1) * u32::from(mss);
+
+        let mut congestion_control = CongestionControl::cubic_with_mss(mss);
+        // Inflate the congestion window so we won't hit congestion during test.
+        congestion_control.inflate_cwnd(20 * u32::from(mss));
+        let mut state = State::<_, _, _, ()>::Established(Established {
+            snd: Send {
+                nxt,
+                max: nxt,
+                una,
+                wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
+                buffer: InfiniteSendBuffer::default(),
+                wl1: ISS_2 + 1,
+                wl2: una,
+                rtt_estimator: Estimator::default(),
+                rtt_sampler: RttSampler::default(),
+                timer: None,
+                congestion_control,
+                wnd_scale: WindowScale::default(),
+            }
+            .into(),
+            rcv: Recv {
+                buffer: RecvBufferState::Open {
+                    buffer: RingBuffer::default(),
+                    assembler: Assembler::new(ISS_2 + 1),
+                },
+                timer: None,
+                mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
+                // quickacks start at zero.
+                remaining_quickacks: 0,
+                last_segment_at: None,
+                wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
+                sack_permitted: SACK_PERMITTED,
+            }
+            .into(),
+        });
+
+        let socket_options = SocketOptions::default_for_state_tests();
+        const RTT: Duration = Duration::from_millis(1);
+        let mut clock = FakeInstantCtx::default();
+        let counters = FakeTcpCounters::default();
+        // Send a single segment, we should've set RTO.
+        let seg = state
+            .poll_send(
+                &FakeStateMachineDebugId,
+                &counters.refs(),
+                u32::MAX,
+                clock.now(),
+                &socket_options,
+            )
+            .expect("should not close");
+        assert_eq!(seg.len(), u32::from(mss));
+        let start_rto = assert_matches!(
+            state.assert_established().snd.timer,
+            Some(SendTimer::Retrans(RetransTimer{at, ..})) => at
+        );
+        clock.sleep(RTT);
+
+        // Receive an ACK with SACK blocks that put us in SACK recovery.
+        let ack = Segment::ack_with_options(
+            ISS_2 + 1,
+            una,
+            WindowSize::DEFAULT >> WindowScale::default(),
+            SegmentOptions {
+                sack_blocks: [SackBlock::try_new(
+                    nxt - u32::from(DUP_ACK_THRESHOLD) * u32::from(mss),
+                    nxt,
+                )
+                .unwrap()]
+                .into_iter()
+                .collect(),
+            }
+            .into(),
+        );
+        let (seg, passive_open, data_acked, newly_closed) = state
+            .on_segment::<(), ClientlessBufferProvider>(
+                &FakeStateMachineDebugId,
+                &counters.refs(),
+                ack,
+                clock.now(),
+                &socket_options,
+                false,
+            );
+        assert_eq!(seg, None);
+        assert_eq!(passive_open, None);
+        assert_eq!(data_acked, DataAcked::No);
+        assert_eq!(newly_closed, NewlyClosed::No);
+        assert!(state.assert_established().snd.congestion_control.in_fast_recovery());
+
+        let seg = state
+            .poll_send(
+                &FakeStateMachineDebugId,
+                &counters.refs(),
+                u32::MAX,
+                clock.now(),
+                &socket_options,
+            )
+            .expect("should not close");
+        assert_eq!(seg.len(), u32::from(mss));
+        // SACK retransmission.
+        assert_eq!(seg.header.seq, una);
+        // RTO is rearmed.
+        let new_rto = assert_matches!(
+            state.assert_established().snd.timer,
+            Some(SendTimer::Retrans(RetransTimer { at, .. })) => at
+        );
+        assert!(new_rto > start_rto, "{new_rto:?} > {start_rto:?}");
     }
 
     // Test a connection that is limited only by a theoretical congestion
