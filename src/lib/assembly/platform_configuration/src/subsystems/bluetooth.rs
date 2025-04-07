@@ -7,8 +7,7 @@ use anyhow::format_err;
 use crate::subsystems::prelude::*;
 use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::bluetooth_config::{
-    AudioGatewayConfig, AudioGatewayEnabledConfig, BluetoothConfig, HandsFreeConfig, HfpCodecId,
-    Snoop,
+    AudioGatewayConfig, BluetoothConfig, HandsFreeConfig, HfpCodecId, Snoop,
 };
 use assembly_config_schema::platform_config::media_config::{AudioConfig, PlatformMediaConfig};
 
@@ -88,10 +87,7 @@ impl DefineSubsystemConfiguration<(&BluetoothConfig, &PlatformMediaConfig)>
         } else {
             profiles.hfp.codecs_supported.clone()
         };
-        // TODO(https://fxbug.dev/401064356): Remove `profiles.hfp.enabled` after soft-transition
-        if profiles.hfp.enabled
-            || matches!(profiles.hfp.audio_gateway, AudioGatewayConfig::Enabled(_))
-        {
+        if let AudioGatewayConfig::Enabled(hfp_ag_features) = &profiles.hfp.audio_gateway {
             builder.platform_bundle("bluetooth_hfp_ag");
 
             let controller_encodes = if profiles.hfp.controller_encodes.is_empty() {
@@ -109,10 +105,6 @@ impl DefineSubsystemConfiguration<(&BluetoothConfig, &PlatformMediaConfig)>
             let mut hfp_ag_config = builder
                 .package("bt-hfp-audio-gateway")
                 .component("meta/bt-hfp-audio-gateway.cm")?;
-            let hfp_ag_features = match profiles.hfp.audio_gateway {
-                AudioGatewayConfig::Enabled(config) => config,
-                AudioGatewayConfig::Disabled => AudioGatewayEnabledConfig::default(),
-            };
             hfp_ag_config
                 .field("three_way_calling", hfp_ag_features.three_way_calling)?
                 .field("reject_incoming_voice_call", hfp_ag_features.reject_incoming_call)?

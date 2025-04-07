@@ -210,11 +210,6 @@ impl From<BluetoothProfileDeserializer<HandsFreeEnabledConfig>> for HandsFreeCon
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default)]
 pub struct HfpConfig {
-    /// Enable hands free calling audio gateway (`bt-hfp-audio-gateway`).
-    // TODO(https://fxbug.dev/401064356): Remove this field after soft-transition is complete.
-    #[serde(skip_serializing_if = "crate::common::is_default")]
-    pub enabled: bool,
-
     /// Specifies the configuration for `bt-hfp-audio-gateway`.
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub audio_gateway: AudioGatewayConfig,
@@ -390,7 +385,6 @@ mod tests {
                         "enhanced_voice_recognition_status": true,
                         "voice_recognition_text": true,
                     },
-                    "enabled": true, // TODO(https://fxbug.dev/401064356): Remove after migration
                     "hands_free": {
                         "echo_canceling_and_noise_reduction": true,
                         "three_way_calling": true,
@@ -433,7 +427,6 @@ mod tests {
                     enhanced_voice_recognition_status: true,
                     voice_recognition_text: true,
                 }),
-                enabled: true,
                 hands_free: HandsFreeConfig::Enabled(HandsFreeEnabledConfig {
                     echo_canceling_and_noise_reduction: true,
                     three_way_calling: true,
@@ -484,7 +477,6 @@ mod tests {
                     enhanced_voice_recognition_status: false,
                     voice_recognition_text: false,
                 }),
-                enabled: false, // TODO(https://fxbug.dev/401064356): Remove after migration
                 hands_free: HandsFreeConfig::Enabled(HandsFreeEnabledConfig {
                     echo_canceling_and_noise_reduction: false,
                     three_way_calling: false,
