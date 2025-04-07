@@ -806,11 +806,7 @@ class VmCowPages final : public VmHierarchyBase,
   // loans with.
   zx_status_t ReplacePage(vm_page_t* before_page, uint64_t offset, bool with_loaned,
                           vm_page_t** after_page, AnonymousPageRequest* page_request)
-      TA_EXCL(lock()) {
-    Guard<VmoLockType> guard{lock()};
-    return ReplacePageLocked(before_page, offset, with_loaned, after_page, page_request);
-  }
-
+      TA_EXCL(lock());
   // Eviction wrapper, unlike ReclaimPage this wrapper can assume it just needs to evict, and has no
   // requirements on updating any reclamation lists. Exposed for the physical page provider to
   // reclaim loaned pages.
@@ -1505,8 +1501,8 @@ class VmCowPages final : public VmHierarchyBase,
   // with a loaned page.  If with_loaned is false, replace with a non-loaned page and a page_request
   // is required to be provided.
   zx_status_t ReplacePageLocked(vm_page_t* before_page, uint64_t offset, bool with_loaned,
-                                vm_page_t** after_page, AnonymousPageRequest* page_request)
-      TA_REQ(lock());
+                                vm_page_t** after_page, DeferredOps& deferred,
+                                AnonymousPageRequest* page_request) TA_REQ(lock());
 
   // Copies the metadata information (dirty state, split bit information etc) from src_page to
   // dst_page in preparation for replacing src with dst. This copies the metadata information only

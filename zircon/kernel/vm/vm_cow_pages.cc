@@ -2944,9 +2944,10 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
       if (owner_cursor_->Page()->is_loaned()) {
         vm_page_t* res_page = nullptr;
         DEBUG_ASSERT(is_page_clean(owner_cursor_->Page()));
+        __UNINITIALIZED DeferredOps deferred(target_, DeferredOps::LockedTag{});
         zx_status_t status =
             target_->ReplacePageLocked(owner_cursor_->Page(), offset_, /*with_loaned=*/false,
-                                       &res_page, page_request->GetAnonymous());
+                                       &res_page, deferred, page_request->GetAnonymous());
         if (status != ZX_OK) {
           return zx::error(status);
         }
@@ -4144,9 +4145,10 @@ zx_status_t VmCowPages::ProtectRangeFromReclamation(VmCowRange range, bool set_a
         if (page->is_loaned()) {
           DEBUG_ASSERT(is_page_clean(page));
           AssertHeld(owner->lock_ref());
-          status =
-              owner->ReplacePageLocked(page, page->object.get_page_offset(),
-                                       /*with_loaned=*/false, &page, page_request.GetAnonymous());
+          __UNINITIALIZED DeferredOps deferred(owner, DeferredOps::LockedTag{});
+          status = owner->ReplacePageLocked(page, page->object.get_page_offset(),
+                                            /*with_loaned=*/false, &page, deferred,
+                                            page_request.GetAnonymous());
           // Let the status fall through below to have success, waiting and errors handled.
         }
 
@@ -6309,8 +6311,9 @@ zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(VmCowRange range,
           // A loaned page could only have been clean.
           DEBUG_ASSERT(!is_page_dirty_tracked(page) || is_page_clean(page));
           DEBUG_ASSERT(page_request);
+          __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
           zx_status_t status =
-              ReplacePageLocked(page, off, /*with_loaned=*/false, &page, page_request);
+              ReplacePageLocked(page, off, /*with_loaned=*/false, &page, deferred, page_request);
           if (status == ZX_ERR_SHOULD_WAIT) {
             return status;
           }
@@ -6345,12 +6348,20 @@ zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(VmCowRange range,
 zx_status_t VmCowPages::ReplacePageWithLoaned(vm_page_t* before_page, uint64_t offset) {
   canary_.Assert();
 
+  __UNINITIALIZED DeferredOps deferred(this);
   Guard<VmoLockType> guard{lock()};
-  return ReplacePageLocked(before_page, offset, true, nullptr, nullptr);
+  return ReplacePageLocked(before_page, offset, true, nullptr, deferred, nullptr);
+}
+
+zx_status_t VmCowPages::ReplacePage(vm_page_t* before_page, uint64_t offset, bool with_loaned,
+                                    vm_page_t** after_page, AnonymousPageRequest* page_request) {
+  __UNINITIALIZED DeferredOps deferred(this);
+  Guard<VmoLockType> guard{lock()};
+  return ReplacePageLocked(before_page, offset, with_loaned, after_page, deferred, page_request);
 }
 
 zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offset, bool with_loaned,
-                                          vm_page_t** after_page,
+                                          vm_page_t** after_page, DeferredOps& deferred,
                                           AnonymousPageRequest* page_request) {
   // If not replacing with loaned it is required that a page_request be provided.
   DEBUG_ASSERT(with_loaned || page_request);
@@ -6377,10 +6388,7 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
   }
 
   // unmap before removing old page
-  {
-    __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
-    RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap, &deferred);
-  }
+  RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap, &deferred);
 
   VmPageOrMarker released_page;
   auto replace_page_in_list = [&](vm_page_t* new_page) {
@@ -6434,7 +6442,7 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
   // The page released was the old page.
   DEBUG_ASSERT(released == old_page);
 
-  RemoveAndFreePageLocked(old_page);
+  RemovePageLocked(old_page, deferred);
   if (after_page) {
     *after_page = new_page;
   }
