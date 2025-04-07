@@ -520,6 +520,9 @@ template("bazel_action") {
   _bazel_build_events_log_json =
       "$target_out_dir/$target_name.bazel_events.log.json"
 
+  _rebased_bazel_build_events_log_json =
+      rebase_path(_bazel_build_events_log_json, root_build_dir)
+
   _bazel_build_files = []
   _bazel_targets = []
   foreach(label, invoker.bazel_targets) {
@@ -624,6 +627,15 @@ template("bazel_action") {
     hermetic_deps = false
   }
 
+  # A file that will contain a mapping from Bazel artifacts to Ninja outputs.
+  _path_mapping = "${target_out_dir}/${target_name}.path_mapping"
+  _rebased_path_mapping = rebase_path(_path_mapping, root_build_dir)
+
+  # A file that will receive the exact Bazel command invoked by the
+  # bazel_action.py script.
+  _bazel_command_file = "${target_out_dir}/${target_name}.bazel_command.sh"
+  _rebased_bazel_command_file = rebase_path(_bazel_command_file, root_build_dir)
+
   action(target_name) {
     forward_variables_from(invoker,
                            [
@@ -644,10 +656,10 @@ template("bazel_action") {
 
     depfile = "$target_gen_dir/$target_name.d"
 
-    outputs = []
-
-    _path_mapping = "${target_out_dir}/${target_name}.path_mapping"
-    outputs += [ _path_mapping ]
+    outputs = [
+      _path_mapping,
+      _bazel_command_file,
+    ]
 
     # Write stamp files for every Bazel target executed by this bazel_action.
     # Note these stamps are written to paths based on Bazel target labels.
@@ -679,8 +691,10 @@ template("bazel_action") {
            [
              "--depfile",
              rebase_path(depfile, root_build_dir),
+             "--command-file",
+             _rebased_bazel_command_file,
              "--path-mapping",
-             rebase_path(_path_mapping, root_build_dir),
+             _rebased_path_mapping,
              "--stamp-files",
            ]
     foreach(s, _dedupe_stamps) {
@@ -767,7 +781,7 @@ template("bazel_action") {
 
       args += [
         "--bazel-build-events-log-json",
-        rebase_path(_bazel_build_events_log_json, root_build_dir),
+        _rebased_bazel_build_events_log_json,
       ]
     }
 
@@ -816,8 +830,7 @@ template("bazel_action") {
         bazel_build_events_log = [
           {
             gn_label = get_label_info(":$target_name", "label_no_toolchain")
-            build_events_log =
-                rebase_path(_bazel_build_events_log_json, root_build_dir)
+            build_events_log = _rebased_bazel_build_events_log_json
             format = "json"
           },
         ]
@@ -833,6 +846,9 @@ template("bazel_action") {
                 rebase_path(_gn_targets_repository_path, root_build_dir)
             gn_targets_manifest =
                 rebase_path(_gn_targets_repository_manifest, root_build_dir)
+            build_events_log_json = _rebased_bazel_build_events_log_json
+            bazel_command_file = _rebased_bazel_command_file
+            path_mapping = _rebased_path_mapping
           },
         ]
       }

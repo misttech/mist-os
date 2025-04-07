@@ -412,6 +412,22 @@ def copy_file_if_changed(
         copy_writable(src_path, dst_path)
 
 
+def write_file_if_changed(dst_path: str, content: str) -> None:
+    if os.path.exists(dst_path):
+        with open(dst_path, "rt") as f:
+            current_content = f.read()
+        if current_content == content:
+            return
+
+    # Use lexists to make sure broken symlinks are removed as well.
+    if os.path.lexists(dst_path):
+        os.remove(dst_path)
+
+    os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+    with open(dst_path, "wt") as f:
+        f.write(content)
+
+
 def force_symlink(target_path: str, link_path: str) -> None:
     link_dir = os.path.dirname(link_path)
     os.makedirs(link_dir, exist_ok=True)
@@ -1095,6 +1111,10 @@ def main() -> int:
         "--path-mapping",
         help="If specified, write a mapping of Ninja outputs to realpaths Bazel outputs",
     )
+    parser.add_argument(
+        "--command-file",
+        help="If specified, write the command used to invoke Bazel to file.",
+    )
     parser.add_argument("extra_bazel_args", nargs=argparse.REMAINDER)
 
     args = parser.parse_args()
@@ -1306,18 +1326,14 @@ def main() -> int:
     output_build_file = os.path.join(
         args.workspace_dir, "buildfiles_genquery", "BUILD.bazel"
     )
-    os.makedirs(os.path.dirname(output_build_file), exist_ok=True)
-    with open(genquery_tmpl, "r") as tmpl:
-        with open(output_build_file, "w") as out:
-            out.write(
-                tmpl.read().format(
-                    query_expression=f"buildfiles(deps({query_targets}))",
-                    query_scopes=",".join(
-                        (f'"{s}"' for s in args.bazel_targets)
-                    ),
-                    query_opts='"--output=label"',
-                )
-            )
+    with open(genquery_tmpl, "rt") as tmpl:
+        output_build_content = tmpl.read().format(
+            query_expression=f"buildfiles(deps({query_targets}))",
+            query_scopes=",".join((f'"{s}"' for s in args.bazel_targets)),
+            query_opts='"--output=label"',
+        )
+
+    write_file_if_changed(output_build_file, output_build_content)
 
     cmd = [args.bazel_launcher, args.command]
 
@@ -1359,6 +1375,12 @@ def main() -> int:
         f"{args.gn_target_label[2:].replace(':', '/')}.command.profile.gz",
     )
     cmd += ["--profile", command_profile_dest]
+
+    if args.command_file:
+        write_file_if_changed(
+            args.command_file,
+            " \\\n  ".join(shlex.quote(c) for c in cmd) + "\n",
+        )
 
     # NOTE: It is important to NOT capture output from this subprocess, to make
     # sure console output from Bazel are correctly printed out by Ninja.
@@ -1572,15 +1594,15 @@ def main() -> int:
         # When determining source path of the copied output, follow links to get
         # out of bazel-bin, because the content of bazel-bin is not guaranteed
         # to be stable after subsequent `bazel` commands.
-        with open(args.path_mapping, "w") as f:
-            f.write(
-                "\n".join(
-                    dst_path
-                    + ":"
-                    + os.path.relpath(os.path.realpath(src_path), current_dir)
-                    for src_path, dst_path in file_copies + dir_copies
-                )
-            )
+        write_file_if_changed(
+            args.path_mapping,
+            "\n".join(
+                dst_path
+                + ":"
+                + os.path.relpath(os.path.realpath(src_path), current_dir)
+                for src_path, dst_path in file_copies + dir_copies
+            ),
+        )
 
     if args.depfile:
         # Perform a cquery to get all source inputs for the targets, this
@@ -1644,9 +1666,7 @@ track all input files that the repository rule may access when it is run.
         if _DEBUG:
             debug("DEPFILE[%s]\n" % depfile_content)
 
-        os.makedirs(os.path.dirname(args.depfile), exist_ok=True)
-        with open(args.depfile, "w") as f:
-            f.write(depfile_content)
+        write_file_if_changed(args.depfile, depfile_content)
 
         for f in args.stamp_files:
             with open(f, "w") as f:
