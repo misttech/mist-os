@@ -327,6 +327,7 @@ _host_tool_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.developer.ffxdaemonlifecycle:fuchsia.developer.ffxdaemonlifecycle",
   "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol",
   "//sdk/fidl/fuchsia.diagnostics.host:fuchsia.diagnostics.host",
+  "//sdk/fidl/fuchsia.fdomain:fuchsia.fdomain",
   "//sdk/fidl/fuchsia.memory.debug:fuchsia.memory.debug",
   "//sdk/fidl/fuchsia.memory.heapdump.client:fuchsia.memory.heapdump.client",
   "//sdk/fidl/fuchsia.memory.inspection:fuchsia.memory.inspection",
