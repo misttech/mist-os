@@ -119,14 +119,6 @@ pub async fn create() -> Result<RealmInstance, Error> {
     builder
         .add_route(
             Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.logger.Log"))
-                .from(Ref::parent())
-                .to(&single_counter),
-        )
-        .await?;
-    builder
-        .add_route(
-            Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
                 .from(Ref::parent())
                 .to(&persistence),

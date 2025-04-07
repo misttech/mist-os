@@ -70,7 +70,6 @@
                 "fuchsia.boot.Arguments",
                 "fuchsia.fshost.Admin",
                 "fuchsia.hardware.power.statecontrol.Admin",
-                "fuchsia.logger.Log",
                 "fuchsia.paver.Paver",
                 "fuchsia.process.Launcher",
             ],

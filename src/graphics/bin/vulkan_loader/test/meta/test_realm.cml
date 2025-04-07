@@ -19,14 +19,6 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.Log" ],
-            from: "parent",
-            to: [
-                "#test_lib_provider",
-                "#vulkan_loader",
-            ],
-        },
-        {
             dictionary: "diagnostics",
             from: "parent",
             to: "all",
