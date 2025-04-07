@@ -295,7 +295,7 @@ fn file_class_from_file_mode(mode: FileMode) -> Result<FileClass, Errno> {
 ///
 /// If no policy has yet been applied to the `parent`s [`create:vfs::FileSystem`] then no SID
 /// is returned.
-fn compute_new_fs_node_sid(
+pub(in crate::security) fn compute_new_fs_node_sid(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     fs: &FileSystem,
