@@ -377,6 +377,15 @@ impl Type {
         }
     }
 
+    /// Return true is `self` is guaranteed to be non-zero
+    pub fn is_non_zero(&self) -> bool {
+        match self {
+            Self::ScalarValue(d) => d.min() > 0,
+            Self::NullOr { .. } => false,
+            _ => true,
+        }
+    }
+
     fn inner(&self, context: &ComputationContext) -> Result<&Type, String> {
         match self {
             Self::Releasable { id, inner } => {
@@ -1780,6 +1789,14 @@ impl ComputationContext {
                 if data.is_zero() =>
             {
                 Ok(None)
+            }
+
+            (JumpWidth::W64, Type::ScalarValue(data), t) if data.is_zero() && t.is_non_zero() => {
+                op(1.into(), 0.into())
+            }
+
+            (JumpWidth::W64, t, Type::ScalarValue(data)) if data.is_zero() && t.is_non_zero() => {
+                op(0.into(), 1.into())
             }
 
             (JumpWidth::W64, Type::PtrToStack { offset: x }, Type::PtrToStack { offset: y }) => {

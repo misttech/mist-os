@@ -911,6 +911,7 @@ pub mod test {
     #[test_case(local_test_data!("malloc_double_free.data"))]
     #[test_case(local_test_data!("malloc_use_free.data"))]
     #[test_case(local_test_data!("null_checks_propagated.data"))]
+    #[test_case(local_test_data!("null_checks_multiple.data"))]
     #[test_case(local_test_data!("packet_access.data"))]
     #[test_case(local_test_data!("read_only_helper.data"))]
     #[test_case(local_test_data!("stack_access.data"))]
