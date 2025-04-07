@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use errors::{ffx_bail, ffx_error};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -17,8 +17,6 @@ use metadata::{CpuArchitecture, ElementType, FfxTool, HostTool, Manifest, Part};
 pub use sdk_metadata as metadata;
 
 const SDK_MANIFEST_PATH: &str = "meta/manifest.json";
-// TODO(https://fxbug.dev/397989792): Remove this hard coded path.
-const SDK_BUILD_MANIFEST_PATH: &str = "sdk/manifest/core";
 
 /// Current "F" milestone for Fuchsia (e.g. F38).
 const MILESTONE: &'static str = include_str!("../../../../../../integration/MILESTONE");
@@ -93,14 +91,6 @@ pub enum SdkRoot {
     ///
     ///  `meta/manifest.json`, which represents the out of tree IDK structure.
     ///
-    /// `sdk/manifest/core`, which represents the in-tree IDK that has not been made
-    /// into a final IDK manifest. This is actually an IDK collection,
-    ///  which contains the atoms for a single build. These atoms contain the mapping from a file
-    /// that is an output of the build to the destination in the IDK root directory. The
-    /// advantage being the contents of IDK can be read by ffx, and access the files wherever they are
-    /// located in the build directory vs. having to copy these files into the final IDK structure.
-    /// As a result, when using a "Full SDK" in-tree, the root should always be the $root_build_dir.
-    ///
     ///  If the manifest is specified, it must be a relative path to the manifest,
     /// based on the root directory.
     Full { root: PathBuf, manifest: Option<String> },
@@ -123,23 +113,12 @@ pub struct FfxSdkConfig {
 
 #[derive(Deserialize)]
 struct SdkAtoms {
-    #[cfg(test)]
-    ids: Vec<serde_json::Value>,
     atoms: Vec<Atom>,
 }
 
 #[derive(Deserialize, Debug)]
 struct Atom {
-    #[cfg(test)]
-    category: String,
-    #[cfg(test)]
-    deps: Vec<String>,
     files: Vec<File>,
-    #[serde(rename = "gn-label")]
-    #[cfg(test)]
-    gn_label: String,
-    #[cfg(test)]
-    id: String,
     meta: String,
     #[serde(rename = "type")]
     kind: ElementType,
@@ -216,8 +195,7 @@ impl SdkRoot {
 
     /// Returns true if the given path appears to be an sdk root.
     fn is_sdk_root(path: &Path) -> bool {
-        // TODO(https://fxbug.dev/397989792) remove the hard coded paths to the manifest for in-tree SDKs.
-        path.join(SDK_MANIFEST_PATH).exists() || path.join(SDK_BUILD_MANIFEST_PATH).exists()
+        path.join(SDK_MANIFEST_PATH).exists()
     }
 
     /// Returns manifest path if it exists.
@@ -228,9 +206,6 @@ impl SdkRoot {
             }
             Self::Full { root, manifest: None } if root.join(SDK_MANIFEST_PATH).exists() => {
                 Some(root.join(SDK_MANIFEST_PATH))
-            }
-            Self::Full { root, manifest: None } if root.join(SDK_BUILD_MANIFEST_PATH).exists() => {
-                Some(root.join(SDK_BUILD_MANIFEST_PATH))
             }
             Self::Full { .. } => None,
             Self::Modular { root, module } => {
@@ -271,20 +246,11 @@ impl SdkRoot {
                 Sdk::from_sdk_dir(&root, SDK_MANIFEST_PATH)
                     .with_context(|| anyhow!("Loading sdk manifest at `{}`", root.display()))
             }
-            // TODO(https://fxbug.dev/397989792): Remove the in-tree hard coded path to the manifest.
-            Self::Full { root, manifest: None } if root.join(SDK_BUILD_MANIFEST_PATH).exists() => {
-                // If the manifest is not specified, but the atom collection manifest exists,
-                // use that as an atom collection.
-                Sdk::from_build_dir(&root, None)
-                    .with_context(|| anyhow!("Loading sdk atom collection at `{}`", root.display()))
-            }
-            Self::Full { root, manifest: _ } => {
-                // Otherwise assume this is a root that has no expected manifest or atom collection.
-                // So make a partial SDK which will work with tools that do not access the SDK
-                // information.
-                Sdk::from_build_dir(&root, None).with_context(|| {
-                    anyhow!("Loading unknown sdk manifest at `{}`", root.display())
-                })
+            Self::Full { root: _, manifest: _ } => {
+                bail!(
+                    "SdkRoot: {self:?} root does not contain an SDK MANIFEST. \
+                 Perhaps this should be kind: SdkRoot::HostTools?"
+                );
             }
             Self::HostTools { root } => {
                 // This is not really a SDK, but a collection of host tools.
@@ -378,7 +344,10 @@ impl Sdk {
             ffx_error!("SDK path `{}` was invalid and couldn't be canonicalized", path.display())
         })?;
         let manifest_path = match module_manifest {
-            None => path.join(SDK_BUILD_MANIFEST_PATH),
+            None => {
+                tracing::info!("Creating build-dir SDK without a manifest");
+                return Ok(Self::new());
+            }
             Some(module) => module_manifest_path(&path, module)?,
         };
 
@@ -630,9 +599,9 @@ impl Sdk {
             }
 
             if atom.meta.len() > 0 {
-                let meta = real_paths.get(&atom.meta).ok_or_else(|| {
-                    anyhow!("Atom did not specify source for its metadata: {atom:?}")
-                })?;
+                // Usually, the meta is a relative file path, but in one case it is a build label.
+                // So just pass through the value if a real path is not found.
+                let meta = real_paths.get(&atom.meta).unwrap_or(&atom.meta);
 
                 metas.push(Part {
                     meta: meta.clone(),
@@ -718,7 +687,6 @@ mod test {
             "../test_data/core-sdk-root",
             "host_arm64/gen/tools/symbol-index/symbol_index_sdk.meta.json"
         );
-        put_file!(r, "../test_data/core-sdk-root", "sdk/manifest/core");
         put_file!(
             r,
             "../test_data/core-sdk-root",
@@ -764,9 +732,8 @@ mod test {
     fn test_manifest_exists() {
         let core_root = core_test_data_root();
         let release_root = sdk_test_data_root();
-        assert!(SdkRoot::Full { root: core_root.path().to_owned(), manifest: None }
-            .manifest_path()
-            .is_some());
+
+        // Modular SDK is used in-tree by ffx-action build templates.
         assert!(SdkRoot::Modular {
             root: core_root.path().to_owned(),
             module: "host_tools_used_by_ffx_action_during_build".to_owned()
@@ -779,129 +746,6 @@ mod test {
         }
         .manifest_path()
         .is_some());
-    }
-
-    #[fuchsia::test]
-    async fn test_core_manifest() {
-        let root = core_test_data_root();
-        let manifest_path = root.path();
-        let atoms: SdkAtoms = serde_json::from_reader(BufReader::new(
-            fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap(),
-        ))
-        .unwrap();
-
-        assert!(atoms.ids.is_empty());
-
-        let atoms = atoms.atoms;
-        assert_eq!(4, atoms.len());
-        assert_eq!("partner", atoms[0].category);
-        assert!(atoms[0].deps.is_empty());
-        assert_eq!(
-            "//src/developer/debug/zxdb:zxdb_sdk(//build/toolchain:host_x64)",
-            atoms[0].gn_label
-        );
-        assert_eq!("sdk://tools/x64/zxdb", atoms[0].id);
-        assert_eq!(ElementType::HostTool, atoms[0].kind);
-        assert_eq!(2, atoms[0].files.len());
-        assert_eq!("host_x64/zxdb", atoms[0].files[0].source);
-        assert_eq!("tools/x64/zxdb", atoms[0].files[0].destination);
-
-        assert_eq!("partner", atoms[3].category);
-        assert!(atoms[3].deps.is_empty());
-        assert_eq!(
-            "//src/developer/ffx/plugins/assembly:sdk(//build/toolchain:host_x64)",
-            atoms[3].gn_label
-        );
-        assert_eq!("sdk://tools/ffx_tools/ffx-assembly", atoms[3].id);
-        assert_eq!(ElementType::FfxTool, atoms[3].kind);
-        assert_eq!(4, atoms[3].files.len());
-        assert_eq!("host_x64/ffx-assembly", atoms[3].files[0].source);
-        assert_eq!("tools/x64/ffx_tools/ffx-assembly", atoms[3].files[0].destination);
-    }
-
-    #[fuchsia::test]
-    async fn test_core_manifest_to_sdk() {
-        let root = core_test_data_root();
-        let manifest_path = root.path();
-        let atoms = serde_json::from_reader(BufReader::new(
-            fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap(),
-        ))
-        .unwrap();
-
-        let sdk = Sdk::from_sdk_atoms(manifest_path, None, atoms, SdkVersion::Unknown).unwrap();
-
-        let mut parts = sdk.parts.iter();
-        assert!(matches!(parts.next().unwrap(), Part { kind: ElementType::HostTool, .. }));
-        assert!(matches!(parts.next().unwrap(), Part { kind: ElementType::HostTool, .. }));
-        assert!(matches!(parts.next().unwrap(), Part { kind: ElementType::HostTool, .. }));
-        assert!(matches!(parts.next().unwrap(), Part { kind: ElementType::FfxTool, .. }));
-        assert!(parts.next().is_none());
-    }
-
-    #[fuchsia::test]
-    async fn test_core_manifest_host_tool() {
-        let root = core_test_data_root();
-        let manifest_path = root.path();
-        let atoms = serde_json::from_reader(BufReader::new(
-            fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap(),
-        ))
-        .unwrap();
-        let expected = manifest_path.join("host_x64/zxdb");
-        fs::write(&expected, "#!/bin/bash\necho hello").expect("fake zxdb");
-        let sdk = Sdk::from_sdk_atoms(manifest_path, None, atoms, SdkVersion::Unknown).unwrap();
-        let zxdb = sdk.get_host_tool("zxdb").unwrap();
-
-        assert_eq!(expected, zxdb);
-
-        let zxdb_cmd = sdk.get_host_tool_command("zxdb").unwrap();
-        assert_eq!(zxdb_cmd.get_program(), manifest_path.join("host_x64/zxdb"));
-    }
-
-    #[fuchsia::test]
-    async fn test_core_manifest_host_tool_multi_arch() {
-        let root = core_test_data_root();
-        let manifest_path = root.path();
-        let atoms = serde_json::from_reader(BufReader::new(
-            fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap(),
-        ))
-        .unwrap();
-
-        let expected = manifest_path.join("host_x64/symbol-index");
-        fs::write(&expected, "#!/bin/bash\necho hello").expect("fake host tool");
-        let sdk = Sdk::from_sdk_atoms(manifest_path, None, atoms, SdkVersion::InTree).unwrap();
-        let symbol_index = sdk.get_host_tool("symbol-index").unwrap();
-
-        assert_eq!(expected, symbol_index);
-
-        let symbol_index_cmd = sdk.get_host_tool_command("symbol-index").unwrap();
-        assert_eq!(symbol_index_cmd.get_program(), manifest_path.join("host_x64/symbol-index"));
-    }
-
-    #[fuchsia::test]
-    async fn test_core_manifest_ffx_tool() {
-        let root = core_test_data_root();
-        let manifest_path = root.path();
-        let atoms = serde_json::from_reader(BufReader::new(
-            fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap(),
-        ))
-        .unwrap();
-
-        let sdk = Sdk::from_sdk_atoms(manifest_path, None, atoms, SdkVersion::Unknown).unwrap();
-        let ffx_assembly = sdk.get_ffx_tool("ffx-assembly").unwrap();
-
-        // get_ffx_tool selects with the current architecture, so the executable path will be
-        // architecture-dependent.
-        let arch = CpuArchitecture::current();
-        let host_dir = match arch {
-            CpuArchitecture::X64 => "host_x64",
-            CpuArchitecture::Arm64 => "host_arm64",
-            CpuArchitecture::Riscv64 => "host_riscv64",
-            _ => panic!("Unsupported architecture {}", arch),
-        };
-        assert_eq!(manifest_path.join(host_dir).join("ffx-assembly"), ffx_assembly.executable);
-        // On the other hand, the metadata comes from a fixed set of input test data, which says
-        // the source of tools/ffx_tools/ffx-assembly.json is host_x64/ffx-assembly.json
-        assert_eq!(manifest_path.join("host_x64/ffx-assembly.json"), ffx_assembly.metadata);
     }
 
     #[fuchsia::test]

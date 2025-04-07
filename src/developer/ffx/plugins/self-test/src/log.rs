@@ -23,32 +23,6 @@ pub mod include_log {
         // Only when invoked from ffx-e2e-with-target.sh we could get sdk.root=.
         if ffx_config::get::<String, _>("sdk.root").await.unwrap_or_default() == "." {
             ensure!(cfg!(target_arch = "x86_64"), "The test only supports x86_64 for now.");
-            let manifest_file = Path::new("sdk/manifest/core");
-            if !manifest_file.exists() {
-                create_dir_all(manifest_file.parent().unwrap())?;
-                File::create(manifest_file)?.write_all(br#"{
-                    "atoms": [{
-                        "category": "partner",
-                        "deps": [],
-                        "files": [
-                        {
-                            "destination": "tools/x64/zxdb",
-                            "source": "host_x64/zxdb"
-                        },
-                        {
-                            "destination": "tools/x64/zxdb-meta.json",
-                            "source": "host_x64/gen/src/developer/debug/zxdb/zxdb_sdk.meta.json"
-                        }
-                        ],
-                        "gn-label": "//src/developer/debug/zxdb:zxdb_sdk(//build/toolchain:host_x64)",
-                        "id": "sdk://tools/x64/zxdb",
-                        "meta": "tools/x64/zxdb-meta.json",
-                        "plasa": [],
-                        "type": "host_tool"
-                    }],
-                    "ids": []
-                }"#)?;
-            }
         }
 
         let target = get_target_addr().await?;

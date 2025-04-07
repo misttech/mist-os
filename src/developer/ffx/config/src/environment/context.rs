@@ -421,7 +421,7 @@ impl EnvironmentContext {
                 let root = build_dir.clone();
                 match module {
                     Some(module) => Ok(SdkRoot::Modular { root, module }),
-                    None => Ok(SdkRoot::Full { root, manifest: None }),
+                    None => Ok(SdkRoot::from_paths(None, module)?),
                 }
             }
             (_, runtime_root) => SdkRoot::from_paths(runtime_root.as_deref(), module),

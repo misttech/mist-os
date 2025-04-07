@@ -87,9 +87,18 @@ if (current_toolchain == default_toolchain) {
             }
           }
 
-          # SDK root
+          # Some prebuilt tools in the IDK need to be specified in-tree
           sdk = {
-            root = "!!BUILD_DIR"
+            overrides = {
+              aemu_internal = rebase_path(
+                      "//prebuilt/third_party/android/aemu/release/linux-x64/emulator")
+              qemu_internal = rebase_path(
+                      "//prebuilt/third_party/qemu/linux-x64/bin/qemu-system-x86_64")
+              uefi_internal_x64 = rebase_path(
+                      "//prebuilt/third_party/edk2/qemu-x64/OVMF_CODE.fd")
+              uefi_internal_arm64 = rebase_path(
+                      "//prebuilt/third_party/edk2/qemu-arm64/QEMU_EFI.fd")
+            }
           }
 
           pbms = {

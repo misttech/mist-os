@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	// The path to the SDK manifest relative to the sdk.root.
+	// The path to the SDK manifest relative to build root.
 	SDKManifestPath = "sdk/manifest/core"
 )
 
@@ -98,13 +98,7 @@ func (f *FFXInstance) EmuStartConsole(ctx context.Context, sdkRoot, name string,
 			return nil, err
 		}
 	}
-	absPath, err := filepath.Abs(sdkRoot)
-	if err != nil {
-		return nil, err
-	}
-	if err := f.ConfigSet(ctx, "sdk.root", absPath); err != nil {
-		return nil, err
-	}
+
 	args := []string{"--console", "--net", "tap", "--name", name, "-H", "-s", "0"}
 	args = append(args, startArgs.ExtraEmuArgs...)
 	if startArgs.Config != "" {
