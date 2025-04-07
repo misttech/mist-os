@@ -85,10 +85,18 @@ template("sdk_collection") {
   }
 
   files = {
+    # Internal manifests.
+    # TODO(https://fxbug.dev/317385989): Eliminate `final_manifest` once ffx
+    # no longer depends on a manifest at that location.
     final_manifest = "${root_out_dir}/sdk/manifest/${collection_name}"
     local_manifest = "${target_gen_dir}/${targets.main}.sdk"
+
+    # IDK-like manifests.
     idk_meta_manifest_json =
         "${target_gen_dir}/${collection_name}.idk_meta_manifest_json.json"
+    collection_manifest_relative_path = "meta/manifest.json"
+
+    # Archive manifest.
     tarmaker_manifest = "${target_gen_dir}/${collection_name}.tarmaker_manifest"
   }
 
@@ -145,8 +153,8 @@ template("sdk_collection") {
     deps = [ ":${targets.final_manifest}" ]
   }
 
-  # Generates the IDK top-level metadata file (meta/manifest.json) describing the
-  # various parts of the SDK collection.
+  # Generates the top-level metadata file (which will later be symlinked at
+  # meta/manifest.json) describing the various parts of the SDK collection.
   python_action(targets.idk_meta_manifest_json) {
     forward_variables_from(invoker, [ "testonly" ])
 
@@ -179,7 +187,8 @@ template("sdk_collection") {
     public_deps = [ ":${targets.local_manifest}" ]
   }
 
-  # Verifies that the IDK meta/manifest.json file is valid.
+  # Verifies that the collection manifest (which will later be symlinked at
+  # meta/manifest.json) file is valid.
   validate_json(targets.verify_idk_meta_manifest_json) {
     forward_variables_from(invoker, [ "testonly" ])
 
@@ -197,7 +206,7 @@ template("sdk_collection") {
   additional_archive_files = [
     {
       source = files.idk_meta_manifest_json
-      dest = "meta/manifest.json"
+      dest = files.collection_manifest_relative_path
       deps = [ ":${targets.idk_meta_manifest_json}" ]
     },
   ]
@@ -234,7 +243,7 @@ template("sdk_collection") {
   }
 
   # Populate the content of the $BUILD_DIR/sdk/exported/{name}/
-  # directory from the content of the archive manifest.
+  # directory from the content of the archive (tarmaker) manifest.
   action(targets.export) {
     forward_variables_from(invoker, [ "testonly" ])
 
@@ -247,7 +256,9 @@ template("sdk_collection") {
 
     outputs = [
       _stamp_file,
-      "$_out_dir/meta/manifest.json",
+
+      # One of many symlinks the script creates based on the archive manifest.
+      "${_out_dir}/${files.collection_manifest_relative_path}",
     ]
 
     depfile = "${_stamp_file}.d"
