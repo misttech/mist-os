@@ -1055,6 +1055,77 @@ TEST_F(IntegrationTest, MustUseUniqueEventIDs) {
   // TODO: Use LLCPP epitaphs when available to detect ZX_ERR_PEER_CLOSED.
 }
 
+TEST_F(IntegrationTest, VsyncEventForImageConfig) {
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
+
+  static constexpr display::ConfigStamp kInitialConfigStamp(42);
+  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp,
+                                        primary_client->CreateFullscreenLayerConfig()));
+
+  // Wait for a VSync acknowledging the displayed configuration.
+  ASSERT_EQ(0u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(kInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
+  EXPECT_EQ(1u, primary_client->state().vsync_count());
+}
+
+TEST_F(IntegrationTest, VsyncEventForImagelessConfig) {
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
+
+  zx::result<display::LayerId> create_color_layer_result =
+      primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
+  ASSERT_OK(create_color_layer_result);
+  display::LayerId color_layer_id = create_color_layer_result.value();
+
+  static constexpr display::ConfigStamp kInitialConfigStamp(42);
+  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
+
+  // Wait for a VSync acknowledging the displayed configuration.
+  ASSERT_EQ(0u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(kInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
+  EXPECT_EQ(1u, primary_client->state().vsync_count());
+}
+
+TEST_F(IntegrationTest, VsyncEventAfterImageLayerConvertsToColorLayer) {
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
+
+  static constexpr display::ConfigStamp kInitialConfigStamp(1);
+  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp,
+                                        primary_client->CreateFullscreenLayerConfig()));
+
+  // Wait for a VSync acknowledging the displayed configuration.
+  ASSERT_EQ(0u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(kInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
+  EXPECT_EQ(1u, primary_client->state().vsync_count());
+
+  // Replace the image layer with a color layer.
+  zx::result<display::LayerId> create_color_layer_result =
+      primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
+  ASSERT_OK(create_color_layer_result);
+  display::LayerId color_layer_id = create_color_layer_result.value();
+
+  static constexpr display::ConfigStamp kSecondConfigStamp(2);
+  ASSERT_OK(primary_client->ApplyLayers(kSecondConfigStamp, {{.layer_id = color_layer_id}}));
+
+  // Wait for a VSync acknowledging the configuration with a layer change.
+  ASSERT_EQ(1u, primary_client->state().vsync_count());
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 2; }));
+  EXPECT_EQ(kSecondConfigStamp, primary_client->state().last_vsync_config_stamp());
+  EXPECT_EQ(2u, primary_client->state().vsync_count());
+}
+
 TEST_F(IntegrationTest, DisplayOwnershipChangeEvents) {
   std::unique_ptr<TestFidlClient> virtcon_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kVirtcon);
@@ -1609,7 +1680,7 @@ TEST_F(IntegrationTest, ClampRgb) {
   ASSERT_TRUE(PollUntilOnLoop([&]() { return FakeDisplayEngine().GetClampRgbValue() == 32; }));
 }
 
-TEST_F(IntegrationTest, ImagelessConfigIsNotApplied) {
+TEST_F(IntegrationTest, VsyncGoesToClientWhoAppliedConfig) {
   // Create and bind virtcon client.
   std::unique_ptr<TestFidlClient> virtcon_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kVirtcon);
