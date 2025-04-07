@@ -398,10 +398,6 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   // Internal decommit range helper that expects the lock to be held.
   zx_status_t DecommitRangeLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
 
-  // Internal prefetch range helper that expects the lock to be held.
-  zx_status_t PrefetchRangeLocked(uint64_t offset, uint64_t len, Guard<VmoLockType>* guard)
-      TA_REQ(lock());
-
   // see GetAttributedMemoryInRange
   AttributionCounts GetAttributedMemoryInRangeLocked(uint64_t offset_bytes,
                                                      uint64_t len_bytes) const TA_REQ(lock());

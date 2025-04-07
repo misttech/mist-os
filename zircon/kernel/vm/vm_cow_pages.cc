@@ -4031,16 +4031,21 @@ void VmCowPages::SetNotPinnedLocked(vm_page_t* page, uint64_t offset) {
   }
 }
 
-void VmCowPages::PromoteRangeForReclamationLocked(VmCowRange range) {
+zx_status_t VmCowPages::PromoteRangeForReclamation(VmCowRange range) {
   canary_.Assert();
 
   // Hints only apply to pager backed VMOs.
   if (!can_root_source_evict()) {
-    return;
+    return ZX_OK;
   }
   // Zero lengths have no work to do.
   if (range.is_empty()) {
-    return;
+    return ZX_OK;
+  }
+
+  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+  if (!range.IsBoundedBy(size_)) {
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   uint64_t start_offset = ROUNDDOWN(range.offset, PAGE_SIZE);
@@ -4049,7 +4054,7 @@ void VmCowPages::PromoteRangeForReclamationLocked(VmCowRange range) {
   __UNINITIALIZED zx::result<VmCowPages::LookupCursor> cursor =
       GetLookupCursorLocked(VmCowRange(start_offset, end_offset - start_offset));
   if (cursor.is_error()) {
-    return;
+    return cursor.status_value();
   }
   // Do not consider pages accessed as the goal is reclaim them, not consider them used.
   cursor->DisableMarkAccessed();
@@ -4075,16 +4080,21 @@ void VmCowPages::PromoteRangeForReclamationLocked(VmCowRange range) {
     // ignore it and move on to the next page. Hints are best effort anyway.
     start_offset += PAGE_SIZE;
   }
+  return ZX_OK;
 }
 
-zx_status_t VmCowPages::ProtectRangeFromReclamationLocked(VmCowRange range, bool set_always_need,
-                                                          bool ignore_errors,
-                                                          Guard<VmoLockType>* guard) {
+zx_status_t VmCowPages::ProtectRangeFromReclamation(VmCowRange range, bool set_always_need,
+                                                    bool ignore_errors) {
   canary_.Assert();
 
   // Hints only apply to pager backed VMOs.
   if (!can_root_source_evict()) {
     return ZX_OK;
+  }
+
+  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+  if (!range.IsBoundedBy(size_)) {
+    return ZX_ERR_OUT_OF_RANGE;
   }
   // Zero lengths have no work to do.
   if (range.is_empty()) {
@@ -4155,7 +4165,7 @@ zx_status_t VmCowPages::ProtectRangeFromReclamationLocked(VmCowRange range, bool
       // up. Either way when go back around in the loop we are going to need a new cursor.
 
       if (status == ZX_ERR_SHOULD_WAIT) {
-        guard->CallUnlocked([&status, &page_request]() { status = page_request.Wait(); });
+        guard.CallUnlocked([&status, &page_request]() { status = page_request.Wait(); });
 
         // The size might have changed since we dropped the lock. Adjust the range if required.
         if (cur_offset >= size_locked()) {
@@ -4191,14 +4201,17 @@ zx_status_t VmCowPages::ProtectRangeFromReclamationLocked(VmCowRange range, bool
   return ZX_OK;
 }
 
-zx_status_t VmCowPages::DecompressInRangeLocked(VmCowRange range, Guard<VmoLockType>* guard) {
+zx_status_t VmCowPages::DecompressInRange(VmCowRange range) {
   canary_.Assert();
 
+  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+  if (!range.IsBoundedBy(size_)) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
   if (range.is_empty()) {
     return ZX_OK;
   }
 
-  DEBUG_ASSERT(range.IsBoundedBy(size_));
   uint64_t cur_offset = ROUNDDOWN(range.offset, PAGE_SIZE);
   uint64_t end_offset = ROUNDUP(range.end(), PAGE_SIZE);
 
@@ -4225,7 +4238,7 @@ zx_status_t VmCowPages::DecompressInRangeLocked(VmCowRange range, Guard<VmoLockT
       return ZX_OK;
     }
     if (status == ZX_ERR_SHOULD_WAIT) {
-      guard->CallUnlocked([&page_request, &status]() { status = page_request.Wait(); });
+      guard.CallUnlocked([&page_request, &status]() { status = page_request.Wait(); });
     }
   } while (status == ZX_OK);
   return status;

@@ -749,24 +749,21 @@ class VmCowPages final : public VmHierarchyBase,
   // rounded down to the page boundary, and |len| will be rounded up to the page boundary.
   // Currently used only for pager-backed VMOs to move their pages to the end of the
   // pager-backed queue, so that they can be evicted first.
-  void PromoteRangeForReclamationLocked(VmCowRange range) TA_REQ(lock());
+  zx_status_t PromoteRangeForReclamation(VmCowRange range);
 
   // Protect pages in the specified range from reclamation under memory pressure. |offset| will be
   // rounded down to the page boundary, and |len| will be rounded up to the page boundary. Any
-  // absent pages in the range will first be committed, and the call will block on the fulfillment
-  // of the page request(s), dropping |guard| while waiting (multiple times if multiple pages need
-  // to be supplied), and then, if |set_always_need| is true, the |always_need| flag in the pages
-  // will be set.
+  // absent pages in the range will first be committed and then, if |set_always_need| is true, the
+  // |always_need| flag in the pages will be set.
   // If the |ignore_errors| flag is set then any per page errors will be ignored and future pages in
   // the range will still be operated on. If this flag is not set then any kind of error causes an
   // immediate abort.
-  zx_status_t ProtectRangeFromReclamationLocked(VmCowRange range, bool set_always_need,
-                                                bool ignore_errors, Guard<VmoLockType>* guard)
-      TA_REQ(lock());
+  zx_status_t ProtectRangeFromReclamation(VmCowRange range, bool set_always_need,
+                                          bool ignore_errors);
 
   // Ensures any pages in the specified range are not compressed, but does not otherwise commit any
-  // pages. In order to handle delayed memory allocations, |guard| may be dropped one or more times.
-  zx_status_t DecompressInRangeLocked(VmCowRange range, Guard<VmoLockType>* guard) TA_REQ(lock());
+  // pages.
+  zx_status_t DecompressInRange(VmCowRange range);
 
   // See VmObject::ChangeHighPriorityCountLocked
   void ChangeHighPriorityCountLocked(int64_t delta) TA_REQ(lock());

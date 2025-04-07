@@ -179,56 +179,31 @@ zx_status_t VmObjectPaged::HintRange(uint64_t offset, uint64_t len, EvictionHint
     lockdep::AssertNoLocksHeld();
   }
 
-  Guard<VmoLockType> guard{lock()};
-
   // Ignore hints for non user-pager-backed VMOs. We choose to silently ignore hints for
   // incompatible combinations instead of failing. This is because the kernel does not make any
   // explicit guarantees on hints; since they are just hints, the kernel is always free to ignore
   // them.
-  if (!cow_pages_locked()->can_root_source_evict()) {
+  if (!cow_pages_->can_root_source_evict()) {
     return ZX_OK;
   }
 
-  auto cow_range = GetCowRangeSizeCheckLocked(offset, len);
+  auto cow_range = GetCowRange(offset, len);
   if (!cow_range) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
   switch (hint) {
     case EvictionHint::DontNeed: {
-      cow_pages_locked()->PromoteRangeForReclamationLocked(*cow_range);
-      break;
+      return cow_pages_->PromoteRangeForReclamation(*cow_range);
     }
     case EvictionHint::AlwaysNeed: {
       // Hints are best effort, so ignore any errors in the paging in process.
-      cow_pages_locked()->ProtectRangeFromReclamationLocked(*cow_range, /*set_always_need=*/true,
-                                                            /*ignore_errors=*/true, &guard);
-      break;
+      return cow_pages_->ProtectRangeFromReclamation(*cow_range, /*set_always_need=*/true,
+                                                     /*ignore_errors=*/true);
     }
   }
 
   return ZX_OK;
-}
-
-zx_status_t VmObjectPaged::PrefetchRangeLocked(uint64_t offset, uint64_t len,
-                                               Guard<VmoLockType>* guard) {
-  auto cow_range = GetCowRangeSizeCheckLocked(offset, len);
-  if (!cow_range) {
-    return ZX_ERR_OUT_OF_RANGE;
-  }
-  // Cannot overflow otherwise IsBoundedBy would have failed.
-  DEBUG_ASSERT(cow_range->is_page_aligned());
-  if (cow_range->is_empty()) {
-    return ZX_OK;
-  }
-  if (cow_pages_locked()->is_root_source_user_pager_backed()) {
-    return cow_pages_locked()->ProtectRangeFromReclamationLocked(*cow_range,
-                                                                 /*set_always_need=*/false,
-                                                                 /*ignore_errors=*/false, guard);
-  } else {
-    // Committing high priority pages is best effort, so ignore any errors from decompressing.
-    return cow_pages_locked()->DecompressInRangeLocked(*cow_range, guard);
-  }
 }
 
 zx_status_t VmObjectPaged::PrefetchRange(uint64_t offset, uint64_t len) {
@@ -236,7 +211,6 @@ zx_status_t VmObjectPaged::PrefetchRange(uint64_t offset, uint64_t len) {
   if (can_block_on_page_requests()) {
     lockdep::AssertNoLocksHeld();
   }
-  Guard<VmoLockType> guard{lock()};
 
   // Round offset and len to be page aligned. Use a sub-scope to validate that temporary end
   // calculations cannot be accidentally used later on.
@@ -254,16 +228,30 @@ zx_status_t VmObjectPaged::PrefetchRange(uint64_t offset, uint64_t len) {
     len = end_page - offset;
   }
 
-  return PrefetchRangeLocked(offset, len, &guard);
+  auto cow_range = GetCowRange(offset, len);
+  if (!cow_range) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  // Cannot overflow otherwise IsBoundedBy would have failed.
+  DEBUG_ASSERT(cow_range->is_page_aligned());
+  if (cow_pages_->is_root_source_user_pager_backed()) {
+    return cow_pages_->ProtectRangeFromReclamation(*cow_range,
+                                                   /*set_always_need=*/false,
+                                                   /*ignore_errors=*/false);
+  }
+  // Committing high priority pages is best effort, so ignore any errors from decompressing.
+  return cow_pages_->DecompressInRange(*cow_range);
 }
 
 void VmObjectPaged::CommitHighPriorityPages(uint64_t offset, uint64_t len) {
-  Guard<VmoLockType> guard{lock()};
-  if (!cow_pages_locked()->is_high_memory_priority_locked()) {
-    return;
+  {
+    Guard<VmoLockType> guard{lock()};
+    if (!cow_pages_locked()->is_high_memory_priority_locked()) {
+      return;
+    }
   }
   // Ignore the result of the prefetch, high priority commit is best effort.
-  PrefetchRangeLocked(offset, len, &guard);
+  PrefetchRange(offset, len);
 }
 
 bool VmObjectPaged::CanDedupZeroPagesLocked() {
