@@ -20,11 +20,6 @@
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
-// TODO(https://fxbug.dev/376575307): Remove deprecation warning suppression when removing
-// fdio_ns_open.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-
 namespace {
 
 TEST(NamespaceTest, CreateDestroy) {
@@ -53,8 +48,6 @@ TEST(NamespaceTest, NullPaths) {
   EXPECT_STATUS(fdio_ns_bind_fd(ns, nullptr, fd.get()), ZX_ERR_INVALID_ARGS);
 
   zx::channel service0, service1;
-  ASSERT_OK(zx::channel::create(0, &service0, &service1));
-  EXPECT_STATUS(fdio_ns_open(ns, nullptr, 0, service0.release()), ZX_ERR_INVALID_ARGS);
   ASSERT_OK(zx::channel::create(0, &service0, &service1));
   EXPECT_STATUS(fdio_ns_open3(ns, nullptr, 0, service0.release()), ZX_ERR_INVALID_ARGS);
 }
@@ -147,26 +140,6 @@ TEST(NamespaceTest, ConnectRoot) {
 
   zx::channel service0, service1;
   ASSERT_OK(zx::channel::create(0, &service0, &service1));
-  ASSERT_OK(fdio_ns_open(ns, "/foo", 1u, service0.release()));
-
-  // Expect an incoming connect on ch1
-  ASSERT_OK(ch1.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), nullptr));
-}
-
-TEST(NamespaceTest, ConnectRootOpen3) {
-  fdio_ns_t* ns;
-  ASSERT_OK(fdio_ns_create(&ns));
-  auto destroy = fit::defer([ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
-
-  zx::channel ch0, ch1;
-  ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
-
-  ASSERT_OK(fdio_ns_bind(ns, "/", ch0.release()));
-  ASSERT_STATUS(ZX_ERR_TIMED_OUT,
-                ch1.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), nullptr));
-
-  zx::channel service0, service1;
-  ASSERT_OK(zx::channel::create(0, &service0, &service1));
   ASSERT_OK(fdio_ns_open3(ns, "/foo", 1u, service0.release()));
 
   // Expect an incoming connect on ch1
@@ -187,26 +160,6 @@ TEST(NamespaceTest, ConnectCanonicalPath) {
 
   zx::channel service0, service1;
   ASSERT_OK(zx::channel::create(0, &service0, &service1));
-  ASSERT_OK(fdio_ns_open(ns, "/foo/bar", 1u, service0.release()));
-
-  // Expect an incoming connect on ch1
-  ASSERT_OK(ch1.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), nullptr));
-}
-
-TEST(NamespaceTest, ConnectCanonicalPathOpen3) {
-  fdio_ns_t* ns;
-  ASSERT_OK(fdio_ns_create(&ns));
-  auto destroy = fit::defer([ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
-
-  zx::channel ch0, ch1;
-  ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
-
-  ASSERT_OK(fdio_ns_bind(ns, "/foo", ch0.release()));
-  ASSERT_STATUS(ZX_ERR_TIMED_OUT,
-                ch1.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), nullptr));
-
-  zx::channel service0, service1;
-  ASSERT_OK(zx::channel::create(0, &service0, &service1));
   ASSERT_OK(fdio_ns_open3(ns, "/foo/bar", 1u, service0.release()));
 
   // Expect an incoming connect on ch1
@@ -214,27 +167,6 @@ TEST(NamespaceTest, ConnectCanonicalPathOpen3) {
 }
 
 TEST(NamespaceTest, ConnectNonCanonicalPath) {
-  fdio_ns_t* ns;
-  ASSERT_OK(fdio_ns_create(&ns));
-
-  zx::channel ch0, ch1;
-  ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
-
-  ASSERT_OK(fdio_ns_bind(ns, "/foo", ch0.release()));
-  ASSERT_STATUS(ZX_ERR_TIMED_OUT,
-                ch1.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), nullptr));
-
-  zx::channel service0, service1;
-  ASSERT_OK(zx::channel::create(0, &service0, &service1));
-  ASSERT_OK(fdio_ns_open(ns, "//foo/fake_subdir/.././Service", 1u, service0.release()));
-
-  // Expect an incoming connect on ch1
-  ASSERT_OK(ch1.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), nullptr));
-
-  ASSERT_OK(fdio_ns_destroy(ns));
-}
-
-TEST(NamespaceTest, ConnectNonCanonicalPathOpen3) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
   auto destroy = fit::defer([ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
@@ -269,8 +201,6 @@ TEST(NamespaceTest, ConnectOversizedPath) {
   // for a null terminator. This path is thus too long by one character.
   EXPECT_EQ(long_path.length(), PATH_MAX);
 
-  EXPECT_STATUS(fdio_ns_open(ns, long_path.c_str(), 0u, ch0.release()), ZX_ERR_BAD_PATH);
-  ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
   EXPECT_STATUS(fdio_ns_open3(ns, long_path.c_str(), 0u, ch0.release()), ZX_ERR_BAD_PATH);
 }
 
@@ -287,8 +217,6 @@ TEST(NamespaceTest, ConnectOversizedPathComponent) {
   // component is thus too long by one character.
   long_path_component.append(NAME_MAX + 1, 'a');
 
-  EXPECT_STATUS(fdio_ns_open(ns, long_path_component.c_str(), 0u, ch0.release()), ZX_ERR_BAD_PATH);
-  ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
   EXPECT_STATUS(fdio_ns_open3(ns, long_path_component.c_str(), 0u, ch0.release()), ZX_ERR_BAD_PATH);
 }
 

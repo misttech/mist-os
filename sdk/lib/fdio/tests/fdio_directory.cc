@@ -10,11 +10,6 @@
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
-// TODO(https://fxbug.dev/376575307): Remove deprecation warning suppression when use of deprecated
-// fdio_open* functions are removed.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-
 namespace {
 
 class DirectoryTest : public zxtest::Test {
@@ -23,7 +18,6 @@ class DirectoryTest : public zxtest::Test {
   }
 };
 
-constexpr uint32_t kFlagsDeprecated = static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable);
 constexpr uint64_t kFlags = static_cast<uint64_t>(fuchsia_io::wire::kRStarDir);
 
 // kPathTooLong is `/a{4095}\0` (leading forward slash then 4,095 'a's then null), which including
@@ -93,7 +87,7 @@ TEST_F(DirectoryTest, ServiceConnect) {
 TEST_F(DirectoryTest, ServiceConnectAt) {
   zx::channel h1, h2;
   ASSERT_OK(zx::channel::create(0, &h1, &h2));
-  ASSERT_OK(fdio_open("/svc", kFlagsDeprecated, h1.release()));
+  ASSERT_OK(fdio_open3("/svc", kFlags, h1.release()));
 
   ASSERT_STATUS(fdio_service_connect_at(h2.get(), nullptr, ZX_HANDLE_INVALID), ZX_ERR_INVALID_ARGS);
 
@@ -103,15 +97,6 @@ TEST_F(DirectoryTest, ServiceConnectAt) {
       h2.get(), fidl::DiscoverableProtocolName<fuchsia_process::Launcher>, h3.release()));
 }
 
-TEST_F(DirectoryTest, Open) {
-  ASSERT_STATUS(fdio_open(nullptr, 0, ZX_HANDLE_INVALID), ZX_ERR_INVALID_ARGS);
-
-  zx::channel h1, h2;
-  ASSERT_OK(zx::channel::create(0, &h1, &h2));
-  ASSERT_STATUS(fdio_open("/x/y/z", kFlagsDeprecated, h1.release()), ZX_ERR_NOT_FOUND);
-  ASSERT_STATUS(fdio_open("/", kFlagsDeprecated, h2.release()), ZX_ERR_NOT_SUPPORTED);
-}
-
 TEST_F(DirectoryTest, Open3) {
   ASSERT_STATUS(fdio_open3(nullptr, 0, ZX_HANDLE_INVALID), ZX_ERR_INVALID_ARGS);
 
@@ -119,93 +104,6 @@ TEST_F(DirectoryTest, Open3) {
   ASSERT_OK(zx::channel::create(0, &h1, &h2));
   ASSERT_STATUS(fdio_open3("/x/y/z", kFlags, h1.release()), ZX_ERR_NOT_FOUND);
   ASSERT_STATUS(fdio_open3("/", kFlags, h2.release()), ZX_ERR_NOT_SUPPORTED);
-}
-
-TEST_F(DirectoryTest, OpenFd) {
-  fbl::unique_fd fd;
-  ASSERT_STATUS(fdio_open_fd(nullptr, kFlagsDeprecated, fd.reset_and_get_address()),
-                ZX_ERR_INVALID_ARGS);
-  ASSERT_STATUS(fdio_open_fd("/x/y/z", kFlagsDeprecated, fd.reset_and_get_address()),
-                ZX_ERR_NOT_FOUND);
-
-  // Opening local directories, like the root of the namespace, should be supported.
-  ASSERT_OK(fdio_open_fd("/", kFlagsDeprecated, fd.reset_and_get_address()));
-
-  // Paths should be canonicalized per
-  // https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.io/io.fidl;l=41-43;drc=e7cbd843e8ced20ea21f9213989d803ae64fcfaf
-  ASSERT_OK(fdio_open_fd("/pkg/..", kFlagsDeprecated, fd.reset_and_get_address()));
-
-  // Paths of 4,097 bytes (including the null) or more should be rejected.
-  ASSERT_STATUS(fdio_open_fd(kPathTooLong.data(), kFlagsDeprecated, fd.reset_and_get_address()),
-                ZX_ERR_BAD_PATH);
-
-  // Path canonicalization of consecutive '/'s should be handled gracefully.
-  ASSERT_OK(fdio_open_fd("//", kFlagsDeprecated, fd.reset_and_get_address()));
-
-  // Relative paths are interpreted to CWD which is '/' at this point of the test.
-  ASSERT_OK(fdio_open_fd("pkg", kFlagsDeprecated, fd.reset_and_get_address()));
-
-  // Should fail to open path ending with a slash if last component is not a directory.
-  ASSERT_STATUS(fdio_open_fd("/pkg/test/fdio-test/", kFlagsDeprecated, fd.reset_and_get_address()),
-                ZX_ERR_NOT_DIR);
-}
-
-TEST_F(DirectoryTest, OpenFdChangeWorkingDir) {
-  ASSERT_EQ(chdir("/pkg"), 0, "errno %d: %s", errno, strerror(errno));
-
-  fbl::unique_fd fd;
-  ASSERT_OK(fdio_open_fd("test", kFlagsDeprecated, fd.reset_and_get_address()));
-  ASSERT_TRUE(fd.is_valid());
-}
-
-TEST_F(DirectoryTest, OpenFdAt) {
-  fbl::unique_fd fd;
-  ASSERT_OK(fdio_open_fd("/pkg/test", kFlagsDeprecated, fd.reset_and_get_address()));
-  ASSERT_TRUE(fd.is_valid());
-
-  fbl::unique_fd fd2;
-  ASSERT_STATUS(fdio_open_fd_at(fd.get(), nullptr, kFlagsDeprecated, fd2.reset_and_get_address()),
-                ZX_ERR_INVALID_ARGS);
-  ASSERT_FALSE(fd2.is_valid());
-  ASSERT_STATUS(fdio_open_fd_at(fd.get(), "some-nonexistent-file", kFlagsDeprecated,
-                                fd2.reset_and_get_address()),
-                ZX_ERR_NOT_FOUND);
-  ASSERT_FALSE(fd2.is_valid());
-
-  // fdio_open_fd_at() should not resolve absolute paths to the root directory, unlike openat().
-  ASSERT_STATUS(fdio_open_fd_at(fd.get(), "/pkg", kFlagsDeprecated, fd2.reset_and_get_address()),
-                ZX_ERR_INVALID_ARGS);
-  ASSERT_FALSE(fd2.is_valid());
-
-  // Should not interpret absolute paths as relative paths to the provided fd.
-  ASSERT_STATUS(
-      fdio_open_fd_at(fd.get(), "/fdio-test", kFlagsDeprecated, fd2.reset_and_get_address()),
-      ZX_ERR_INVALID_ARGS);
-  ASSERT_FALSE(fd2.is_valid());
-
-  // Paths of 4,097 bytes (including the null) or more should be rejected.
-  ASSERT_STATUS(
-      fdio_open_fd_at(fd.get(), kPathTooLong.data(), kFlagsDeprecated, fd2.reset_and_get_address()),
-      ZX_ERR_BAD_PATH);
-
-  // Verify that we can open and read from the binary this test is compiled into.
-  ASSERT_OK(fdio_open_fd_at(fd.get(), "fdio-test", kFlagsDeprecated, fd2.reset_and_get_address()));
-  ASSERT_TRUE(fd2.is_valid());
-  char buf[256];
-  ssize_t bytes_read = read(fd2.get(), buf, 256);
-  ASSERT_EQ(bytes_read, 256);
-
-  // Paths should be canonicalized per
-  // https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.io/io.fidl;l=41-43;drc=e7cbd843e8ced20ea21f9213989d803ae64fcfaf
-  ASSERT_OK(
-      fdio_open_fd_at(fd.get(), "fdio-test/..", kFlagsDeprecated, fd2.reset_and_get_address()));
-  ASSERT_TRUE(fd2.is_valid());
-
-  // Should fail to open path ending with a slash if last component is not a directory.
-  ASSERT_STATUS(
-      fdio_open_fd_at(fd.get(), "fdio-test/", kFlagsDeprecated, fd2.reset_and_get_address()),
-      ZX_ERR_NOT_DIR);
-  ASSERT_FALSE(fd2.is_valid());
 }
 
 TEST_F(DirectoryTest, Open3Fd) {
@@ -290,22 +188,6 @@ TEST_F(DirectoryTest, Open3FdAt) {
   ASSERT_FALSE(fd2.is_valid());
 }
 
-TEST_F(DirectoryTest, OpenAtConsumesHandleOnFailure) {
-  zx::channel h1, h2;
-  ASSERT_OK(zx::channel::create(0, &h1, &h2));
-  ASSERT_OK(fdio_open("/svc", kFlagsDeprecated, h1.release()));
-
-  zx::channel h3, h4;
-  ASSERT_OK(zx::channel::create(0, &h3, &h4));
-  ASSERT_STATUS(fdio_open_at(h2.get(), /*path=*/nullptr, kFlagsDeprecated, h3.release()),
-                ZX_ERR_INVALID_ARGS);
-
-  zx_signals_t pending;
-  ASSERT_OK(h4.wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite_past(), &pending));
-  // fdio_open_at takes ownership of the request handle even when path == nullptr
-  ASSERT_TRUE((pending & ZX_CHANNEL_PEER_CLOSED) != 0);
-}
-
 TEST_F(DirectoryTest, Open3AtConsumesHandleOnFailure) {
   zx::channel h1, h2;
   ASSERT_OK(zx::channel::create(0, &h1, &h2));
@@ -323,5 +205,3 @@ TEST_F(DirectoryTest, Open3AtConsumesHandleOnFailure) {
 }
 
 }  // namespace
-
-#pragma clang diagnostic pop
