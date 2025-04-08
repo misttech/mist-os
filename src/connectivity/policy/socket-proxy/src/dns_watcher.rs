@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Implements the fuchsia.netpol.socketproxy.DnsServerWatcher service.
+//! Implements the fuchsia.net.policy.socketproxy.DnsServerWatcher service.
 
 use anyhow::{Context, Error};
 use fidl::endpoints::{ControlHandle as _, RequestStream as _, Responder as _};
-use fidl_fuchsia_netpol_socketproxy::{self as fnp_socketproxy, DnsServerList};
+use fidl_fuchsia_net_policy_socketproxy::{self as fnp_socketproxy, DnsServerList};
 use fuchsia_inspect_derive::{IValue, Inspect, Unit};
 use futures::channel::mpsc;
 use futures::lock::Mutex;
@@ -27,7 +27,7 @@ struct DnsServerWatcherState {
     updates_sent: u32,
 }
 
-/// A wrapper around the fuchsia.netpol.socketproxy.DnsServerWatcher service
+/// A wrapper around the fuchsia.net.policy.socketproxy.DnsServerWatcher service
 /// that tracks when a DnsServerList update needs to be sent.
 #[derive(Inspect, Debug, Clone)]
 pub(crate) struct DnsServerWatcher {
@@ -44,7 +44,7 @@ impl DnsServerWatcher {
         Self { dns_rx, state: Default::default() }
     }
 
-    /// Runs the fuchsia.netpol.socketproxy.DnsServerWatcher service.
+    /// Runs the fuchsia.net.policy.socketproxy.DnsServerWatcher service.
     pub(crate) async fn run<'a>(
         &self,
         stream: fnp_socketproxy::DnsServerWatcherRequestStream,
@@ -58,7 +58,7 @@ impl DnsServerWatcher {
             }
         };
         let mut dns_rx = self.dns_rx.lock().await;
-        info!("Starting fuchsia.netpol.socketproxy.DnsServerWatcher server");
+        info!("Starting fuchsia.net.policy.socketproxy.DnsServerWatcher server");
         let mut stream = stream.map(|result| result.context("failed request")).fuse();
 
         loop {

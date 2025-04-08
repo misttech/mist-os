@@ -5,9 +5,9 @@
 //! Implementation of the network socket proxy.
 //!
 //! Runs proxied versions of fuchsia.posix.socket.Provider and fuchsia.posix.socket.raw.Provider.
-//! Exposes fuchsia.netpol.socketproxy.StarnixNetworks,
-//! fuchsia.netpol.socketproxy.FuchsiaNetworks, and
-//! fuchsia.netpol.socketproxy.DnsServerWatcher.
+//! Exposes fuchsia.net.policy.socketproxy.StarnixNetworks,
+//! fuchsia.net.policy.socketproxy.FuchsiaNetworks, and
+//! fuchsia.net.policy.socketproxy.DnsServerWatcher.
 
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_posix_socket::{self as fposix_socket, OptionalUint32};
@@ -83,9 +83,9 @@ impl SocketProxy {
 }
 
 enum IncomingService {
-    StarnixNetworks(fidl_fuchsia_netpol_socketproxy::StarnixNetworksRequestStream),
-    FuchsiaNetworks(fidl_fuchsia_netpol_socketproxy::FuchsiaNetworksRequestStream),
-    DnsServerWatcher(fidl_fuchsia_netpol_socketproxy::DnsServerWatcherRequestStream),
+    StarnixNetworks(fidl_fuchsia_net_policy_socketproxy::StarnixNetworksRequestStream),
+    FuchsiaNetworks(fidl_fuchsia_net_policy_socketproxy::FuchsiaNetworksRequestStream),
+    DnsServerWatcher(fidl_fuchsia_net_policy_socketproxy::DnsServerWatcherRequestStream),
     PosixSocket(fidl_fuchsia_posix_socket::ProviderRequestStream),
     PosixSocketRaw(fidl_fuchsia_posix_socket_raw::ProviderRequestStream),
 }

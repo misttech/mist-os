@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_net::{IpAddress, SocketAddress};
-use fidl_fuchsia_netpol_socketproxy::{
+use fidl_fuchsia_net_policy_socketproxy::{
     DnsServerList, FuchsiaNetworkInfo, Network, NetworkDnsServers, NetworkInfo, StarnixNetworkInfo,
 };
 

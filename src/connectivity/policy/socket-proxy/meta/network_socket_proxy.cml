@@ -14,9 +14,9 @@
     capabilities: [
         {
             protocol: [
-                "fuchsia.netpol.socketproxy.DnsServerWatcher",
-                "fuchsia.netpol.socketproxy.FuchsiaNetworks",
-                "fuchsia.netpol.socketproxy.StarnixNetworks",
+                "fuchsia.net.policy.socketproxy.DnsServerWatcher",
+                "fuchsia.net.policy.socketproxy.FuchsiaNetworks",
+                "fuchsia.net.policy.socketproxy.StarnixNetworks",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.posix.socket.raw.Provider",
             ],
@@ -33,9 +33,9 @@
     expose: [
         {
             protocol: [
-                "fuchsia.netpol.socketproxy.DnsServerWatcher",
-                "fuchsia.netpol.socketproxy.FuchsiaNetworks",
-                "fuchsia.netpol.socketproxy.StarnixNetworks",
+                "fuchsia.net.policy.socketproxy.DnsServerWatcher",
+                "fuchsia.net.policy.socketproxy.FuchsiaNetworks",
+                "fuchsia.net.policy.socketproxy.StarnixNetworks",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.posix.socket.raw.Provider",
             ],

@@ -19,8 +19,8 @@
     expose: [
         {
             protocol: [
-                "fuchsia.netpol.socketproxy.DnsServerWatcher",
-                "fuchsia.netpol.socketproxy.StarnixNetworks",
+                "fuchsia.net.policy.socketproxy.DnsServerWatcher",
+                "fuchsia.net.policy.socketproxy.StarnixNetworks",
             ],
             from: "void",
             availability: "optional",

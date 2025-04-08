@@ -25,7 +25,7 @@ use std::borrow::Cow;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
 
-use {fidl_fuchsia_net as fnet, fidl_fuchsia_netpol_socketproxy as fnp_socketproxy};
+use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_policy_socketproxy as fnp_socketproxy};
 
 const DEFAULT_NETWORK_FILE_NAME: &str = "default";
 
