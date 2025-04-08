@@ -15,6 +15,7 @@
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
+#include <linux/perf_event.h>
 #include <linux/userfaultfd.h>
 
 #include "src/starnix/tests/selinux/userspace/util.h"
@@ -124,6 +125,24 @@ TEST(AnonInodeTest, SignalFdIsUnlabeled) {
   sigset_t signals;
   sigemptyset(&signals);
   fbl::unique_fd fd(signalfd(-1, &signals, SFD_CLOEXEC));
+  ASSERT_TRUE(fd.is_valid());
+
+  EXPECT_EQ(GetLabel(fd.get()), fit::error(ENOTSUP));
+}
+
+TEST(AnonInodeTest, PerfEventFdIsUnlabeled) {
+  perf_event_attr attr{};
+  attr.type = PERF_TYPE_SOFTWARE;
+  attr.size = sizeof(attr);
+  attr.config = PERF_COUNT_SW_DUMMY;
+  attr.sample_type = PERF_SAMPLE_IP;
+  attr.disabled = true;
+  attr.exclude_kernel = true;
+  attr.exclude_hv = true;
+  attr.exclude_idle = true;
+
+  fbl::unique_fd fd(static_cast<int>(
+      syscall(SYS_perf_event_open, &attr, /*pid=*/0, /*cpu=*/-1, /*group_fd=*/-1, /*flags=*/0)));
   ASSERT_TRUE(fd.is_valid());
 
   EXPECT_EQ(GetLabel(fd.get()), fit::error(ENOTSUP));

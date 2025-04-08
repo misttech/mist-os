@@ -17,6 +17,7 @@
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 #include <linux/capability.h>
+#include <linux/perf_event.h>
 
 #include "src/lib/files/directory.h"
 #include "src/lib/files/file.h"
@@ -861,6 +862,28 @@ TEST_F(ProcSelfFdTest, DeletedAndUnreachable) {
     EXPECT_EQ(links_to, filename + " (deleted)");
   });
   ASSERT_TRUE(helper.WaitForChildren());
+}
+
+// Validate naming of perf_event_open descriptors as reported via "/proc/self/fd".
+TEST_F(ProcSelfFdTest, PerfEventFdName) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Require CAP_SYS_ADMIN to test perf_event_open(), Skipping.";
+  }
+  perf_event_attr attr{};
+  attr.type = PERF_TYPE_SOFTWARE;
+  attr.size = sizeof(attr);
+  attr.config = PERF_COUNT_SW_DUMMY;
+  attr.sample_type = PERF_SAMPLE_IP;
+  attr.disabled = true;
+  attr.exclude_kernel = true;
+  attr.exclude_hv = true;
+  attr.exclude_idle = true;
+
+  fbl::unique_fd perf_event_fd(SAFE_SYSCALL(static_cast<int>(
+      syscall(SYS_perf_event_open, &attr, /*pid=*/0, /*cpu=*/-1, /*group_fd=*/-1, /*flags=*/0))));
+  ASSERT_TRUE(perf_event_fd.is_valid()) << "perf_event_open() failed:" << strerror(errno);
+
+  EXPECT_EQ(read_fd_link(perf_event_fd.get()), "anon_inode:[perf_event]");
 }
 
 }  // namespace
