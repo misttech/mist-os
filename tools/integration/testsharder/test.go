@@ -58,10 +58,18 @@ type Test struct {
 	Metadata metadata.TestMetadata `json:"metadata,omitempty"`
 }
 
-func (t *Test) applyModifier(m TestModifier) {
+func (t *Test) applyModifier(m TestModifier, s *Shard) {
 	// Only apply MaxAttempts if the test is not already set to be multiplied.
 	if m.MaxAttempts > 0 && t.RunAlgorithm != StopOnFailure {
-		t.Runs = m.MaxAttempts
+		if s.IsBootTest {
+			// Boot tests look through serial logs from the target
+			// for tests that automatically run on boot up, so it
+			// doesn't make sense to retry. If it succeeds on a retry,
+			// that just means the test took longer than expected.
+			t.Runs = 1
+		} else {
+			t.Runs = m.MaxAttempts
+		}
 		t.RunAlgorithm = StopOnSuccess
 	}
 	if m.TotalRuns >= 0 {

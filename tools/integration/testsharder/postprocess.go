@@ -341,13 +341,13 @@ func ApplyModifiers(shards []*Shard, modMatches []ModifierMatch) ([]*Shard, erro
 			if !ok {
 				defaultModForEnv = modsPerEnv[environmentName(defaultEnv)]
 			}
-			test.applyModifier(defaultModForEnv.Modifier)
+			test.applyModifier(defaultModForEnv.Modifier, shard)
 			for _, modMatch := range modMatches {
 				if !envsEqual(modMatch.Env, build.Environment{}) && !envsEqual(modMatch.Env, shard.Env) {
 					continue
 				}
 				if modMatch.Test == test.Name {
-					test.applyModifier(modMatch.Modifier)
+					test.applyModifier(modMatch.Modifier, shard)
 				}
 			}
 			modifiedTests = append(modifiedTests, test)
