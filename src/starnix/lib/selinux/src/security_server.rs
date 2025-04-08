@@ -1435,10 +1435,12 @@ mod tests {
             todo_deny b/002 test_exception_other_t test_exception_target_t chr_file
             todo_deny b/003 test_exception_source_t test_exception_other_t anon_inode
             todo_deny b/004 test_exception_permissive_t test_exception_target_t file
+            todo_permissive b/005 test_exception_todo_permissive_t
 
             // These statements should not be resolved.
             todo_deny b/101 test_undefined_source_t test_exception_target_t file
             todo_deny b/102 test_exception_source_t test_undefined_target_t file
+            todo_permissive b/103 test_undefined_source_t
         ";
         let security_server = SecurityServer::new_with_exceptions(EXCEPTIONS_CONFIG.into());
         security_server.set_enforcing(true);
@@ -1464,6 +1466,11 @@ mod tests {
         let unmatched_sid = security_server
             .security_context_to_sid(
                 "test_exception_u:object_r:test_exception_unmatched_t:s0".into(),
+            )
+            .unwrap();
+        let todo_permissive_sid = security_server
+            .security_context_to_sid(
+                "test_exception_u:object_r:test_exception_todo_permissive_t:s0".into(),
             )
             .unwrap();
 
@@ -1527,6 +1534,45 @@ mod tests {
         assert_eq!(
             permission_check.has_permission(permissive_sid, target_sid, FilePermission::Entrypoint),
             PermissionCheckResult { permit: true, audit: true, todo_bug: None }
+        );
+
+        // Todo-permissive SID is not granted any permissions, so all permissions should be granted,
+        // to all target domains and classes, and all grants should be associated with the bug.
+        assert_eq!(
+            permission_check.has_permission(
+                todo_permissive_sid,
+                target_sid,
+                FilePermission::Entrypoint
+            ),
+            PermissionCheckResult {
+                permit: true,
+                audit: true,
+                todo_bug: Some(NonZeroU64::new(5).unwrap())
+            }
+        );
+        assert_eq!(
+            permission_check.has_permission(
+                todo_permissive_sid,
+                todo_permissive_sid,
+                FilePermission::Entrypoint
+            ),
+            PermissionCheckResult {
+                permit: true,
+                audit: true,
+                todo_bug: Some(NonZeroU64::new(5).unwrap())
+            }
+        );
+        assert_eq!(
+            permission_check.has_permission(
+                todo_permissive_sid,
+                target_sid,
+                FilePermission::Entrypoint
+            ),
+            PermissionCheckResult {
+                permit: true,
+                audit: true,
+                todo_bug: Some(NonZeroU64::new(5).unwrap())
+            }
         );
     }
 
