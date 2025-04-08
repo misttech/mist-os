@@ -19,12 +19,8 @@
                 "cpu_target_features.has_expected_x86_compiler_values",
 
                 // Test for a RISC-V syscall. Skipped on other architectures.
-                "sys_cachectl.__riscv_flush_icache",
-                "sys_hwprobe.__riscv_hwprobe",
-                "sys_hwprobe.__riscv_hwprobe_fail",
-                "sys_hwprobe.__riscv_hwprobe_misaligned_scalar",
-                "sys_hwprobe.__riscv_hwprobe_misaligned_vector",
-                "sys_hwprobe.__riscv_hwprobe_syscall_vdso",
+                "sys_cachectl.__riscv_*",
+                "sys_hwprobe.__riscv_*",
 
                 // These tests currently pass on arm64 and are SKIPPED on x86_64. Our test harness thinks skipped tests fail.
                 "MemtagStackTest.*",

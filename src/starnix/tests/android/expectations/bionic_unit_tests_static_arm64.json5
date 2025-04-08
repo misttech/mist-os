@@ -26,12 +26,8 @@
                 "time.clock",
 
                 // Test for a RISC-V syscall. Skipped on other architectures.
-                "sys_cachectl.__riscv_flush_icache",
-                "sys_hwprobe.__riscv_hwprobe",
-                "sys_hwprobe.__riscv_hwprobe_fail",
-                "sys_hwprobe.__riscv_hwprobe_misaligned_scalar",
-                "sys_hwprobe.__riscv_hwprobe_misaligned_vector",
-                "sys_hwprobe.__riscv_hwprobe_syscall_vdso",
+                "sys_cachectl.__riscv_*",
+                "sys_hwprobe.__riscv_*",
 
                 // TODO(https://fxbug.dev/345290064): Started failing and blocking roller.
                 "MemtagNoteTest.*",
