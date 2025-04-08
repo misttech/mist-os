@@ -45,9 +45,6 @@
             ],
             availability: "optional",
         },
-        {
-            service: [ "fuchsia.hardware.overnet.Service" ],
-        },
     ],
     expose: [
         {
