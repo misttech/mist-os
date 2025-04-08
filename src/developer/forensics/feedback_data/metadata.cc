@@ -34,6 +34,7 @@ std::set<std::string> kUtcBootDifferenceAllowlist = {
 };
 
 std::set<std::string> kPreviousBootUtcBootDifferenceAllowlist = {
+    kAttachmentLogKernelPrevious,
     kAttachmentLogSystemPrevious,
 };
 

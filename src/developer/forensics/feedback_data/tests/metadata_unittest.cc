@@ -435,6 +435,7 @@ TEST_F(MetadataTest, Check_UtcBootDifference) {
   const feedback::AttachmentKeys attachment_allowlist = {
       kAttachmentInspect,
       kAttachmentLogKernel,
+      kAttachmentLogKernelPrevious,
       kAttachmentLogSystem,
       feedback::kPreviousLogsFilePath,
   };
@@ -446,6 +447,7 @@ TEST_F(MetadataTest, Check_UtcBootDifference) {
   feedback::Attachments attachments;
   attachments.insert({kAttachmentInspect, feedback::AttachmentValue("")});
   attachments.insert({kAttachmentLogKernel, feedback::AttachmentValue("")});
+  attachments.insert({kAttachmentLogKernelPrevious, feedback::AttachmentValue("")});
   attachments.insert({kAttachmentLogSystem, feedback::AttachmentValue("")});
   attachments.insert({kAttachmentLogSystemPrevious, feedback::AttachmentValue("")});
 
@@ -467,6 +469,8 @@ TEST_F(MetadataTest, Check_UtcBootDifference) {
 
   UTC_BOOT_DIFFERENCE_IS(metadata_json, kAttachmentInspect, utc_boot_difference);
   UTC_BOOT_DIFFERENCE_IS(metadata_json, kAttachmentLogKernel, utc_boot_difference);
+  UTC_BOOT_DIFFERENCE_IS(metadata_json, kAttachmentLogKernelPrevious,
+                         kPreviousBootUtcBootDifference);
   UTC_BOOT_DIFFERENCE_IS(metadata_json, kAttachmentLogSystem, utc_boot_difference);
   UTC_BOOT_DIFFERENCE_IS(metadata_json, kAttachmentLogSystemPrevious,
                          kPreviousBootUtcBootDifference);

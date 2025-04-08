@@ -131,6 +131,7 @@ TEST_F(ProdConfigTest, DefaultSnapshot) {
                                                 "build.snapshot.xml",
                                                 "build.kernel-boot-options.txt",
                                                 "inspect.json",
+                                                "log.kernel.previous_boot.txt",
                                                 "log.kernel.txt",
                                                 "log.system.previous_boot.txt",
                                                 "log.system.txt",

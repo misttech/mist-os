@@ -15,6 +15,7 @@
 #include <lib/zx/time.h>
 
 #include <memory>
+#include <optional>
 
 #include "src/developer/forensics/feedback/annotations/annotation_manager.h"
 #include "src/developer/forensics/feedback/attachment_providers.h"
@@ -40,7 +41,7 @@ class FeedbackData {
   FeedbackData(async_dispatcher_t* dispatcher, std::shared_ptr<sys::ServiceDirectory> services,
                timekeeper::Clock* clock, inspect::Node* inspect_root, cobalt::Logger* cobalt,
                RedactorBase* redactor, feedback::AnnotationManager* annotation_manager,
-               Options options);
+               std::optional<std::string> dlog, Options options);
 
   feedback_data::DataProvider* DataProvider();
 

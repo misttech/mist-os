@@ -16,6 +16,7 @@
 #include "src/developer/forensics/feedback/attachments/file_backed_provider.h"
 #include "src/developer/forensics/feedback/attachments/inspect.h"
 #include "src/developer/forensics/feedback/attachments/kernel_log.h"
+#include "src/developer/forensics/feedback/attachments/previous_boot_kernel_log.h"
 #include "src/developer/forensics/feedback/attachments/previous_boot_log.h"
 #include "src/developer/forensics/feedback/attachments/system_log.h"
 #include "src/developer/forensics/feedback_data/inspect_data_budget.h"
@@ -33,7 +34,7 @@ class AttachmentProviders {
                       std::optional<zx::duration> delete_previous_boot_log_at,
                       timekeeper::Clock* clock, RedactorBase* redactor,
                       feedback_data::InspectDataBudget* inspect_data_budget,
-                      std::set<std::string> allowlist);
+                      std::set<std::string> allowlist, std::optional<std::string> dlog);
 
   AttachmentManager* GetAttachmentManager() { return &attachment_manager_; }
 
@@ -44,6 +45,7 @@ class AttachmentProviders {
   SystemLog system_log_;
   Inspect inspect_;
   PreviousBootLog previous_boot_log_;
+  PreviousBootKernelLog previous_boot_kernel_log_;
   FileBackedProvider build_snapshot_;
   FileBackedProvider kernel_boot_options_;
 

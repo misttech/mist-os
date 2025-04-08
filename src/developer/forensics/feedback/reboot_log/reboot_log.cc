@@ -4,17 +4,20 @@
 
 #include "src/developer/forensics/feedback/reboot_log/reboot_log.h"
 
+#include <lib/fit/defer.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include <sstream>
 #include <unordered_set>
+#include <utility>
 
 #include "src/developer/forensics/feedback/reboot_log/graceful_reboot_reason.h"
 #include "src/developer/forensics/feedback/reboot_log/reboot_reason.h"
+#include "src/developer/forensics/feedback_data/constants.h"
 #include "src/lib/files/file.h"
 #include "src/lib/fxl/strings/join_strings.h"
 #include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/fxl/strings/string_printf.h"
+#include "src/lib/fxl/strings/trim.h"
 
 namespace forensics {
 namespace feedback {
@@ -26,6 +29,8 @@ namespace {
 // https://osscs.corp.google.com/fuchsia/fuchsia/+/main:zircon/kernel/lib/crashlog/crashlog.cc;l=146;drc=e81b291e80479976c2cca9f87b600917fda48475
 constexpr std::string_view kCriticalProcessPrefix =
     "ROOT JOB TERMINATED BY CRITICAL PROCESS DEATH: ";
+constexpr std::string_view kBeginDlog = "--- BEGIN DLOG DUMP ---";
+constexpr std::string_view kEndDlog = "--- END DLOG DUMP ---";
 
 enum class ZirconRebootReason {
   kNotSet,
@@ -153,6 +158,38 @@ ZirconRebootReason ExtractZirconRebootInfo(const std::string& path,
   }
 
   return reason;
+}
+
+// Prints |reboot_log| with the DLOG removed. Returns the removed DLOG, if present.
+std::optional<std::string> ExtractDlogAndLogRebootLog(const std::string& reboot_log) {
+  auto fallback_log =
+      fit::defer([&reboot_log] { FX_LOGS(INFO) << "Reboot info:\n"
+                                               << reboot_log; });
+
+  const size_t begin_header_pos = reboot_log.find(kBeginDlog);
+  if (begin_header_pos == std::string::npos) {
+    return std::nullopt;
+  }
+
+  const size_t payload_begin = begin_header_pos + kBeginDlog.size();
+  const size_t payload_end = reboot_log.find(kEndDlog, begin_header_pos);
+
+  if (payload_end == std::string::npos) {
+    // For some reason the DLOG dump started, but never finished.
+    return std::nullopt;
+  }
+
+  const size_t end_footer_pos = payload_end + kEndDlog.size();
+
+  fallback_log.cancel();
+  FX_LOGS(INFO) << "Reboot info:\n"
+                << reboot_log.substr(0, begin_header_pos)
+                << "DLOG dump can be found in the snapshot file: "
+                << feedback_data::kAttachmentLogKernelPrevious << reboot_log.substr(end_footer_pos);
+
+  const std::string dlog = reboot_log.substr(payload_begin, payload_end - payload_begin);
+
+  return std::string(fxl::TrimString(dlog, " \f\n\r\t\v"));
 }
 
 std::vector<GracefulRebootReason> ExtractGracefulRebootInfo(
@@ -296,19 +333,19 @@ RebootLog RebootLog::ParseRebootLog(const std::string& zircon_reboot_log_path,
 
   const auto reboot_reason = DetermineRebootReason(zircon_reason, graceful_reasons, not_a_fdr);
   const auto reboot_log = MakeRebootLog(zircon_reboot_log, graceful_reasons, reboot_reason);
+  const std::optional<std::string> dlog = ExtractDlogAndLogRebootLog(reboot_log);
 
-  FX_LOGS(INFO) << "Reboot info:\n" << reboot_log;
-
-  return RebootLog(reboot_reason, reboot_log, last_boot_uptime, last_boot_runtime,
+  return RebootLog(reboot_reason, reboot_log, dlog, last_boot_uptime, last_boot_runtime,
                    critical_process);
 }
 
 RebootLog::RebootLog(enum RebootReason reboot_reason, std::string reboot_log_str,
-                     std::optional<zx::duration> last_boot_uptime,
+                     std::optional<std::string> dlog, std::optional<zx::duration> last_boot_uptime,
                      std::optional<zx::duration> last_boot_runtime,
                      std::optional<std::string> critical_process)
     : reboot_reason_(reboot_reason),
       reboot_log_str_(reboot_log_str),
+      dlog_(std::move(dlog)),
       last_boot_uptime_(last_boot_uptime),
       last_boot_runtime_(last_boot_runtime),
       critical_process_(critical_process) {}

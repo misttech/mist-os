@@ -109,6 +109,7 @@ int main() {
       component.Dispatcher(), component.Services(), component.Clock(), component.InspectRoot(),
       cobalt.get(), startup_annotations,
       fidl::InterfaceRequest<fuchsia::process::lifecycle::Lifecycle>(std::move(lifecycle_channel)),
+      reboot_log.Dlog(),
       MainService::Options{*build_type_config, local_device_id_path,
                            kCurrentGracefulRebootReasonFile,
                            LastReboot::Options{

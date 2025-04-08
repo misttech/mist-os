@@ -13,6 +13,8 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include <memory>
+#include <optional>
+#include <utility>
 
 #include "src/developer/forensics/feedback/annotations/device_id_provider.h"
 #include "src/developer/forensics/feedback/annotations/provider.h"
@@ -44,7 +46,7 @@ MainService::MainService(
     timekeeper::Clock* clock, inspect::Node* inspect_root, cobalt::Logger* cobalt,
     const Annotations& startup_annotations,
     fidl::InterfaceRequest<fuchsia::process::lifecycle::Lifecycle> lifecycle_channel,
-    Options options)
+    std::optional<std::string> dlog, Options options)
     : dispatcher_(dispatcher),
       executor_(dispatcher),
       services_(services),
@@ -58,7 +60,8 @@ MainService::MainService(
                    MakeDeviceIdProvider(options.local_device_id_path, dispatcher_, services_)),
       network_watcher_(dispatcher, *services),
       feedback_data_(dispatcher_, services_, clock_, inspect_root_, cobalt_, redactor_.get(),
-                     annotations_.GetAnnotationManager(), options.feedback_data_options),
+                     annotations_.GetAnnotationManager(), std::move(dlog),
+                     options.feedback_data_options),
       crash_reports_(dispatcher_, services_, clock_, inspect_root_,
                      annotations_.GetAnnotationManager(), feedback_data_.DataProvider(),
                      options.crash_reports_options),

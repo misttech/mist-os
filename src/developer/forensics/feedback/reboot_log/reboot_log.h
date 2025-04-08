@@ -22,6 +22,7 @@ class RebootLog {
                                   const std::string& graceful_reboot_log_path, bool not_a_fdr);
 
   const std::string& RebootLogStr() const { return reboot_log_str_; }
+  const std::optional<std::string>& Dlog() const { return dlog_; }
   enum RebootReason RebootReason() const { return reboot_reason_; }
   const std::optional<zx::duration>& Uptime() const { return last_boot_uptime_; }
   const std::optional<zx::duration>& Runtime() const { return last_boot_runtime_; }
@@ -29,13 +30,14 @@ class RebootLog {
 
   // Exposed for testing purposes.
   RebootLog(enum RebootReason reboot_reason, std::string reboot_log_str,
-            std::optional<zx::duration> last_boot_uptime,
+            std::optional<std::string> dlog, std::optional<zx::duration> last_boot_uptime,
             std::optional<zx::duration> last_boot_runtime,
             std::optional<std::string> critical_process);
 
  private:
   enum RebootReason reboot_reason_;
   std::string reboot_log_str_;
+  std::optional<std::string> dlog_;
   std::optional<zx::duration> last_boot_uptime_;
   std::optional<zx::duration> last_boot_runtime_;
   std::optional<std::string> critical_process_;
