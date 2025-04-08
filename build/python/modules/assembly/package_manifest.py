@@ -50,7 +50,7 @@ class BlobEntry:
     source_path: Optional[FilePath] = None
 
     def compare_with(
-        self, other: "BlobEntry", allow_source_path_differences=False
+        self, other: "BlobEntry", allow_source_path_differences: bool = False
     ) -> list[str]:
         """Compare this BlobEntry with the other, reporting any differences.
 
@@ -101,7 +101,7 @@ class PackageManifest:
     subpackages: list[SubpackageEntry] = field(default_factory=list)
     repository: Optional[str] = None
 
-    def set_paths_relative(self, relative_to_file: bool):
+    def set_paths_relative(self, relative_to_file: bool) -> None:
         self.blob_sources_relative = (
             "file" if relative_to_file else "working_dir"
         )
@@ -110,7 +110,9 @@ class PackageManifest:
         return {blob.path: blob for blob in self.blobs}
 
     def compare_with(
-        self, other: "PackageManifest", allow_source_path_differences=False
+        self,
+        other: "PackageManifest",
+        allow_source_path_differences: bool = False,
     ) -> list[str]:
         """Compare this package manifest with the other, reporting any
         differences.

@@ -9,6 +9,7 @@ import argparse
 import json
 import os
 import sys
+from typing import Iterable
 
 from assembly import FilePath, ImageAssemblyConfig, PackageManifest
 from depfile import DepFile
@@ -24,16 +25,17 @@ def get_relative_path(relative_path: str, relative_to_file: str) -> str:
 
 
 def files_from_package_set(
-    package_set: list[FilePath], deps: set[FilePath]
+    package_set: Iterable[FilePath], deps: set[FilePath]
 ) -> set[FilePath]:
     paths: set[FilePath] = set()
-    for manifest in package_set:
+    for manifest_path in package_set:
+        manifest = str(manifest_path)
         paths.add(manifest)
         with open(manifest, "r") as file:
             package_manifest = json_load(PackageManifest, file)
             blob_sources = []
             for blob in package_manifest.blobs:
-                path = blob.source_path
+                path = str(blob.source_path)
                 if package_manifest.blob_sources_relative:
                     path = get_relative_path(path, manifest)
                 blob_sources.append(path)
@@ -41,7 +43,7 @@ def files_from_package_set(
             if package_manifest.subpackages:
                 subpackage_set = []
                 for subpackage in package_manifest.subpackages:
-                    path = subpackage.manifest_path
+                    path = str(subpackage.manifest_path)
                     if package_manifest.blob_sources_relative:
                         path = get_relative_path(path, manifest)
                     if path not in deps:
@@ -76,7 +78,7 @@ def main() -> int:
     inputs: set[FilePath] = set()
 
     with open(args.image_assembly_config, "r") as f:
-        config = ImageAssemblyConfig.json_load(f)
+        config = json_load(ImageAssemblyConfig, f)
 
         # Collect the list of files that are read in this script.
         deps.update(config.base)
@@ -90,7 +92,8 @@ def main() -> int:
         inputs.update(files_from_package_set(config.system, deps))
         inputs.update(files_from_package_set(config.bootfs_packages, deps))
         inputs.update([entry.source for entry in config.bootfs_files])
-        inputs.add(config.kernel.path)
+        if config.kernel.path:
+            inputs.add(config.kernel.path)
         if config.devicetree:
             inputs.add(config.devicetree)
 
@@ -126,7 +129,7 @@ def main() -> int:
 
     with open(args.output, "w") as f:
         for input in inputs:
-            f.write(input + "\n")
+            f.write(f"{input}\n")
 
     return 0
 

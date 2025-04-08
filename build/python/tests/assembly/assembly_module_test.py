@@ -330,7 +330,8 @@ class AssemblyInputBundleTest(unittest.TestCase):
         ]
 
         self.assertEqual(
-            aib.json_dumps(indent=2), raw_assembly_input_bundle_json
+            serialization.json_dumps(aib, indent=2),
+            raw_assembly_input_bundle_json,
         )
 
     def test_deserialization(self) -> None:
@@ -382,8 +383,8 @@ class AssemblyInputBundleTest(unittest.TestCase):
             ),
         ]
 
-        parsed_aib = AssemblyInputBundle.json_loads(
-            raw_assembly_input_bundle_json
+        parsed_aib = serialization.json_loads(
+            AssemblyInputBundle, raw_assembly_input_bundle_json
         )
 
         def assert_field_equal(
@@ -629,8 +630,10 @@ class AIBCreatorTest(unittest.TestCase):
                 bundle_path, os.path.join(assembly_dir, "assembly_config.json")
             )
             with open(bundle_path) as bundle_file:
-                parsed_bundle = AssemblyInputBundle.json_load(bundle_file)
-                self.assertEqual(parsed_bundle, bundle)
+                parsed_bundle = serialization.json_load(
+                    AssemblyInputBundle, bundle_file
+                )
+            self.assertEqual(parsed_bundle, bundle)
 
             # Verify that resultant AIB contains the correct base packages.
             self.assertEqual(bundle.packages, set(expected_package_manifests))

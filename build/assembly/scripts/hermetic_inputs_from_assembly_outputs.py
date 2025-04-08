@@ -34,19 +34,19 @@ def add_inputs_from_packages(
             package_manifest = json_load(PackageManifest, f)
 
         for blob in package_manifest.blobs:
-            blob_source = blob.source_path
+            blob_source = str(blob.source_path)
 
             if package_manifest.blob_sources_relative == "file":
-                blob_source = get_relative_path(blob_source, manifest_path)
+                blob_source = get_relative_path(blob_source, str(manifest_path))
 
             inputs.append(blob_source)
 
         for subpackage in package_manifest.subpackages:
-            subpackage_path = subpackage.manifest_path
+            subpackage_path = str(subpackage.manifest_path)
 
             if package_manifest.blob_sources_relative == "file":
                 subpackage_path = get_relative_path(
-                    subpackage_path, manifest_path
+                    subpackage_path, str(manifest_path)
                 )
 
             if not subpackage_path in all_manifest_paths:

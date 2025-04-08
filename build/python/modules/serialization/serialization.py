@@ -553,6 +553,9 @@ def serialize_dict(cls: type[C]) -> type[C]:
     return wrap(cls)
 
 
+# WARNING: DEPRECATED: This decorator defeats mypy's static analysis and will
+# result in typing errors at build time for any code that uses it. Use
+# serialization.{json_load, json_loads, json_dump, json_dumps} directly instead.
 def serialize_json(cls: type[C]) -> type[C]:
     """A decorator that adds JSON serialization and deserialization fns to the
     class, which follow the [`json.load()`], [`json.dumps()`], etc. functions.

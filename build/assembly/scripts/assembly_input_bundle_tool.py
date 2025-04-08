@@ -13,7 +13,6 @@ from typing import Any, TextIO
 
 from assembly import (
     AIBCreator,
-    AssemblyInputBundle,
     DriverDetails,
     FileEntry,
     FilePath,
@@ -371,51 +370,6 @@ def generate_archive(args: argparse.Namespace) -> None:
             DepFile.from_deps(args.output, deps).write_to(depfile)
 
 
-def diff_bundles(args: argparse.Namespace) -> None:
-    first = AssemblyInputBundle.json_load(args.first)
-    second = AssemblyInputBundle.json_load(args.second)
-    result = first.difference(second)
-    if args.output:
-        with open(args.output, "w") as output:
-            result.json_dump(output)
-    else:
-        print(result)
-
-
-def intersect_bundles(args: argparse.Namespace) -> None:
-    bundles = [AssemblyInputBundle.json_load(file) for file in args.bundles]
-    result = bundles[0]
-    for next_bundle in bundles[1:]:
-        result = result.intersection(next_bundle)
-    if args.output:
-        with open(args.output, "w") as output:
-            result.json_dump(output)
-    else:
-        print(result)
-
-
-def find_blob(args: argparse.Namespace) -> None:
-    bundle = AssemblyInputBundle.json_load(args.bundle_config)
-    bundle_dir = os.path.dirname(args.bundle_config.name)
-    manifests: list[FilePath] = [*bundle.base, *bundle.cache, *bundle.system]
-    found_at = find_blob_in_manifests(args.blob, bundle_dir, manifests)
-    if found_at:
-        pkg_header = "Package"
-        path_header = "Path"
-        pkg_column_width = max(
-            len(pkg_header), *[len(entry[0]) for entry in found_at]
-        )
-        path_column_width = max(
-            len(path_header), *[len(entry[1]) for entry in found_at]
-        )
-        formatter = f"{{0: <{pkg_column_width}}}  | {{1: <{path_column_width}}}"
-        header = formatter.format(pkg_header, path_header)
-        print(header)
-        print("=" * len(header))
-        for pkg, path in found_at:
-            print(formatter.format(pkg, path))
-
-
 def find_blob_in_manifests(
     blob_to_find: str, bundle_dir: str, manifests_to_search: list[FilePath]
 ) -> list[tuple[FilePath, FilePath]]:
@@ -563,46 +517,6 @@ def main() -> int:
 
     ###
     #
-    # 'assembly_input_bundle_tool diff' subcommand parser
-    #
-    diff_bundles_parser = sub_parsers.add_parser(
-        "diff",
-        help="Calculate the difference between the first and second bundles (A-B).",
-    )
-    diff_bundles_parser.add_argument(
-        "first", help="The first bundle (A)", type=argparse.FileType("r")
-    )
-    diff_bundles_parser.add_argument(
-        "second", help="The second bundle (B)", type=argparse.FileType("r")
-    )
-    diff_bundles_parser.add_argument(
-        "--output",
-        help="A file to write the output to, instead of stdout.",
-    )
-    diff_bundles_parser.set_defaults(handler=diff_bundles)
-
-    ###
-    #
-    # 'assembly_input_bundle_tool intersect' subcommand parser
-    #
-    intersect_bundles_parser = sub_parsers.add_parser(
-        "intersect", help="Calculate the intersection of the provided bundles."
-    )
-    intersect_bundles_parser.add_argument(
-        "bundles",
-        nargs="+",
-        action="extend",
-        help="Paths to the bundle configs.",
-        type=argparse.FileType("r"),
-    )
-    intersect_bundles_parser.add_argument(
-        "--output",
-        help="A file to write the output to, instead of stdout.",
-    )
-    intersect_bundles_parser.set_defaults(handler=intersect_bundles)
-
-    ###
-    #
     # 'assembly_input_bundle_tool generate-package-creation-manifest' subcommand
     #  parser
     #
@@ -639,25 +553,6 @@ def main() -> int:
     archive_creation_parser.add_argument("--output", required=True)
     archive_creation_parser.add_argument("--depfile")
     archive_creation_parser.set_defaults(handler=generate_archive)
-
-    ###
-    #
-    # 'assembly_input_bundle_tool find-blob' subcommand parser
-    #
-    find_blob_parser = sub_parsers.add_parser(
-        "find-blob",
-        help="Find what causes a blob to be included in the Assembly Input Bundle.",
-    )
-    find_blob_parser.add_argument(
-        "--bundle-config",
-        required=True,
-        type=argparse.FileType("r"),
-        help="Path to the assembly_config.json for the bundle",
-    )
-    find_blob_parser.add_argument(
-        "--blob", required=True, help="Merkle of the blob to search for."
-    )
-    find_blob_parser.set_defaults(handler=find_blob)
 
     args: argparse.Namespace = parser.parse_args()
 
