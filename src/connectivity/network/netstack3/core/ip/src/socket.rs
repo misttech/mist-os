@@ -484,9 +484,6 @@ where
         S::Buffer: BufferMut,
         O: SendOptions<I> + RouteResolutionOptions<I>,
     {
-        // TODO(joshlf): Call `trace!` with relevant fields from the socket.
-        self.counters().send_ip_packet.increment();
-
         send_ip_packet(self, bindings_ctx, ip_sock, body, options, tx_metadata)
     }
 

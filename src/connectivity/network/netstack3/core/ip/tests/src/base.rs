@@ -286,7 +286,7 @@ fn test_ipv6_icmp_parameter_problem_non_must() {
         receive_ip_packet: 1,
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 }
 
 #[test]
@@ -361,7 +361,7 @@ fn test_ipv6_unrecognized_ext_hdr_option() {
         ctx.core_ctx.common_icmp::<Ipv6>().tx_counters.parameter_problem.get(),
         expected_icmps
     );
-    IpCounterExpectations::<Ipv6>::expect_dispatched(1).assert_counters(&ctx.core_ctx());
+    IpCounterExpectations::<Ipv6>::expect_dispatched(1).assert_counters(&ctx.core_ctx(), &device);
     assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
     // Test with unrecognized option type set with
@@ -479,7 +479,7 @@ fn test_ipv6_unrecognized_ext_hdr_option() {
         send_ip_packet: expected_icmps,
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 }
 
 #[ip_test(I)]
@@ -488,14 +488,14 @@ fn test_ip_packet_reassembly_not_needed<I: TestIpExt + IpExt>() {
     let device: DeviceId<_> = device_ids[0].clone().into();
     let fragment_id = 5;
 
-    IpCounterExpectations::<I>::default().assert_counters(&ctx.core_ctx());
+    IpCounterExpectations::<I>::default().assert_counters(&ctx.core_ctx(), &device);
 
     // Test that a non fragmented packet gets dispatched right away.
 
     process_ip_fragment::<I>(&mut ctx, &device, fragment_id, 0, 1);
 
     // Make sure the packet got dispatched.
-    IpCounterExpectations::<I>::expect_dispatched(1).assert_counters(&ctx.core_ctx());
+    IpCounterExpectations::<I>::expect_dispatched(1).assert_counters(&ctx.core_ctx(), &device);
 }
 
 #[ip_test(I)]
@@ -520,7 +520,7 @@ fn test_ip_packet_reassembly<I: TestIpExt + IpExt>() {
         need_more_fragments: 2,
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 
     // Process fragment #2
     process_ip_fragment::<I>(&mut ctx, &device, fragment_id, 2, 3);
@@ -534,7 +534,7 @@ fn test_ip_packet_reassembly<I: TestIpExt + IpExt>() {
         deliver_unicast: 1,
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 }
 
 #[ip_test(I)]
@@ -564,7 +564,7 @@ fn test_ip_packet_reassembly_with_packets_arriving_out_of_order<I: TestIpExt + I
         need_more_fragments: 3,
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 
     // Process a packet that does not require reassembly (packet #2, fragment #0).
     process_ip_fragment::<I>(&mut ctx, &device, fragment_id_2, 0, 1);
@@ -577,7 +577,7 @@ fn test_ip_packet_reassembly_with_packets_arriving_out_of_order<I: TestIpExt + I
         deliver_unicast: 1,
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 
     // Process packet #0, fragment #2
     process_ip_fragment::<I>(&mut ctx, &device, fragment_id_0, 2, 3);
@@ -590,7 +590,7 @@ fn test_ip_packet_reassembly_with_packets_arriving_out_of_order<I: TestIpExt + I
         deliver_unicast: 1,
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 
     // Process packet #0, fragment #0
     process_ip_fragment::<I>(&mut ctx, &device, fragment_id_0, 0, 3);
@@ -604,7 +604,7 @@ fn test_ip_packet_reassembly_with_packets_arriving_out_of_order<I: TestIpExt + I
         deliver_unicast: 2,
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 
     // Process packet #1, fragment #1
     process_ip_fragment::<I>(&mut ctx, &device, fragment_id_1, 1, 3);
@@ -618,7 +618,7 @@ fn test_ip_packet_reassembly_with_packets_arriving_out_of_order<I: TestIpExt + I
         deliver_unicast: 3,
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 }
 
 #[ip_test(I)]
@@ -666,7 +666,7 @@ where
         need_more_fragments: 3,
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 }
 
 // TODO(https://fxbug.dev/345814518): Once we don't reassemble on forwarding,
@@ -697,6 +697,7 @@ fn test_ip_reassembly_when_forwarding<I: TestIpExt + IpExt>() {
     // Make sure the (strongly referenced) device IDs are dropped before
     // `net`.
     let alice_device_id: DeviceId<_> = alice_device_ids[0].clone().into();
+    let bob_device_id: DeviceId<_> = bob_device_ids[0].clone().into();
     core::mem::drop((alice_device_ids, bob_device_ids));
 
     let fragment_id = 5;
@@ -715,7 +716,7 @@ fn test_ip_reassembly_when_forwarding<I: TestIpExt + IpExt>() {
         need_more_fragments: 1,
         ..Default::default()
     }
-    .assert_counters(&net.context("alice").core_ctx());
+    .assert_counters(&net.context("alice").core_ctx(), &alice_device_id);
 
     // Process fragment #1
     net.with_context("alice", |ctx| {
@@ -726,10 +727,11 @@ fn test_ip_reassembly_when_forwarding<I: TestIpExt + IpExt>() {
         need_more_fragments: 2,
         ..Default::default()
     }
-    .assert_counters(&net.context("alice").core_ctx());
+    .assert_counters(&net.context("alice").core_ctx(), &alice_device_id);
 
     // Make sure Bob hasn't received the packet.
-    IpCounterExpectations::<I>::default().assert_counters(&net.context("bob").core_ctx());
+    IpCounterExpectations::<I>::default()
+        .assert_counters(&net.context("bob").core_ctx(), &bob_device_id);
 
     // Process fragment #2
     net.with_context("alice", |ctx| {
@@ -744,11 +746,11 @@ fn test_ip_reassembly_when_forwarding<I: TestIpExt + IpExt>() {
         forward: 1,
         ..Default::default()
     }
-    .assert_counters(&net.context("alice").core_ctx());
+    .assert_counters(&net.context("alice").core_ctx(), &alice_device_id);
 
     // Make sure the packet finally got dispatched once Bob received the whole packet.
     IpCounterExpectations::<I>::expect_dispatched(1)
-        .assert_counters(&net.context("bob").core_ctx());
+        .assert_counters(&net.context("bob").core_ctx(), &bob_device_id);
 
     // Make sure there are no more events.
     assert!(net.step().is_idle());
@@ -810,7 +812,7 @@ fn test_ipv6_packet_too_big() {
         },
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
     let Ctx { core_ctx, bindings_ctx } = &mut ctx;
     assert_eq!(core_ctx.common_icmp::<Ipv6>().tx_counters.packet_too_big.get(), 1);
 
@@ -934,7 +936,7 @@ fn test_ip_update_pmtu<I: GetPmtuIpExt>() {
     ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), packet_buf);
 
     // Should have dispatched the packet.
-    IpCounterExpectations::<I>::expect_dispatched(1).assert_counters(&ctx.core_ctx());
+    IpCounterExpectations::<I>::expect_dispatched(1).assert_counters(&ctx.core_ctx(), &device);
 
     assert_eq!(
         I::get_pmtu(&ctx.core_ctx, fake_config.local_ip.get(), fake_config.remote_ip.get())
@@ -959,7 +961,7 @@ fn test_ip_update_pmtu<I: GetPmtuIpExt>() {
     ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), packet_buf);
 
     // Should have dispatched the packet.
-    IpCounterExpectations::<I>::expect_dispatched(2).assert_counters(&ctx.core_ctx());
+    IpCounterExpectations::<I>::expect_dispatched(2).assert_counters(&ctx.core_ctx(), &device);
 
     // The PMTU should not have updated to `new_mtu2`
     assert_eq!(
@@ -985,7 +987,7 @@ fn test_ip_update_pmtu<I: GetPmtuIpExt>() {
     ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), packet_buf);
 
     // Should have dispatched the packet.
-    IpCounterExpectations::<I>::expect_dispatched(3).assert_counters(&ctx.core_ctx());
+    IpCounterExpectations::<I>::expect_dispatched(3).assert_counters(&ctx.core_ctx(), &device);
 
     // The PMTU should have updated to 1900.
     assert_eq!(
@@ -1022,7 +1024,7 @@ fn test_ip_update_pmtu_too_low<I: GetPmtuIpExt>() {
     ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), packet_buf);
 
     // Should have dispatched the packet.
-    IpCounterExpectations::<I>::expect_dispatched(1).assert_counters(&ctx.core_ctx());
+    IpCounterExpectations::<I>::expect_dispatched(1).assert_counters(&ctx.core_ctx(), &device);
 
     assert_eq!(
         I::get_pmtu(&ctx.core_ctx, fake_config.local_ip.get(), fake_config.remote_ip.get()),
@@ -1070,7 +1072,7 @@ fn test_ipv4_remote_no_rfc1191() {
         receive_icmp_error: 1,
         ..IpCounterExpectations::expect_dispatched(1)
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 
     // Should have decreased PMTU value to the next lower PMTU
     // plateau from `path_mtu::PMTU_PLATEAUS`.
@@ -1098,7 +1100,7 @@ fn test_ipv4_remote_no_rfc1191() {
         receive_icmp_error: 1,
         ..IpCounterExpectations::expect_dispatched(2)
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 
     // Should not have updated PMTU as there is no other valid
     // lower PMTU value.
@@ -1126,7 +1128,7 @@ fn test_ipv4_remote_no_rfc1191() {
         receive_icmp_error: 2,
         ..IpCounterExpectations::expect_dispatched(3)
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 
     // Should have decreased PMTU value to the next lower PMTU
     // plateau from `path_mtu::PMTU_PLATEAUS`.
@@ -1157,7 +1159,7 @@ fn test_ipv4_remote_no_rfc1191() {
         receive_icmp_error: 2,
         ..IpCounterExpectations::expect_dispatched(4)
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 
     // Should not have updated the PMTU as the current PMTU is lower.
     assert_eq!(
@@ -1204,7 +1206,7 @@ fn test_invalid_icmpv4_in_ipv6() {
         receive_ip_packet: 1,
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 
     // In IPv6, the next header value (ICMP(v4)) would have been considered
     // unrecognized so an ICMP parameter problem response SHOULD be sent,
@@ -1250,7 +1252,7 @@ fn test_invalid_icmpv6_in_ipv4() {
         send_ip_packet: 1,
         ..IpCounterExpectations::expect_dispatched(1)
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
     assert_eq!(ctx.core_ctx.common_icmp::<Ipv4>().tx_counters.dest_unreachable.get(), 1);
     let frames = ctx.bindings_ctx.take_ethernet_frames();
     let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
@@ -1310,7 +1312,7 @@ fn test_joining_leaving_ip_multicast_group<I: TestIpExt + IpExt>() {
         multicast_no_interest: 1,
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 
     // Join the multicast group and receive the packet, we should dispatch
     // it.
@@ -1342,7 +1344,7 @@ fn test_joining_leaving_ip_multicast_group<I: TestIpExt + IpExt>() {
         dispatch_receive_ip_packet: 1,
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 
     // Leave the multicast group and receive the packet, we should not
     // dispatch it.
@@ -1373,7 +1375,7 @@ fn test_joining_leaving_ip_multicast_group<I: TestIpExt + IpExt>() {
         dispatch_receive_ip_packet: 1,
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 }
 
 #[test]
@@ -1437,10 +1439,11 @@ fn test_no_dispatch_non_ndp_packets_during_ndp_dad() {
         dispatch_receive_ip_packet: 0,
         receive_ip_packet: 1,
         dropped: 1,
+        send_ip_packet: 1,
         version_rx: Ipv6RxCounters { drop_for_tentative: 1, ..Default::default() },
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 
     // Wait until DAD is complete. Arbitrarily choose a year in the future
     // as a time after which we're confident DAD will be complete. We can't
@@ -1457,12 +1460,13 @@ fn test_no_dispatch_non_ndp_packets_during_ndp_dad() {
     IpCounterExpectations::<Ipv6> {
         receive_ip_packet: 2,
         dropped: 1,
+        send_ip_packet: 1,
         version_rx: Ipv6RxCounters { drop_for_tentative: 1, ..Default::default() },
         dispatch_receive_ip_packet: 1,
         deliver_unicast: 1,
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 
     // Set the new IP (this should trigger DAD).
     let ip = config.local_ip.get();
@@ -1482,12 +1486,13 @@ fn test_no_dispatch_non_ndp_packets_during_ndp_dad() {
     IpCounterExpectations::<Ipv6> {
         receive_ip_packet: 3,
         dropped: 2,
+        send_ip_packet: 2,
         version_rx: Ipv6RxCounters { drop_for_tentative: 2, ..Default::default() },
         dispatch_receive_ip_packet: 1,
         deliver_unicast: 1,
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 
     // Make sure all timers are done (DAD to complete on the interface due
     // to new IP).
@@ -1501,12 +1506,13 @@ fn test_no_dispatch_non_ndp_packets_during_ndp_dad() {
     IpCounterExpectations::<Ipv6> {
         receive_ip_packet: 4,
         dropped: 2,
+        send_ip_packet: 2,
         version_rx: Ipv6RxCounters { drop_for_tentative: 2, ..Default::default() },
         dispatch_receive_ip_packet: 2,
         deliver_unicast: 2,
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 }
 
 #[test]
@@ -1550,7 +1556,7 @@ fn test_drop_non_unicast_ipv6_source() {
         version_rx: Ipv6RxCounters { non_unicast_source: 1, ..Default::default() },
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 }
 
 /// Constructs a buffer containing an IP packet with sensible defaults.

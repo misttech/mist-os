@@ -153,7 +153,7 @@ pub mod testutil {
     pub use crate::device::link::testutil::{FakeLinkAddress, FakeLinkDevice, FakeLinkDeviceId};
     pub use crate::device::testutil::{
         FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,
-        MultipleDevicesId,
+        MultipleDevicesId, MultipleDevicesIdState,
     };
     pub use crate::event::testutil::FakeEventCtx;
     pub use crate::frame::testutil::{FakeFrameCtx, FakeTxMetadata, WithFakeFrameContext};

@@ -300,7 +300,9 @@ mod testutil {
     use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu};
     use net_types::{MulticastAddr, SpecifiedAddr};
     use netstack3_base::testutil::{FakeStrongDeviceId, MultipleDevicesId};
-    use netstack3_base::{CoreTimerContext, CounterContext, CtxPair, FrameDestination, Marks};
+    use netstack3_base::{
+        CoreTimerContext, CounterContext, CtxPair, FrameDestination, Marks, ResourceCounterContext,
+    };
     use netstack3_filter::ProofOfEgressCheck;
     use packet::{BufferMut, InnerPacketBuilder, Serializer};
     use packet_formats::ip::{IpPacketBuilder, IpProto};
@@ -370,7 +372,8 @@ mod testutil {
         pub(crate) forwarding_enabled_devices: HashSet<D>,
         // The list of packets sent by the netstack.
         pub(crate) sent_packets: Vec<SentPacket<I, D>>,
-        counters: IpCounters<I>,
+        stack_wide_counters: IpCounters<I>,
+        per_device_counters: IpCounters<I>,
         multicast_forwarding_counters: MulticastForwardingCounters<I>,
     }
 
@@ -392,7 +395,15 @@ mod testutil {
         for FakeCoreCtxState<I, D>
     {
         fn counters(&self) -> &IpCounters<I> {
-            &self.counters
+            &self.stack_wide_counters
+        }
+    }
+
+    impl<I: IpLayerIpExt, D: FakeStrongDeviceId> ResourceCounterContext<D, IpCounters<I>>
+        for FakeCoreCtxState<I, D>
+    {
+        fn per_resource_counters(&self, _resource: &D) -> &IpCounters<I> {
+            &self.per_device_counters
         }
     }
 

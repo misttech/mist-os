@@ -403,6 +403,25 @@ pub(crate) mod testutil {
         }
     }
 
+    /// Holds per-device state for a [`MultipleDevicesId`].
+    #[derive(Default)]
+    pub struct MultipleDevicesIdState<T> {
+        a: T,
+        b: T,
+        c: T,
+    }
+
+    impl<T> MultipleDevicesIdState<T> {
+        /// Accesses the per-device state for the given device ID.
+        pub fn state(&self, device: &MultipleDevicesId) -> &T {
+            match device {
+                MultipleDevicesId::A => &self.a,
+                MultipleDevicesId::B => &self.b,
+                MultipleDevicesId::C => &self.c,
+            }
+        }
+    }
+
     impl<S, Meta, D: StrongDeviceIdentifier> DeviceIdContext<AnyDevice> for FakeCoreCtx<S, Meta, D> {
         type DeviceId = D;
         type WeakDeviceId = D::Weak;

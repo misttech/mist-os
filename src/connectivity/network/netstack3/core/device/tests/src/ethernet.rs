@@ -100,7 +100,7 @@ fn test_receive_ip_frame<I: TestIpExt + IpExt>(enable: bool) {
         dropped: expected_received,
         ..Default::default()
     }
-    .assert_counters(&ctx.core_ctx());
+    .assert_counters(&ctx.core_ctx(), &device);
 }
 
 #[test]

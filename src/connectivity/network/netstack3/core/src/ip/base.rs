@@ -241,6 +241,34 @@ impl<BT: BindingsTypes, I: IpLayerIpExt, L> CounterContext<IpCounters<I>> for Co
     }
 }
 
+impl<BT: BindingsTypes, I: IpLayerIpExt, L> ResourceCounterContext<DeviceId<BT>, IpCounters<I>>
+    for CoreCtx<'_, BT, L>
+{
+    fn per_resource_counters<'a>(&'a self, device_id: &'a DeviceId<BT>) -> &'a IpCounters<I> {
+        for_any_device_id!(
+            DeviceId,
+            device_id,
+            id => self.per_resource_counters(id)
+        )
+    }
+}
+
+impl<BT: BindingsTypes, D: DeviceStateSpec, I: IpLayerIpExt, L>
+    ResourceCounterContext<BaseDeviceId<D, BT>, IpCounters<I>> for CoreCtx<'_, BT, L>
+{
+    fn per_resource_counters<'a>(
+        &'a self,
+        device_id: &'a BaseDeviceId<D, BT>,
+    ) -> &'a IpCounters<I> {
+        device_id
+            .device_state(
+                &self.unlocked_access::<crate::lock_ordering::UnlockedState>().device.origin,
+            )
+            .as_ref()
+            .ip_counters::<I>()
+    }
+}
+
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<I, BC, L> IpStateContext<I> for CoreCtx<'_, BC, L>
 where
@@ -508,7 +536,7 @@ impl<
         original_body: &[u8],
         err: Icmpv4ErrorCode,
     ) {
-        CounterContext::<IpCounters<Ipv4>>::counters(self).receive_icmp_error.increment();
+        self.increment_both(device, |c: &IpCounters<Ipv4>| &c.receive_icmp_error);
         trace!("InnerIcmpContext<Ipv4>::receive_icmp_error({:?})", err);
 
         match original_proto {
@@ -586,7 +614,7 @@ impl<
         original_body: &[u8],
         err: Icmpv6ErrorCode,
     ) {
-        CounterContext::<IpCounters<Ipv6>>::counters(self).receive_icmp_error.increment();
+        self.increment_both(device, |c: &IpCounters<Ipv6>| &c.receive_icmp_error);
         trace!("InnerIcmpContext<Ipv6>::receive_icmp_error({:?})", err);
 
         match original_next_header {

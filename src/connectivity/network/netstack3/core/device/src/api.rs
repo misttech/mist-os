@@ -19,7 +19,7 @@ use netstack3_ip::device::{
     Ipv6DeviceConfigurationContext,
 };
 use netstack3_ip::gmp::{IgmpCounters, MldCounters};
-use netstack3_ip::{self as ip, RawMetric};
+use netstack3_ip::{self as ip, IpCounters, RawMetric};
 use packet::BufferMut;
 
 use crate::internal::base::{
@@ -297,6 +297,22 @@ where
                     device,
                 ),
             );
+            inspector.record_child("IPv4", |inspector| {
+                inspector.delegate_inspectable(
+                    ResourceCounterContext::<_, IpCounters<Ipv4>>::per_resource_counters(
+                        self.core_ctx(),
+                        device,
+                    ),
+                )
+            });
+            inspector.record_child("IPv6", |inspector| {
+                inspector.delegate_inspectable(
+                    ResourceCounterContext::<_, IpCounters<Ipv6>>::per_resource_counters(
+                        self.core_ctx(),
+                        device,
+                    ),
+                )
+            });
             inspector.record_child("IGMP", |inspector| {
                 inspector.delegate_inspectable(
                     ResourceCounterContext::<_, IgmpCounters>::per_resource_counters(
@@ -408,6 +424,8 @@ pub trait DeviceApiCoreContext<
     + RecvFrameContext<D::FrameMetadata<BaseDeviceId<D, BC>>, BC>
     + ResourceCounterContext<Self::DeviceId, DeviceCounters>
     + ResourceCounterContext<Self::DeviceId, D::Counters>
+    + ResourceCounterContext<Self::DeviceId, IpCounters<Ipv4>>
+    + ResourceCounterContext<Self::DeviceId, IpCounters<Ipv6>>
     + ResourceCounterContext<Self::DeviceId, IgmpCounters>
     + ResourceCounterContext<Self::DeviceId, MldCounters>
     + CoreTimerContext<D::TimerId<Self::WeakDeviceId>, BC>
@@ -425,6 +443,8 @@ where
         + RecvFrameContext<D::FrameMetadata<BaseDeviceId<D, BC>>, BC>
         + ResourceCounterContext<Self::DeviceId, DeviceCounters>
         + ResourceCounterContext<Self::DeviceId, D::Counters>
+        + ResourceCounterContext<Self::DeviceId, IpCounters<Ipv4>>
+        + ResourceCounterContext<Self::DeviceId, IpCounters<Ipv6>>
         + ResourceCounterContext<Self::DeviceId, IgmpCounters>
         + ResourceCounterContext<Self::DeviceId, MldCounters>
         + CoreTimerContext<D::TimerId<Self::WeakDeviceId>, BC>,

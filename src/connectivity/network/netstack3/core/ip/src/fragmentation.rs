@@ -605,7 +605,7 @@ pub struct FragmentationCounters<C = Counter> {
 }
 
 impl FragmentationCounters {
-    pub(crate) fn error_counter(&self, error: FragmentationError) -> &Counter {
+    pub(crate) fn error_counter(&self, error: &FragmentationError) -> &Counter {
         match error {
             FragmentationError::NotAllowed => &self.error_not_allowed,
             FragmentationError::MtuTooSmall => &self.error_mtu_too_small,

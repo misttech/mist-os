@@ -234,7 +234,7 @@ impl<C: CounterRepr> Inspectable for Ipv6RxCounters<C> {
 pub mod testutil {
     use super::*;
 
-    use netstack3_base::CounterContext;
+    use netstack3_base::ResourceCounterContext;
 
     impl<C: CounterRepr> From<&Ipv4RxCounters> for Ipv4RxCounters<C> {
         fn from(counters: &Ipv4RxCounters) -> Ipv4RxCounters<C> {
@@ -336,8 +336,21 @@ pub mod testutil {
 
         /// Assert that the counters tracked by `core_ctx` match expectations.
         #[track_caller]
-        pub fn assert_counters<CC: CounterContext<IpCounters<I>>>(self, core_ctx: &CC) {
-            assert_eq!(IpCounterExpectations::from(core_ctx.counters()), self);
+        pub fn assert_counters<D, CC: ResourceCounterContext<D, IpCounters<I>>>(
+            self,
+            core_ctx: &CC,
+            device: &D,
+        ) {
+            assert_eq!(
+                &IpCounterExpectations::from(core_ctx.counters()),
+                &self,
+                "stack-wide counters"
+            );
+            assert_eq!(
+                &IpCounterExpectations::from(core_ctx.per_resource_counters(device)),
+                &self,
+                "per-device counters"
+            );
         }
     }
 }

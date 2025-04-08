@@ -9,7 +9,7 @@ use ip_test_macro::ip_test;
 use net_types::ip::{AddrSubnet, IpAddress as _, IpVersion, Mtu};
 use net_types::{Witness, ZonedAddr};
 use netstack3_base::testutil::TestIpExt;
-use netstack3_base::CounterContext;
+use netstack3_base::{CounterContext, ResourceCounterContext};
 use netstack3_core::sync::RemoveResourceResult;
 use netstack3_core::testutil::{
     CtxPairExt as _, FakeBindingsCtx, FakeCtx, PureIpDeviceAndIpVersion, DEFAULT_INTERFACE_METRIC,
@@ -74,17 +74,20 @@ fn update_tx_queue_config() {
 #[ip_test(I)]
 fn receive_frame<I: TestIpExt + IpExt>() {
     let mut ctx = FakeCtx::default();
-    let device = ctx.core_api().device::<PureIpDevice>().add_device_with_default_state(
+    let base_device_id = ctx.core_api().device::<PureIpDevice>().add_device_with_default_state(
         PureIpDeviceCreationProperties { mtu: MTU },
         DEFAULT_INTERFACE_METRIC,
     );
-    ctx.test_api().enable_device(&device.clone().into());
+    let device_id: DeviceId<FakeBindingsCtx> = base_device_id.clone().into();
+    ctx.test_api().enable_device(&device_id);
 
     fn check_frame_counters<
         I: IpExt,
-        CC: CounterContext<DeviceCounters> + CounterContext<IpCounters<I>>,
+        D,
+        CC: CounterContext<DeviceCounters> + ResourceCounterContext<D, IpCounters<I>>,
     >(
         core_ctx: &CC,
+        device: &D,
         count: u64,
     ) {
         IpCounterExpectations {
@@ -93,7 +96,7 @@ fn receive_frame<I: TestIpExt + IpExt>() {
             forwarding_disabled: count,
             ..Default::default()
         }
-        .assert_counters(core_ctx);
+        .assert_counters(core_ctx, device);
         let device_counters = CounterContext::<DeviceCounters>::counters(core_ctx);
         assert_eq!(device_counters.recv_frame.get(), count);
         match I::VERSION {
@@ -107,12 +110,12 @@ fn receive_frame<I: TestIpExt + IpExt>() {
     }
 
     // Receive a frame from the network and verify delivery to the IP layer.
-    check_frame_counters::<I, _>(&ctx.core_ctx(), 0);
+    check_frame_counters::<I, _, _>(&ctx.core_ctx(), &device_id, 0);
     ctx.core_api().device::<PureIpDevice>().receive_frame(
-        PureIpDeviceReceiveFrameMetadata { device_id: device, ip_version: I::VERSION },
+        PureIpDeviceReceiveFrameMetadata { device_id: base_device_id, ip_version: I::VERSION },
         default_ip_packet::<I>(),
     );
-    check_frame_counters::<I, _>(&ctx.core_ctx(), 1);
+    check_frame_counters::<I, _, _>(&ctx.core_ctx(), &device_id, 1);
 }
 
 #[ip_test(I)]
