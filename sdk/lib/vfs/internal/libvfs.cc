@@ -77,9 +77,9 @@ class LibvfsComposedServiceDir final : public intree_vfs::PseudoDir {
         auto connector = [name = std::string(name.data(), name.length()),
                           dir = &fallback_dir_](zx::channel channel) -> zx_status_t {
 #if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
-          auto response = fidl::WireCall(*dir)->DeprecatedOpen(
-              fuchsia_io::OpenFlags(), fuchsia_io::ModeType(), fidl::StringView::FromExternal(name),
-              fidl::ServerEnd<fuchsia_io::Node>{std::move(channel)});
+          auto response = fidl::WireCall(*dir)->Open(fidl::StringView::FromExternal(name),
+                                                     fuchsia_io::Flags::kProtocolService, {},
+                                                     std::move(channel));
 #else
           auto response = fidl::WireCall(*dir)->Open(
               fuchsia_io::OpenFlags(), fuchsia_io::ModeType(), fidl::StringView::FromExternal(name),
