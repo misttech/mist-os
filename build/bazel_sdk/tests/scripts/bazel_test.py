@@ -419,8 +419,8 @@ class BazelRepositoryMap(object):
         if repo_name:
             external_repo_dir = self._output_base / "external" / repo_name
             final_path = external_repo_dir / target_path
-            if final_path.exists():
-                return final_path.resolve()
+            assert final_path.exists(), f"File '{final_path}' does not exist."
+            return final_path.resolve()
 
         # This should not happen, but print an error message pointing to this
         # script in case it really does!
