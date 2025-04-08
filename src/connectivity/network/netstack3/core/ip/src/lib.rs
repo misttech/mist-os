@@ -18,6 +18,7 @@ mod internal {
 
     pub(super) mod api;
     pub(super) mod base;
+    pub(super) mod counters;
     pub(super) mod device;
     pub(super) mod fragmentation;
     pub(super) mod gmp;
@@ -227,7 +228,7 @@ pub use internal::base::{
     gen_ip_packet_id, receive_ipv4_packet, receive_ipv4_packet_action, receive_ipv6_packet,
     receive_ipv6_packet_action, resolve_output_route_to_destination, AddressStatus,
     BaseTransportIpContext, DeviceIpLayerMetadata, DropReason, FilterHandlerProvider, HopLimits,
-    IpCounters, IpDeviceConfirmReachableContext, IpDeviceContext, IpDeviceEgressStateContext,
+    IpDeviceConfirmReachableContext, IpDeviceContext, IpDeviceEgressStateContext,
     IpDeviceIngressStateContext, IpDeviceMtuContext, IpLayerBindingsContext, IpLayerContext,
     IpLayerEvent, IpLayerHandler, IpLayerIpExt, IpLayerTimerId, IpPacketDestination,
     IpRouteTableContext, IpRouteTablesContext, IpSendFrameError, IpSendFrameErrorReason,
@@ -238,7 +239,7 @@ pub use internal::base::{
     TransportIpContext, TransportReceiveError, DEFAULT_HOP_LIMITS, DEFAULT_TTL,
     IPV6_DEFAULT_SUBNET,
 };
-pub use internal::fragmentation::FragmentationCounters;
+pub use internal::counters::IpCounters;
 pub use internal::local_delivery::{
     IpHeaderInfo, LocalDeliveryPacketInfo, ReceiveIpPacketMeta, TransparentLocalDelivery,
 };

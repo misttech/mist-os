@@ -27,10 +27,11 @@ use packet_formats::ip::DscpAndEcn;
 use thiserror::Error;
 
 use crate::internal::base::{
-    FilterHandlerProvider, IpCounters, IpDeviceMtuContext, IpLayerIpExt, IpLayerPacketMetadata,
+    FilterHandlerProvider, IpDeviceMtuContext, IpLayerIpExt, IpLayerPacketMetadata,
     IpPacketDestination, IpSendFrameError, IpSendFrameErrorReason, ResolveRouteError,
     SendIpPacketMeta,
 };
+use crate::internal::counters::IpCounters;
 use crate::internal::device::state::IpDeviceStateIpExt;
 use crate::internal::routing::rules::RuleInput;
 use crate::internal::routing::PacketOrigin;

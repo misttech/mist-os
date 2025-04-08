@@ -17,7 +17,7 @@ use netstack3_ip::icmp::{
 use netstack3_ip::multicast_forwarding::MulticastForwardingCounters;
 use netstack3_ip::nud::{NudCounters, NudCountersInner};
 use netstack3_ip::raw::RawIpSocketCounters;
-use netstack3_ip::{FragmentationCounters, IpCounters, IpLayerIpExt};
+use netstack3_ip::IpCounters;
 use netstack3_tcp::{CombinedTcpCounters, TcpCountersWithSocket, TcpCountersWithoutSocket};
 use netstack3_udp::{CombinedUdpCounters, UdpCountersWithSocket, UdpCountersWithoutSocket};
 
@@ -122,10 +122,14 @@ where
                 .delegate_inspectable(CounterContext::<MldCounters>::counters(self.core_ctx()));
         });
         inspector.record_child("IPv4", |inspector| {
-            inspect_ip_counters::<Ipv4>(inspector, self.core_ctx().counters());
+            inspector.delegate_inspectable(CounterContext::<IpCounters<Ipv4>>::counters(
+                self.core_ctx(),
+            ));
         });
         inspector.record_child("IPv6", |inspector| {
-            inspect_ip_counters::<Ipv6>(inspector, self.core_ctx().counters());
+            inspector.delegate_inspectable(CounterContext::<IpCounters<Ipv6>>::counters(
+                self.core_ctx(),
+            ));
         });
         inspector.record_child("MulticastForwarding", |inspector| {
             inspector.record_child("V4", |inspector| {
@@ -300,84 +304,4 @@ fn inspect_ndp_rx_counters(inspector: &mut impl Inspector, counters: &NdpRxCount
     inspector.record_counter("NeighborAdvertisement", neighbor_advertisement);
     inspector.record_counter("RouterSolicitation", router_solicitation);
     inspector.record_counter("RouterAdvertisement", router_advertisement);
-}
-
-fn inspect_ip_counters<I: IpLayerIpExt>(inspector: &mut impl Inspector, counters: &IpCounters<I>) {
-    let IpCounters {
-        deliver_unicast,
-        deliver_multicast,
-        dispatch_receive_ip_packet,
-        dispatch_receive_ip_packet_other_host,
-        receive_ip_packet,
-        send_ip_packet,
-        forwarding_disabled,
-        forward,
-        no_route_to_host,
-        mtu_exceeded,
-        ttl_expired,
-        receive_icmp_error,
-        fragment_reassembly_error,
-        need_more_fragments,
-        invalid_fragment,
-        fragment_cache_full,
-        parameter_problem,
-        unspecified_destination,
-        unspecified_source,
-        dropped,
-        tx_illegal_loopback_address,
-        version_rx,
-        multicast_no_interest,
-        invalid_cached_conntrack_entry,
-        fragmentation,
-    } = counters;
-    inspector.record_child("PacketTx", |inspector| {
-        inspector.record_counter("Sent", send_ip_packet);
-        inspector.record_counter("IllegalLoopbackAddress", tx_illegal_loopback_address);
-    });
-    inspector.record_child("PacketRx", |inspector| {
-        inspector.record_counter("Received", receive_ip_packet);
-        inspector.record_counter("Dispatched", dispatch_receive_ip_packet);
-        inspector.record_counter("OtherHost", dispatch_receive_ip_packet_other_host);
-        inspector.record_counter("ParameterProblem", parameter_problem);
-        inspector.record_counter("UnspecifiedDst", unspecified_destination);
-        inspector.record_counter("UnspecifiedSrc", unspecified_source);
-        inspector.record_counter("Dropped", dropped);
-        inspector.record_counter("MulticastNoInterest", multicast_no_interest);
-        inspector.record_counter("DeliveredUnicast", deliver_unicast);
-        inspector.record_counter("DeliveredMulticast", deliver_multicast);
-        inspector.record_counter("InvalidCachedConntrackEntry", invalid_cached_conntrack_entry);
-        inspector.delegate_inspectable(version_rx);
-    });
-    inspector.record_child("Forwarding", |inspector| {
-        inspector.record_counter("Forwarded", forward);
-        inspector.record_counter("ForwardingDisabled", forwarding_disabled);
-        inspector.record_counter("NoRouteToHost", no_route_to_host);
-        inspector.record_counter("MtuExceeded", mtu_exceeded);
-        inspector.record_counter("TtlExpired", ttl_expired);
-    });
-    inspector.record_counter("RxIcmpError", receive_icmp_error);
-    inspector.record_child("FragmentsRx", |inspector| {
-        inspector.record_counter("ReassemblyError", fragment_reassembly_error);
-        inspector.record_counter("NeedMoreFragments", need_more_fragments);
-        inspector.record_counter("InvalidFragment", invalid_fragment);
-        inspector.record_counter("CacheFull", fragment_cache_full);
-    });
-    inspector.record_child("FragmentsTx", |inspector| {
-        let FragmentationCounters {
-            fragmentation_required,
-            fragments,
-            error_not_allowed,
-            error_mtu_too_small,
-            error_body_too_long,
-            error_inner_size_limit_exceeded,
-            error_fragmented_serializer,
-        } = fragmentation;
-        inspector.record_counter("FragmentationRequired", fragmentation_required);
-        inspector.record_counter("Fragments", fragments);
-        inspector.record_counter("ErrorNotAllowed", error_not_allowed);
-        inspector.record_counter("ErrorMtuTooSmall", error_mtu_too_small);
-        inspector.record_counter("ErrorBodyTooLong", error_body_too_long);
-        inspector.record_counter("ErrorInnerSizeLimitExceeded", error_inner_size_limit_exceeded);
-        inspector.record_counter("ErrorFragmentedSerializer", error_fragmented_serializer);
-    });
 }

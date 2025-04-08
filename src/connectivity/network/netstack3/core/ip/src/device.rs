@@ -43,9 +43,8 @@ use packet_formats::utils::NonZeroDuration;
 use zerocopy::SplitByteSlice;
 
 use crate::device::CommonAddressProperties;
-use crate::internal::base::{
-    DeviceIpLayerMetadata, IpCounters, IpDeviceMtuContext, IpPacketDestination,
-};
+use crate::internal::base::{DeviceIpLayerMetadata, IpDeviceMtuContext, IpPacketDestination};
+use crate::internal::counters::IpCounters;
 use crate::internal::device::config::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
 };

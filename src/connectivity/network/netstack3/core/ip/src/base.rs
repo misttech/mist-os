@@ -30,12 +30,11 @@ use net_types::{
 use netstack3_base::socket::SocketIpAddrExt as _;
 use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
-    AnyDevice, BroadcastIpExt, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
+    AnyDevice, BroadcastIpExt, CoreTimerContext, CounterContext, DeviceIdContext,
     DeviceIdentifier as _, DeviceWithName, ErrorAndSerializer, EventContext, FrameDestination,
-    HandleableTimer, Inspectable, Inspector, InspectorExt as _, InstantContext, IpAddressId,
-    IpDeviceAddr, IpDeviceAddressIdContext, IpExt, MarkDomain, Marks, Matcher as _,
-    NestedIntoCoreTimerCtx, NotFoundError, RngContext, SendFrameErrorReason,
-    StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler,
+    HandleableTimer, InstantContext, IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext, IpExt,
+    MarkDomain, Marks, Matcher as _, NestedIntoCoreTimerCtx, NotFoundError, RngContext,
+    SendFrameErrorReason, StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler,
     TxMetadataBindingsTypes, WeakIpAddressId, WrapBroadcastMarker,
 };
 use netstack3_filter::{
@@ -55,6 +54,7 @@ use packet_formats::ipv6::Ipv6Packet;
 use thiserror::Error;
 use zerocopy::SplitByteSlice;
 
+use crate::internal::counters::{IpCounters, IpCountersIpExt};
 use crate::internal::device::opaque_iid::IidSecret;
 use crate::internal::device::slaac::SlaacCounters;
 use crate::internal::device::state::{
@@ -63,9 +63,7 @@ use crate::internal::device::state::{
 use crate::internal::device::{
     self, IpAddressIdExt, IpDeviceBindingsContext, IpDeviceIpExt, IpDeviceSendContext,
 };
-use crate::internal::fragmentation::{
-    FragmentableIpSerializer, FragmentationCounters, FragmentationIpExt, IpFragmenter,
-};
+use crate::internal::fragmentation::{FragmentableIpSerializer, FragmentationIpExt, IpFragmenter};
 use crate::internal::gmp::igmp::IgmpCounters;
 use crate::internal::gmp::mld::MldCounters;
 use crate::internal::gmp::GmpQueryHandler;
@@ -750,6 +748,7 @@ pub trait IpLayerIpExt:
     + FragmentationIpExt
     + IpDeviceIpExt
     + IpAddressIdExt
+    + IpCountersIpExt
 {
     /// IP Address status.
     type AddressStatus: Debug;
@@ -761,8 +760,6 @@ pub trait IpLayerIpExt:
     type PacketIdState;
     /// The type of a single packet identifier.
     type PacketId;
-    /// Receive counters.
-    type RxCounters: Default + Inspectable;
     /// Produces the next packet ID from the state.
     fn next_packet_id_from_state(state: &Self::PacketIdState) -> Self::PacketId;
 }
@@ -773,7 +770,6 @@ impl IpLayerIpExt for Ipv4 {
         Ipv4State<StrongDeviceId, BT>;
     type PacketIdState = AtomicU16;
     type PacketId = u16;
-    type RxCounters = Ipv4RxCounters;
     fn next_packet_id_from_state(next_packet_id: &Self::PacketIdState) -> Self::PacketId {
         // Relaxed ordering as we only need atomicity without synchronization. See
         // https://en.cppreference.com/w/cpp/atomic/memory_order#Relaxed_ordering
@@ -788,7 +784,6 @@ impl IpLayerIpExt for Ipv6 {
         Ipv6State<StrongDeviceId, BT>;
     type PacketIdState = ();
     type PacketId = ();
-    type RxCounters = Ipv6RxCounters;
     fn next_packet_id_from_state((): &Self::PacketIdState) -> Self::PacketId {
         ()
     }
@@ -1951,119 +1946,6 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
     type Lock = RwLock<filter::State<I, I::Weak<BT>, BT>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.filter)
-    }
-}
-
-/// Ip layer counters.
-#[derive(Default, GenericOverIp)]
-#[generic_over_ip(I, Ip)]
-pub struct IpCounters<I: IpLayerIpExt> {
-    /// Count of incoming IP unicast packets delivered.
-    pub deliver_unicast: Counter,
-    /// Count of incoming IP multicast packets delivered.
-    pub deliver_multicast: Counter,
-    /// Count of incoming IP packets that are dispatched to the appropriate protocol.
-    pub dispatch_receive_ip_packet: Counter,
-    /// Count of incoming IP packets destined to another host.
-    pub dispatch_receive_ip_packet_other_host: Counter,
-    /// Count of incoming IP packets received by the stack.
-    pub receive_ip_packet: Counter,
-    /// Count of sent outgoing IP packets.
-    pub send_ip_packet: Counter,
-    /// Count of packets to be forwarded which are instead dropped because
-    /// forwarding is disabled.
-    pub forwarding_disabled: Counter,
-    /// Count of incoming packets forwarded to another host.
-    pub forward: Counter,
-    /// Count of incoming packets which cannot be forwarded because there is no
-    /// route to the destination host.
-    pub no_route_to_host: Counter,
-    /// Count of incoming packets which cannot be forwarded because the MTU has
-    /// been exceeded.
-    pub mtu_exceeded: Counter,
-    /// Count of incoming packets which cannot be forwarded because the TTL has
-    /// expired.
-    pub ttl_expired: Counter,
-    /// Count of ICMP error messages received.
-    pub receive_icmp_error: Counter,
-    /// Count of IP fragment reassembly errors.
-    pub fragment_reassembly_error: Counter,
-    /// Count of IP fragments that could not be reassembled because more
-    /// fragments were needed.
-    pub need_more_fragments: Counter,
-    /// Count of IP fragments that could not be reassembled because the fragment
-    /// was invalid.
-    pub invalid_fragment: Counter,
-    /// Count of IP fragments that could not be reassembled because the stack's
-    /// per-IP-protocol fragment cache was full.
-    pub fragment_cache_full: Counter,
-    /// Count of incoming IP packets not delivered because of a parameter problem.
-    pub parameter_problem: Counter,
-    /// Count of incoming IP packets with an unspecified destination address.
-    pub unspecified_destination: Counter,
-    /// Count of incoming IP packets with an unspecified source address.
-    pub unspecified_source: Counter,
-    /// Count of incoming IP packets dropped.
-    pub dropped: Counter,
-    /// Number of frames rejected because they'd cause illegal loopback
-    /// addresses on the wire.
-    pub tx_illegal_loopback_address: Counter,
-    /// Version specific rx counters.
-    pub version_rx: I::RxCounters,
-    /// Count of incoming IP multicast packets that were dropped because
-    /// The stack doesn't have any sockets that belong to the multicast group,
-    /// and the stack isn't configured to forward the multicast packet.
-    pub multicast_no_interest: Counter,
-    /// Count of looped-back packets that held a cached conntrack entry that could
-    /// not be downcasted to the expected type. This would happen if, for example, a
-    /// packet was modified to a different IP version between EGRESS and INGRESS.
-    pub invalid_cached_conntrack_entry: Counter,
-    /// IP fragmentation counters.
-    pub fragmentation: FragmentationCounters,
-}
-
-/// IPv4-specific Rx counters.
-#[derive(Default)]
-pub struct Ipv4RxCounters {
-    /// Count of incoming broadcast IPv4 packets delivered.
-    pub deliver_broadcast: Counter,
-}
-
-impl Inspectable for Ipv4RxCounters {
-    fn record<I: Inspector>(&self, inspector: &mut I) {
-        let Self { deliver_broadcast } = self;
-        inspector.record_counter("DeliveredBroadcast", deliver_broadcast);
-    }
-}
-
-/// IPv6-specific Rx counters.
-#[derive(Default)]
-pub struct Ipv6RxCounters {
-    /// Count of incoming IPv6 packets dropped because the destination address
-    /// is only tentatively assigned to the device.
-    pub drop_for_tentative: Counter,
-    /// Count of incoming IPv6 packets dropped due to a non-unicast source address.
-    pub non_unicast_source: Counter,
-    /// Count of incoming IPv6 packets discarded while processing extension
-    /// headers.
-    pub extension_header_discard: Counter,
-    /// Count of incoming neighbor solicitations discarded as looped-back
-    /// DAD probes.
-    pub drop_looped_back_dad_probe: Counter,
-}
-
-impl Inspectable for Ipv6RxCounters {
-    fn record<I: Inspector>(&self, inspector: &mut I) {
-        let Self {
-            drop_for_tentative,
-            non_unicast_source,
-            extension_header_discard,
-            drop_looped_back_dad_probe,
-        } = self;
-        inspector.record_counter("DroppedTentativeDst", drop_for_tentative);
-        inspector.record_counter("DroppedNonUnicastSrc", non_unicast_source);
-        inspector.record_counter("DroppedExtensionHeader", extension_header_discard);
-        inspector.record_counter("DroppedLoopedBackDadProbe", drop_looped_back_dad_probe);
     }
 }
 
