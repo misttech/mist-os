@@ -4093,34 +4093,54 @@ zx_status_t VmCowPages::ProtectRangeFromReclamation(VmCowRange range, bool set_a
     return ZX_OK;
   }
 
-  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
-  if (!range.IsBoundedBy(size_)) {
-    return ZX_ERR_OUT_OF_RANGE;
-  }
-  // Zero lengths have no work to do.
-  if (range.is_empty()) {
-    return ZX_OK;
+  // Validate that the range is completely in range at the start of the operation. Although we
+  // tolerate the VMO shrinking during the operation, the range must be valid at the point we
+  // started.
+  {
+    Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+    if (!range.IsBoundedBy(size_)) {
+      return ZX_ERR_OUT_OF_RANGE;
+    }
+    // Zero lengths have no work to do.
+    if (range.is_empty()) {
+      return ZX_OK;
+    }
   }
 
-  uint64_t cur_offset = ROUNDDOWN(range.offset, PAGE_SIZE);
-  uint64_t end_offset = ROUNDUP(range.end(), PAGE_SIZE);
+  range = range.ExpandTillPageAligned();
 
   __UNINITIALIZED MultiPageRequest page_request;
-  while (cur_offset < end_offset) {
-    __UNINITIALIZED zx::result<VmCowPages::LookupCursor> cursor =
-        GetLookupCursorLocked(VmCowRange(cur_offset, end_offset - cur_offset));
-    if (cursor.is_error()) {
-      return cursor.status_value();
-    }
-    AssertHeld(cursor->lock_ref());
-    for (; cur_offset < end_offset; cur_offset += PAGE_SIZE) {
-      const uint64_t remaining = end_offset - cur_offset;
-      // Lookup the page, this will fault in the page from the parent if necessary, but will not
-      // allocate pages directly in this if it is a child.
-      auto result =
-          cursor->RequirePage(false, static_cast<uint>(remaining / PAGE_SIZE), &page_request);
-      zx_status_t status = result.status_value();
-      if (status == ZX_OK) {
+  while (!range.is_empty()) {
+    zx_status_t status;
+    {
+      Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+      // The size might have changed since we dropped the lock. Adjust the range if required.
+      if (range.offset >= size_) {
+        // No more pages to hint.
+        return ZX_OK;
+      }
+      // Shrink the range if required. Proceed with hinting on the remaining pages in the range;
+      // we've already hinted on the preceding pages, so just go on ahead instead of returning an
+      // error. The range was valid at the time we started hinting.
+      if (!range.IsBoundedBy(size_)) {
+        range = range.WithLength(size_ - range.offset);
+      }
+
+      __UNINITIALIZED zx::result<VmCowPages::LookupCursor> cursor =
+          GetLookupCursorLocked(VmCowRange(range.offset, range.len));
+      if (cursor.is_error()) {
+        return cursor.status_value();
+      }
+      AssertHeld(cursor->lock_ref());
+      for (; !range.is_empty(); range = range.TrimedFromStart(PAGE_SIZE)) {
+        // Lookup the page, this will fault in the page from the parent if necessary, but will not
+        // allocate pages directly in this if it is a child.
+        auto result =
+            cursor->RequirePage(false, static_cast<uint>(range.len / PAGE_SIZE), &page_request);
+        status = result.status_value();
+        if (status != ZX_OK) {
+          break;
+        }
         // If we reached here, we successfully found a page at the current offset.
         vm_page_t* page = result->page;
 
@@ -4151,41 +4171,27 @@ zx_status_t VmCowPages::ProtectRangeFromReclamation(VmCowRange range, bool set_a
                                             page_request.GetAnonymous());
           // Let the status fall through below to have success, waiting and errors handled.
         }
+        if (status != ZX_OK) {
+          break;
+        }
 
-        if (status == ZX_OK) {
-          DEBUG_ASSERT(!page->is_loaned());
-          if (set_always_need) {
-            page->object.always_need = 1;
-            vm_vmo_always_need.Add(1);
-            // Nothing more to do beyond marking the page always_need true. The lookup must have
-            // already marked the page accessed, moving it to the head of the first page queue.
-          }
-          continue;
+        DEBUG_ASSERT(!page->is_loaned());
+        if (set_always_need) {
+          page->object.always_need = 1;
+          vm_vmo_always_need.Add(1);
+          // Nothing more to do beyond marking the page always_need true. The lookup must have
+          // already marked the page accessed, moving it to the head of the first page queue.
         }
       }
-      // There was either an error in the original require page, or in processing what was looked
-      // up. Either way when go back around in the loop we are going to need a new cursor.
-
+    }
+    if (status != ZX_OK) {
       if (status == ZX_ERR_SHOULD_WAIT) {
-        guard.CallUnlocked([&status, &page_request]() { status = page_request.Wait(); });
-
-        // The size might have changed since we dropped the lock. Adjust the range if required.
-        if (cur_offset >= size_locked()) {
-          // No more pages to hint.
-          return ZX_OK;
-        }
-        // Shrink the range if required. Proceed with hinting on the remaining pages in the range;
-        // we've already hinted on the preceding pages, so just go on ahead instead of returning an
-        // error. The range was valid at the time we started hinting.
-        if (end_offset > size_locked()) {
-          end_offset = size_locked();
-        }
+        status = page_request.Wait();
 
         // If the wait succeeded, cur_offset will now have a backing page, so we need to try the
-        // same offset again with a new cursor. In case of failure, simply continue on to the next
-        // page, as hints are best effort only.
+        // same offset again with a new cursor.
         if (status == ZX_OK) {
-          break;
+          continue;
         }
       }
 
@@ -4195,9 +4201,8 @@ zx_status_t VmCowPages::ProtectRangeFromReclamation(VmCowRange range, bool set_a
         return status;
       }
 
-      // Break out of the inner loop to get a new cursor for the next offset.
-      cur_offset += PAGE_SIZE;
-      break;
+      // Ignore the error, move to the next offset.
+      range = range.TrimedFromStart(PAGE_SIZE);
     }
   }
   return ZX_OK;
