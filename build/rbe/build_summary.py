@@ -237,7 +237,10 @@ def prepare_summary_table(
     action_categories = {
         k for v in rbe_data.status_metrics.values() for k in v.keys()
     }
-    action_categories.remove("all")  # "all" is special, always in last position
+    if "all" in action_categories:
+        # "all" is special, always in last position
+        action_categories.remove("all")
+
     ordered_action_categories = sorted(action_categories) + ["all"]
 
     shared_header = tablefmt.make_table_header(

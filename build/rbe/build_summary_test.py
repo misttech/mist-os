@@ -1109,6 +1109,18 @@ class LoadRbeMetricsTest(BuildSummaryTestBase):
 
 
 class PrepareSummaryTableTest(BuildSummaryTestBase):
+    def test_empty(self) -> None:
+        # Test for empty metrics.
+        rbe_data = build_summary.load_rbe_metrics({})
+        table = build_summary.prepare_summary_table(rbe_data)
+        found_status_total = False
+        for row in table:
+            if row[0] == "total":  # under CompletionStatus
+                self.assertEqual(row[1], 0)
+                found_status_total = True
+
+        self.assertTrue(found_status_total)
+
     def test_prepare(self) -> None:
         rbe_data = build_summary.load_rbe_metrics(self.parsed_input)
         table = build_summary.prepare_summary_table(rbe_data)
