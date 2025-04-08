@@ -15,8 +15,6 @@ if (is_fuchsia) {
   current_target_tuple = "${clang_cpu}-unknown-linux-gnu"
 } else if (is_mac) {
   current_target_tuple = "${clang_cpu}-apple-darwin"
-} else if (current_cpu == "wasm32" && current_os == "unknown") {
-  current_target_tuple = "${clang_cpu}-unknown-unknown"
 } else if (current_os == "win") {
   current_target_tuple = "${clang_cpu}-pc-windows-msvc"
 } else {

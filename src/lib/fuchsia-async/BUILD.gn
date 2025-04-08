@@ -79,21 +79,17 @@ rustc_library("fuchsia-async") {
       "//sdk/rust/zx-status",
       "//sdk/rust/zx-types",
       "//third_party/rust_crates:bitflags",
+      "//third_party/rust_crates:futures-lite",
       "//third_party/rust_crates:lazy_static",
+      "//third_party/rust_crates:thiserror",
+      "//third_party/rust_crates:tokio",
     ]
-    if (current_toolchain != unknown_wasm32_toolchain) {
-      deps += [
-        "//third_party/rust_crates:futures-lite",
-        "//third_party/rust_crates:thiserror",
-        "//third_party/rust_crates:tokio",
-      ]
-      sources += [ "src/net/portable/udp.rs" ]
-    }
     sources += [
       "src/handle/emulated/channel.rs",
       "src/handle/emulated/mod.rs",
       "src/handle/emulated/socket.rs",
       "src/net/portable/mod.rs",
+      "src/net/portable/udp.rs",
       "src/runtime/portable.rs",
       "src/runtime/portable/scope.rs",
     ]

@@ -79,8 +79,5 @@ rustc_test("triage-lib-unittests") {
 
 group("tests") {
   testonly = true
-  deps = [
-    ":triage-lib-unittests($host_toolchain)",
-    "wasm:tests",
-  ]
+  deps = [ ":triage-lib-unittests($host_toolchain)" ]
 }
