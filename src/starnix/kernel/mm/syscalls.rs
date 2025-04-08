@@ -493,9 +493,19 @@ fn do_futex<Key: FutexKey>(
     value3: u32,
 ) -> Result<usize, Errno> {
     let futexes = Key::get_table_from_task(current_task)?;
-
-    let is_realtime = op & FUTEX_CLOCK_REALTIME != 0;
     let cmd = op & (FUTEX_CMD_MASK as u32);
+
+    let is_realtime = match (cmd, op & FUTEX_CLOCK_REALTIME != 0) {
+        // This option bit can be employed only with the FUTEX_WAIT_BITSET, FUTEX_WAIT_REQUEUE_PI,
+        // (since Linux 4.5) FUTEX_WAIT, and (since Linux 5.14) FUTEX_LOCK_PI2 operations.
+        (FUTEX_WAIT_BITSET | FUTEX_WAIT_REQUEUE_PI | FUTEX_WAIT | FUTEX_LOCK_PI2, true) => true,
+        (_, true) => return error!(EINVAL),
+
+        // FUTEX_LOCK_PI always uses realtime.
+        (FUTEX_LOCK_PI, _) => true,
+
+        (_, false) => false,
+    };
 
     // The timeout is interpreted differently by WAIT and WAIT_BITSET: WAIT takes a
     // timeout and WAIT_BITSET takes a deadline.
@@ -577,13 +587,9 @@ fn do_futex<Key: FutexKey>(
             track_stub!(TODO("https://fxbug.dev/361181773"), "FUTEX_CMP_REQUEUE_PI");
             error!(ENOSYS)
         }
-        FUTEX_LOCK_PI => {
+        FUTEX_LOCK_PI | FUTEX_LOCK_PI2 => {
             futexes.lock_pi(current_task, addr, read_timeout(current_task)?)?;
             Ok(0)
-        }
-        FUTEX_LOCK_PI2 => {
-            track_stub!(TODO("https://fxbug.dev/361181560"), "FUTEX_LOCK_PI2");
-            error!(ENOSYS)
         }
         FUTEX_TRYLOCK_PI => {
             track_stub!(TODO("https://fxbug.dev/361175318"), "FUTEX_TRYLOCK_PI");
