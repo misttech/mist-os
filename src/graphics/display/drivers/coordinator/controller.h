@@ -161,12 +161,6 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
 
   size_t ImportedImagesCountForTesting() const;
 
-  // Identifies the most recent completely applied display configuration.
-  //
-  // The returned stamp is updated after the display engine driver acknowledges
-  // having applied the configuration.
-  display::DriverConfigStamp last_applied_driver_config_stamp() const;
-
   // Typically called by OpenController/OpenVirtconController. However, this is made public
   // for use by testing services which provide a fake display controller.
   zx_status_t CreateClient(
@@ -255,8 +249,6 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   inspect::UintProperty last_valid_apply_config_config_stamp_property_;
 
   display::DriverConfigStamp last_issued_driver_config_stamp_ __TA_GUARDED(mtx()) =
-      display::kInvalidDriverConfigStamp;
-  display::DriverConfigStamp last_applied_driver_config_stamp_ __TA_GUARDED(mtx()) =
       display::kInvalidDriverConfigStamp;
 };
 

@@ -969,6 +969,10 @@ class IntegrationTest : public TestBase {
 
   void TriggerDisplayEngineVsync() { FakeDisplayEngine().TriggerVsync(); }
 
+  display::DriverConfigStamp DisplayEngineAppliedConfigStamp() {
+    return FakeDisplayEngine().LastAppliedConfigStamp();
+  }
+
   // Sets up a Display Coordinator client connection that delivers VSync events.
   //
   // The returned client is guaranteed to have a connected display. However, the
@@ -1236,7 +1240,7 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
   // TODO(https://fxbug.dev/388885807): The call below assumes that engine
   // driver-side config stamps match client-managed config stamps.
   display::DriverConfigStamp invalid_config_stamp =
-      CoordinatorController()->last_applied_driver_config_stamp() - display::DriverConfigStamp{1};
+      DisplayEngineAppliedConfigStamp() - display::DriverConfigStamp{1};
   const config_stamp_t invalid_banjo_config_stamp =
       display::ToBanjoDriverConfigStamp(invalid_config_stamp);
   CoordinatorController()->DisplayEngineListenerOnDisplayVsync(
@@ -1894,11 +1898,10 @@ TEST_F(IntegrationTest, ApplyConfigWithWaitingImage) {
   // now ready. Once the configuration is applied, the next VSync must reflect
   // it.
   display::DriverConfigStamp image_without_fence_driver_config_stamp =
-      CoordinatorController()->last_applied_driver_config_stamp();
+      DisplayEngineAppliedConfigStamp();
   image_ready_fence.event.signal(0u, ZX_EVENT_SIGNALED);
   ASSERT_TRUE(PollUntilOnLoop([&]() {
-    return CoordinatorController()->last_applied_driver_config_stamp() >
-           image_without_fence_driver_config_stamp;
+    return DisplayEngineAppliedConfigStamp() > image_without_fence_driver_config_stamp;
   }));
 
   ASSERT_EQ(3u, primary_client->state().vsync_count());
@@ -2111,11 +2114,10 @@ TEST_F(IntegrationTest, ApplyConfigSkipsConfigWithWaitingImage) {
   // that includes the second image. Once the configuration is applied, the next
   // VSync must reflect it.
   display::DriverConfigStamp image_without_fence_driver_config_stamp =
-      CoordinatorController()->last_applied_driver_config_stamp();
+      DisplayEngineAppliedConfigStamp();
   image_ready_fence2.event.signal(0u, ZX_EVENT_SIGNALED);
   ASSERT_TRUE(PollUntilOnLoop([&]() {
-    return CoordinatorController()->last_applied_driver_config_stamp() >
-           image_without_fence_driver_config_stamp;
+    return DisplayEngineAppliedConfigStamp() > image_without_fence_driver_config_stamp;
   }));
 
   ASSERT_EQ(3u, primary_client->state().vsync_count());
@@ -2129,7 +2131,7 @@ TEST_F(IntegrationTest, ApplyConfigSkipsConfigWithWaitingImage) {
   // We should still see |apply_config_stamp_2| as the latest presented config
   // stamp in the client.
   display::DriverConfigStamp image_with_fence2_driver_config_stamp =
-      CoordinatorController()->last_applied_driver_config_stamp();
+      DisplayEngineAppliedConfigStamp();
   image_ready_fence1.event.signal(0u, ZX_EVENT_SIGNALED);
 
   // TODO(https://fxbug.dev/388885807): This check can have a false positive
@@ -2139,12 +2141,10 @@ TEST_F(IntegrationTest, ApplyConfigSkipsConfigWithWaitingImage) {
     PollUntilOnLoop([&]() {
       if (zx::clock::get_monotonic() >= deadline)
         return true;
-      return CoordinatorController()->last_applied_driver_config_stamp() >
-             image_with_fence2_driver_config_stamp;
+      return DisplayEngineAppliedConfigStamp() > image_with_fence2_driver_config_stamp;
     });
   }
-  EXPECT_EQ(image_with_fence2_driver_config_stamp,
-            CoordinatorController()->last_applied_driver_config_stamp());
+  EXPECT_EQ(image_with_fence2_driver_config_stamp, DisplayEngineAppliedConfigStamp());
 
   ASSERT_EQ(4u, primary_client->state().vsync_count());
   TriggerDisplayEngineVsync();

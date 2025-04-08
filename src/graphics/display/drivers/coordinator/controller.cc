@@ -583,11 +583,6 @@ void Controller::ApplyConfig(std::span<DisplayConfig*> display_configs,
 
   const config_stamp_t banjo_config_stamp = display::ToBanjoDriverConfigStamp(driver_config_stamp);
   engine_driver_client_->ApplyConfiguration(banjo_display_configs, &banjo_config_stamp);
-
-  {
-    fbl::AutoLock<fbl::Mutex> lock(mtx());
-    last_applied_driver_config_stamp_ = driver_config_stamp;
-  }
 }
 
 void Controller::ReleaseImage(display::DriverImageId driver_image_id) {
@@ -848,11 +843,6 @@ void Controller::OpenCoordinatorWithListenerForPrimary(
   } else {
     completer.ReplyError(create_status);
   }
-}
-
-display::DriverConfigStamp Controller::last_applied_driver_config_stamp() const {
-  fbl::AutoLock lock(mtx());
-  return last_applied_driver_config_stamp_;
 }
 
 // static

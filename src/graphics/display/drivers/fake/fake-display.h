@@ -124,6 +124,12 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   // Can be called from any thread.
   void TriggerVsync();
 
+  // Can be called from any thread.
+  display::DriverConfigStamp LastAppliedConfigStamp() const {
+    std::lock_guard lock(mutex_);
+    return applied_config_stamp_;
+  }
+
   // Just for display core unittests.
   //
   // Can be called from any thread.
