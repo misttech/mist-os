@@ -35,8 +35,8 @@ class Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_TEST> {
 
   // Device protocol implementation.
   void DdkUnbind(ddk::UnbindTxn txn) {
-    dispatcher_.ShutdownAsync();
     unbind_txn_ = std::move(txn);
+    dispatcher_.ShutdownAsync();
   }
   void DdkRelease() { delete this; }
 

@@ -39,9 +39,10 @@ class Device : public DeviceType {
 
   // Device protocol implementation.
   void DdkUnbind(ddk::UnbindTxn txn) {
-    dispatcher_.ShutdownAsync();
     unbind_txn_ = std::move(txn);
+    dispatcher_.ShutdownAsync();
   }
+
   void DdkRelease() { delete this; }
 
   zx_status_t Init();
