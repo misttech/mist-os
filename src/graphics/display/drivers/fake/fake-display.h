@@ -111,10 +111,18 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   // Can be called from any thread.
   bool IsCaptureSupported() const;
 
-  // Dispatches an OnVsync() event to the Display Coordinator.
+  // Manually triggers the VSync dispatch logic.
+  //
+  // Must only be called when periodic VSync is disabled. This restriction
+  // serves to ensure good test design, and it is not based on implementation
+  // limitations.
+  //
+  // May not be called before `ApplyConfiguration()`. Each VSync event must
+  // include a valid `ConfigStamp`, which requires having an applied
+  // configuration.
   //
   // Can be called from any thread.
-  void SendVsync() __TA_EXCLUDES(engine_listener_mutex_);
+  void TriggerVsync();
 
   // Just for display core unittests.
   //
@@ -138,6 +146,11 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
 
   // The loop executed by the capture thread.
   void CaptureThread() __TA_EXCLUDES(mutex_);
+
+  // Dispatches an OnVsync() event to the Display Coordinator.
+  //
+  // Can be called from any thread.
+  void SendVsync() __TA_EXCLUDES(engine_listener_mutex_);
 
   // Simulates a display capture, if a capture was requested.
   zx::result<> ServiceAnyCaptureRequest();

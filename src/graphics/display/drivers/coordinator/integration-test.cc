@@ -967,7 +967,7 @@ class IntegrationTest : public TestBase {
         display::kInvalidDisplayId, 0, display::kInvalidDriverConfigStamp);
   }
 
-  void SendVsyncFromDisplayEngine() { FakeDisplayEngine().SendVsync(); }
+  void TriggerDisplayEngineVsync() { FakeDisplayEngine().TriggerVsync(); }
 
   // Sets up a Display Coordinator client connection that delivers VSync events.
   //
@@ -1066,7 +1066,7 @@ TEST_F(IntegrationTest, VsyncEventForImageConfig) {
 
   // Wait for a VSync acknowledging the displayed configuration.
   ASSERT_EQ(0u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
   EXPECT_EQ(kInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
@@ -1087,7 +1087,7 @@ TEST_F(IntegrationTest, VsyncEventForImagelessConfig) {
 
   // Wait for a VSync acknowledging the displayed configuration.
   ASSERT_EQ(0u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
   EXPECT_EQ(kInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
@@ -1104,7 +1104,7 @@ TEST_F(IntegrationTest, VsyncEventAfterImageLayerConvertsToColorLayer) {
 
   // Wait for a VSync acknowledging the displayed configuration.
   ASSERT_EQ(0u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
   EXPECT_EQ(kInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
@@ -1120,7 +1120,7 @@ TEST_F(IntegrationTest, VsyncEventAfterImageLayerConvertsToColorLayer) {
 
   // Wait for a VSync acknowledging the configuration with a layer change.
   ASSERT_EQ(1u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 2; }));
   EXPECT_EQ(kSecondConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(2u, primary_client->state().vsync_count());
@@ -1164,7 +1164,7 @@ TEST_F(IntegrationTest, SendVsyncsAfterImagelessConfig) {
   ASSERT_OK(primary_client->ApplyLayers(kPrimary1InitialConfigStamp,
                                         primary_client->CreateFullscreenLayerConfig()));
   ASSERT_EQ(0u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
   EXPECT_EQ(kPrimary1InitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
@@ -1189,7 +1189,7 @@ TEST_F(IntegrationTest, SendVsyncsAfterImagelessConfig) {
 
   // The VSync must be routed to the client that applied the configuration,
   // which is now disconnected. Nothing should be sent to the new client.
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
 
   static constexpr display::ConfigStamp kPrimary2InitialConfigStamp(4);
   ASSERT_OK(primary_client->ApplyLayers(kPrimary2InitialConfigStamp,
@@ -1197,7 +1197,7 @@ TEST_F(IntegrationTest, SendVsyncsAfterImagelessConfig) {
 
   // Send a VSync using the config the client applied.
   ASSERT_EQ(0u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
   EXPECT_EQ(kPrimary2InitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
@@ -1222,7 +1222,7 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
                                         primary_client->CreateFullscreenLayerConfig()));
 
   ASSERT_EQ(0u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
   EXPECT_EQ(kPrimaryInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
@@ -1244,7 +1244,7 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
 
   // Send a second vsync, using the config the client applied.
   ASSERT_EQ(1u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 2; }));
   EXPECT_EQ(kPrimaryInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(2u, primary_client->state().vsync_count());
@@ -1670,7 +1670,7 @@ TEST_F(IntegrationTest, ClampRgb) {
   ASSERT_OK(virtcon_client->ApplyLayers(kVirtconInitialConfigStamp,
                                         {{.layer_id = virtcon_color_layer_id}}));
 
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   // TODO(https://fxbug.dev/388885807): This test is racy. There's no guarantee
   // that the VSync has reached the Display Coordinator. Figure out the right
   // contract for RGB clamp application, and write the test against that
@@ -1705,7 +1705,7 @@ TEST_F(IntegrationTest, VsyncGoesToClientWhoAppliedConfig) {
   // This is the case until the primary client applies a config.
   EXPECT_EQ(0u, primary_client->state().vsync_count());
   ASSERT_EQ(0u, virtcon_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client->state().vsync_count() >= 1; }));
   EXPECT_EQ(kVirtconInitialConfigStamp, virtcon_client->state().last_vsync_config_stamp());
   EXPECT_EQ(0u, primary_client->state().vsync_count());
@@ -1719,7 +1719,7 @@ TEST_F(IntegrationTest, VsyncGoesToClientWhoAppliedConfig) {
   // Primary client should receive VSync events after applying a config.
   ASSERT_EQ(0u, primary_client->state().vsync_count());
   EXPECT_EQ(1u, virtcon_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
   EXPECT_EQ(kPrimaryInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
@@ -1758,7 +1758,7 @@ TEST_F(IntegrationTest, VsyncReflectsAppliedConfig) {
   ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
 
   ASSERT_EQ(0u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
   EXPECT_EQ(kInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
@@ -1781,7 +1781,7 @@ TEST_F(IntegrationTest, VsyncReflectsAppliedConfig) {
                                         {{.layer_id = layer1_id, .image_id = image1_id}}));
 
   ASSERT_EQ(1u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 2; }));
   EXPECT_EQ(kNoFence1ConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(2u, primary_client->state().vsync_count());
@@ -1792,7 +1792,7 @@ TEST_F(IntegrationTest, VsyncReflectsAppliedConfig) {
                                         {{.layer_id = layer1_id, .image_id = image2_id}}));
 
   ASSERT_EQ(2u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 3; }));
   EXPECT_EQ(kNoFence2ConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(3u, primary_client->state().vsync_count());
@@ -1802,7 +1802,7 @@ TEST_F(IntegrationTest, VsyncReflectsAppliedConfig) {
   ASSERT_OK(primary_client->ApplyLayers(kNoImageConfigStamp, {{.layer_id = color_layer_id}}));
 
   ASSERT_EQ(3u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 4; }));
   EXPECT_EQ(kNoImageConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(4u, primary_client->state().vsync_count());
@@ -1839,7 +1839,7 @@ TEST_F(IntegrationTest, ApplyConfigWithWaitingImage) {
   ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
 
   ASSERT_EQ(0u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
   EXPECT_EQ(kInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
@@ -1869,7 +1869,7 @@ TEST_F(IntegrationTest, ApplyConfigWithWaitingImage) {
                                   {{.layer_id = layer1_id, .image_id = image_without_fence_id}}));
 
   ASSERT_EQ(1u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 2; }));
   EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(2u, primary_client->state().vsync_count());
@@ -1884,7 +1884,7 @@ TEST_F(IntegrationTest, ApplyConfigWithWaitingImage) {
                                           .image_ready_wait_event_id = image_ready_fence.id}}));
 
   ASSERT_EQ(2u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 3; }));
   EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(3u, primary_client->state().vsync_count());
@@ -1902,7 +1902,7 @@ TEST_F(IntegrationTest, ApplyConfigWithWaitingImage) {
   }));
 
   ASSERT_EQ(3u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 4; }));
   EXPECT_EQ(kImageWithFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(4u, primary_client->state().vsync_count());
@@ -1940,7 +1940,7 @@ TEST_F(IntegrationTest, ApplyConfigRemovesLayerWithWaitingImage) {
   ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
 
   ASSERT_EQ(0u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
   EXPECT_EQ(kInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
@@ -1970,7 +1970,7 @@ TEST_F(IntegrationTest, ApplyConfigRemovesLayerWithWaitingImage) {
                                   {{.layer_id = layer1_id, .image_id = image_without_fence_id}}));
 
   ASSERT_EQ(1u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 2; }));
   EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(2u, primary_client->state().vsync_count());
@@ -1985,7 +1985,7 @@ TEST_F(IntegrationTest, ApplyConfigRemovesLayerWithWaitingImage) {
                                           .image_ready_wait_event_id = image_ready_fence.id}}));
 
   ASSERT_EQ(2u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 3; }));
   EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(3u, primary_client->state().vsync_count());
@@ -2000,7 +2000,7 @@ TEST_F(IntegrationTest, ApplyConfigRemovesLayerWithWaitingImage) {
   // will be the latest one applied to the display controller, since the waiting
   // image has been removed from the configuration.
   ASSERT_EQ(3u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 4; }));
   EXPECT_EQ(kNoImageConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(4u, primary_client->state().vsync_count());
@@ -2071,7 +2071,7 @@ TEST_F(IntegrationTest, ApplyConfigSkipsConfigWithWaitingImage) {
                                   {{.layer_id = layer1_id, .image_id = image_without_fence_id}}));
 
   ASSERT_EQ(0u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
   EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
@@ -2086,7 +2086,7 @@ TEST_F(IntegrationTest, ApplyConfigSkipsConfigWithWaitingImage) {
                                           .image_ready_wait_event_id = image_ready_fence1.id}}));
 
   ASSERT_EQ(1u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 2; }));
   EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(2u, primary_client->state().vsync_count());
@@ -2101,7 +2101,7 @@ TEST_F(IntegrationTest, ApplyConfigSkipsConfigWithWaitingImage) {
                                           .image_ready_wait_event_id = image_ready_fence2.id}}));
 
   ASSERT_EQ(2u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 3; }));
   EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(3u, primary_client->state().vsync_count());
@@ -2119,7 +2119,7 @@ TEST_F(IntegrationTest, ApplyConfigSkipsConfigWithWaitingImage) {
   }));
 
   ASSERT_EQ(3u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 4; }));
   EXPECT_EQ(kImageWithFence2ConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(4u, primary_client->state().vsync_count());
@@ -2147,7 +2147,7 @@ TEST_F(IntegrationTest, ApplyConfigSkipsConfigWithWaitingImage) {
             CoordinatorController()->last_applied_driver_config_stamp());
 
   ASSERT_EQ(4u, primary_client->state().vsync_count());
-  SendVsyncFromDisplayEngine();
+  TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 5; }));
   EXPECT_EQ(kImageWithFence2ConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(5u, primary_client->state().vsync_count());
