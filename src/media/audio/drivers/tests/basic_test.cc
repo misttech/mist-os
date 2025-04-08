@@ -110,8 +110,10 @@ void BasicTest::WatchGainStateAndExpectNoUpdate() {
 void BasicTest::RequestSetGain() {
   ASSERT_TRUE(device_entry().isStreamConfig()) << __func__ << ": device_entry is not StreamConfig";
   ASSERT_TRUE(properties().has_value());
-  if (*properties()->max_gain_db == *properties()->min_gain_db && !*properties()->can_mute &&
-      !*properties()->can_agc) {
+  ASSERT_TRUE(properties()->max_gain_db.has_value());
+  ASSERT_TRUE(properties()->min_gain_db.has_value());
+  if (properties()->max_gain_db == properties()->min_gain_db &&
+      !properties()->can_mute.value_or(false) && !properties()->can_agc.value_or(false)) {
     GTEST_SKIP() << "*** Audio " << driver_type() << " has fixed gain ("
                  << initial_gain_state_->gain_db()
                  << " dB) and cannot MUTE or AGC. Skipping SetGain test. ***";
