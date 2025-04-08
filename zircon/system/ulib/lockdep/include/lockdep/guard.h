@@ -121,8 +121,8 @@ class Guard;
 
 // Specialization of Guard that acquires the given lock in exclusive mode.
 template <typename LockType, typename Option>
-class __TA_SCOPED_CAPABILITY Guard<LockType, Option,
-                                   internal::EnableIfNotShared<LockType, Option>> {
+class __TA_SCOPED_CAPABILITY
+    Guard<LockType, Option, internal::EnableIfNotShared<LockType, Option>> {
   static_assert(!std::is_same<LockPolicy<LockType, Option>, AmbiguousOption>::value,
                 "The Option argument of Guard<LockType, Option> must always "
                 "be specified when the policy for LockType is defined using "
@@ -774,7 +774,7 @@ class __TA_SCOPED_CAPABILITY Guard<LockType, Option, internal::EnableIfShared<Lo
 };
 
 // NullGuard is a stub class that has the same API as Guard but does nothing.
-class NullGuard {
+class __TA_SCOPED_CAPABILITY NullGuard {
  public:
   NullGuard(NullGuard&&) = delete;
   NullGuard(const NullGuard&) = delete;
@@ -782,9 +782,10 @@ class NullGuard {
   NullGuard& operator=(const NullGuard&) = delete;
 
   template <typename Lockable, typename... Args>
-  NullGuard(Lockable* lock, Args&&... state_args) {}
+  explicit NullGuard(Lockable* lock, Args&&... state_args) __TA_ACQUIRE(lock) {}
+  ~NullGuard() __TA_RELEASE() { Release(); }
   template <typename... Args>
-  void Release(Args&&... args) {}
+  void Release(Args&&... args) __TA_RELEASE() {}
 
   template <typename Op, typename... ReleaseArgs>
   void CallUnlocked(Op&& op, ReleaseArgs&&... release_args) {

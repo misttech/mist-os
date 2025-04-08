@@ -46,25 +46,6 @@ struct NullLockPolicy {};
 bool is_tx_irq_enabled = false;
 bool is_serial_enabled = false;
 
-// Forward declare class with capability annotation to avoid formatter doing
-// the wrong thing.
-class TA_SCOPED_CAP NullGuard;
-
-// TODO(https://fxbug.dev/42073424): Switch to lockdep::NullGuard once fbl::NullLock
-// and NullGuard are both annotated, and the existing use cases are
-// TA compliant.
-class NullGuard {
- public:
-  template <typename Lockable>
-  NullGuard(Lockable* lock, const char*) TA_ACQ(lock) {}
-  ~NullGuard() TA_REL() {}
-
-  template <typename T>
-  void CallUnlocked(T&& op) {
-    op();
-  }
-};
-
 template <typename LockPolicy, typename Guard>
 using GuardSelector =
     std::conditional_t<std::is_same_v<LockPolicy, NullLockPolicy>, NullGuard, Guard>;
