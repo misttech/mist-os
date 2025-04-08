@@ -62,13 +62,13 @@ impl MemfsInstance {
 
         let (root_dir, server_end) = fidl::endpoints::create_endpoints();
         exposed_dir
-            .deprecated_open(
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::POSIX_EXECUTABLE
-                    | fio::OpenFlags::POSIX_WRITABLE,
-                fio::ModeType::empty(),
+            .open(
                 "memfs",
-                fidl::endpoints::ServerEnd::new(server_end.into_channel()),
+                fio::PERM_READABLE
+                    | fio::Flags::PERM_INHERIT_WRITE
+                    | fio::Flags::PERM_INHERIT_EXECUTE,
+                &Default::default(),
+                server_end.into_channel(),
             )
             .expect("Failed to open memfs's root");
         let namespace = fdio::Namespace::installed().expect("Failed to get local namespace");

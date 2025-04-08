@@ -263,11 +263,11 @@ async fn get_entries(dir: &fio::DirectoryProxy) -> Result<Vec<DirectoryEntry>, E
         // NB: We are loading all the files we are going to serialize into memory first.
         // if the partition is too big this will be a problem.
         let (file_proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
-        dir.deprecated_open(
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
-            fio::ModeType::empty(),
+        dir.open(
             &ent.name,
-            fidl::endpoints::ServerEnd::new(server_end.into_channel()),
+            fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
+            server_end.into_channel(),
         )
         .with_context(|| format!("failed to open file {}", ent.name))?;
         let (status, attrs) = file_proxy.get_attr().await.with_context(|| {

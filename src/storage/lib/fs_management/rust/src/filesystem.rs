@@ -290,13 +290,11 @@ impl Filesystem {
             .map_err(Status::from_raw)?;
 
         let (root_dir, server_end) = create_endpoints::<fio::NodeMarker>();
-        exposed_dir.deprecated_open(
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::POSIX_EXECUTABLE
-                | fio::OpenFlags::POSIX_WRITABLE,
-            fio::ModeType::empty(),
+        exposed_dir.open(
             "root",
-            server_end,
+            fio::PERM_READABLE | fio::Flags::PERM_INHERIT_WRITE | fio::Flags::PERM_INHERIT_EXECUTE,
+            &Default::default(),
+            server_end.into_channel(),
         )?;
         let component = self.component.clone();
         if !reuse_component_after_serving {
@@ -702,13 +700,11 @@ impl ServingMultiVolumeFilesystem {
         exposed_dir: fio::DirectoryProxy,
     ) -> Result<&mut ServingVolume, Error> {
         let (root_dir, server_end) = create_endpoints::<fio::NodeMarker>();
-        exposed_dir.deprecated_open(
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::POSIX_EXECUTABLE
-                | fio::OpenFlags::POSIX_WRITABLE,
-            fio::ModeType::empty(),
+        exposed_dir.open(
             "root",
-            server_end,
+            fio::PERM_READABLE | fio::Flags::PERM_INHERIT_WRITE | fio::Flags::PERM_INHERIT_EXECUTE,
+            &Default::default(),
+            server_end.into_channel(),
         )?;
         Ok(self.volumes.entry(volume).or_insert(ServingVolume {
             root_dir: ClientEnd::<fio::DirectoryMarker>::new(root_dir.into_channel()).into_proxy(),
