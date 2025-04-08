@@ -410,36 +410,51 @@ VmHierarchyBase::VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state)
 VmHierarchyBase::VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state) { DEBUG_ASSERT(!state); }
 #endif
 
+// TODO(https://fxbug.dev/408878701): add option to dump by koid.
 static int cmd_vm_object(int argc, const cmd_args* argv, uint32_t flags) {
-  if (argc < 2) {
-  notenoughargs:
-    printf("not enough arguments\n");
-  usage:
+  auto usage_msg = [argv]() {
     printf("usage:\n");
     printf("%s dump <address>\n", argv[0].str);
     printf("%s dump_pages <address>\n", argv[0].str);
     return ZX_ERR_INTERNAL;
+  };
+
+  if (argc < 2) {
+    printf("not enough arguments\n");
+    return usage_msg();
   }
 
   if (!strcmp(argv[1].str, "dump")) {
     if (argc < 3) {
-      goto notenoughargs;
+      printf("not enough arguments\n");
+      return usage_msg();
     }
 
     VmObject* o = reinterpret_cast<VmObject*>(argv[2].u);
+
+    if (o == NULL) {
+      printf("invalid address\n");
+      return usage_msg();
+    }
 
     o->Dump(0, false);
   } else if (!strcmp(argv[1].str, "dump_pages")) {
     if (argc < 3) {
-      goto notenoughargs;
+      printf("not enough arguments\n");
+      return usage_msg();
     }
 
     VmObject* o = reinterpret_cast<VmObject*>(argv[2].u);
 
+    if (o == NULL) {
+      printf("invalid address\n");
+      return usage_msg();
+    }
+
     o->Dump(0, true);
   } else {
     printf("unknown command\n");
-    goto usage;
+    return usage_msg();
   }
 
   return ZX_OK;
