@@ -253,6 +253,15 @@ impl Drop for ThreadGroup {
         let state = self.mutable_state.get_mut();
         assert!(state.tasks.is_empty());
         assert!(state.children.is_empty());
+        assert!(state
+            .parent
+            .as_ref()
+            .and_then(|p| p.0.upgrade().as_ref().map(|p| p
+                .read()
+                .children
+                .get(&self.leader)
+                .is_none()))
+            .unwrap_or(true));
     }
 }
 
@@ -578,7 +587,7 @@ impl ThreadGroup {
         Ok(())
     }
 
-    pub fn remove<L>(&self, locked: &mut Locked<'_, L>, task: &OwnedRef<Task>)
+    pub fn remove<L>(&self, locked: &mut Locked<'_, L>, task: &Task)
     where
         L: LockBefore<ProcessGroupState>,
     {

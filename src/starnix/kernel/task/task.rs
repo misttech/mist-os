@@ -1574,6 +1574,11 @@ impl Releasable for Task {
     fn release<'a: 'b, 'b>(mut self, context: Self::Context<'a, 'b>) {
         let (thread_state, locked) = context;
 
+        // We remove from the thread group here because the WeakRef in the pid
+        // table to this task must be valid until this task is removed from the
+        // thread group, and the code below will invalidate it.
+        self.thread_group.remove(locked, &self);
+
         *self.proc_pid_directory_cache.get_mut() = None;
 
         self.ptrace_disconnect();
@@ -1592,7 +1597,7 @@ impl Releasable for Task {
         // Apply any delayed releasers left.
         current_task.trigger_delayed_releaser(locked);
 
-        // Drop the task now that is has been released. This requires to take it fro the OwnedRef
+        // Drop the task now that is has been released. This requires to take it from the OwnedRef
         // and from the resulting ReleaseGuard.
         let CurrentTask { mut task, .. } = current_task;
         let task = OwnedRef::take(&mut task).expect("task should not have been re-owned");
