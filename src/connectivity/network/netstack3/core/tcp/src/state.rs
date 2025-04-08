@@ -75,11 +75,6 @@ const SWS_PROBE_TIMEOUT: Duration = Duration::from_millis(100);
 const SWS_BUFFER_FACTOR: u32 = 2;
 
 /// Whether netstack3 senders support receiving selective acks.
-// TODO(https://fxbug.dev/42078221): Tell the peer we can do SACK even when not
-// in tests.
-#[cfg(not(test))]
-const SACK_PERMITTED: bool = false;
-#[cfg(test)]
 const SACK_PERMITTED: bool = true;
 
 /// A trait abstracting an identifier for a state machine.
@@ -1677,9 +1672,6 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             return (Some(rcv.make_ack(*snd_max)), DataAcked::No);
         }
 
-        // TODO(https://fxbug.dev/42078221): Remove SACK_PERMITTED guard when
-        // SACK-based loss recovery is complete.
-        let seg_sack_blocks = if SACK_PERMITTED { seg_sack_blocks } else { &SackBlocks::EMPTY };
         let is_dup_ack_by_sack =
             congestion_control.preprocess_ack(seg_ack, *snd_nxt, seg_sack_blocks);
         let (is_dup_ack, data_acked) = if seg_ack.after(*snd_una) {
@@ -3617,7 +3609,7 @@ mod test {
     use net_types::ip::Ipv4;
     use netstack3_base::testutil::{FakeInstant, FakeInstantCtx};
     use netstack3_base::{FragmentedPayload, InstantContext as _, Options, SackBlock};
-    use test_case::test_case;
+    use test_case::{test_case, test_matrix};
 
     use super::*;
     use crate::internal::base::DEFAULT_FIN_WAIT2_TIMEOUT;
@@ -9069,6 +9061,13 @@ mod test {
         .assert_counters(&counters);
     }
 
+    // Define an enum here so test case name generation with test matrix works
+    // better.
+    enum SackPermitted {
+        Yes,
+        No,
+    }
+
     // Test a connection that is limited only by a theoretical congestion
     // window, provided in multiples of MSS.
     //
@@ -9083,16 +9082,18 @@ mod test {
     // - After sending enough bytes and going through enough congestion events,
     //   the TCP sender has an _acceptable_ estimate of what the congestion
     //   window is.
-    #[test_case(1)]
-    #[test_case(2)]
-    #[test_case(3)]
-    #[test_case(5)]
-    #[test_case(20)]
-    #[test_case(50)]
-    fn congestion_window_limiting(theoretical_window: u32) {
+    #[test_matrix(
+        [1, 2, 3, 5, 20, 50],
+        [SackPermitted::Yes, SackPermitted::No]
+    )]
+    fn congestion_window_limiting(theoretical_window: u32, sack_permitted: SackPermitted) {
         netstack3_base::testutil::set_logger_for_test();
 
         let mss = DEVICE_MAXIMUM_SEGMENT_SIZE;
+        let generate_sack = match sack_permitted {
+            SackPermitted::Yes => true,
+            SackPermitted::No => false,
+        };
 
         // The test argument is the theoretical window in terms of multiples
         // of mss.
@@ -9191,12 +9192,21 @@ mod test {
         };
 
         while continue_running(&mut state) {
-            clock.sleep(Duration::from_millis(1));
+            // Use a somewhat large RTT. When SACK recovery is in use, the
+            // infinite amount of available data combined with the RTO rearms on
+            // retransmission causes it to always have more data to send, so the
+            // RTT is effectively what's driving the clock in that case.
+            clock.sleep(Duration::from_millis(10));
             if pending_acks.is_empty() {
                 poll_until_empty(&mut state, &mut pending_segments, clock.now());
             } else {
-                for ack in pending_acks.drain(..) {
-                    let seg: Segment<()> = Segment::ack(ISS_2 + 1, ack, snd_wnd >> wnd_scale);
+                for (ack, sack_blocks) in pending_acks.drain(..) {
+                    let seg: Segment<()> = Segment::ack_with_options(
+                        ISS_2 + 1,
+                        ack,
+                        snd_wnd >> wnd_scale,
+                        SegmentOptions { sack_blocks }.into(),
+                    );
                     let (seg, passive_open, data_acked, newly_closed) = state
                         .on_segment::<_, ClientlessBufferProvider>(
                         &FakeStateMachineDebugId,
@@ -9227,6 +9237,17 @@ mod test {
             let in_loss_recovery = congestion_control.inspect_loss_recovery_mode().is_some();
             let pipe = congestion_control.pipe();
             let sent = u32::try_from(pending_segments.len()).unwrap() * u32::from(mss);
+            let recovery_counters = if generate_sack {
+                (
+                    counters.stack_wide.sack_retransmits.get(),
+                    counters.stack_wide.sack_recovery.get(),
+                )
+            } else {
+                (
+                    counters.stack_wide.fast_retransmits.get(),
+                    counters.stack_wide.fast_recovery.get(),
+                )
+            };
 
             if !in_slow_start {
                 total_sent += sent;
@@ -9242,12 +9263,10 @@ mod test {
                     pipe={pipe}, \
                     in_slow_start={in_slow_start}, \
                     in_loss_recovery={in_loss_recovery}, \
-                    retransmits={}, \
-                    fast_retransmits={}, \
-                    fast_recovery={}",
+                    total_retransmits={}, \
+                    (retransmits,recovery)={:?}",
                 counters.stack_wide.retransmits.get(),
-                counters.stack_wide.fast_retransmits.get(),
-                counters.stack_wide.fast_recovery.get(),
+                recovery_counters,
             );
 
             if pending_segments.is_empty() {
@@ -9269,7 +9288,9 @@ mod test {
                 if seq.after_or_eq(receiver.nxt()) {
                     let _: usize = receiver.insert(seq..(seq + len));
                 }
-                pending_acks.push(receiver.nxt());
+                let sack_blocks =
+                    if generate_sack { receiver.sack_blocks() } else { SackBlocks::default() };
+                pending_acks.push((receiver.nxt(), sack_blocks));
             }
         }
 
