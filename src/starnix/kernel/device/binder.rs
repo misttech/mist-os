@@ -1003,13 +1003,22 @@ impl BinderProcess {
         };
         let owner = proxy.owner.upgrade().ok_or_else(|| errno!(ENOENT))?;
         let mut owner = owner.lock();
+        // Check if the subscriber already exists
+        if owner
+            .freeze_subscribers
+            .iter()
+            .find(|(bp, c)| bp.as_ptr() == self && *c == cookie)
+            .is_some()
+        {
+            return error!(EINVAL);
+        }
+        owner.freeze_subscribers.push((self.weak_self.clone(), cookie));
         let info = binder_frozen_state_info {
             cookie,
             is_frozen: if owner.freeze_status.frozen { 1 } else { 0 },
             reserved: 0,
         };
         self.enqueue_command(Command::FrozenBinder(info));
-        owner.freeze_subscribers.push((self.weak_self.clone(), cookie));
         Ok(())
     }
 
