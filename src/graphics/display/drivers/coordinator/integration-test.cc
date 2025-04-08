@@ -1065,8 +1065,11 @@ TEST_F(IntegrationTest, VsyncEventForImageConfig) {
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
 
   static constexpr display::ConfigStamp kInitialConfigStamp(42);
+  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp,
                                         primary_client->CreateFullscreenLayerConfig()));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
 
   // Wait for a VSync acknowledging the displayed configuration.
   ASSERT_EQ(0u, primary_client->state().vsync_count());
@@ -1087,7 +1090,10 @@ TEST_F(IntegrationTest, VsyncEventForImagelessConfig) {
   display::LayerId color_layer_id = create_color_layer_result.value();
 
   static constexpr display::ConfigStamp kInitialConfigStamp(42);
+  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
 
   // Wait for a VSync acknowledging the displayed configuration.
   ASSERT_EQ(0u, primary_client->state().vsync_count());
@@ -1103,8 +1109,12 @@ TEST_F(IntegrationTest, VsyncEventAfterImageLayerConvertsToColorLayer) {
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
 
   static constexpr display::ConfigStamp kInitialConfigStamp(1);
+  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp,
                                         primary_client->CreateFullscreenLayerConfig()));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
+  const display::DriverConfigStamp initial_driver_config_stamp = DisplayEngineAppliedConfigStamp();
 
   // Wait for a VSync acknowledging the displayed configuration.
   ASSERT_EQ(0u, primary_client->state().vsync_count());
@@ -1120,7 +1130,10 @@ TEST_F(IntegrationTest, VsyncEventAfterImageLayerConvertsToColorLayer) {
   display::LayerId color_layer_id = create_color_layer_result.value();
 
   static constexpr display::ConfigStamp kSecondConfigStamp(2);
+  ASSERT_EQ(initial_driver_config_stamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kSecondConfigStamp, {{.layer_id = color_layer_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() > initial_driver_config_stamp; }));
 
   // Wait for a VSync acknowledging the configuration with a layer change.
   ASSERT_EQ(1u, primary_client->state().vsync_count());
@@ -1165,8 +1178,14 @@ TEST_F(IntegrationTest, SendVsyncsAfterImagelessConfig) {
 
   // Display an image.
   static constexpr display::ConfigStamp kPrimary1InitialConfigStamp(2);
+  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kPrimary1InitialConfigStamp,
                                         primary_client->CreateFullscreenLayerConfig()));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
+  const display::DriverConfigStamp primary1_initial_driver_config_stamp =
+      DisplayEngineAppliedConfigStamp();
+
   ASSERT_EQ(0u, primary_client->state().vsync_count());
   TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
@@ -1178,9 +1197,15 @@ TEST_F(IntegrationTest, SendVsyncsAfterImagelessConfig) {
       primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
   ASSERT_OK(create_primary_color_layer_result);
   display::LayerId primary_color_layer_id = create_primary_color_layer_result.value();
+
   static constexpr display::ConfigStamp kPrimary1SecondConfigStamp(3);
+  ASSERT_EQ(primary1_initial_driver_config_stamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kPrimary1SecondConfigStamp,
                                         {{.layer_id = primary_color_layer_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() > primary1_initial_driver_config_stamp; }));
+  const display::DriverConfigStamp primary1_second_driver_config_stamp =
+      DisplayEngineAppliedConfigStamp();
 
   // The old client disconnects
   primary_client.reset();
@@ -1193,11 +1218,15 @@ TEST_F(IntegrationTest, SendVsyncsAfterImagelessConfig) {
 
   // The VSync must be routed to the client that applied the configuration,
   // which is now disconnected. Nothing should be sent to the new client.
+  EXPECT_EQ(primary1_second_driver_config_stamp, DisplayEngineAppliedConfigStamp());
   TriggerDisplayEngineVsync();
 
   static constexpr display::ConfigStamp kPrimary2InitialConfigStamp(4);
+  ASSERT_EQ(primary1_second_driver_config_stamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kPrimary2InitialConfigStamp,
                                         primary_client->CreateFullscreenLayerConfig()));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() > primary1_second_driver_config_stamp; }));
 
   // Send a VSync using the config the client applied.
   ASSERT_EQ(0u, primary_client->state().vsync_count());
@@ -1213,8 +1242,14 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
   ASSERT_OK(virtcon_client->SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode::kFallback));
   ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client->state().has_display_ownership(); }));
 
+  // Apply a config so the client starts receiving VSync events.
   static constexpr display::ConfigStamp kVirtconInitialConfigStamp(1);
+  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(virtcon_client->ApplyLayers(kVirtconInitialConfigStamp, {}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
+  const display::DriverConfigStamp virtcon_initial_driver_config_stamp =
+      DisplayEngineAppliedConfigStamp();
 
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
@@ -1222,8 +1257,11 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
 
   // Present an image
   static constexpr display::ConfigStamp kPrimaryInitialConfigStamp(2);
+  ASSERT_EQ(virtcon_initial_driver_config_stamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kPrimaryInitialConfigStamp,
                                         primary_client->CreateFullscreenLayerConfig()));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() > virtcon_initial_driver_config_stamp; }));
 
   ASSERT_EQ(0u, primary_client->state().vsync_count());
   TriggerDisplayEngineVsync();
@@ -1236,13 +1274,8 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
   // TODO(https://fxbug.dev/388885807): The comment above describes the behavior
   // of a misbehaving display engine driver. Consider whether it's suitable to
   // disconnect the driver, rather than working around the error.
-  //
-  // TODO(https://fxbug.dev/388885807): The call below assumes that engine
-  // driver-side config stamps match client-managed config stamps.
-  display::DriverConfigStamp invalid_config_stamp =
-      DisplayEngineAppliedConfigStamp() - display::DriverConfigStamp{1};
   const config_stamp_t invalid_banjo_config_stamp =
-      display::ToBanjoDriverConfigStamp(invalid_config_stamp);
+      display::ToBanjoDriverConfigStamp(virtcon_initial_driver_config_stamp);
   CoordinatorController()->DisplayEngineListenerOnDisplayVsync(
       ToBanjoDisplayId(primary_client->state().display_id()), 0u, &invalid_banjo_config_stamp);
 
@@ -1274,7 +1307,10 @@ TEST_F(IntegrationTest, AcknowledgeVsync) {
 
   // Apply a config so the client starts receiving VSync events.
   static constexpr display::ConfigStamp kInitialConfigStamp(1);
+  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
 
   // send vsyncs up to watermark level
   ASSERT_EQ(0u, primary_client->state().vsync_count());
@@ -1306,7 +1342,10 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterQueueFull) {
 
   // Apply a config so the client starts receiving VSync events.
   static constexpr display::ConfigStamp kInitialConfigStamp(1);
+  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
 
   // send vsyncs until max vsync
   ASSERT_EQ(0u, primary_client->state().vsync_count());
@@ -1358,7 +1397,10 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterLongTime) {
 
   // Apply a config so the client starts receiving VSync events.
   static constexpr display::ConfigStamp kInitialConfigStamp(1);
+  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
 
   // send vsyncs until max vsyncs
   ASSERT_EQ(0u, primary_client->state().vsync_count());
@@ -1407,7 +1449,10 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithUnissuedCookie) {
 
   // Apply a config so the client starts receiving VSync events.
   static constexpr display::ConfigStamp kInitialConfigStamp(1);
+  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
 
   // send vsyncs until max vsync
   ASSERT_EQ(0u, primary_client->state().vsync_count());
@@ -1479,7 +1524,10 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
 
   // Apply a config so the client starts receiving VSync events.
   static constexpr display::ConfigStamp kInitialConfigStamp(1);
+  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
 
   // send vsyncs until max vsync
   ASSERT_EQ(0u, primary_client->state().vsync_count());
@@ -1671,8 +1719,11 @@ TEST_F(IntegrationTest, ClampRgb) {
 
   // Apply a config so the virtcon client's RGB clamp is set.
   static constexpr display::ConfigStamp kVirtconInitialConfigStamp(1);
+  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(virtcon_client->ApplyLayers(kVirtconInitialConfigStamp,
                                         {{.layer_id = virtcon_color_layer_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
 
   TriggerDisplayEngineVsync();
   // TODO(https://fxbug.dev/388885807): This test is racy. There's no guarantee
@@ -1697,8 +1748,13 @@ TEST_F(IntegrationTest, VsyncGoesToClientWhoAppliedConfig) {
   display::LayerId virtcon_color_layer_id = create_virtcon_color_layer_result.value();
 
   static constexpr display::ConfigStamp kVirtconInitialConfigStamp(1);
+  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(virtcon_client->ApplyLayers(kVirtconInitialConfigStamp,
                                         {{.layer_id = virtcon_color_layer_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
+  const display::DriverConfigStamp virtcon_initial_driver_config_stamp =
+      DisplayEngineAppliedConfigStamp();
 
   // Create and bind primary client.
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
@@ -1717,8 +1773,11 @@ TEST_F(IntegrationTest, VsyncGoesToClientWhoAppliedConfig) {
 
   // Present an image from the primary client.
   static constexpr display::ConfigStamp kPrimaryInitialConfigStamp(2);
+  ASSERT_EQ(virtcon_initial_driver_config_stamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kPrimaryInitialConfigStamp,
                                         primary_client->CreateFullscreenLayerConfig()));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() > virtcon_initial_driver_config_stamp; }));
 
   // Primary client should receive VSync events after applying a config.
   ASSERT_EQ(0u, primary_client->state().vsync_count());
@@ -1759,7 +1818,11 @@ TEST_F(IntegrationTest, VsyncReflectsAppliedConfig) {
 
   // Apply a config so the client starts receiving VSync events.
   static constexpr display::ConfigStamp kInitialConfigStamp(1);
+  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
+  const display::DriverConfigStamp initial_driver_config_stamp = DisplayEngineAppliedConfigStamp();
 
   ASSERT_EQ(0u, primary_client->state().vsync_count());
   TriggerDisplayEngineVsync();
@@ -1781,8 +1844,13 @@ TEST_F(IntegrationTest, VsyncReflectsAppliedConfig) {
 
   // Present one single image without wait.
   static constexpr display::ConfigStamp kNoFence1ConfigStamp(2);
+  ASSERT_EQ(initial_driver_config_stamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kNoFence1ConfigStamp,
                                         {{.layer_id = layer1_id, .image_id = image1_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() > initial_driver_config_stamp; }));
+  const display::DriverConfigStamp no_fence1_driver_config_stamp =
+      DisplayEngineAppliedConfigStamp();
 
   ASSERT_EQ(1u, primary_client->state().vsync_count());
   TriggerDisplayEngineVsync();
@@ -1792,8 +1860,13 @@ TEST_F(IntegrationTest, VsyncReflectsAppliedConfig) {
 
   // Present another image layer without a wait fence.
   static constexpr display::ConfigStamp kNoFence2ConfigStamp(3);
+  ASSERT_EQ(no_fence1_driver_config_stamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kNoFence2ConfigStamp,
                                         {{.layer_id = layer1_id, .image_id = image2_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() > no_fence1_driver_config_stamp; }));
+  const display::DriverConfigStamp no_fence2_driver_config_stamp =
+      DisplayEngineAppliedConfigStamp();
 
   ASSERT_EQ(2u, primary_client->state().vsync_count());
   TriggerDisplayEngineVsync();
@@ -1803,7 +1876,10 @@ TEST_F(IntegrationTest, VsyncReflectsAppliedConfig) {
 
   // Hide the image layer and replace it with a color layer.
   static constexpr display::ConfigStamp kNoImageConfigStamp(4);
+  ASSERT_EQ(no_fence2_driver_config_stamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kNoImageConfigStamp, {{.layer_id = color_layer_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() > no_fence2_driver_config_stamp; }));
 
   ASSERT_EQ(3u, primary_client->state().vsync_count());
   TriggerDisplayEngineVsync();
@@ -1840,7 +1916,11 @@ TEST_F(IntegrationTest, ApplyConfigWithWaitingImage) {
 
   // Apply a config so the client starts receiving VSync events.
   static constexpr display::ConfigStamp kInitialConfigStamp(1);
+  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
+  const display::DriverConfigStamp initial_driver_config_stamp = DisplayEngineAppliedConfigStamp();
 
   ASSERT_EQ(0u, primary_client->state().vsync_count());
   TriggerDisplayEngineVsync();
@@ -1868,9 +1948,14 @@ TEST_F(IntegrationTest, ApplyConfigWithWaitingImage) {
 
   // Present one image layer without a wait event.
   static constexpr display::ConfigStamp kImageWithoutFenceConfigStamp(2);
+  ASSERT_EQ(initial_driver_config_stamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(
       primary_client->ApplyLayers(kImageWithoutFenceConfigStamp,
                                   {{.layer_id = layer1_id, .image_id = image_without_fence_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() > initial_driver_config_stamp; }));
+  const display::DriverConfigStamp image_without_fence_driver_config_stamp =
+      DisplayEngineAppliedConfigStamp();
 
   ASSERT_EQ(1u, primary_client->state().vsync_count());
   TriggerDisplayEngineVsync();
@@ -1897,8 +1982,7 @@ TEST_F(IntegrationTest, ApplyConfigWithWaitingImage) {
   // configuration kImageWithFenceConfigStamp, which includes the image that is
   // now ready. Once the configuration is applied, the next VSync must reflect
   // it.
-  display::DriverConfigStamp image_without_fence_driver_config_stamp =
-      DisplayEngineAppliedConfigStamp();
+  ASSERT_EQ(image_without_fence_driver_config_stamp, DisplayEngineAppliedConfigStamp());
   image_ready_fence.event.signal(0u, ZX_EVENT_SIGNALED);
   ASSERT_TRUE(PollUntilOnLoop([&]() {
     return DisplayEngineAppliedConfigStamp() > image_without_fence_driver_config_stamp;
@@ -1940,7 +2024,11 @@ TEST_F(IntegrationTest, ApplyConfigRemovesLayerWithWaitingImage) {
 
   // Apply a config so the client starts receiving VSync events.
   static constexpr display::ConfigStamp kInitialConfigStamp(1);
+  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
+  const display::DriverConfigStamp initial_driver_config_stamp = DisplayEngineAppliedConfigStamp();
 
   ASSERT_EQ(0u, primary_client->state().vsync_count());
   TriggerDisplayEngineVsync();
@@ -1968,9 +2056,14 @@ TEST_F(IntegrationTest, ApplyConfigRemovesLayerWithWaitingImage) {
 
   // Present an image layer.
   static constexpr display::ConfigStamp kImageWithoutFenceConfigStamp(2);
+  ASSERT_EQ(initial_driver_config_stamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(
       primary_client->ApplyLayers(kImageWithoutFenceConfigStamp,
                                   {{.layer_id = layer1_id, .image_id = image_without_fence_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() > initial_driver_config_stamp; }));
+  const display::DriverConfigStamp image_without_fence_driver_config_stamp =
+      DisplayEngineAppliedConfigStamp();
 
   ASSERT_EQ(1u, primary_client->state().vsync_count());
   TriggerDisplayEngineVsync();
@@ -1982,6 +2075,7 @@ TEST_F(IntegrationTest, ApplyConfigRemovesLayerWithWaitingImage) {
   // Coordinator must wait on the event. VSync events must report the previous
   // configuration.
   static constexpr display::ConfigStamp kImageWithFenceConfigStamp(3);
+  ASSERT_EQ(image_without_fence_driver_config_stamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kImageWithFenceConfigStamp,
                                         {{.layer_id = layer1_id,
                                           .image_id = image_with_fence_id,
@@ -1997,7 +2091,11 @@ TEST_F(IntegrationTest, ApplyConfigRemovesLayerWithWaitingImage) {
   // "skip over" the image layer that is not ready, and apply the configuration
   // with the color layer.
   static constexpr display::ConfigStamp kNoImageConfigStamp(4);
+  ASSERT_EQ(image_without_fence_driver_config_stamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(primary_client->ApplyLayers(kNoImageConfigStamp, {{.layer_id = color_layer_id}}));
+  ASSERT_TRUE(PollUntilOnLoop([&]() {
+    return DisplayEngineAppliedConfigStamp() > image_without_fence_driver_config_stamp;
+  }));
 
   // On Vsync, the configuration stamp client receives on Vsync event message
   // will be the latest one applied to the display controller, since the waiting
@@ -2069,9 +2167,14 @@ TEST_F(IntegrationTest, ApplyConfigSkipsConfigWithWaitingImage) {
 
   // Apply a config so the client starts receiving VSync events.
   static constexpr display::ConfigStamp kImageWithoutFenceConfigStamp(2);
+  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
   ASSERT_OK(
       primary_client->ApplyLayers(kImageWithoutFenceConfigStamp,
                                   {{.layer_id = layer1_id, .image_id = image_without_fence_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
+  const display::DriverConfigStamp image_without_fence_driver_config_stamp =
+      DisplayEngineAppliedConfigStamp();
 
   ASSERT_EQ(0u, primary_client->state().vsync_count());
   TriggerDisplayEngineVsync();
@@ -2113,12 +2216,13 @@ TEST_F(IntegrationTest, ApplyConfigSkipsConfigWithWaitingImage) {
   // configuration that includes the first image, and apply the configuration
   // that includes the second image. Once the configuration is applied, the next
   // VSync must reflect it.
-  display::DriverConfigStamp image_without_fence_driver_config_stamp =
-      DisplayEngineAppliedConfigStamp();
+  ASSERT_EQ(image_without_fence_driver_config_stamp, DisplayEngineAppliedConfigStamp());
   image_ready_fence2.event.signal(0u, ZX_EVENT_SIGNALED);
   ASSERT_TRUE(PollUntilOnLoop([&]() {
     return DisplayEngineAppliedConfigStamp() > image_without_fence_driver_config_stamp;
   }));
+  const display::DriverConfigStamp image_with_fence2_driver_config_stamp =
+      DisplayEngineAppliedConfigStamp();
 
   ASSERT_EQ(3u, primary_client->state().vsync_count());
   TriggerDisplayEngineVsync();
@@ -2130,8 +2234,6 @@ TEST_F(IntegrationTest, ApplyConfigSkipsConfigWithWaitingImage) {
   // old event associated with the old image shouldn't trigger ReapplyConfig().
   // We should still see |apply_config_stamp_2| as the latest presented config
   // stamp in the client.
-  display::DriverConfigStamp image_with_fence2_driver_config_stamp =
-      DisplayEngineAppliedConfigStamp();
   image_ready_fence1.event.signal(0u, ZX_EVENT_SIGNALED);
 
   // TODO(https://fxbug.dev/388885807): This check can have a false positive
