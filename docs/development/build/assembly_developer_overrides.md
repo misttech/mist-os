@@ -78,9 +78,25 @@ assembly_developer_overrides("my_custom_base_packages") {
 
 ## Add a shell command {#add-shell-command}
 
-There may be some cases where you may need to include shell components to
-your product's configuration. In this case, your `//local/BUILD.gn` may look
-like:
+There may be some cases where you may need to include shell commands to your
+product's configuration. When adding CLI tools for running in the Fuchsia shell,
+it's necessary to both add the package and configure assembly to create the
+launcher stub that runs the component for the binary. This is due that most CLI
+tools are actually components.
+
+To do this, define a `shell_commands` list within your
+`assembly_developer_overrides`. Each entry in this list is an object with the
+following keys:
+
+* `package_name`: The name of the package that contains the shell command. This
+  must match the `package_name` defined in the package's `BUILD.gn` file.
+* `components`: A list of the CLI binaries within the package that you want to
+  register as shell commands. Assembly automatically adds the `meta/` prefix and
+  `.cm` suffix to these names when looking for their component manifests.
+  For example, `foo` becomes `meta/foo.cm`.
+
+For example, to add the `cp` command from the `//third_party/sbase` package,
+your `//local/BUILD.gn` may look like:
 
 ```gn
 import("//build/assembly/developer_overrides.gni")
@@ -90,7 +106,32 @@ assembly_developer_overrides("my_custom_shell_commands") {
     {
       package_name = "//third_party/sbase"
       components = [ "cp" ]
-    },
+    }
+  ]
+}
+```
+
+### Add a shell command to a package set {#add-shell-command-package-set}
+
+Additionally, if making the package available through package discovery
+isn't sufficient, you can also add the package target to a package set.
+For example, to add the package to the `base` package set, your
+`//local/BUILD.gn` may look like:
+
+```gn
+import("//build/assembly/developer_overrides.gni")
+
+assembly_developer_overrides("my_custom_shell_commands") {
+  shell_commands = [
+    {
+      package_name = "//third_party/sbase"
+      components = [ "cp" ]
+    }
+  ]
+
+  # This GN target should define a package named "foo_cli".
+  base_packages = [
+    "//some/gn/target/for/my/package:foo_cli"
   ]
 }
 ```
