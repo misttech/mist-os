@@ -34,6 +34,7 @@ fuchsia_cc_driver("dwmac-driver") {
     "//sdk/banjo/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.ethernet.mac:fuchsia.hardware.ethernet.mac_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.test:fuchsia.hardware.test_banjo_cpp",
+    "//sdk/fidl/fuchsia.boot.metadata:fuchsia.boot.metadata_cpp",
     "//sdk/fidl/fuchsia.hardware.ethernet.board:fuchsia.hardware.ethernet.board_cpp",
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp",
     "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
