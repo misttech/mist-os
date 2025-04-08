@@ -26,6 +26,7 @@ use netstack3_core::testutil::{
 use netstack3_core::IpExt;
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::device::{IpDeviceStateContext, StableSlaacAddressConfiguration};
+use netstack3_ip::testutil::IpCounterExpectations;
 use packet::{Buf, Serializer as _};
 use packet_formats::ethernet::EthernetFrameLengthCheck;
 use packet_formats::icmp::IcmpDestUnreachable;
@@ -93,7 +94,13 @@ fn test_receive_ip_frame<I: TestIpExt + IpExt>(enable: bool) {
         .device::<EthernetLinkDevice>()
         .receive_frame(RecvEthernetFrameMeta { device_id: eth_device }, Buf::new(bytes, ..));
 
-    assert_eq!(ctx.core_ctx.common_ip::<I>().counters().receive_ip_packet.get(), expected_received);
+    IpCounterExpectations::<I> {
+        receive_ip_packet: expected_received,
+        forwarding_disabled: expected_received,
+        dropped: expected_received,
+        ..Default::default()
+    }
+    .assert_counters(&ctx.core_ctx());
 }
 
 #[test]

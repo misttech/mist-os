@@ -584,23 +584,24 @@ fn set_ipv4_fragment(
 }
 
 /// Counters kept by the IP stack pertaining to fragmentation.
-#[derive(Default)]
-pub struct FragmentationCounters {
+#[derive(Default, Debug)]
+#[cfg_attr(any(test, feature = "testutils"), derive(PartialEq))]
+pub struct FragmentationCounters<C = Counter> {
     /// The number of IP frames requiring fragmentation on egress.
-    pub fragmentation_required: Counter,
+    pub fragmentation_required: C,
     /// The total number of fragments sent.
-    pub fragments: Counter,
+    pub fragments: C,
     /// The number of `NotAllowed` errors encountered.
-    pub error_not_allowed: Counter,
+    pub error_not_allowed: C,
     /// The number of `MtuTooSmall` errors encountered.
-    pub error_mtu_too_small: Counter,
+    pub error_mtu_too_small: C,
     /// The number of `BodyTooLong` errors encountered.
-    pub error_body_too_long: Counter,
+    pub error_body_too_long: C,
     /// The number of `SizeLimitExceeded` errors encountered.
-    pub error_inner_size_limit_exceeded: Counter,
+    pub error_inner_size_limit_exceeded: C,
     /// Counts the number of times fragmentation was short-circuited due to a
     /// fragment serialization error.
-    pub error_fragmented_serializer: Counter,
+    pub error_fragmented_serializer: C,
 }
 
 impl FragmentationCounters {
@@ -610,6 +611,30 @@ impl FragmentationCounters {
             FragmentationError::MtuTooSmall => &self.error_mtu_too_small,
             FragmentationError::BodyTooLong => &self.error_body_too_long,
             FragmentationError::SizeLimitExceeded => &self.error_inner_size_limit_exceeded,
+        }
+    }
+}
+
+#[cfg(any(test, feature = "testutils"))]
+impl From<&FragmentationCounters> for FragmentationCounters<u64> {
+    fn from(counters: &FragmentationCounters) -> FragmentationCounters<u64> {
+        let FragmentationCounters {
+            fragmentation_required,
+            fragments,
+            error_not_allowed,
+            error_mtu_too_small,
+            error_body_too_long,
+            error_inner_size_limit_exceeded,
+            error_fragmented_serializer,
+        } = counters;
+        FragmentationCounters {
+            fragmentation_required: fragmentation_required.get(),
+            fragments: fragments.get(),
+            error_not_allowed: error_not_allowed.get(),
+            error_mtu_too_small: error_mtu_too_small.get(),
+            error_body_too_long: error_body_too_long.get(),
+            error_inner_size_limit_exceeded: error_inner_size_limit_exceeded.get(),
+            error_fragmented_serializer: error_fragmented_serializer.get(),
         }
     }
 }

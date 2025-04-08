@@ -30,7 +30,7 @@ use net_types::{
 use netstack3_base::socket::SocketIpAddrExt as _;
 use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
-    AnyDevice, BroadcastIpExt, CoreTimerContext, CounterContext, DeviceIdContext,
+    AnyDevice, BroadcastIpExt, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
     DeviceIdentifier as _, DeviceWithName, ErrorAndSerializer, EventContext, FrameDestination,
     HandleableTimer, InstantContext, IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext, IpExt,
     MarkDomain, Marks, Matcher as _, NestedIntoCoreTimerCtx, NotFoundError, RngContext,
@@ -2740,7 +2740,7 @@ where
             let counters = CounterContext::<IpCounters<I>>::counters(core_ctx);
             #[derive(GenericOverIp)]
             #[generic_over_ip(I, Ip)]
-            struct InCounters<'a, I: IpLayerIpExt>(&'a I::RxCounters);
+            struct InCounters<'a, I: IpLayerIpExt>(&'a I::RxCounters<Counter>);
             I::map_ip::<_, ()>(
                 InCounters(&counters.version_rx),
                 |_counters| {

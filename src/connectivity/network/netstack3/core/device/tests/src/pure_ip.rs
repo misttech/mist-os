@@ -9,6 +9,7 @@ use ip_test_macro::ip_test;
 use net_types::ip::{AddrSubnet, IpAddress as _, IpVersion, Mtu};
 use net_types::{Witness, ZonedAddr};
 use netstack3_base::testutil::TestIpExt;
+use netstack3_base::CounterContext;
 use netstack3_core::sync::RemoveResourceResult;
 use netstack3_core::testutil::{
     CtxPairExt as _, FakeBindingsCtx, FakeCtx, PureIpDeviceAndIpVersion, DEFAULT_INTERFACE_METRIC,
@@ -19,8 +20,9 @@ use netstack3_device::pure_ip::{
     self, PureIpDevice, PureIpDeviceCreationProperties, PureIpDeviceReceiveFrameMetadata,
 };
 use netstack3_device::queue::TransmitQueueConfiguration;
-use netstack3_device::DeviceId;
-use netstack3_ip::IpPacketDestination;
+use netstack3_device::{DeviceCounters, DeviceId};
+use netstack3_ip::testutil::IpCounterExpectations;
+use netstack3_ip::{IpCounters, IpPacketDestination};
 use packet::{Buf, Serializer as _};
 use packet_formats::ip::{IpPacketBuilder, IpProto};
 use test_case::test_case;
@@ -78,26 +80,39 @@ fn receive_frame<I: TestIpExt + IpExt>() {
     );
     ctx.test_api().enable_device(&device.clone().into());
 
-    fn check_frame_counters<I: IpExt>(stack_state: &StackState<FakeBindingsCtx>, count: u64) {
-        assert_eq!(stack_state.common_ip::<I>().counters().receive_ip_packet.get(), count);
-        assert_eq!(stack_state.device().counters.recv_frame.get(), count);
+    fn check_frame_counters<
+        I: IpExt,
+        CC: CounterContext<DeviceCounters> + CounterContext<IpCounters<I>>,
+    >(
+        core_ctx: &CC,
+        count: u64,
+    ) {
+        IpCounterExpectations {
+            receive_ip_packet: count,
+            dropped: count,
+            forwarding_disabled: count,
+            ..Default::default()
+        }
+        .assert_counters(core_ctx);
+        let device_counters = CounterContext::<DeviceCounters>::counters(core_ctx);
+        assert_eq!(device_counters.recv_frame.get(), count);
         match I::VERSION {
             IpVersion::V4 => {
-                assert_eq!(stack_state.device().counters.recv_ipv4_delivered.get(), count)
+                assert_eq!(device_counters.recv_ipv4_delivered.get(), count)
             }
             IpVersion::V6 => {
-                assert_eq!(stack_state.device().counters.recv_ipv6_delivered.get(), count)
+                assert_eq!(device_counters.recv_ipv6_delivered.get(), count)
             }
         }
     }
 
     // Receive a frame from the network and verify delivery to the IP layer.
-    check_frame_counters::<I>(&ctx.core_ctx, 0);
+    check_frame_counters::<I, _>(&ctx.core_ctx(), 0);
     ctx.core_api().device::<PureIpDevice>().receive_frame(
         PureIpDeviceReceiveFrameMetadata { device_id: device, ip_version: I::VERSION },
         default_ip_packet::<I>(),
     );
-    check_frame_counters::<I>(&ctx.core_ctx, 1);
+    check_frame_counters::<I, _>(&ctx.core_ctx(), 1);
 }
 
 #[ip_test(I)]

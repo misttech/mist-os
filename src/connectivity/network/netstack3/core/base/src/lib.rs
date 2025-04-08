@@ -28,13 +28,14 @@ mod port_alloc;
 mod resource_references;
 mod rng;
 mod tcp;
+mod test_only;
 mod time;
 mod uninstantiable;
 mod work_queue;
 
 pub use context::{BuildableCoreContext, ContextPair, ContextProvider, CtxPair};
 pub use convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};
-pub use counters::{Counter, CounterContext, ResourceCounterContext};
+pub use counters::{Counter, CounterContext, CounterRepr, ResourceCounterContext};
 pub use data_structures::token_bucket::TokenBucket;
 pub use device::address::{
     AssignedAddrIpExt, IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext, Ipv4DeviceAddr,
@@ -74,6 +75,7 @@ pub use tcp::segment::{
     SegmentOptions,
 };
 pub use tcp::seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize};
+pub use test_only::{TestOnlyFrom, TestOnlyPartialEq};
 pub use time::local_timer_heap::LocalTimerHeap;
 pub use time::{
     AtomicInstant, CoreTimerContext, HandleableTimer, Instant, InstantBindingsTypes,

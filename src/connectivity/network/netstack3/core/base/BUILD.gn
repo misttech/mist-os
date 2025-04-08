@@ -43,6 +43,7 @@ rustc_library_with_features("netstack3-base") {
     "src/tcp/base.rs",
     "src/tcp/segment.rs",
     "src/tcp/seqnum.rs",
+    "src/test_only.rs",
     "src/testutil/addr.rs",
     "src/testutil/benchmarks.rs",
     "src/testutil/fake_bindings.rs",

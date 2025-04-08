@@ -31,6 +31,7 @@ use netstack3_ip::socket::{
     DeviceIpSocketHandler, IpSockCreationError, IpSockDefinition, IpSockSendError, IpSocketHandler,
     MmsError, RouteResolutionOptions, SendOptions,
 };
+use netstack3_ip::testutil::IpCounterExpectations;
 use netstack3_ip::{
     self as ip, device, AddableEntryEither, AddableMetric, IpDeviceMtuContext, RawMetric,
     ResolveRouteError,
@@ -428,7 +429,14 @@ fn test_send_local<I: IpSocketIpExt + IpExt>(
 
     assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
-    assert_eq!(ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet.get(), 1);
+    IpCounterExpectations::<I> {
+        receive_ip_packet: 1,
+        dispatch_receive_ip_packet: 1,
+        deliver_unicast: 1,
+        send_ip_packet: 1,
+        ..Default::default()
+    }
+    .assert_counters(&ctx.core_ctx());
 }
 
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]

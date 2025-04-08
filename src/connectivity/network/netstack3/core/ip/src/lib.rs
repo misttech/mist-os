@@ -239,7 +239,8 @@ pub use internal::base::{
     TransportIpContext, TransportReceiveError, DEFAULT_HOP_LIMITS, DEFAULT_TTL,
     IPV6_DEFAULT_SUBNET,
 };
-pub use internal::counters::IpCounters;
+pub use internal::counters::{IpCounters, Ipv6RxCounters};
+pub use internal::fragmentation::FragmentationCounters;
 pub use internal::local_delivery::{
     IpHeaderInfo, LocalDeliveryPacketInfo, ReceiveIpPacketMeta, TransparentLocalDelivery,
 };
@@ -263,6 +264,7 @@ pub use internal::types::{
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
     pub use crate::internal::base::testutil::DualStackSendIpPacketMeta;
+    pub use crate::internal::counters::testutil::IpCounterExpectations;
     pub use crate::internal::local_delivery::testutil::FakeIpHeaderInfo;
     pub use crate::internal::routing::testutil::{
         add_route, del_device_routes, del_routes_to_subnet, set_rules,
