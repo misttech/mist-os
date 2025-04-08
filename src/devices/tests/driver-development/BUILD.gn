@@ -8,11 +8,7 @@ import("//build/test.gni")
 
 group("tests") {
   testonly = true
-
-  # TODO(https://fxbug.dev/406591090): Re-enable once no longer flakey.
-  if (target_cpu != "riscv64") {
-    deps = [ ":package" ]
-  }
+  deps = [ ":package" ]
 }
 
 rustc_test("driver_development_test") {
