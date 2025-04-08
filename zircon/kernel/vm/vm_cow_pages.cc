@@ -4111,6 +4111,12 @@ zx_status_t VmCowPages::ProtectRangeFromReclamation(VmCowRange range, bool set_a
 
   __UNINITIALIZED MultiPageRequest page_request;
   while (!range.is_empty()) {
+    // Any loaned page replacement needs to happen outside the main lock acquisition so if we loaned
+    // page is found we use these variables to record its information and process it after dropping
+    // the lock.
+    fbl::RefPtr<VmCowPages> loaned_page_owner;
+    uint64_t loaned_page_offset = 0;
+    vm_page_t* loaned_page = nullptr;
     zx_status_t status;
     {
       Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
@@ -4165,11 +4171,10 @@ zx_status_t VmCowPages::ProtectRangeFromReclamation(VmCowRange range, bool set_a
         if (page->is_loaned()) {
           DEBUG_ASSERT(is_page_clean(page));
           AssertHeld(owner->lock_ref());
-          __UNINITIALIZED DeferredOps deferred(owner, DeferredOps::LockedTag{});
-          status = owner->ReplacePageLocked(page, page->object.get_page_offset(),
-                                            /*with_loaned=*/false, &page, deferred,
-                                            page_request.GetAnonymous());
-          // Let the status fall through below to have success, waiting and errors handled.
+          loaned_page_owner = fbl::MakeRefPtrUpgradeFromRaw<VmCowPages>(owner, owner->lock());
+          loaned_page = page;
+          loaned_page_offset = page->object.get_page_offset();
+          break;
         }
         if (status != ZX_OK) {
           break;
@@ -4182,6 +4187,18 @@ zx_status_t VmCowPages::ProtectRangeFromReclamation(VmCowRange range, bool set_a
           // Nothing more to do beyond marking the page always_need true. The lookup must have
           // already marked the page accessed, moving it to the head of the first page queue.
         }
+      }
+    }
+    // Check if we exited to swap a loaned page.
+    if (loaned_page) {
+      vm_page_t* after;
+      status = loaned_page_owner->ReplacePage(loaned_page, loaned_page_offset, false, &after,
+                                              page_request.GetAnonymous());
+      if (status != ZX_ERR_SHOULD_WAIT) {
+        // Between finding the loaned page and attempting to replace it the lock was dropped and so
+        // ReplacePage could spuriously fail, hence ignore any other failure and go around the loop
+        // and retry.
+        status = ZX_OK;
       }
     }
     if (status != ZX_OK) {
