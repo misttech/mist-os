@@ -1158,6 +1158,104 @@ TEST_F(IntegrationTest, DisplayOwnershipChangeEvents) {
   ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client->state().has_display_ownership(); }));
 }
 
+TEST_F(IntegrationTest, VsyncEventAfterOwnerChangeWithImageLayers) {
+  std::unique_ptr<TestFidlClient> virtcon_client = OpenCoordinatorTestFidlClient(
+      &sysmem_client_, DisplayProviderClient(), ClientPriority::kVirtcon);
+  ASSERT_OK(virtcon_client->SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode::kFallback));
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client->state().has_display_ownership(); }));
+
+  static constexpr display::ConfigStamp kVirtconConfigStamp(1);
+  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
+  ASSERT_OK(virtcon_client->ApplyLayers(kVirtconConfigStamp,
+                                        virtcon_client->CreateFullscreenLayerConfig()));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
+  const display::DriverConfigStamp virtcon_driver_config_stamp = DisplayEngineAppliedConfigStamp();
+
+  ASSERT_EQ(0u, virtcon_client->state().vsync_count());
+  TriggerDisplayEngineVsync();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(kVirtconConfigStamp, virtcon_client->state().last_vsync_config_stamp());
+  EXPECT_EQ(1u, virtcon_client->state().vsync_count());
+
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
+
+  static constexpr display::ConfigStamp kPrimaryConfigStamp(2);
+  ASSERT_EQ(virtcon_driver_config_stamp, DisplayEngineAppliedConfigStamp());
+  ASSERT_OK(primary_client->ApplyLayers(kPrimaryConfigStamp,
+                                        primary_client->CreateFullscreenLayerConfig()));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() > virtcon_driver_config_stamp; }));
+
+  EXPECT_EQ(1u, virtcon_client->state().vsync_count());
+  EXPECT_EQ(kVirtconConfigStamp, virtcon_client->state().last_vsync_config_stamp());
+
+  ASSERT_EQ(0u, primary_client->state().vsync_count());
+  TriggerDisplayEngineVsync();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(kPrimaryConfigStamp, primary_client->state().last_vsync_config_stamp());
+  EXPECT_EQ(1u, primary_client->state().vsync_count());
+
+  EXPECT_EQ(1u, virtcon_client->state().vsync_count());
+  EXPECT_EQ(kVirtconConfigStamp, virtcon_client->state().last_vsync_config_stamp());
+}
+
+TEST_F(IntegrationTest, VsyncEventAfterOwnerChangeWithColorLayers) {
+  std::unique_ptr<TestFidlClient> virtcon_client = OpenCoordinatorTestFidlClient(
+      &sysmem_client_, DisplayProviderClient(), ClientPriority::kVirtcon);
+  ASSERT_OK(virtcon_client->SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode::kFallback));
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client->state().has_display_ownership(); }));
+
+  zx::result<display::LayerId> create_virtcon_color_layer_result =
+      virtcon_client->CreateFullscreenColorLayer(kFuchsiaBgra);
+  ASSERT_OK(create_virtcon_color_layer_result);
+  display::LayerId virtcon_color_layer_id = create_virtcon_color_layer_result.value();
+
+  static constexpr display::ConfigStamp kVirtconConfigStamp(1);
+  ASSERT_EQ(display::kInvalidDriverConfigStamp, DisplayEngineAppliedConfigStamp());
+  ASSERT_OK(
+      virtcon_client->ApplyLayers(kVirtconConfigStamp, {{.layer_id = virtcon_color_layer_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() != display::kInvalidDriverConfigStamp; }));
+  const display::DriverConfigStamp virtcon_driver_config_stamp = DisplayEngineAppliedConfigStamp();
+
+  ASSERT_EQ(0u, virtcon_client->state().vsync_count());
+  TriggerDisplayEngineVsync();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(kVirtconConfigStamp, virtcon_client->state().last_vsync_config_stamp());
+  EXPECT_EQ(1u, virtcon_client->state().vsync_count());
+
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
+
+  zx::result<display::LayerId> create_primary_color_layer_result =
+      primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
+  ASSERT_OK(create_primary_color_layer_result);
+  display::LayerId primary_color_layer_id = create_primary_color_layer_result.value();
+
+  static constexpr display::ConfigStamp kPrimaryConfigStamp(2);
+  ASSERT_EQ(virtcon_driver_config_stamp, DisplayEngineAppliedConfigStamp());
+  ASSERT_OK(
+      primary_client->ApplyLayers(kPrimaryConfigStamp, {{.layer_id = primary_color_layer_id}}));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return DisplayEngineAppliedConfigStamp() > virtcon_driver_config_stamp; }));
+
+  EXPECT_EQ(1u, virtcon_client->state().vsync_count());
+  EXPECT_EQ(kVirtconConfigStamp, virtcon_client->state().last_vsync_config_stamp());
+
+  ASSERT_EQ(0u, primary_client->state().vsync_count());
+  TriggerDisplayEngineVsync();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
+  EXPECT_EQ(kPrimaryConfigStamp, primary_client->state().last_vsync_config_stamp());
+  EXPECT_EQ(1u, primary_client->state().vsync_count());
+
+  EXPECT_EQ(1u, virtcon_client->state().vsync_count());
+  EXPECT_EQ(kVirtconConfigStamp, virtcon_client->state().last_vsync_config_stamp());
+}
+
 TEST_F(IntegrationTest, SendVsyncsAfterImagelessConfig) {
   std::unique_ptr<TestFidlClient> virtcon_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kVirtcon);
