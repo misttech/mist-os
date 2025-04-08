@@ -570,13 +570,27 @@ uint64_t* KTraceState::ReserveRaw(uint32_t num_words) {
 
 }  // namespace internal
 
-// The global ktrace state.
-KTrace KTrace::instance_;
+//
+// Implement the single buffer specializations for KTraceImpl.
+//
 
-zx_status_t KTrace::Start(uint32_t categories, internal::KTraceState::StartMode start_mode) {
+template <>
+void KTraceImpl<BufferMode::kSingle>::Init(uint32_t bufsize, uint32_t initial_grpmask) {
+  cpu_context_map_.Init();
+  internal_state_.Init(bufsize, initial_grpmask);
+  set_categories_bitmask(initial_grpmask);
+}
+
+template <>
+zx_status_t KTraceImpl<BufferMode::kSingle>::Start(uint32_t action, uint32_t categories) {
   if (categories == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
+
+  using StartMode = ::internal::KTraceState::StartMode;
+  const StartMode start_mode =
+      (action == KTRACE_ACTION_START) ? StartMode::Saturate : StartMode::Circular;
+
   const zx_status_t status = internal_state_.Start(start_mode);
   if (status != ZX_OK) {
     return status;
@@ -596,30 +610,40 @@ zx_status_t KTrace::Start(uint32_t categories, internal::KTraceState::StartMode 
   return ZX_OK;
 }
 
-zx_status_t KTrace::Control(uint32_t action, uint32_t options) {
-  using StartMode = ::internal::KTraceState::StartMode;
-  switch (action) {
-    case KTRACE_ACTION_START:
-    case KTRACE_ACTION_START_CIRCULAR: {
-      const StartMode start_mode =
-          (action == KTRACE_ACTION_START) ? StartMode::Saturate : StartMode::Circular;
-      return Start(options ? options : KTRACE_GRP_ALL, start_mode);
-    }
-
-    case KTRACE_ACTION_STOP:
-      set_categories_bitmask(0u);
-      return internal_state_.Stop();
-
-    case KTRACE_ACTION_REWIND:
-      return internal_state_.Rewind();
-
-    default:
-      return ZX_ERR_INVALID_ARGS;
-  }
-  return ZX_OK;
+template <>
+zx_status_t KTraceImpl<BufferMode::kSingle>::Stop() {
+  set_categories_bitmask(0u);
+  return internal_state_.Stop();
 }
 
-void KTrace::InitHook(unsigned) {
+template <>
+zx_status_t KTraceImpl<BufferMode::kSingle>::Rewind() {
+  return internal_state_.Rewind();
+}
+
+template <>
+zx::result<internal::KTraceState::PendingCommit> KTraceImpl<BufferMode::kSingle>::Reserve(
+    uint64_t header) {
+  return internal_state_.Reserve(header);
+}
+
+template <>
+zx::result<size_t> KTraceImpl<BufferMode::kSingle>::ReadUser(user_out_ptr<void> ptr, uint32_t off,
+                                                             size_t len) {
+  const ssize_t ret = internal_state_.ReadUser(ptr, off, len);
+  if (ret < 0) {
+    return zx::error(static_cast<zx_status_t>(ret));
+  }
+  return zx::ok(ret);
+}
+
+//
+// TODO(https://fxbug.dev/404539312): Implement the per-CPU buffer specializations for KTraceImpl.
+//
+
+// The InitHook is the same for both the single and per-CPU buffer implementation of KTrace.
+template <BufferMode Mode>
+void KTraceImpl<Mode>::InitHook(unsigned) {
   const uint32_t bufsize = gBootOptions->ktrace_bufsize << 20;
   const uint32_t initial_grpmask = gBootOptions->ktrace_grpmask;
 
