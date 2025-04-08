@@ -1220,14 +1220,17 @@ zx_status_t VmObjectPaged::DecommitRangeLocked(uint64_t offset, uint64_t len) {
   return cow_pages_locked()->DecommitRangeLocked(*cow_range);
 }
 
-zx_status_t VmObjectPaged::ZeroPartialPageLocked(uint64_t page_base_offset,
-                                                 uint64_t zero_start_offset,
-                                                 uint64_t zero_end_offset,
-                                                 Guard<VmoLockType>* guard) {
+zx_status_t VmObjectPaged::ZeroPartialPage(uint64_t page_base_offset, uint64_t zero_start_offset,
+                                           uint64_t zero_end_offset) {
   DEBUG_ASSERT(zero_start_offset <= zero_end_offset);
   DEBUG_ASSERT(zero_end_offset <= PAGE_SIZE);
   DEBUG_ASSERT(IS_PAGE_ALIGNED(page_base_offset));
-  DEBUG_ASSERT(page_base_offset < size_locked());
+
+  Guard<VmoLockType> guard{lock()};
+
+  if (page_base_offset >= size_locked()) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
 
   // TODO: Consider replacing this with a more appropriate generic API when one is available.
   if (cow_pages_locked()->PageWouldReadZeroLocked(page_base_offset)) {
@@ -1246,7 +1249,7 @@ zx_status_t VmObjectPaged::ZeroPartialPageLocked(uint64_t page_base_offset,
         memset(dst, 0, len);
         return UserCopyCaptureFaultsResult{ZX_OK};
       },
-      guard);
+      &guard);
 }
 
 zx_status_t VmObjectPaged::ZeroRangeInternal(uint64_t offset, uint64_t len, bool dirty_track) {
@@ -1257,6 +1260,31 @@ zx_status_t VmObjectPaged::ZeroRangeInternal(uint64_t offset, uint64_t len, bool
   // May need to zero in chunks across multiple different lock acquisitions so loop until nothing
   // left to do.
   while (len > 0) {
+    // Check for any non-page aligned start and handle separately.
+    if (!IS_PAGE_ALIGNED(offset)) {
+      // We're doing partial page writes, so we should be dirty tracking.
+      DEBUG_ASSERT(dirty_track);
+      const uint64_t page_base = ROUNDDOWN(offset, PAGE_SIZE);
+      const uint64_t zero_start_offset = offset - page_base;
+      const uint64_t zero_len = ktl::min(PAGE_SIZE - zero_start_offset, len);
+      zx_status_t status =
+          ZeroPartialPage(page_base, zero_start_offset, zero_start_offset + zero_len);
+      if (status != ZX_OK) {
+        return status;
+      }
+      // Advance over the length we zeroed and then, since the lock might have been dropped, go
+      // around the loop to redo the checks.
+      offset += zero_len;
+      len -= zero_len;
+      continue;
+    }
+    // The start is page aligned, so if the remaining length is not a page size then perform the
+    // final sub-page zero.
+    if (len < PAGE_SIZE) {
+      DEBUG_ASSERT(dirty_track);
+      return ZeroPartialPage(offset, 0, len);
+    }
+
     // We might need a page request if the VMO is backed by a page source.
     __UNINITIALIZED MultiPageRequest page_request;
     uint64_t zeroed_len = 0;
@@ -1270,39 +1298,13 @@ zx_status_t VmObjectPaged::ZeroRangeInternal(uint64_t offset, uint64_t len, bool
         return ZX_ERR_BAD_STATE;
       }
 
-      // Validate the range.
-      ktl::optional<VmCowRange> cow_range = GetCowRangeSizeCheckLocked(offset, len);
+      // Offset is page aligned, and we have at least one full page to process, so find the page
+      // aligned length to hand over to the cow pages zero method.
+      ktl::optional<VmCowRange> cow_range =
+          GetCowRangeSizeCheckLocked(offset, ROUNDDOWN(len, PAGE_SIZE));
       if (!cow_range) {
         return ZX_ERR_OUT_OF_RANGE;
       }
-
-      // Check for any non-page aligned start and handle separately.
-      if (!IS_PAGE_ALIGNED(offset)) {
-        // We're doing partial page writes, so we should be dirty tracking.
-        DEBUG_ASSERT(dirty_track);
-        const uint64_t page_base = ROUNDDOWN(offset, PAGE_SIZE);
-        const uint64_t zero_start_offset = offset - page_base;
-        const uint64_t zero_len = ktl::min(PAGE_SIZE - zero_start_offset, len);
-        status = ZeroPartialPageLocked(page_base, zero_start_offset, zero_start_offset + zero_len,
-                                       &guard);
-        if (status != ZX_OK) {
-          return status;
-        }
-        // Advance over the length we zeroed and then, since the lock might have been dropped, go
-        // around the loop to redo the checks.
-        offset += zero_len;
-        len -= zero_len;
-        continue;
-      }
-      // The start is page aligned, so if the remaining length is not a page size then perform the
-      // final sub-page zero.
-      if (len < PAGE_SIZE) {
-        DEBUG_ASSERT(dirty_track);
-        return ZeroPartialPageLocked(offset, 0, len, &guard);
-      }
-      // Offset is page aligned, and we have at least one full page to process, so find the page
-      // aligned length to hand over to the cow pages zero method.
-      VmCowRange zero_range = cow_range->WithLength(ROUNDDOWN(cow_range->len, PAGE_SIZE));
 
 #if DEBUG_ASSERT_IMPLEMENTED
       // Currently we want ZeroPagesLocked() to not decommit any pages from a contiguous VMO.  In
@@ -1312,7 +1314,7 @@ zx_status_t VmObjectPaged::ZeroRangeInternal(uint64_t offset, uint64_t len, bool
 #endif
       // Now that we have a page aligned range we can try hand over to the cow pages zero method.
       status =
-          cow_pages_locked()->ZeroPagesLocked(zero_range, dirty_track, &page_request, &zeroed_len);
+          cow_pages_locked()->ZeroPagesLocked(*cow_range, dirty_track, &page_request, &zeroed_len);
       if (zeroed_len != 0) {
         // Mark modified since we wrote zeros.
         mark_modified_locked();

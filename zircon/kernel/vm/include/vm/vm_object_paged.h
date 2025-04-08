@@ -408,13 +408,11 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
                                       VmObjectReadWriteOptions options, T copyfunc,
                                       Guard<VmoLockType>* guard) TA_REQ(lock());
 
-  // Zeroes a partial range in a page. May use CallUnlocked on the passed in guard. The page to zero
-  // is looked up using page_base_offset, and will be committed if needed. The range of
-  // [zero_start_offset, zero_end_offset) is relative to the page and so [0, PAGE_SIZE) would zero
-  // the entire page.
-  zx_status_t ZeroPartialPageLocked(uint64_t page_base_offset, uint64_t zero_start_offset,
-                                    uint64_t zero_end_offset, Guard<VmoLockType>* guard)
-      TA_REQ(lock());
+  // Zeroes a partial range in a page. The page to zero is looked up using page_base_offset, and
+  // will be committed if needed. The range of [zero_start_offset, zero_end_offset) is relative to
+  // the page and so [0, PAGE_SIZE) would zero the entire page.
+  zx_status_t ZeroPartialPage(uint64_t page_base_offset, uint64_t zero_start_offset,
+                              uint64_t zero_end_offset);
 
   // Internal helper for ZeroRange*.
   zx_status_t ZeroRangeInternal(uint64_t offset, uint64_t len, bool dirty_track);
