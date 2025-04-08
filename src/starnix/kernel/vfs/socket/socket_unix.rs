@@ -189,14 +189,14 @@ impl UnixSocket {
             left,
             open_flags,
             /* kernel_private= */ false,
-        )?;
+        );
         let right = Socket::new_file(
             locked,
             current_task,
             right,
             open_flags,
             /* kernel_private= */ false,
-        )?;
+        );
         Ok((left, right))
     }
 

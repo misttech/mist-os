@@ -31,6 +31,7 @@
                 "mac_admin",
                 "mmap",
                 "msg",
+                "netlink_socket",
                 "nlmsg",
                 "nnp_nosuid*",
                 "notify",

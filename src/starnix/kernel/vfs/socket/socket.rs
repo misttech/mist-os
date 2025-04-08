@@ -477,7 +477,7 @@ impl Socket {
         socket: SocketHandle,
         open_flags: OpenFlags,
         kernel_private: bool,
-    ) -> Result<FileHandle, Errno>
+    ) -> FileHandle
     where
         L: LockBefore<FileOpsCore>,
     {
@@ -485,14 +485,6 @@ impl Socket {
         // Ensure sockfs gets labeled if mounted after the SELinux policy has been loaded.
         security::file_system_resolve_security(locked, &current_task, &fs)
             .expect("resolve fs security");
-        security::check_socket_create_access(
-            current_task,
-            socket.domain,
-            socket.socket_type,
-            socket.protocol,
-            &fs,
-            kernel_private,
-        )?;
         let mode = mode!(IFSOCK, 0o777);
         let node = fs.create_node(
             current_task,
@@ -500,7 +492,7 @@ impl Socket {
             FsNodeInfo::new_factory(mode, current_task.as_fscred()),
         );
         security::socket_post_create(&socket, &node);
-        Ok(FileObject::new_anonymous(current_task, SocketFile::new(socket), node, open_flags))
+        FileObject::new_anonymous(current_task, SocketFile::new(socket), node, open_flags)
     }
 
     /// Returns the Socket that this FileHandle refers to. If this file is not a socket file,

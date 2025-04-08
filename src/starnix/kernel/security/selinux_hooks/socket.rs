@@ -3,16 +3,15 @@
 // found in the LICENSE file.
 
 use super::audit::Auditable;
-use super::fs_node::compute_new_fs_node_sid;
 use crate::task::CurrentTask;
 use crate::vfs::socket::{
     NetlinkFamily, Socket, SocketAddress, SocketDomain, SocketProtocol, SocketType,
 };
-use crate::vfs::{Anon, FileSystemHandle, FsNode};
+use crate::vfs::{Anon, FsNode};
 use selinux::permission_check::PermissionCheck;
 use selinux::{
-    CommonFsNodePermission, CommonSocketPermission, FsNodeClass, InitialSid, KernelPermission,
-    SecurityId, SecurityServer, SocketClass,
+    CommonSocketPermission, FsNodeClass, InitialSid, KernelPermission, SecurityId, SecurityServer,
+    SocketClass,
 };
 use starnix_uapi::errors::Errno;
 
@@ -32,43 +31,28 @@ fn has_socket_permission(
     }
 
     let socket_sid = fs_node_effective_sid_and_class(socket_node).sid;
-    let audit_context = [audit_context, socket_node.into()];
-    has_socket_permission_for_sid(
-        permission_check,
-        subject_sid,
-        socket_sid,
-        permission,
-        (&audit_context).into(),
-    )
-}
 
-/// Checks that `current_task` has the specified `permission` for the `socket_sid`.
-fn has_socket_permission_for_sid(
-    permission_check: &PermissionCheck<'_>,
-    subject_sid: SecurityId,
-    socket_sid: SecurityId,
-    permission: &KernelPermission,
-    audit_context: Auditable<'_>,
-) -> Result<(), Errno> {
     // If the socket is for kernel-internal use we can return success immediately.
-    // TODO: https://fxbug.dev/364569010 - check if there are additional cases when the socket is
-    // for kernel-internal use.
+    // TODO(https://fxbug.dev/364569010): check if there are additional cases when the socket is for
+    // kernel-internal use.
     if subject_sid == SecurityId::initial(InitialSid::Kernel)
         || socket_sid == SecurityId::initial(InitialSid::Kernel)
     {
         return Ok(());
     }
-    check_permission(permission_check, subject_sid, socket_sid, permission.clone(), audit_context)
+    let audit_context = [audit_context, socket_node.into()];
+    check_permission(
+        permission_check,
+        subject_sid,
+        socket_sid,
+        permission.clone(),
+        (&audit_context).into(),
+    )
 }
 
-/// Computes the socket security class for `domain`, `socket_type` and `protocol`.
-fn compute_socket_security_class(
-    domain: SocketDomain,
-    socket_type: SocketType,
-    protocol: SocketProtocol,
-) -> SocketClass {
-    match domain {
-        SocketDomain::Unix => match socket_type {
+pub(in crate::security) fn socket_post_create(socket: &Socket, socket_node: &FsNode) {
+    let security_class = match socket.domain {
+        SocketDomain::Unix => match socket.socket_type {
             SocketType::Stream | SocketType::SeqPacket => SocketClass::UnixStream,
             SocketType::Datagram => SocketClass::UnixDgram,
             SocketType::Raw | SocketType::Rdm | SocketType::Dccp | SocketType::Packet => {
@@ -76,12 +60,12 @@ fn compute_socket_security_class(
             }
         },
         SocketDomain::Vsock => SocketClass::Vsock,
-        SocketDomain::Inet | SocketDomain::Inet6 => match socket_type {
-            SocketType::Stream => match protocol {
+        SocketDomain::Inet | SocketDomain::Inet6 => match socket.socket_type {
+            SocketType::Stream => match socket.protocol {
                 SocketProtocol::IP | SocketProtocol::TCP => SocketClass::Tcp,
                 _ => SocketClass::Socket,
             },
-            SocketType::Datagram => match protocol {
+            SocketType::Datagram => match socket.protocol {
                 SocketProtocol::IP | SocketProtocol::UDP => SocketClass::Udp,
                 _ => SocketClass::Socket,
             },
@@ -91,7 +75,7 @@ fn compute_socket_security_class(
             | SocketType::Dccp
             | SocketType::Packet => SocketClass::RawIp,
         },
-        SocketDomain::Netlink => match NetlinkFamily::from_raw(protocol.as_raw()) {
+        SocketDomain::Netlink => match NetlinkFamily::from_raw(socket.protocol.as_raw()) {
             NetlinkFamily::Route => SocketClass::NetlinkRoute,
             NetlinkFamily::Firewall => SocketClass::NetlinkFirewall,
             NetlinkFamily::SockDiag => SocketClass::NetlinkTcpDiag,
@@ -118,52 +102,8 @@ fn compute_socket_security_class(
         },
         SocketDomain::Packet => SocketClass::Packet,
         SocketDomain::Key => SocketClass::Key,
-    }
-}
-
-/// Checks that `current_task` has permission to create a socket with `domain`, `socket_type` and
-/// `protocol`.
-pub(in crate::security) fn check_socket_create_access(
-    security_server: &SecurityServer,
-    current_task: &CurrentTask,
-    domain: SocketDomain,
-    socket_type: SocketType,
-    protocol: SocketProtocol,
-    sockfs: &FileSystemHandle,
-    kernel_private: bool,
-) -> Result<(), Errno> {
-    // Creating kernel sockets is allowed.
-    if kernel_private {
-        return Ok(());
-    }
-
-    let current_sid = current_task.security_state.lock().current_sid;
-    let new_socket_class = compute_socket_security_class(domain, socket_type, protocol);
-    let new_socket_sid = compute_new_fs_node_sid(
-        security_server,
-        current_task,
-        &sockfs,
-        None,
-        new_socket_class.into(),
-        "".into(),
-    )?
-    .map(|(sid, _)| sid)
-    // TODO: https://fxbug.dev/364569053 - default to socket-related initial SIDs.
-    .unwrap_or_else(|| SecurityId::initial(InitialSid::Unlabeled));
-
-    has_socket_permission_for_sid(
-        &security_server.as_permission_check(),
-        current_sid,
-        new_socket_sid,
-        &CommonFsNodePermission::Create.for_class(new_socket_class),
-        current_task.into(),
-    )
-}
-
-/// Computes and sets the security class for `socket_node`.
-pub(in crate::security) fn socket_post_create(socket: &Socket, socket_node: &FsNode) {
-    socket_node.security_state.lock().class =
-        compute_socket_security_class(socket.domain, socket.socket_type, socket.protocol).into();
+    };
+    socket_node.security_state.lock().class = security_class.into();
 }
 
 /// Checks that `current_task` has the right permissions to perform a bind operation on
@@ -179,7 +119,7 @@ pub(in crate::security) fn check_socket_bind_access(
         panic!("check_socket_bind_access called for non-Socket class")
     };
 
-    // TODO: https://fxbug.dev/364569010 - Add checks for `name_bind` between the socket and the SID
+    // TODO(https://fxbug.dev/364569010): Add checks for `name_bind` between the socket and the SID
     // of the port number, and for `node_bind` between the socket and the SID of the IP address.
     has_socket_permission(
         &security_server.as_permission_check(),
@@ -203,7 +143,7 @@ pub(in crate::security) fn check_socket_connect_access(
         panic!("check_socket_connect_access called for non-Socket class")
     };
 
-    // TODO: https://fxbug.dev/364568577 - Add checks for `name_connect` between the socket and the
+    // TODO(https://fxbug.dev/364568577): Add checks for `name_connect` between the socket and the
     // SID of the port number for TCP sockets.
     has_socket_permission(
         &security_server.as_permission_check(),
@@ -220,8 +160,6 @@ mod tests {
     use super::*;
     use crate::security::selinux_hooks::testing::spawn_kernel_with_selinux_hooks_test_policy_and_run;
     use crate::vfs::socket::new_socket_file;
-    use assert_matches::assert_matches;
-    use starnix_uapi::errors::EACCES;
     use starnix_uapi::open_flags::OpenFlags;
 
     #[fuchsia::test]
@@ -229,7 +167,7 @@ mod tests {
         spawn_kernel_with_selinux_hooks_test_policy_and_run(
             |locked, current_task, security_server| {
                 let task_sid = security_server
-                    .security_context_to_sid(b"u:object_r:test_socket_create_yes_t:s0".into())
+                    .security_context_to_sid(b"u:object_r:test_socket_create_t:s0".into())
                     .expect("invalid security context");
                 current_task.security_state.lock().current_sid = task_sid;
 
@@ -248,53 +186,6 @@ mod tests {
                     SocketClass::UnixStream.into()
                 );
                 assert_eq!(get_cached_sid(socket_node.node()), Some(task_sid));
-            },
-        )
-    }
-
-    #[fuchsia::test]
-    async fn socket_create_is_allowed() {
-        spawn_kernel_with_selinux_hooks_test_policy_and_run(
-            |locked, current_task, security_server| {
-                let task_sid = security_server
-                    .security_context_to_sid(b"u:object_r:test_socket_create_yes_t:s0".into())
-                    .expect("invalid security context");
-                current_task.security_state.lock().current_sid = task_sid;
-
-                assert_matches!(
-                    new_socket_file(
-                        locked,
-                        current_task,
-                        SocketDomain::Unix,
-                        SocketType::Stream,
-                        OpenFlags::RDWR,
-                        SocketProtocol::IP,
-                        /* kernel_private= */ false,
-                    ),
-                    Ok(_)
-                );
-            },
-        )
-    }
-
-    #[fuchsia::test]
-    async fn socket_create_is_denied() {
-        spawn_kernel_with_selinux_hooks_test_policy_and_run(
-            |locked, current_task, security_server| {
-                let task_sid = security_server
-                    .security_context_to_sid(b"u:object_r:test_socket_create_no_t:s0".into())
-                    .expect("invalid security context");
-                current_task.security_state.lock().current_sid = task_sid;
-
-                assert_matches!(new_socket_file(
-                    locked,
-                    current_task,
-                    SocketDomain::Unix,
-                    SocketType::Stream,
-                    OpenFlags::RDWR,
-                    SocketProtocol::IP,
-                    /* kernel_private= */ false,
-                ), Err(errno) if errno == EACCES);
             },
         )
     }

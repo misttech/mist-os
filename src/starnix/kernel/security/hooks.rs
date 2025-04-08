@@ -12,7 +12,7 @@ use crate::mm::{MappingOptions, ProtectionFlags};
 use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
-use crate::vfs::socket::{Socket, SocketAddress, SocketDomain, SocketProtocol, SocketType};
+use crate::vfs::socket::{Socket, SocketAddress};
 use crate::vfs::{
     Anon, DirEntryHandle, FileHandle, FileObject, FileSystem, FileSystemHandle, FsNode, FsStr,
     FsString, Mount, NamespaceNode, OutputBuffer, ValueOrSize, XattrOp,
@@ -866,32 +866,8 @@ pub fn check_exec_access(
     )
 }
 
-/// Checks if creating a socket is allowed.
-/// Corresponds to the `socket_create()` LSM hook.
-pub fn check_socket_create_access(
-    current_task: &CurrentTask,
-    domain: SocketDomain,
-    socket_type: SocketType,
-    protocol: SocketProtocol,
-    sockfs: &FileSystemHandle,
-    kernel_private: bool,
-) -> Result<(), Errno> {
-    profile_duration!("security.hooks.socket_create");
-    if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::socket::check_socket_create_access(
-            &security_server,
-            current_task,
-            domain,
-            socket_type,
-            protocol,
-            sockfs,
-            kernel_private,
-        )
-    })
-}
-
 /// Computes and updates the socket security class for the `FsNode` associated with a new socket.
-/// Corresponds to the `socket_post_create()` LSM hook.
+/// Corresponds to the `socket_post_create()` LSM hooks.
 pub fn socket_post_create(socket: &Socket, socket_node: &FsNode) {
     profile_duration!("security.hooks.socket_post_create");
     selinux_hooks::socket::socket_post_create(socket, socket_node);

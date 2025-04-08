@@ -419,8 +419,7 @@ mod tests {
             socket,
             OpenFlags::RDWR,
             /* kernel_private=*/ false,
-        )
-        .expect("Failed to create socket file.");
+        );
 
         const XFER_SIZE: usize = 42;
 
@@ -467,8 +466,7 @@ mod tests {
             socket_object,
             OpenFlags::RDWR,
             /* kernel_private=*/ false,
-        )
-        .expect("Failed to create socket file.");
+        );
 
         assert_eq!(
             socket.query_events(&mut locked, &current_task),

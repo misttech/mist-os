@@ -334,7 +334,7 @@ pub fn sys_accept4(
         accepted_socket,
         open_flags,
         /* kernel_private= */ false,
-    )?;
+    );
     let fd_flags = if flags & SOCK_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
     let accepted_fd = current_task.add_file(accepted_socket_file, fd_flags)?;
     Ok(accepted_fd)
