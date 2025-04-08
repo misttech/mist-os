@@ -30,6 +30,7 @@ use starnix_uapi::file_mode::{Access, FileMode};
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::signals::Signal;
+use starnix_uapi::syslog::SyslogAction;
 use starnix_uapi::unmount_flags::UnmountFlags;
 use starnix_uapi::{bpf_cmd, errno, error, rlimit, BPF_F_RDONLY, BPF_F_WRONLY};
 use std::sync::Arc;
@@ -1006,6 +1007,15 @@ pub fn check_signal_access(
             &target,
             signal,
         )
+    })
+}
+
+/// Checks if a particular syslog action is allowed.
+/// Corresponds to the `task_syslog()` LSM hook.
+pub fn check_syslog_access(source: &CurrentTask, action: SyslogAction) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.check_syslog_access");
+    if_selinux_else_default_ok(source, |security_server| {
+        selinux_hooks::task::check_syslog(&security_server.as_permission_check(), &source, action)
     })
 }
 
