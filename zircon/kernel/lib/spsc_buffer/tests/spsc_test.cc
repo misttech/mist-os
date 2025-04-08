@@ -498,6 +498,33 @@ class SpscBufferTests {
 
     END_TEST;
   }
+
+  // Test that draining the buffer works.
+  static bool TestDrain() {
+    BEGIN_TEST;
+
+    // Initialize the backing storage for the SPSC buffer.
+    constexpr uint32_t kStorageSize = 256;
+    ktl::array<ktl::byte, kStorageSize> storage;
+
+    // Initialize the SPSC buffer and write some data into it.
+    // This write is done by setting bytes in the storage buffer directly and then modifying the
+    // read and write pointers for simplicity.
+    SpscBuffer spsc;
+    spsc.Init(ktl::span<ktl::byte>(storage.data(), kStorageSize));
+    memset(storage.data(), 'f', kStorageSize / 2);
+    const uint64_t starting_pointers = SpscBuffer::CombinePointers({
+        .read = 0,
+        .write = kStorageSize / 2,
+    });
+    spsc.combined_pointers_.store(starting_pointers, ktl::memory_order_release);
+
+    // Drain the buffer, then verify that it is empty.
+    spsc.Drain();
+    ASSERT_EQ(0u, spsc.AvailableData(spsc.LoadPointers()));
+
+    END_TEST;
+  }
 };
 
 UNITTEST_START_TESTCASE(spsc_buffer_tests)
@@ -508,5 +535,6 @@ UNITTEST("available_data", SpscBufferTests::TestAvailableData)
 UNITTEST("advance_read_pointer", SpscBufferTests::TestAdvanceReadPointer)
 UNITTEST("advance_write_pointer", SpscBufferTests::TestAdvanceWritePointer)
 UNITTEST("read_write_single_threaded", SpscBufferTests::TestReadWriteSingleThreaded)
+UNITTEST("drain", SpscBufferTests::TestDrain)
 UNITTEST_END_TESTCASE(spsc_buffer_tests, "spsc_buffer",
                       "Test the single-producer, single-consumer ring buffer implementation.")

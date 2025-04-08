@@ -235,6 +235,21 @@ class SpscBuffer {
     return zx::ok(amount_to_copy);
   }
 
+  // Empties the contents of the buffer. This is logically a Read operation, so a Read and Drain
+  // cannot be called concurrently. Additionally, the behavior of this method is non-deterministic
+  // if a Write is in-progress; the Drain may empty the buffer completely, or it may empty out all
+  // data up to the beginning of the in-progress write. If callers wish to use this method to
+  // deterministically empty the buffer, they will need to synchronize with Writers as well as
+  // Readers.
+  void Drain() {
+    const RingPointers initial_state = LoadPointers();
+    const uint32_t available_data = AvailableData(initial_state);
+    if (available_data == 0) {
+      return;
+    }
+    AdvanceReadPointer(initial_state, available_data);
+  }
+
  private:
   friend class SpscBufferTests;
 
