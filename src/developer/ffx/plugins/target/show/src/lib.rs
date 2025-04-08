@@ -7,20 +7,21 @@ use addr::TargetIpAddr;
 use anyhow::{anyhow, bail, Result};
 use async_lock::Mutex;
 use async_trait::async_trait;
+use fdomain_fuchsia_buildinfo::ProviderProxy;
+use fdomain_fuchsia_feedback::{DeviceIdProviderProxy, LastRebootInfoProviderProxy};
+use fdomain_fuchsia_hwinfo::{Architecture, BoardProxy, DeviceProxy, ProductProxy};
+use fdomain_fuchsia_update_channelcontrol::ChannelControlProxy;
 use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
 use fho::{deferred, Deferred, DirectConnector, FfxMain, FfxTool};
-use fidl_fuchsia_buildinfo::ProviderProxy;
 use fidl_fuchsia_developer_ffx::TargetIpAddrInfo;
-use fidl_fuchsia_feedback::{DeviceIdProviderProxy, LastRebootInfoProviderProxy};
-use fidl_fuchsia_hwinfo::{Architecture, BoardProxy, DeviceProxy, ProductProxy};
-use fidl_fuchsia_update_channelcontrol::ChannelControlProxy;
 use show::{
     AddressData, BoardData, BuildData, DeviceData, ProductData, TargetShowInfo, UpdateData,
 };
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use target_holders::{moniker, RemoteControlProxyHolder, TargetProxyHolder};
+use target_holders::fdomain::{moniker, RemoteControlProxyHolder};
+use target_holders::TargetProxyHolder;
 use timeout::timeout;
 use {ffx_target, ffx_target_show_args as args};
 
@@ -260,24 +261,24 @@ async fn gather_update_show(channel_control: ChannelControlProxy) -> Result<Upda
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffx_target::{FidlPipe, TargetProxy};
-    use ffx_writer::{Format, TestBuffers};
-    use fidl_fuchsia_buildinfo::{BuildInfo, ProviderRequest};
-    use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetInfo, TargetIp, TargetRequest};
-    use fidl_fuchsia_developer_remotecontrol::{
+    use fdomain_fuchsia_buildinfo::{BuildInfo, ProviderRequest};
+    use fdomain_fuchsia_developer_remotecontrol::{
         IdentifyHostResponse, RemoteControlProxy, RemoteControlRequest,
     };
-    use fidl_fuchsia_feedback::{
+    use fdomain_fuchsia_feedback::{
         DeviceIdProviderRequest, LastReboot, LastRebootInfoProviderRequest, RebootReason,
     };
-    use fidl_fuchsia_hwinfo::{
+    use fdomain_fuchsia_hwinfo::{
         BoardInfo, BoardRequest, DeviceInfo, DeviceRequest, ProductInfo, ProductRequest,
     };
-    use fidl_fuchsia_intl::RegulatoryDomain;
+    use fdomain_fuchsia_intl::RegulatoryDomain;
+    use fdomain_fuchsia_update_channelcontrol::ChannelControlRequest;
+    use ffx_target::{FidlPipe, TargetProxy};
+    use ffx_writer::{Format, TestBuffers};
+    use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetInfo, TargetIp, TargetRequest};
     use fidl_fuchsia_net::{IpAddress, Ipv4Address};
-    use fidl_fuchsia_update_channelcontrol::ChannelControlRequest;
     use serde_json::Value;
-    use target_holders::fake_proxy;
+    use target_holders::fdomain::fake_proxy;
 
     const IPV4_ADDR: [u8; 4] = [127, 0, 0, 1];
 
@@ -328,7 +329,7 @@ mod tests {
 
     fn setup_fake_target_server() -> Deferred<TargetProxyHolder> {
         Deferred::from_output(Ok({
-            fake_proxy::<TargetProxy>(move |req| match req {
+            target_holders::fake_proxy::<TargetProxy>(move |req| match req {
                 TargetRequest::GetSshAddress { responder, .. } => {
                     responder
                         .send(&TargetIpAddrInfo::Ip(TargetIp {
@@ -357,16 +358,16 @@ mod tests {
         }))
     }
 
-    fn setup_fake_device_id_server() -> DeviceIdProviderProxy {
-        fake_proxy(move |req| match req {
+    fn setup_fake_device_id_server(client: Arc<fdomain_client::Client>) -> DeviceIdProviderProxy {
+        fake_proxy(client, move |req| match req {
             DeviceIdProviderRequest::GetId { responder } => {
                 responder.send("fake_device_id").unwrap();
             }
         })
     }
 
-    fn setup_fake_build_info_server() -> ProviderProxy {
-        fake_proxy(move |req| match req {
+    fn setup_fake_build_info_server(client: Arc<fdomain_client::Client>) -> ProviderProxy {
+        fake_proxy(client, move |req| match req {
             ProviderRequest::GetBuildInfo { responder } => {
                 responder
                     .send(&BuildInfo {
@@ -381,8 +382,8 @@ mod tests {
         })
     }
 
-    fn setup_fake_board_server() -> BoardProxy {
-        fake_proxy(move |req| match req {
+    fn setup_fake_board_server(client: Arc<fdomain_client::Client>) -> BoardProxy {
+        fake_proxy(client, move |req| match req {
             BoardRequest::GetInfo { responder } => {
                 responder
                     .send(&BoardInfo {
@@ -396,8 +397,10 @@ mod tests {
         })
     }
 
-    fn setup_fake_last_reboot_info_server() -> LastRebootInfoProviderProxy {
-        fake_proxy(move |req| match req {
+    fn setup_fake_last_reboot_info_server(
+        client: Arc<fdomain_client::Client>,
+    ) -> LastRebootInfoProviderProxy {
+        fake_proxy(client, move |req| match req {
             LastRebootInfoProviderRequest::Get { responder } => {
                 responder
                     .send(&LastReboot {
@@ -413,20 +416,23 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_show_cmd_impl() {
+        let client = fdomain_local::local_client(|| Err(zx_status::Status::NOT_SUPPORTED));
         let buffers = TestBuffers::default();
         let output = VerifiedMachineWriter::<TargetShowInfo>::new_test(None, &buffers);
         let tool = ShowTool {
             cmd: args::TargetShow { ..Default::default() },
-            rcs_proxy: setup_fake_rcs_server().into(),
+            rcs_proxy: setup_fake_rcs_server(Arc::clone(&client)).into(),
             connector: None,
             target_proxy: setup_fake_target_server(),
-            channel_control_proxy: setup_fake_channel_control_server(),
-            board_proxy: setup_fake_board_server(),
-            device_proxy: setup_fake_device_server(),
-            product_proxy: setup_fake_product_server(),
-            build_info_proxy: setup_fake_build_info_server(),
-            device_id_proxy: Deferred::from_output(Ok(setup_fake_device_id_server())),
-            last_reboot_info_proxy: setup_fake_last_reboot_info_server(),
+            channel_control_proxy: setup_fake_channel_control_server(Arc::clone(&client)),
+            board_proxy: setup_fake_board_server(Arc::clone(&client)),
+            device_proxy: setup_fake_device_server(Arc::clone(&client)),
+            product_proxy: setup_fake_product_server(Arc::clone(&client)),
+            build_info_proxy: setup_fake_build_info_server(Arc::clone(&client)),
+            device_id_proxy: Deferred::from_output(Ok(setup_fake_device_id_server(Arc::clone(
+                &client,
+            )))),
+            last_reboot_info_proxy: setup_fake_last_reboot_info_server(Arc::clone(&client)),
         };
         tool.main(output).await.expect("show tool main");
         // Convert to a readable string instead of using a byte string and comparing that. Unless
@@ -450,14 +456,15 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_gather_board_show() {
-        let test_proxy = setup_fake_board_server();
+        let client = fdomain_local::local_client(|| Err(zx_status::Status::NOT_SUPPORTED));
+        let test_proxy = setup_fake_board_server(client);
         let result = gather_board_show(test_proxy).await.expect("gather board show");
         assert_eq!(result.name, Some("fake_name".to_string()));
         assert_eq!(result.revision, Some("fake_revision".to_string()));
     }
 
-    fn setup_fake_device_server() -> DeviceProxy {
-        fake_proxy(move |req| match req {
+    fn setup_fake_device_server(client: Arc<fdomain_client::Client>) -> DeviceProxy {
+        fake_proxy(client, move |req| match req {
             DeviceRequest::GetInfo { responder } => {
                 responder
                     .send(&DeviceInfo {
@@ -473,8 +480,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_gather_device_show() {
-        let test_proxy = setup_fake_device_server();
-        let device_id_proxy = Deferred::from_output(Ok(setup_fake_device_id_server()));
+        let client = fdomain_local::local_client(|| Err(zx_status::Status::NOT_SUPPORTED));
+        let test_proxy = setup_fake_device_server(Arc::clone(&client));
+        let device_id_proxy = Deferred::from_output(Ok(setup_fake_device_id_server(client)));
         let result =
             gather_device_show(test_proxy, device_id_proxy).await.expect("gather device show");
         assert_eq!(result.serial_number, Some("fake_serial".to_string()));
@@ -482,8 +490,8 @@ mod tests {
         assert_eq!(result.retail_demo, Some(false))
     }
 
-    fn setup_fake_product_server() -> ProductProxy {
-        fake_proxy(move |req| match req {
+    fn setup_fake_product_server(client: Arc<fdomain_client::Client>) -> ProductProxy {
+        fake_proxy(client, move |req| match req {
             ProductRequest::GetInfo { responder } => {
                 responder
                     .send(&ProductInfo {
@@ -515,7 +523,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_gather_product_show() {
-        let test_proxy = setup_fake_product_server();
+        let client = fdomain_local::local_client(|| Err(zx_status::Status::NOT_SUPPORTED));
+        let test_proxy = setup_fake_product_server(client);
         let result = gather_product_show(test_proxy).await.expect("gather product show");
         assert_eq!(result.audio_amplifier, Some("fake_audio_amplifier".to_string()));
         assert_eq!(result.build_date, Some("fake_build_date".to_string()));
@@ -524,8 +533,8 @@ mod tests {
         assert_eq!(result.colorway, Some("fake_colorway".to_string()));
     }
 
-    fn setup_fake_rcs_server() -> RemoteControlProxy {
-        fake_proxy(move |req| match req {
+    fn setup_fake_rcs_server(client: Arc<fdomain_client::Client>) -> RemoteControlProxy {
+        fake_proxy(client, move |req| match req {
             RemoteControlRequest::IdentifyHost { responder } => {
                 let response = IdentifyHostResponse {
                     nodename: Some(String::from("fake_fuchsia_device")),
@@ -537,8 +546,10 @@ mod tests {
         })
     }
 
-    fn setup_fake_channel_control_server() -> ChannelControlProxy {
-        fake_proxy(move |req| match req {
+    fn setup_fake_channel_control_server(
+        client: Arc<fdomain_client::Client>,
+    ) -> ChannelControlProxy {
+        fake_proxy(client, move |req| match req {
             ChannelControlRequest::GetCurrent { responder } => {
                 responder.send("fake_channel").unwrap();
             }
@@ -551,7 +562,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_gather_update_show() {
-        let test_proxy = setup_fake_channel_control_server();
+        let client = fdomain_local::local_client(|| Err(zx_status::Status::NOT_SUPPORTED));
+        let test_proxy = setup_fake_channel_control_server(client);
         let result = gather_update_show(test_proxy).await.expect("gather update show");
         assert_eq!(result.current_channel, "fake_channel".to_string());
         assert_eq!(result.next_channel, "fake_target".to_string());
@@ -566,21 +578,24 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_verify_machine_schema() {
+        let client = fdomain_local::local_client(|| Err(zx_status::Status::NOT_SUPPORTED));
         let buffers = TestBuffers::default();
         let mut output =
             <ShowTool as FfxMain>::Writer::new_test(Some(Format::JsonPretty), &buffers);
         let tool = ShowTool {
             cmd: args::TargetShow { ..Default::default() },
-            rcs_proxy: setup_fake_rcs_server().into(),
+            rcs_proxy: setup_fake_rcs_server(Arc::clone(&client)).into(),
             connector: None,
             target_proxy: setup_fake_target_server(),
-            channel_control_proxy: setup_fake_channel_control_server(),
-            board_proxy: setup_fake_board_server(),
-            device_proxy: setup_fake_device_server(),
-            product_proxy: setup_fake_product_server(),
-            build_info_proxy: setup_fake_build_info_server(),
-            device_id_proxy: Deferred::from_output(Ok(setup_fake_device_id_server())),
-            last_reboot_info_proxy: setup_fake_last_reboot_info_server(),
+            channel_control_proxy: setup_fake_channel_control_server(Arc::clone(&client)),
+            board_proxy: setup_fake_board_server(Arc::clone(&client)),
+            device_proxy: setup_fake_device_server(Arc::clone(&client)),
+            product_proxy: setup_fake_product_server(Arc::clone(&client)),
+            build_info_proxy: setup_fake_build_info_server(Arc::clone(&client)),
+            device_id_proxy: Deferred::from_output(Ok(setup_fake_device_id_server(Arc::clone(
+                &client,
+            )))),
+            last_reboot_info_proxy: setup_fake_last_reboot_info_server(Arc::clone(&client)),
         };
         tool.show_cmd(&mut output).await.expect("main");
         let (stdout, _stderr) = buffers.into_strings();
@@ -607,20 +622,23 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_show_cmd_impl_direct_connection() {
+        let client = fdomain_local::local_client(|| Err(zx_status::Status::NOT_SUPPORTED));
         let buffers = TestBuffers::default();
         let output = VerifiedMachineWriter::<TargetShowInfo>::new_test(None, &buffers);
         let tool = ShowTool {
             cmd: args::TargetShow { ..Default::default() },
-            rcs_proxy: setup_fake_rcs_server().into(),
+            rcs_proxy: setup_fake_rcs_server(Arc::clone(&client)).into(),
             connector: Some(setup_fake_direct_connector()),
             target_proxy: setup_fake_target_server(),
-            channel_control_proxy: setup_fake_channel_control_server(),
-            board_proxy: setup_fake_board_server(),
-            device_proxy: setup_fake_device_server(),
-            product_proxy: setup_fake_product_server(),
-            build_info_proxy: setup_fake_build_info_server(),
-            device_id_proxy: Deferred::from_output(Ok(setup_fake_device_id_server())),
-            last_reboot_info_proxy: setup_fake_last_reboot_info_server(),
+            channel_control_proxy: setup_fake_channel_control_server(Arc::clone(&client)),
+            board_proxy: setup_fake_board_server(Arc::clone(&client)),
+            device_proxy: setup_fake_device_server(Arc::clone(&client)),
+            product_proxy: setup_fake_product_server(Arc::clone(&client)),
+            build_info_proxy: setup_fake_build_info_server(Arc::clone(&client)),
+            device_id_proxy: Deferred::from_output(Ok(setup_fake_device_id_server(Arc::clone(
+                &client,
+            )))),
+            last_reboot_info_proxy: setup_fake_last_reboot_info_server(Arc::clone(&client)),
         };
         tool.main(output).await.expect("show tool main");
         // Convert to a readable string instead of using a byte string and comparing that. Unless

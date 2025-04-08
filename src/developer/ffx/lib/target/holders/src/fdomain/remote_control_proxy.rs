@@ -59,11 +59,16 @@ impl TryFromEnv for RemoteControlProxyHolder {
             FhoConnectionBehavior::DaemonConnector(dc) => match dc.remote_factory_fdomain().await {
                 Ok(p) => Ok(p.into()),
                 Err(e) => {
+                    let doctor_tip = "Please check the connection to the target; `ffx doctor -v` may help diagnose the issue.";
                     if let Some(ffx_e) = &e.downcast_ref::<FfxError>() {
-                        let message = format!("Failed connecting to remote control proxy: {ffx_e}");
+                        let message = format!(
+                            "Failed connecting to remote control proxy: {ffx_e}. {doctor_tip}"
+                        );
                         Err(e).user_message(message)
                     } else {
-                        Err(e).user_message("Failed to create remote control proxy. Please check the connection to the target;`ffx doctor -v` may help diagnose the issue.")
+                        let message =
+                            format!("Failed to create remote control proxy: {e}. {doctor_tip}");
+                        Err(e).user_message(message)
                     }
                 }
             },
@@ -99,14 +104,13 @@ where
 ///
 /// This is basically the same thing as `ffx_plugin` used to generate for
 /// each proxy argument, but uses a generic instead of text replacement.
-pub async fn fake_proxy<T: fdomain_client::fidl::Proxy>(
+pub fn fake_proxy<T: fdomain_client::fidl::Proxy>(
     client: Arc<fdomain_client::Client>,
     mut handle_request: impl FnMut(fdomain_client::fidl::Request<T::Protocol>) + 'static,
 ) -> T {
     fake_async_proxy(client, async move |req| {
         handle_request(req);
     })
-    .await
 }
 
 /// Sets up a fake FDomain proxy of type `T` handing requests to the given
@@ -114,7 +118,7 @@ pub async fn fake_proxy<T: fdomain_client::fidl::Proxy>(
 ///
 /// This is basically the same thing as `ffx_plugin` used to generate for
 /// each proxy argument, but uses a generic instead of text replacement.
-pub async fn fake_async_proxy<T: fdomain_client::fidl::Proxy>(
+pub fn fake_async_proxy<T: fdomain_client::fidl::Proxy>(
     client: Arc<fdomain_client::Client>,
     mut handle_request: impl AsyncFnMut(fdomain_client::fidl::Request<T::Protocol>) + 'static,
 ) -> T {
