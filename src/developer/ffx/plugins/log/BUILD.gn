@@ -88,6 +88,8 @@ ffx_tool("ffx_log_tool") {
 
   sdk_target_name = "sdk"
   sdk_category = "partner"
+
+  data_deps = [ "//tools/symbolizer:symbolizer_host_tool" ]
 }
 
 group("log") {
