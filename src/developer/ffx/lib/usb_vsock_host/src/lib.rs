@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use bind_fuchsia_google_platform_usb::{
-    BIND_USB_PROTOCOL_OVERNET, BIND_USB_SUBCLASS_OVERNET, BIND_USB_VID_GOOGLE,
+    BIND_USB_PROTOCOL_VSOCK_BRIDGE, BIND_USB_SUBCLASS_VSOCK_BRIDGE, BIND_USB_VID_GOOGLE,
 };
 use bind_fuchsia_usb::BIND_USB_CLASS_VENDOR_SPECIFIC;
 use fuchsia_async as fasync;
@@ -581,8 +581,8 @@ impl UsbVsockHost {
         let interface = match device.scan_interfaces(|device, interface| {
             let subclass_match = u32::from(device.vendor) == BIND_USB_VID_GOOGLE
                 && u32::from(interface.class) == BIND_USB_CLASS_VENDOR_SPECIFIC
-                && u32::from(interface.subclass) == BIND_USB_SUBCLASS_OVERNET;
-            let protocol_match = u32::from(interface.protocol) == BIND_USB_PROTOCOL_OVERNET;
+                && u32::from(interface.subclass) == BIND_USB_SUBCLASS_VSOCK_BRIDGE;
+            let protocol_match = u32::from(interface.protocol) == BIND_USB_PROTOCOL_VSOCK_BRIDGE;
             subclass_match && protocol_match
         }) {
             Ok(dev) => dev,
