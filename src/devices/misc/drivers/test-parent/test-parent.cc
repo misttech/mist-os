@@ -2,81 +2,67 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
-#include <lib/ddk/platform-defs.h>
+#include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <zircon/assert.h>
 #include <zircon/types.h>
 
-#include <memory>
-
-#include <ddktl/device.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/test/cpp/bind.h>
 
 namespace {
 
-class TestParent;
-using TestParentType = ddk::Device<TestParent>;
-
-class TestParent : public TestParentType {
+class TestParent : public fdf::DriverBase {
  public:
-  explicit TestParent(zx_device_t* device) : TestParentType(device) {}
+  static constexpr std::string_view kDriverName = "test-parent";
+  static constexpr std::string_view kChildNodeName = "sys";
+  static constexpr std::string_view kGrandchildNodeName = "test";
 
-  static zx_status_t Create(zx_device_t* parent);
+  TestParent(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
 
-  // Device protocol implementation.
-  void DdkRelease() { delete this; }
+  zx::result<> Start() override;
+
+ private:
+  fdf::OwnedChildNode child_;
+  fidl::ClientEnd<fuchsia_driver_framework::NodeController> grandchild_;
+  compat::SyncInitializedDeviceServer compat_server_;
 };
 
-zx_status_t TestParent::Create(zx_device_t* parent) {
-  auto test_parent = std::make_unique<TestParent>(parent);
-  zx_status_t status =
-      test_parent->DdkAdd(ddk::DeviceAddArgs("test").set_proto_id(ZX_PROTOCOL_TEST_PARENT));
-  if (status != ZX_OK) {
-    return status;
+zx::result<> TestParent::Start() {
+  zx::result<> result = compat_server_.Initialize(
+      incoming(), outgoing(), node_name(), kGrandchildNodeName, compat::ForwardMetadata::None());
+  if (result.is_error()) {
+    fdf::error("Failed to initialize compat server: {}", result);
+    return result.take_error();
   }
 
-  // Now owned by the driver framework.
-  [[maybe_unused]] auto ptr = test_parent.release();
-
-  return ZX_OK;
-}
-
-class SysDevice;
-using SysDeviceType = ddk::Device<SysDevice>;
-
-class SysDevice : public SysDeviceType {
- public:
-  explicit SysDevice(zx_device_t* device) : SysDeviceType(device) {}
-
-  static zx_status_t Create(void* ctx, zx_device_t* parent, const char* name,
-                            zx_handle_t items_svc_handle);
-
-  // Device protocol implementation.
-  void DdkRelease() { delete this; }
-};
-
-zx_status_t SysDevice::Create(void* ctx, zx_device_t* parent, const char* name,
-                              zx_handle_t items_svc_handle) {
-  auto sys_device = std::make_unique<SysDevice>(parent);
-  zx_status_t status =
-      sys_device->DdkAdd(ddk::DeviceAddArgs("sys").set_flags(DEVICE_ADD_NON_BINDABLE));
-  if (status != ZX_OK) {
-    return status;
+  // Add child.
+  zx::result child = AddOwnedChild(kChildNodeName);
+  if (child.is_error()) {
+    fdf::error("Failed to add child: {}", child);
+    return child.take_error();
   }
+  child_ = std::move(child.value());
 
-  // Now owned by the driver framework.
-  auto ptr = sys_device.release();
-  return TestParent::Create(ptr->zxdev());
+  // Add grandchild.
+  std::vector properties = {
+      fdf::MakeProperty2(bind_fuchsia::PROTOCOL, bind_fuchsia_test::BIND_PROTOCOL_PARENT),
+  };
+  std::vector offers = compat_server_.CreateOffers2();
+  zx::result grandchild =
+      fdf::AddChild(child_.node_, logger(), kGrandchildNodeName, properties, offers);
+  if (grandchild.is_error()) {
+    fdf::error("Failed to add grandchild: {}", grandchild);
+    return grandchild.take_error();
+  }
+  grandchild_ = std::move(grandchild.value());
+
+  return zx::ok();
 }
-
-static constexpr zx_driver_ops_t driver_ops = []() {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.create = SysDevice::Create;
-  return ops;
-}();
 
 }  // namespace
 
-ZIRCON_DRIVER(test - parent, driver_ops, "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT(TestParent);

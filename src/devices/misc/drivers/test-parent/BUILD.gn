@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/bind/bind.gni")
-import("//build/dist/renamed_binary.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("test-parent-bind") {
@@ -11,14 +10,15 @@ driver_bind_rules("test-parent-bind") {
 }
 
 fuchsia_cc_driver("test-parent-sys_driver") {
-  legacy = true
   output_name = "test-parent-sys"
   sources = [ "test-parent.cc" ]
   deps = [
     ":test-parent-bind",
-    "//src/devices/lib/driver",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
+    "//src/devices/lib/driver:driver_runtime",
   ]
 }
 

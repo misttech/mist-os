@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
+        "driver_component/driver.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
+        binary: "driver/test-parent-sys.so",
         bind: "meta/bind/test-parent-bind.bindbc",
-        compat: "driver/test-parent-sys.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
