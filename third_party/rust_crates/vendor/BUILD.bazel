@@ -3271,14 +3271,14 @@ alias(
 )
 
 alias(
-    name = "zerocopy-0.8.25-alpha",
-    actual = "//third_party/rust_crates/vendor/zerocopy-0.8.25-alpha:zerocopy",
+    name = "zerocopy-0.8.25-alpha.2",
+    actual = "//third_party/rust_crates/vendor/zerocopy-0.8.25-alpha.2:zerocopy",
     tags = ["manual"],
 )
 
 alias(
     name = "zerocopy",
-    actual = "//third_party/rust_crates/vendor/zerocopy-0.8.25-alpha:zerocopy",
+    actual = "//third_party/rust_crates/vendor/zerocopy-0.8.25-alpha.2:zerocopy",
     tags = ["manual"],
 )
 
