@@ -64,11 +64,7 @@ pub struct FeatureFlags {
 impl FeatureFlags {
     /// Flags to use in "real" binaries.
     pub fn prod() -> Self {
-        FeatureFlags {
-            // Continue supporting the old stub behavior until manual testing
-            // is complete.
-            use_ndp_watcher_instead_of_nduseropt_stub: false,
-        }
+        FeatureFlags { use_ndp_watcher_instead_of_nduseropt_stub: true }
     }
 
     /// Flags to use in unit and integration tests.
