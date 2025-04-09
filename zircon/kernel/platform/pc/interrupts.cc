@@ -10,6 +10,7 @@
 #include <debug.h>
 #include <lib/acpi_lite/apic.h>
 #include <lib/acpi_lite/structures.h>
+#include <lib/ktrace.h>
 #include <sys/types.h>
 #include <trace.h>
 #include <zircon/types.h>
@@ -34,6 +35,10 @@
 #include "platform_p.h"
 
 #include <ktl/enforce.h>
+
+#define LOCAL_TRACE 0
+
+#define IFRAME_PC(frame) ((frame)->ip)
 
 namespace {
 
@@ -203,11 +208,18 @@ void platform_irq(iframe_t* frame) {
   uint64_t x86_vector = frame->vector;
   DEBUG_ASSERT(x86_vector >= X86_INT_PLATFORM_BASE && x86_vector <= X86_INT_PLATFORM_MAX);
 
+  ktrace::Scope trace = KTRACE_CPU_BEGIN_SCOPE("kernel:irq", "irq", ("irq #", x86_vector));
+
+  LTRACEF_LEVEL(2, "cpu %u currthread %p vector %lu pc %#" PRIxPTR "\n", arch_curr_cpu_num(),
+                Thread::Current::Get(), x86_vector, (uintptr_t)IFRAME_PC(frame));
+
   // deliver the interrupt
   kInterruptManager.InvokeX86Vector(static_cast<uint8_t>(x86_vector));
 
   // NOTE: On x86, we always deactivate the interrupt.
   apic_issue_eoi();
+
+  LTRACEF_LEVEL(2, "cpu %u exit\n", arch_curr_cpu_num());
 }
 
 zx_status_t register_int_handler(unsigned int vector, int_handler handler, void* arg) {
