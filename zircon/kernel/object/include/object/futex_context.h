@@ -90,8 +90,16 @@ class FutexContext {
     ASSIGN_WOKEN,
   };
 
+  // See |Init|.
+  enum class ProcessType { Regular, Shared };
+
   FutexContext();
   ~FutexContext();
+
+  // Initialize this instance for use in the specified process type.
+  //
+  // Must be called exactly once.
+  zx_status_t Init(ProcessType type);
 
   // Called as ThreadDispatchers are created and destroyed in order to ensure
   // that there are always two FutexStates for each ThreadDispatcher in a
@@ -453,10 +461,12 @@ class FutexContext {
   // while holding the thread lock.
   DECLARE_SPINLOCK(FutexContext, lockdep::LockFlagsTrackingDisabled) pool_lock_;
 
-  // Hash table for FutexStates currently in use (eg; futexes with waiters).
-  fbl::HashTable<FutexId, ktl::unique_ptr<FutexState>,
-                 fbl::DoublyLinkedList<ktl::unique_ptr<FutexState>>>
-      active_futexes_ TA_GUARDED(pool_lock_);
+  using ActiveFutexMap = fbl::HashTable<FutexId, ktl::unique_ptr<FutexState>,
+                                        fbl::DoublyLinkedList<ktl::unique_ptr<FutexState>>, size_t,
+                                        fbl::kDynamicBucketCount>;
+
+  // Map containing FutexStates currently in use (eg; futexes with waiters).
+  ActiveFutexMap active_futexes_ TA_GUARDED(pool_lock_);
 
   // Free list for all futexes which are currently not in use.
   fbl::DoublyLinkedList<ktl::unique_ptr<FutexState>> free_futexes_ TA_GUARDED(pool_lock_);
