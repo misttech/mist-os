@@ -354,6 +354,7 @@ impl Vsock {
                     self.start_listener2(listener, Addr(remote_cid, local_port))
                         .map_err(|e| e.into_status().into_raw()),
                 ),
+            ConnectorRequest::GetCid { responder } => responder.send(self.borrow().local_cid),
         }
         .map_err(|e| Error::ClientCommunication(e.into()))
     }
