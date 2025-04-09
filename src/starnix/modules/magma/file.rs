@@ -138,7 +138,7 @@ use starnix_core::vfs::{
     fileops_impl_noop_sync, Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode, MemoryRegularFile,
 };
 use starnix_lifecycle::AtomicU64Counter;
-use starnix_logging::{impossible_error, log_error, log_warn, set_zx_name, track_stub};
+use starnix_logging::{impossible_error, log_error, log_warn, track_stub};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::user_buffer::UserBuffer;
@@ -685,14 +685,13 @@ impl FileOps for MagmaFile {
                 let status: i32;
                 let mut result_semaphore_id = 0;
 
-                // Use VMO semaphores for compatibility with sync files, which need timestamps.
-                if let Ok(vmo) = zx::Vmo::create(/*size=*/ 1) {
+                // Use counter semaphores for compatibility with sync files, which need timestamps.
+                if let Ok(counter) = zx::Counter::create() {
                     let flags: u64 = 0;
-                    set_zx_name(&vmo, b"starnix:magma_semaphore");
                     let semaphore;
                     let semaphore_id;
                     (status, semaphore, semaphore_id) =
-                        import_semaphore2(&connection, vmo.into(), flags);
+                        import_semaphore2(&connection, counter.into(), flags);
                     if status == MAGMA_STATUS_OK {
                         result_semaphore_id = self.semaphore_id_generator.next();
 
