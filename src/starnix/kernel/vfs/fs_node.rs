@@ -916,6 +916,24 @@ macro_rules! fs_node_impl_symlink {
 #[macro_export]
 macro_rules! fs_node_impl_dir_readonly {
     () => {
+        fn check_access(
+            &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            node: &$crate::vfs::FsNode,
+            current_task: &$crate::task::CurrentTask,
+            access: starnix_uapi::file_mode::Access,
+            info: &starnix_sync::RwLock<$crate::vfs::FsNodeInfo>,
+            reason: $crate::vfs::CheckAccessReason,
+        ) -> Result<(), starnix_uapi::errors::Errno> {
+            if access.contains(starnix_uapi::file_mode::Access::WRITE) {
+                return starnix_uapi::error!(
+                    EROFS,
+                    format!("check_access failed: read-only directory")
+                );
+            }
+            node.default_check_access_impl(current_task, access, reason, info.read())
+        }
+
         fn mkdir(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
