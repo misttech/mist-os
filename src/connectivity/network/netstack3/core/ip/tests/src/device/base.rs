@@ -29,13 +29,14 @@ use netstack3_ip::device::{
     AddIpAddrSubnetError, AddressRemovedReason, CommonAddressProperties, DadTimerId,
     IpAddressState, IpDeviceConfiguration, IpDeviceConfigurationUpdate, IpDeviceEvent,
     IpDeviceFlags, IpDeviceStateContext, Ipv4DeviceConfigurationUpdate,
-    Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler, Ipv6DeviceTimerId, Lifetime,
-    PreferredLifetime, RsTimerId, SetIpAddressPropertiesError, SlaacConfigurationUpdate,
-    StableSlaacAddressConfiguration, TemporarySlaacAddressConfiguration,
-    UpdateIpConfigurationError,
+    Ipv6DeviceConfigurationUpdate, Ipv6DeviceContext, Ipv6DeviceHandler, Ipv6DeviceTimerId,
+    Ipv6NetworkLearnedParameters, Lifetime, PreferredLifetime, RsTimerId,
+    SetIpAddressPropertiesError, SlaacConfigurationUpdate, StableSlaacAddressConfiguration,
+    TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
 };
 use netstack3_ip::gmp::{IgmpConfigMode, MldConfigMode, MldTimerId};
 use netstack3_ip::nud::{self, LinkResolutionResult};
+use packet_formats::utils::NonZeroDuration;
 
 #[test]
 fn enable_disable_ipv4() {
@@ -513,6 +514,44 @@ fn enable_disable_ipv6() {
     // Disable device again so timers are cancelled.
     test_disable_device(&mut ctx, true);
     let _ = ctx.bindings_ctx.take_events();
+}
+
+#[test]
+fn forget_learned_network_params_on_disable_ipv6() {
+    let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
+    let ethernet_device_id =
+        ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
+            EthernetCreationProperties {
+                mac: Ipv6::TEST_ADDRS.local_mac,
+                max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            },
+            DEFAULT_INTERFACE_METRIC,
+        );
+    let device_id = ethernet_device_id.into();
+    assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv6>(&device_id, true), false);
+
+    // Fake discovering a retransmit timer from the network.
+    const RETRANSMIT_TIMER: NonZeroDuration =
+        unsafe { NonZeroDuration::new_unchecked(Duration::from_secs(1)) };
+    let (mut core_ctx, mut bindings_ctx) = ctx.contexts();
+    Ipv6DeviceHandler::set_discovered_retrans_timer(
+        &mut core_ctx,
+        &mut bindings_ctx,
+        &device_id,
+        RETRANSMIT_TIMER,
+    );
+    Ipv6DeviceContext::with_network_learned_parameters(&mut core_ctx, &device_id, |params| {
+        let Ipv6NetworkLearnedParameters { retrans_timer } = params;
+        assert_eq!(retrans_timer, &Some(RETRANSMIT_TIMER))
+    });
+
+    // Disable the device and verify the learned parameters are cleared.
+    assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv6>(&device_id, false), true);
+    let (mut core_ctx, _bindings_ctx) = ctx.contexts();
+    Ipv6DeviceContext::with_network_learned_parameters(&mut core_ctx, &device_id, |params| {
+        let Ipv6NetworkLearnedParameters { retrans_timer } = params;
+        assert_eq!(retrans_timer, &None);
+    });
 }
 
 #[test]

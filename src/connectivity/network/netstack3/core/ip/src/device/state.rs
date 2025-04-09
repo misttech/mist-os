@@ -706,6 +706,11 @@ impl Ipv6NetworkLearnedParameters {
     pub fn retrans_timer_or_default(&self) -> NonZeroDuration {
         self.retrans_timer.clone().unwrap_or(RETRANS_TIMER_DEFAULT)
     }
+
+    /// Forgets any learned network parameters, resetting to the default values.
+    pub fn reset(&mut self) {
+        *self = Default::default()
+    }
 }
 
 /// The state common to all IPv6 devices.

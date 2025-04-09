@@ -1281,6 +1281,10 @@ fn disable_ipv6_device_with_config<
 
     RsHandler::stop_router_solicitation(core_ctx, bindings_ctx, device_id);
 
+    // Reset the learned network parameters. If the device is re-enabled in the
+    // future, there's no guarantee that it's on the same network.
+    core_ctx.with_network_learned_parameters_mut(device_id, |params| params.reset());
+
     // Delete the link-local address generated when enabling the device and stop
     // DAD on the other addresses.
     core_ctx
