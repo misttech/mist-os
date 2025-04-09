@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
 import("//build/testing/perf/test.gni")
 import("//src/diagnostics/archivist/build/archivist.gni")
 
@@ -27,6 +28,28 @@ archivist_optimized_binary("logging-bin") {
   sources = [ "src/logging.rs" ]
 }
 
+rustc_binary("logging-e2e-bin") {
+  testonly = true
+  name = "archivist_logging_e2e_benchmarks"
+  edition = "2018"
+
+  source_root = "src/logging_e2e.rs"
+
+  deps = [
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
+    "//src/developer/fuchsia-criterion",
+    "//src/lib/diagnostics/log/rust",
+    "//src/lib/diagnostics/reader/rust",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component-test",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
+  ]
+
+  sources = [ "src/logging_e2e.rs" ]
+}
+
 archivist_optimized_binary("formatter-bin") {
   output_name = "archivist_formatter_benchmarks"
   edition = "2018"
@@ -48,6 +71,7 @@ archivist_optimized_binary("formatter-bin") {
 
 _formatter_benchmark_component = "formatter"
 _logging_benchmark_component = "logging"
+_logging_e2e_benchmark_component = "logging_e2e"
 
 fuchsia_component("formatter-benchmarks-component") {
   component_name = _formatter_benchmark_component
@@ -61,11 +85,21 @@ fuchsia_component("logging-benchmarks-component") {
   manifest = "meta/logging.cml"
 }
 
+fuchsia_component("logging-e2e-benchmarks-component") {
+  testonly = true
+  component_name = _logging_e2e_benchmark_component
+  deps = [ ":logging-e2e-bin" ]
+  manifest = "meta/logging_e2e.cml"
+}
+
 fuchsia_package("archivist-benchmarks") {
+  testonly = true
   deps = [
     ":formatter-benchmarks-component",
     ":logging-benchmarks-component",
+    ":logging-e2e-benchmarks-component",
   ]
+  subpackages = [ "//src/diagnostics/archivist:archivist-for-embedding" ]
 }
 
 fuchsia_component_perf_test("archivist-formatter-benchmark") {
@@ -80,11 +114,18 @@ fuchsia_component_perf_test("archivist-logging-benchmark") {
   expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.archivist.logging.txt"
 }
 
+fuchsia_component_perf_test("archivist-logging-e2e-benchmark") {
+  package = ":archivist-benchmarks"
+  component_name = _logging_e2e_benchmark_component
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.archivist.logging_e2e.txt"
+}
+
 group("build-only") {
   testonly = true
   deps = [
     ":formatter-benchmarks-component",
     ":logging-benchmarks-component",
+    ":logging-e2e-benchmarks-component",
   ]
 }
 
@@ -93,5 +134,6 @@ group("bench") {
   deps = [
     ":archivist-formatter-benchmark",
     ":archivist-logging-benchmark",
+    ":archivist-logging-e2e-benchmark",
   ]
 }
