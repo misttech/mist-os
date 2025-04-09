@@ -15,10 +15,6 @@ rustc_library("fuchsia-async") {
   edition = "2021"
   with_unit_tests = true
 
-  # TODO(https://fxbug.dev/42179953) Remove --nocapture when this flake is found and fixed.
-  if (is_host) {
-    args = [ "--nocapture" ]
-  }
   deps = [
     "//src/lib/fuchsia-async-macro",
     "//third_party/rust_crates:futures",
