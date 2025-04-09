@@ -537,8 +537,6 @@ impl SharedFutexKey {
 }
 
 struct FutexTableState<Key: FutexKey> {
-    // TODO(tbodt): Delete the wait queue from the hashmap when it becomes empty. Not doing
-    // this is a memory leak.
     waiters: HashMap<Key, FutexWaiters>,
     rt_mutex_waiters: HashMap<Key, VecDeque<RtMutexWaiter>>,
 }
