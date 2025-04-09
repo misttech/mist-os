@@ -382,6 +382,12 @@ zx_status_t PcieDevice::ProbeBarsLocked() {
 
   [[maybe_unused]] uint8_t header_type = cfg_->Read(PciConfig::kHeaderType) & PCI_HEADER_TYPE_MASK;
 
+#if __mist_os__
+  if (header_type == PCI_HEADER_TYPE_CARD_BUS) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+#endif
+
   DEBUG_ASSERT((header_type == PCI_HEADER_TYPE_STANDARD) ||
                (header_type == PCI_HEADER_TYPE_PCI_BRIDGE));
   DEBUG_ASSERT(bar_count_ <= ktl::size(bars_));
