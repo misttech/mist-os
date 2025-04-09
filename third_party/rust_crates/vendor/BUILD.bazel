@@ -1123,14 +1123,14 @@ alias(
 )
 
 alias(
-    name = "hashlink-0.9.1",
-    actual = "//third_party/rust_crates/vendor/hashlink-0.9.1:hashlink",
+    name = "hashlink-0.10.0",
+    actual = "//third_party/rust_crates/vendor/hashlink-0.10.0:hashlink",
     tags = ["manual"],
 )
 
 alias(
     name = "hashlink",
-    actual = "//third_party/rust_crates/vendor/hashlink-0.9.1:hashlink",
+    actual = "//third_party/rust_crates/vendor/hashlink-0.10.0:hashlink",
     tags = ["manual"],
 )
 

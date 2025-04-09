@@ -368,7 +368,7 @@ _NORMAL_DEPENDENCIES = {
             "gpt": Label("//third_party/rust_crates/vendor/gpt-3.0.0:gpt"),
             "half": Label("//third_party/rust_crates/vendor/half-2.4.1:half"),
             "handlebars": Label("//third_party/rust_crates/vendor/handlebars-4.3.5:handlebars"),
-            "hashlink": Label("//third_party/rust_crates/vendor/hashlink-0.9.1:hashlink"),
+            "hashlink": Label("//third_party/rust_crates/vendor/hashlink-0.10.0:hashlink"),
             "heck": Label("//third_party/rust_crates/vendor/heck-0.4.1:heck"),
             "hex": Label("//third_party/rust_crates/vendor/hex-0.4.3:hex"),
             "hkdf": Label("//third_party/rust_crates/vendor/hkdf-0.12.4:hkdf"),
