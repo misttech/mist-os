@@ -254,6 +254,26 @@ PciCapMsi::PciCapMsi(const PcieDevice& dev, uint16_t base, uint8_t id)
   is_valid_ = true;
 }
 
+/*
+ * @see PCI Local Bus Specification 3.0 Section 6.8.2
+ */
+PciCapMsix::PciCapMsix(const PcieDevice& dev, uint16_t base, uint8_t id)
+    : PciStdCapability(dev, base, id) {
+  DEBUG_ASSERT(id == PCIE_CAP_ID_MSIX);
+  auto cfg = dev.config();
+
+  ctrl_ = PciReg16(static_cast<uint8_t>(base_ + kMsixControlOffset));
+  table_reg_ = PciReg32(static_cast<uint8_t>(base_ + kMsixTableOffset));
+  pba_reg_ = PciReg32(static_cast<uint8_t>(base_ + kMsixPbaOffset));
+
+  uint16_t ctrl = cfg->Read(ctrl_reg());
+
+  // Table size is stored in the register as N-1 (PCIe Base Spec 7.7.2.2)
+  table_size_ = PCIE_CAP_MSIX_CTRL_GET_TABLE_SIZE(ctrl);
+
+  printf("table_size: %u\n", table_size_);
+}
+
 /* Catch quirks and invalid capability offsets we may see */
 inline zx_status_t validate_capability_offset(uint8_t offset) {
   if (offset == 0xFF || offset < PCIE_CAP_PTR_MIN_VALID || offset > PCIE_CAP_PTR_MAX_VALID) {
@@ -307,6 +327,9 @@ zx_status_t PcieDevice::ParseStdCapabilitiesLocked() {
      */
     PciStdCapability* cap;
     switch (id) {
+      case PCIE_CAP_ID_MSIX:
+        cap = irq_.msix = new (&ac) PciCapMsix(*this, cap_offset, id);
+        break;
       case PCIE_CAP_ID_MSI:
         cap = irq_.msi = new (&ac) PciCapMsi(*this, cap_offset, id);
         break;

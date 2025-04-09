@@ -144,9 +144,9 @@ zx_status_t PcieDevice::InitLocked(PcieUpstreamNode& upstream) {
 
   // Now that we know what our capabilities are, initialize our internal IRQ
   // bookkeeping
-  res = InitLegacyIrqStateLocked(upstream);
-  if (res != ZX_OK)
-    return res;
+  //res = InitLegacyIrqStateLocked(upstream);
+  //if (res != ZX_OK)
+  //  return res;
 
   return ZX_OK;
 }

@@ -44,6 +44,18 @@ constexpr uint8_t PCIE_CAP_ID_ADVANCED_FEATURES = 0x13;
 constexpr uint8_t PCIE_CAP_ID_ENHANCED_ALLOCATION = 0x14;
 
 /**
+ * Structure definitions for capability PCIE_CAP_ID_MSIX
+ *
+ * @see The PCI Local Bus specification v3.0 Section 6.8.2
+ */
+#define PCIE_CAP_MSIX_CTRL_GET_ENB(ctrl) ((ctrl & 0x8000) != 0)
+#define PCIE_CAP_MSIX_CTRL_GET_FUNCTION_MASK(ctrl) ((ctrl & 0x4000) != 0)
+#define PCIE_CAP_MSIX_CTRL_GET_TABLE_SIZE(ctrl) ((ctrl & 0x07FF) + 1)
+
+#define PCIE_CAP_MSIX_CTRL_SET_ENB(val, ctrl) (uint16_t)((ctrl & ~0x8000) | (!!val))
+// #define PCIE_CAP_MSIX_CTRL_SET_FUNCTION_MASK(val, ctrl)
+
+/**
  * Structure definitions for capability PCIE_CAP_ID_MSI
  *
  * @see The PCI Local Bus specification v3.0 Section 6.8.1
@@ -199,6 +211,37 @@ class PciStdCapability : public fbl::SinglyLinkedListable<ktl::unique_ptr<PciStd
   uint16_t base_;
   uint8_t id_;
   bool is_valid_ = false;
+};
+
+/* MSI-X Interrupts.
+ * @see PCI Local Bus Spec v3.0 section 6.8.2
+ */
+class PciCapMsix : public PciStdCapability {
+ public:
+  static constexpr uint16_t kMsixControlOffset = 0x02;
+  static constexpr uint16_t kMsixTableOffset = 0x04;
+  static constexpr uint16_t kMsixPbaOffset = 0x08;
+
+  PciCapMsix(const PcieDevice& dev, uint16_t base, uint8_t id);
+  ~PciCapMsix() {}
+
+  // Accessors
+  PciReg16 ctrl_reg() const { return ctrl_; }
+  PciReg32 table_reg() const { return table_reg_; }
+  PciReg32 pba_reg() const { return pba_reg_; }
+
+ private:
+  // Read-only values cached at initialization.
+  // uint32_t table_offset_;
+  // uint32_t pba_offset_;
+  uint16_t table_size_;
+  // uint8_t table_bar_;
+  // uint8_t pba_bar_;
+
+  // Cached registers
+  PciReg16 ctrl_;
+  PciReg32 table_reg_;
+  PciReg32 pba_reg_;
 };
 
 /* MSI Interrupts.

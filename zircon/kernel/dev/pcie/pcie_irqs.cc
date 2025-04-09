@@ -30,7 +30,7 @@
 
 #include <ktl/enforce.h>
 
-#define LOCAL_TRACE 0
+#define LOCAL_TRACE 2
 
 /******************************************************************************
  *
@@ -541,6 +541,29 @@ void PcieDevice::MsiIrqHandlerThunk(void* arg) {
 
 /******************************************************************************
  *
+ * MSI-X IRQ mode routines.
+ *
+ ******************************************************************************/
+
+zx_status_t PcieDevice::EnterMsixIrqMode(uint requested_irqs) {
+  DEBUG_ASSERT(requested_irqs);
+
+  zx_status_t res = ZX_ERR_NOT_SUPPORTED;
+
+  // We cannot go into MSI-X mode if we don't support MSI at all, or we don't
+  // support the number of IRQs requested
+  if (!irq_.msix || !irq_.msix->is_valid() || !bus_drv_.platform().supports_msi() /*||
+      (requested_irqs > irq_.msix->max_irqs())*/) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  return res;
+}
+
+void PcieDevice::LeaveMsixIrqMode() {}
+
+/******************************************************************************
+ *
  * Internal implementation of the Kernel facing API.
  *
  ******************************************************************************/
@@ -597,8 +620,13 @@ zx_status_t PcieDevice::QueryIrqModeCapabilitiesLocked(pcie_irq_mode_t mode,
         return ZX_ERR_NOT_SUPPORTED;
       }
 
-      /* TODO(johngro) : finish MSI-X implementation. */
-      return ZX_ERR_NOT_SUPPORTED;
+      /* If the device supports MSI-X, it will have a pointer to the control
+       * structure in config. */
+      if (!irq_.msix || !irq_.msix->is_valid()) {
+        return ZX_ERR_NOT_SUPPORTED;
+      }
+
+      break;
 
     default:
       return ZX_ERR_INVALID_ARGS;
@@ -649,9 +677,11 @@ zx_status_t PcieDevice::SetIrqModeLocked(pcie_irq_mode_t mode, uint requested_ir
       LeaveMsiIrqMode();
       break;
 
-      // Right now, there should be no way to get into MSI-X mode
     case PCIE_IRQ_MODE_MSI_X:
-      return ZX_ERR_NOT_SUPPORTED;
+      DEBUG_ASSERT(irq_.msix);
+      DEBUG_ASSERT(irq_.msix->is_valid());
+      LeaveMsixIrqMode();
+      break;
 
     // If we're disabled we have no work to do besides some sanity checks
     case PCIE_IRQ_MODE_DISABLED:
@@ -670,6 +700,8 @@ zx_status_t PcieDevice::SetIrqModeLocked(pcie_irq_mode_t mode, uint requested_ir
       return EnterLegacyIrqMode(requested_irqs);
     case PCIE_IRQ_MODE_MSI:
       return EnterMsiIrqMode(requested_irqs);
+    case PCIE_IRQ_MODE_MSI_X:
+      return EnterMsixIrqMode(requested_irqs);
     default:
       return ZX_ERR_NOT_SUPPORTED;
   }
@@ -938,8 +970,8 @@ zx_status_t PcieDevice::InitLegacyIrqStateLocked(PcieUpstreamNode& upstream) {
     switch (res) {
       case ZX_OK:
         cfg_->Write(PciConfig::kInterruptLine, static_cast<uint8_t>(irq_.legacy.irq_id));
-        TRACEF("[%02x:%02x.%01x] pin %u mapped to %#x\n", bus_id_, dev_id_, func_id_,
-               irq_.legacy.pin, irq_.legacy.irq_id);
+        LTRACEF("[%02x:%02x.%01x] pin %u mapped to %#x\n", bus_id_, dev_id_, func_id_,
+                irq_.legacy.pin, irq_.legacy.irq_id);
         break;
       case ZX_ERR_NOT_FOUND:
         // QEMU does not have _PRT tables.

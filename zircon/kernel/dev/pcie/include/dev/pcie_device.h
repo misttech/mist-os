@@ -418,6 +418,16 @@ class PcieDevice {
   void MsiIrqHandler(pcie_irq_handler_state_t& hstate);
   static void MsiIrqHandlerThunk(void* arg);
 
+  // Internal MSI-X IRQ support.
+  void SetMsixEnb(bool enb) {
+    DEBUG_ASSERT(irq_.msix);
+    DEBUG_ASSERT(irq_.msix->is_valid());
+    cfg_->Write(irq_.msix->ctrl_reg(),
+                PCIE_CAP_MSIX_CTRL_SET_ENB(enb, cfg_->Read(irq_.msix->ctrl_reg())));
+  }
+  void LeaveMsixIrqMode();
+  zx_status_t EnterMsixIrqMode(uint requested_irqs) __TA_REQUIRES(dev_lock_);
+
   // Common Internal IRQ support.
   void ResetCommonIrqBookkeeping();
   zx_status_t AllocIrqHandlers(uint requested_irqs, bool is_masked);
@@ -450,9 +460,7 @@ class PcieDevice {
     } legacy;
 
     PciCapMsi* msi = nullptr;
-    /* TODO(johngro) : Add MSI-X state */
-    struct {
-    } msi_x;
+    PciCapMsix* msix = nullptr;
   } irq_;
 };
 

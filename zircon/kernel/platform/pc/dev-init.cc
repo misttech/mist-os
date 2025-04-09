@@ -18,7 +18,6 @@
 
 namespace {
 
-#if 0
 class PcPciePlatformSupport : public PciePlatformInterface {
  public:
   explicit PcPciePlatformSupport(bool has_msi)
@@ -36,9 +35,8 @@ class PcPciePlatformSupport : public PciePlatformInterface {
     return msi_register_handler(block, msi_id, handler, ctx);
   }
 };
-#endif
 
-lazy_init::LazyInit<NoMsiPciePlatformInterface, lazy_init::CheckType::None,
+lazy_init::LazyInit<PcPciePlatformSupport, lazy_init::CheckType::None,
                     lazy_init::Destructor::Disabled>
     g_platform_pcie_support;
 }  // namespace
@@ -46,8 +44,8 @@ lazy_init::LazyInit<NoMsiPciePlatformInterface, lazy_init::CheckType::None,
 void PlatformDriverHandoffEarly(const ArchPhysHandoff& arch_handoff) {}
 
 void PlatformDriverHandoffLate(const ArchPhysHandoff& arch_handoff) {
-  // Initialize the PCI platform, claiming no MSI support
-  g_platform_pcie_support.Initialize();
+  // Initialize the PCI platform, claiming MSI support
+  g_platform_pcie_support.Initialize(true);
 
   zx_status_t res = PcieBusDriver::InitializeDriver(g_platform_pcie_support.Get());
   if (res != ZX_OK) {
