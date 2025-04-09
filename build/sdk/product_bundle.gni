@@ -202,12 +202,7 @@ template("product_bundle") {
 
     hermetic_inputs_target = ":${targets.hermetic_inputs}"
     hermetic_inputs_file = files.hermetic_inputs
-    hermetic_action_ignored_prefixes = [
-      "${files.outdir}/blobs",
-      "${files.outdir}/partitions",
-      "${files.outdir}/repository",
-      "${files.outdir}/recovery_repository",
-    ]
+    hermetic_action_ignored_prefixes = [ "${files.outdir}" ]
 
     # The target below is generated as a part of the `ffx_tool` action at
     # `//src/developer/ffx/plugins/product:ffx_product_tool`. See there
