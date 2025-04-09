@@ -47,13 +47,27 @@ static int visual_page = 0;
 static int curs_x[PAGE_MAX];
 static int curs_y[PAGE_MAX];
 
-static struct { int x1, y1, x2, y2; } view_window = {0, 0, 79, 24};
+static struct {
+  int x1, y1, x2, y2;
+} view_window = {.x1 = 0, .y1 = 0, .x2 = 79, .y2 = 49};
+
+static void legacy_pc_console_print_callback(PrintCallback* cb, ktl::string_view str) {
+  for (char c : str) {
+    if (c == '\n')
+      cputc('\r');
+    cputc(c);
+  }
+}
+
+static PrintCallback cb{legacy_pc_console_print_callback};
 
 void platform_init_console(void) {
   curr_save();
   window(0, 0, 79, 24);
   clear();
   place(0, 0);
+
+  register_print_callback(&cb);
 }
 
 void set_visual_page(int page) {

@@ -159,11 +159,13 @@ void vm_init() {
     ASSERT(ac.check());
   }
 
+#ifndef __mist_os__
   // Protect the regions of the physmap that are not backed by normal memory.
   //
   // See the comments for |phsymap_protect_non_arena_regions| for why we're doing this.
   //
   physmap_protect_non_arena_regions();
+#endif
 
   cmpct_set_fill_on_alloc_threshold(gBootOptions->alloc_fill_threshold);
 }

@@ -396,11 +396,13 @@ zx_status_t platform_mp_cpu_unplug(cpu_num_t cpu_id) { return arch_mp_cpu_unplug
 const char* manufacturer = "unknown";
 const char* product = "unknown";
 
+extern Cbuf rx_queue;
+
 void platform_init(void) {
   platform_init_crashlog();
 
 #if NO_USER_KEYBOARD
-  platform_init_keyboard(&console_input_buf);
+  platform_init_keyboard(&rx_queue);
 #endif
 
   // Initialize all PvEoi instances prior to starting secondary CPUs.

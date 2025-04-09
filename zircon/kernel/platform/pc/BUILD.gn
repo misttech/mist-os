@@ -76,6 +76,15 @@ zx_library("pc") {
       "//zircon/system/ulib/affine",
     ]
   }
+
+  if (is_mistos) {
+    sources -= [ "console.cc" ]
+    deps += [ ":console" ]
+    defines = [
+      "WITH_LEGACY_PC_CONSOLE",
+      "NO_USER_KEYBOARD=1",
+    ]
+  }
 }
 
 source_set("tests") {
@@ -87,5 +96,21 @@ source_set("tests") {
     "//zircon/kernel/lib/console",
     "//zircon/kernel/lib/pow2_range_allocator",
     "//zircon/kernel/lib/unittest",
+  ]
+}
+
+source_set("console") {
+  sources = [ "console.cc" ]
+  defines = [ "WITH_LEGACY_PC_CONSOLE" ]
+  deps = [
+    "//zircon/kernel/lib/init",
+    "//zircon/kernel/lib/io",
+    "//zircon/kernel/vm:headers",
+  ]
+  include_dirs = [ "include" ]
+
+  cflags_cc = [
+    "-Wno-implicit-int-conversion",
+    "-Wno-register",
   ]
 }
