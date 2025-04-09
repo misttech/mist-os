@@ -1381,44 +1381,9 @@ zx_status_t VmObjectPaged::ReadWriteInternal(uint64_t offset, size_t len, bool w
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  Guard<VmoLockType> guard{AssertOrderedLock, lock(), cow_pages_->lock_order(),
-                           VmLockAcquireMode::First};
-
-  // Declare a lambda that will check any object properties we require to be true and, if can_trim
-  // is set, reduce the requested length if it exceeds the the VMO size. We place these in a lambda
-  // so that we can perform them any time the lock is dropped.
-  const bool can_trim = !!(options & VmObjectReadWriteOptions::TrimLength);
-  auto check_and_trim = [this, can_trim, &end_offset]() TA_REQ(lock()) -> zx_status_t {
-    if (cache_policy_ != ARCH_MMU_FLAG_CACHED) {
-      return ZX_ERR_BAD_STATE;
-    }
-    const uint64_t size = size_locked();
-    if (end_offset > size) {
-      if (can_trim) {
-        end_offset = size;
-      } else {
-        return ZX_ERR_OUT_OF_RANGE;
-      }
-    }
-    return ZX_OK;
-  };
-
-  // Perform initial check.
-  if (zx_status_t status = check_and_trim(); status != ZX_OK) {
-    return status;
-  }
-
   // Track our two offsets.
   uint64_t src_offset = offset;
   size_t dest_offset = 0;
-
-  auto mark_modified = fit::defer([this, &dest_offset, write]() {
-    if (write && dest_offset > 0) {
-      // We wrote something, so mark as modified.
-      AssertHeld(lock_ref());
-      mark_modified_locked();
-    }
-  });
 
   // The PageRequest is a non-trivial object so we declare it outside the loop to avoid having to
   // construct and deconstruct it each iteration. It is tolerant of being reused and will
@@ -1428,140 +1393,126 @@ zx_status_t VmObjectPaged::ReadWriteInternal(uint64_t offset, size_t len, bool w
   // we need to first read in the range and then dirty it, and we cannot have both a read and dirty
   // request outstanding at one time.
   __UNINITIALIZED MultiPageRequest page_request(!write);
-  // Copy loop uses a custom status variant to track its state so that it easily create an
-  // unambiguous distinction between no error and no error but the lock has been dropped.
-  // Overloading one of the zx_status_t values (such as ZX_ERR_NEXT or ZX_ERR_SHOULD_WAIT) to mean
-  // this is confusing and error prone. The downside to this approach is the StatusType is 8 bytes
-  // versus the 4 bytes of a zx_status_t.
-  struct LockDroppedTag {
-    bool operator==(const LockDroppedTag& other) const { return true; }
-    bool operator!=(const LockDroppedTag& other) const { return false; }
-  };
-  using StatusType = ktl::variant<zx_status_t, LockDroppedTag>;
-  while (src_offset < end_offset) {
-    const size_t first_page_offset = ROUNDDOWN(src_offset, PAGE_SIZE);
-    const size_t last_page_offset = ROUNDDOWN(end_offset - 1, PAGE_SIZE);
-    size_t remaining_pages = (last_page_offset - first_page_offset) / PAGE_SIZE + 1;
-    size_t pages_since_last_unlock = 0;
-    __UNINITIALIZED zx::result<VmCowPages::LookupCursor> cursor =
-        GetLookupCursorLocked(first_page_offset, remaining_pages * PAGE_SIZE);
-    if (cursor.is_error()) {
-      return cursor.status_value();
-    }
-    // Performing explicit accesses by request of the user, so disable zero forking.
-    cursor->DisableZeroFork();
-    AssertHeld(cursor->lock_ref());
+  do {
+    zx_status_t status;
+    __UNINITIALIZED UserCopyCaptureFaultsResult copy_result(ZX_OK);
+    {
+      Guard<VmoLockType> guard{AssertOrderedLock, lock(), cow_pages_->lock_order(),
+                               VmLockAcquireMode::First};
+      if (cache_policy_ != ARCH_MMU_FLAG_CACHED) {
+        return ZX_ERR_BAD_STATE;
+      }
+      if (end_offset > size_locked()) {
+        if (!!(options & VmObjectReadWriteOptions::TrimLength)) {
+          if (src_offset >= size_locked()) {
+            return ZX_OK;
+          }
+          end_offset = size_locked();
+        } else {
+          return ZX_ERR_OUT_OF_RANGE;
+        }
+      } else if (src_offset >= end_offset) {
+        return ZX_OK;
+      }
 
-    StatusType status = ZX_OK;
-    while (remaining_pages > 0) {
-      const size_t page_offset = src_offset % PAGE_SIZE;
-      const size_t tocopy = ktl::min(PAGE_SIZE - page_offset, end_offset - src_offset);
+      const size_t first_page_offset = ROUNDDOWN(src_offset, PAGE_SIZE);
+      const size_t last_page_offset = ROUNDDOWN(end_offset - 1, PAGE_SIZE);
+      size_t remaining_pages = (last_page_offset - first_page_offset) / PAGE_SIZE + 1;
+      size_t pages_since_last_unlock = 0;
+      bool modified = false;
 
-      // If we need to wait on pages then we would like to wait on as many as possible, up to the
-      // actual limit of the read/write operation. For a read we can wake up once some pages are
-      // received, minimizing the latency before we start making progress, but as this is not true
-      // for writes we cap the maximum number requested.
-      constexpr uint64_t kMaxWriteWaitPages = 16;
-      const uint64_t max_wait_pages = write ? kMaxWriteWaitPages : UINT64_MAX;
-      const uint64_t max_waitable_pages = ktl::min(remaining_pages, max_wait_pages);
+      __UNINITIALIZED zx::result<VmCowPages::LookupCursor> cursor =
+          GetLookupCursorLocked(first_page_offset, remaining_pages * PAGE_SIZE);
+      if (cursor.is_error()) {
+        return cursor.status_value();
+      }
+      // Performing explicit accesses by request of the user, so disable zero forking.
+      cursor->DisableZeroFork();
+      AssertHeld(cursor->lock_ref());
 
-      // Attempt to lookup a page
-      __UNINITIALIZED zx::result<VmCowPages::LookupCursor::RequireResult> result =
-          cursor->RequirePage(write, static_cast<uint>(max_waitable_pages), &page_request);
+      while (remaining_pages > 0) {
+        const size_t page_offset = src_offset % PAGE_SIZE;
+        const size_t tocopy = ktl::min(PAGE_SIZE - page_offset, end_offset - src_offset);
 
-      status = result.status_value();
-      if (status == StatusType(ZX_OK)) {
+        // If we need to wait on pages then we would like to wait on as many as possible, up to the
+        // actual limit of the read/write operation. For a read we can wake up once some pages are
+        // received, minimizing the latency before we start making progress, but as this is not true
+        // for writes we cap the maximum number requested.
+        constexpr uint64_t kMaxWriteWaitPages = 16;
+        const uint64_t max_wait_pages = write ? kMaxWriteWaitPages : UINT64_MAX;
+        const uint64_t max_waitable_pages = ktl::min(remaining_pages, max_wait_pages);
+
+        // Attempt to lookup a page
+        __UNINITIALIZED zx::result<VmCowPages::LookupCursor::RequireResult> result =
+            cursor->RequirePage(write, static_cast<uint>(max_waitable_pages), &page_request);
+
+        status = result.status_value();
+        if (status != ZX_OK) {
+          break;
+        }
+
         // Compute the kernel mapping of this page.
         const paddr_t pa = result->page->paddr();
         char* page_ptr = reinterpret_cast<char*>(paddr_to_physmap(pa));
 
         // Call the copy routine. If the copy was successful then ZX_OK is returned, otherwise
         // ZX_ERR_SHOULD_WAIT may be returned to indicate the copy failed but we can retry it.
-        UserCopyCaptureFaultsResult copy_result =
-            copyfunc(page_ptr + page_offset, dest_offset, tocopy);
+        copy_result = copyfunc(page_ptr + page_offset, dest_offset, tocopy);
 
         // If a fault has actually occurred, then we will have captured fault info that we can use
         // to handle the fault.
         if (copy_result.fault_info.has_value()) {
-          guard.CallUnlocked(
-              [&info = *copy_result.fault_info, to_fault = len - dest_offset, &status] {
-                // If status is not ZX_OK, there is no guarantee that any of the data has been
-                // copied.
-                status = Thread::Current::SoftFaultInRange(info.pf_va, info.pf_flags, to_fault);
-              });
-          if (status == StatusType(ZX_OK)) {
-            status = LockDroppedTag{};
-          }
-        } else {
-          // If we encounter _any_ unrecoverable error from the copy operation which
-          // produced no fault address, squash the error down to just "NOT_FOUND".
-          // This is what the SoftFault error would have told us if we did try to
-          // handle the fault and could not.
-          if (copy_result.status != ZX_OK) {
-            status = ZX_ERR_NOT_FOUND;
-          }
-        }
-      } else if (status == StatusType(ZX_ERR_SHOULD_WAIT)) {
-        // RequirePage 'failed', but told us that it had filled out the page request, so we should
-        // wait on it. Waiting on the page request must be done with the lock dropped.
-        DEBUG_ASSERT(can_block_on_page_requests());
-        guard.CallUnlocked([&status, &page_request]() { status = page_request.Wait(); });
-        if (likely(status == StatusType(ZX_OK))) {
-          // page request waiting succeeded, but indicate that the lock has been dropped.
-          status = LockDroppedTag{};
-        } else if (status == StatusType(ZX_ERR_TIMED_OUT)) {
-          DumpLocked(0, false);
-        }
-      }
-      // If any 'errors', including having dropped the lock, exit back to the outer loop to handle
-      // and/or retry.
-      if (status != StatusType(ZX_OK)) {
-        break;
-      }
-
-      // Advance the copy location.
-      src_offset += tocopy;
-      dest_offset += tocopy;
-      remaining_pages--;
-
-      // Periodically yield the lock in order to allow other read or write
-      // operations to advance sooner than they otherwise would.
-      constexpr size_t kPagesBetweenUnlocks = 16;
-      if (unlikely(++pages_since_last_unlock == kPagesBetweenUnlocks)) {
-        pages_since_last_unlock = 0;
-        if (guard.lock()->IsContested()) {
-          // Just drop the lock and re-acquire it. There is no need to yield.
-          //
-          // Since the lock is contested, the empty |CallUnlocked| will:
-          // 1. Immediately grant the lock to another thread. This thread may
-          //   continue running until #3, or it may be descheduled.
-          // 2. Run the empty lambda.
-          // 3. Attempt to re-acquire the lock. There are 3 possibilities:
-          //   3a. Mutex is owned by the other thread, and is contested (there
-          //       are more waiters besides the other thread). This thread will
-          //       immediately block on the Mutex.
-          //   3b. Mutex is owned by the other thread, and uncontested. This
-          //       thread will spin on the Mutex, and block after some time.
-          //   3c. Mutex is un-owned.  This thread will immediately own the
-          //       Mutex again and continue running.
-          //
-          // Thus, there is no danger of thrashing here. The other thread will
-          // always get the Mutex, even without an explicit yield.
-          guard.CallUnlocked([]() {});
-          status = LockDroppedTag{};
           break;
         }
+        // If we encounter _any_ unrecoverable error from the copy operation which
+        // produced no fault address, squash the error down to just "NOT_FOUND".
+        // This is what the SoftFault error would have told us if we did try to
+        // handle the fault and could not.
+        if (copy_result.status != ZX_OK) {
+          status = ZX_ERR_NOT_FOUND;
+          break;
+        }
+        // Advance the copy location.
+        src_offset += tocopy;
+        dest_offset += tocopy;
+        remaining_pages--;
+        modified = write;
+
+        // Periodically yield the lock in order to allow other read or write
+        // operations to advance sooner than they otherwise would.
+        constexpr size_t kPagesBetweenUnlocks = 16;
+        if (unlikely(++pages_since_last_unlock == kPagesBetweenUnlocks)) {
+          pages_since_last_unlock = 0;
+          if (guard.lock()->IsContested()) {
+            break;
+          }
+        }
+      }
+      // Before dropping the lock, check if any pages were modified and update the VMO state
+      // accordingly.
+      if (modified) {
+        mark_modified_locked();
       }
     }
-    // Whenever the lock is dropped we need to re-check the properties before going back around
-    // for a new cursor.
-    if (status == StatusType(LockDroppedTag{})) {
-      status = check_and_trim();
+
+    // If there was a fault while copying, then handle it now that the lock is dropped.
+    if (copy_result.fault_info.has_value()) {
+      auto& info = *copy_result.fault_info;
+      uint64_t to_fault = len - dest_offset;
+      status = Thread::Current::SoftFaultInRange(info.pf_va, info.pf_flags, to_fault);
+    } else if (status == ZX_ERR_SHOULD_WAIT) {
+      // RequirePage 'failed', but told us that it had filled out the page request, so we should
+      // wait on it.
+      DEBUG_ASSERT(can_block_on_page_requests());
+      status = page_request.Wait();
+      if (status == ZX_ERR_TIMED_OUT) {
+        Dump(0, false);
+      }
     }
-    if (status != StatusType(ZX_OK)) {
-      return ktl::get<zx_status_t>(status);
+    if (status != ZX_OK) {
+      return status;
     }
-  }
+  } while (src_offset < end_offset);
 
   return ZX_OK;
 }
