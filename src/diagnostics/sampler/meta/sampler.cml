@@ -10,6 +10,10 @@
         runner: "elf",
         binary: "bin/launcher",
         args: [ "sampler" ],
+        environ: [
+            // TODO(https://fxbug.dev/382623426): revisit this.
+            "SCUDO_OPTIONS=release_to_os_interval_ms=0",
+        ],
     },
     use: [
         {
