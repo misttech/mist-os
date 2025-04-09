@@ -864,9 +864,6 @@ void Client::ApplyConfig3(ApplyConfig3RequestView request,
       applied_layer_node.layer->ApplyChanges();
     }
   }
-  // Overflow doesn't matter, since stamps only need to be unique until
-  // the configuration is applied with vsync.
-  client_apply_count_++;
 
   ApplyConfig();
 
@@ -1241,7 +1238,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
 }
 
 void Client::ReapplyConfig() {
-  if (client_apply_count_) {
+  if (latest_config_stamp_ != display::kInvalidConfigStamp) {
     ApplyConfig();
   }
 }
@@ -1330,7 +1327,7 @@ void Client::ApplyConfig() {
 
     controller_.ApplyConfig(
         std::span<DisplayConfig*>(display_config_ptrs, display_config_ptrs_index),
-        applied_config_stamp, client_apply_count_, id_);
+        applied_config_stamp, id_);
   }
 }
 

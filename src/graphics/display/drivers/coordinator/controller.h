@@ -20,8 +20,8 @@
 #include <zircon/time.h>
 #include <zircon/types.h>
 
+#include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <list>
 #include <memory>
 #include <span>
@@ -114,8 +114,8 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   void SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virtcon_mode);
 
   void ApplyConfig(std::span<DisplayConfig*> display_configs,
-                   display::ConfigStamp client_config_stamp, uint32_t layer_stamp,
-                   ClientId client_id) __TA_EXCLUDES(mtx());
+                   display::ConfigStamp client_config_stamp, ClientId client_id)
+      __TA_EXCLUDES(mtx());
 
   void ReleaseImage(display::DriverImageId driver_image_id);
   void ReleaseCaptureImage(display::DriverCaptureImageId driver_capture_image_id);
@@ -215,7 +215,6 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   bool unbinding_ __TA_GUARDED(mtx()) = false;
 
   DisplayInfo::Map displays_ __TA_GUARDED(mtx());
-  uint32_t applied_layer_stamp_ = UINT32_MAX;
   ClientId applied_client_id_ = kInvalidClientId;
   display::DriverCaptureImageId pending_release_capture_image_id_ =
       display::kInvalidDriverCaptureImageId;
