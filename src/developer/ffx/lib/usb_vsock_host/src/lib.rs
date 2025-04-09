@@ -19,12 +19,10 @@ use std::pin::pin;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use thiserror::Error;
-use usb_vsock::{Address, Header, Packet, PacketType, UsbPacketBuilder, VsockPacketIterator};
-
-/// Magic sent in the sync packet of the USB protocol. This is a temporary
-/// version from the original Overnet protocol. We'll be updating it soon as the
-/// newer VSOCK protocol nears completion.
-const OVERNET_MAGIC: &[u8; 16] = b"OVERNET USB\xff\x00\xff\x00\xff";
+use usb_vsock::{
+    Address, Header, Packet, PacketType, UsbPacketBuilder, VsockPacketIterator, CID_ANY, CID_HOST,
+    CID_LOOPBACK, VSOCK_MAGIC,
+};
 
 /// How long to wait for the USB protocol to synchronize.
 const MAGIC_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
@@ -71,8 +69,26 @@ enum SyncError {
 /// Creates a new magic packet used to synchronize a USB VSOCK connection.
 fn sync_packet() -> Vec<u8> {
     let header = &mut Header::new(PacketType::Sync);
-    header.payload_len = (OVERNET_MAGIC.len() as u32).into();
-    let packet = Packet { header, payload: OVERNET_MAGIC };
+    header.payload_len = (VSOCK_MAGIC.len() as u32).into();
+    header.host_cid = CID_HOST.into();
+    header.host_port = 0.into();
+    header.device_cid = CID_ANY.into();
+    header.device_port = 0.into();
+    let packet = Packet { header, payload: VSOCK_MAGIC };
+    let mut packet_storage = vec![0; header.packet_size()];
+    packet.write_to_unchecked(&mut packet_storage);
+    packet_storage
+}
+
+/// Creates a new magic packet used to finish synchronizing a USB VSOCK connection.
+fn sync_ack_packet(cid: u32) -> Vec<u8> {
+    let header = &mut Header::new(PacketType::Sync);
+    header.payload_len = (VSOCK_MAGIC.len() as u32).into();
+    header.host_cid = CID_HOST.into();
+    header.host_port = 0.into();
+    header.device_cid = cid.into();
+    header.device_port = 0.into();
+    let packet = Packet { header, payload: VSOCK_MAGIC };
     let mut packet_storage = vec![0; header.packet_size()];
     packet.write_to_unchecked(&mut packet_storage);
     packet_storage
@@ -95,7 +111,7 @@ async fn wait_for_magic(
     debug_name: &str,
     out_ep: &usb_rs::BulkOutEndpoint,
     in_ep: &usb_rs::BulkInEndpoint,
-) -> Result<(), SyncError> {
+) -> Result<u32, SyncError> {
     let mut magic_timer = fasync::Timer::new(MAGIC_TIMEOUT);
     let mut buf = [0u8; MTU];
     out_ep.write(&sync_packet()).await.map_err(SyncError::Send)?;
@@ -125,10 +141,10 @@ async fn wait_for_magic(
             };
             match packet.header.packet_type {
                 PacketType::Sync => {
-                    let magic = <&[u8; 16]>::try_from(packet.payload).ok();
+                    let magic = <&[u8; 7]>::try_from(packet.payload).ok();
 
-                    if magic.filter(|x| **x == *OVERNET_MAGIC).is_some() {
-                        return Ok(());
+                    if magic.filter(|x| **x == *VSOCK_MAGIC).is_some() {
+                        return Ok(packet.header.device_cid.get());
                     }
 
                     tracing::warn!(
@@ -182,9 +198,10 @@ enum LinkError {
 /// Handles sending packets from `usb_vsock::Connection` over the USB device,
 /// and giving received packets from the USB device to the same connection.
 async fn run_usb_link(
+    host: Weak<UsbVsockHost>,
     debug_name: String,
     interface: usb_rs::Interface,
-    connection: Arc<usb_vsock::Connection<Vec<u8>>>,
+    cid_out: &mut Option<u32>,
 ) -> Result<(), LinkError> {
     tracing::info!("Setting up USB link for {debug_name}");
     let debug_name = debug_name.as_str();
@@ -215,7 +232,46 @@ async fn run_usb_link(
     let in_ep = in_ep.ok_or(LinkError::InMissing)?;
     let out_ep = out_ep.ok_or(LinkError::OutMissing)?;
 
-    wait_for_magic(debug_name, &out_ep, &in_ep).await?;
+    let requested_cid = wait_for_magic(debug_name, &out_ep, &in_ep).await?;
+
+    let (conn_state, incoming_requests) = ConnectionState::new();
+    let connection = Arc::clone(&conn_state.connection);
+    let cid = if let Some(host) = host.upgrade() {
+        let cid = {
+            let mut inner = host.inner.lock().unwrap();
+            let cid = if requested_cid > CID_HOST
+                && requested_cid != CID_ANY
+                && !inner.conns.contains_key(&requested_cid)
+            {
+                requested_cid
+            } else {
+                host.next_cid.fetch_add(1, Ordering::Relaxed)
+            };
+
+            inner.conns.insert(cid, conn_state);
+            *cid_out = Some(cid);
+            cid
+        };
+
+        host.add_incoming_request_handler(cid, incoming_requests);
+
+        let mut sender = host.event_sender.clone();
+        host.scope.spawn(async move {
+            let _ = sender.send(UsbVsockHostEvent::AddedCid(cid)).await;
+        });
+
+        cid
+    } else {
+        tracing::warn!(
+            device = debug_name,
+            "Host object disappeared before connection established"
+        );
+        return Ok(());
+    };
+
+    let debug_name = format!("usb:cid:{cid} ({debug_name})");
+
+    out_ep.write(&sync_ack_packet(cid)).await.map_err(SyncError::Send)?;
 
     let tx_conn = connection.clone();
     let tx = async move {
@@ -360,6 +416,25 @@ impl PortState {
 struct ConnectionState {
     connection: Arc<usb_vsock::Connection<Vec<u8>>>,
     _control_socket: fuchsia_async::Socket,
+}
+
+impl ConnectionState {
+    /// Create a new connection state.
+    fn new() -> (Self, mpsc::Receiver<usb_vsock::ConnectionRequest>) {
+        let (incoming_requests_tx, incoming_requests) = mpsc::channel(1);
+        let (control_socket, other_end) = fuchsia_async::emulated_handle::Socket::create_stream();
+        let control_socket = fuchsia_async::Socket::from_socket(control_socket);
+        let other_end = fuchsia_async::Socket::from_socket(other_end);
+        let connection = Arc::new(usb_vsock::Connection::new(other_end, incoming_requests_tx));
+
+        (
+            ConnectionState {
+                connection: Arc::clone(&connection),
+                _control_socket: control_socket,
+            },
+            incoming_requests,
+        )
+    }
 }
 
 /// Errors returned from operations on [`UsbVsockHost`]
@@ -518,7 +593,7 @@ impl UsbVsockHost {
         }
 
         let cid = cid.get();
-        let cid = if cid == 1 { 2 } else { cid };
+        let cid = if cid == CID_LOOPBACK { CID_HOST } else { cid };
 
         // TODO(407622394): Handle loopback cases.
         let Some(conn) =
@@ -531,7 +606,12 @@ impl UsbVsockHost {
         let host_port = self.alloc_port();
 
         conn.connect(
-            usb_vsock::Address { device_cid: cid, host_cid: 2, device_port: port, host_port },
+            usb_vsock::Address {
+                device_cid: cid,
+                host_cid: CID_HOST,
+                device_port: port,
+                host_port,
+            },
             socket,
         )
         .await
@@ -545,13 +625,13 @@ impl UsbVsockHost {
         cid: Option<NonZero<u32>>,
     ) -> Result<impl Stream<Item = (fasync::Socket, usb_vsock::ConnectionState)>, UsbVsockError>
     {
-        let cid = cid.map(|x| x.get()).map(|x| if x == 1 { 2 } else { x });
+        let cid = cid.map(|x| x.get()).map(|x| if x == CID_LOOPBACK { CID_HOST } else { x });
         let mut inner = self.inner.lock().unwrap();
 
         // Technically this might not be spec behavior but I think it's smart.
         // See comment in add_incoming_request_handler
         if let Some(cid) = cid {
-            if cid > 2 && !inner.conns.contains_key(&cid) {
+            if cid > CID_HOST && !inner.conns.contains_key(&cid) {
                 return Err(UsbVsockError::NotFound(cid));
             }
         }
@@ -596,51 +676,20 @@ impl UsbVsockHost {
             }
         };
 
-        let _cid = self.next_cid.fetch_add(1, Ordering::Relaxed);
-        // TODO: Delete this when we stop hardcoding the CID on the device side.
-        let cid = 3;
-
-        let (incoming_requests_tx, incoming_requests) = mpsc::channel(1);
-        let (control_socket, other_end) = fuchsia_async::emulated_handle::Socket::create_stream();
-        let control_socket = fuchsia_async::Socket::from_socket(control_socket);
-        let other_end = fuchsia_async::Socket::from_socket(other_end);
-        let connection = Arc::new(usb_vsock::Connection::new(other_end, incoming_requests_tx));
-
         let weak_this = Arc::downgrade(self);
-        self.scope.spawn({
-            let connection = Arc::clone(&connection);
-            async move {
-                if let Err(e) = run_usb_link(
-                    format!("usb:cid:{cid} ({})", device.debug_name()),
-                    interface,
-                    connection,
-                )
-                .await
-                {
-                    tracing::warn!("USB link terminated with error: {:?}", e)
-                } else {
-                    tracing::info!("Shut down USB link for {}", device.debug_name())
-                }
-
-                if let Some(this) = weak_this.upgrade() {
-                    this.remove_device(cid);
-                }
-            }
-        });
-
-        // Put this in place before we spawn the incoming requests future just
-        // to be absolutely sure there's no race condition.
-        self.inner
-            .lock()
-            .unwrap()
-            .conns
-            .insert(cid, ConnectionState { connection, _control_socket: control_socket });
-
-        self.add_incoming_request_handler(cid, incoming_requests);
-
-        let mut sender = self.event_sender.clone();
         self.scope.spawn(async move {
-            let _ = sender.send(UsbVsockHostEvent::AddedCid(cid)).await;
+            let mut cid = None;
+            if let Err(e) =
+                run_usb_link(weak_this.clone(), device.debug_name(), interface, &mut cid).await
+            {
+                tracing::warn!("USB link terminated with error: {:?}", e)
+            } else {
+                tracing::info!("Shut down USB link for {}", device.debug_name())
+            }
+
+            if let (Some(this), Some(cid)) = (weak_this.upgrade(), cid) {
+                this.remove_device(cid);
+            }
         });
 
         true
@@ -695,7 +744,7 @@ impl UsbVsockHost {
                     let usb_vsock::Address { device_cid, host_cid, device_port: _, host_port } =
                         *incoming.address();
 
-                    let accept_channel = if host_cid != 2 {
+                    let accept_channel = if host_cid != CID_HOST {
                         tracing::warn!("USB device usb:cid:{cid} tried to connect to non-host cid {host_cid}");
                         None
                     } else if device_cid != cid {
@@ -860,7 +909,7 @@ mod test {
         let addr = incoming.address();
 
         assert_eq!(cid, addr.device_cid);
-        assert_eq!(2, addr.host_cid);
+        assert_eq!(CID_HOST, addr.host_cid);
         assert_eq!(1234, addr.device_port);
 
         let (b, other_end) = fasync::emulated_handle::Socket::create_stream();

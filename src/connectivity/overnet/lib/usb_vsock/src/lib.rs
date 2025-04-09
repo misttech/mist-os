@@ -10,6 +10,26 @@ mod packet;
 pub use connection::*;
 pub use packet::*;
 
+/// Magic sent in the sync packet of the USB protocol.
+///
+/// The 0 indicates protocol version 0, and we expect the reply sync packet to
+/// have the exact same contents. As we version the protocol this may increment.
+///
+/// To document the semantics, let's say this header were "vsock:3". The device
+/// could reply with a lower number, say "vsock:1". This is the device
+/// requesting a downgrade, and if we accept we send the final sync with
+/// "vsock:1". Otherwise we hang up.
+pub const VSOCK_MAGIC: &[u8; 7] = b"vsock:0";
+
+/// A placeholder CID indicating "any" CID is acceptable.
+pub const CID_ANY: u32 = u32::MAX;
+
+/// CID of the host.
+pub const CID_HOST: u32 = 2;
+
+/// The loopback CID.
+pub const CID_LOOPBACK: u32 = 1;
+
 /// An address for a vsock packet transmitted over USB. Since this library does not implement
 /// policy decisions, it includes all four components of a vsock address pair even though some
 /// may not be appropriate for some situations.
