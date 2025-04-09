@@ -1226,30 +1226,31 @@ zx_status_t VmObjectPaged::ZeroPartialPage(uint64_t page_base_offset, uint64_t z
   DEBUG_ASSERT(zero_end_offset <= PAGE_SIZE);
   DEBUG_ASSERT(IS_PAGE_ALIGNED(page_base_offset));
 
-  Guard<VmoLockType> guard{lock()};
+  {
+    Guard<VmoLockType> guard{lock()};
 
-  if (page_base_offset >= size_locked()) {
-    return ZX_ERR_OUT_OF_RANGE;
-  }
+    if (page_base_offset >= size_locked()) {
+      return ZX_ERR_OUT_OF_RANGE;
+    }
 
-  // TODO: Consider replacing this with a more appropriate generic API when one is available.
-  if (cow_pages_locked()->PageWouldReadZeroLocked(page_base_offset)) {
-    // This is already considered zero so no need to redundantly zero again.
-    return ZX_OK;
+    // TODO: Consider replacing this with a more appropriate generic API when one is available.
+    if (cow_pages_locked()->PageWouldReadZeroLocked(page_base_offset)) {
+      // This is already considered zero so no need to redundantly zero again.
+      return ZX_OK;
+    }
   }
 
   // Need to actually zero out bytes in the page.
-  return ReadWriteInternalLocked(
-      page_base_offset + zero_start_offset, zero_end_offset - zero_start_offset, true,
-      VmObjectReadWriteOptions::None,
-      [](void* dst, size_t offset, size_t len) -> UserCopyCaptureFaultsResult {
-        // We're memsetting the *kernel* address of an allocated page, so we know that this
-        // cannot fault. memset may not be the most efficient, but we don't expect to be doing
-        // this very often.
-        memset(dst, 0, len);
-        return UserCopyCaptureFaultsResult{ZX_OK};
-      },
-      &guard);
+  return ReadWriteInternal(page_base_offset + zero_start_offset,
+                           zero_end_offset - zero_start_offset, true,
+                           VmObjectReadWriteOptions::None,
+                           [](void* dst, size_t offset, size_t len) -> UserCopyCaptureFaultsResult {
+                             // We're memsetting the *kernel* address of an allocated page, so we
+                             // know that this cannot fault. memset may not be the most efficient,
+                             // but we don't expect to be doing this very often.
+                             memset(dst, 0, len);
+                             return UserCopyCaptureFaultsResult{ZX_OK};
+                           });
 }
 
 zx_status_t VmObjectPaged::ZeroRangeInternal(uint64_t offset, uint64_t len, bool dirty_track) {
@@ -1371,15 +1372,17 @@ zx_status_t VmObjectPaged::Resize(uint64_t s) {
 // routine. The copy routine has the expected type signature of: (void *ptr, uint64_t offset,
 //  uint64_t len) -> UserCopyCaptureFaultsResult.
 template <typename T>
-zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, bool write,
-                                                   VmObjectReadWriteOptions options, T copyfunc,
-                                                   Guard<VmoLockType>* guard) {
+zx_status_t VmObjectPaged::ReadWriteInternal(uint64_t offset, size_t len, bool write,
+                                             VmObjectReadWriteOptions options, T copyfunc) {
   canary_.Assert();
 
   uint64_t end_offset;
   if (add_overflow(offset, len, &end_offset)) {
     return ZX_ERR_OUT_OF_RANGE;
   }
+
+  Guard<VmoLockType> guard{AssertOrderedLock, lock(), cow_pages_->lock_order(),
+                           VmLockAcquireMode::First};
 
   // Declare a lambda that will check any object properties we require to be true and, if can_trim
   // is set, reduce the requested length if it exceeds the the VMO size. We place these in a lambda
@@ -1480,7 +1483,7 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
         // If a fault has actually occurred, then we will have captured fault info that we can use
         // to handle the fault.
         if (copy_result.fault_info.has_value()) {
-          guard->CallUnlocked(
+          guard.CallUnlocked(
               [&info = *copy_result.fault_info, to_fault = len - dest_offset, &status] {
                 // If status is not ZX_OK, there is no guarantee that any of the data has been
                 // copied.
@@ -1502,7 +1505,7 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
         // RequirePage 'failed', but told us that it had filled out the page request, so we should
         // wait on it. Waiting on the page request must be done with the lock dropped.
         DEBUG_ASSERT(can_block_on_page_requests());
-        guard->CallUnlocked([&status, &page_request]() { status = page_request.Wait(); });
+        guard.CallUnlocked([&status, &page_request]() { status = page_request.Wait(); });
         if (likely(status == StatusType(ZX_OK))) {
           // page request waiting succeeded, but indicate that the lock has been dropped.
           status = LockDroppedTag{};
@@ -1526,7 +1529,7 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
       constexpr size_t kPagesBetweenUnlocks = 16;
       if (unlikely(++pages_since_last_unlock == kPagesBetweenUnlocks)) {
         pages_since_last_unlock = 0;
-        if (guard->lock()->IsContested()) {
+        if (guard.lock()->IsContested()) {
           // Just drop the lock and re-acquire it. There is no need to yield.
           //
           // Since the lock is contested, the empty |CallUnlocked| will:
@@ -1544,7 +1547,7 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
           //
           // Thus, there is no danger of thrashing here. The other thread will
           // always get the Mutex, even without an explicit yield.
-          guard->CallUnlocked([]() {});
+          guard.CallUnlocked([]() {});
           status = LockDroppedTag{};
           break;
         }
@@ -1583,10 +1586,7 @@ zx_status_t VmObjectPaged::Read(void* _ptr, uint64_t offset, size_t len) {
     lockdep::AssertNoLocksHeld();
   }
 
-  Guard<VmoLockType> guard{lock()};
-
-  return ReadWriteInternalLocked(offset, len, false, VmObjectReadWriteOptions::None, read_routine,
-                                 &guard);
+  return ReadWriteInternal(offset, len, false, VmObjectReadWriteOptions::None, read_routine);
 }
 
 zx_status_t VmObjectPaged::Write(const void* _ptr, uint64_t offset, size_t len) {
@@ -1608,10 +1608,7 @@ zx_status_t VmObjectPaged::Write(const void* _ptr, uint64_t offset, size_t len) 
     lockdep::AssertNoLocksHeld();
   }
 
-  Guard<VmoLockType> guard{lock()};
-
-  return ReadWriteInternalLocked(offset, len, true, VmObjectReadWriteOptions::None, write_routine,
-                                 &guard);
+  return ReadWriteInternal(offset, len, true, VmObjectReadWriteOptions::None, write_routine);
 }
 
 zx_status_t VmObjectPaged::CacheOp(uint64_t offset, uint64_t len, CacheOpType type) {
@@ -1752,9 +1749,7 @@ zx_status_t VmObjectPaged::ReadUser(user_out_ptr<char> ptr, uint64_t offset, siz
     lockdep::AssertNoLocksHeld();
   }
 
-  Guard<VmoLockType> guard{lock()};
-
-  return ReadWriteInternalLocked(offset, len, false, options, read_routine, &guard);
+  return ReadWriteInternal(offset, len, false, options, read_routine);
 }
 
 zx_status_t VmObjectPaged::WriteUser(user_in_ptr<const char> ptr, uint64_t offset, size_t len,
@@ -1788,9 +1783,7 @@ zx_status_t VmObjectPaged::WriteUser(user_in_ptr<const char> ptr, uint64_t offse
     lockdep::AssertNoLocksHeld();
   }
 
-  Guard<VmoLockType> guard{lock()};
-
-  return ReadWriteInternalLocked(offset, len, true, options, write_routine, &guard);
+  return ReadWriteInternal(offset, len, true, options, write_routine);
 }
 
 zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSpliceList* pages) {

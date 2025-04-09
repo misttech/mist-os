@@ -404,9 +404,8 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
 
   // internal read/write routine that takes a templated copy function to help share some code
   template <typename T>
-  zx_status_t ReadWriteInternalLocked(uint64_t offset, size_t len, bool write,
-                                      VmObjectReadWriteOptions options, T copyfunc,
-                                      Guard<VmoLockType>* guard) TA_REQ(lock());
+  zx_status_t ReadWriteInternal(uint64_t offset, size_t len, bool write,
+                                VmObjectReadWriteOptions options, T copyfunc);
 
   // Zeroes a partial range in a page. The page to zero is looked up using page_base_offset, and
   // will be committed if needed. The range of [zero_start_offset, zero_end_offset) is relative to
