@@ -50,7 +50,7 @@ Without additional flags, the `intl_property_manager` serves an empty `Profile`.
 It is possible to add flags to instruct it to serve a nonempty `Profile`, as
 follows:
 
-* `--set_initial_profile`: this flag *must* be set to instruct the server to
+* `--set-initial-profile`: this flag *must* be set to instruct the server to
   serve a nonempty initial locale.
 * `--locale_ids=...`: a comma-separated list of BCP-47 compatible locale
   identifiers to be served, in the order of preference.
