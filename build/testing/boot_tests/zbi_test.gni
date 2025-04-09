@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/board.gni")
 import("//build/images/vbmeta.gni")
 import("//build/testing/boot_tests/boot_test.gni")
 import("//build/testing/environments.gni")
@@ -191,6 +192,10 @@ template("zbi_test") {
     zbi = ":$zbi_target"
     if (use_vbmeta) {
       vbmeta = ":$vbmeta_target"
+    }
+
+    if (dtbo_label != false) {
+      dtbo = dtbo_label
     }
   }
 }

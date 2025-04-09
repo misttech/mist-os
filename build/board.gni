@@ -42,6 +42,9 @@ declare_args() {
   # The partitions config information used to create an update package and
   # product bundle.
   partitions_config_label = false
+
+  # The label for the dtbo target. This is used by boot_tests
+  dtbo_label = false
 }
 
 declare_args() {
