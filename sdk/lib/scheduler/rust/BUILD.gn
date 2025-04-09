@@ -12,7 +12,7 @@ rustc_library("rust") {
   deps = [
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_rust",
     "//sdk/rust/zx",
-    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-component/client",
     "//src/lib/fuchsia-runtime",
     "//src/lib/fuchsia-sync",
     "//third_party/rust_crates:anyhow",

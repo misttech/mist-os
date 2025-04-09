@@ -7,7 +7,7 @@
 
 use fidl::endpoints::ClientEnd;
 use fidl::AsHandleRef;
-use fuchsia_component::client;
+use fuchsia_component_client::connect_to_protocol;
 use fuchsia_inspect::Inspector;
 use log::error;
 use pin_project::pin_project;
@@ -137,7 +137,7 @@ pub fn publish(
     let tree = service::spawn_tree_server(inspector.clone(), vmo_preference, &scope);
 
     let inspect_sink = inspect_sink_client.map(|client| client.into_proxy()).or_else(|| {
-        client::connect_to_protocol::<finspect::InspectSinkMarker>()
+        connect_to_protocol::<finspect::InspectSinkMarker>()
             .map_err(|err| error!(err:%; "failed to spawn the fuchsia.inspect.Tree server"))
             .ok()
     })?;
@@ -198,7 +198,7 @@ impl PublishedInspectController {
     pub async fn escrow_frozen(self, opts: EscrowOptions) -> Option<EscrowToken> {
         let inspect_sink = match opts.inspect_sink {
             Some(proxy) => proxy,
-            None => match client::connect_to_protocol::<finspect::InspectSinkMarker>() {
+            None => match connect_to_protocol::<finspect::InspectSinkMarker>() {
                 Ok(inspect_sink) => inspect_sink,
                 Err(err) => {
                     error!(err:%; "failed to spawn the fuchsia.inspect.Tree server");
