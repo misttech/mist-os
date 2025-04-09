@@ -946,15 +946,17 @@ class KTraceImpl {
   }
 
   // Getter and setter for the categories bitmask.
-  // These use relaxed semantics because reading the bitmask does not need to synchronize memory
-  // operations across threads. Said another way, memory side effects of the release sequence
-  // headed by set_categories_bitmask do not need to be observable after a thread calls
-  // categories_bitmask.
+  // These use acquire-release semantics because the order in which we set the bitmask matters.
+  // Specifically, when starting a trace, we want to ensure that all of the trace metadata that we
+  // emit (such as thread and process names, among other things) happens-before we allow trace
+  // records from arbitrary categories to enter the trace buffer. Without this affordance, it is
+  // possible for trace records from other categories to fill up the buffer and cause the metadata
+  // to be dropped, which would make the trace hard to understand.
   uint32_t categories_bitmask() const {
-    return categories_bitmask_.load(ktl::memory_order_relaxed);
+    return categories_bitmask_.load(ktl::memory_order_acquire);
   }
   void set_categories_bitmask(uint32_t new_mask) {
-    categories_bitmask_.store(new_mask, ktl::memory_order_relaxed);
+    categories_bitmask_.store(new_mask, ktl::memory_order_release);
   }
 
   // The internal ring buffer implementation. It also currently Stops, Starts, and Rewinds tracing.
