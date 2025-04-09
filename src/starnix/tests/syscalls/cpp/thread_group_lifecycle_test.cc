@@ -22,5 +22,9 @@ TEST(ThreadGroupLifeCycleTest, ErroneousClone) {
   ASSERT_EQ(EFAULT, errno);
 
   // Fork to ensure starnix iterate over current children.
-  ASSERT_GE(fork(), 0);
+  pid_t fork_result = fork();
+  ASSERT_GE(fork_result, 0);
+  if (fork_result == 0) {
+    _Exit(0);
+  }
 }
