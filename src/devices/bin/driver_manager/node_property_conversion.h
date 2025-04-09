@@ -41,6 +41,15 @@ inline fuchsia_driver_framework::wire::NodeProperty ToDeprecatedProperty(
       .value = fidl::ToWire(allocator, fidl::ToNatural(property.value))};
 }
 
+inline fuchsia_driver_framework::BindRule2 ToBindRule2(
+    const fuchsia_driver_framework::BindRule bind_rule) {
+  ZX_ASSERT(bind_rule.key().Which() ==
+            fuchsia_driver_framework::NodePropertyKey::Tag::kStringValue);
+  return fuchsia_driver_framework::BindRule2{{.key = bind_rule.key().string_value().value(),
+                                              .condition = bind_rule.condition(),
+                                              .values = bind_rule.values()}};
+}
+
 }  // namespace driver_manager
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_NODE_PROPERTY_CONVERSION_H_

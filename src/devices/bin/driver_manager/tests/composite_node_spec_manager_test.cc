@@ -104,7 +104,7 @@ class CompositeNodeSpecManagerTest : public zxtest::Test {
         std::make_unique<driver_manager::CompositeNodeSpecManager>(&bridge_);
   }
 
-  fdf::ParentSpec2 MakeParentSpec(std::vector<fdf::BindRule> bind_rules,
+  fdf::ParentSpec2 MakeParentSpec(std::vector<fdf::BindRule2> bind_rules,
                                   std::vector<fdf::NodeProperty2> properties) {
     return fdf::ParentSpec2{{
         .bind_rules = std::move(bind_rules),
@@ -158,8 +158,8 @@ TEST_F(CompositeNodeSpecManagerTest, TestAddMatchCompositeNodeSpec) {
   fidl::Arena allocator;
 
   std::vector<fdf::ParentSpec2> parents{
-      MakeParentSpec({fdf::MakeAcceptBindRule("b", 1u)}, {fdf::MakeProperty2("a", 1u)}),
-      MakeParentSpec({fdf::MakeAcceptBindRule("a", 10u)}, {fdf::MakeProperty2("b", 1u)}),
+      MakeParentSpec({fdf::MakeAcceptBindRule2("b", 1u)}, {fdf::MakeProperty2("a", 1u)}),
+      MakeParentSpec({fdf::MakeAcceptBindRule2("a", 10u)}, {fdf::MakeProperty2("b", 1u)}),
   };
 
   auto spec_name = "test_name";
@@ -193,8 +193,8 @@ TEST_F(CompositeNodeSpecManagerTest, TestBindSameNodeTwice) {
   fidl::Arena allocator;
 
   std::vector<fdf::ParentSpec2> parents{
-      MakeParentSpec({fdf::MakeAcceptBindRule("b", 1u)}, {fdf::MakeProperty2("a", 1u)}),
-      MakeParentSpec({fdf::MakeAcceptBindRule("b", 1u)}, {fdf::MakeProperty2("c", 100u)}),
+      MakeParentSpec({fdf::MakeAcceptBindRule2("b", 1u)}, {fdf::MakeProperty2("a", 1u)}),
+      MakeParentSpec({fdf::MakeAcceptBindRule2("b", 1u)}, {fdf::MakeProperty2("c", 100u)}),
   };
 
   auto spec_name = "test_name";
@@ -227,8 +227,8 @@ TEST_F(CompositeNodeSpecManagerTest, FailedDriverIndexCall) {
   fidl::Arena allocator;
 
   std::vector<fdf::ParentSpec2> parents{
-      MakeParentSpec({fdf::MakeAcceptBindRule("b", 1u)}, {fdf::MakeProperty2("a", 1u)}),
-      MakeParentSpec({fdf::MakeAcceptBindRule("b", 1u)}, {fdf::MakeProperty2("c", 100u)}),
+      MakeParentSpec({fdf::MakeAcceptBindRule2("b", 1u)}, {fdf::MakeProperty2("a", 1u)}),
+      MakeParentSpec({fdf::MakeAcceptBindRule2("b", 1u)}, {fdf::MakeProperty2("c", 100u)}),
   };
 
   bridge_.set_add_spec_status(ZX_ERR_INTERNAL);
@@ -245,7 +245,7 @@ TEST_F(CompositeNodeSpecManagerTest, TestMultibindDisabled) {
   fidl::Arena allocator;
 
   auto shared_bind_rules = std::vector{
-      fdf::MakeAcceptBindRule("f", 10u),
+      fdf::MakeAcceptBindRule2("f", 10u),
   };
   auto shared_props = std::vector{
       fdf::MakeProperty2("c", 10u),
@@ -253,7 +253,7 @@ TEST_F(CompositeNodeSpecManagerTest, TestMultibindDisabled) {
 
   // Add the first composite node spec.
   std::vector<fdf::ParentSpec2> parent_specs_1{
-      MakeParentSpec({fdf::MakeAcceptBindRule("b", 1u)}, {fdf::MakeProperty2("d", 1u)}),
+      MakeParentSpec({fdf::MakeAcceptBindRule2("b", 1u)}, {fdf::MakeProperty2("d", 1u)}),
       MakeParentSpec(shared_bind_rules, shared_props),
   };
 
@@ -300,7 +300,7 @@ TEST_F(CompositeNodeSpecManagerTest, TestMultibindEnabled) {
   fidl::Arena allocator;
 
   auto shared_bind_rules = std::vector{
-      fdf::MakeAcceptBindRule("g", 10u),
+      fdf::MakeAcceptBindRule2("g", 10u),
   };
   auto shared_props = std::vector{
       fdf::MakeProperty2("c", 10u),
@@ -308,7 +308,7 @@ TEST_F(CompositeNodeSpecManagerTest, TestMultibindEnabled) {
 
   // Add the first composite node spec.
   std::vector<fdf::ParentSpec2> parent_specs_1{
-      MakeParentSpec({fdf::MakeAcceptBindRule("b", 1u)}, {fdf::MakeProperty2("d", 1u)}),
+      MakeParentSpec({fdf::MakeAcceptBindRule2("b", 1u)}, {fdf::MakeProperty2("d", 1u)}),
       MakeParentSpec(shared_bind_rules, shared_props),
   };
 
@@ -344,8 +344,8 @@ TEST_F(CompositeNodeSpecManagerTest, TestMultibindEnabled) {
 TEST_F(CompositeNodeSpecManagerTest, TestBindWithNoCompositeMatch) {
   fidl::Arena allocator;
   std::vector<fdf::ParentSpec2> parent_specs{
-      MakeParentSpec({fdf::MakeAcceptBindRule("a", 10u)}, {fdf::MakeProperty2("no_match", 1u)}),
-      MakeParentSpec({fdf::MakeAcceptBindRule("b", 1u)}, {fdf::MakeProperty2("no_match_2", 1u)}),
+      MakeParentSpec({fdf::MakeAcceptBindRule2("a", 10u)}, {fdf::MakeProperty2("no_match", 1u)}),
+      MakeParentSpec({fdf::MakeAcceptBindRule2("b", 1u)}, {fdf::MakeProperty2("no_match_2", 1u)}),
   };
 
   auto spec_name = "test_name";
@@ -386,7 +386,7 @@ TEST_F(CompositeNodeSpecManagerTest, TestBindWithNoCompositeMatch) {
 TEST_F(CompositeNodeSpecManagerTest, TestAddDuplicate) {
   fidl::Arena allocator;
   std::vector<fdf::ParentSpec2> parent_specs{
-      MakeParentSpec({fdf::MakeAcceptBindRule("a", 10u)}, {fdf::MakeProperty2("a", 1u)}),
+      MakeParentSpec({fdf::MakeAcceptBindRule2("a", 10u)}, {fdf::MakeProperty2("a", 1u)}),
   };
 
   auto spec_name = "test_name";
@@ -398,8 +398,8 @@ TEST_F(CompositeNodeSpecManagerTest, TestAddDuplicate) {
 TEST_F(CompositeNodeSpecManagerTest, TestDuplicateSpecsWithMatch) {
   fidl::Arena allocator;
   std::vector<fdf::ParentSpec2> parent_specs{
-      MakeParentSpec({fdf::MakeAcceptBindRule("a", 10u)}, {fdf::MakeProperty2("a", 1u)}),
-      MakeParentSpec({fdf::MakeAcceptBindRule("b", 1u)}, {fdf::MakeProperty2("e", 10u)}),
+      MakeParentSpec({fdf::MakeAcceptBindRule2("a", 10u)}, {fdf::MakeProperty2("a", 1u)}),
+      MakeParentSpec({fdf::MakeAcceptBindRule2("b", 1u)}, {fdf::MakeProperty2("e", 10u)}),
   };
 
   auto spec_name = "test_name";
@@ -412,8 +412,8 @@ TEST_F(CompositeNodeSpecManagerTest, TestDuplicateSpecsWithMatch) {
 TEST_F(CompositeNodeSpecManagerTest, TestRebindRequestWithNoMatch) {
   fidl::Arena allocator;
   std::vector<fdf::ParentSpec2> parent_specs{
-      MakeParentSpec({fdf::MakeAcceptBindRule("a", 10u)}, {fdf::MakeProperty2("a", 1u)}),
-      MakeParentSpec({fdf::MakeAcceptBindRule("b", 1u)}, {fdf::MakeProperty2("e", 10u)}),
+      MakeParentSpec({fdf::MakeAcceptBindRule2("a", 10u)}, {fdf::MakeProperty2("a", 1u)}),
+      MakeParentSpec({fdf::MakeAcceptBindRule2("b", 1u)}, {fdf::MakeProperty2("e", 10u)}),
   };
 
   std::string spec_name = "test_name";
@@ -433,8 +433,8 @@ TEST_F(CompositeNodeSpecManagerTest, TestRebindRequestWithNoMatch) {
 TEST_F(CompositeNodeSpecManagerTest, TestRebindRequestWithMatch) {
   fidl::Arena allocator;
   std::vector<fdf::ParentSpec2> parent_specs{
-      MakeParentSpec({fdf::MakeAcceptBindRule("a", 10u)}, {fdf::MakeProperty2("a", 1u)}),
-      MakeParentSpec({fdf::MakeAcceptBindRule("b", 1u)}, {fdf::MakeProperty2("e", 10u)}),
+      MakeParentSpec({fdf::MakeAcceptBindRule2("a", 10u)}, {fdf::MakeProperty2("a", 1u)}),
+      MakeParentSpec({fdf::MakeAcceptBindRule2("b", 1u)}, {fdf::MakeProperty2("e", 10u)}),
   };
 
   std::string spec_name = "test_name";

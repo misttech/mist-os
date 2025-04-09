@@ -204,6 +204,7 @@ option_encoding!(opt_composite_driver_info, fdf::CompositeDriverInfo, "Composite
 
 vector_encoding!(vector_node_property_value, fdf::NodePropertyValue, "NodePropertyValueDef");
 vector_encoding!(vector_bind_rule, fdf::BindRule, "BindRuleDef");
+vector_encoding!(vector_bind_rule2, fdf::BindRule2, "BindRule2Def");
 vector_encoding!(vector_node_property, fdf::NodeProperty, "NodePropertyDef");
 vector_encoding!(vector_node_property2, fdf::NodeProperty2, "NodeProperty2Def");
 vector_encoding!(vector_parent_spec, fdf::ParentSpec, "ParentSpecDef");
@@ -261,6 +262,22 @@ pub struct BindRuleDef {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(remote = "fdf::BindRule2")]
+pub struct BindRule2Def {
+    /// Property key.
+    pub key: String,
+    /// Condition for evaluating the property values in
+    /// the matching process. The values must be ACCEPT
+    /// or REJECT.
+    #[serde(with = "ConditionDef")]
+    pub condition: fdf::Condition,
+    /// A list of property values. Must not be empty. The property
+    /// values must be the same type.
+    #[serde(with = "vector_node_property_value")]
+    pub values: Vec<fdf::NodePropertyValue>,
+}
+
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "fdf::ParentSpec")]
 pub struct ParentSpecDef {
     /// Parent's bind rules. Property keys must be unique. Must not be empty.
@@ -276,8 +293,8 @@ pub struct ParentSpecDef {
 #[serde(remote = "fdf::ParentSpec2")]
 pub struct ParentSpec2Def {
     /// Parent's bind rules. Property keys must be unique. Must not be empty.
-    #[serde(with = "vector_bind_rule")]
-    pub bind_rules: Vec<fdf::BindRule>,
+    #[serde(with = "vector_bind_rule2")]
+    pub bind_rules: Vec<fdf::BindRule2>,
     /// Properties for matching against a composite driver's bind rules.
     /// Keys must be unique.
     #[serde(with = "vector_node_property2")]

@@ -25,6 +25,22 @@ type BindRule = struct {
     values vector<NodePropertyValue>:MAX_PROPERTY_COUNT;
 };
 
+/// Represents a bind rule in a parent specification.
+@available(added=NEXT)
+type BindRule2 = struct {
+    /// Property key.
+    key NodePropertyKeyString;
+
+    /// Condition for evaluating the property values in
+    /// the matching process. The values must be ACCEPT
+    /// or REJECT.
+    condition Condition;
+
+    /// A list of property values. Must not be empty. The property
+    /// values must be the same type.
+    values vector<NodePropertyValue>:MAX_PROPERTY_COUNT;
+};
+
 /// Specification for a node that parents the composite node created from the
 /// composite node specification.
 type ParentSpec = struct {
@@ -41,7 +57,7 @@ type ParentSpec = struct {
 @available(added=NEXT)
 type ParentSpec2 = struct {
     /// Parent's bind rules. Property keys must be unique. Must not be empty.
-    bind_rules vector<BindRule>:MAX_PROPERTY_COUNT;
+    bind_rules vector<BindRule2>:MAX_PROPERTY_COUNT;
 
     /// Properties for matching against a composite driver's bind rules.
     /// Keys must be unique and string-based.

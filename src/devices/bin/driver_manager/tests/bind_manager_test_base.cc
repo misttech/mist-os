@@ -241,8 +241,8 @@ void BindManagerTestBase::AddCompositeNodeSpec(std::string composite,
   for (auto& parent : parents) {
     auto instance_id = GetOrAddInstanceId(parent);
     parent_specs.push_back(fdf::ParentSpec2{
-        {.bind_rules = {fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID,
-                                                instance_id)},
+        {.bind_rules = {fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID,
+                                                 instance_id)},
          .properties = {fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id)}}});
   }
 

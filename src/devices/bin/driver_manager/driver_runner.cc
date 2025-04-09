@@ -367,12 +367,16 @@ void DriverRunner::AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& c
     }
     auto to_parent_spec2 = [](const auto& parent) {
       auto parent_spec = fidl::ToNatural(parent);
+      std::vector<fuchsia_driver_framework::BindRule2> bind_rules;
+      std::transform(parent_spec.bind_rules().begin(), parent_spec.bind_rules().end(),
+                     std::back_inserter(bind_rules), ToBindRule2);
+
       std::vector<fuchsia_driver_framework::NodeProperty2> properties;
       std::transform(parent_spec.properties().begin(), parent_spec.properties().end(),
                      std::back_inserter(properties),
                      [](const auto& prop) { return ToProperty2(prop); });
       return fuchsia_driver_framework::ParentSpec2{{
-          .bind_rules = std::move(parent_spec.bind_rules()),
+          .bind_rules = std::move(bind_rules),
           .properties = std::move(properties),
       }};
     };

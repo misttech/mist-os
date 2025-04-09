@@ -1138,11 +1138,11 @@ TEST_P(DriverRunnerTest, CreateAndBindCompositeNodeSpec) {
       {.name = name,
        .parents2 = std::vector<fuchsia_driver_framework::ParentSpec2>{
            fuchsia_driver_framework::ParentSpec2({
-               .bind_rules = std::vector<fuchsia_driver_framework::BindRule>(),
+               .bind_rules = std::vector<fuchsia_driver_framework::BindRule2>(),
                .properties = std::vector<fuchsia_driver_framework::NodeProperty2>(),
            }),
            fuchsia_driver_framework::ParentSpec2({
-               .bind_rules = std::vector<fuchsia_driver_framework::BindRule>(),
+               .bind_rules = std::vector<fuchsia_driver_framework::BindRule2>(),
                .properties = std::vector<fuchsia_driver_framework::NodeProperty2>(),
            })}});
 

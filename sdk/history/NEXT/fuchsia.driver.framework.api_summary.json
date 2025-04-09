@@ -22,6 +22,28 @@
         "name": "fuchsia.driver.framework/BindRule"
     },
     {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/BindRule2.condition",
+        "ordinal": "2",
+        "type": "fuchsia.driver.framework/Condition"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/BindRule2.key",
+        "ordinal": "1",
+        "type": "string:256"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/BindRule2.values",
+        "ordinal": "3",
+        "type": "vector<fuchsia.driver.framework/NodePropertyValue>:64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.driver.framework/BindRule2"
+    },
+    {
         "kind": "table/member",
         "name": "fuchsia.driver.framework/BusInfo.address",
         "ordinal": "2",
@@ -992,7 +1014,7 @@
         "kind": "struct/member",
         "name": "fuchsia.driver.framework/ParentSpec2.bind_rules",
         "ordinal": "1",
-        "type": "vector<fuchsia.driver.framework/BindRule>:64"
+        "type": "vector<fuchsia.driver.framework/BindRule2>:64"
     },
     {
         "kind": "struct/member",
