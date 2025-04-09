@@ -1308,6 +1308,7 @@ zx_status_t VmObjectPaged::ZeroRangeInternal(uint64_t offset, uint64_t len, bool
     uint64_t zeroed_len = 0;
     zx_status_t status;
     {
+      __UNINITIALIZED VmCowPages::DeferredOps deferred(cow_pages_.get());
       Guard<VmoLockType> guard{lock()};
 
       // Zeroing a range behaves as if it were an efficient zx_vmo_write. As we cannot write to
@@ -1331,8 +1332,8 @@ zx_status_t VmObjectPaged::ZeroRangeInternal(uint64_t offset, uint64_t len, bool
           is_contiguous() ? cow_pages_locked()->DebugGetPageCountLocked() : 0;
 #endif
       // Now that we have a page aligned range we can try hand over to the cow pages zero method.
-      status =
-          cow_pages_locked()->ZeroPagesLocked(*cow_range, dirty_track, &page_request, &zeroed_len);
+      status = cow_pages_locked()->ZeroPagesLocked(*cow_range, dirty_track, deferred, &page_request,
+                                                   &zeroed_len);
       if (zeroed_len != 0) {
         // Mark modified since we wrote zeros.
         mark_modified_locked();

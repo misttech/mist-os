@@ -3334,7 +3334,7 @@ bool VmCowPages::PageWouldReadZeroLocked(uint64_t page_offset) {
 
 zx_status_t VmCowPages::ZeroPagesPreservingContentLocked(uint64_t page_start_base,
                                                          uint64_t page_end_base, bool dirty_track,
-                                                         list_node_t* freed_list,
+                                                         DeferredOps& deferred,
                                                          MultiPageRequest* page_request,
                                                          uint64_t* processed_len_out) {
   // Validate inputs.
@@ -3400,7 +3400,6 @@ zx_status_t VmCowPages::ZeroPagesPreservingContentLocked(uint64_t page_start_bas
               // ensures that we request dirty transition if needed by the pager.
               LookupCursor cursor(this, VmCowRange(off, PAGE_SIZE));
               AssertHeld(cursor.lock_ref());
-              __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
               zx::result<LookupCursor::RequireResult> result =
                   cursor.RequireOwnedPage(true, 1, deferred, page_request);
               if (result.is_error()) {
@@ -3503,7 +3502,7 @@ zx_status_t VmCowPages::ZeroPagesPreservingContentLocked(uint64_t page_start_bas
         DEBUG_ASSERT(state.start == state.end);
         vm_page_t* page = page_list_.ReplacePageWithZeroInterval(state.start, required_state);
         DEBUG_ASSERT(page->object.pin_count == 0);
-        RemovePageToListLocked(page, freed_list);
+        RemovePageLocked(page, deferred);
       } else if (state.overwrite_interval) {
         uint64_t old_start = state.start;
         uint64_t old_end = state.end;
@@ -3549,7 +3548,7 @@ zx_status_t VmCowPages::ZeroPagesPreservingContentLocked(uint64_t page_start_bas
   return ZX_OK;
 }
 
-zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
+zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track, DeferredOps& deferred,
                                         MultiPageRequest* page_request, uint64_t* zeroed_len_out) {
   canary_.Assert();
 
@@ -3571,29 +3570,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
   // Unmap any page that is touched by this range in any of our, or our childrens, mapping
   // regions. We do this on the assumption we are going to be able to free pages either completely
   // or by turning them into markers and it's more efficient to unmap once in bulk here.
-  {
-    __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
-    RangeChangeUpdateLocked(range, RangeChangeOp::Unmap, &deferred);
-  }
-
-  list_node_t freed_list;
-  list_initialize(&freed_list);
-
-  // See also free_any_pages below, which intentionally frees incrementally.
-  auto auto_free = fit::defer([this, &freed_list]() {
-    if (!list_is_empty(&freed_list)) {
-      FreePages(&freed_list);
-    }
-  });
-
-  // Ideally we just collect up pages and hand them over to the pmm all at the end, but if we need
-  // to allocate any pages then we would like to ensure that we do not cause total memory to peak
-  // higher due to squirreling these pages away.
-  auto free_any_pages = [this, &freed_list] {
-    if (!list_is_empty(&freed_list)) {
-      FreePages(&freed_list);
-    }
-  };
+  RangeChangeUpdateLocked(range, RangeChangeOp::Unmap, &deferred);
 
   // Give us easier names for our range.
   const uint64_t start = range.offset;
@@ -3606,7 +3583,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
   // If the page source preserves content, we can perform efficient zeroing by inserting dirty zero
   // intervals. Handle this case separately.
   if (is_source_preserving_page_content()) {
-    return ZeroPagesPreservingContentLocked(start, end, dirty_track, &freed_list, page_request,
+    return ZeroPagesPreservingContentLocked(start, end, dirty_track, deferred, page_request,
                                             zeroed_len_out);
   }
   // dirty_track has no meaning for VMOs without page sources that preserve content, so ignore it
@@ -3705,9 +3682,6 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
     // committed pages). A committed page in this case exists if the parent has any content.
     // Otherwise, we'll need to zero an actual page.
     if (!can_decommit_slot(slot, offset) || !parent_has_content(offset)) {
-      // We might allocate a new page below. Free any pages we've accumulated first.
-      free_any_pages();
-
       // If we're here because of !parent_has_content() and slot doesn't have a page, we can simply
       // allocate a zero page to replace the empty slot. Otherwise, we'll have to look up the page
       // and zero it.
@@ -3753,7 +3727,6 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
         return cursor.error_value();
       }
       AssertHeld(cursor->lock_ref());
-      __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
       auto result = cursor->RequirePage(true, 1, deferred, page_request);
       if (result.is_error()) {
         return result.error_value();
@@ -3771,7 +3744,6 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
     const InitialPageContent& content = get_initial_page_content(offset);
     AssertHeld(content.page_owner->lock_ref());
     if (!slot && content.page_owner->is_hidden()) {
-      free_any_pages();
       // TODO(https://fxbug.dev/42138396): This could be more optimal since unlike a regular cow
       // clone, we are not going to actually need to read the target page we are cloning, and hence
       // it does not actually need to get converted.
@@ -3783,8 +3755,8 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
         }
       }
       zx_status_t result = CloneCowPageAsZeroLocked(
-          offset, &freed_list, content.page_owner, content.page_or_marker->Page(),
-          content.owner_offset, page_request->GetAnonymous());
+          offset, deferred.FreedList(this).List(), content.page_owner,
+          content.page_or_marker->Page(), content.owner_offset, page_request->GetAnonymous());
       if (result != ZX_OK) {
         return result;
       }
@@ -3803,13 +3775,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
     // Free the old page.
     if (released_page.IsPage()) {
       vm_page_t* page = released_page.ReleasePage();
-      DEBUG_ASSERT(page->object.pin_count == 0);
-      // Already handled pager backed VMOs previously, and loaned pages cannot appear in anonymous
-      // VMOs.
-      DEBUG_ASSERT(!page->is_loaned());
-      pmm_page_queues()->Remove(page);
-      DEBUG_ASSERT(!list_in_list(&page->queue_node));
-      list_add_tail(&freed_list, &page->queue_node);
+      RemovePageLocked(page, deferred);
     } else if (released_page.IsReference()) {
       FreeReference(released_page.ReleaseReference());
     }
@@ -3842,12 +3808,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
                                          !is_root_source_user_pager_backed()))) {
           if (slot->IsPage()) {
             vm_page_t* page = slot->ReleasePage();
-            // Already handled pager backed VMOs previously, and loaned pages cannot appear in
-            // anonymous VMOs.
-            DEBUG_ASSERT(!page->is_loaned());
-            pmm_page_queues()->Remove(page);
-            DEBUG_ASSERT(!list_in_list(&page->queue_node));
-            list_add_tail(&freed_list, &page->queue_node);
+            RemovePageLocked(page, deferred);
           } else if (slot->IsReference()) {
             FreeReference(slot->ReleaseReference());
           } else {

@@ -566,8 +566,9 @@ class VmCowPages final : public VmHierarchyBase,
   //  operation. |zeroed_len_out| will contain the range that was partially zeroed, so the caller
   //  can advance the start offset before retrying.
   //  Any other error code indicates a failure to zero a part of the range or the whole range.
-  zx_status_t ZeroPagesLocked(VmCowRange range, bool dirty_track, MultiPageRequest* page_request,
-                              uint64_t* zeroed_len_out) TA_REQ(lock());
+  zx_status_t ZeroPagesLocked(VmCowRange range, bool dirty_track, DeferredOps& deferred,
+                              MultiPageRequest* page_request, uint64_t* zeroed_len_out)
+      TA_REQ(lock());
 
   // Attempts to commit a range of pages. This has three kinds of return status
   //  ZX_OK => The whole range was successfully committed and |len| will be written to
@@ -1548,7 +1549,7 @@ class VmCowPages final : public VmHierarchyBase,
   // |is_source_preserving_page_content| is true. |dirty_track| can be set to |true| if any zeroes
   // inserted are to be treated as Dirty, otherwise they are not dirty tracked.
   zx_status_t ZeroPagesPreservingContentLocked(uint64_t page_start_base, uint64_t page_end_base,
-                                               bool dirty_track, list_node_t* freed_list,
+                                               bool dirty_track, DeferredOps& deferred,
                                                MultiPageRequest* page_request,
                                                uint64_t* processed_len_out) TA_REQ(lock());
 
