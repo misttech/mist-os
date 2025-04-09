@@ -601,13 +601,13 @@ void Controller::OnClientDead(ClientProxy* client) {
   }
   if (client == virtcon_client_) {
     virtcon_client_ = nullptr;
-    virtcon_mode_ = fidl_display::wire::VirtconMode::kInactive;
+    virtcon_mode_ = fidl_display::wire::VirtconMode::kFallback;
     virtcon_client_ready_ = false;
   } else if (client == primary_client_) {
     primary_client_ = nullptr;
     primary_client_ready_ = false;
   } else {
-    ZX_DEBUG_ASSERT_MSG(false, "Dead client is neither vc nor primary\n");
+    ZX_DEBUG_ASSERT_MSG(false, "Dead client is neither Virtcon nor Primary\n");
   }
   HandleClientOwnershipChanges();
 

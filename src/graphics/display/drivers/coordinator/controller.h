@@ -238,7 +238,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   bool primary_client_ready_ __TA_GUARDED(mtx()) = false;
 
   fuchsia_hardware_display::wire::VirtconMode virtcon_mode_ __TA_GUARDED(mtx()) =
-      fuchsia_hardware_display::wire::VirtconMode::kInactive;
+      fuchsia_hardware_display::wire::VirtconMode::kFallback;
 
   std::unique_ptr<EngineDriverClient> engine_driver_client_;
 
