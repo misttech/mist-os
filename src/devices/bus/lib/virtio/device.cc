@@ -107,7 +107,7 @@ int Device::IrqThreadEntry(void* arg) {
 void Device::StartIrqThread() {
   ktl::array<char, ZX_MAX_NAME_LEN> name{};
   snprintf(name.data(), name.size(), "%s-irq-worker", tag());
-  irq_thread_ = Thread::Create(name.data(), IrqThreadEntry, this, DEFAULT_PRIORITY);
+  irq_thread_ = Thread::Create(name.data(), IrqThreadEntry, this, HIGH_PRIORITY);
   irq_thread_->Resume();
 }
 

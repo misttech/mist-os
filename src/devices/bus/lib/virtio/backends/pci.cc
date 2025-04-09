@@ -112,8 +112,7 @@ zx_status_t PciBackend::ConfigureInterruptMode() {
 
 zx::result<uint32_t> PciBackend::WaitForInterrupt() {
   zx_port_packet_t pp;
-  zx_status_t st =
-      wait_port_.dispatcher()->Dequeue(Deadline::after_mono(zx_duration_from_msec(100)), &pp);
+  zx_status_t st = wait_port_.dispatcher()->Dequeue(Deadline::after_mono(ZX_MSEC(100)), &pp);
   if (st != ZX_OK) {
     return zx::error(st);
   }
