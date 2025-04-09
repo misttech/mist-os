@@ -415,7 +415,7 @@ async fn server_component_controller(
         task_complete.into_stream().map(Event::Completion),
     );
 
-    if let Some(event) = stream.next().await {
+    while let Some(event) = stream.next().await {
         match event {
             Event::Controller(Ok(frunner::ComponentControllerRequest::Stop { .. })) => {
                 log_info!("Stopping the container.");
@@ -441,9 +441,16 @@ async fn server_component_controller(
                 log_info!(result:?; "init process exited.");
             }
         }
+
+        // We treat any event in the stream as an invitation to shut down.
+        if !kernel.is_shutting_down() {
+            kernel.shut_down();
+        }
     }
 
     log_debug!("done listening for container-terminating events");
+
+    // In case the stream ended without an event, shut down the kernel here.
     if !kernel.is_shutting_down() {
         kernel.shut_down();
     }
