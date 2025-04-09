@@ -11,25 +11,26 @@ group("tests") {
   testonly = true
 
   # This preserves the default audio driver testing (for now).
-  deps = [ ":audio_driver_basic_tests" ]
+  deps = [ ":basic" ]
 }
 
-group("all_tests") {
+group("all") {
   testonly = true
 
   deps = [
-    ":audio_driver_admin_tests",
-    ":audio_driver_basic_tests",
+    ":admin",
+    ":basic",
   ]
 
   # Certain test cases (e.g. position accuracy) are disabled by default (enabled by cmdline flag).
   # They have hard realtime constraints; debug builds are too slow.
   if (!is_debug) {
-    deps += [ ":audio_driver_realtime_tests" ]
+    deps += [ ":realtime" ]
   }
 }
 
-fuchsia_unittest_package("audio_driver_basic_tests") {
+fuchsia_unittest_package("basic") {
+  package_name = "audio_driver_basic_tests"
   manifest = "meta/audio_driver_basic_tests.cml"
   deps = [
     ":audio_driver_tests_bin",
@@ -47,7 +48,8 @@ fuchsia_unittest_package("audio_driver_basic_tests") {
   test_type = "device"
 }
 
-fuchsia_unittest_package("audio_driver_admin_tests") {
+fuchsia_unittest_package("admin") {
+  package_name = "audio_driver_admin_tests"
   manifest = "meta/audio_driver_admin_tests.cml"
   deps = [
     ":audio_driver_tests_bin",
@@ -65,7 +67,8 @@ fuchsia_unittest_package("audio_driver_admin_tests") {
   test_type = "device"
 }
 
-fuchsia_unittest_package("audio_driver_realtime_tests") {
+fuchsia_unittest_package("realtime") {
+  package_name = "audio_driver_realtime_tests"
   manifest = "meta/audio_driver_realtime_tests.cml"
   deps = [
     ":audio_driver_tests_bin",
