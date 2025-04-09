@@ -8,8 +8,8 @@ import asyncio
 import logging
 from typing import Any, Optional
 
-import fidl.fuchsia_bluetooth as f_bt
-import fidl.fuchsia_bluetooth_sys as f_btsys_controller
+import fidl_fuchsia_bluetooth as f_bt
+import fidl_fuchsia_bluetooth_sys as f_btsys_controller
 import fuchsia_controller_py as fc
 from fuchsia_controller_py import Channel
 
@@ -234,7 +234,7 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
 
     def connect_device(
         self,
-        identifier: str,
+        identifier: int,
         connection_type: BluetoothConnectionType = 1,
         timeout_sec: Optional[int | None] = None,
     ) -> None:
@@ -264,7 +264,7 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
             ) from e
 
     def forget_device(
-        self, identifier: str, timeout_sec: Optional[int | None] = None
+        self, identifier: int, timeout_sec: Optional[int | None] = None
     ) -> None:
         """Forget and delete peer device via Bluetooth.
 
@@ -391,7 +391,7 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
 
     def pair_device(
         self,
-        identifier: Any,
+        identifier: int,
         connection_type: BluetoothConnectionType = 1,
         timeout_sec: Optional[int | None] = None,
     ) -> None:

@@ -8,7 +8,7 @@ import datetime
 import unittest
 from unittest import mock
 
-import fidl.fuchsia_hardware_rtc as frtc
+import fidl_fuchsia_hardware_rtc as frtc
 import fuchsia_controller_py
 
 from honeydew import affordances_capable
@@ -63,7 +63,9 @@ class RtcFcTests(unittest.TestCase):
 
     def test_rtc_get(self) -> None:
         chip_time = frtc.Time(23, 50, 15, 5, 2, 2022)
-        self.m_run.return_value.response.rtc = chip_time
+        self.m_run.return_value = frtc.DeviceGetResult(
+            response=frtc.DeviceGetResponse(rtc=chip_time)
+        )
 
         want = datetime.datetime(
             chip_time.year,
@@ -90,7 +92,9 @@ class RtcFcTests(unittest.TestCase):
 
     def test_rtc_set(self) -> None:
         time = datetime.datetime(2022, 2, 5, 15, 50, 23)
-        self.m_run.return_value.response.status = ZX_OK
+        self.m_run.return_value = frtc.DeviceSetResult(
+            response=frtc.DeviceSetResponse(status=ZX_OK)
+        )
 
         want = frtc.Time(
             time.second, time.minute, time.hour, time.day, time.month, time.year
@@ -110,7 +114,9 @@ class RtcFcTests(unittest.TestCase):
         This tests the struct case.
         """
         time = datetime.datetime(2022, 2, 5, 15, 50, 23)
-        self.m_run.return_value.response.status = ZX_ERR_INTERNAL
+        self.m_run.return_value = frtc.DeviceSetResult(
+            response=frtc.DeviceSetResponse(status=ZX_ERR_INTERNAL)
+        )
 
         msg = r"Device\.Set\(\) error"
         with self.assertRaisesRegex(HoneydewRtcError, msg):

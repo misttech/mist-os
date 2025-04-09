@@ -10,9 +10,9 @@ from collections.abc import Callable
 from typing import Any
 from unittest import mock
 
-import fidl.fuchsia_bluetooth as f_bt
-import fidl.fuchsia_bluetooth_gatt2 as f_gatt_controller
-import fidl.fuchsia_bluetooth_le as f_ble_controller
+import fidl_fuchsia_bluetooth as f_bt
+import fidl_fuchsia_bluetooth_gatt2 as f_gatt_controller
+import fidl_fuchsia_bluetooth_le as f_ble_controller
 from parameterized import param, parameterized
 
 from honeydew import affordances_capable

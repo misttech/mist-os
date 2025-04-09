@@ -25,7 +25,7 @@ from honeydew.transports.ffx import ffx as ffx_transport
 
 # TODO: b/354239403: This can not be done today, but probably should be done at
 # some point:
-# import fidl.fuchsia_power_observability as fobs
+# import fidl_fuchsia_power_observability as fobs
 # Then, replace all labels appearing in constants.fidl with strings from there.
 
 _INPUT_ARGS: dict[str, object] = {

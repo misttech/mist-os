@@ -5,7 +5,7 @@
 
 import logging
 
-import fidl.fuchsia_location_namedplace as f_location_namedplace
+import fidl_fuchsia_location_namedplace as f_location_namedplace
 from fuchsia_controller_py import ZxStatus
 
 from honeydew import affordances_capable, errors

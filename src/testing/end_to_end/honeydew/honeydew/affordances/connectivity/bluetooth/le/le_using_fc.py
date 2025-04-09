@@ -9,9 +9,9 @@ import logging
 import uuid
 from typing import Any
 
-import fidl.fuchsia_bluetooth as f_bt
-import fidl.fuchsia_bluetooth_gatt2 as f_gatt_controller
-import fidl.fuchsia_bluetooth_le as f_ble_controller
+import fidl_fuchsia_bluetooth as f_bt
+import fidl_fuchsia_bluetooth_gatt2 as f_gatt_controller
+import fidl_fuchsia_bluetooth_le as f_ble_controller
 import fuchsia_controller_py as fc
 from fidl import StopServer
 from fuchsia_controller_py import Channel

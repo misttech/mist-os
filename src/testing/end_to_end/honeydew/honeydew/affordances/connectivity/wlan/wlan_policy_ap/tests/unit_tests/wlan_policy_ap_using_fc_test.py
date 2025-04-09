@@ -10,8 +10,8 @@ from contextlib import contextmanager
 from typing import TypeVar
 from unittest import mock
 
-import fidl.fuchsia_wlan_common as f_wlan_common
-import fidl.fuchsia_wlan_policy as f_wlan_policy
+import fidl_fuchsia_wlan_common as f_wlan_common
+import fidl_fuchsia_wlan_policy as f_wlan_policy
 from fuchsia_controller_py import Channel, ZxStatus
 
 from honeydew import affordances_capable
@@ -49,7 +49,7 @@ _ACCESS_POINT_STATE = AccessPointState(
 _ACCESS_POINT_STATE_FIDL = f_wlan_policy.AccessPointState(
     state=f_wlan_policy.OperatingState.STARTING,
     mode=f_wlan_policy.ConnectivityMode.LOCAL_ONLY,
-    band=f_wlan_policy.OperatingBand.ONLY_2_4GHZ,
+    band=f_wlan_policy.OperatingBand.ONLY_2_4_GHZ,
     frequency=None,
     clients=None,
     id_=f_wlan_policy.NetworkIdentifier(
@@ -146,7 +146,7 @@ class WlanPolicyApFCTests(unittest.TestCase):
         ap_provider_client.get_controller = mock.Mock(wraps=get_controller)
 
         with mock.patch(
-            "fidl.fuchsia_wlan_policy.AccessPointProviderClient", autospec=True
+            "fidl_fuchsia_wlan_policy.AccessPointProviderClient", autospec=True
         ) as fidl_mock:
             fidl_mock.return_value = ap_provider_client
             yield ap_provider_client
@@ -167,7 +167,7 @@ class WlanPolicyApFCTests(unittest.TestCase):
         ap_listener_client.get_listener = mock.Mock(wraps=get_listener)
 
         with mock.patch(
-            "fidl.fuchsia_wlan_policy.AccessPointListenerClient", autospec=True
+            "fidl_fuchsia_wlan_policy.AccessPointListenerClient", autospec=True
         ) as fidl_mock:
             fidl_mock.return_value = ap_listener_client
             yield ap_listener_client
@@ -180,7 +180,7 @@ class WlanPolicyApFCTests(unittest.TestCase):
         )
 
         with mock.patch(
-            "fidl.fuchsia_wlan_policy.AccessPointControllerClient",
+            "fidl_fuchsia_wlan_policy.AccessPointControllerClient",
             autospec=True,
         ) as fidl_mock:
             fidl_mock.return_value = ap_controller_client

@@ -5,12 +5,13 @@
 
 import asyncio
 import logging
+from typing import Sequence
 
-import fidl.fuchsia_location_namedplace as f_location_namedplace
-import fidl.fuchsia_wlan_common as f_wlan_common
-import fidl.fuchsia_wlan_device_service as f_wlan_device_service
-import fidl.fuchsia_wlan_ieee80211 as f_wlan_ieee80211
-import fidl.fuchsia_wlan_sme as f_wlan_sme
+import fidl_fuchsia_location_namedplace as f_location_namedplace
+import fidl_fuchsia_wlan_common as f_wlan_common
+import fidl_fuchsia_wlan_device_service as f_wlan_device_service
+import fidl_fuchsia_wlan_ieee80211 as f_wlan_ieee80211
+import fidl_fuchsia_wlan_sme as f_wlan_sme
 from fidl._client import FidlClient
 from fuchsia_controller_py import Channel, ZxStatus
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
@@ -191,8 +192,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             sme.connect(req=req, txn=server.take())
 
             # Wait for the driver to finish connecting.
-            response = await asyncio.wait_for(results.get(), timeout=60)
-            result = response.result
+            result = await asyncio.wait_for(results.get(), timeout=60)
         except ZxStatus as status:
             raise wlan_errors.HoneydewWlanError(
                 f"ClientSme.Connect() error {status}"
@@ -261,17 +261,22 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             )
 
         try:
-            create_iface = await self._device_monitor_proxy.create_iface(
-                phy_id=phy_id,
-                role=role.to_fidl(),
-                sta_addr=MacAddress(sta_addr).bytes(),
-            )
-        except ZxStatus as status:
+            create_iface_response = (
+                await self._device_monitor_proxy.create_iface(
+                    phy_id=phy_id,
+                    role=role.to_fidl(),
+                    sta_address=MacAddress(sta_addr).bytes(),
+                )
+            ).unwrap()
+        except (ZxStatus, AssertionError) as e:
             raise wlan_errors.HoneydewWlanError(
-                f"DeviceMonitor.CreateIface() error {status}"
-            ) from status
+                f"DeviceMonitor.CreateIface() error"
+            ) from e
 
-        return create_iface.iface_id
+        assert (
+            create_iface_response.iface_id is not None
+        ), f"{create_iface_response!r} missing iface_id"
+        return create_iface_response.iface_id
 
     @asyncmethod
     # pylint: disable-next=invalid-overridden-method
@@ -331,63 +336,59 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             The currently configured country code from `phy_id`.
 
         Raises:
-            HoneydewWlanError: Error from WLAN stack
+            HoneydewWlanError: DeviceMonitor.GetCountry error
         """
         try:
-            get_country = await self._device_monitor_proxy.get_country(
-                phy_id=phy_id
-            )
-            if get_country.err is not None:
-                raise ZxStatus(get_country.err)
-        except ZxStatus as status:
+            get_country_response = (
+                await self._device_monitor_proxy.get_country(phy_id=phy_id)
+            ).unwrap()
+        except (ZxStatus, AssertionError) as e:
             raise wlan_errors.HoneydewWlanError(
-                f"DeviceMonitor.GetCountry() error {status}"
-            ) from status
+                f"DeviceMonitor.GetCountry() error"
+            ) from e
 
         return CountryCode(
-            bytes(get_country.response.resp.alpha2).decode("utf-8")
+            bytes(get_country_response.resp.alpha2).decode("utf-8")
         )
 
     @asyncmethod
     # pylint: disable-next=invalid-overridden-method
-    async def get_iface_id_list(self) -> list[int]:
+    async def get_iface_id_list(self) -> Sequence[int]:
         """Get list of wlan iface IDs on device.
 
         Returns:
             A list of wlan iface IDs that are present on the device.
 
         Raises:
-            HoneydewWlanError: Error from WLAN stack
+            HoneydewWlanError: DeviceMonitor.ListIfaces error
         """
         return await self._get_iface_id_list()
 
-    async def _get_iface_id_list(self) -> list[int]:
+    async def _get_iface_id_list(self) -> Sequence[int]:
         try:
-            resp = await self._device_monitor_proxy.list_ifaces()
+            return (await self._device_monitor_proxy.list_ifaces()).iface_list
         except ZxStatus as status:
             raise wlan_errors.HoneydewWlanError(
                 f"DeviceMonitor.ListIfaces() error {status}"
             ) from status
-        return resp.iface_list
 
     @asyncmethod
     # pylint: disable-next=invalid-overridden-method
-    async def get_phy_id_list(self) -> list[int]:
+    async def get_phy_id_list(self) -> Sequence[int]:
         """Get list of phy ids on device.
 
         Returns:
             A list of phy ids that is present on the device.
 
         Raises:
-            HoneydewWlanError: Error from WLAN stack
+            HoneydewWlanError: DeviceMonitor.ListPhys error
         """
         try:
-            resp = await self._device_monitor_proxy.list_phys()
+            return (await self._device_monitor_proxy.list_phys()).phy_list
         except ZxStatus as status:
             raise wlan_errors.HoneydewWlanError(
                 f"DeviceMonitor.ListPhys() error {status}"
             ) from status
-        return resp.phy_list
 
     @asyncmethod
     # pylint: disable-next=invalid-overridden-method
@@ -407,16 +408,14 @@ class Wlan(AsyncAdapter, wlan.Wlan):
 
     async def _query_iface(self, iface_id: int) -> QueryIfaceResponse:
         try:
-            query = await self._device_monitor_proxy.query_iface(
-                iface_id=iface_id
-            )
-            if query.err is not None:
-                raise query.err
-        except ZxStatus as status:
+            query_iface_response = (
+                await self._device_monitor_proxy.query_iface(iface_id=iface_id)
+            ).unwrap()
+        except (ZxStatus, AssertionError) as e:
             raise wlan_errors.HoneydewWlanError(
-                f"DeviceMonitor.QueryIface() error {status}"
-            ) from status
-        return QueryIfaceResponse.from_fidl(query.response.resp)
+                f"DeviceMonitor.QueryIface() error"
+            ) from e
+        return QueryIfaceResponse.from_fidl(query_iface_response.resp)
 
     @asyncmethod
     # pylint: disable-next=invalid-overridden-method
@@ -438,20 +437,17 @@ class Wlan(AsyncAdapter, wlan.Wlan):
         req = f_wlan_sme.ScanRequest(passive=f_wlan_sme.PassiveScanRequest())
 
         try:
-            scan = await client_sme.scan_for_controller(req=req)
-        except ZxStatus as status:
+            scan_for_controller_response = (
+                await client_sme.scan_for_controller(req=req)
+            ).unwrap()
+        except (ZxStatus, AssertionError) as e:
             raise wlan_errors.HoneydewWlanError(
-                f"ClientSme.ScanForController() error {status}"
-            ) from status
-
-        if scan.err is not None:
-            raise wlan_errors.HoneydewWlanError(
-                f"ClientSme.ScanForController() ScanErrorCode {scan.err}"
-            )
+                f"ClientSme.ScanForController() error"
+            ) from e
 
         results: dict[str, list[BssDescription]] = {}
 
-        for scan_result in scan.response.scan_results:
+        for scan_result in scan_for_controller_response.scan_results:
             desc = BssDescription.from_fidl(scan_result.bss_description)
             ssid = desc.ssid()
             if ssid:
@@ -605,7 +601,7 @@ class ConnectTransactionEventHandler(f_wlan_sme.ConnectTransactionEventHandler):
         _LOGGER.debug(
             "ConnectTransaction.OnConnectResult() called with %s", req
         )
-        await self._connect_results.put(req)
+        await self._connect_results.put(req.result)
 
     def on_disconnect(
         self, req: f_wlan_sme.ConnectTransactionOnDisconnectRequest

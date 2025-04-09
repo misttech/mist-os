@@ -6,8 +6,8 @@
 
 import logging
 
-import fidl.fuchsia_bluetooth_gatt2 as f_gatt_controller
-import fidl.fuchsia_bluetooth_sys as f_btsys_controller
+import fidl_fuchsia_bluetooth_gatt2 as f_gatt_controller
+import fidl_fuchsia_bluetooth_sys as f_btsys_controller
 from fidl import StopServer
 
 from honeydew.affordances.connectivity.bluetooth.utils import (
@@ -61,6 +61,11 @@ class PairingDelegateImpl(f_btsys_controller.PairingDelegateServer):
             "Pairing was successful. Calling StopServer to unblock execution."
         )
         raise StopServer
+
+    def on_remote_keypress(self, *args, **kwargs) -> None:
+        raise NotImplementedError(
+            "Honeydew PairingDelegateImpl does not implement PairingDelegate.OnRemoteKeypress"
+        )
 
 
 class GattLocalServerImpl(f_gatt_controller.LocalServiceServer):

@@ -6,7 +6,7 @@
 import asyncio
 import datetime
 
-import fidl.fuchsia_hardware_rtc as frtc
+import fidl_fuchsia_hardware_rtc as frtc
 import fuchsia_controller_py
 
 from honeydew import affordances_capable
@@ -59,7 +59,7 @@ class RtcUisngFc(rtc.Rtc):
             self.__class__.MONIKER_NEW, CAPABILITY
         )
         try:
-            self._proxy: frtc.Device.Client = frtc.DeviceClient(
+            self._proxy: frtc.DeviceClient = frtc.DeviceClient(
                 self._controller.connect_device_proxy(ep_old)
             )
         except RuntimeError:
@@ -77,19 +77,19 @@ class RtcUisngFc(rtc.Rtc):
     def get(self) -> datetime.datetime:
         """See base class."""
         try:
-            time = asyncio.run(self._proxy.get())
-        except fuchsia_controller_py.ZxStatus as status:
-            msg = f"Device.Get() error {status}"
-            raise HoneydewRtcError(msg) from status
+            response = asyncio.run(self._proxy.get()).unwrap()
+        except (AssertionError, fuchsia_controller_py.ZxStatus) as e:
+            msg = f"Device.Get() error {e}"
+            raise HoneydewRtcError(msg) from e
 
-        response = time.response.rtc
+        time = response.rtc
         return datetime.datetime(
-            response.year,
-            response.month,
-            response.day,
-            response.hours,
-            response.minutes,
-            response.seconds,
+            time.year,
+            time.month,
+            time.day,
+            time.hours,
+            time.minutes,
+            time.seconds,
         )
 
     def set(self, time: datetime.datetime) -> None:
@@ -99,11 +99,11 @@ class RtcUisngFc(rtc.Rtc):
         )
 
         try:
-            result = asyncio.run(self._proxy.set_(rtc=ftime))
-        except fuchsia_controller_py.ZxStatus as status:
-            msg = f"Device.Set() error {status}"
-            raise HoneydewRtcError(msg) from status
+            response = asyncio.run(self._proxy.set_(rtc=ftime)).unwrap()
+        except (AssertionError, fuchsia_controller_py.ZxStatus) as e:
+            msg = f"Device.Set() error {e}"
+            raise HoneydewRtcError(msg) from e
 
-        if result.response.status != fuchsia_controller_py.ZxStatus.ZX_OK:
-            msg = f"Device.Set() error {result.response.status}"
+        if response.status != fuchsia_controller_py.ZxStatus.ZX_OK:
+            msg = f"Device.Set() error {response.status}"
             raise HoneydewRtcError(msg)

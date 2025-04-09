@@ -7,8 +7,8 @@ import unittest
 from unittest import mock
 
 import fidl
-import fidl.fuchsia_bluetooth as f_bt
-import fidl.fuchsia_bluetooth_sys as f_btsys_controller
+import fidl_fuchsia_bluetooth as f_bt
+import fidl_fuchsia_bluetooth_sys as f_btsys_controller
 from fuchsia_controller_py import Channel
 
 from honeydew.affordances.connectivity.bluetooth.utils import (

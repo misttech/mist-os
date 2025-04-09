@@ -10,12 +10,12 @@ from collections.abc import Callable
 from typing import Any
 from unittest import mock
 
-import fidl.fuchsia_buildinfo as f_buildinfo
-import fidl.fuchsia_developer_remotecontrol as fd_remotecontrol
-import fidl.fuchsia_feedback as f_feedback
-import fidl.fuchsia_hardware_power_statecontrol as fhp_statecontrol
-import fidl.fuchsia_hwinfo as f_hwinfo
-import fidl.fuchsia_io as f_io
+import fidl_fuchsia_buildinfo as f_buildinfo
+import fidl_fuchsia_developer_remotecontrol as fd_remotecontrol
+import fidl_fuchsia_feedback as f_feedback
+import fidl_fuchsia_hardware_power_statecontrol as fhp_statecontrol
+import fidl_fuchsia_hwinfo as f_hwinfo
+import fidl_fuchsia_io as f_io
 import fuchsia_controller_py as fuchsia_controller
 import fuchsia_inspect
 from fuchsia_controller_py import ZxStatus
@@ -150,19 +150,19 @@ _MOCK_ARGS: dict[str, str] = {
 
 _BASE64_ENCODED_BYTES: bytes = base64.b64decode("some base64 encoded string==")
 
-_MOCK_DEVICE_PROPERTIES: dict[str, dict[str, Any]] = {
-    "build_info": {
-        "version": "123456",
-    },
-    "device_info_from_fidl": {
-        "serial_number": "123456",
-    },
-    "product_info": {
-        "manufacturer": "default-manufacturer",
-        "model": "default-model",
-        "name": "default-product-name",
-    },
-}
+_MOCK_BUILD_INFO = f_buildinfo.BuildInfo(
+    version="123456",
+)
+
+_MOCK_DEVICE_INFO = f_hwinfo.DeviceInfo(
+    serial_number="123456",
+)
+
+_MOCK_PRODUCT_INFO = f_hwinfo.ProductInfo(
+    manufacturer="default-manufacturer",
+    model="default-model",
+    name="default-product-name",
+)
 
 
 def _custom_test_name_func(
@@ -1333,7 +1333,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         "get_build_info",
         new_callable=mock.AsyncMock,
         return_value=f_buildinfo.ProviderGetBuildInfoResponse(
-            build_info=_MOCK_DEVICE_PROPERTIES["build_info"]
+            build_info=_MOCK_BUILD_INFO
         ),
     )
     @mock.patch.object(
@@ -1348,9 +1348,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
     ) -> None:
         """Testcase for FuchsiaDevice._build_info property"""
         # pylint: disable=protected-access
-        self.assertEqual(
-            self.fd_fc_obj._build_info, _MOCK_DEVICE_PROPERTIES["build_info"]
-        )
+        self.assertEqual(self.fd_fc_obj._build_info, _MOCK_BUILD_INFO)
 
         mock_fc_connect_device_proxy.assert_called_once()
         mock_buildinfo_provider.assert_called()
@@ -1360,7 +1358,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         "get_build_info",
         new_callable=mock.AsyncMock,
         return_value=f_buildinfo.ProviderGetBuildInfoResponse(
-            build_info=_MOCK_DEVICE_PROPERTIES["build_info"]
+            build_info=_MOCK_BUILD_INFO
         ),
     )
     @mock.patch.object(
@@ -1389,9 +1387,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         f_hwinfo.DeviceClient,
         "get_info",
         new_callable=mock.AsyncMock,
-        return_value=f_hwinfo.DeviceGetInfoResponse(
-            info=_MOCK_DEVICE_PROPERTIES["device_info_from_fidl"]
-        ),
+        return_value=f_hwinfo.DeviceGetInfoResponse(info=_MOCK_DEVICE_INFO),
     )
     @mock.patch.object(
         fuchsia_controller_impl.FuchsiaControllerImpl,
@@ -1407,7 +1403,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         # pylint: disable=protected-access
         self.assertEqual(
             self.fd_fc_obj._device_info_from_fidl,
-            _MOCK_DEVICE_PROPERTIES["device_info_from_fidl"],
+            _MOCK_DEVICE_INFO,
         )
 
         mock_fc_connect_device_proxy.assert_called_once()
@@ -1417,9 +1413,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         f_hwinfo.DeviceClient,
         "get_info",
         new_callable=mock.AsyncMock,
-        return_value=f_hwinfo.DeviceGetInfoResponse(
-            info=_MOCK_DEVICE_PROPERTIES["device_info_from_fidl"]
-        ),
+        return_value=f_hwinfo.DeviceGetInfoResponse(info=_MOCK_DEVICE_INFO),
     )
     @mock.patch.object(
         fuchsia_controller_impl.FuchsiaControllerImpl,
@@ -1437,7 +1431,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         mock_hwinfo_device.side_effect = ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS)
         with self.assertRaises(fc_errors.FuchsiaControllerError):
             # pylint: disable=protected-access
-            _: dict[str, Any] = self.fd_fc_obj._device_info_from_fidl
+            _ = self.fd_fc_obj._device_info_from_fidl
 
         mock_fc_connect_device_proxy.assert_called_once()
 
@@ -1445,9 +1439,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         f_hwinfo.ProductClient,
         "get_info",
         new_callable=mock.AsyncMock,
-        return_value=f_hwinfo.ProductGetInfoResponse(
-            info=_MOCK_DEVICE_PROPERTIES["product_info"]
-        ),
+        return_value=f_hwinfo.ProductGetInfoResponse(info=_MOCK_PRODUCT_INFO),
     )
     @mock.patch.object(
         fuchsia_controller_impl.FuchsiaControllerImpl,
@@ -1463,7 +1455,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         # pylint: disable=protected-access
         self.assertEqual(
             self.fd_fc_obj._product_info,
-            _MOCK_DEVICE_PROPERTIES["product_info"],
+            _MOCK_PRODUCT_INFO,
         )
 
         mock_fc_connect_device_proxy.assert_called_once()
@@ -1473,9 +1465,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         f_hwinfo.ProductClient,
         "get_info",
         new_callable=mock.AsyncMock,
-        return_value=f_hwinfo.ProductGetInfoResponse(
-            info=_MOCK_DEVICE_PROPERTIES["product_info"]
-        ),
+        return_value=f_hwinfo.ProductGetInfoResponse(info=_MOCK_PRODUCT_INFO),
     )
     @mock.patch.object(
         fuchsia_controller_impl.FuchsiaControllerImpl,

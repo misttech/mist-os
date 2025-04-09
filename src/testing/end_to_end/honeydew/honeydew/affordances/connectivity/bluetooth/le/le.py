@@ -6,7 +6,7 @@
 import abc
 from typing import Any
 
-import fidl.fuchsia_bluetooth as f_bt
+import fidl_fuchsia_bluetooth as f_bt
 
 from honeydew.affordances.connectivity.bluetooth.bluetooth_common import (
     bluetooth_common,

@@ -10,12 +10,12 @@ from contextlib import contextmanager
 from typing import TypeVar
 from unittest import mock
 
-import fidl.fuchsia_location_namedplace as f_location_namedplace
-import fidl.fuchsia_wlan_common as f_wlan_common
-import fidl.fuchsia_wlan_common_security as f_wlan_common_security
-import fidl.fuchsia_wlan_device_service as f_wlan_device_service
-import fidl.fuchsia_wlan_ieee80211 as f_wlan_ieee80211
-import fidl.fuchsia_wlan_sme as f_wlan_sme
+import fidl_fuchsia_location_namedplace as f_location_namedplace
+import fidl_fuchsia_wlan_common as f_wlan_common
+import fidl_fuchsia_wlan_common_security as f_wlan_common_security
+import fidl_fuchsia_wlan_device_service as f_wlan_device_service
+import fidl_fuchsia_wlan_ieee80211 as f_wlan_ieee80211
+import fidl_fuchsia_wlan_sme as f_wlan_sme
 from fuchsia_controller_py import Channel, ZxStatus
 
 from honeydew import affordances_capable
@@ -222,12 +222,12 @@ class WlanFCTests(unittest.TestCase):
     def _mock_list_ifaces(self, zx_err: int | None = None) -> None:
         """Mock fuchsia.wlan.device.service.DeviceMonitor/QueryIface."""
         if zx_err:
-            self.wlan_obj._device_monitor_proxy.list_ifaces.return_value = (
+            self.wlan_obj._device_monitor_proxy.list_ifaces.return_value = (  # type: ignore[attr-defined]
                 _async_error(ZxStatus(zx_err))
             )
             return
 
-        self.wlan_obj._device_monitor_proxy.list_ifaces.return_value = (
+        self.wlan_obj._device_monitor_proxy.list_ifaces.return_value = (  # type: ignore[attr-defined]
             _async_response(
                 f_wlan_device_service.DeviceMonitorListIfacesResponse(
                     iface_list=[1]
@@ -238,12 +238,12 @@ class WlanFCTests(unittest.TestCase):
     def _mock_query_iface(self, zx_err: int | None = None) -> None:
         """Mock fuchsia.wlan.device.service.DeviceMonitor/QueryIface."""
         if zx_err:
-            self.wlan_obj._device_monitor_proxy.query_iface.return_value = (
+            self.wlan_obj._device_monitor_proxy.query_iface.return_value = (  # type: ignore[attr-defined]
                 _async_error(ZxStatus(zx_err))
             )
             return
 
-        self.wlan_obj._device_monitor_proxy.query_iface.return_value = (
+        self.wlan_obj._device_monitor_proxy.query_iface.return_value = (  # type: ignore[attr-defined]
             _async_response(_TEST_QUERY_IFACE_RESP_FC)
         )
 
@@ -252,10 +252,10 @@ class WlanFCTests(unittest.TestCase):
         """Mock fuchsia.wlan.sme.ClientSme for the duration of this context."""
         client_sme = mock.MagicMock(spec=f_wlan_sme.ClientSmeClient)
         with mock.patch(
-            "fidl.fuchsia_wlan_sme.ClientSmeClient", autospec=True
+            "fidl_fuchsia_wlan_sme.ClientSmeClient", autospec=True
         ) as f_client_sme:
             f_client_sme.return_value = client_sme
-            self.wlan_obj._device_monitor_proxy.get_client_sme.return_value = (
+            self.wlan_obj._device_monitor_proxy.get_client_sme.return_value = (  # type: ignore[attr-defined]
                 _async_response(None)
             )
             yield client_sme
@@ -327,8 +327,8 @@ class WlanFCTests(unittest.TestCase):
                             authentication=auth.to_fidl(),
                             deprecated_scan_type=f_wlan_common.ScanType.ACTIVE,
                         )
-                        self.assertListEqual(req.ssid, expect.ssid)
-                        self.assertListEqual(
+                        self.assertSequenceEqual(req.ssid, expect.ssid)
+                        self.assertSequenceEqual(
                             req.bss_description.bssid,
                             expect.bss_description.bssid,
                         )
@@ -486,8 +486,8 @@ class WlanFCTests(unittest.TestCase):
                     ).to_fidl(),
                     deprecated_scan_type=f_wlan_common.ScanType.ACTIVE,
                 )
-                self.assertListEqual(req.ssid, expect.ssid)
-                self.assertListEqual(
+                self.assertSequenceEqual(req.ssid, expect.ssid)
+                self.assertSequenceEqual(
                     req.bss_description.bssid, expect.bss_description.bssid
                 )
                 self.assertEqual(req.authentication, expect.authentication)
@@ -505,7 +505,10 @@ class WlanFCTests(unittest.TestCase):
             status_resp = f_wlan_sme.ClientStatusResponse(
                 connected=copy.deepcopy(_TEST_SERVING_AP_INFO)
             )
-            status_resp.connected.ssid.append(ord("2"))
+            assert status_resp.connected is not None
+            wrong_ssid = list(status_resp.connected.ssid)
+            wrong_ssid.append(ord("2"))
+            status_resp.connected.ssid = wrong_ssid
             client_sme.status.return_value = _async_response(
                 f_wlan_sme.ClientSmeStatusResponse(resp=status_resp)
             )
@@ -523,7 +526,10 @@ class WlanFCTests(unittest.TestCase):
         resp_wrong_ssid = f_wlan_sme.ClientStatusResponse(
             connected=copy.deepcopy(_TEST_SERVING_AP_INFO)
         )
-        resp_wrong_ssid.connected.ssid.append(ord("2"))
+        assert resp_wrong_ssid.connected is not None
+        wrong_ssid = list(resp_wrong_ssid.connected.ssid)
+        wrong_ssid.append(ord("2"))
+        resp_wrong_ssid.connected.ssid = wrong_ssid
 
         for msg, status_resp in [
             (
@@ -558,8 +564,8 @@ class WlanFCTests(unittest.TestCase):
                             ).to_fidl(),
                             deprecated_scan_type=f_wlan_common.ScanType.ACTIVE,
                         )
-                        self.assertListEqual(req.ssid, expect.ssid)
-                        self.assertListEqual(
+                        self.assertSequenceEqual(req.ssid, expect.ssid)
+                        self.assertSequenceEqual(
                             req.bss_description.bssid,
                             expect.bss_description.bssid,
                         )
@@ -602,8 +608,10 @@ class WlanFCTests(unittest.TestCase):
                 )
 
                 self.wlan_obj._device_monitor_proxy.create_iface.return_value = _async_response(
-                    f_wlan_device_service.DeviceMonitorCreateIfaceResponse(
-                        iface_id=phy_id,
+                    f_wlan_device_service.DeviceMonitorCreateIfaceResult(
+                        response=f_wlan_device_service.DeviceMonitorCreateIfaceResponse(
+                            iface_id=phy_id,
+                        )
                     )
                 )
                 self.assertEqual(
@@ -721,6 +729,9 @@ class WlanFCTests(unittest.TestCase):
                 expected=expected,
                 expected_err=expected_err,
             ):
+                assert isinstance(country_code, list)
+                assert all(isinstance(b, int) for b in country_code)
+
                 self.wlan_obj._device_monitor_proxy = mock.MagicMock(
                     spec=f_wlan_device_service.DeviceMonitorClient
                 )
@@ -820,7 +831,11 @@ class WlanFCTests(unittest.TestCase):
                     else:
                         compatibility = f_wlan_sme.Compatibility(
                             compatible=(
-                                f_wlan_common_security.Protocol.WPA2_PERSONAL
+                                f_wlan_sme.Compatible(
+                                    mutual_security_protocols=[
+                                        f_wlan_common_security.Protocol.WPA2_PERSONAL
+                                    ]
+                                )
                             )
                         )
                         if err is not None:
@@ -871,7 +886,7 @@ class WlanFCTests(unittest.TestCase):
                     spec=f_location_namedplace.RegulatoryRegionConfiguratorClient
                 )
                 with mock.patch(
-                    "fidl.fuchsia_location_namedplace.RegulatoryRegionConfiguratorClient",
+                    "fidl_fuchsia_location_namedplace.RegulatoryRegionConfiguratorClient",
                     autospec=True,
                 ) as f_regulatory_mock:
                     f_regulatory_mock.return_value = regulatory_mock

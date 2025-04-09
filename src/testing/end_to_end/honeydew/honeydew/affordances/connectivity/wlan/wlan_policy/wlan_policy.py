@@ -5,11 +5,12 @@
 
 import abc
 
+import fidl_fuchsia_wlan_common as f_wlan_common
+
 from honeydew.affordances import affordance
 from honeydew.affordances.connectivity.wlan.utils.types import (
     ClientStateSummary,
     NetworkConfig,
-    RequestStatus,
     SecurityType,
 )
 
@@ -21,7 +22,7 @@ class WlanPolicy(affordance.Affordance):
     @abc.abstractmethod
     def connect(
         self, target_ssid: str, security_type: SecurityType
-    ) -> RequestStatus:
+    ) -> f_wlan_common.RequestStatus:
         """Triggers connection to a network.
 
         Args:

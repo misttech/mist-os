@@ -142,7 +142,6 @@ python_library("honeydew_no_testonly") {
   library_deps = [
     ":honeydew_ffx_tool_deps",
     ":honeydew_fidl_ir_and_deps",
-    "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
     "//src/lib/diagnostics/python/fuchsia_inspect",
     "//third_party/pypng",
   ]
@@ -157,37 +156,6 @@ python_library("honeydew_no_testonly") {
   assert_no_deps = markers_partner_idk_host_tools_must_not_depend_on
 }
 
-# FIDL dependencies that will be used in Honeydew using Fuchsia-Controller.
-group("honeydew_fidl_ir_and_deps") {
-  # Needed for SDK inclusion.
-  testonly = false
-
-  data_deps = [
-    # Required by Fuchsia Controller usage in Honeydew affordances and device classes.
-    "//sdk/fidl/fuchsia.bluetooth.gatt2:fuchsia.bluetooth.gatt2_host_test_data(${toolchain_variant.base})",
-    "//sdk/fidl/fuchsia.bluetooth.le:fuchsia.bluetooth.le_host_test_data(${toolchain_variant.base})",
-    "//sdk/fidl/fuchsia.bluetooth.sys:fuchsia.bluetooth.sys_host_test_data(${toolchain_variant.base})",
-    "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_host_test_data(${toolchain_variant.base})",
-    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_host_test_data(${toolchain_variant.base})",
-    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_host_test_data(${toolchain_variant.base})",
-    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_host_test_data(${toolchain_variant.base})",
-    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_host_test_data(${toolchain_variant.base})",
-    "//sdk/fidl/fuchsia.hardware.rtc:fuchsia.hardware.rtc_host_test_data(${toolchain_variant.base})",
-    "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_host_test_data(${toolchain_variant.base})",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_host_test_data(${toolchain_variant.base})",
-    "//sdk/fidl/fuchsia.location.namedplace:fuchsia.location.namedplace_host_test_data(${toolchain_variant.base})",
-    "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_host_test_data(${toolchain_variant.base})",
-    "//sdk/fidl/fuchsia.net.root:fuchsia.net.root_host_test_data(${toolchain_variant.base})",
-    "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_host_test_data(${toolchain_variant.base})",
-    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_host_test_data(${toolchain_variant.base})",
-    "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_host_test_data(${toolchain_variant.base})",
-    "//sdk/fidl/fuchsia.wlan.policy:fuchsia.wlan.policy_host_test_data(${toolchain_variant.base})",
-
-    # Required by Fuchsia Controller itself.
-    "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
-  ]
-}
-
 # FFX tools that will be used in Honeydew.
 group("honeydew_ffx_tool_deps") {
   # Needed for SDK inclusion.
@@ -199,6 +167,33 @@ group("honeydew_ffx_tool_deps") {
     "//src/developer/ffx/plugins/session:ffx_session_tool_test_data",
     "//src/developer/ffx/plugins/test:ffx_test_tool_test_data",
     "//src/developer/ffx/tools/starnix:ffx_starnix_test_data",
+  ]
+}
+
+# FIDL dependencies that will be used in Honeydew using Fuchsia-Controller.
+group("honeydew_fidl_ir_and_deps") {
+  # Needed for SDK inclusion.
+  testonly = false
+
+  deps = [
+    "//sdk/fidl/fuchsia.bluetooth.gatt2:fuchsia.bluetooth.gatt2_python",
+    "//sdk/fidl/fuchsia.bluetooth.le:fuchsia.bluetooth.le_python",
+    "//sdk/fidl/fuchsia.bluetooth.sys:fuchsia.bluetooth.sys_python",
+    "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_python",
+    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_python",
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_python",
+    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_python",
+    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_python",
+    "//sdk/fidl/fuchsia.hardware.rtc:fuchsia.hardware.rtc_python",
+    "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_python",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_python",
+    "//sdk/fidl/fuchsia.location.namedplace:fuchsia.location.namedplace_python",
+    "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_python",
+    "//sdk/fidl/fuchsia.net.root:fuchsia.net.root_python",
+    "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_python",
+    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_python",
+    "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_python",
+    "//sdk/fidl/fuchsia.wlan.policy:fuchsia.wlan.policy_python",
   ]
 }
 

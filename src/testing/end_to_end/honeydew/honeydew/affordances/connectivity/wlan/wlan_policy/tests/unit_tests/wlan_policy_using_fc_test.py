@@ -10,8 +10,8 @@ from contextlib import contextmanager
 from typing import TypeVar
 from unittest import mock
 
-import fidl.fuchsia_wlan_common as f_wlan_common
-import fidl.fuchsia_wlan_policy as f_wlan_policy
+import fidl_fuchsia_wlan_common as f_wlan_common
+import fidl_fuchsia_wlan_policy as f_wlan_policy
 from fuchsia_controller_py import Channel, ZxStatus
 
 from honeydew import affordances_capable
@@ -24,7 +24,6 @@ from honeydew.affordances.connectivity.wlan.utils.types import (
     NetworkConfig,
     NetworkIdentifier,
     NetworkState,
-    RequestStatus,
     SecurityType,
     WlanClientState,
 )
@@ -183,15 +182,13 @@ class WlanPolicyFCTests(unittest.TestCase):
                 f_wlan_policy.ClientStateUpdatesClient(updates)
             )
 
-        self.wlan_policy_obj._client_provider_proxy.get_controller = mock.Mock(
-            wraps=get_controller
-        )
+        self.wlan_policy_obj._client_provider_proxy.get_controller = mock.Mock(wraps=get_controller)  # type: ignore[method-assign]
 
         client_controller_proxy = mock.MagicMock(
             spec=f_wlan_policy.ClientControllerClient
         )
         with mock.patch(
-            "fidl.fuchsia_wlan_policy.ClientControllerClient", autospec=True
+            "fidl_fuchsia_wlan_policy.ClientControllerClient", autospec=True
         ) as f_client_controller:
             f_client_controller.return_value = client_controller_proxy
             yield client_controller_proxy
@@ -213,7 +210,7 @@ class WlanPolicyFCTests(unittest.TestCase):
         client_listener_proxy.get_listener = mock.Mock(wraps=get_listener)
 
         with mock.patch(
-            "fidl.fuchsia_wlan_policy.ClientListenerClient", autospec=True
+            "fidl_fuchsia_wlan_policy.ClientListenerClient", autospec=True
         ) as f_client_listener:
             f_client_listener.return_value = client_listener_proxy
             yield client_listener_proxy
@@ -248,7 +245,7 @@ class WlanPolicyFCTests(unittest.TestCase):
                             status=f_wlan_common.RequestStatus.ACKNOWLEDGED
                         )
                     ),
-                    RequestStatus.ACKNOWLEDGED,
+                    f_wlan_common.RequestStatus.ACKNOWLEDGED,
                 ),
                 (
                     "not supported",
@@ -257,7 +254,7 @@ class WlanPolicyFCTests(unittest.TestCase):
                             status=f_wlan_common.RequestStatus.REJECTED_NOT_SUPPORTED
                         )
                     ),
-                    RequestStatus.REJECTED_NOT_SUPPORTED,
+                    f_wlan_common.RequestStatus.REJECTED_NOT_SUPPORTED,
                 ),
                 (
                     "incompatible mode",
@@ -266,7 +263,7 @@ class WlanPolicyFCTests(unittest.TestCase):
                             status=f_wlan_common.RequestStatus.REJECTED_INCOMPATIBLE_MODE
                         )
                     ),
-                    RequestStatus.REJECTED_INCOMPATIBLE_MODE,
+                    f_wlan_common.RequestStatus.REJECTED_INCOMPATIBLE_MODE,
                 ),
                 (
                     "already in use",
@@ -275,7 +272,7 @@ class WlanPolicyFCTests(unittest.TestCase):
                             status=f_wlan_common.RequestStatus.REJECTED_ALREADY_IN_USE
                         )
                     ),
-                    RequestStatus.REJECTED_ALREADY_IN_USE,
+                    f_wlan_common.RequestStatus.REJECTED_ALREADY_IN_USE,
                 ),
                 (
                     "duplicate request",
@@ -284,7 +281,7 @@ class WlanPolicyFCTests(unittest.TestCase):
                             status=f_wlan_common.RequestStatus.REJECTED_DUPLICATE_REQUEST
                         )
                     ),
-                    RequestStatus.REJECTED_DUPLICATE_REQUEST,
+                    f_wlan_common.RequestStatus.REJECTED_DUPLICATE_REQUEST,
                 ),
                 (
                     "internal error",
@@ -295,7 +292,7 @@ class WlanPolicyFCTests(unittest.TestCase):
                 with self.subTest(msg=msg, resp=resp, expected=expected):
                     client_controller.connect.reset_mock()
                     client_controller.connect.return_value = resp
-                    if expected:
+                    if expected is not None:
                         connect_resp = self.wlan_policy_obj.connect(
                             _TEST_SSID, SecurityType.NONE
                         )
@@ -382,8 +379,6 @@ class WlanPolicyFCTests(unittest.TestCase):
         with self._mock_create_client_controller():
             self.wlan_policy_obj.create_client_controller()
 
-            self.assertIsNotNone(self.client_state_updates_proxy)
-            self.assertIsNotNone(self.wlan_policy_obj._client_controller)
             assert self.client_state_updates_proxy is not None
             assert self.wlan_policy_obj._client_controller is not None
 
@@ -477,7 +472,7 @@ class WlanPolicyFCTests(unittest.TestCase):
             # Mock remove_network, which should be called once for each saved
             # network.
             res = f_wlan_policy.ClientControllerRemoveNetworkResult(
-                response=f_wlan_policy.ClientControllerRemoveNetworkResponse()
+                response=None
             )
             client_controller.remove_network.side_effect = [
                 _async_response(res),
@@ -505,7 +500,7 @@ class WlanPolicyFCTests(unittest.TestCase):
             self.wlan_policy_obj.create_client_controller()
 
             res = f_wlan_policy.ClientControllerRemoveNetworkResult(
-                response=f_wlan_policy.ClientControllerRemoveNetworkResponse()
+                response=None
             )
             client_controller.remove_network.return_value = _async_response(res)
 
@@ -559,9 +554,7 @@ class WlanPolicyFCTests(unittest.TestCase):
         with self._mock_create_client_controller() as client_controller:
             self.wlan_policy_obj.create_client_controller()
 
-            res = f_wlan_policy.ClientControllerSaveNetworkResult(
-                response=f_wlan_policy.ClientControllerSaveNetworkResponse()
-            )
+            res = f_wlan_policy.ClientControllerSaveNetworkResult(response=None)
             client_controller.save_network.return_value = _async_response(res)
 
             self.wlan_policy_obj.save_network(
@@ -635,14 +628,18 @@ class WlanPolicyFCTests(unittest.TestCase):
             )
 
             networks = self.wlan_policy_obj.scan_for_networks()
-            networks.sort()  # order does not matter
-            self.assertEqual(
-                networks,
-                [
+            networks.sort()
+            expected = list(
+                {
                     _TEST_SSID,
                     _TEST_SSID + "2",
                     _TEST_SSID + "3",
-                ],
+                }
+            )
+            expected.sort()
+            self.assertEqual(
+                networks,
+                expected,
             )
 
             assert self.scan_result_iterator is not None

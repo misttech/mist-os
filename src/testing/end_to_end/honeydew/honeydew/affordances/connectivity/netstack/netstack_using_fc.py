@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import logging
 
-import fidl.fuchsia_net_interfaces as f_net_interfaces
-import fidl.fuchsia_net_root as f_net_root
+import fidl_fuchsia_net_interfaces as f_net_interfaces
+import fidl_fuchsia_net_root as f_net_root
 from fuchsia_controller_py import Channel, ZxStatus
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 
@@ -143,12 +143,17 @@ class NetstackUsingFc(AsyncAdapter, netstack.Netstack):
 
             event = resp.event
             if event.existing:
+                assert (
+                    event.existing.id_ is not None
+                ), f"{event.existing!r} missing id"
                 try:
-                    res = await self._interfaces_proxy.get_mac(
-                        id_=event.existing.id_
-                    )
-
-                    if res.err:
+                    try:
+                        get_mac_response = (
+                            await self._interfaces_proxy.get_mac(
+                                id_=event.existing.id_
+                            )
+                        ).unwrap()
+                    except AssertionError:
                         _LOGGER.debug(
                             'Failed to find the MAC of interface "%s" (%s); '
                             "it no longer exists",
@@ -158,8 +163,10 @@ class NetstackUsingFc(AsyncAdapter, netstack.Netstack):
                         continue  # this is fine and sometimes even expected
 
                     mac = (
-                        MacAddress.from_bytes(bytes(res.response.mac.octets))
-                        if res.response.mac
+                        MacAddress.from_bytes(
+                            bytes(get_mac_response.mac.octets)
+                        )
+                        if get_mac_response.mac
                         else None
                     )
                 except ZxStatus as status:
