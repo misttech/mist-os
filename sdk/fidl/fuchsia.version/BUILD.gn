@@ -10,4 +10,5 @@ fidl("fuchsia.version") {
   sdk_area = "Unknown"
   sources = [ "version.fidl" ]
   enable_hlcpp = true
+  enable_rust_next = true
 }

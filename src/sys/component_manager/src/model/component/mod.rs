@@ -30,7 +30,8 @@ use ::routing::resolving::{
 };
 use async_trait::async_trait;
 use cm_rust::{
-    CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, UseDecl, UseStorageDecl,
+    CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, NativeIntoFidl, UseDecl,
+    UseStorageDecl,
 };
 use cm_types::{Name, Url};
 use cm_util::TaskGroup;
@@ -41,7 +42,7 @@ use errors::{
     OpenOutgoingDirError, ResolveActionError, StartActionError, StopActionError,
     StructuredConfigError,
 };
-use fidl::endpoints::create_proxy;
+use fidl::endpoints::{create_proxy, Proxy};
 use futures::future::{join_all, BoxFuture};
 use futures::lock::{MappedMutexGuard, Mutex, MutexGuard};
 use hooks::{Event, EventPayload, Hooks};
@@ -71,7 +72,8 @@ use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_component_sandbox as fsandbox,
-    fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
+    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess,
+    fuchsia_async as fasync,
 };
 
 pub type WeakComponentInstance = WeakComponentInstanceInterface<ComponentInstance>;
@@ -185,11 +187,45 @@ impl Component {
     }
 }
 
+impl From<&Component> for fresolution::Component {
+    fn from(component: &Component) -> fresolution::Component {
+        let bytes_to_fmem_data = |bytes: &[u8]| {
+            let vmo = zx::Vmo::create(bytes.len() as u64).unwrap();
+            vmo.write(&bytes, 0).unwrap();
+            fmem::Data::Buffer(fmem::Buffer { vmo, size: bytes.len() as u64 })
+        };
+        let decl = Some(bytes_to_fmem_data(
+            &fidl::persist(&component.decl.clone().native_into_fidl()).expect(
+                "we should always be able to persist a manifest that we got by unpersisting it",
+            ),
+        ));
+        let package = component.package.as_ref().map(|package| fresolution::Package {
+            url: Some(package.package_url.clone()),
+            directory: fuchsia_fs::directory::clone(&package.package_dir)
+                .ok()
+                .and_then(|proxy| proxy.into_client_end().ok()),
+            ..Default::default()
+        });
+        fresolution::Component {
+            url: Some(component.resolved_url.clone()),
+            decl,
+            package,
+            config_values: component
+                .config
+                .as_ref()
+                .map(|config| bytes_to_fmem_data(&config.clone().encode_as_fidl_struct())),
+            resolution_context: component.context_to_resolve_children.as_ref().map(Into::into),
+            abi_revision: component.abi_revision.as_ref().map(|abi_revision| abi_revision.as_u64()),
+            ..Default::default()
+        }
+    }
+}
+
 /// Package information possibly returned by the resolver.
 #[derive(Clone, Debug)]
 pub struct Package {
     /// The URL of the package itself.
-    pub _package_url: String,
+    pub package_url: String,
     /// The package that this resolved component belongs to
     pub package_dir: fio::DirectoryProxy,
 }
@@ -198,7 +234,7 @@ impl TryFrom<ResolvedPackage> for Package {
     type Error = ResolveActionError;
 
     fn try_from(package: ResolvedPackage) -> Result<Self, Self::Error> {
-        Ok(Self { _package_url: package.url, package_dir: package.directory.into_proxy() })
+        Ok(Self { package_url: package.url, package_dir: package.directory.into_proxy() })
     }
 }
 

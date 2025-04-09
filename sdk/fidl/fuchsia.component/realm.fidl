@@ -7,6 +7,7 @@ using fuchsia.io;
 using fuchsia.process;
 using fuchsia.component.decl;
 using fuchsia.component.sandbox;
+using fuchsia.component.resolution;
 
 /// The maximum number of handles that can be passed to a created component.
 const MAX_HANDLE_COUNT uint32 = 128;
@@ -122,6 +123,13 @@ closed protocol Realm {
         collection fuchsia.component.decl.CollectionRef;
         iter server_end:ChildIterator;
     }) -> () error Error;
+
+    /// Returns the set of information that was given to the component framework
+    /// by this component's resolver.
+    @available(added=HEAD)
+    strict GetResolvedInfo() -> (resource struct {
+        resolved_info fuchsia.component.resolution.Component;
+    }) error Error;
 };
 
 type CreateChildArgs = resource table {
