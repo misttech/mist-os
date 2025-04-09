@@ -782,8 +782,7 @@ class base_socket {
     if (response.is_error()) {
       return response.error_value();
     }
-    return client_.client_end().channel().wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite(),
-                                                   nullptr);
+    return ZX_OK;
   }
 
   zx_status_t CloneSocket(zx_handle_t* out_handle) {
