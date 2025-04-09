@@ -834,12 +834,11 @@ pub fn sys_sched_setaffinity(
     cpusetsize: u32,
     user_mask: UserAddress,
 ) -> Result<(), Errno> {
-    security::check_task_capable(current_task, CAP_SYS_NICE)?;
     if pid < 0 {
         return error!(EINVAL);
     }
     let weak = get_task_or_current(current_task, pid);
-    let _task = Task::from_weak(&weak)?;
+    let target_task = Task::from_weak(&weak)?;
 
     check_cpu_set_alignment(current_task, cpusetsize)?;
 
@@ -855,6 +854,12 @@ pub fn sys_sched_setaffinity(
     }
     if !has_valid_cpu_in_mask {
         return error!(EINVAL);
+    }
+
+    let friendly = current_task.creds().euid == target_task.creds().euid
+        || current_task.creds().euid == target_task.creds().uid;
+    if !friendly {
+        security::check_task_capable(current_task, CAP_SYS_NICE)?;
     }
 
     // Currently, we ignore the mask and act as if the system reset the mask

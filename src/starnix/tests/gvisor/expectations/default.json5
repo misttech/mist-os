@@ -336,9 +336,6 @@
                 "PrivateFutexTest.WakeOp0Xor",
                 "SharedPrivate/PrivateAndSharedFutexTest.PITryLock/*",
 
-                // getcpu_host_test and getcpu_test
-                "GetcpuTest.IsValidCpu",
-
                 // getdents_test
                 "GetdentsTest/0.TooLargeSize",
                 "GetdentsTest/1.TooLargeSize",
