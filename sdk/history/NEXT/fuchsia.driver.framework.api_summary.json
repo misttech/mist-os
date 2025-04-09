@@ -187,6 +187,12 @@
         "type": "vector<fuchsia.driver.framework/ParentSpec>"
     },
     {
+        "kind": "table/member",
+        "name": "fuchsia.driver.framework/CompositeNodeSpec.parents2",
+        "ordinal": "3",
+        "type": "vector<fuchsia.driver.framework/ParentSpec2>"
+    },
+    {
         "kind": "table",
         "name": "fuchsia.driver.framework/CompositeNodeSpec"
     },
@@ -199,6 +205,11 @@
         "kind": "enum/member",
         "name": "fuchsia.driver.framework/CompositeNodeSpecError.DRIVER_INDEX_FAILURE",
         "value": "4"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.driver.framework/CompositeNodeSpecError.DUPLICATE_PARENTS",
+        "value": "5"
     },
     {
         "kind": "enum/member",
@@ -976,6 +987,22 @@
     {
         "kind": "struct",
         "name": "fuchsia.driver.framework/ParentSpec"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/ParentSpec2.bind_rules",
+        "ordinal": "1",
+        "type": "vector<fuchsia.driver.framework/BindRule>:64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/ParentSpec2.properties",
+        "ordinal": "2",
+        "type": "vector<fuchsia.driver.framework/NodeProperty2>:64"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.driver.framework/ParentSpec2"
     },
     {
         "kind": "library",

@@ -76,10 +76,10 @@ void TestBindManagerBridge::AddSpecToDriverIndex(
 
 void TestBindManagerBridge::AddCompositeNodeSpec(
     std::string composite, std::vector<std::string> parent_names,
-    std::vector<fdf::ParentSpec> parents,
+    std::vector<fdf::ParentSpec2> parents,
     std::unique_ptr<driver_manager::CompositeNodeSpecImpl> spec) {
   fidl::Arena arena;
-  auto fidl_spec = fdf::CompositeNodeSpec{{.name = composite, .parents = std::move(parents)}};
+  auto fidl_spec = fdf::CompositeNodeSpec{{.name = composite, .parents2 = std::move(parents)}};
   specs_.emplace(composite, CompositeNodeSpecData{
                                 .spec = spec.get(),
                                 .fidl_info = fdf::CompositeInfo{{
@@ -236,14 +236,14 @@ void BindManagerTestBase::AddAndBindNode_EXPECT_QUEUED(
 
 void BindManagerTestBase::AddCompositeNodeSpec(std::string composite,
                                                std::vector<std::string> parents) {
-  std::vector<fdf::ParentSpec> parent_specs;
+  std::vector<fdf::ParentSpec2> parent_specs;
   parent_specs.reserve(parents.size());
   for (auto& parent : parents) {
     auto instance_id = GetOrAddInstanceId(parent);
-    parent_specs.push_back(fdf::ParentSpec{
+    parent_specs.push_back(fdf::ParentSpec2{
         {.bind_rules = {fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID,
                                                 instance_id)},
-         .properties = {fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id)}}});
+         .properties = {fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id)}}});
   }
 
   auto spec = std::make_unique<driver_manager::CompositeNodeSpecImpl>(

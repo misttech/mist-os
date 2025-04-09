@@ -16,7 +16,7 @@ class CompositeNodeSpecImplTest : public DriverManagerTestBase {
   driver_manager::NodeManager* GetNodeManager() override { return &node_manager; }
 
   driver_manager::CompositeNodeSpecImpl CreateCompositeNodeSpec(std::string name, size_t size) {
-    std::vector<fuchsia_driver_framework::ParentSpec> parents(size);
+    std::vector<fuchsia_driver_framework::ParentSpec2> parents(size);
     return driver_manager::CompositeNodeSpecImpl(
         driver_manager::CompositeNodeSpecCreateInfo{
             .name = std::move(name),
@@ -32,7 +32,7 @@ class CompositeNodeSpecImplTest : public DriverManagerTestBase {
         .composite = fuchsia_driver_framework::CompositeInfo{{
             .spec = fuchsia_driver_framework::CompositeNodeSpec{{
                 .name = spec.name(),
-                .parents = std::vector<fuchsia_driver_framework::ParentSpec>(parent_names.size()),
+                .parents2 = std::vector<fuchsia_driver_framework::ParentSpec2>(parent_names.size()),
             }},
             .matched_driver = fuchsia_driver_framework::CompositeDriverMatch{{
                 .composite_driver = fuchsia_driver_framework::CompositeDriverInfo{{

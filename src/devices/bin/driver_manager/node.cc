@@ -1552,21 +1552,6 @@ Node::GetNodeProperties(std::string_view parent_name) const {
   return {it->second};
 }
 
-std::optional<std::vector<fuchsia_driver_framework::NodeProperty>>
-Node::GetDeprecatedNodeProperties(std::string_view parent_name) const {
-  auto node_properties = GetNodeProperties(parent_name);
-  if (!node_properties) {
-    return std::nullopt;
-  }
-
-  std::vector<fuchsia_driver_framework::NodeProperty> deprecated_properties;
-  deprecated_properties.reserve(node_properties->size());
-  for (auto& property : node_properties.value()) {
-    deprecated_properties.emplace_back(ToDeprecatedProperty(property));
-  }
-  return deprecated_properties;
-}
-
 Node::DriverComponent::DriverComponent(
     Node& node, std::string url,
     fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,

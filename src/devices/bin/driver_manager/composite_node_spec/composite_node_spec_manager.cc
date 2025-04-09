@@ -12,7 +12,7 @@ namespace driver_manager {
 namespace fdd = fuchsia_driver_development;
 namespace fdfw = fuchsia_driver_framework;
 
-CompositeNodeSpecManager::CompositeNodeSpecManager(CompositeManagerBridge *bridge)
+CompositeNodeSpecManager::CompositeNodeSpecManager(CompositeManagerBridge* bridge)
     : bridge_(bridge) {}
 
 void CompositeNodeSpecManager::AddSpec(
@@ -20,7 +20,8 @@ void CompositeNodeSpecManager::AddSpec(
     std::unique_ptr<CompositeNodeSpec> spec,
     fit::callback<void(fit::result<fdfw::CompositeNodeSpecError>)> callback) {
   ZX_ASSERT(spec);
-  ZX_ASSERT(fidl_spec.has_name() && fidl_spec.has_parents() && !fidl_spec.parents().empty());
+  ZX_ASSERT(fidl_spec.has_name() && ((fidl_spec.has_parents() && !fidl_spec.parents().empty()) ||
+                                     fidl_spec.has_parents2() && !fidl_spec.parents2().empty()));
 
   auto name = std::string(fidl_spec.name().get());
   if (specs_.find(name) != specs_.end()) {
@@ -50,8 +51,8 @@ void CompositeNodeSpecManager::AddSpec(
 }
 
 zx::result<BindSpecResult> CompositeNodeSpecManager::BindParentSpec(
-    fidl::AnyArena &arena, fidl::VectorView<fdfw::wire::CompositeParent> composite_parents,
-    const NodeWkPtr &node_ptr, bool enable_multibind) {
+    fidl::AnyArena& arena, fidl::VectorView<fdfw::wire::CompositeParent> composite_parents,
+    const NodeWkPtr& node_ptr, bool enable_multibind) {
   if (composite_parents.empty()) {
     LOGF(ERROR, "composite_parents needs to contain as least one composite parent.");
     return zx::error(ZX_ERR_INVALID_ARGS);
@@ -72,14 +73,14 @@ zx::result<BindSpecResult> CompositeNodeSpecManager::BindParentSpec(
       continue;
     }
 
-    auto &composite = composite_parent.composite();
-    auto &index = composite_parent.index();
+    auto& composite = composite_parent.composite();
+    auto& index = composite_parent.index();
 
     if (!composite.has_matched_driver()) {
       continue;
     }
 
-    auto &matched_driver = composite.matched_driver();
+    auto& matched_driver = composite.matched_driver();
 
     if (!matched_driver.has_composite_driver() || !matched_driver.has_parent_names()) {
       LOGF(WARNING, "CompositeDriverMatch does not have all needed fields.");
@@ -91,26 +92,36 @@ zx::result<BindSpecResult> CompositeNodeSpecManager::BindParentSpec(
       continue;
     }
 
-    auto &spec_info = composite.spec();
+    auto& spec_info = composite.spec();
 
-    if (!spec_info.has_name() || !spec_info.has_parents()) {
+    if (!spec_info.has_name() || (!spec_info.has_parents() && !spec_info.has_parents2())) {
       LOGF(WARNING, "CompositeNodeSpec missing name or parents.");
       continue;
     }
 
-    auto &name = spec_info.name();
-    auto &parents = spec_info.parents();
+    auto check_parents = [&](auto parents) {
+      if (index >= parents.count()) {
+        LOGF(WARNING, "CompositeParent index is out of bounds.");
+        return true;
+      }
+      if (matched_driver.parent_names().count() != parents.count()) {
+        LOGF(WARNING, "Parent names count does not match the spec parent count.");
+        return true;
+      }
+      return false;
+    };
 
-    if (index >= parents.count()) {
-      LOGF(WARNING, "CompositeParent index is out of bounds.");
-      continue;
+    if (spec_info.has_parents()) {
+      if (check_parents(spec_info.parents())) {
+        continue;
+      }
+    } else {
+      if (check_parents(spec_info.parents2())) {
+        continue;
+      }
     }
 
-    if (matched_driver.parent_names().count() != parents.count()) {
-      LOGF(WARNING, "Parent names count does not match the spec parent count.");
-      continue;
-    }
-
+    auto& name = spec_info.name();
     auto name_val = std::string(name.get());
     if (specs_.find(name_val) == specs_.end()) {
       LOGF(ERROR, "Missing composite node spec %s", name_val.c_str());
@@ -122,7 +133,7 @@ zx::result<BindSpecResult> CompositeNodeSpecManager::BindParentSpec(
       continue;
     }
 
-    auto &spec = specs_[name_val];
+    auto& spec = specs_[name_val];
     auto result = spec->BindParent(composite_parent, node_ptr);
 
     if (result.is_error()) {
@@ -148,7 +159,7 @@ zx::result<BindSpecResult> CompositeNodeSpecManager::BindParentSpec(
   auto wire_parents =
       fidl::VectorView<fdfw::wire::CompositeParent>(arena, bound_composite_parents.size());
   int i = 0;
-  for (auto &bound_composite_parent : bound_composite_parents) {
+  for (auto& bound_composite_parent : bound_composite_parents) {
     wire_parents[i++] = bound_composite_parent;
   }
 
@@ -182,9 +193,9 @@ void CompositeNodeSpecManager::Rebind(std::string spec_name,
 }
 
 std::vector<fdd::wire::CompositeNodeInfo> CompositeNodeSpecManager::GetCompositeInfo(
-    fidl::AnyArena &arena) const {
+    fidl::AnyArena& arena) const {
   std::vector<fdd::wire::CompositeNodeInfo> composites;
-  for (auto &[name, spec] : specs_) {
+  for (auto& [name, spec] : specs_) {
     if (spec) {
       composites.push_back(spec->GetCompositeInfo(arena));
     }

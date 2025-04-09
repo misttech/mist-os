@@ -16,7 +16,7 @@ using RemoveCompositeNodeCallback = fit::callback<void(zx::result<>)>;
 
 struct CompositeNodeSpecCreateInfo {
   std::string name;
-  std::vector<fuchsia_driver_framework::ParentSpec> parents;
+  std::vector<fuchsia_driver_framework::ParentSpec2> parents;
 };
 
 // This partially abstract class represents a composite node spec and is responsible for managing
@@ -41,7 +41,7 @@ class CompositeNodeSpec {
   // rebind.
   void Remove(RemoveCompositeNodeCallback callback);
 
-  const std::vector<fuchsia_driver_framework::ParentSpec>& parent_specs() const {
+  const std::vector<fuchsia_driver_framework::ParentSpec2>& parent_specs() const {
     return parent_specs_;
   }
 
@@ -67,7 +67,7 @@ class CompositeNodeSpec {
  private:
   std::string name_;
   std::vector<std::optional<NodeWkPtr>> parent_nodes_;
-  std::vector<fuchsia_driver_framework::ParentSpec> parent_specs_;
+  std::vector<fuchsia_driver_framework::ParentSpec2> parent_specs_;
 };
 
 }  // namespace driver_manager

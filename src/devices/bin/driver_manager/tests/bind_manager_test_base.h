@@ -108,7 +108,7 @@ class TestBindManagerBridge final : public driver_manager::BindManagerBridge,
   }
 
   void AddCompositeNodeSpec(std::string composite, std::vector<std::string> parent_names,
-                            std::vector<fuchsia_driver_framework::ParentSpec> parents,
+                            std::vector<fuchsia_driver_framework::ParentSpec2> parents,
                             std::unique_ptr<driver_manager::CompositeNodeSpecImpl> spec);
 
   const std::unordered_map<std::string, CompositeNodeSpecData>& specs() const { return specs_; }

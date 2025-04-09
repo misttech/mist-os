@@ -53,11 +53,8 @@ zx::result<std::optional<NodeWkPtr>> CompositeNodeSpecImpl::BindParentImpl(
 
   ZX_ASSERT(parent_specs().size() > composite_parent.index());
 
-  std::vector<fuchsia_driver_framework::NodeProperty2> properties;
-  properties.reserve(parent_specs()[composite_parent.index()].properties().size());
-  for (auto& property : parent_specs()[composite_parent.index()].properties()) {
-    properties.emplace_back(ToProperty2(property));
-  }
+  std::vector<fuchsia_driver_framework::NodeProperty2> properties =
+      parent_specs()[composite_parent.index()].properties();
 
   zx::result<> add_result =
       parent_set_collector_->AddNode(composite_parent.index(), properties, node_ptr);
