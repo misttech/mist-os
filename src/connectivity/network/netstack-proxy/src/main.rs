@@ -14,9 +14,7 @@
 //! extract out the capabilities that are routed to netstack-proxy that are not
 //! used by netstack itself.
 
-use fidl::endpoints::DiscoverableProtocolMarker;
-
-use vfs::directory::entry_container::Directory;
+use fidl::endpoints::{DiscoverableProtocolMarker, Proxy as _};
 use vfs::directory::helper::DirectlyMutable;
 use {fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration, fuchsia_async as fasync};
 
@@ -98,21 +96,9 @@ pub async fn main() -> std::process::ExitCode {
         .unwrap_or_else(|e| panic!("failed to add entry {name}: {e:?}"));
     }
 
-    let scope = vfs::execution_scope::ExecutionScope::new();
-
-    let (svc_dir, server_end) = fidl::endpoints::create_endpoints::<fidl_fuchsia_io::NodeMarker>();
-    let flags = fidl_fuchsia_io::PERM_READABLE
-        | fidl_fuchsia_io::PERM_WRITABLE
-        | fidl_fuchsia_io::PERM_EXECUTABLE;
-    svc.open(
-        scope.clone(),
-        vfs::path::Path::dot(),
-        flags.clone(),
-        &mut vfs::ObjectRequest::new(flags, &Default::default(), server_end.into_channel()),
-    )
-    .expect("failed to create connection to service directory");
-
-    actions.push(fdio::SpawnAction::add_namespace_entry(c"/svc", svc_dir.into_channel().into()));
+    let svc_dir = vfs::directory::serve_read_only(svc);
+    let handle = svc_dir.into_client_end().unwrap().into();
+    actions.push(fdio::SpawnAction::add_namespace_entry(c"/svc", handle));
 
     // Pass down the configuration VMO if we have it.
     let config_vmo_handle_info = fuchsia_runtime::HandleType::ComponentConfigVmo.into();

@@ -212,7 +212,6 @@ mod tests {
     use std::collections::HashSet;
     use std::str::FromStr;
     use std::sync::Arc;
-    use vfs::directory::entry_container::Directory;
     use vfs::file::vmo::read_only;
     use {fidl_fuchsia_device as fdev, fuchsia_async as fasync};
 
@@ -299,50 +298,22 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn open_two_directories() {
-        let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-
         let root = vfs::pseudo_directory! {
             "test" => vfs::pseudo_directory! {
                 "dir" => vfs::pseudo_directory! {},
             },
         };
-        let flags: fio::Flags =
-            fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::Flags::PERM_EXECUTE;
-        let object_request =
-            vfs::ObjectRequest::new(flags, &Default::default(), server.into_channel());
-        object_request.handle(|object_request| {
-            root.clone().open(
-                vfs::execution_scope::ExecutionScope::new(),
-                vfs::path::Path::dot(),
-                fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::Flags::PERM_EXECUTE,
-                object_request,
-            )
-        });
-
+        let client = vfs::directory::serve_read_only(root);
         let directory = recursive_wait_and_open_directory(&client, "test/dir").await.unwrap();
         let () = directory.close().await.unwrap().unwrap();
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn open_directory_with_leading_slash() {
-        let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-
         let root = vfs::pseudo_directory! {
             "test" => vfs::pseudo_directory! {},
         };
-        let flags: fio::Flags =
-            fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::Flags::PERM_EXECUTE;
-        let object_request =
-            vfs::ObjectRequest::new(flags, &Default::default(), server.into_channel());
-        object_request.handle(|object_request| {
-            root.open(
-                vfs::execution_scope::ExecutionScope::new(),
-                vfs::path::Path::dot(),
-                flags,
-                object_request,
-            )
-        });
-
+        let client = vfs::directory::serve_read_only(root);
         let directory = recursive_wait_and_open_directory(&client, "/test").await.unwrap();
         let () = directory.close().await.unwrap().unwrap();
     }
