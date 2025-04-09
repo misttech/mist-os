@@ -359,6 +359,8 @@ impl InputEventsRelay {
                 while let Some(Ok(request)) = event_stream.next().await {
                     match request {
                         KeyboardListenerRequest::OnKeyEvent { event, responder } => {
+                            trace_duration!(c"input", c"starnix_process_keyboard_event");
+
                             let new_events = parse_fidl_keyboard_event_to_linux_input_event(&event);
 
                             let mut devs = slf.devices.lock();
@@ -467,6 +469,8 @@ impl InputEventsRelay {
 
             match next_event_future.await {
                 Some(Ok(fuipolicy::MediaButtonsListenerRequest::OnEvent { event, responder })) => {
+                    trace_duration!(c"input", c"starnix_process_button_event");
+
                     let batch =
                         parse_fidl_button_event(&event, power_was_pressed, function_was_pressed);
 

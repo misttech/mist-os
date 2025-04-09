@@ -43,8 +43,17 @@ impl UnhandledInputHandler for ModifierHandler {
                 device_event: InputDeviceEvent::Keyboard(mut event),
                 device_descriptor,
                 event_time,
-                trace_id: _,
+                trace_id,
             } => {
+                fuchsia_trace::duration!(c"input", c"modifier_handler");
+                if let Some(trace_id) = trace_id {
+                    fuchsia_trace::flow_step!(
+                        c"input",
+                        c"event_in_input_pipeline",
+                        trace_id.into()
+                    );
+                }
+
                 self.inspect_status.count_received_event(InputEvent::from(unhandled_input_event));
                 self.modifier_state.borrow_mut().update(event.get_event_type(), event.get_key());
                 self.lock_state.borrow_mut().update(event.get_event_type(), event.get_key());
@@ -57,7 +66,7 @@ impl UnhandledInputHandler for ModifierHandler {
                     device_descriptor,
                     event_time,
                     handled: Handled::No,
-                    trace_id: None,
+                    trace_id,
                 }]
             }
             // Pass other events through.
@@ -124,7 +133,7 @@ impl UnhandledInputHandler for ModifierMeaningHandler {
                 device_event: InputDeviceEvent::Keyboard(mut event),
                 device_descriptor,
                 event_time,
-                trace_id: _,
+                trace_id,
             } if event.get_key_meaning()
                 == Some(KeyMeaning::NonPrintableKey(NonPrintableKey::AltGraph)) =>
             {
@@ -145,7 +154,7 @@ impl UnhandledInputHandler for ModifierMeaningHandler {
                     device_descriptor,
                     event_time,
                     handled: Handled::No,
-                    trace_id: None,
+                    trace_id,
                 }]
             }
             // Pass other events through.

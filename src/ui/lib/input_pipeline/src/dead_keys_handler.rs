@@ -85,6 +85,7 @@ struct StoredEvent {
     event: KeyboardEvent,
     device_descriptor: InputDeviceDescriptor,
     event_time: zx::MonotonicInstant,
+    trace_id: Option<fuchsia_trace::Id>,
 }
 
 impl fmt::Display for StoredEvent {
@@ -103,7 +104,7 @@ impl Into<InputEvent> for StoredEvent {
             device_descriptor: self.device_descriptor,
             event_time: self.event_time,
             handled: Handled::No,
-            trace_id: None,
+            trace_id: self.trace_id,
         }
     }
 }
@@ -137,6 +138,7 @@ impl StoredEvent {
             event,
             device_descriptor: self.device_descriptor,
             event_time: self.event_time,
+            trace_id: self.trace_id,
         }
     }
 
@@ -349,10 +351,19 @@ impl DeadKeysHandler {
                 device_event: InputDeviceEvent::Keyboard(event),
                 device_descriptor,
                 event_time,
-                trace_id: _,
+                trace_id,
             } => {
+                fuchsia_trace::duration!(c"input", c"dead_keys_handler");
+                if let Some(trace_id) = trace_id {
+                    fuchsia_trace::flow_step!(
+                        c"input",
+                        c"event_in_input_pipeline",
+                        trace_id.into()
+                    );
+                }
+
                 self.inspect_status.count_received_event(InputEvent::from(unhandled_input_event));
-                let event = StoredEvent { event, device_descriptor, event_time };
+                let event = StoredEvent { event, device_descriptor, event_time, trace_id };
                 // Separated into two statements to ensure the logs are not truncated.
                 log::debug!("state: {:?}", self.state.borrow());
                 log::debug!("event: {}", &event);

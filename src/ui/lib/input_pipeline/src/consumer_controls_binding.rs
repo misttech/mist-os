@@ -239,12 +239,20 @@ impl ConsumerControlsBinding {
             }
         };
 
+        let trace_id: fuchsia_trace::Id = match report.trace_id {
+            Some(trace_id) => trace_id.into(),
+            None => fuchsia_trace::Id::new(),
+        };
+
+        fuchsia_trace::flow_begin!(c"input", c"event_in_input_pipeline", trace_id);
+
         send_consumer_controls_event(
             pressed_buttons,
             device_descriptor,
             input_event_sender,
             inspect_status,
             metrics_logger,
+            trace_id,
         );
 
         (Some(report), None)
@@ -258,12 +266,14 @@ impl ConsumerControlsBinding {
 /// - `device_descriptor`: The descriptor for the input device generating the input reports.
 /// - `sender`: The stream to send the InputEvent to.
 /// - `metrics_logger`: The metrics logger.
+/// - `trace_id`: The trace_id of this button event.
 fn send_consumer_controls_event(
     pressed_buttons: Vec<ConsumerControlButton>,
     device_descriptor: &input_device::InputDeviceDescriptor,
     sender: &mut UnboundedSender<input_device::InputEvent>,
     inspect_status: &InputDeviceStatus,
     metrics_logger: &metrics::MetricsLogger,
+    trace_id: fuchsia_trace::Id,
 ) {
     let event = input_device::InputEvent {
         device_event: input_device::InputDeviceEvent::ConsumerControls(ConsumerControlsEvent::new(
@@ -272,7 +282,7 @@ fn send_consumer_controls_event(
         device_descriptor: device_descriptor.clone(),
         event_time: zx::MonotonicInstant::get(),
         handled: Handled::No,
-        trace_id: None,
+        trace_id: Some(trace_id),
     };
 
     match sender.unbounded_send(event.clone()) {

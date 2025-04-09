@@ -448,6 +448,12 @@ impl KeyboardBinding {
             fuchsia_trace::flow_end!(c"input", c"input_report", trace_id.into());
         }
 
+        let tracing_id = match report.trace_id {
+            Some(id) => id.into(),
+            None => fuchsia_trace::Id::new(),
+        };
+        fuchsia_trace::flow_begin!(c"input", c"key_event_thread", tracing_id);
+
         inspect_status.count_received_report(&report);
         // Input devices can have multiple types so ensure `report` is a KeyboardInputReport.
         match &report.keyboard {
@@ -490,6 +496,7 @@ impl KeyboardBinding {
             input_event_sender.clone(),
             inspect_sender,
             metrics_logger,
+            tracing_id,
         );
 
         (Some(report), Some(inspect_receiver))
@@ -528,6 +535,7 @@ impl KeyboardBinding {
         input_event_sender: UnboundedSender<input_device::InputEvent>,
         inspect_sender: UnboundedSender<input_device::InputEvent>,
         metrics_logger: &metrics::MetricsLogger,
+        tracing_id: fuchsia_trace::Id,
     ) {
         // Dispatches all key events individually in a separate task.  This is done in a separate
         // function so that the lifetime of `new_keys` above could be detached from that of the
@@ -539,10 +547,18 @@ impl KeyboardBinding {
             input_event_sender: UnboundedSender<input_device::InputEvent>,
             inspect_sender: UnboundedSender<input_device::InputEvent>,
             metrics_logger: metrics::MetricsLogger,
+            tracing_id: fuchsia_trace::Id,
         ) {
             fasync::Task::local(async move {
+                fuchsia_trace::duration!(c"input", c"key_event_thread");
+                fuchsia_trace::flow_end!(c"input", c"key_event_thread", tracing_id);
+
                 let mut event_time = event_time;
                 for (key, event_type) in key_events.into_iter() {
+                    let trace_id = fuchsia_trace::Id::new();
+                    fuchsia_trace::duration!(c"input", c"keyboard_event_in_binding");
+                    fuchsia_trace::flow_begin!(c"input", c"event_in_input_pipeline", trace_id);
+
                     let event = input_device::InputEvent {
                         device_event: input_device::InputDeviceEvent::Keyboard(
                             KeyboardEvent::new(key, event_type),
@@ -550,7 +566,7 @@ impl KeyboardBinding {
                         device_descriptor: device_descriptor.clone(),
                         event_time,
                         handled: Handled::No,
-                        trace_id: None,
+                        trace_id: Some(trace_id),
                     };
                     match input_event_sender.unbounded_send(event.clone()) {
                         Err(error) => {
@@ -603,6 +619,7 @@ impl KeyboardBinding {
             input_event_sender,
             inspect_sender,
             metrics_logger.clone(),
+            tracing_id,
         );
     }
 }
