@@ -25,6 +25,10 @@ config("abi") {
     "-mno-3dnow",
     "-mno-avx",
     "-mno-avx2",
+
+    # Disable popcnt instruction (not supported by old processors)
+    # TODO (Herrera): check possible performance penalty in newer processors.
+    "-mno-popcnt",
   ]
 
   if (is_gcc) {
