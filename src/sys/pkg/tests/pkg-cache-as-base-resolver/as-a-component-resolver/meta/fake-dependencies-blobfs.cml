@@ -7,11 +7,24 @@
         runner: "elf",
         binary: "bin/base_resolver_fake_dependencies_bin",
     },
-    offer: [
+    capabilities: [
         {
-            protocol: "fuchsia.kernel.VmexResource",
-            from: "parent",
-            to: "#fs-collection",
+            protocol: "fuchsia.fxfs.BlobCreator",
+            path: "/fxfs-svc/fuchsia.fxfs.BlobCreator",
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobReader",
+            path: "/fxfs-svc/fuchsia.fxfs.BlobReader",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.fxfs.BlobCreator",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobReader",
+            from: "self",
         },
     ],
 }

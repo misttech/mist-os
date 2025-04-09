@@ -89,20 +89,9 @@ impl From<ffxfs::CreateBlobError> for CreateError {
 /// A builder for [`Client`]
 #[derive(Default)]
 pub struct ClientBuilder {
-    use_reader: Reader,
-    use_creator: bool,
     readable: bool,
     writable: bool,
     executable: bool,
-}
-
-#[derive(Default)]
-enum Reader {
-    #[default]
-    DontUse,
-    Use {
-        use_vmex: bool,
-    },
 }
 
 impl ClientBuilder {
@@ -121,28 +110,20 @@ impl ClientBuilder {
             flags |= fio::PERM_EXECUTABLE
         }
         let dir = fuchsia_fs::directory::open_in_namespace("/blob", flags)?;
-        let reader = match self.use_reader {
-            Reader::DontUse => None,
-            Reader::Use { use_vmex } => {
-                if use_vmex {
-                    if let Ok(client) = fuchsia_component::client::connect_to_protocol::<
-                        fidl_fuchsia_kernel::VmexResourceMarker,
-                    >() {
-                        if let Ok(vmex) = client.get().await {
-                            info!("Got vmex resource");
-                            vmo_blob::init_vmex_resource(vmex)
-                                .map_err(BlobfsError::InitVmexResource)?;
-                        }
-                    }
-                }
-                Some(
-                    fuchsia_component::client::connect_to_protocol::<ffxfs::BlobReaderMarker>()
-                        .map_err(BlobfsError::ConnectToBlobReader)?,
-                )
+        if let Ok(client) = fuchsia_component::client::connect_to_protocol::<
+            fidl_fuchsia_kernel::VmexResourceMarker,
+        >() {
+            if let Ok(vmex) = client.get().await {
+                info!("Got vmex resource");
+                vmo_blob::init_vmex_resource(vmex).map_err(BlobfsError::InitVmexResource)?;
             }
-        };
+        }
+        let reader = Some(
+            fuchsia_component::client::connect_to_protocol::<ffxfs::BlobReaderMarker>()
+                .map_err(BlobfsError::ConnectToBlobReader)?,
+        );
 
-        let creator = if self.use_creator {
+        let creator = if self.writable {
             Some(
                 fuchsia_component::client::connect_to_protocol::<ffxfs::BlobCreatorMarker>()
                     .map_err(BlobfsError::ConnectToBlobCreator)?,
@@ -154,23 +135,6 @@ impl ClientBuilder {
         Ok(Client { dir, creator, reader })
     }
 
-    /// [`Client`] will connect to and use fuchsia.fxfs/BlobReader for reads. Sets the VmexResource
-    /// for `Client`. The VmexResource is used by `get_backing_memory` to mark blobs as executable.
-    pub fn use_reader(self) -> Self {
-        Self { use_reader: Reader::Use { use_vmex: true }, ..self }
-    }
-
-    /// [`Client`] will connect to and use fuchsia.fxfs/BlobReader for reads. Does not set the
-    /// VmexResource.
-    pub fn use_reader_no_vmex(self) -> Self {
-        Self { use_reader: Reader::Use { use_vmex: false }, ..self }
-    }
-
-    /// If set, [`Client`] will connect to and use fuchsia.fxfs/BlobCreator for writes.
-    pub fn use_creator(self) -> Self {
-        Self { use_creator: true, ..self }
-    }
-
     /// If set, [`Client`] will connect to /blob in the current component's namespace with
     /// [`fio::PERM_READABLE`].
     pub fn readable(self) -> Self {
@@ -178,7 +142,8 @@ impl ClientBuilder {
     }
 
     /// If set, [`Client`] will connect to /blob in the current component's namespace with
-    /// [`fio::PERM_WRITABLE`] which needed so that [`Client::delete_blob`] can unlink the file.
+    /// [`fio::PERM_WRITABLE`] which needed so that [`Client::delete_blob`] can unlink the file,
+    /// and [`Client`] will connect to and use fuchsia.fxfs/BlobCreator for writes.
     pub fn writable(self) -> Self {
         Self { writable: true, ..self }
     }

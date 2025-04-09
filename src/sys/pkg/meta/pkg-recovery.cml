@@ -49,6 +49,14 @@
             ],
         },
         {
+            protocol: [
+                "fuchsia.fxfs.BlobCreator",
+                "fuchsia.fxfs.BlobReader",
+            ],
+            from: "parent",
+            to: "#pkg-cache",
+        },
+        {
             config: [
                 "fuchsia.pkgcache.AllPackagesExecutable",
                 "fuchsia.pkgcache.EnableUpgradablePackages",

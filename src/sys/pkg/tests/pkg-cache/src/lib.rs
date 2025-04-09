@@ -614,11 +614,9 @@ where
             "bootfs-blobs" => bootfs_blobs,
             "svc" => local_child_svc_dir,
         };
-        if matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob) {
-            local_child_out_dir
-                .add_entry("blob-svc", vfs::remote::remote_dir(blobfs.svc_dir()))
-                .unwrap();
-        }
+        local_child_out_dir
+            .add_entry("blob-svc", vfs::remote::remote_dir(blobfs.svc_dir()))
+            .unwrap();
 
         let local_child_out_dir = Mutex::new(Some(local_child_out_dir));
 
@@ -690,8 +688,7 @@ where
             builder
                 .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
                     name: "fuchsia.pkgcache.UseFxblob".parse().unwrap(),
-                    value: matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob)
-                        .into(),
+                    value: true.into(),
                 }))
                 .await
                 .unwrap();
@@ -782,28 +779,22 @@ where
             )
             .await
             .unwrap();
-        if matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob) {
-            builder
-                .add_route(
-                    Route::new()
-                        .capability(
-                            Capability::protocol::<ffxfs::BlobCreatorMarker>().path(format!(
-                                "/blob-svc/{}",
-                                ffxfs::BlobCreatorMarker::PROTOCOL_NAME
-                            )),
-                        )
-                        .capability(
-                            Capability::protocol::<ffxfs::BlobReaderMarker>().path(format!(
-                                "/blob-svc/{}",
-                                ffxfs::BlobReaderMarker::PROTOCOL_NAME
-                            )),
-                        )
-                        .from(&service_reflector)
-                        .to(&pkg_cache),
-                )
-                .await
-                .unwrap();
-        }
+        builder
+            .add_route(
+                Route::new()
+                    .capability(
+                        Capability::protocol::<ffxfs::BlobCreatorMarker>()
+                            .path(format!("/blob-svc/{}", ffxfs::BlobCreatorMarker::PROTOCOL_NAME)),
+                    )
+                    .capability(
+                        Capability::protocol::<ffxfs::BlobReaderMarker>()
+                            .path(format!("/blob-svc/{}", ffxfs::BlobReaderMarker::PROTOCOL_NAME)),
+                    )
+                    .from(&service_reflector)
+                    .to(&pkg_cache),
+            )
+            .await
+            .unwrap();
         builder
             .add_route(
                 Route::new()

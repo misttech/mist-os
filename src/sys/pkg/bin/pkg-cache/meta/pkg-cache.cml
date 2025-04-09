@@ -72,6 +72,8 @@
         {
             protocol: [
                 "fuchsia.boot.Arguments",
+                "fuchsia.fxfs.BlobCreator",
+                "fuchsia.fxfs.BlobReader",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.metrics.MetricEventLoggerFactory",
@@ -80,14 +82,6 @@
         },
         {
             protocol: "fuchsia.tracing.provider.Registry",
-            availability: "optional",
-        },
-        {
-            protocol: "fuchsia.fxfs.BlobCreator",
-            availability: "optional",
-        },
-        {
-            protocol: "fuchsia.fxfs.BlobReader",
             availability: "optional",
         },
         {

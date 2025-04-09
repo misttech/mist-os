@@ -39,14 +39,17 @@ impl Cache {
 #[cfg(test)]
 pub(crate) mod for_tests {
     use super::*;
-    use anyhow::Context as _;
     use blobfs_ramdisk::BlobfsRamdisk;
+    use fidl::endpoints::{ServerEnd, SynchronousProxy};
     use fuchsia_component_test::{
         Capability, ChildOptions, ChildRef, RealmBuilder, RealmInstance, Ref, Route,
     };
     use futures::prelude::*;
     use std::sync::Arc;
-    use {fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics, fuchsia_async as fasync};
+    use {
+        fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics,
+        fuchsia_async as fasync,
+    };
 
     pub struct CacheForTest {
         pub blobfs: blobfs_ramdisk::BlobfsRamdisk,
@@ -58,21 +61,63 @@ pub(crate) mod for_tests {
             realm_builder: &RealmBuilder,
             blobfs: &BlobfsRamdisk,
         ) -> Result<ChildRef, Error> {
-            let blobfs_proxy = blobfs.root_dir_proxy().context("getting root dir proxy").unwrap();
+            let blobfs_proxy = blobfs.root_dir_proxy().expect("getting root dir proxy");
+            let svc_dir = blobfs.svc_dir().expect("getting service dir proxy").unwrap();
 
             let local_mocks = realm_builder
                 .add_local_child(
                     "pkg_cache_service_reflector",
                     move |handles| {
                         let mut fs = fuchsia_component::server::ServiceFs::new();
-                        // Not necessary for updates, but prevents spam of irrelevant error logs.
-                        fs.dir("svc").add_fidl_service(move |stream| {
-                            fasync::Task::spawn(
-                                Arc::new(mock_metrics::MockMetricEventLoggerFactory::new())
-                                    .run_logger_factory(stream),
+                        let (creator_dir, server_end) =
+                            fidl::endpoints::create_sync_proxy::<fio::DirectoryMarker>();
+                        svc_dir
+                            .open(
+                                ".",
+                                fio::Flags::PERM_READ,
+                                &fio::Options::default(),
+                                server_end.into_channel(),
                             )
-                            .detach()
-                        });
+                            .unwrap();
+                        let (reader_dir, server_end) =
+                            fidl::endpoints::create_sync_proxy::<fio::DirectoryMarker>();
+                        svc_dir
+                            .open(
+                                ".",
+                                fio::Flags::PERM_READ,
+                                &fio::Options::default(),
+                                server_end.into_channel(),
+                            )
+                            .unwrap();
+                        // Not necessary for updates, but prevents spam of irrelevant error logs.
+                        fs.dir("svc")
+                            .add_fidl_service(move |stream| {
+                                fasync::Task::spawn(
+                                    Arc::new(mock_metrics::MockMetricEventLoggerFactory::new())
+                                        .run_logger_factory(stream),
+                                )
+                                .detach()
+                            })
+                            .add_service_connector(
+                                move |server_end: ServerEnd<ffxfs::BlobCreatorMarker>| {
+                                    fdio::service_connect_at(
+                                        creator_dir.as_channel(),
+                                        "fuchsia.fxfs.BlobCreator",
+                                        server_end.into_channel(),
+                                    )
+                                    .unwrap();
+                                },
+                            )
+                            .add_service_connector(
+                                move |server_end: ServerEnd<ffxfs::BlobReaderMarker>| {
+                                    fdio::service_connect_at(
+                                        reader_dir.as_channel(),
+                                        "fuchsia.fxfs.BlobReader",
+                                        server_end.into_channel(),
+                                    )
+                                    .unwrap();
+                                },
+                            );
                         fs.add_remote("blob", Clone::clone(&blobfs_proxy));
                         async move {
                             fs.serve_connection(handles.outgoing_dir).unwrap();
@@ -138,6 +183,17 @@ pub(crate) mod for_tests {
                     Route::new()
                         .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
                         .from(Ref::parent())
+                        .to(&pkg_cache),
+                )
+                .await
+                .unwrap();
+
+            realm_builder
+                .add_route(
+                    Route::new()
+                        .capability(Capability::protocol_by_name("fuchsia.fxfs.BlobCreator"))
+                        .capability(Capability::protocol_by_name("fuchsia.fxfs.BlobReader"))
+                        .from(&local_mocks)
                         .to(&pkg_cache),
                 )
                 .await

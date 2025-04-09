@@ -14,9 +14,19 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.kernel.VmexResource" ],
+            protocol: "fuchsia.fxfs.BlobCreator",
+            from: "#fake_dependencies",
+            to: "#pkg-cache",
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobReader",
+            from: "#fake_dependencies",
+            to: "#pkg-cache",
+        },
+        {
+            protocol: "fuchsia.kernel.VmexResource",
             from: "parent",
-            to: "#fake_dependencies",
+            to: "#pkg-cache",
         },
     ],
 }
