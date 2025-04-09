@@ -204,7 +204,7 @@ class UsbPeripheral : public UsbPeripheralType,
   void ClearFunctions();
   // Updates the internal state after all functions have finished being removed.
   void ClearFunctionsComplete() __TA_REQUIRES(lock_);
-  std::string GetSerialNumber();
+  zx::result<std::string> GetSerialNumber();
   zx_status_t DeviceStateChangedLocked() __TA_REQUIRES(lock_);
   zx_status_t AddFunctionDevices() __TA_REQUIRES(lock_);
   zx_status_t GetDescriptor(uint8_t request_type, uint16_t value, uint16_t index, void* buffer,
