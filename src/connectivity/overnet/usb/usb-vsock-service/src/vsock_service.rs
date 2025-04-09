@@ -8,6 +8,7 @@ use futures::channel::mpsc;
 use futures::{StreamExt, TryStreamExt};
 use log::{debug, error, info};
 use std::io::Error;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{self, Arc, Weak};
 use usb_vsock::{Address, Connection, PacketBuffer};
 use zx::Status;
@@ -18,6 +19,7 @@ use crate::ConnectionRequest;
 pub struct VsockService<B> {
     connection: sync::Mutex<Option<Weak<Connection<B>>>>,
     callback: CallbacksProxy,
+    current_cid: AtomicU32,
     scope: Scope,
 }
 
@@ -41,9 +43,13 @@ impl<B: PacketBuffer> VsockService<B> {
                 info!("Client callback set for vsock client");
                 let connection = Default::default();
                 let callback = cb.into_proxy();
+                // since we aren't connected to a host yet, we claim to be cid 3 (the first
+                // non-reserved cid). The host can override this when a new connection is
+                // established.
+                let current_cid = AtomicU32::new(3);
                 scope.spawn(Self::run_incoming_loop(incoming_connections, callback.clone()));
                 responder.send(Ok(())).map_err(Error::other)?;
-                Ok(Self { connection, callback, scope })
+                Ok(Self { connection, callback, scope, current_cid })
             }
             other => {
                 Err(Error::other(format!("unexpected message before start message: {other:?}")))
@@ -51,13 +57,18 @@ impl<B: PacketBuffer> VsockService<B> {
         }
     }
 
+    pub fn current_cid(&self) -> u32 {
+        self.current_cid.load(Ordering::Relaxed)
+    }
+
     /// Set the current connection to be used by the vsock service server.
     ///
     /// # Panics
     ///
     /// Panics if the current socket is already set.
-    pub async fn set_connection(&self, conn: Arc<Connection<B>>) {
-        self.callback.transport_reset(3).await.unwrap_or_else(log_callback_error);
+    pub async fn set_connection(&self, conn: Arc<Connection<B>>, cid: u32) {
+        self.current_cid.store(cid, Ordering::Relaxed);
+        self.callback.transport_reset(cid).await.unwrap_or_else(log_callback_error);
         let mut current = self.connection.lock().unwrap();
         if current.as_ref().and_then(Weak::upgrade).is_some() {
             panic!("Can only have one active connection set at a time");
@@ -71,17 +82,20 @@ impl<B: PacketBuffer> VsockService<B> {
     }
 
     async fn send_request(&self, addr: Addr, data: zx::Socket) -> Result<(), Status> {
+        log::trace!("sending request for connection to address {addr:?}");
         let cb = self.callback.clone();
         let connection = self.get_connection();
+        let device_cid = self.current_cid();
         self.scope.spawn(async move {
             let Some(connection) = connection else {
                 // immediately reject a connection request if we don't have a usb connection to
                 // put it on
+                debug!("connection to {addr:?} rejected due to lack of a host connection");
                 cb.rst(&addr).unwrap_or_else(log_callback_error);
                 return;
             };
             let status = match connection
-                .connect(from_fidl_addr(3, addr), Socket::from_socket(data))
+                .connect(from_fidl_addr(device_cid, addr), Socket::from_socket(data))
                 .await
             {
                 Ok(status) => status,
@@ -101,7 +115,7 @@ impl<B: PacketBuffer> VsockService<B> {
 
     async fn send_shutdown(&self, addr: Addr) -> Result<(), Status> {
         if let Some(connection) = self.get_connection() {
-            connection.close(&from_fidl_addr(3, addr)).await;
+            connection.close(&from_fidl_addr(self.current_cid(), addr)).await;
         } else {
             // this connection can't exist so just tell the caller that it was reset.
             self.callback.rst(&addr).unwrap_or_else(log_callback_error);
@@ -111,7 +125,7 @@ impl<B: PacketBuffer> VsockService<B> {
 
     async fn send_rst(&self, addr: Addr) -> Result<(), Status> {
         if let Some(connection) = self.get_connection() {
-            connection.reset(&from_fidl_addr(3, addr)).await.ok();
+            connection.reset(&from_fidl_addr(self.current_cid(), addr)).await.ok();
         }
         Ok(())
     }
@@ -121,7 +135,7 @@ impl<B: PacketBuffer> VsockService<B> {
         // it through the state machine. Since the main client of this particular api should be
         // keeping track on its own, and we will ignore accepts of unknown addresses, this should be
         // fine.
-        let address = from_fidl_addr(3, addr);
+        let address = from_fidl_addr(self.current_cid(), addr);
         let request = ConnectionRequest::new(address.clone());
         let Some(connection) = self.get_connection() else {
             error!("Tried to accept connection for {address:?} on usb connection that is not open");
@@ -174,7 +188,7 @@ impl<B: PacketBuffer> VsockService<B> {
                 SendResponse { addr, data, responder } => responder
                     .send(self.send_response(addr, data).await.map_err(Status::into_raw))
                     .map_err(Error::other)?,
-                GetCid { responder } => responder.send(3).map_err(Error::other)?,
+                GetCid { responder } => responder.send(self.current_cid()).map_err(Error::other)?,
             }
         }
         Ok(())
