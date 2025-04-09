@@ -75,7 +75,6 @@ template("sherlock_driver") {
       "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
       "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib_cpp",
-      "//sdk/fidl/fuchsia.hardware.gpt.metadata:fuchsia.hardware.gpt.metadata_cpp",
       "//sdk/fidl/fuchsia.hardware.gpu.amlogic:fuchsia.hardware.gpu.amlogic_cpp",
       "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_bindlib_cpp",
