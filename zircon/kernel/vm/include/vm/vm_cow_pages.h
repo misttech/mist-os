@@ -1752,20 +1752,26 @@ class VmCowPages::LookupCursor {
   // reference to the zero page. |will_write| indicates if this page needs to be writable or not,
   // which for an owned and allocated page just involves a potential dirty request / transition.
   zx::result<RequireResult> RequireOwnedPage(bool will_write, uint max_request_pages,
-                                             MultiPageRequest* page_request) TA_REQ(lock());
+                                             DeferredOps& deferred, MultiPageRequest* page_request)
+      TA_REQ(lock());
 
   // Returned page will only be read from. This can return zero pages or pages from a parent VMO.
-  zx::result<RequireResult> RequireReadPage(uint max_request_pages, MultiPageRequest* page_request)
-      TA_REQ(lock());
+  // A DeferredOps is required to be passed in, even though a Read does not ever directly generate
+  // any deferred actions, to enforce the requirement that all operations on a pager backed VMO are
+  // serialized with the paged_vmo_lock. Having to present a DeferredOps here is a simple way to
+  // ensure this lock is held.
+  zx::result<RequireResult> RequireReadPage(uint max_request_pages, DeferredOps& deferred,
+                                            MultiPageRequest* page_request) TA_REQ(lock());
 
   // Returned page will be readable or writable based on the |will_write| flag.
   zx::result<RequireResult> RequirePage(bool will_write, uint max_request_pages,
-                                        MultiPageRequest* page_request) TA_REQ(lock()) {
+                                        DeferredOps& deferred, MultiPageRequest* page_request)
+      TA_REQ(lock()) {
     // Being writable implies owning the page, so forward to the correct operation.
     if (will_write) {
-      return RequireOwnedPage(true, max_request_pages, page_request);
+      return RequireOwnedPage(true, max_request_pages, deferred, page_request);
     }
-    return RequireReadPage(max_request_pages, page_request);
+    return RequireReadPage(max_request_pages, deferred, page_request);
   }
 
   // The IfExistPages methods is intended to be cheaper than the Require* methods and to allow for
@@ -1948,6 +1954,7 @@ class VmCowPages::LookupCursor {
   // page is inserted into target at the current offset_ and the cursor is incremented.
   zx::result<RequireResult> TargetAllocateCopyPageAsResult(vm_page_t* source,
                                                            DirtyState dirty_state,
+                                                           VmCowPages::DeferredOps& deferred,
                                                            AnonymousPageRequest* page_request)
       TA_REQ(lock());
 

@@ -813,8 +813,9 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
           for (uint64_t off = 0; off < len; off += PAGE_SIZE) {
             vm_page_t* page = nullptr;
             if (commit) {
+              __UNINITIALIZED VmCowPages::DeferredOps deferred(paged->MakeDeferredOpsLocked());
               __UNINITIALIZED zx::result<VmCowPages::LookupCursor::RequireResult> result =
-                  cursor->RequireOwnedPage(writing, 1, &page_request);
+                  cursor->RequireOwnedPage(writing, 1, deferred, &page_request);
               if (result.is_error()) {
                 zx_status_t status = result.error_value();
                 // As per the comment above page_request definition, there should never be commit
@@ -1093,8 +1094,9 @@ ktl::pair<zx_status_t, uint32_t> VmMapping::PageFaultLocked(vaddr_t va, const ui
       uint curr_mmu_flags = range.mmu_flags;
 
       uint num_curr_pages = static_cast<uint>(num_required_pages - (offset / PAGE_SIZE));
+      __UNINITIALIZED VmCowPages::DeferredOps deferred(paged->MakeDeferredOpsLocked());
       __UNINITIALIZED zx::result<VmCowPages::LookupCursor::RequireResult> result =
-          cursor->RequirePage(write, num_curr_pages, page_request);
+          cursor->RequirePage(write, num_curr_pages, deferred, page_request);
       if (result.is_error()) {
         coalescer.Flush();
         return {result.error_value(), coalescer.TotalMapped()};

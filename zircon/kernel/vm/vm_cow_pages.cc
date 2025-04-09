@@ -2618,6 +2618,7 @@ bool VmCowPages::LookupCursor::TargetZeroContentSupplyDirty(bool writing) const 
 
 zx::result<VmCowPages::LookupCursor::RequireResult>
 VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, DirtyState dirty_state,
+                                                         VmCowPages::DeferredOps& deferred,
                                                          AnonymousPageRequest* page_request) {
   vm_page_t* out_page = nullptr;
   zx_status_t status =
@@ -2664,12 +2665,9 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
     return page_transaction.take_error();
   }
 
-  {
-    __UNINITIALIZED DeferredOps deferred(target_, DeferredOps::LockedTag{});
-    [[maybe_unused]] VmPageOrMarker old = target_->CompleteAddPageLocked(
-        *page_transaction, VmPageOrMarker::Page(out_page), &deferred);
-    DEBUG_ASSERT(!old.IsPageOrRef());
-  }
+  [[maybe_unused]] VmPageOrMarker old =
+      target_->CompleteAddPageLocked(*page_transaction, VmPageOrMarker::Page(out_page), &deferred);
+  DEBUG_ASSERT(!old.IsPageOrRef());
 
   // If asked to explicitly mark zero forks, and this is actually fork of the zero page, move to the
   // correct queue. Discardable pages are not considered zero forks as they are always in the
@@ -2912,7 +2910,8 @@ uint VmCowPages::LookupCursor::IfExistPages(bool will_write, uint max_pages, pad
 }
 
 zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::RequireOwnedPage(
-    bool will_write, uint max_request_pages, MultiPageRequest* page_request) {
+    bool will_write, uint max_request_pages, DeferredOps& deferred,
+    MultiPageRequest* page_request) {
   DEBUG_ASSERT(page_request);
 
   // Make sure the cursor is valid.
@@ -2943,7 +2942,6 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
       if (owner_cursor_->Page()->is_loaned()) {
         vm_page_t* res_page = nullptr;
         DEBUG_ASSERT(is_page_clean(owner_cursor_->Page()));
-        __UNINITIALIZED DeferredOps deferred(target_, DeferredOps::LockedTag{});
         zx_status_t status =
             target_->ReplacePageLocked(owner_cursor_->Page(), offset_, /*with_loaned=*/false,
                                        &res_page, deferred, page_request->GetAnonymous());
@@ -2983,10 +2981,9 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
     pmm_page_queues()->MarkAccessed(owner_cursor_->Page());
     if (!owner()->is_hidden()) {
       // Directly copying the page from the owner into the target.
-      return TargetAllocateCopyPageAsResult(owner_cursor_->Page(), DirtyState::Untracked,
+      return TargetAllocateCopyPageAsResult(owner_cursor_->Page(), DirtyState::Untracked, deferred,
                                             page_request->GetAnonymous());
     }
-    __UNINITIALIZED DeferredOps deferred(target_, DeferredOps::LockedTag{});
     zx_status_t result = target_->CloneCowPageLocked(
         offset_, alloc_list_, owner(), owner_cursor_->Page(), owner_info_.owner_offset_, deferred,
         page_request->GetAnonymous(), &res_page);
@@ -3026,7 +3023,7 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
     // Allocate the page and mark it dirty or clean as previously determined.
     return TargetAllocateCopyPageAsResult(vm_get_zero_page(),
                                           target_page_dirty ? DirtyState::Dirty : DirtyState::Clean,
-                                          page_request->GetAnonymous());
+                                          deferred, page_request->GetAnonymous());
   }
   DEBUG_ASSERT(CursorIsEmpty());
 
@@ -3036,7 +3033,7 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
 }
 
 zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::RequireReadPage(
-    uint max_request_pages, MultiPageRequest* page_request) {
+    uint max_request_pages, DeferredOps& deferred, MultiPageRequest* page_request) {
   DEBUG_ASSERT(page_request);
 
   // Make sure the cursor is valid.
@@ -3150,8 +3147,9 @@ zx_status_t VmCowPages::CommitRangeLocked(VmCowRange range, uint64_t* committed_
   zx_status_t status = ZX_OK;
   uint64_t offset = start_offset;
   while (offset < end) {
+    __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
     __UNINITIALIZED zx::result<VmCowPages::LookupCursor::RequireResult> result =
-        cursor->RequireOwnedPage(false, static_cast<uint>((end - offset) / PAGE_SIZE),
+        cursor->RequireOwnedPage(false, static_cast<uint>((end - offset) / PAGE_SIZE), deferred,
                                  page_request);
 
     if (result.is_error()) {
@@ -3399,8 +3397,9 @@ zx_status_t VmCowPages::ZeroPagesPreservingContentLocked(uint64_t page_start_bas
               // ensures that we request dirty transition if needed by the pager.
               LookupCursor cursor(this, VmCowRange(off, PAGE_SIZE));
               AssertHeld(cursor.lock_ref());
+              __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
               zx::result<LookupCursor::RequireResult> result =
-                  cursor.RequireOwnedPage(true, 1, page_request);
+                  cursor.RequireOwnedPage(true, 1, deferred, page_request);
               if (result.is_error()) {
                 return result.error_value();
               }
@@ -3768,7 +3767,8 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
         return cursor.error_value();
       }
       AssertHeld(cursor->lock_ref());
-      auto result = cursor->RequirePage(true, 1, page_request);
+      __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
+      auto result = cursor->RequirePage(true, 1, deferred, page_request);
       if (result.is_error()) {
         return result.error_value();
       }
@@ -4119,6 +4119,7 @@ zx_status_t VmCowPages::ProtectRangeFromReclamation(VmCowRange range, bool set_a
     vm_page_t* loaned_page = nullptr;
     zx_status_t status;
     {
+      __UNINITIALIZED DeferredOps deferred(this);
       Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
       // The size might have changed since we dropped the lock. Adjust the range if required.
       if (range.offset >= size_) {
@@ -4141,8 +4142,8 @@ zx_status_t VmCowPages::ProtectRangeFromReclamation(VmCowRange range, bool set_a
       for (; !range.is_empty(); range = range.TrimedFromStart(PAGE_SIZE)) {
         // Lookup the page, this will fault in the page from the parent if necessary, but will not
         // allocate pages directly in this if it is a child.
-        auto result =
-            cursor->RequirePage(false, static_cast<uint>(range.len / PAGE_SIZE), &page_request);
+        auto result = cursor->RequirePage(false, static_cast<uint>(range.len / PAGE_SIZE), deferred,
+                                          &page_request);
         status = result.status_value();
         if (status != ZX_OK) {
           break;
@@ -4804,7 +4805,7 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(VmCowRange range, VmPageSplice
     {
       // Once we have a zero page ready to go, require an owned page at the current position.
       auto result = cursor->RequireOwnedPage(true, static_cast<uint>((end - position) / PAGE_SIZE),
-                                             page_request);
+                                             deferred, page_request);
       if (result.is_error()) {
         status = result.error_value();
         break;
@@ -4994,7 +4995,7 @@ zx_status_t VmCowPages::SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pa
     AssertHeld(cursor->lock_ref());
     while (position < end) {
       auto result = cursor->RequireOwnedPage(true, static_cast<uint>((end - position) / PAGE_SIZE),
-                                             page_request);
+                                             deferred, page_request);
       if (result.is_error()) {
         return result.error_value();
       }

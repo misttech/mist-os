@@ -1397,6 +1397,7 @@ zx_status_t VmObjectPaged::ReadWriteInternal(uint64_t offset, size_t len, bool w
     zx_status_t status;
     __UNINITIALIZED UserCopyCaptureFaultsResult copy_result(ZX_OK);
     {
+      __UNINITIALIZED VmCowPages::DeferredOps deferred(cow_pages_.get());
       Guard<VmoLockType> guard{AssertOrderedLock, lock(), cow_pages_->lock_order(),
                                VmLockAcquireMode::First};
       if (cache_policy_ != ARCH_MMU_FLAG_CACHED) {
@@ -1444,7 +1445,8 @@ zx_status_t VmObjectPaged::ReadWriteInternal(uint64_t offset, size_t len, bool w
 
         // Attempt to lookup a page
         __UNINITIALIZED zx::result<VmCowPages::LookupCursor::RequireResult> result =
-            cursor->RequirePage(write, static_cast<uint>(max_waitable_pages), &page_request);
+            cursor->RequirePage(write, static_cast<uint>(max_waitable_pages), deferred,
+                                &page_request);
 
         status = result.status_value();
         if (status != ZX_OK) {
@@ -2047,6 +2049,7 @@ zx_status_t VmObjectPaged::UnlockRange(uint64_t offset, uint64_t len) {
 
 zx_status_t VmObjectPaged::GetPage(uint64_t offset, uint pf_flags, list_node* alloc_list,
                                    MultiPageRequest* page_request, vm_page_t** page, paddr_t* pa) {
+  __UNINITIALIZED VmCowPages::DeferredOps deferred(cow_pages_.get());
   Guard<VmoLockType> guard{lock()};
   const bool write = pf_flags & VMM_PF_FLAG_WRITE;
   zx::result<VmCowPages::LookupCursor> cursor = GetLookupCursorLocked(offset, PAGE_SIZE);
@@ -2072,7 +2075,7 @@ zx_status_t VmObjectPaged::GetPage(uint64_t offset, uint pf_flags, list_node* al
     }
     return ZX_OK;
   }
-  auto result = cursor->RequirePage(write, PAGE_SIZE, page_request);
+  auto result = cursor->RequirePage(write, PAGE_SIZE, deferred, page_request);
   if (result.is_error()) {
     return result.error_value();
   }
