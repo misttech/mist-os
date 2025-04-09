@@ -610,7 +610,9 @@ fn process_touchpad_reports(
     metrics_logger: &metrics::MetricsLogger,
 ) -> (Option<InputReport>, Option<UnboundedReceiver<InputEvent>>) {
     fuchsia_trace::duration!(c"input", c"touch-binding-process-report");
-    fuchsia_trace::flow_end!(c"input", c"input_report", report.trace_id.unwrap_or(0).into());
+    if let Some(trace_id) = report.trace_id {
+        fuchsia_trace::flow_end!(c"input", c"input_report", trace_id.into());
+    }
 
     // Input devices can have multiple types so ensure `report` is a TouchInputReport.
     let touch_report: &fidl_fuchsia_input_report::TouchInputReport = match &report.touch {

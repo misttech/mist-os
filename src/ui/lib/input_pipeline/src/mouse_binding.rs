@@ -393,6 +393,11 @@ impl MouseBinding {
         inspect_status: &InputDeviceStatus,
         metrics_logger: &metrics::MetricsLogger,
     ) -> (Option<InputReport>, Option<UnboundedReceiver<InputEvent>>) {
+        fuchsia_trace::duration!(c"input", c"mouse-binding-process-report");
+        if let Some(trace_id) = report.trace_id {
+            fuchsia_trace::flow_end!(c"input", c"input_report", trace_id.into());
+        }
+
         inspect_status.count_received_report(&report);
         // Input devices can have multiple types so ensure `report` is a MouseInputReport.
         let mouse_report: &fidl_input_report::MouseInputReport = match &report.mouse {
