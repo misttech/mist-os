@@ -908,7 +908,7 @@ mod tests {
         let scope = vfs::execution_scope::ExecutionScope::new();
         partitions_dir
             .clone()
-            .open3(
+            .open(
                 scope.clone(),
                 vfs::path::Path::validate_and_split("part-000").unwrap(),
                 flags.clone(),
@@ -917,7 +917,7 @@ mod tests {
             .unwrap();
         partitions_dir
             .clone()
-            .open3(
+            .open(
                 scope.clone(),
                 vfs::path::Path::validate_and_split("part-001").unwrap(),
                 flags.clone(),

@@ -154,7 +154,7 @@ mod tests {
         let (client, server) = fidl::endpoints::create_endpoints();
         let flags = fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY;
         vfs_dir
-            .open3(
+            .open(
                 ExecutionScope::new(),
                 Path::dot(),
                 flags,

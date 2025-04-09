@@ -1399,7 +1399,7 @@ mod tests {
         const FLAGS: fio::Flags = fio::PERM_READABLE;
         FLAGS
             .to_object_request(dir1_server)
-            .handle(|request| dir1.open3(dir_scope.clone(), vfs::Path::dot(), FLAGS, request));
+            .handle(|request| dir1.open(dir_scope.clone(), vfs::Path::dot(), FLAGS, request));
 
         let (dir2_server, dir2_client) = zx::Channel::create();
         let dir2 = pseudo_directory! {
@@ -1407,7 +1407,7 @@ mod tests {
         };
         FLAGS
             .to_object_request(dir2_server)
-            .handle(|request| dir2.open3(dir_scope.clone(), vfs::Path::dot(), FLAGS, request));
+            .handle(|request| dir2.open(dir_scope.clone(), vfs::Path::dot(), FLAGS, request));
 
         let (mut builder, proxy) = setup_test_util_builder(true)?;
         builder.add_namespace_entries(vec![

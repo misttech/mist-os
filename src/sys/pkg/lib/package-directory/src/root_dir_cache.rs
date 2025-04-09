@@ -223,7 +223,7 @@ mod tests {
         let dir = server.get_or_insert(metafar_blob.merkle, None).await.unwrap();
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = vfs::execution_scope::ExecutionScope::new();
-        let () = dir.open(
+        let () = dir.deprecated_open(
             scope.clone(),
             fio::OpenFlags::RIGHT_READABLE,
             vfs::path::Path::dot(),

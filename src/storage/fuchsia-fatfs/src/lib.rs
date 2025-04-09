@@ -307,7 +307,7 @@ mod tests {
         let scope = ExecutionScope::new();
         let (proxy, remote) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         let root = fatfs.get_root().expect("get_root OK");
-        root.clone().open(scope, fio::OpenFlags::RIGHT_READABLE, Path::dot(), remote);
+        root.clone().deprecated_open(scope, fio::OpenFlags::RIGHT_READABLE, Path::dot(), remote);
         root.close();
 
         structure.verify(proxy).await.expect("Verify succeeds");

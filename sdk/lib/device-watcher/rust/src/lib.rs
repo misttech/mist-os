@@ -311,7 +311,7 @@ mod tests {
         let object_request =
             vfs::ObjectRequest::new(flags, &Default::default(), server.into_channel());
         object_request.handle(|object_request| {
-            root.clone().open3(
+            root.clone().open(
                 vfs::execution_scope::ExecutionScope::new(),
                 vfs::path::Path::dot(),
                 fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::Flags::PERM_EXECUTE,
@@ -335,7 +335,7 @@ mod tests {
         let object_request =
             vfs::ObjectRequest::new(flags, &Default::default(), server.into_channel());
         object_request.handle(|object_request| {
-            root.open3(
+            root.open(
                 vfs::execution_scope::ExecutionScope::new(),
                 vfs::path::Path::dot(),
                 flags,

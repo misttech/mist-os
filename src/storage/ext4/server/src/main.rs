@@ -159,7 +159,12 @@ fn serve_vmo(
         Err(err) => return construct_fs_error_to_mount_vmo_result(err),
     };
 
-    tree.open(scope, fio::OpenFlags::RIGHT_READABLE, Path::dot(), root.into_channel().into());
+    tree.deprecated_open(
+        scope,
+        fio::OpenFlags::RIGHT_READABLE,
+        Path::dot(),
+        root.into_channel().into(),
+    );
 
     MountVmoResult::Success(Success {})
 }
@@ -189,7 +194,7 @@ async fn main() -> Result<(), Error> {
         };
 
         let scope = ExecutionScope::new();
-        tree.open(
+        tree.deprecated_open(
             scope.clone(),
             fio::OpenFlags::RIGHT_READABLE,
             Path::dot(),

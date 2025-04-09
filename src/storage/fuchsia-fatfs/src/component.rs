@@ -124,7 +124,7 @@ impl Component {
             }),
         )?;
 
-        self.outgoing_dir.clone().open(
+        self.outgoing_dir.clone().deprecated_open(
             self.scope.clone(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
             Path::dot(),

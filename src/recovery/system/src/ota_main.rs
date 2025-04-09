@@ -45,7 +45,7 @@ where
 
     let scope = vfs::execution_scope::ExecutionScope::new();
     SERVE_FLAGS.to_object_request(out_dir.into_channel()).handle(|request| {
-        outgoing_dir_vfs.clone().open3(scope.clone(), vfs::Path::dot(), SERVE_FLAGS, request)
+        outgoing_dir_vfs.clone().open(scope.clone(), vfs::Path::dot(), SERVE_FLAGS, request)
     });
     fasync::Task::local(async move { scope.wait().await }).detach();
 
@@ -156,7 +156,7 @@ mod tests {
         };
 
         SERVE_FLAGS.to_object_request(server.into_channel()).handle(|request| {
-            dir.clone().open3(scope.clone(), vfs::Path::dot(), SERVE_FLAGS, request)
+            dir.clone().open(scope.clone(), vfs::Path::dot(), SERVE_FLAGS, request)
         });
 
         fasync::Task::local(async move { scope.wait().await }).detach();

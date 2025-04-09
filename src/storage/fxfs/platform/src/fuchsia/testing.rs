@@ -162,7 +162,7 @@ impl TestFixture {
             .root()
             .clone()
             .as_directory()
-            .open3(
+            .open(
                 volume.volume().scope().clone(),
                 Path::dot(),
                 flags,

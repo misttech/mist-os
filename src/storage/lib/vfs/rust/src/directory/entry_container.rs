@@ -9,7 +9,7 @@ use crate::directory::dirents_sink;
 use crate::directory::traversal_position::TraversalPosition;
 use crate::execution_scope::ExecutionScope;
 use crate::node::Node;
-use crate::object_request::ObjectRequestRef;
+use crate::object_request::{ObjectRequestRef, ToObjectRequest as _};
 use crate::path::Path;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
@@ -53,46 +53,22 @@ pub use private::DirectoryWatcher;
 /// All directories implement this trait.  If a directory can be modified it should
 /// also implement the `MutableDirectory` trait.
 pub trait Directory: Node {
-    /// Opens a connection to this item if the `path` is "." or a connection to an item inside this
-    /// one otherwise.  `path` will not contain any "." or ".." components.
-    ///
-    /// `flags` holds one or more of the `OPEN_RIGHT_*`, `OPEN_FLAG_*` constants.  Processing of the
-    /// `flags` value is specific to the item - in particular, the `OPEN_RIGHT_*` flags need to
-    /// match the item capabilities.
-    ///
-    /// It is the responsibility of the implementation to strip POSIX flags if the path crosses
-    /// a boundary that does not have the required permissions.
-    ///
-    /// It is the responsibility of the implementation to send an `OnOpen` event on the channel
-    /// contained by `server_end` in case [`fio::OpenFlags::DESCRIBE`]` was set.
-    ///
-    /// This method is called via either `Open` or `Clone` fuchsia.io methods. Any errors that occur
-    /// during this process should be sent as a channel closure epitaph via `server_end`. No errors
-    /// should ever affect the connection where `Open` or `Clone` were received.
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    );
-
     /// Opens a connection to this item if the `path` is "." or a connection to an item inside
     /// this one otherwise.  `path` will not contain any "." or ".." components.
     ///
-    /// `flags` corresponds to the fuchsia.io [`fio::Flags`] type. See fuchsia.io's Open3 method for
+    /// `flags` corresponds to the fuchsia.io [`fio::Flags`] type. See fuchsia.io's Open method for
     /// more information regarding how flags are handled and what flag combinations are valid.
     ///
-    /// If this method was initiated by a FIDL Open3 call, hierarchical rights are enforced at the
+    /// If this method was initiated by a FIDL Open call, hierarchical rights are enforced at the
     /// connection layer.
     ///
     /// If the implementation takes `object_request`, it is then responsible for sending an
     /// `OnRepresentation` event when `flags` includes [`fio::Flags::FLAG_SEND_REPRESENTATION`].
     ///
-    /// This method is called via either `Open3` or `Reopen` fuchsia.io methods. Any errors returned
+    /// This method is called via either `Open` or `Reopen` fuchsia.io methods. Any errors returned
     /// during this process will be sent via an epitaph on the `object_request` channel before
     /// closing the channel.
-    fn open3(
+    fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: Path,
@@ -100,9 +76,9 @@ pub trait Directory: Node {
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status>;
 
-    /// Same as `open3` but the implementation is async. This may be more efficient if the directory
-    /// needs to do async work to open the connection.
-    fn open3_async(
+    /// Same as [`Self::open`] but the implementation is async. This may be more efficient if the
+    /// directory needs to do async work to open the connection.
+    fn open_async(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: Path,
@@ -112,7 +88,7 @@ pub trait Directory: Node {
     where
         Self: Sized,
     {
-        ready(self.open3(scope, path, flags, object_request))
+        ready(self.open(scope, path, flags, object_request))
     }
 
     /// Reads directory entries starting from `pos` by adding them to `sink`.
@@ -138,6 +114,18 @@ pub trait Directory: Node {
     /// Unregister a watcher from this directory. The watcher should no longer
     /// receive events.
     fn unregister_watcher(self: Arc<Self>, key: usize);
+
+    /// DEPRECATED - Do not implement unless required for backwards compatibility. Called when
+    /// handling a fuchsia.io/Directory.DeprecatedOpen request.
+    fn deprecated_open(
+        self: Arc<Self>,
+        _scope: ExecutionScope,
+        flags: fio::OpenFlags,
+        _path: Path,
+        server_end: ServerEnd<fio::NodeMarker>,
+    ) {
+        flags.to_object_request(server_end.into_channel()).shutdown(Status::NOT_SUPPORTED);
+    }
 }
 
 /// This trait indicates a directory that can be mutated by adding and removing entries.

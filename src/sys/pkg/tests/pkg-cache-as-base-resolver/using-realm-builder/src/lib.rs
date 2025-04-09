@@ -152,7 +152,7 @@ impl TestEnvBuilder {
                     };
                     let scope = ExecutionScope::new();
                     OUT_DIR_FLAGS.to_object_request(handles.outgoing_dir).handle(|request| {
-                        out_dir.open3(scope.clone(), vfs::Path::dot(), OUT_DIR_FLAGS, request)
+                        out_dir.open(scope.clone(), vfs::Path::dot(), OUT_DIR_FLAGS, request)
                     });
                     async move { Ok(scope.wait().await) }.boxed()
                 },
@@ -180,7 +180,7 @@ impl TestEnvBuilder {
                     };
                     let scope = vfs::execution_scope::ExecutionScope::new();
                     OUT_DIR_FLAGS.to_object_request(handles.outgoing_dir).handle(|request| {
-                        out_dir.open3(scope.clone(), vfs::Path::dot(), OUT_DIR_FLAGS, request)
+                        out_dir.open(scope.clone(), vfs::Path::dot(), OUT_DIR_FLAGS, request)
                     });
                     async move {
                         scope.wait().await;
