@@ -5,7 +5,7 @@
 #include "src/graphics/display/drivers/intel-display/ddi-physical-layer-manager.h"
 
 #include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
-#include <lib/driver/mock-mmio/cpp/mock-mmio-range.h>
+#include <lib/driver/mock-mmio/cpp/globally-ordered-region.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio/mmio-buffer.h>
 
@@ -239,10 +239,11 @@ TEST_F(DdiManagerTigerLakeTest, ParseVbtTable_Dell5420) {
   // - DDI_TC_2:Type-C DDI with Type-C port
 
   constexpr static int kMmioRangeSize = 0x200000;
-  mock_mmio::MockMmioRange mmio_range{kMmioRangeSize, mock_mmio::MockMmioRange::Size::k32};
+  mock_mmio::GloballyOrderedRegion mmio_range{kMmioRangeSize,
+                                              mock_mmio::GloballyOrderedRegion::Size::k32};
   fdf::MmioBuffer mmio_buffer{mmio_range.GetMmioBuffer()};
 
-  mmio_range.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       // Access pattern from ComboDdiTigerLakeTest.InitializeDdiADell5420.
       {.address = kPortCompDw3AOffset, .value = 0xc0606b25},
       {.address = kPortCompDw1AOffset, .value = 0x81000400},
@@ -342,7 +343,8 @@ TEST_F(DdiManagerTigerLakeTest, ParseVbtTable_NUC11PAHi5) {
   // - DDI_TC_6: Type-C DDI with Type-C port
 
   constexpr static int kMmioRangeSize = 0x200000;
-  mock_mmio::MockMmioRange mmio_range{kMmioRangeSize, mock_mmio::MockMmioRange::Size::k32};
+  mock_mmio::GloballyOrderedRegion mmio_range{kMmioRangeSize,
+                                              mock_mmio::GloballyOrderedRegion::Size::k32};
   fdf::MmioBuffer mmio_buffer{mmio_range.GetMmioBuffer()};
 
   TestPower power(&mmio_buffer);

@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/hdmi-transmitter.h"
 
-#include <lib/driver/mock-mmio/cpp/mock-mmio-range.h>
+#include <lib/driver/mock-mmio/cpp/globally-ordered-region.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/zx/result.h>
 
@@ -99,8 +99,8 @@ class HdmiTransmitterTest : public testing::Test {
   fdf_testing::ScopedGlobalLogger logger_;
 
   constexpr static int kTopLevelMmioRangeSize = 0x8000;
-  mock_mmio::MockMmioRange top_level_mmio_range_{kTopLevelMmioRangeSize,
-                                                 mock_mmio::MockMmioRange::Size::k32};
+  mock_mmio::GloballyOrderedRegion top_level_mmio_range_{
+      kTopLevelMmioRangeSize, mock_mmio::GloballyOrderedRegion::Size::k32};
 
   std::unique_ptr<HdmiTransmitter> dut_;
 
@@ -120,7 +120,7 @@ constexpr int kHdmiTxTopTmdsClkPttn23 = 0x0b * 4;
 constexpr int kHdmiTxTopTmdsClkPttnCntl = 0x0c * 4;
 
 TEST_F(HdmiTransmitterTest, ResetTest) {
-  top_level_mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  top_level_mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kHdmiTxTopSwResetOffset, .value = 0, .write = true},
       {.address = kHdmiTxTopClkCntlOffset, .value = 0xff, .write = true},
   }));
@@ -152,7 +152,7 @@ TEST_F(HdmiTransmitterTest, ModeSetTest) {
       .color_depth = designware_hdmi::ColorDepth::kCd24B,
   };
 
-  top_level_mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  top_level_mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kHdmiTxTopBistCntl, .value = 1 << 12, .write = true},
       {.address = kHdmiTxTopIntrStatClr, .value = 0x1f, .write = true},
       {.address = kHdmiTxTopIntrMaskn, .value = 0x9f, .write = true},

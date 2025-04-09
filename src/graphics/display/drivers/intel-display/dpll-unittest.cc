@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-display/dpll.h"
 
-#include <lib/driver/mock-mmio/cpp/mock-mmio-range.h>
+#include <lib/driver/mock-mmio/cpp/globally-ordered-region.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio/mmio-buffer.h>
 
@@ -43,7 +43,8 @@ class DisplayPllTigerLakeTest : public ::testing::Test {
   constexpr static int kMmioRangeSize = 0x140000;
 
   fdf_testing::ScopedGlobalLogger logger_;
-  mock_mmio::MockMmioRange mmio_range_{kMmioRangeSize, mock_mmio::MockMmioRange::Size::k32};
+  mock_mmio::GloballyOrderedRegion mmio_range_{kMmioRangeSize,
+                                               mock_mmio::GloballyOrderedRegion::Size::k32};
   fdf::MmioBuffer mmio_buffer_{mmio_range_.GetMmioBuffer()};
 
   display::ScopedValueChange<int> lock_wait_timeout_change_;
@@ -51,7 +52,7 @@ class DisplayPllTigerLakeTest : public ::testing::Test {
 };
 
 TEST_F(DisplayPllTigerLakeTest, EnableHdmi) {
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kDpll0EnableOffset, .value = 0x00000000},
       {.address = kDpll0EnableOffset, .value = 0x08000000, .write = true},
       // Should wait until the powered on bit is set.
@@ -87,7 +88,7 @@ TEST_F(DisplayPllTigerLakeTest, EnableHdmi) {
 }
 
 TEST_F(DisplayPllTigerLakeTest, EnableDisplayPort) {
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kDpll0EnableOffset, .value = 0x00000000},
       {.address = kDpll0EnableOffset, .value = 0x08000000, .write = true},
       // Should wait until the powered on bit is set.

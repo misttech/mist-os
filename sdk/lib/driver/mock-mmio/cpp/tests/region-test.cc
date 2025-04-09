@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/driver/mock-mmio/cpp/mock-mmio-reg.h>
+#include <lib/driver/mock-mmio/cpp/region.h>
 #include <lib/mmio/mmio.h>
 #include <zircon/syscalls.h>
 
@@ -11,8 +11,8 @@
 namespace mock_mmio_test {
 
 TEST(MockMmioReg, CopyFrom) {
-  mock_mmio::MockMmioRegRegion reg_region_1(sizeof(uint32_t), 0x100);
-  mock_mmio::MockMmioRegRegion reg_region_2(sizeof(uint32_t), 0x100);
+  mock_mmio::Region reg_region_1(sizeof(uint32_t), 0x100);
+  mock_mmio::Region reg_region_2(sizeof(uint32_t), 0x100);
 
   fdf::MmioBuffer dut_1 = reg_region_1.GetMmioBuffer();
   fdf::MmioBuffer dut_2 = reg_region_2.GetMmioBuffer();
@@ -35,16 +35,15 @@ TEST(MockMmioReg, GetMmioBuffer) {
   constexpr size_t kRegArrayLength = 128;
   const size_t kRegSize = zx_system_get_page_size();
   const size_t kExpectedMmioSize = kRegArrayLength * kRegSize;
-  mock_mmio::MockMmioRegRegion reg_region_no_offset(kRegSize, kRegArrayLength);
-  mock_mmio::MockMmioRegRegion reg_region_with_offset(kRegSize, kRegArrayLength / 2,
-                                                      kRegArrayLength / 2);
+  mock_mmio::Region reg_region_no_offset(kRegSize, kRegArrayLength);
+  mock_mmio::Region reg_region_with_offset(kRegSize, kRegArrayLength / 2, kRegArrayLength / 2);
 
   ASSERT_EQ(kExpectedMmioSize, reg_region_no_offset.GetMmioBuffer().get_size());
   ASSERT_EQ(kExpectedMmioSize, reg_region_with_offset.GetMmioBuffer().get_size());
 }
 
 TEST(MockMmioReg, View) {
-  mock_mmio::MockMmioRegRegion reg_region(sizeof(uint32_t), 0x100);
+  mock_mmio::Region reg_region(sizeof(uint32_t), 0x100);
 
   fdf::MmioBuffer dut = reg_region.GetMmioBuffer();
   fdf::MmioView dut_view_1 = dut.View(0x40);
@@ -66,7 +65,7 @@ TEST(MockMmioReg, View) {
 }
 
 TEST(MockMmioReg, Offset) {
-  mock_mmio::MockMmioRegRegion reg_region(sizeof(uint32_t), 0x100, 0x1'0000 / sizeof(uint32_t));
+  mock_mmio::Region reg_region(sizeof(uint32_t), 0x100, 0x1'0000 / sizeof(uint32_t));
 
   fdf::MmioBuffer dut = reg_region.GetMmioBuffer();
 
