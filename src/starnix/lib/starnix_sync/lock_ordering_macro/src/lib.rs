@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use proc_macro::TokenStream;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 use syn::Ident;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd)]
 struct Edge {
     from: Ident,
     to: Ident,
@@ -23,14 +23,14 @@ impl syn::parse::Parse for Edge {
 }
 
 struct Graph {
-    levels: HashSet<Ident>,
-    edges: HashSet<Edge>,
+    levels: BTreeSet<Ident>,
+    edges: BTreeSet<Edge>,
 }
 
 impl syn::parse::Parse for Graph {
     fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
-        let mut levels = HashSet::new();
-        let mut edges = HashSet::new();
+        let mut levels = BTreeSet::new();
+        let mut edges = BTreeSet::new();
         while !input.is_empty() {
             let edge: Edge = input.parse()?;
             let Edge { from, to } = edge.clone();
@@ -46,8 +46,8 @@ impl syn::parse::Parse for Graph {
 fn build_lock_graph(
     current: &Ident,
     past: &mut Vec<Ident>,
-    adj_list: &HashMap<Ident, HashSet<Ident>>,
-    all_paths: &mut HashSet<Edge>,
+    adj_list: &BTreeMap<Ident, BTreeSet<Ident>>,
+    all_paths: &mut BTreeSet<Edge>,
 ) {
     for p in past.into_iter() {
         if p == current {
@@ -75,11 +75,11 @@ fn build_lock_graph(
 #[proc_macro]
 pub fn lock_ordering(input: TokenStream) -> TokenStream {
     let Graph { levels, edges } = syn::parse_macro_input!(input as Graph);
-    let mut adj_list: HashMap<Ident, HashSet<Ident>> = HashMap::new();
+    let mut adj_list: BTreeMap<Ident, BTreeSet<Ident>> = BTreeMap::new();
 
     let mut result = proc_macro2::TokenStream::new();
     for level in levels.into_iter() {
-        adj_list.insert(level.clone(), HashSet::new());
+        adj_list.insert(level.clone(), BTreeSet::new());
         if level != "Unlocked" {
             result.extend(quote::quote! {
                 pub enum #level {}
@@ -96,7 +96,7 @@ pub fn lock_ordering(input: TokenStream) -> TokenStream {
 
     let unlocked_id = Ident::new("Unlocked", proc_macro2::Span::call_site());
     let mut past: Vec<Ident> = vec![];
-    let mut all_edges: HashSet<Edge> = HashSet::new();
+    let mut all_edges: BTreeSet<Edge> = BTreeSet::new();
     build_lock_graph(&unlocked_id, &mut past, &adj_list, &mut all_edges);
 
     for Edge { from, to } in all_edges.into_iter() {
