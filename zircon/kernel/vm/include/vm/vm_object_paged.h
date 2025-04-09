@@ -405,9 +405,6 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   // Unified function that implements both CommitRange and CommitRangePinned
   zx_status_t CommitRangeInternal(uint64_t offset, uint64_t len, bool pin, bool write);
 
-  // Internal decommit range helper that expects the lock to be held.
-  zx_status_t DecommitRangeLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
-
   // see GetAttributedMemoryInRange
   AttributionCounts GetAttributedMemoryInRangeLocked(uint64_t offset_bytes,
                                                      uint64_t len_bytes) const TA_REQ(lock());

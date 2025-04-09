@@ -3238,9 +3238,11 @@ zx_status_t VmCowPages::PinRangeLocked(VmCowRange range) {
   return status;
 }
 
-zx_status_t VmCowPages::DecommitRangeLocked(VmCowRange range) {
+zx_status_t VmCowPages::DecommitRange(VmCowRange range) {
   canary_.Assert();
 
+  __UNINITIALIZED DeferredOps deferred(this);
+  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
   // Validate the size and perform our zero-length hot-path check before we recurse
   // up to our top-level ancestor.  Size bounding needs to take place relative
   // to the child the operation was originally targeted against.
@@ -3266,10 +3268,11 @@ zx_status_t VmCowPages::DecommitRangeLocked(VmCowRange range) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  return UnmapAndFreePagesLocked(range.offset, range.len).status_value();
+  return UnmapAndFreePagesLocked(range.offset, range.len, deferred).status_value();
 }
 
-zx::result<uint64_t> VmCowPages::UnmapAndFreePagesLocked(uint64_t offset, uint64_t len) {
+zx::result<uint64_t> VmCowPages::UnmapAndFreePagesLocked(uint64_t offset, uint64_t len,
+                                                         DeferredOps& deferred) {
   canary_.Assert();
 
   if (AnyPagesPinnedLocked(offset, len)) {
@@ -3278,28 +3281,23 @@ zx::result<uint64_t> VmCowPages::UnmapAndFreePagesLocked(uint64_t offset, uint64
 
   LTRACEF("start offset %#" PRIx64 ", end %#" PRIx64 "\n", offset, offset + len);
 
-  // We've already trimmed the range in DecommitRangeLocked().
+  // We've already trimmed the range in DecommitRange().
   DEBUG_ASSERT(InRange(offset, len, size_));
 
   // Verify page alignment.
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(len) || (offset + len == size_));
 
-  // DecommitRangeLocked() will call this function only on a VMO with no parent.
+  // DecommitRange() will call this function only on a VMO with no parent.
   DEBUG_ASSERT(!parent_);
 
   // unmap all of the pages in this range on all the mapping regions
-  {
-    __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
-    RangeChangeUpdateLocked(VmCowRange(offset, len), RangeChangeOp::Unmap, &deferred);
-  }
+  RangeChangeUpdateLocked(VmCowRange(offset, len), RangeChangeOp::Unmap, &deferred);
 
-  __UNINITIALIZED ScopedPageFreedList freed_list;
-  __UNINITIALIZED BatchPQRemove page_remover(freed_list);
+  __UNINITIALIZED BatchPQRemove page_remover(deferred.FreedList(this));
 
   page_list_.RemovePages(page_remover.RemovePagesCallback(), offset, offset + len);
   page_remover.Flush();
-  freed_list.FreePages(this);
 
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
@@ -3562,30 +3560,13 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
   // This function tries to zero pages as optimally as possible for most cases, so we attempt
   // increasingly expensive actions only if certain preconditions do not allow us to perform the
   // cheaper action. Broadly speaking, the sequence of actions that are attempted are as follows.
-  //  1) Try to decommit the entire range at once if the VMO allows it.
-  //  2) Otherwise, try to decommit each page if the VMO allows it and doing so doesn't expose
-  //  content in the parent (if any) that shouldn't be visible.
-  //  3) Otherwise, if this is a child VMO and there is no committed page yet, allocate a zero page.
-  //  4) Otherwise, look up the page, faulting it in if necessary, and zero the page. If the page
+  //  1) Try to decommit each page if the VMO allows it and doing so doesn't expose  content in the
+  //  parent (if any) that shouldn't be visible.
+  //  2) Otherwise, if this is a child VMO and there is no committed page yet, allocate a zero page.
+  //  3) Otherwise, look up the page, faulting it in if necessary, and zero the page. If the page
   //  source needs to supply or dirty track the page, a page request is initialized and we return
   //  early with ZX_ERR_SHOULD_WAIT. The caller is expected to wait on the page request, and then
   //  retry. On the retry, we should be able to look up the page successfully and zero it.
-
-  // First try and do the more efficient decommit. We prefer/ decommit as it performs work in the
-  // order of the number of committed pages, instead of work in the order of size of the range. An
-  // error from DecommitRangeLocked indicates that the VMO is not of a form that decommit can safely
-  // be performed without exposing data that we shouldn't between children and parents, but no
-  // actual state will have been changed. Should decommit succeed we are done, otherwise we will
-  // have to handle each offset individually.
-  //
-  // Zeroing doesn't decommit pages of contiguous VMOs.
-  if (can_decommit_zero_pages()) {
-    zx_status_t status = DecommitRangeLocked(range);
-    if (status == ZX_OK) {
-      *zeroed_len_out = range.len;
-      return ZX_OK;
-    }
-  }
 
   // Unmap any page that is touched by this range in any of our, or our childrens, mapping
   // regions. We do this on the assumption we are going to be able to free pages either completely
@@ -6986,12 +6967,13 @@ VmCowPages::DiscardablePageCounts VmCowPages::DebugGetDiscardablePageCounts() co
 uint64_t VmCowPages::DiscardPages() {
   canary_.Assert();
 
+  __UNINITIALIZED DeferredOps deferred(this);
   Guard<VmoLockType> guard{lock()};
   // Discard any errors and overlap a 0 return value for errors.
-  return DiscardPagesLocked().value_or(0);
+  return DiscardPagesLocked(deferred).value_or(0);
 }
 
-zx::result<uint64_t> VmCowPages::DiscardPagesLocked() {
+zx::result<uint64_t> VmCowPages::DiscardPagesLocked(DeferredOps& deferred) {
   // Not a discardable VMO.
   if (!discardable_tracker_) {
     return zx::error(ZX_ERR_BAD_STATE);
@@ -7003,7 +6985,7 @@ zx::result<uint64_t> VmCowPages::DiscardPagesLocked() {
   }
 
   // Remove all pages.
-  zx::result<uint64_t> result = UnmapAndFreePagesLocked(0, size_);
+  zx::result<uint64_t> result = UnmapAndFreePagesLocked(0, size_, deferred);
 
   if (result.is_ok()) {
     reclamation_event_count_++;
@@ -7017,6 +6999,7 @@ zx::result<uint64_t> VmCowPages::DiscardPagesLocked() {
 zx::result<uint64_t> VmCowPages::ReclaimDiscardable(vm_page_t* page, uint64_t offset) {
   DEBUG_ASSERT(discardable_tracker_);
 
+  __UNINITIALIZED DeferredOps deferred(this);
   Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
 
   const VmPageOrMarker* page_or_marker = page_list_.Lookup(offset);
@@ -7037,7 +7020,7 @@ zx::result<uint64_t> VmCowPages::ReclaimDiscardable(vm_page_t* page, uint64_t of
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  return DiscardPagesLocked();
+  return DiscardPagesLocked(deferred);
 }
 
 void VmCowPages::CopyPageContentsForReplacementLocked(vm_page_t* dst_page, vm_page_t* src_page) {

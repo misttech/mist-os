@@ -550,7 +550,7 @@ class VmCowPages final : public VmHierarchyBase,
   // For consistency if there is a parent or a backing page source, such that the range would not
   // explicitly copy-on-write the zero page then this will fail. Use ZeroPagesLocked for an
   // operation that is guaranteed to succeed, but may not release memory.
-  zx_status_t DecommitRangeLocked(VmCowRange range) TA_REQ(lock());
+  zx_status_t DecommitRange(VmCowRange range);
 
   // After successful completion the range of pages will all read as zeros. The mechanism used to
   // achieve this is not guaranteed to decommit, but it will try to.
@@ -1232,13 +1232,15 @@ class VmCowPages final : public VmHierarchyBase,
       TA_REQ(lock());
 
   // Unmaps and frees all the committed pages in the specified range.
-  // Upon success the removed pages are freed and the number of pages freed is returned.
+  // Upon success the removed pages are placed in the DeferredOps freed list, and the number of such
+  // pages is returned.
   //
   // Unlike DecommitRangeLocked(), this function only operates on |this| node, which must have no
   // parent.
   // |offset| must be page aligned. |len| must be less than or equal to |size_ - offset|. If |len|
   // is less than |size_ - offset| it must be page aligned.
-  zx::result<uint64_t> UnmapAndFreePagesLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
+  zx::result<uint64_t> UnmapAndFreePagesLocked(uint64_t offset, uint64_t len, DeferredOps& deferred)
+      TA_REQ(lock());
 
   // internal check if any pages in a range are pinned
   bool AnyPagesPinnedLocked(uint64_t offset, size_t len) TA_REQ(lock());
@@ -1534,7 +1536,7 @@ class VmCowPages final : public VmHierarchyBase,
   zx::result<uint64_t> ReclaimDiscardable(vm_page_t* page, uint64_t offset);
 
   // Internal helper for discarding a VMO. Will discard if VMO is unlocked returning the count.
-  zx::result<uint64_t> DiscardPagesLocked() TA_REQ(lock());
+  zx::result<uint64_t> DiscardPagesLocked(DeferredOps& deferred) TA_REQ(lock());
 
   // Internal helper for modifying just this value of high_priority_count_ without performing any
   // propagating.

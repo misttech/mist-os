@@ -1199,17 +1199,12 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
 zx_status_t VmObjectPaged::DecommitRange(uint64_t offset, uint64_t len) {
   canary_.Assert();
   LTRACEF("offset %#" PRIx64 ", len %#" PRIx64 "\n", offset, len);
-  Guard<VmoLockType> guard{lock()};
+
   if (is_contiguous() && !pmm_physical_page_borrowing_config()->is_loaning_enabled()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  return DecommitRangeLocked(offset, len);
-}
 
-zx_status_t VmObjectPaged::DecommitRangeLocked(uint64_t offset, uint64_t len) {
-  canary_.Assert();
-
-  auto cow_range = GetCowRangeSizeCheckLocked(offset, len);
+  auto cow_range = GetCowRange(offset, len);
   if (!cow_range) {
     return ZX_ERR_OUT_OF_RANGE;
   }
@@ -1217,7 +1212,7 @@ zx_status_t VmObjectPaged::DecommitRangeLocked(uint64_t offset, uint64_t len) {
   // Decommit of pages from a contiguous VMO relies on contiguous VMOs not being resizable.
   DEBUG_ASSERT(!is_resizable() || !is_contiguous());
 
-  return cow_pages_locked()->DecommitRangeLocked(*cow_range);
+  return cow_pages_->DecommitRange(*cow_range);
 }
 
 zx_status_t VmObjectPaged::ZeroPartialPage(uint64_t page_base_offset, uint64_t zero_start_offset,
@@ -1284,6 +1279,28 @@ zx_status_t VmObjectPaged::ZeroRangeInternal(uint64_t offset, uint64_t len, bool
     if (len < PAGE_SIZE) {
       DEBUG_ASSERT(dirty_track);
       return ZeroPartialPage(offset, 0, len);
+    }
+
+    // First try and do the more efficient decommit. We prefer/ decommit as it performs work in the
+    // order of the number of committed pages, instead of work in the order of size of the range. An
+    // error from DecommitRangeLocked indicates that the VMO is not of a form that decommit can
+    // safely be performed without exposing data that we shouldn't between children and parents, but
+    // no actual state will have been changed. Should decommit succeed we are done, otherwise we
+    // will have to handle each offset individually.
+    //
+    // Zeroing doesn't decommit pages of contiguous VMOs.
+    if (!is_contiguous()) {
+      ktl::optional<VmCowRange> cow_range = GetCowRange(offset, ROUNDDOWN(len, PAGE_SIZE));
+      if (!cow_range) {
+        return ZX_ERR_OUT_OF_RANGE;
+      }
+
+      zx_status_t status = cow_pages_->DecommitRange(*cow_range);
+      if (status == ZX_OK) {
+        offset += cow_range->len;
+        len -= cow_range->len;
+        continue;
+      }
     }
 
     // We might need a page request if the VMO is backed by a page source.
