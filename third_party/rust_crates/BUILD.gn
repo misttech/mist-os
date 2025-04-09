@@ -399,6 +399,10 @@ group("handlebars") {
   public_deps = [ ":handlebars-v4_3_5" ]
 }
 
+group("hashlink") {
+  public_deps = [ ":hashlink-v0_9_1" ]
+}
+
 group("heck") {
   public_deps = [ ":heck-v0_4_1" ]
 }
@@ -7183,6 +7187,70 @@ rust_library("hashbrown-v0_12_3") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":hashbrown-v0_12_3.license" ]
+}
+
+license("hashbrown-v0_14_5.license") {
+  public_package_name = "hashbrown"
+  license_files = [
+    "//third_party/rust_crates/vendor/hashbrown-0.14.5/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/hashbrown-0.14.5/LICENSE-MIT",
+  ]
+}
+
+rust_library("hashbrown-v0_14_5") {
+  crate_name = "hashbrown"
+  crate_root = "//third_party/rust_crates/vendor/hashbrown-0.14.5/src/lib.rs"
+  output_name = "hashbrown-f05a6fd9a28e658d"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":ahash-v0_8_11" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=f05a6fd9a28e658d",
+    "-Cextra-filename=-f05a6fd9a28e658d",
+    "--cfg=feature=\"ahash\"",
+    "--cfg=feature=\"inline-more\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":hashbrown-v0_14_5.license" ]
+}
+
+license("hashlink-v0_9_1.license") {
+  public_package_name = "hashlink"
+  license_files = [
+    "//third_party/rust_crates/vendor/hashlink-0.9.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/hashlink-0.9.1/LICENSE-MIT",
+  ]
+}
+
+rust_library("hashlink-v0_9_1") {
+  crate_name = "hashlink"
+  crate_root = "//third_party/rust_crates/vendor/hashlink-0.9.1/src/lib.rs"
+  output_name = "hashlink-db1e96566f8e955d"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":hashbrown-v0_14_5" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=db1e96566f8e955d",
+    "-Cextra-filename=-db1e96566f8e955d",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":hashlink-v0_9_1.license" ]
 }
 
 license("heck-v0_3_1.license") {
