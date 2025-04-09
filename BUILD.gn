@@ -2291,11 +2291,15 @@ group("root_targets") {
     "//build/sdk:sdk_versioned_shared_libraries",
     "//build/sdk:sdk_versioned_source_sets",
 
-    # The Fuchsia Bazel SDK generated from the Core IDK, and the associated tests.
+    # The Fuchsia Bazel SDK generated from the Fuchsia IDK, and the associated tests.
     "//sdk:final_fuchsia_sdk_tests",
 
     # The IDK generated for the in-tree @fuchsia_sdk Bazel workspace, and associated tests.
     "//sdk:bazel_in_tree_idk_tests",
+
+    # A subset of the the Fuchsia Bazel SDK that only supports `HEAD` on the
+    # `target_cpu` architecture.
+    "//sdk:final_fuchsia_sdk_head_only",
 
     # This target is listed explicitly by multiple CI bot build configurations.
     # See https://fxbug.dev/42162374 for context.
