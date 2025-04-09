@@ -18,7 +18,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, OnceLock, Weak};
 
 use crate::power::{
-    create_proxy_for_wake_events_counter_zero, mark_proxy_message_handled, OnWakeOps,
+    create_proxy_for_wake_events_counter_zero, mark_all_proxy_messages_handled, OnWakeOps,
 };
 use crate::task::{CurrentTask, HandleWaitCanceler, TargetTime, WaitCanceler};
 use crate::vfs::timer::TimerOps;
@@ -276,15 +276,17 @@ impl HrTimerManager {
             fuchsia_trace::duration!(c"alarms", c"start_next_receiver:loop");
             let guard = self.lock();
             let Some(node) = guard.timer_heap.peek() else {
-                log_warn!("HrTimer manager worker thread woke up with an empty timer heap.");
-                guard.message_counter.as_ref().map(mark_proxy_message_handled);
+                log_warn!("hrtimer: manager worker thread woke up with an empty timer heap.");
+                guard.message_counter.as_ref().map(mark_all_proxy_messages_handled);
                 continue;
             };
+
             let Some(new_deadline) = guard.current_deadline else {
-                log_warn!("HrTimer manager worker thread woke up without a timer deadline");
-                guard.message_counter.as_ref().map(mark_proxy_message_handled);
+                log_warn!("hrtimer: manager worker thread woke up without a timer deadline");
+                guard.message_counter.as_ref().map(mark_all_proxy_messages_handled);
                 continue;
             };
+
             fuchsia_trace::instant!(
                 c"alarms",
                 c"start_next_receiver:loop:deadline",
@@ -329,9 +331,11 @@ impl HrTimerManager {
                     .expect("infallible");
             }
 
-            // Mark the message as handled since the next hanging get has been scheduled, meaning
-            // that it is fine to suspend the container at this point (if the counter if 0).
-            guard.message_counter.as_ref().map(mark_proxy_message_handled);
+            // Mark all the proxy messages as handled (reset the counter to 0), since it's now
+            // fine to suspend. The counter can't simply be decremented by one since the
+            // hr_timer_manager itself may have incremented the counter to keep the container from
+            // suspending while an alarm was being scheduled.
+            guard.message_counter.as_ref().map(mark_all_proxy_messages_handled);
             drop(guard);
 
             let resp = {
@@ -341,6 +345,7 @@ impl HrTimerManager {
                 set_and_wait.await
             };
 
+            let mut guard = self.lock();
             match resp {
                 Ok(Ok(lease)) => {
                     let koid = lease.get_koid().unwrap();
@@ -360,7 +365,6 @@ impl HrTimerManager {
                         drop(lease_token);
                     }
 
-                    let mut guard = self.lock();
                     // Remove the expired HrTimer from the heap, but only actually remove it if the
                     // deadline has not changed.
                     guard.timer_heap.retain(|t| {
@@ -376,7 +380,7 @@ impl HrTimerManager {
                         // If there are more timers to start, we have to keep the message counter
                         // positive to prevent suspension until the hanging get has been scheduled.
                         // Otherwise, we might miss a wake up.
-                        guard.message_counter.as_ref().map(mark_proxy_message_handled);
+                        guard.message_counter.as_ref().map(mark_all_proxy_messages_handled);
                         continue;
                     }
 
@@ -387,22 +391,18 @@ impl HrTimerManager {
                         continue;
                     }
                 }
-                Ok(Err(e)) => {
-                    let guard = self.lock();
-                    guard.message_counter.as_ref().map(mark_proxy_message_handled);
-                    match e {
-                        fta::WakeError::Dropped => {
-                            fuchsia_trace::duration!(c"alarms", c"alarm:drop", "deadline" => new_deadline.into_nanos());
+                Ok(Err(e)) => match e {
+                    fta::WakeError::Dropped => {
+                        fuchsia_trace::duration!(c"alarms", c"alarm:drop", "deadline" => new_deadline.into_nanos());
 
-                            log_debug!(
-                                "A new HrTimer with \
+                        log_debug!(
+                            "A new HrTimer with \
                                 an earlier deadline has been started. \
                                 This `SetAndWait` attempt is cancelled."
-                            )
-                        }
-                        _ => log_error!("Wake::SetAndWait driver error: {e:?}"),
+                        )
                     }
-                }
+                    _ => log_error!("Wake::SetAndWait driver error: {e:?}"),
+                },
                 // In this case we don't need to set a FIDL message as handled, since the error was
                 // in the bindings/connection so no message was returned.
                 Err(e) => log_error!("Wake::SetAndWait fidl error: {e}"),
@@ -462,6 +462,7 @@ impl HrTimerManager {
 
         let new_deadline = node.deadline;
         fuchsia_trace::duration!(c"alarms", c"starnix:start_next", "new_deadline" => new_deadline.into_nanos());
+
         // Only restart the HrTimer device when the deadline is different from the running one.
         if guard.current_deadline == Some(new_deadline) {
             return Ok(());
@@ -532,9 +533,11 @@ impl HrTimerManager {
         };
         self.record_event(&mut guard, inspect_event_type, Some(new_timer_node.deadline));
 
-        // Signal the wake event before starting the first timer. This ensures that the
+        let increment_message_counter = after_len == 1 && Some(deadline) != guard.current_deadline;
+
+        // Increment the counter before starting the first timer. This ensures that the
         // kernel will not suspend until the first timer has been started.
-        if after_len == 1 && Some(deadline) != guard.current_deadline {
+        if increment_message_counter {
             guard.message_counter.as_ref().map(|c| c.add(1));
         }
 

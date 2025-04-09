@@ -389,6 +389,11 @@ pub fn mark_proxy_message_handled(counter: &zx::Counter) {
     counter.add(-1).expect("Failed to decrement counter");
 }
 
+/// Marks all messages tracked by `counter` as handled.
+pub fn mark_all_proxy_messages_handled(counter: &zx::Counter) {
+    counter.write(0).expect("Failed to decrement counter");
+}
+
 /// Creates a watcher between clients and the Starnix runner.
 ///
 /// Changes in the power state of the container are relayed by the event pair.
