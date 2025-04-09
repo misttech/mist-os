@@ -30,7 +30,7 @@ constexpr std::string_view kUMSProductDescription = "USB Mass Storage";
 constexpr std::string_view kRNDISProductDescription = "RNDIS Ethernet";
 constexpr std::string_view kTestProductDescription = "USB Function Test";
 constexpr std::string_view kADBProductDescription = "ADB";
-constexpr std::string_view kFfxProductDescription = "VSOCK Bridge";
+constexpr std::string_view kVsockBridgeProductDescription = "VSOCK Bridge";
 constexpr std::string_view kFastbootProductDescription = "Fastboot";
 
 constexpr peripheral::wire::FunctionDescriptor kCDCFunctionDescriptor = {
