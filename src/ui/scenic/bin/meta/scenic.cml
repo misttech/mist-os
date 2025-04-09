@@ -80,6 +80,11 @@
             type: "uint64",
         },
         {
+            config: "fuchsia.scenic.FramePredictionMarginInUs",
+            key: "frame_prediction_margin_in_us",
+            type: "uint64",
+        },
+        {
             config: "fuchsia.scenic.PointerAutoFocus",
             key: "pointer_auto_focus",
             type: "bool",
