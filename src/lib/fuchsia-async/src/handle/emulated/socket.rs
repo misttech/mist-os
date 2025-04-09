@@ -93,7 +93,6 @@ impl Socket {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl tokio::io::AsyncWrite for Socket {
     fn poll_write(
         self: std::pin::Pin<&mut Self>,
@@ -118,7 +117,6 @@ impl tokio::io::AsyncWrite for Socket {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl tokio::io::AsyncRead for Socket {
     fn poll_read(
         self: Pin<&mut Self>,

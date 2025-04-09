@@ -26,7 +26,6 @@ rustc_library("fuchsia-async") {
     "src/lib.rs",
     "src/net/mod.rs",
     "src/runtime/mod.rs",
-    "src/runtime/stub.rs",
     "src/runtime/task_group.rs",
     "src/test_support.rs",
   ]
