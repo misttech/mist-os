@@ -6,8 +6,8 @@
 
 use crate::node::{CloseError, OpenError};
 use fidl::{persist, unpersist, Persistable};
+use flex_fuchsia_io as fio;
 use thiserror::Error;
-use {fidl_fuchsia_io as fio, zx_status};
 
 mod async_reader;
 pub use async_reader::AsyncReader;
@@ -20,9 +20,11 @@ mod buffered_async_read_at;
 pub use buffered_async_read_at::BufferedAsyncReadAt;
 
 #[cfg(target_os = "fuchsia")]
+#[cfg(not(feature = "fdomain"))]
 pub use fuchsia::*;
 
 #[cfg(target_os = "fuchsia")]
+#[cfg(not(feature = "fdomain"))]
 mod fuchsia {
     use super::*;
     use crate::node::{take_on_open_event, Kind};

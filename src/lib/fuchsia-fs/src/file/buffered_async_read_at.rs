@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::file::{AsyncGetSize, AsyncReadAt};
-use fidl_fuchsia_io as fio;
+use flex_fuchsia_io as fio;
 use pin_project::pin_project;
 use std::cmp::min;
 use std::convert::TryInto as _;

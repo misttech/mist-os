@@ -4,10 +4,9 @@
 
 //! Utility functions for fuchsia.io directories.
 
-use crate::file::ReadError;
 use crate::node::{self, CloneError, CloseError, OpenError, RenameError};
 use crate::PERM_READABLE;
-use fidl::endpoints::{ClientEnd, ServerEnd};
+use flex_fuchsia_io as fio;
 use fuchsia_async::{DurationExt, MonotonicDuration, TimeoutExt};
 use futures::future::BoxFuture;
 use futures::stream::{self, BoxStream, StreamExt};
@@ -15,20 +14,25 @@ use std::collections::VecDeque;
 use std::str::Utf8Error;
 use thiserror::Error;
 use zerocopy::{FromBytes, Immutable, KnownLayout, Ref, Unaligned};
-use {fidl_fuchsia_io as fio, zx_status};
+
+use flex_client::fidl::{ClientEnd, ProtocolMarker, ServerEnd};
+use flex_client::ProxyHasDomain;
 
 mod watcher;
 pub use watcher::{WatchEvent, WatchMessage, Watcher, WatcherCreateError, WatcherStreamError};
 
 #[cfg(target_os = "fuchsia")]
+#[cfg(not(feature = "fdomain"))]
 pub use fuchsia::*;
 
 #[cfg(not(target_os = "fuchsia"))]
 pub use host::*;
 
 #[cfg(target_os = "fuchsia")]
+#[cfg(not(feature = "fdomain"))]
 mod fuchsia {
     use super::*;
+    use crate::file::ReadError;
 
     /// Opens the given `path` from the current namespace as a [`DirectoryProxy`].
     ///
@@ -78,6 +82,7 @@ mod fuchsia {
 #[cfg(not(target_os = "fuchsia"))]
 mod host {
     use super::*;
+    use crate::file::ReadError;
 
     /// Opens `path` from the `parent` directory as a file and reads the file contents into a Vec.
     pub async fn read_file(parent: &fio::DirectoryProxy, path: &str) -> Result<Vec<u8>, ReadError> {
@@ -141,7 +146,7 @@ pub fn open_directory_async(
     path: &str,
     flags: fio::Flags,
 ) -> Result<fio::DirectoryProxy, OpenError> {
-    let (dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+    let (dir, server_end) = parent.domain().create_proxy::<fio::DirectoryMarker>();
 
     let flags = flags | fio::Flags::PROTOCOL_DIRECTORY;
 
@@ -164,7 +169,7 @@ pub async fn open_directory(
     path: &str,
     flags: fio::Flags,
 ) -> Result<fio::DirectoryProxy, OpenError> {
-    let (dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+    let (dir, server_end) = parent.domain().create_proxy::<fio::DirectoryMarker>();
 
     let flags = flags | fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_SEND_REPRESENTATION;
 
@@ -187,7 +192,7 @@ pub async fn create_directory(
     path: &str,
     flags: fio::Flags,
 ) -> Result<fio::DirectoryProxy, OpenError> {
-    let (dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+    let (dir, server_end) = parent.domain().create_proxy::<fio::DirectoryMarker>();
 
     let flags = flags
         | fio::Flags::FLAG_MAYBE_CREATE
@@ -235,7 +240,7 @@ pub fn open_file_async(
     path: &str,
     flags: fio::Flags,
 ) -> Result<fio::FileProxy, OpenError> {
-    let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
+    let (file, server_end) = parent.domain().create_proxy::<fio::FileMarker>();
 
     let flags = flags | fio::Flags::PROTOCOL_FILE;
 
@@ -258,7 +263,7 @@ pub async fn open_file(
     path: &str,
     flags: fio::Flags,
 ) -> Result<fio::FileProxy, OpenError> {
-    let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
+    let (file, server_end) = parent.domain().create_proxy::<fio::FileMarker>();
 
     let flags = flags | fio::Flags::PROTOCOL_FILE | fio::Flags::FLAG_SEND_REPRESENTATION;
 
@@ -282,7 +287,7 @@ pub async fn open_node(
     path: &str,
     flags: fio::Flags,
 ) -> Result<fio::NodeProxy, OpenError> {
-    let (file, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
+    let (file, server_end) = parent.domain().create_proxy::<fio::NodeMarker>();
 
     let flags = flags | fio::Flags::FLAG_SEND_REPRESENTATION;
 
@@ -301,12 +306,12 @@ pub async fn open_node(
 
 /// Opens the given `path` from the given `parent` directory as a [`P::Proxy`]. The target is not
 /// verified to be any particular type and may not implement the [`P`] protocol.
-pub fn open_async<P: fidl::endpoints::ProtocolMarker>(
+pub fn open_async<P: ProtocolMarker>(
     parent: &fio::DirectoryProxy,
     path: &str,
     flags: fio::Flags,
 ) -> Result<P::Proxy, OpenError> {
-    let (client, server_end) = fidl::endpoints::create_endpoints::<P>();
+    let (client, server_end) = parent.domain().create_endpoints::<P>();
 
     #[cfg(fuchsia_api_level_at_least = "NEXT")]
     let () = parent
@@ -322,7 +327,7 @@ pub fn open_async<P: fidl::endpoints::ProtocolMarker>(
 
 /// Opens a new connection to the given `directory`. The cloned connection has the same permissions.
 pub fn clone(dir: &fio::DirectoryProxy) -> Result<fio::DirectoryProxy, CloneError> {
-    let (client_end, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+    let (client_end, server_end) = dir.domain().create_proxy::<fio::DirectoryMarker>();
     #[cfg(fuchsia_api_level_at_least = "26")]
     dir.clone(server_end.into_channel().into()).map_err(CloneError::SendCloneRequest)?;
     #[cfg(not(fuchsia_api_level_at_least = "26"))]
@@ -392,6 +397,7 @@ async fn split_path<'a>(
 
 /// Rename `src` to `dst` under the given directory, `src` and `dst` may contain "/".
 pub async fn rename(dir: &fio::DirectoryProxy, src: &str, dst: &str) -> Result<(), RenameError> {
+    use flex_client::Event;
     let (src_parent, src_filename) = split_path(dir, src).await?;
     let src_parent = src_parent.as_ref().unwrap_or(dir);
     let (dst_parent, dst_filename) = split_path(dir, dst).await?;
@@ -399,7 +405,7 @@ pub async fn rename(dir: &fio::DirectoryProxy, src: &str, dst: &str) -> Result<(
     let (status, dst_parent_dir_token) =
         dst_parent.get_token().await.map_err(RenameError::SendGetTokenRequest)?;
     zx_status::Status::ok(status).map_err(RenameError::GetTokenError)?;
-    let event = fidl::Event::from(dst_parent_dir_token.ok_or(RenameError::NoHandleError)?);
+    let event = Event::from(dst_parent_dir_token.ok_or(RenameError::NoHandleError)?);
     src_parent
         .rename(src_filename, event, dst_filename)
         .await
@@ -691,7 +697,7 @@ pub async fn remove_dir_recursive(
     root_dir: &fio::DirectoryProxy,
     name: &str,
 ) -> Result<(), EnumerateError> {
-    let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+    let (dir, dir_server) = root_dir.domain().create_proxy::<fio::DirectoryMarker>();
 
     #[cfg(fuchsia_api_level_at_least = "NEXT")]
     root_dir
@@ -722,7 +728,7 @@ fn remove_dir_contents(dir: fio::DirectoryProxy) -> BoxFuture<'static, Result<()
             match dirent.kind {
                 DirentKind::Directory => {
                     let (subdir, subdir_server) =
-                        fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+                        dir.domain().create_proxy::<fio::DirectoryMarker>();
                     #[cfg(fuchsia_api_level_at_least = "NEXT")]
                     dir.open(
                         &dirent.name,
@@ -755,10 +761,11 @@ fn remove_dir_contents(dir: fio::DirectoryProxy) -> BoxFuture<'static, Result<()
 
 /// Opens `path` from the `parent` directory as a file and reads the file contents as a utf-8
 /// encoded string.
+#[cfg(not(feature = "fdomain"))]
 pub async fn read_file_to_string(
     parent: &fio::DirectoryProxy,
     path: &str,
-) -> Result<String, ReadError> {
+) -> Result<String, crate::file::ReadError> {
     let contents = read_file(parent, path).await?;
     Ok(String::from_utf8(contents)?)
 }
@@ -766,7 +773,7 @@ pub async fn read_file_to_string(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::file::write;
+    use crate::file::{write, ReadError};
     use assert_matches::assert_matches;
     use fuchsia_async as fasync;
     use futures::channel::oneshot;

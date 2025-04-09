@@ -156,7 +156,7 @@ mod tests {
     use futures::future::{self};
     use futures::StreamExt as _;
     use tempfile::TempDir;
-    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
+    use {flex_fuchsia_io as fio, fuchsia_async as fasync};
 
     async fn read_to_end_file_with_expected_contents(expected_contents: &[u8]) {
         let dir = TempDir::new().unwrap();

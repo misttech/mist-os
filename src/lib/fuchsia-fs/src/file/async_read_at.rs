@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 use fidl::client::QueryResponseFut;
+use flex_client::Dialect;
+use flex_fuchsia_io as fio;
 use futures::future::Future;
 use futures::io::{AsyncRead, AsyncSeek, SeekFrom};
 use futures::FutureExt;
@@ -11,7 +13,6 @@ use std::convert::TryInto as _;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use {fidl_fuchsia_io as fio, zx_status};
 
 /// Trait for reading at a given offset asynchronously.
 /// This is basically `futures::io::AsyncRead` with an extra offset.
@@ -77,7 +78,10 @@ pub struct AsyncFile {
     file: fio::FileProxy,
     read_at_state: ReadAtState,
     get_attributes_fut: Option<
-        QueryResponseFut<Result<(fio::MutableNodeAttributes, fio::ImmutableNodeAttributes), i32>>,
+        QueryResponseFut<
+            Result<(fio::MutableNodeAttributes, fio::ImmutableNodeAttributes), i32>,
+            Dialect,
+        >,
     >,
 }
 
@@ -85,7 +89,7 @@ pub struct AsyncFile {
 enum ReadAtState {
     Empty,
     Forwarding {
-        fut: QueryResponseFut<Result<Vec<u8>, i32>>,
+        fut: QueryResponseFut<Result<Vec<u8>, i32>, Dialect>,
         file_offset: u64,
         zero_byte_request: bool,
     },

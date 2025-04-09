@@ -7,42 +7,54 @@ import("//build/dist/resource.gni")
 import("//build/fidl/fidl.gni")
 import("//build/rust/rustc_library.gni")
 
-rustc_library("fuchsia-fs") {
-  with_unit_tests = true
-  edition = "2021"
+template("fuchsia_fs_lib") {
+  rustc_library(target_name) {
+    with_unit_tests = true
+    edition = "2021"
 
+    deps = [
+             "//sdk/rust/zx-status",
+             "//src/lib/fidl/rust/fidl",
+             "//src/lib/fuchsia-async",
+             "//third_party/rust_crates:futures",
+             "//third_party/rust_crates:pin-project",
+             "//third_party/rust_crates:rand",
+             "//third_party/rust_crates:static_assertions",
+             "//third_party/rust_crates:thiserror",
+             "//third_party/rust_crates:zerocopy",
+           ] + invoker.deps
+
+    test_deps = [
+      ":fidl.test.schema_rust",
+      "//src/lib/fuchsia",
+      "//src/storage/lib/vfs/rust:vfs",
+      "//third_party/rust_crates:assert_matches",
+      "//third_party/rust_crates:proptest",
+      "//third_party/rust_crates:tempfile",
+    ]
+
+    sources = [
+      "src/directory.rs",
+      "src/directory/watcher.rs",
+      "src/file.rs",
+      "src/file/async_read_at.rs",
+      "src/file/async_read_at_ext.rs",
+      "src/file/async_reader.rs",
+      "src/file/buffered_async_read_at.rs",
+      "src/lib.rs",
+      "src/node.rs",
+    ]
+
+    if (defined(invoker.features)) {
+      features = invoker.features
+    }
+  }
+}
+
+fuchsia_fs_lib("fuchsia-fs") {
   deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//sdk/rust/zx-status",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:pin-project",
-    "//third_party/rust_crates:rand",
-    "//third_party/rust_crates:static_assertions",
-    "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:zerocopy",
-  ]
-
-  test_deps = [
-    ":fidl.test.schema_rust",
-    "//src/lib/fuchsia",
-    "//src/storage/lib/vfs/rust:vfs",
-    "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:proptest",
-    "//third_party/rust_crates:tempfile",
-  ]
-
-  sources = [
-    "src/directory.rs",
-    "src/directory/watcher.rs",
-    "src/file.rs",
-    "src/file/async_read_at.rs",
-    "src/file/async_read_at_ext.rs",
-    "src/file/async_reader.rs",
-    "src/file/buffered_async_read_at.rs",
-    "src/lib.rs",
-    "src/node.rs",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_fidl_flex",
+    "//src/lib/fdomain/client:flex_fidl",
   ]
 
   if (is_fuchsia) {
@@ -51,6 +63,15 @@ rustc_library("fuchsia-fs") {
       "//src/lib/fdio/rust:fdio",
     ]
   }
+}
+
+fuchsia_fs_lib("fuchsia-fs_fdomain") {
+  deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_fdomain_flex",
+    "//src/lib/fdomain/client:flex_fdomain",
+  ]
+
+  features = [ "fdomain" ]
 }
 
 fidl("fidl.test.schema") {

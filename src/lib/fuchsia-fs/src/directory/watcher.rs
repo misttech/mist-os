@@ -6,6 +6,8 @@
 
 #![deny(missing_docs)]
 
+use flex_client::{MessageBuf, ProxyHasDomain};
+use flex_fuchsia_io as fio;
 use futures::stream::{FusedStream, Stream};
 use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
@@ -14,13 +16,9 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use thiserror::Error;
 use zx_status::assoc_values;
-use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
-#[cfg(target_os = "fuchsia")]
-use zx::MessageBuf;
-
-#[cfg(not(target_os = "fuchsia"))]
-use fasync::emulated_handle::MessageBuf;
+#[cfg(not(feature = "fdomain"))]
+use fuchsia_async as fasync;
 
 #[derive(Debug, Error, Clone)]
 #[allow(missing_docs)]
@@ -35,11 +33,16 @@ pub enum WatcherCreateError {
     ChannelConversion(#[source] zx_status::Status),
 }
 
-#[derive(Debug, Error, Eq, PartialEq)]
+#[derive(Debug, Error)]
+#[cfg_attr(not(feature = "fdomain"), derive(Eq, PartialEq))]
 #[allow(missing_docs)]
 pub enum WatcherStreamError {
+    #[cfg(not(feature = "fdomain"))]
     #[error("read from watch channel failed with status: {0}")]
     ChannelRead(#[from] zx_status::Status),
+    #[cfg(feature = "fdomain")]
+    #[error("read from watch channel failed: {0}")]
+    ChannelRead(#[from] flex_client::Error),
 }
 
 /// Describes the type of event that occurred in the directory being watched.
@@ -84,7 +87,7 @@ enum WatcherState {
 #[derive(Debug)]
 #[must_use = "futures/streams must be polled"]
 pub struct Watcher {
-    ch: fasync::Channel,
+    ch: flex_client::AsyncChannel,
     // If idx >= buf.bytes().len(), you must call reset_buf() before get_next_msg().
     buf: MessageBuf,
     idx: usize,
@@ -96,7 +99,7 @@ impl Unpin for Watcher {}
 impl Watcher {
     /// Creates a new `Watcher` for the directory given by `dir`.
     pub async fn new(dir: &fio::DirectoryProxy) -> Result<Watcher, WatcherCreateError> {
-        let (client_end, server_end) = fidl::endpoints::create_endpoints();
+        let (client_end, server_end) = dir.domain().create_endpoints();
         let options = 0u32;
         let status = dir
             .watch(fio::WatchMask::all(), options, server_end)
@@ -106,7 +109,10 @@ impl Watcher {
         let mut buf = MessageBuf::new();
         buf.ensure_capacity_bytes(fio::MAX_BUF as usize);
         Ok(Watcher {
+            #[cfg(not(feature = "fdomain"))]
             ch: fasync::Channel::from_channel(client_end.into_channel()),
+            #[cfg(feature = "fdomain")]
+            ch: client_end.into_channel(),
             buf,
             idx: 0,
             state: WatcherState::Watching,
