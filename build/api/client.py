@@ -252,9 +252,6 @@ class LastBuildApiFilter(object):
         return bool(args.last_build_only)
 
     def __init__(self, args: argparse.Namespace):
-        import ninja_artifacts
-        from build_api_filter import BuildApiFilter
-
         self._error = ""
 
         # Verify that the last build was successful, and set error otherwise.
@@ -264,15 +261,7 @@ class LastBuildApiFilter(object):
                 return
 
         self._ninja = get_ninja_path(args.fuchsia_dir, args.host_tag)
-        ninja_runner = ninja_artifacts.NinjaRunner(self._ninja)
-
-        last_build_artifacts = ninja_artifacts.get_last_build_artifacts(
-            args.build_dir, ninja_runner
-        )
-        last_build_sources = ninja_artifacts.get_last_build_sources(
-            args.build_dir, ninja_runner
-        )
-        self._filter = BuildApiFilter(last_build_artifacts, last_build_sources)
+        self._filter = self.generate_filter(self._ninja, args.build_dir)
 
     @property
     def error(self) -> str:
@@ -281,6 +270,20 @@ class LastBuildApiFilter(object):
     def filter_json(self, api_name: str, json_value: T.Any) -> T.Any:
         assert not self._error, "Cannot call filter_json() on error"
         return self._filter.filter_api_json(api_name, json_value)
+
+    @staticmethod
+    def generate_filter(ninja: Path, build_dir: Path) -> T.Any:
+        import ninja_artifacts
+        from build_api_filter import BuildApiFilter
+
+        ninja_runner = ninja_artifacts.NinjaRunner(ninja)
+        last_build_artifacts = ninja_artifacts.get_last_build_artifacts(
+            build_dir, ninja_runner
+        )
+        last_build_sources = ninja_artifacts.get_last_build_sources(
+            build_dir, ninja_runner
+        )
+        return BuildApiFilter(last_build_artifacts, last_build_sources)
 
 
 def cmd_print(args: argparse.Namespace) -> int:
@@ -345,35 +348,84 @@ def cmd_print_all(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_print_debug_symbols(args: argparse.Namespace) -> int:
-    import json
+class DebugSymbolCommandState(object):
+    def __init__(
+        self,
+        modules: BuildApiModuleList,
+        ninja: Path,
+        build_dir: Path,
+        resolve_build_ids: bool = True,
+        test_mode: bool = False,
+    ) -> None:
+        import debug_symbols
 
-    import debug_symbols
+        self._modules = modules
+        self._ninja = ninja
+        self._build_dir = build_dir
+        self._debug_parser = debug_symbols.DebugSymbolsManifestParser(build_dir)
 
-    module = args.modules.find("debug_symbols")
-    if not module.path.exists():
-        return _printerr(
-            f"Missing input file, please use `fx set` or `fx gen` command: {module.path}"
-        )
-
-    debug_parser = debug_symbols.DebugSymbolsManifestParser(args.build_dir)
-    if args.resolve_build_ids:
-        debug_parser.enable_build_id_resolution()
-        if args.test_mode:
+        if resolve_build_ids:
+            self._debug_parser.enable_build_id_resolution()
+        if test_mode:
             # --test-mode is used during regression testing to avoid
             # using a fake ELF input file. Simply return the file name
             # as the build-id value for now.
             def get_build_id(path: Path) -> str:
                 return path.name
 
-            debug_parser.set_build_id_callback_for_test(get_build_id)
+            self._debug_parser.set_build_id_callback_for_test(get_build_id)
 
-    try:
-        debug_parser.parse_manifest_file(module.path)
-    except ValueError as e:
-        return _printerr(str(e))
+    def parse_manifest(self, last_build_only: bool) -> int:
+        module = self._modules.find("debug_symbols")
+        assert module
+        if not module.path.exists():
+            return _printerr(
+                f"Missing input file, please use `fx set` or `fx gen` command: {module.path}"
+            )
 
-    result = debug_parser.entries
+        import json
+
+        with module.path.open("rt") as f:
+            manifest_json = json.load(f)
+
+        if last_build_only:
+            # Only filter the top-level entries, as Bazel-generated artifacts
+            # have a "debug" path that points directly in the Bazel output_base
+            # and are not known as Ninja artifacts.
+            api_filter = LastBuildApiFilter.generate_filter(
+                self._ninja, self._build_dir
+            )
+            manifest_json = api_filter.filter_api_json(
+                "debug_symbols", manifest_json
+            )
+
+        try:
+            self._debug_parser.parse_manifest_json(manifest_json, module.path)
+        except ValueError as e:
+            return _printerr(str(e))
+        return 0
+
+    @property
+    def debug_symbol_entries(self) -> list[dict[str, T.Any]]:
+        return self._debug_parser.entries
+
+
+def cmd_print_debug_symbols(args: argparse.Namespace) -> int:
+    state = DebugSymbolCommandState(
+        args.modules,
+        get_ninja_path(args.fuchsia_dir, args.host_tag),
+        args.build_dir,
+        args.resolve_build_ids,
+        args.test_mode,
+    )
+
+    status = state.parse_manifest(bool(args.last_build_only))
+    if status != 0:
+        return status
+
+    result = state.debug_symbol_entries
+
+    import json
 
     if args.pretty:
         print(
@@ -381,6 +433,54 @@ def cmd_print_debug_symbols(args: argparse.Namespace) -> int:
         )
     else:
         print(json.dumps(result, sort_keys=True))
+    return 0
+
+
+def cmd_export_last_build_debug_symbols(args: argparse.Namespace) -> int:
+    import debug_symbols
+
+    state = DebugSymbolCommandState(
+        args.modules,
+        get_ninja_path(args.fuchsia_dir, args.host_tag),
+        args.build_dir,
+        resolve_build_ids=True,  # Always resolve the .build-id value
+        test_mode=args.test_mode,
+    )
+
+    state.parse_manifest(last_build_only=True)
+
+    if args.no_breakpad_symbols_generation:
+        dump_syms_tool = None
+    else:
+        dump_syms_tool = args.dump_syms
+        if not dump_syms_tool:
+            dump_syms_tool = (
+                args.fuchsia_dir
+                / f"prebuilt/third_party/breakpad/{args.host_tag}/dump_syms/dump_syms"
+            )
+            if not dump_syms_tool.exists():
+                print(
+                    f"ERROR: Missing breakpad tool, use --dump_syms=TOOL: {dump_syms_tool}"
+                )
+
+    def log_error(error: str) -> None:
+        print(f"ERROR: {error}", file=sys.stderr)
+
+    def log(msg: str) -> None:
+        if not args.quiet:
+            print(msg)
+
+    exporter = debug_symbols.DebugSymbolExporter(
+        args.build_dir,
+        dump_syms_tool=dump_syms_tool,
+        log=log,
+        log_error=log_error,
+    )
+    exporter.parse_debug_symbols(state.debug_symbol_entries)
+
+    if not exporter.export_debug_symbols(args.output_dir):
+        return 1
+
     return 0
 
 
@@ -701,6 +801,39 @@ def main(main_args: T.Sequence[str]) -> int:
     )
     fx_build_args_to_labels_parser.set_defaults(
         func=cmd_fx_build_args_to_labels
+    )
+
+    export_last_build_debug_symbols_parser = subparsers.add_parser(
+        "export_last_build_debug_symbols",
+        help="Export the debug symbols from last build's artifacts",
+        description="Export the ELF debug symbol files, and optional breakpad symbol ones, from last build's artifacts.",
+    )
+    export_last_build_debug_symbols_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        required=True,
+        help="Output directory, this will be cleaned before generation.",
+    )
+    export_last_build_debug_symbols_parser.add_argument(
+        "--no-breakpad-symbols-generation",
+        action="store_true",
+        help="Do not try to generate breakpad symbol files in the output. Ignores --dump_syms.",
+    )
+    export_last_build_debug_symbols_parser.add_argument(
+        "--dump_syms",
+        type=Path,
+        help="Path to Breakpad dump_syms binary (auto-detected), used by --with-breakpad-symbols.",
+    )
+    export_last_build_debug_symbols_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print details of operations.",
+    )
+    export_last_build_debug_symbols_parser.add_argument(
+        "--test-mode", action="store_true", help="For regression tests only."
+    )
+    export_last_build_debug_symbols_parser.set_defaults(
+        func=cmd_export_last_build_debug_symbols
     )
 
     args = parser.parse_args(main_args)

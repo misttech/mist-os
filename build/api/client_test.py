@@ -643,6 +643,70 @@ build all: phony out1 out2 out3
         self._last_targets_path.write_text("all")
         assert_last_ninja_artifacts_output("out1\nout2\nout3\n")
 
+    def test_export_last_build_debug_symbols(self):
+        self.maxDiff = None
+
+        self._build_ninja_path.write_text(
+            """
+rule whatever
+  command = ignored
+
+build obj/src/foo/lib_shared/libfoo.so.unstripped obj/src/bar/binary.unstripped obj/src/zoo/binary.unstripped: whatever ../../prebuilt/.build-id/aa/bbbbbbbbbbb.debug
+
+build $:default: phony obj/src/foo/lib_shared/libfoo.so.unstripped
+"""
+        )
+
+        # Create a fake dump_syms tool that simply prints the path of
+        # the input debug symbol file.
+        dump_syms = self._top_dir / "dump_syms"
+        dump_syms.write_text(
+            f"""#!{sys.executable}
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-r", action="store_true")
+parser.add_argument("-n")
+parser.add_argument("-o")
+parser.add_argument("debug_symbol_file")
+
+args = parser.parse_args()
+
+print(args.debug_symbol_file)
+"""
+        )
+        dump_syms.chmod(0o755)
+
+        export_dir = self._top_dir / "exported_debug_symbols"
+
+        expected_err = """MISSING build-id FOR {'cpu': 'x64', 'debug': 'obj/src/zoo/binary.unstripped', 'label': '//src/zoo:binary', 'os': 'fuchsia'}
+"""
+
+        expected_out = f"""Creating {export_dir}/build-ids.json
+Creating {export_dir}/build-ids.txt
+Creating 3 symlinks in {export_dir}
+Generating 3 breakpad symbols in {export_dir}
+  - Creating .build-id/00/000000000000001.sym FROM obj/src/foo/lib_shared/libfoo.so.unstripped
+  - Creating .build-id/aa/bbbbbbbbbbb.sym FROM ../../prebuilt/.build-id/aa/bbbbbbbbbbb.debug
+  - Creating .build-id/bu/ild_id_for_bar.sym FROM obj/src/bar/binary.unstripped
+Done!
+"""
+        self.assert_raw_outputs(
+            self.run_raw_client(
+                [
+                    "--build-dir",
+                    str(self._build_dir),
+                    "--fuchsia-dir",
+                    str(_SCRIPT_DIR.parent.parent.resolve()),
+                    "export_last_build_debug_symbols",
+                    f"--output-dir={export_dir}",
+                    f"--dump_syms={dump_syms}",
+                ]
+            ),
+            expected_out,
+            expected_err,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
