@@ -40,11 +40,11 @@ static ACPI_STATUS handle_prt(ACPI_HANDLE object, zx_pci_init_arg_t* arg, uint8_
   ACPI_BUFFER buffer = {
       // Request that the ACPI subsystem allocate the buffer
       .Length = ACPI_ALLOCATE_BUFFER,
-      .Pointer = NULL,
+      .Pointer = nullptr,
   };
   ACPI_BUFFER crs_buffer = {
       .Length = ACPI_ALLOCATE_BUFFER,
-      .Pointer = NULL,
+      .Pointer = nullptr,
   };
 
   ACPI_STATUS status = AcpiGetIrqRoutingTable(object, &buffer);
@@ -363,7 +363,6 @@ zx_status_t get_pci_init_arg(acpi::Acpi* acpi, ACPI_HANDLE object, zx_pci_init_a
   if (status != ZX_OK) {
     // We log but we do not fail here. QEMU does not have _PRT.
     LTRACEF("acpi: error %d in find_pci_legacy_irq_mapping\n", status);
-    //goto fail;
   }
 
   *arg = res;
