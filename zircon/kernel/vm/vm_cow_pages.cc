@@ -1982,9 +1982,14 @@ zx_status_t VmCowPages::AddNewPagesLocked(uint64_t start_offset, list_node_t* pa
     if (status != ZX_OK) {
       // Put the page back on the list so that someone owns it and it'll get free'd.
       list_add_head(pages, &p->queue_node);
-      // Decommit any pages we already placed.
+      // Remove any pages we already placed.
       if (offset > start_offset) {
-        DecommitRangeLocked(VmCowRange(start_offset, offset - start_offset));
+        __UNINITIALIZED ScopedPageFreedList freed_list;
+        __UNINITIALIZED BatchPQRemove page_remover(freed_list);
+
+        page_list_.RemovePages(page_remover.RemovePagesCallback(), start_offset, offset);
+        page_remover.Flush();
+        freed_list.FreePages(this);
       }
 
       // Free all the pages back as we had ownership of them.
