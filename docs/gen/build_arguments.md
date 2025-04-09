@@ -79,7 +79,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2124
+From //build/config/BUILDCONFIG.gn:2120
 
 ### allowed_test_device_types
 
@@ -700,27 +700,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8718156285712910865"`
-
-From //out/not-default/args.gn:10
-
-**Overridden from the default:** `""`
-
-From //build/info/info.gni:17
-
-**Current value for `target_cpu = "riscv64"`:** `"8718156285712910865"`
-
-From //out/not-default/args.gn:10
-
-**Overridden from the default:** `""`
-
-From //build/info/info.gni:17
-
-**Current value for `target_cpu = "x64"`:** `"8718156285712910865"`
-
-From //out/not-default/args.gn:10
-
-**Overridden from the default:** `""`
+**Current value (from the default):** `""`
 
 From //build/info/info.gni:17
 
@@ -735,7 +715,7 @@ only want to build and define a small subset of the tree.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:16
+From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
@@ -743,7 +723,7 @@ From //BUILD.gn:123
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:16
+From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
@@ -751,7 +731,7 @@ From //BUILD.gn:123
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:16
+From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
@@ -1106,7 +1086,7 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
@@ -1167,7 +1147,7 @@ This should never be set as a build argument.
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
   clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
 }
 }
@@ -1784,7 +1764,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
-  clang_rt_cxx = ""
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
 }
 }
   ubsan = {
@@ -2264,7 +2244,7 @@ These are always a dependency of the main product assembly.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:25
+From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
@@ -2272,7 +2252,7 @@ From //BUILD.gn:86
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:25
+From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
@@ -2280,7 +2260,7 @@ From //BUILD.gn:86
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:25
+From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
@@ -2353,7 +2333,7 @@ hardware or emulated).
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:21
+From //out/not-default/args.gn:20
 
 **Overridden from the default:** `[]`
 
@@ -2361,7 +2341,7 @@ From //BUILD.gn:75
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:21
+From //out/not-default/args.gn:20
 
 **Overridden from the default:** `[]`
 
@@ -2369,7 +2349,7 @@ From //BUILD.gn:75
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:21
+From //out/not-default/args.gn:20
 
 **Overridden from the default:** `[]`
 
@@ -2810,7 +2790,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1904
+From //build/config/BUILDCONFIG.gn:1900
 
 ### fastboot_product
 
@@ -3090,7 +3070,7 @@ Fully hermetic tests (both by packaging and at runtime)
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:19
+From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
@@ -3098,7 +3078,7 @@ From //BUILD.gn:67
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:19
+From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
@@ -3106,7 +3086,7 @@ From //BUILD.gn:67
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:19
+From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
@@ -3132,7 +3112,7 @@ These will be added to the build using the host toolchain.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:11
+From //out/not-default/args.gn:10
 
 **Overridden from the default:** `[]`
 
@@ -3140,7 +3120,7 @@ From //BUILD.gn:93
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:11
+From //out/not-default/args.gn:10
 
 **Overridden from the default:** `[]`
 
@@ -3148,7 +3128,7 @@ From //BUILD.gn:93
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:11
+From //out/not-default/args.gn:10
 
 **Overridden from the default:** `[]`
 
@@ -3167,7 +3147,7 @@ These will be added to the build using the host toolchain.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:22
+From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
@@ -3175,7 +3155,7 @@ From //BUILD.gn:81
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:22
+From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
@@ -3183,7 +3163,7 @@ From //BUILD.gn:81
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:22
+From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
@@ -3797,7 +3777,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1688
+From //build/config/BUILDCONFIG.gn:1684
 
 ### link_rbe_check
 
@@ -4914,7 +4894,7 @@ Example:
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:27
+From //out/not-default/args.gn:26
 
 **Overridden from the default:** `[]`
 
@@ -4922,7 +4902,7 @@ From //build/assembly/developer_overrides.gni:443
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:27
+From //out/not-default/args.gn:26
 
 **Overridden from the default:** `[]`
 
@@ -4930,7 +4910,7 @@ From //build/assembly/developer_overrides.gni:443
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:27
+From //out/not-default/args.gn:26
 
 **Overridden from the default:** `[]`
 
@@ -5631,7 +5611,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2114
+From //build/config/BUILDCONFIG.gn:2110
 
 ### select_variant_canonical
 
@@ -5641,7 +5621,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2119
+From //build/config/BUILDCONFIG.gn:2115
 
 ### select_variant_shortcuts
 
@@ -5706,7 +5686,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1911
+From //build/config/BUILDCONFIG.gn:1907
 
 ### size_checker_input
 
@@ -5998,19 +5978,19 @@ From //src/sysmem/server/BUILD.gn:29
 
 **Current value for `target_cpu = "arm64"`:** `"arm64"`
 
-From //out/not-default/args.gn:12
+From //out/not-default/args.gn:11
 
 **Overridden from the default:** `""`
 
 **Current value for `target_cpu = "riscv64"`:** `"riscv64"`
 
-From //out/not-default/args.gn:12
+From //out/not-default/args.gn:11
 
 **Overridden from the default:** `""`
 
 **Current value for `target_cpu = "x64"`:** `"x64"`
 
-From //out/not-default/args.gn:12
+From //out/not-default/args.gn:11
 
 **Overridden from the default:** `""`
 
@@ -6088,7 +6068,7 @@ be flagged as an error by the build.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:20
+From //out/not-default/args.gn:19
 
 **Overridden from the default:** `[]`
 
@@ -6096,7 +6076,7 @@ From //BUILD.gn:71
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:20
+From //out/not-default/args.gn:19
 
 **Overridden from the default:** `[]`
 
@@ -6104,7 +6084,7 @@ From //BUILD.gn:71
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:20
+From //out/not-default/args.gn:19
 
 **Overridden from the default:** `[]`
 
@@ -6168,7 +6148,7 @@ for details and documentation for each field.
 }
 ```
 
-From //build/config/BUILDCONFIG.gn:100
+From //build/config/BUILDCONFIG.gn:96
 
 ### truncate_build_info_commit_date
 
@@ -6226,7 +6206,7 @@ the build.
 
 **Current value for `target_cpu = "arm64"`:** `["//bundles/kitchen_sink"]`
 
-From //out/not-default/args.gn:15
+From //out/not-default/args.gn:14
 
 **Overridden from the default:** `[]`
 
@@ -6234,7 +6214,7 @@ From //BUILD.gn:34
 
 **Current value for `target_cpu = "riscv64"`:** `["//bundles/buildbot/minimal"]`
 
-From //out/not-default/args.gn:15
+From //out/not-default/args.gn:14
 
 **Overridden from the default:** `[]`
 
@@ -6242,7 +6222,7 @@ From //BUILD.gn:34
 
 **Current value for `target_cpu = "x64"`:** `["//bundles/kitchen_sink"]`
 
-From //out/not-default/args.gn:15
+From //out/not-default/args.gn:14
 
 **Overridden from the default:** `[]`
 
@@ -6745,7 +6725,7 @@ This allows testing for a Zircon-specific toolchain with:
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:117
+From //build/config/BUILDCONFIG.gn:113
 
 ### zircon_tracelog
 
