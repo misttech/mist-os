@@ -6,6 +6,7 @@ use crate::device::binder::{BinderDriver, RemoteBinderConnection};
 use crate::device::DeviceOps;
 use crate::mm::memory::MemoryObject;
 use crate::mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags};
+use crate::power::mark_proxy_message_handled;
 use crate::task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
@@ -649,7 +650,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                 }
                 unknown => log_warn!("Unknown ContainerPowerController request: {:#?}", unknown),
             };
-            message_counter.add(-1).expect("Failed to decrement message counter");
+            mark_proxy_message_handled(&message_counter);
             Ok(())
         }
 

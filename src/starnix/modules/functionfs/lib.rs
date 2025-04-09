@@ -5,7 +5,7 @@
 use fidl::endpoints::SynchronousProxy;
 use fidl_fuchsia_hardware_adb as fadb;
 use futures_util::StreamExt;
-use starnix_core::power::create_proxy_for_wake_events_counter;
+use starnix_core::power::{create_proxy_for_wake_events_counter, mark_proxy_message_handled};
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::{
     fileops_impl_noop_sync, fileops_impl_seekless, fs_args, fs_node_impl_dir_readonly,
@@ -80,9 +80,7 @@ async fn handle_adb(
             // We can simply clear this after getting a response because we care about
             // reads. Allow new FIDL messages to come through and only go to sleep if
             // we have an outstanding read.
-            message_counter.as_ref().map(|c| {
-                c.add(-1).expect("Failed message decrement");
-            });
+            message_counter.as_ref().map(mark_proxy_message_handled);
         }
     }
 
@@ -92,7 +90,6 @@ async fn handle_adb(
         message_counter: &Option<zx::Counter>,
         commands: async_channel::Receiver<ReadCommand>,
     ) {
-        let message_counter = message_counter.as_ref();
         commands
             .for_each(|ReadCommand { response_sender }| async move {
                 // Queue up our receive future. We want to do this before we decrement the counter,
@@ -101,9 +98,7 @@ async fn handle_adb(
 
                 // The message is queued in the channel, so now we can decrement the unhandled
                 // message counter to make sure we aren't preventing the container from suspending.
-                message_counter.as_ref().map(|c| {
-                    c.add(-1).expect("Failed message decrement");
-                });
+                message_counter.as_ref().map(mark_proxy_message_handled);
 
                 let response = match receive_future.await {
                     Err(err) => {
@@ -147,9 +142,7 @@ async fn handle_adb(
 
                 // We can simply decrement this after getting a response because responses to
                 // writes from the container to the host are not expected to wake the container.
-                message_counter.as_ref().map(|c| {
-                    c.add(-1).expect("Failed message decrement");
-                });
+                message_counter.as_ref().map(mark_proxy_message_handled);
                 response_sender
                     .send(response)
                     .map_err(|e| log_error!("Failed to send to main thread: {:#?}", e))
@@ -300,9 +293,7 @@ fn connect_to_device(
 
         // Decrement the counter after we receive a response, since we don't need to schedule
         // another message before allowing the container to suspend.
-        message_counter.as_ref().map(|c| {
-            c.add(-1).expect("Failed to decrement");
-        });
+        message_counter.as_ref().map(mark_proxy_message_handled);
 
         if status == fadb::StatusFlags::ONLINE {
             break;

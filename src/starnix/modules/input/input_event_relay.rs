@@ -16,7 +16,7 @@ use fidl_fuchsia_ui_pointer::{
     {self as fuipointer},
 };
 use futures::StreamExt as _;
-use starnix_core::power::create_proxy_for_wake_events_counter;
+use starnix_core::power::{create_proxy_for_wake_events_counter, mark_proxy_message_handled};
 use starnix_core::task::Kernel;
 use starnix_logging::{
     log_warn, trace_duration, trace_duration_begin, trace_duration_end, trace_flow_end,
@@ -214,7 +214,7 @@ impl InputEventsRelay {
 
                 // .. until the counter that we passed to the runner has been decremented. This prevents
                 // the container from suspending between calls to `watch`.
-                message_counter.as_ref().map(|c| c.add(-1));
+                message_counter.as_ref().map(mark_proxy_message_handled);
 
                 match watch_future.await {
                     Ok(touch_events) => {
@@ -463,7 +463,7 @@ impl InputEventsRelay {
             let next_event_future = local_listener_stream.next();
 
             // The previous hanging get has been handled, so decrement the unhandled message counter.
-            message_counter.as_ref().map(|c| c.add(-1));
+            message_counter.as_ref().map(mark_proxy_message_handled);
 
             match next_event_future.await {
                 Some(Ok(fuipolicy::MediaButtonsListenerRequest::OnEvent { event, responder })) => {
@@ -614,7 +614,7 @@ impl InputEventsRelay {
 
             // .. until the message counter has been decremented. This prevents
             // the container from suspending between calls to `watch`.
-            message_counter.as_ref().map(|c| c.add(-1));
+            message_counter.as_ref().map(mark_proxy_message_handled);
 
             match event_future.await {
                 Ok(mouse_events) => {

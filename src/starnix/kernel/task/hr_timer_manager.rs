@@ -17,7 +17,9 @@ use std::collections::BinaryHeap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, OnceLock, Weak};
 
-use crate::power::{create_proxy_for_wake_events_counter_zero, OnWakeOps};
+use crate::power::{
+    create_proxy_for_wake_events_counter_zero, mark_proxy_message_handled, OnWakeOps,
+};
 use crate::task::{CurrentTask, HandleWaitCanceler, TargetTime, WaitCanceler};
 use crate::vfs::timer::TimerOps;
 
@@ -275,18 +277,12 @@ impl HrTimerManager {
             let guard = self.lock();
             let Some(node) = guard.timer_heap.peek() else {
                 log_warn!("HrTimer manager worker thread woke up with an empty timer heap.");
-                guard
-                    .message_counter
-                    .as_ref()
-                    .map(|c| c.add(-1).expect("Failed to decrement counter"));
+                guard.message_counter.as_ref().map(mark_proxy_message_handled);
                 continue;
             };
             let Some(new_deadline) = guard.current_deadline else {
                 log_warn!("HrTimer manager worker thread woke up without a timer deadline");
-                guard
-                    .message_counter
-                    .as_ref()
-                    .map(|c| c.add(-1).expect("Failed to decrement counter"));
+                guard.message_counter.as_ref().map(mark_proxy_message_handled);
                 continue;
             };
             fuchsia_trace::instant!(
@@ -335,7 +331,7 @@ impl HrTimerManager {
 
             // Mark the message as handled since the next hanging get has been scheduled, meaning
             // that it is fine to suspend the container at this point (if the counter if 0).
-            guard.message_counter.as_ref().map(|c| c.add(-1).expect("Failed to decrement counter"));
+            guard.message_counter.as_ref().map(mark_proxy_message_handled);
             drop(guard);
 
             let resp = {
@@ -380,10 +376,7 @@ impl HrTimerManager {
                         // If there are more timers to start, we have to keep the message counter
                         // positive to prevent suspension until the hanging get has been scheduled.
                         // Otherwise, we might miss a wake up.
-                        guard
-                            .message_counter
-                            .as_ref()
-                            .map(|c| c.add(-1).expect("Failed to decrement counter"));
+                        guard.message_counter.as_ref().map(mark_proxy_message_handled);
                         continue;
                     }
 
@@ -396,10 +389,7 @@ impl HrTimerManager {
                 }
                 Ok(Err(e)) => {
                     let guard = self.lock();
-                    guard
-                        .message_counter
-                        .as_ref()
-                        .map(|c| c.add(-1).expect("Failed to decrement counter"));
+                    guard.message_counter.as_ref().map(mark_proxy_message_handled);
                     match e {
                         fta::WakeError::Dropped => {
                             fuchsia_trace::duration!(c"alarms", c"alarm:drop", "deadline" => new_deadline.into_nanos());
@@ -413,6 +403,8 @@ impl HrTimerManager {
                         _ => log_error!("Wake::SetAndWait driver error: {e:?}"),
                     }
                 }
+                // In this case we don't need to set a FIDL message as handled, since the error was
+                // in the bindings/connection so no message was returned.
                 Err(e) => log_error!("Wake::SetAndWait fidl error: {e}"),
             }
         }
