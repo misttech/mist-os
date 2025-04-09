@@ -27,10 +27,9 @@ pub struct Syslog {
     syscall_subscription: OnceLock<Mutex<LogSubscription>>,
 }
 
-#[derive(Debug)]
 pub enum SyslogAccess {
-    DevKmsg(SyslogAction),
-    ProcKmsg(SyslogAction),
+    DevKmsg,
+    ProcKmsg,
     Syscall(SyslogAction),
 }
 
@@ -52,36 +51,15 @@ impl Syslog {
     }
 
     /// Validates that syslog access is unrestricted, or that the `current_task` has the relevant
-    /// capability, or global admin capability as well as applying the SELinux policy.
+    /// capability, or global admin capability.
     pub fn validate_access(current_task: &CurrentTask, access: SyslogAccess) -> Result<(), Errno> {
-        let action = match access {
-            SyslogAccess::DevKmsg(SyslogAction::Open)
-            | SyslogAccess::ProcKmsg(SyslogAction::Open) => SyslogAction::Open,
-            SyslogAccess::Syscall(a) => a,
-            // If we got here we already validated Open on these files.
-            SyslogAccess::DevKmsg(_) | SyslogAccess::ProcKmsg(_) => return Ok(()),
-        };
-
         // According to syslog(2) man, ReadAll (3) and SizeBuffer (10) are allowed unprivileged
-        // access only if restrict_dmsg is 0.
-        let action_is_privileged = matches!(
-            access,
-            SyslogAccess::Syscall(SyslogAction::ReadAll | SyslogAction::SizeBuffer)
-        );
-        let restrict_dmesg = current_task.kernel().restrict_dmesg.load(Ordering::Relaxed);
-        if !action_is_privileged || restrict_dmesg {
-            Self::check_capabilities(current_task)?;
+        // access only if restrict_dmsg is 0;
+        if matches!(access, SyslogAccess::Syscall(SyslogAction::ReadAll | SyslogAction::SizeBuffer))
+            && !current_task.kernel().restrict_dmesg.load(Ordering::Relaxed)
+        {
+            return Ok(());
         }
-
-        // We just perform these checks on ProcKmsg and syslog(2) which are equivalent. This check
-        // doesn't exist for /dev/kmsg which is controlled through restrict_dmesg instead.
-        if !matches!(access, SyslogAccess::DevKmsg(_)) {
-            security::check_syslog_access(current_task, action)?
-        }
-        Ok(())
-    }
-
-    fn check_capabilities(current_task: &CurrentTask) -> Result<(), Errno> {
         if security::is_task_capable_noaudit(current_task, CAP_SYS_ADMIN) {
             return Ok(());
         }

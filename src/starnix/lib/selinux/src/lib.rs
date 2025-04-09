@@ -144,8 +144,6 @@ enumerable_enum! {
         SockFile,
         /// The SELinux "socket" object class.
         Socket,
-        /// The SELinux "system" object class.
-        System,
         /// The SELinux "tcp_socket" object class.
         TcpSocket,
         /// The SELinux "udp_socket" object class.
@@ -203,7 +201,6 @@ impl KernelClass {
             Self::Security => "security",
             Self::SockFile => "sock_file",
             Self::Socket => "socket",
-            Self::System => "system",
             Self::TcpSocket => "tcp_socket",
             Self::UdpSocket => "udp_socket",
             Self::UnixDgramSocket => "unix_dgram_socket",
@@ -543,8 +540,6 @@ permission_enum! {
         SockFile(SockFilePermission),
         /// Permissions for the well-known SELinux "socket" object class.
         Socket(SocketPermission),
-        /// Permissions for the well-known SELinux "system" object class.
-        System(SystemPermission),
         /// Permissions for the well-known SELinux "tcp_socket" object class.
         TcpSocket(TcpSocketPermission),
         /// Permissions for the well-known SELinux "udp_socket" object class.
@@ -1311,22 +1306,6 @@ class_permission_enum! {
         SetCheckReqProt("setcheckreqprot"),
         /// Permission to switch the system between permissive and enforcing modes, via "enforce".
         SetEnforce("setenforce"),
-        // keep-sorted end
-     }
-}
-
-class_permission_enum! {
-    /// A well-known "system" class permission in SELinux policy, used to control access to
-    /// sensitive administrative and query API surfaces in the "selinuxfs".
-    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-    SystemPermission {
-        // keep-sorted start
-        /// Permission to use the syslog(2) CONSOLE action types.
-        SyslogConsole("syslog_console"),
-        /// Permission to use other syslog(2) action types.
-        SyslogMod("syslog_mod"),
-        /// Permission to use the syslog(2) READ_ALL related action types.
-        SyslogRead("syslog_read"),
         // keep-sorted end
      }
 }

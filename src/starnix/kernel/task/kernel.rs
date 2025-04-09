@@ -442,7 +442,7 @@ impl Kernel {
             next_file_object_id: Default::default(),
             system_limits: SystemLimits::default(),
             ptrace_scope: AtomicU8::new(0),
-            restrict_dmesg: AtomicBool::new(true), // Restrict log access by default.
+            restrict_dmesg: AtomicBool::new(true),
             disable_unprivileged_bpf: AtomicU8::new(0), // Enable unprivileged BPF by default.
             build_version: OnceCell::new(),
             stats: Arc::new(KernelStats::default()),

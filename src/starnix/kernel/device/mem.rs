@@ -25,7 +25,6 @@ use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::syslog::SyslogAction;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, error};
@@ -262,7 +261,7 @@ pub fn open_kmsg(
     _node: &FsNode,
     flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
-    Syslog::validate_access(current_task, SyslogAccess::DevKmsg(SyslogAction::Open))?;
+    Syslog::validate_access(current_task, SyslogAccess::DevKmsg)?;
     let subscription = if flags.can_read() {
         Some(Mutex::new(Syslog::snapshot_then_subscribe(&current_task)?))
     } else {
