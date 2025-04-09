@@ -35,7 +35,10 @@ if (is_host) {
 
 if (is_host) {
   go_library("bazel2gn_lib") {
-    sources = [ "bazel2gn.go" ]
+    sources = [
+      "bazel2gn.go",
+      "select.go",
+    ]
     importpath = "go.fuchsia.dev/fuchsia/build/tools/bazel2gn"
     deps = [ "//third_party/golibs:go.starlark.net/syntax" ]
   }
@@ -53,7 +56,10 @@ if (is_host) {
 }
 if (is_host) {
   go_test("bazel2gn_tests") {
-    sources = [ "bazel2gn_test.go" ]
+    sources = [
+      "bazel2gn_test.go",
+      "select_test.go",
+    ]
     embed = [ ":bazel2gn_lib" ]
     deps = [
       "//third_party/golibs:github.com/google/go-cmp/cmp",
