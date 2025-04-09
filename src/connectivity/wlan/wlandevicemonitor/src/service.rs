@@ -10,11 +10,13 @@ use core::sync::atomic::AtomicUsize;
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_wlan_device_service::{self as fidl_svc, DeviceMonitorRequest};
 use futures::channel::mpsc;
+use futures::lock::Mutex;
 use futures::stream::FuturesUnordered;
 use futures::{select, StreamExt};
 use ieee80211::{MacAddr, MacAddrBytes, NULL_ADDR};
 use log::{error, info, warn};
 use std::sync::atomic::Ordering;
+use std::sync::{Arc, LazyLock};
 use wlan_fidl_ext::{ResponderExt, WithName};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_device as fidl_dev,
@@ -446,6 +448,18 @@ async fn destroy_iface(
     ifaces_tree: &IfacesTree,
     id: u16,
 ) -> Result<(), zx::Status> {
+    // There is a race between this function call returning and handle_single_new_iface realizing
+    // that the interface has gone down.  If this function has not returned, then it is possible
+    // that the driver has not yet fully removed the interface and handle_single_new_iface's call
+    // of this function will alert watchers that the interface is gone.  Attempts to create a new
+    // interface during this period will result in failure.
+    //
+    // Each call to this function should acquire the mutex to ensure that internal state remains
+    // consistent through this critical section.
+    static DESTROY_IFACE_LOCK: LazyLock<Arc<Mutex<()>>> =
+        LazyLock::new(|| Arc::new(Mutex::new(())));
+    let _guard = DESTROY_IFACE_LOCK.lock().await;
+
     info!("destroy_iface(id = {})", id);
     let iface = ifaces.get(&id).ok_or(zx::Status::NOT_FOUND)?;
 
@@ -2105,6 +2119,69 @@ mod tests {
 
         // Verify iface was removed from available ifaces despite the closure.
         assert!(test_values.ifaces.get(&42u16).is_none(), "iface expected to be deleted");
+    }
+
+    #[fuchsia::test]
+    fn destroy_iface_called_twice() {
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+        let (iface_map, mut iface_events) = IfaceMap::new();
+        let mut phy_stream = fake_destroy_iface_env(&test_values.phys, &iface_map);
+
+        // Clear out the iface addition notification.
+        if let Ok(Some(crate::watchable_map::MapEvent::KeyInserted(iface_id))) =
+            iface_events.try_next()
+        {
+            assert_eq!(iface_id, 42u16);
+        } else {
+            panic!("No iface ID was added.")
+        }
+
+        // Create two simultaneous attempts to destroy the same interface.
+        let first_destroy_fut =
+            super::destroy_iface(&test_values.phys, &iface_map, &test_values.ifaces_tree, 42);
+        let mut first_destroy_fut = pin!(first_destroy_fut);
+
+        let second_destroy_fut =
+            super::destroy_iface(&test_values.phys, &iface_map, &test_values.ifaces_tree, 42);
+        let mut second_destroy_fut = pin!(second_destroy_fut);
+
+        // Progress the first attempt so that it acquires the lock and issues a DestroyIface
+        // request.
+        assert_eq!(Poll::Pending, exec.run_until_stalled(&mut first_destroy_fut));
+        let (_req, responder) = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+            Poll::Ready(Some(Ok(fidl_dev::PhyRequest::DestroyIface { req, responder }))) => (req, responder)
+        );
+
+        // Progress the second attempt, verify that it blocks, no new attempts are made to destroy
+        // the interface, and no OnIfaceRemoved events are sent.
+        assert_eq!(Poll::Pending, exec.run_until_stalled(&mut second_destroy_fut));
+        assert_variant!(exec.run_until_stalled(&mut phy_stream.next()), Poll::Pending);
+        if iface_events.try_next().is_ok() {
+            panic!("Received unexpected iface event.");
+        }
+
+        // Respond to the initial destroy iface request and verify that the initial request runs to
+        // completion and produces an OnIfaceRemoved event.
+        responder.send(Ok(())).expect("failed to send DestroyIfaceResponse");
+        assert_eq!(exec.run_until_stalled(&mut first_destroy_fut), Poll::Ready(Ok(())));
+        if let Ok(Some(crate::watchable_map::MapEvent::KeyRemoved(iface_id))) =
+            iface_events.try_next()
+        {
+            assert_eq!(iface_id, 42u16);
+        } else {
+            panic!("No iface ID was removed.")
+        }
+
+        // The second request to destroy iface should be unblocked and should run to completion
+        // without producing any watcher events.
+        assert_eq!(
+            exec.run_until_stalled(&mut second_destroy_fut),
+            Poll::Ready(Err(zx::Status::NOT_FOUND))
+        );
+        if iface_events.try_next().is_ok() {
+            panic!("Received unexpected iface event.");
+        }
     }
 
     #[fuchsia::test]
