@@ -340,7 +340,7 @@ synstructure = "0.13.1"
 tar = "0.4.25"
 term_grid = "0.2.0"
 termios = "0.3.3"
-tinyjson = "2.5.0"
+tinyjson = "2.5.1"
 # TODO(https://fxbug.dev/106164) Enable the "rt" and "net" features here once gnaw
 # supports target-specific feature resolution
 tokio = { version = "=1.38.1", default-features = false }
@@ -1028,7 +1028,7 @@ visibility = [
 # Has build script but no config needed.
 
 # Not actually used in the gn build at all, just for the rules_rust bazel rules.
-[gn.package.tinyjson."2.5.0"]
+[gn.package.tinyjson."2.5.1"]
 group_visibility = { import = "//third_party/rust_crates/private_visibility.gni", variable = "private_visibility" }
 
 # TODO(https://fxbug.dev/106164) This manual configuration enables the "rt", "net"

@@ -1080,7 +1080,7 @@ import("//third_party/rust_crates/private_visibility.gni")
 
 if (!(current_os == "fuchsia")) {
   group("tinyjson") {
-    public_deps = [ ":tinyjson-v2_5_0" ]
+    public_deps = [ ":tinyjson-v2_5_1" ]
 
     visibility = private_visibility
   }
@@ -16949,16 +16949,16 @@ rust_library("thread_local-v1_1_7") {
   applicable_licenses = [ ":thread_local-v1_1_7.license" ]
 }
 
-license("tinyjson-v2_5_0.license") {
+license("tinyjson-v2_5_1.license") {
   public_package_name = "tinyjson"
   license_files =
-      [ "//third_party/rust_crates/vendor/tinyjson-2.5.0/LICENSE.txt" ]
+      [ "//third_party/rust_crates/vendor/tinyjson-2.5.1/LICENSE.txt" ]
 }
 
-rust_library("tinyjson-v2_5_0") {
+rust_library("tinyjson-v2_5_1") {
   crate_name = "tinyjson"
-  crate_root = "//third_party/rust_crates/vendor/tinyjson-2.5.0/src/lib.rs"
-  output_name = "tinyjson-a756eab61975480c"
+  crate_root = "//third_party/rust_crates/vendor/tinyjson-2.5.1/src/lib.rs"
+  output_name = "tinyjson-59ab06257b3a31b0"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -16968,13 +16968,13 @@ rust_library("tinyjson-v2_5_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=a756eab61975480c",
-    "-Cextra-filename=-a756eab61975480c",
+    "-Cmetadata=59ab06257b3a31b0",
+    "-Cextra-filename=-59ab06257b3a31b0",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":tinyjson-v2_5_0.license" ]
+  applicable_licenses = [ ":tinyjson-v2_5_1.license" ]
 }
 
 license("tinyvec-v1_3_1.license") {

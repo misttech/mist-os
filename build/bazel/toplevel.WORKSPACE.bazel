@@ -67,7 +67,7 @@ local_repository(
 # A dependency of rules_rust
 new_local_repository(
     name = "rules_rust_tinyjson",
-    path = "third_party/rust_crates/vendor/tinyjson-2.5.0",
+    path = "third_party/rust_crates/vendor/tinyjson-2.5.1",
     build_file = "@rules_rust//util/process_wrapper:BUILD.tinyjson.bazel",
 )
 

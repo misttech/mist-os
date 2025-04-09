@@ -22,7 +22,7 @@ package_info(
     name = "package_info",
     package_name = "tinyjson",
     package_url = "https://github.com/rhysd/tinyjson",
-    package_version = "2.5.0",
+    package_version = "2.5.1",
 )
 
 license(
@@ -67,5 +67,5 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "2.5.0",
+    version = "2.5.1",
 )

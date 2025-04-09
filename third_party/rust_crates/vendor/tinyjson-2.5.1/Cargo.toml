@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "tinyjson"
-version = "2.5.0"
+version = "2.5.1"
 authors = ["rhysd <lin90162@yahoo.co.jp>"]
 include = [
     "Cargo.toml",

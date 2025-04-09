@@ -2839,14 +2839,14 @@ alias(
 )
 
 alias(
-    name = "tinyjson-2.5.0",
-    actual = "//third_party/rust_crates/vendor/tinyjson-2.5.0:tinyjson",
+    name = "tinyjson-2.5.1",
+    actual = "//third_party/rust_crates/vendor/tinyjson-2.5.1:tinyjson",
     tags = ["manual"],
 )
 
 alias(
     name = "tinyjson",
-    actual = "//third_party/rust_crates/vendor/tinyjson-2.5.0:tinyjson",
+    actual = "//third_party/rust_crates/vendor/tinyjson-2.5.1:tinyjson",
     tags = ["manual"],
 )
 
