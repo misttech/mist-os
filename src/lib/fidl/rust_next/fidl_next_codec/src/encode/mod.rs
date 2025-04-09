@@ -262,6 +262,11 @@ mod tests {
     use crate::testing::assert_encoded;
 
     #[test]
+    fn encode_unit() {
+        assert_encoded((), &chunks![]);
+    }
+
+    #[test]
     fn encode_bool() {
         assert_encoded(true, &chunks![0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         assert_encoded(false, &chunks![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);

@@ -12,7 +12,7 @@ use fidl_next_codec::{
 };
 
 /// An internal framework error.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(i32)]
 pub enum FrameworkError {
     /// The protocol method was not recognized by the receiver.

@@ -90,6 +90,11 @@ mod tests {
     use crate::{WireOptionalString, WireOptionalVector};
 
     #[test]
+    fn decode_unit() {
+        assert_decoded::<()>(&mut chunks![], |_| ());
+    }
+
+    #[test]
     fn decode_bool() {
         assert_decoded::<bool>(&mut chunks![0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00], |x| {
             assert!(*x)

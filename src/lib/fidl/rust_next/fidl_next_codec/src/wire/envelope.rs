@@ -22,12 +22,14 @@ struct Encoded {
     flags: WireU16,
 }
 
+const INLINE_SIZE: usize = 4;
+
 /// A FIDL envelope
 #[repr(C, align(8))]
 pub union WireEnvelope {
     zero: [u8; 8],
     encoded: Encoded,
-    decoded_inline: [MaybeUninit<u8>; 4],
+    decoded_inline: [MaybeUninit<u8>; INLINE_SIZE],
     decoded_out_of_line: *mut (),
 }
 
@@ -63,11 +65,23 @@ impl WireEnvelope {
 
         let handles_before = encoder.__internal_handle_count();
 
-        if size_of::<T::Encoded>() > 4 {
-            return Err(EncodeError::ExpectedInline(size_of::<T::Encoded>()));
+        let encoded_size = size_of::<T::Encoded>();
+        if encoded_size <= INLINE_SIZE {
+            // If the encoded inline value is less than 4 bytes long, we need to zero out the part
+            // that won't get written over
+            unsafe {
+                maybe_num_bytes
+                    .as_mut_ptr()
+                    .cast::<u8>()
+                    .add(encoded_size)
+                    .write_bytes(0, INLINE_SIZE - encoded_size);
+            }
+        } else {
+            return Err(EncodeError::ExpectedInline(encoded_size));
         }
 
         let value_out = unsafe { &mut *maybe_num_bytes.as_mut_ptr().cast() };
+        T::Encoded::zero_padding(value_out);
         value.encode(encoder, value_out)?;
 
         flags.write(WireU16(Self::IS_INLINE_BIT));
@@ -97,8 +111,19 @@ impl WireEnvelope {
 
         let handles_before = encoder.__internal_handle_count();
 
-        if size_of::<T::Encoded>() <= 4 {
+        let encoded_size = size_of::<T::Encoded>();
+        if encoded_size <= INLINE_SIZE {
+            // If the encoded inline value is less than 4 bytes long, we need to zero out the part
+            // that won't get written over
+            unsafe {
+                maybe_num_bytes
+                    .as_mut_ptr()
+                    .cast::<u8>()
+                    .add(encoded_size)
+                    .write_bytes(0, INLINE_SIZE - encoded_size);
+            }
             let value_out = unsafe { &mut *maybe_num_bytes.as_mut_ptr().cast() };
+            T::Encoded::zero_padding(value_out);
             value.encode(encoder, value_out)?;
             flags.write(WireU16(Self::IS_INLINE_BIT));
         } else {
@@ -146,7 +171,7 @@ impl WireEnvelope {
             if num_bytes as usize % CHUNK_SIZE != 0 {
                 return Err(DecodeError::InvalidEnvelopeSize(num_bytes));
             }
-            if num_bytes <= 4 {
+            if num_bytes <= INLINE_SIZE as u32 {
                 return Err(DecodeError::OutOfLineValueTooSmall(num_bytes));
             }
             Ok(Some(num_bytes as usize / CHUNK_SIZE))
@@ -229,7 +254,7 @@ impl WireEnvelope {
         }
 
         // Decode inline value
-        if size_of::<T>() > 4 {
+        if size_of::<T>() > INLINE_SIZE {
             return Err(DecodeError::InlineValueTooBig(size_of::<T>()));
         }
         munge!(let Self { mut decoded_inline } = slot);
@@ -281,7 +306,7 @@ impl WireEnvelope {
             unsafe { decoded_out_of_line.as_mut_ptr().write(value_ptr.cast()) };
         } else {
             // Decode inline value
-            if size_of::<T>() > 4 {
+            if size_of::<T>() > INLINE_SIZE {
                 return Err(DecodeError::InlineValueTooBig(size_of::<T>()));
             }
             munge!(let Self { mut decoded_inline } = slot);
@@ -302,7 +327,7 @@ impl WireEnvelope {
 
     #[inline]
     unsafe fn as_ptr<T>(this: *mut Self) -> *mut T {
-        if size_of::<T>() <= 4 {
+        if size_of::<T>() <= INLINE_SIZE {
             let inline = unsafe { addr_of_mut!((*this).decoded_inline) };
             inline.cast()
         } else {
@@ -328,11 +353,11 @@ impl WireEnvelope {
     /// The envelope must have been successfully decoded as a `T`.
     #[inline]
     pub unsafe fn clone_unchecked<T: Clone>(&self) -> Self {
-        debug_assert_eq!(size_of::<T>(), 4);
+        debug_assert_eq!(size_of::<T>(), INLINE_SIZE);
 
         union ClonedToDecodedInline<T> {
             cloned: ManuallyDrop<T>,
-            decoded_inline: [MaybeUninit<u8>; 4],
+            decoded_inline: [MaybeUninit<u8>; INLINE_SIZE],
         }
 
         let cloned = unsafe { self.deref_unchecked::<T>().clone() };
