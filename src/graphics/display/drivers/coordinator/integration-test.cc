@@ -1318,19 +1318,14 @@ TEST_F(IntegrationTest, VsyncEventAfterOwnerChangeWithColorLayers) {
   EXPECT_EQ(kVirtconConfigStamp, virtcon_client->state().last_vsync_config_stamp());
 }
 
-TEST_F(IntegrationTest, SendVsyncsAfterImagelessConfig) {
+TEST_F(IntegrationTest, VsyncEventsAfterClientChange) {
   std::unique_ptr<TestFidlClient> virtcon_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kVirtcon);
+  ASSERT_OK(virtcon_client->SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode::kFallback));
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client->state().has_display_ownership(); }));
 
-  zx::result<display::LayerId> create_virtcon_color_layer_result =
-      virtcon_client->CreateFullscreenColorLayer(kFuchsiaBgra);
-  ASSERT_OK(create_virtcon_color_layer_result);
-  display::LayerId virtcon_color_layer_id = create_virtcon_color_layer_result.value();
-
-  // Apply a configuration so the client receives VSync events.
-  static constexpr display::ConfigStamp kVirtconInitialConfigStamp(1);
-  ASSERT_OK(virtcon_client->ApplyLayers(kVirtconInitialConfigStamp,
-                                        {{.layer_id = virtcon_color_layer_id}}));
+  // The Virtcon client does not apply any configuration, so it will never be
+  // eligible for VSync events.
 
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
@@ -1367,11 +1362,14 @@ TEST_F(IntegrationTest, SendVsyncsAfterImagelessConfig) {
   const display::DriverConfigStamp primary1_second_driver_config_stamp =
       DisplayEngineAppliedConfigStamp();
 
-  // The old client disconnects
+  // The primary client disconnects, and the Virtcon client receives display
+  // ownership. The old primary client's config remains applied, because the
+  // Virtcon client did not apply any config.
   primary_client.reset();
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return !IsClientConnected(ClientPriority::kPrimary); }));
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client->state().has_display_ownership(); }));
+  EXPECT_EQ(primary1_second_driver_config_stamp, DisplayEngineAppliedConfigStamp());
 
-  // A new client connects
+  // A new primary client connects.
   primary_client = OpenCoordinatorTestFidlClient(&sysmem_client_, DisplayProviderClient(),
                                                  ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
@@ -1389,11 +1387,13 @@ TEST_F(IntegrationTest, SendVsyncsAfterImagelessConfig) {
       [&]() { return DisplayEngineAppliedConfigStamp() > primary1_second_driver_config_stamp; }));
 
   // Send a VSync using the config the client applied.
+  EXPECT_EQ(0u, virtcon_client->state().vsync_count());
   ASSERT_EQ(0u, primary_client->state().vsync_count());
   TriggerDisplayEngineVsync();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().vsync_count() >= 1; }));
   EXPECT_EQ(kPrimary2InitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
+  EXPECT_EQ(0u, virtcon_client->state().vsync_count());
 }
 
 TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
