@@ -25,6 +25,7 @@ def get_sorted_parts(atoms: list[Atom]) -> T.Sequence[IdkPart]:
         (
             {
                 "meta": a.metadata,
+                "stable": a.stable,
                 "type": a.type,
             }
             for a in atoms
