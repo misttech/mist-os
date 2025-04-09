@@ -46,5 +46,5 @@ rust_file = "src/paravirtualization/lib/vsock/vsock_sys/src/lib.rs"
 bindgen.type_allowlist = [
     "sockaddr_vm",
 ]
-bindgen.function_allowlist = ["create_virtio_stream_socket"]
+bindgen.function_allowlist = ["create_virtio_stream_socket", "get_local_cid"]
 bindgen.run(INPUT_FILE, rust_file)
