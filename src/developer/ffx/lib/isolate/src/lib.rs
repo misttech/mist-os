@@ -196,8 +196,16 @@ impl Isolate {
         // dedicated temporary areas.
         // We should propagate PATH to children, because it may contain
         // changes e.g. that point to vendored binaries.
+        // Propagate SYMBOL_INDEX_INCLUDE and GCE_METADATA_HOST too, which
+        // contains extra URLs and authentication info that are necessary for
+        // symbolization.
         for (var, val) in std::env::vars() {
-            if var.contains("TEMP") || var.contains("TMP") || var == "PATH" {
+            if var.contains("TEMP")
+                || var.contains("TMP")
+                || var == "PATH"
+                || var == "SYMBOL_INDEX_INCLUDE"
+                || var == "GCE_METADATA_HOST"
+            {
                 let _ = env_vars.insert(var, val);
             }
         }
