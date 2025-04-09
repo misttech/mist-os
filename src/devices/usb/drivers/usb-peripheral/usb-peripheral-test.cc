@@ -23,11 +23,12 @@
 #include <memory>
 #include <vector>
 
+#include <gtest/gtest.h>
 #include <usb/usb.h>
-#include <zxtest/zxtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/devices/usb/drivers/usb-peripheral/usb-function.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace fdci = fuchsia_hardware_usb_dci;
 namespace fdescriptor = fuchsia_hardware_usb_descriptor;
@@ -121,7 +122,7 @@ class FakeDevice : public ddk::UsbDciProtocol<FakeDevice, ddk::base_protocol>,
   fidl::WireSyncClient<fdci::UsbDciInterface> client_;
 };
 
-class UsbPeripheralHarness : public zxtest::Test {
+class UsbPeripheralHarness : public ::testing::Test {
  public:
   void SetUp() override {
     dci_ = std::make_unique<FakeDevice>();
@@ -142,7 +143,7 @@ class UsbPeripheralHarness : public zxtest::Test {
     root_device_->SetConfigVmo(fake_config.ToVmo());
 
     ASSERT_OK(usb_peripheral::UsbPeripheral::Create(nullptr, root_device_.get()));
-    ASSERT_EQ(1, root_device_->child_count());
+    ASSERT_EQ(1u, root_device_->child_count());
     mock_dev_ = root_device_->GetLatestChild();
 
     namespace_.SyncCall([&](Namespace* ns) { client_.Bind(ns->dci.client().TakeClientEnd()); });
