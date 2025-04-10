@@ -6,12 +6,12 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_VIRTIO_BLOCK_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_VIRTIO_BLOCK_H_
 
-#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/bio.h>
 #include <lib/virtio/backends/backend.h>
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>
 #include <lib/zx/time.h>
+#include <mistos/hardware/block/driver/c/banjo.h>
 #include <stdlib.h>
 #include <zircon/compiler.h>
 
