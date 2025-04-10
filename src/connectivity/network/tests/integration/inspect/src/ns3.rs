@@ -26,7 +26,9 @@ use fnet_filter_ext::{
     RuleId, TransportProtocolMatcher,
 };
 use futures::StreamExt as _;
-use net_declare::{fidl_mac, fidl_subnet, net_ip_v4, net_ip_v6, std_ip_v4, std_ip_v6};
+use net_declare::{
+    fidl_mac, fidl_subnet, net_ip_v4, net_ip_v6, net_subnet_v4, std_ip_v4, std_ip_v6,
+};
 use net_types::ethernet::Mac;
 use net_types::ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv4Addr, Ipv6};
 use net_types::{AddrAndPortFormatter, Witness as _};
@@ -49,7 +51,8 @@ use test_case::test_case;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter as fnet_filter,
     fidl_fuchsia_net_filter_ext as fnet_filter_ext,
-    fidl_fuchsia_net_multicast_admin as fnet_multicast_admin, fidl_fuchsia_netemul as fnetemul,
+    fidl_fuchsia_net_multicast_admin as fnet_multicast_admin,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_netemul as fnetemul,
     fidl_fuchsia_posix_socket as fposix_socket,
     fidl_fuchsia_posix_socket_packet as fposix_socket_packet,
     fidl_fuchsia_posix_socket_raw as fposix_socket_raw,
@@ -913,6 +916,202 @@ async fn get_loopback_id(realm: &netemul::TestRealm<'_>) -> u64 {
 }
 
 #[netstack_test]
+async fn inspect_rules(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
+    let rule_table_v4 = realm
+        .connect_to_protocol::<fidl_fuchsia_net_routes_admin::RuleTableV4Marker>()
+        .expect("failed to connect to fuchsia.net.routes.admin/RuleTableV4");
+    const PRIORITY: fnet_routes_ext::rules::RuleSetPriority =
+        fnet_routes_ext::rules::RuleSetPriority::new(100);
+    let rule_set = fnet_routes_ext::rules::new_rule_set::<Ipv4>(&rule_table_v4, PRIORITY)
+        .expect("failed to create rule set");
+
+    fnet_routes_ext::rules::add_rule(
+        &rule_set,
+        0.into(),
+        fnet_routes_ext::rules::RuleMatcher::<Ipv4> {
+            from: Some(net_subnet_v4!("192.168.0.0/24")),
+            ..Default::default()
+        },
+        fnet_routes_ext::rules::RuleAction::Unreachable,
+    )
+    .await
+    .expect("fidl")
+    .expect("failed to add rule");
+
+    fnet_routes_ext::rules::add_rule(
+        &rule_set,
+        1.into(),
+        fnet_routes_ext::rules::RuleMatcher::<Ipv4> {
+            locally_generated: Some(true),
+            ..Default::default()
+        },
+        fnet_routes_ext::rules::RuleAction::Unreachable,
+    )
+    .await
+    .expect("fidl")
+    .expect("failed to add rule");
+
+    fnet_routes_ext::rules::add_rule(
+        &rule_set,
+        2.into(),
+        fnet_routes_ext::rules::RuleMatcher::<Ipv4> {
+            locally_generated: Some(true),
+            bound_device: Some(fnet_routes_ext::rules::InterfaceMatcher::Unbound),
+            ..Default::default()
+        },
+        fnet_routes_ext::rules::RuleAction::Unreachable,
+    )
+    .await
+    .expect("fidl")
+    .expect("failed to add rule");
+
+    fnet_routes_ext::rules::add_rule(
+        &rule_set,
+        3.into(),
+        fnet_routes_ext::rules::RuleMatcher::<Ipv4> {
+            locally_generated: Some(true),
+            bound_device: Some(fnet_routes_ext::rules::InterfaceMatcher::DeviceName(
+                "device-name".to_owned(),
+            )),
+            ..Default::default()
+        },
+        fnet_routes_ext::rules::RuleAction::Unreachable,
+    )
+    .await
+    .expect("fidl")
+    .expect("failed to add rule");
+
+    fnet_routes_ext::rules::add_rule(
+        &rule_set,
+        4.into(),
+        fnet_routes_ext::rules::RuleMatcher::<Ipv4> {
+            mark_1: Some(fnet_routes_ext::rules::MarkMatcher::Unmarked),
+            ..Default::default()
+        },
+        fnet_routes_ext::rules::RuleAction::Unreachable,
+    )
+    .await
+    .expect("fidl")
+    .expect("failed to add rule");
+
+    fnet_routes_ext::rules::add_rule(
+        &rule_set,
+        5.into(),
+        fnet_routes_ext::rules::RuleMatcher::<Ipv4> {
+            mark_2: Some(fnet_routes_ext::rules::MarkMatcher::Marked {
+                mask: 100,
+                between: 0..=100,
+            }),
+            ..Default::default()
+        },
+        fnet_routes_ext::rules::RuleAction::Unreachable,
+    )
+    .await
+    .expect("fidl")
+    .expect("failed to add rule");
+
+    fnet_routes_ext::rules::add_rule(
+        &rule_set,
+        6.into(),
+        fnet_routes_ext::rules::RuleMatcher::<Ipv4> {
+            locally_generated: Some(false),
+            ..Default::default()
+        },
+        fnet_routes_ext::rules::RuleAction::Unreachable,
+    )
+    .await
+    .expect("fidl")
+    .expect("failed to add rule");
+
+    let data =
+        get_inspect_data(&realm, "netstack", "root").await.expect("inspect data should be present");
+
+    // Debug print the tree to make debugging easier in case of failures.
+    println!("Got inspect data: {:#?}", data);
+    diagnostics_assertions::assert_data_tree!(data, "root": contains {
+        Routes: {
+            Ipv4: contains {
+                Rules: {
+                    "0": {
+                        Matchers: {
+                            SourceAddressFrom: "192.168.0.0/24",
+                        },
+                        Action: "Unreachable",
+                    },
+                    "1": {
+                        Matchers: {
+                            LocalOrigin: {},
+                        },
+                        Action: "Unreachable",
+                    },
+                    "2": {
+                        Matchers: {
+                            LocalOrigin: {
+                                BoundDevice: "Unbound",
+                            }
+                        },
+                        Action: "Unreachable",
+                    },
+                    "3": {
+                        Matchers: {
+                            LocalOrigin: {
+                                BoundDevice: "device-name",
+                            }
+                        },
+                        Action: "Unreachable",
+                    },
+                    "4": {
+                        Matchers: {
+                            Mark1: "Unmarked",
+                        },
+                        Action: "Unreachable",
+                    },
+                    "5": {
+                        Matchers: {
+                            Mark2: {
+                                Mask: 100u64,
+                                Range: {
+                                    StartInclusive: 0u64,
+                                    EndInclusive: 100u64,
+                                }
+                            }
+                        },
+                        Action: "Unreachable",
+                    },
+                    "6": {
+                        Matchers: {
+                            TrafficOrigin: "NonLocal",
+                        },
+                        Action: "Unreachable",
+                    },
+                    // This is the default rule, not installed above.
+                    "7": {
+                        Matchers: {},
+                        Action: {
+                            Lookup: 0u64,
+                        },
+                    },
+                },
+            },
+            Ipv6: contains {
+                Rules: {
+                    // This is the default rule, not installed above.
+                    "0": {
+                        Matchers: {},
+                        Action: {
+                            Lookup: 1u64,
+                        }
+                    }
+                },
+            }
+        }
+    })
+}
+
+#[netstack_test]
 async fn inspect_routes(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm =
@@ -928,13 +1127,9 @@ async fn inspect_routes(name: &str) {
             Ipv4: {
                 Rules: {
                     "0": {
-                        Matchers: {
-                            SourceAddressMatcher: "",
-                            TrafficOriginMatcher: "None",
-                            MarkMatchers: {}
-                        },
+                        Matchers: {},
                         Action: {
-                            Lookup: "0",
+                            Lookup: 0u64,
                         }
                     }
                 },
@@ -960,13 +1155,9 @@ async fn inspect_routes(name: &str) {
             Ipv6: {
                 Rules: {
                     "0": {
-                        Matchers: {
-                            SourceAddressMatcher: "",
-                            TrafficOriginMatcher: "None",
-                            MarkMatchers: {}
-                        },
+                        Matchers: {},
                         Action: {
-                            Lookup: "1",
+                            Lookup: 1u64,
                         }
                     }
                 },

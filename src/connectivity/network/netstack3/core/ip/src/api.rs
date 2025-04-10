@@ -4,8 +4,6 @@
 
 //! Defines the public API exposed to bindings by the IP module.
 
-use alloc::format;
-use alloc::string::{String, ToString as _};
 use alloc::vec::Vec;
 use assert_matches::assert_matches;
 use net_types::ip::{Ip, IpAddr, IpVersionMarker, Ipv4, Ipv6};
@@ -13,9 +11,9 @@ use net_types::{SpecifiedAddr, Witness as _};
 
 use netstack3_base::sync::{PrimaryRc, RwLock};
 use netstack3_base::{
-    AnyDevice, ContextPair, DeferredResourceRemovalContext, DeviceIdContext, Inspector,
-    InspectorDeviceExt, MarkDomain, Marks, ReferenceNotifiersExt as _,
-    RemoveResourceResultWithContext, StrongDeviceIdentifier, WrapBroadcastMarker,
+    AnyDevice, ContextPair, DeferredResourceRemovalContext, DeviceIdContext, DeviceNameMatcher,
+    InspectableValue, Inspector, InspectorDeviceExt, MarkDomain, Marks, ReferenceNotifiersExt as _,
+    RemoveResourceResultWithContext, StrongDeviceIdentifier, SubnetMatcher, WrapBroadcastMarker,
 };
 
 use crate::internal::base::{
@@ -25,7 +23,9 @@ use crate::internal::base::{
 use crate::internal::device::{
     IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
 };
-use crate::internal::routing::rules::{MarkMatcher, Rule, RuleAction, RuleMatcher};
+use crate::internal::routing::rules::{
+    BoundDeviceMatcher, MarkMatcher, Rule, RuleAction, RuleMatcher, TrafficOriginMatcher,
+};
 use crate::internal::routing::RoutingTable;
 use crate::internal::types::{
     Destination, Entry, EntryAndGeneration, Metric, NextHop, OrderedEntry, ResolvedRoute,
@@ -216,45 +216,58 @@ where
             {
                 inspector.record_unnamed_child(|inspector| {
                     inspector.record_child("Matchers", |inspector| {
-                        let source_address_matcher = source_address_matcher
-                            .map_or_else(|| String::new(), |m| m.0.to_string());
-                        inspector.record_str("SourceAddressMatcher", &source_address_matcher);
-                        inspector.record_debug("TrafficOriginMatcher", traffic_origin_matcher);
-                        inspector.record_child("MarkMatchers", |inspector| {
-                            for (domain, matcher) in
-                                mark_matchers.iter().filter_map(|(d, m)| m.map(|m| (d, m)))
-                            {
-                                let domain_str = match domain {
-                                    MarkDomain::Mark1 => "Mark1",
-                                    MarkDomain::Mark2 => "Mark2",
-                                };
-                                match matcher {
-                                    MarkMatcher::Unmarked => {
-                                        inspector.record_str(domain_str, "Unmarked")
-                                    }
-                                    MarkMatcher::Marked { start, end, mask } => inspector
-                                        .record_child(domain_str, |inspector| {
-                                            inspector.record_str("Mask", &format!("{mask:#010x}"));
-                                            inspector.record_str(
-                                                "Range",
-                                                &format!("{start:#x}..{end:#x}"),
-                                            );
-                                        }),
+                        if let Some(SubnetMatcher(subnet)) = source_address_matcher {
+                            inspector.record_display("SourceAddressFrom", subnet);
+                        }
+                        if let Some(matcher) = traffic_origin_matcher {
+                            match matcher {
+                                TrafficOriginMatcher::NonLocal => {
+                                    inspector.record_str("TrafficOrigin", "NonLocal")
+                                }
+                                TrafficOriginMatcher::Local { bound_device_matcher } => inspector
+                                    .record_child("LocalOrigin", |inspector| {
+                                        if let Some(bound_device_matcher) = bound_device_matcher {
+                                            bound_device_matcher.record("BoundDevice", inspector);
+                                        }
+                                    }),
+                            }
+                        }
+                        for (domain, matcher) in
+                            mark_matchers.iter().filter_map(|(d, m)| m.map(|m| (d, m)))
+                        {
+                            let domain_str = match domain {
+                                MarkDomain::Mark1 => "Mark1",
+                                MarkDomain::Mark2 => "Mark2",
+                            };
+                            match matcher {
+                                MarkMatcher::Unmarked => {
+                                    inspector.record_str(domain_str, "Unmarked")
+                                }
+                                MarkMatcher::Marked { start, end, mask } => {
+                                    inspector.record_child(domain_str, |inspector| {
+                                        inspector.record_uint("Mask", mask);
+                                        inspector.record_child("Range", |inspector| {
+                                            inspector.record_uint("StartInclusive", start);
+                                            inspector.record_uint("EndInclusive", end);
+                                        })
+                                    })
                                 }
                             }
-                        });
+                        }
                     });
-                    inspector.record_child("Action", |inspector| match action {
+                    match action {
                         RuleAction::Unreachable => inspector.record_str("Action", "Unreachable"),
                         RuleAction::Lookup(table_id) => {
-                            let bindings_id = core_ctx
-                                .with_ip_routing_table(table_id, |_core_ctx, table| {
-                                    table.bindings_id
-                                });
-                            let bindings_id = bindings_id.unwrap_or(main_table_id);
-                            inspector.record_str("Lookup", &format!("{bindings_id}"))
+                            inspector.record_child("Action", |inspector| {
+                                let bindings_id = core_ctx
+                                    .with_ip_routing_table(table_id, |_core_ctx, table| {
+                                        table.bindings_id
+                                    });
+                                let bindings_id = bindings_id.unwrap_or(main_table_id);
+                                inspector.record_uint("Lookup", bindings_id)
+                            })
                         }
-                    })
+                    }
                 })
             }
         })
@@ -332,6 +345,17 @@ where
         &mut self,
     ) -> Vec<RoutingTableId<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>> {
         self.core_ctx().with_ip_routing_tables(|_ctx, tables| tables.keys().cloned().collect())
+    }
+}
+
+impl InspectableValue for BoundDeviceMatcher {
+    fn record<I: Inspector>(&self, name: &str, inspector: &mut I) {
+        match self {
+            BoundDeviceMatcher::Unbound => inspector.record_str(name, "Unbound"),
+            BoundDeviceMatcher::DeviceName(DeviceNameMatcher(device)) => {
+                inspector.record_str(name, device)
+            }
+        }
     }
 }
 
