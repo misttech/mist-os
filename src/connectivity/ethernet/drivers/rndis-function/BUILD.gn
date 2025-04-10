@@ -17,12 +17,13 @@ driver_bind_rules("rndis_function_bind") {
   ]
 }
 
-source_set("rndis-function-lib") {
+source_set("common") {
   configs += [ "//build/config:all_source" ]
   sources = [
     "rndis_function.cc",
     "rndis_function.h",
   ]
+  deps = [ "//src/lib/ddk:ddk_metadata" ]
   public_deps = [
     ":rndis_function_bind",
     "//sdk/banjo/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_banjo_cpp",
@@ -34,18 +35,16 @@ source_set("rndis-function-lib") {
     "//sdk/lib/async:async-cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
     "//src/connectivity/ethernet/lib/rndis",
-    "//src/devices/usb/lib/usb",
     "//src/devices/usb/lib/usb:cdc",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//src/devices/usb/lib/usb:usb-dfv2-compat-logging",
     "//zircon/system/ulib/fbl",
   ]
 }
 
 fuchsia_cc_driver("rndis-function-driver") {
-  legacy = true
-
   # visibility = [ ":*" ]
   output_name = "rndis-function"
 
@@ -54,7 +53,7 @@ fuchsia_cc_driver("rndis-function-driver") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   deps = [
-    ":rndis-function-lib",
+    ":common",
     "//src/devices/lib/driver",
   ]
 }
@@ -77,9 +76,10 @@ test("rndis-function-test") {
   }
   sources = [ "rndis_function_test.cc" ]
   deps = [
-    ":rndis-function-lib",
-    "//src/devices/testing/mock-ddk",
-    "//zircon/system/ulib/zxtest",
+    ":common",
+    "//sdk/lib/driver/testing/cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
   ]
 }
 

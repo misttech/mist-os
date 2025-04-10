@@ -12,6 +12,9 @@
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/task.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/fit/function.h>
 #include <lib/operation/ethernet.h>
 
@@ -19,7 +22,6 @@
 #include <queue>
 #include <thread>
 
-#include <ddktl/device.h>
 #include <fbl/mutex.h>
 #include <usb/cdc.h>
 #include <usb/request-cpp.h>
@@ -28,23 +30,21 @@
 
 #include "src/connectivity/ethernet/lib/rndis/rndis.h"
 
-class RndisFunction;
-
-using RndisFunctionType = ddk::Device<RndisFunction, ddk::Unbindable, ddk::Suspendable>;
-
-class RndisFunction : public RndisFunctionType,
+class RndisFunction : public fdf::DriverBase,
                       public ddk::UsbFunctionInterfaceProtocol<RndisFunction>,
-                      public ddk::EthernetImplProtocol<RndisFunction, ddk::base_protocol> {
+                      public ddk::EthernetImplProtocol<RndisFunction> {
  public:
-  explicit RndisFunction(zx_device_t* parent)
-      : RndisFunctionType(parent),
-        loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
-        function_(parent) {}
+  static constexpr std::string_view kDriverName = "rndis-function";
+  static constexpr std::string_view kChildNodeName = "rndis-function";
 
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkSuspend(ddk::SuspendTxn txn);
-  void DdkRelease();
+  RndisFunction(fdf::DriverStartArgs start_args,
+                fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
 
+  zx::result<> Start() override;
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
+
+  // ddk::UsbFunctionInterfaceProtocol<RndisFunction> implementation.
   size_t UsbFunctionInterfaceGetDescriptorsSize();
   void UsbFunctionInterfaceGetDescriptors(uint8_t* out_descriptors_buffer, size_t descriptors_size,
                                           size_t* out_descriptors_actual);
@@ -54,6 +54,7 @@ class RndisFunction : public RndisFunctionType,
   zx_status_t UsbFunctionInterfaceSetConfigured(bool configured, usb_speed_t speed);
   zx_status_t UsbFunctionInterfaceSetInterface(uint8_t interface, uint8_t alt_setting);
 
+  // ddk::EthernetImplProtocol<RndisFunction> implementation.
   zx_status_t EthernetImplQuery(uint32_t options, ethernet_info_t* info);
   void EthernetImplStop();
   zx_status_t EthernetImplStart(const ethernet_ifc_protocol_t* ifc_);
@@ -62,9 +63,6 @@ class RndisFunction : public RndisFunctionType,
   zx_status_t EthernetImplSetParam(uint32_t param, int32_t value, const uint8_t* data,
                                    size_t data_size);
   void EthernetImplGetBti(zx::bti* bti) { bti->reset(); }
-
-  static zx_status_t Create(void* ctx, zx_device_t* dev);
-  zx_status_t Bind();
 
  private:
   zx_status_t HandleCommand(const void* buffer, size_t size);
@@ -104,7 +102,7 @@ class RndisFunction : public RndisFunctionType,
   static constexpr uint16_t kVendorDriverVersionMajor = 1;
   static constexpr uint16_t kVendorDriverVersionMinor = 0;
 
-  async::Loop loop_;
+  async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
 
   ddk::EthernetIfcProtocolClient ifc_ __TA_GUARDED(lock_);
   ddk::UsbFunctionProtocolClient function_;
@@ -131,7 +129,7 @@ class RndisFunction : public RndisFunctionType,
 
   size_t pending_requests_ __TA_GUARDED(lock_) = 0;
 
-  std::optional<fit::function<void()>> shutdown_callback_;
+  std::optional<fdf::PrepareStopCompleter> prepare_stop_completer_;
 
   usb_request_complete_callback_t read_request_complete_ = {
       .callback =
@@ -176,6 +174,13 @@ class RndisFunction : public RndisFunctionType,
     usb_endpoint_descriptor_t out_ep;
     usb_endpoint_descriptor_t in_ep;
   } __PACKED descriptors_;
+
+  compat::SyncInitializedDeviceServer compat_server_;
+  fidl::ClientEnd<fuchsia_driver_framework::NodeController> child_;
+  compat::BanjoServer usb_function_interface_banjo_server_{ZX_PROTOCOL_USB_FUNCTION, this,
+                                                           &usb_function_interface_protocol_ops_};
+  compat::BanjoServer ethernet_impl_banjo_server_{ZX_PROTOCOL_ETHERNET_IMPL, this,
+                                                  &ethernet_impl_protocol_ops_};
 };
 
 #endif  // SRC_CONNECTIVITY_ETHERNET_DRIVERS_RNDIS_FUNCTION_RNDIS_FUNCTION_H_

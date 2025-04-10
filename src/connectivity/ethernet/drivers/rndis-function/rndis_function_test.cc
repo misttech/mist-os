@@ -6,13 +6,14 @@
 
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/sync/completion.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
-#include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
 
-class FakeFunction : public ddk::UsbFunctionProtocol<FakeFunction, ddk::base_protocol> {
+class FakeFunction : public ddk::UsbFunctionProtocol<FakeFunction> {
  public:
   FakeFunction() : protocol_({.ops = &usb_function_protocol_ops_, .ctx = this}) {}
 
@@ -114,6 +115,10 @@ class FakeFunction : public ddk::UsbFunctionProtocol<FakeFunction, ddk::base_pro
   size_t ConfigEpCalls() const { return config_ep_calls_; }
   size_t DisableEpCalls() const { return disable_ep_calls_; }
 
+  compat::DeviceServer::SpecificGetBanjoProtoCb GetBanjoCallback() {
+    return banjo_server_.callback();
+  }
+
   usb::BorrowedRequestQueue<void> pending_out_requests_;
   usb::BorrowedRequestQueue<void> pending_in_requests_;
   usb::BorrowedRequestQueue<void> pending_notification_requests_;
@@ -129,6 +134,7 @@ class FakeFunction : public ddk::UsbFunctionProtocol<FakeFunction, ddk::base_pro
 
   size_t config_ep_calls_ = 0;
   size_t disable_ep_calls_ = 0;
+  compat::BanjoServer banjo_server_{ZX_PROTOCOL_USB_FUNCTION, this, &usb_function_protocol_ops_};
 };
 
 class FakeEthernetInterface : public ddk::EthernetIfcProtocol<FakeEthernetInterface> {
@@ -158,25 +164,62 @@ class FakeEthernetInterface : public ddk::EthernetIfcProtocol<FakeEthernetInterf
   sync_completion_t packet_received_sync_;
 };
 
-class RndisFunctionTest : public zxtest::Test {
+class RndisFunctionTestEnvironment : public fdf_testing::Environment {
  public:
-  void SetUp() override {
-    root_->AddProtocol(ZX_PROTOCOL_USB_FUNCTION, function_.Protocol()->ops,
-                       function_.Protocol()->ctx);
-    root_->SetMetadata(DEVICE_METADATA_MAC_ADDRESS, mac_addr_.data(), mac_addr_.size());
+  void Init(const std::array<uint8_t, ETH_MAC_SIZE>& mac_address) {
+    compat::DeviceServer::BanjoConfig config{.default_proto_id = ZX_PROTOCOL_USB_FUNCTION};
+    config.callbacks[ZX_PROTOCOL_USB_FUNCTION] = function_.GetBanjoCallback();
+    default_device_server_.Initialize("default", std::nullopt, std::move(config));
 
-    device_ = std::make_unique<RndisFunction>(/*parent=*/root_.get());
-    device_->Bind();
+    pdev_device_server_.Initialize("pdev", std::nullopt, std::move(config));
+    ASSERT_OK(default_device_server_.AddMetadata(DEVICE_METADATA_MAC_ADDRESS, mac_address.data(),
+                                                 mac_address.size()));
+  }
+
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    zx_status_t status = default_device_server_.Serve(
+        fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+
+    status = pdev_device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                       &to_driver_vfs);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+
+    return zx::ok();
+  }
+
+  FakeFunction& function() { return function_; }
+
+ private:
+  compat::DeviceServer default_device_server_;
+  compat::DeviceServer pdev_device_server_;
+  FakeFunction function_;
+};
+
+class FixtureConfig final {
+ public:
+  using DriverType = RndisFunction;
+  using EnvironmentType = RndisFunctionTestEnvironment;
+};
+
+class RndisFunctionTest : public ::testing::Test {
+ public:
+  static constexpr std::array<uint8_t, ETH_MAC_SIZE> kMacAddr = {0x01, 0x23, 0x34,
+                                                                 0x56, 0x67, 0x89};
+
+  void SetUp() override {
+    driver_test_.RunInEnvironmentTypeContext([&](auto& env) { env.Init(kMacAddr); });
+    ASSERT_OK(driver_test_.StartDriver());
   }
 
   void TearDown() override {
-    auto device = device_.release();
-    device->DdkAsyncRemove();
-    mock_ddk::ReleaseFlaggedDevices(root_.get());
+    zx::result<> result = driver_test_.StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
   }
-
-  static constexpr std::array<uint8_t, ETH_MAC_SIZE> mac_addr_ = {0x01, 0x23, 0x34,
-                                                                  0x56, 0x67, 0x89};
 
   static constexpr size_t kNetbufSize =
       eth::BorrowedOperation<>::OperationSize(sizeof(ethernet_netbuf_t));
@@ -191,10 +234,10 @@ class RndisFunctionTest : public zxtest::Test {
     };
 
     size_t actual;
-    zx_status_t status = device_->UsbFunctionInterfaceControl(
+    zx_status_t status = driver().UsbFunctionInterfaceControl(
         &setup, reinterpret_cast<const uint8_t*>(data), length, nullptr, 0, &actual);
     ASSERT_EQ(status, ZX_OK);
-    ASSERT_EQ(actual, 0);
+    ASSERT_EQ(actual, 0u);
   }
 
   void ReadResponse(void* data, size_t length) {
@@ -207,7 +250,7 @@ class RndisFunctionTest : public zxtest::Test {
     };
 
     size_t actual;
-    zx_status_t status = device_->UsbFunctionInterfaceControl(
+    zx_status_t status = driver().UsbFunctionInterfaceControl(
         &setup, nullptr, 0, reinterpret_cast<uint8_t*>(data), length, &actual);
     ASSERT_EQ(status, ZX_OK);
     ASSERT_GE(length, actual);
@@ -231,8 +274,8 @@ class RndisFunctionTest : public zxtest::Test {
     auto response = reinterpret_cast<rndis_query_complete*>(buffer.data());
     ASSERT_EQ(response->msg_type, RNDIS_QUERY_CMPLT);
     ASSERT_GE(response->msg_length, sizeof(rndis_query_complete));
-    ASSERT_GE(response->request_id, 42);
-    ASSERT_EQ(response->status, RNDIS_STATUS_SUCCESS);
+    ASSERT_GE(response->request_id, 42u);
+    ASSERT_EQ(response->status, static_cast<uint32_t>(RNDIS_STATUS_SUCCESS));
 
     size_t offset = response->info_buffer_offset + offsetof(rndis_query_complete, request_id);
     ASSERT_GE(offset, sizeof(rndis_query_complete));
@@ -261,79 +304,88 @@ class RndisFunctionTest : public zxtest::Test {
 
     rndis_indicate_status status;
     ReadResponse(&status, sizeof(status));
-    EXPECT_EQ(status.msg_type, RNDIS_INDICATE_STATUS_MSG);
+    EXPECT_EQ(status.msg_type, static_cast<uint32_t>(RNDIS_INDICATE_STATUS_MSG));
     EXPECT_EQ(status.msg_length, sizeof(rndis_indicate_status));
-    EXPECT_EQ(status.status, RNDIS_STATUS_MEDIA_CONNECT);
+    EXPECT_EQ(status.status, static_cast<uint32_t>(RNDIS_STATUS_MEDIA_CONNECT));
 
     rndis_set_complete response;
     ReadResponse(&response, sizeof(response));
-    ASSERT_EQ(response.msg_type, RNDIS_SET_CMPLT);
+    ASSERT_EQ(response.msg_type, static_cast<uint32_t>(RNDIS_SET_CMPLT));
     ASSERT_GE(response.msg_length, sizeof(rndis_set_complete));
-    ASSERT_GE(response.request_id, 42);
-    ASSERT_EQ(response.status, RNDIS_STATUS_SUCCESS);
+    ASSERT_GE(response.request_id, 42u);
+    ASSERT_EQ(response.status, static_cast<uint32_t>(RNDIS_STATUS_SUCCESS));
   }
 
   void ReadIndicateStatus(uint32_t expected_status) {
     rndis_indicate_status status;
     ReadResponse(&status, sizeof(status));
-    ASSERT_EQ(status.msg_type, RNDIS_INDICATE_STATUS_MSG);
+    ASSERT_EQ(status.msg_type, static_cast<uint32_t>(RNDIS_INDICATE_STATUS_MSG));
     ASSERT_EQ(status.msg_length, sizeof(rndis_indicate_status));
     ASSERT_EQ(status.status, expected_status);
   }
 
-  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
-  std::unique_ptr<RndisFunction> device_;
-  FakeFunction function_;
+ protected:
+  RndisFunction& driver() { return *driver_test_.driver(); }
+
+  FakeEthernetInterface& ifc() { return ifc_; }
+
+  void RunInFunctionContext(fit::callback<void(FakeFunction&)> callback) {
+    driver_test_.RunInEnvironmentTypeContext(
+        [callback = std::move(callback)](auto& env) mutable { callback(env.function()); });
+  }
+
+ private:
+  fdf_testing::ForegroundDriverTest<FixtureConfig> driver_test_;
   FakeEthernetInterface ifc_;
 };
 
-TEST_F(RndisFunctionTest, Suspend) {
-  ddk::SuspendTxn txn(device_->zxdev(), 0, 0, 0);
-  device_->DdkSuspend(std::move(txn));
-  root_->GetLatestChild()->WaitUntilSuspendReplyCalled();
-}
-
 TEST_F(RndisFunctionTest, Configure) {
-  EXPECT_EQ(function_.ConfigEpCalls(), 0);
-  EXPECT_EQ(function_.DisableEpCalls(), 0);
+  RunInFunctionContext([](auto& function) {
+    EXPECT_EQ(function.ConfigEpCalls(), 0u);
+    EXPECT_EQ(function.DisableEpCalls(), 0u);
+  });
 
   zx_status_t status =
-      device_->UsbFunctionInterfaceSetConfigured(/*configured=*/true, USB_SPEED_FULL);
+      driver().UsbFunctionInterfaceSetConfigured(/*configured=*/true, USB_SPEED_FULL);
   ASSERT_OK(status);
 
-  EXPECT_EQ(function_.ConfigEpCalls(), 3);
-  EXPECT_EQ(function_.DisableEpCalls(), 0);
+  RunInFunctionContext([](auto& function) {
+    EXPECT_EQ(function.ConfigEpCalls(), 3u);
+    EXPECT_EQ(function.DisableEpCalls(), 0u);
+  });
 
-  status = device_->UsbFunctionInterfaceSetConfigured(/*configured=*/false, USB_SPEED_FULL);
+  status = driver().UsbFunctionInterfaceSetConfigured(/*configured=*/false, USB_SPEED_FULL);
   ASSERT_OK(status);
 
-  EXPECT_EQ(function_.ConfigEpCalls(), 3);
-  EXPECT_EQ(function_.DisableEpCalls(), 3);
+  RunInFunctionContext([](auto& function) {
+    EXPECT_EQ(function.ConfigEpCalls(), 3u);
+    EXPECT_EQ(function.DisableEpCalls(), 3u);
+  });
 }
 
 TEST_F(RndisFunctionTest, EthernetQuery) {
   ethernet_info_t info;
-  zx_status_t status = device_->EthernetImplQuery(/*options=*/0, &info);
+  zx_status_t status = driver().EthernetImplQuery(/*options=*/0, &info);
   ASSERT_OK(status);
-  EXPECT_BYTES_EQ(&info.mac, mac_addr_.data(), mac_addr_.size());
+  EXPECT_EQ(std::to_array(info.mac), kMacAddr);
 }
 
 TEST_F(RndisFunctionTest, EthernetStartStop) {
-  zx_status_t status = device_->EthernetImplStart(ifc_.Protocol());
+  zx_status_t status = driver().EthernetImplStart(ifc().Protocol());
   ASSERT_OK(status);
-  EXPECT_TRUE(ifc_.LastStatus().has_value());
-  EXPECT_EQ(ifc_.LastStatus().value(), 0);
+  EXPECT_TRUE(ifc().LastStatus().has_value());
+  EXPECT_EQ(ifc().LastStatus().value(), 0u);
 
-  status = device_->EthernetImplStart(ifc_.Protocol());
+  status = driver().EthernetImplStart(ifc().Protocol());
   EXPECT_EQ(status, ZX_ERR_ALREADY_BOUND);
 
   // Set a packet filter to put the device online.
   SetPacketFilter();
-  EXPECT_TRUE(ifc_.LastStatus().has_value());
-  EXPECT_EQ(ifc_.LastStatus().value(), ETHERNET_STATUS_ONLINE);
+  EXPECT_TRUE(ifc().LastStatus().has_value());
+  EXPECT_EQ(ifc().LastStatus().value(), ETHERNET_STATUS_ONLINE);
 
-  device_->EthernetImplStop();
-  status = device_->EthernetImplStart(ifc_.Protocol());
+  driver().EthernetImplStop();
+  status = driver().EthernetImplStart(ifc().Protocol());
   ASSERT_OK(status);
 
   ReadIndicateStatus(RNDIS_STATUS_MEDIA_DISCONNECT);
@@ -347,9 +399,9 @@ TEST_F(RndisFunctionTest, InvalidSizeCommand) {
                               invalid_data.size());
   ReadResponse(buffer.data(), buffer.size());
   auto status = reinterpret_cast<rndis_indicate_status*>(buffer.data());
-  EXPECT_EQ(status->msg_type, RNDIS_INDICATE_STATUS_MSG);
+  EXPECT_EQ(status->msg_type, static_cast<uint32_t>(RNDIS_INDICATE_STATUS_MSG));
   EXPECT_EQ(status->msg_length, buffer.size());
-  EXPECT_EQ(status->status, RNDIS_STATUS_INVALID_DATA);
+  EXPECT_EQ(status->status, static_cast<uint32_t>(RNDIS_STATUS_INVALID_DATA));
 }
 
 TEST_F(RndisFunctionTest, InitMessage) {
@@ -366,30 +418,30 @@ TEST_F(RndisFunctionTest, InitMessage) {
   rndis_init_complete response;
   ReadResponse(&response, sizeof(response));
 
-  EXPECT_EQ(response.msg_type, RNDIS_INITIALIZE_CMPLT);
+  EXPECT_EQ(response.msg_type, static_cast<uint32_t>(RNDIS_INITIALIZE_CMPLT));
   EXPECT_EQ(response.msg_length, sizeof(response));
-  EXPECT_EQ(response.request_id, 42);
-  EXPECT_EQ(response.status, RNDIS_STATUS_SUCCESS);
-  EXPECT_EQ(response.major_version, RNDIS_MAJOR_VERSION);
-  EXPECT_EQ(response.minor_version, RNDIS_MINOR_VERSION);
-  EXPECT_EQ(response.device_flags, RNDIS_DF_CONNECTIONLESS);
-  EXPECT_EQ(response.medium, RNDIS_MEDIUM_802_3);
-  EXPECT_EQ(response.max_packets_per_xfer, 1);
-  EXPECT_EQ(response.max_xfer_size, RNDIS_MAX_XFER_SIZE);
-  EXPECT_EQ(response.packet_alignment, 0);
-  EXPECT_EQ(response.reserved0, 0);
-  EXPECT_EQ(response.reserved1, 0);
+  EXPECT_EQ(response.request_id, 42u);
+  EXPECT_EQ(response.status, static_cast<uint32_t>(RNDIS_STATUS_SUCCESS));
+  EXPECT_EQ(response.major_version, static_cast<uint32_t>(RNDIS_MAJOR_VERSION));
+  EXPECT_EQ(response.minor_version, static_cast<uint32_t>(RNDIS_MINOR_VERSION));
+  EXPECT_EQ(response.device_flags, static_cast<uint32_t>(RNDIS_DF_CONNECTIONLESS));
+  EXPECT_EQ(response.medium, static_cast<uint32_t>(RNDIS_MEDIUM_802_3));
+  EXPECT_EQ(response.max_packets_per_xfer, 1u);
+  EXPECT_EQ(response.max_xfer_size, static_cast<uint32_t>(RNDIS_MAX_XFER_SIZE));
+  EXPECT_EQ(response.packet_alignment, 0u);
+  EXPECT_EQ(response.reserved0, 0u);
+  EXPECT_EQ(response.reserved1, 0u);
 }
 
 TEST_F(RndisFunctionTest, Send) {
   // Start the interface and bring the device online.
-  zx_status_t status = device_->EthernetImplStart(ifc_.Protocol());
+  zx_status_t status = driver().EthernetImplStart(ifc().Protocol());
   ASSERT_OK(status);
 
   SetPacketFilter();
 
   ethernet_info_t info;
-  status = device_->EthernetImplQuery(/*options=*/0, &info);
+  status = driver().EthernetImplQuery(/*options=*/0, &info);
   ASSERT_OK(status);
 
   uint32_t transmit_ok, transmit_errors, transmit_no_buffer;
@@ -397,9 +449,9 @@ TEST_F(RndisFunctionTest, Send) {
   QueryOid(OID_GEN_RCV_OK, &transmit_ok, sizeof(transmit_ok), &actual);
   QueryOid(OID_GEN_RCV_ERROR, &transmit_errors, sizeof(transmit_errors), &actual);
   QueryOid(OID_GEN_RCV_NO_BUFFER, &transmit_no_buffer, sizeof(transmit_no_buffer), &actual);
-  EXPECT_EQ(transmit_ok, 0);
-  EXPECT_EQ(transmit_errors, 0);
-  EXPECT_EQ(transmit_no_buffer, 0);
+  EXPECT_EQ(transmit_ok, 0u);
+  EXPECT_EQ(transmit_errors, 0u);
+  EXPECT_EQ(transmit_no_buffer, 0u);
 
   // Fill the TX queue.
   for (size_t i = 0; i != 8; ++i) {
@@ -409,7 +461,7 @@ TEST_F(RndisFunctionTest, Send) {
     buffer->operation()->data_size = sizeof(data);
 
     zx_status_t result;
-    device_->EthernetImplQueueTx(/*options=*/0, buffer->take(),
+    driver().EthernetImplQueueTx(/*options=*/0, buffer->take(),
                                  [](void* cookie, zx_status_t status, ethernet_netbuf_t* netbuf) {
                                    eth::Operation<> buffer(netbuf, kNetbufSize);
                                    *reinterpret_cast<zx_status_t*>(cookie) = status;
@@ -421,9 +473,9 @@ TEST_F(RndisFunctionTest, Send) {
   QueryOid(OID_GEN_RCV_OK, &transmit_ok, sizeof(transmit_ok), &actual);
   QueryOid(OID_GEN_RCV_ERROR, &transmit_errors, sizeof(transmit_errors), &actual);
   QueryOid(OID_GEN_RCV_NO_BUFFER, &transmit_no_buffer, sizeof(transmit_no_buffer), &actual);
-  EXPECT_EQ(transmit_ok, 8);
-  EXPECT_EQ(transmit_errors, 0);
-  EXPECT_EQ(transmit_no_buffer, 0);
+  EXPECT_EQ(transmit_ok, 8u);
+  EXPECT_EQ(transmit_errors, 0u);
+  EXPECT_EQ(transmit_no_buffer, 0u);
 
   // One more packet should fail. The other packets haven't completed yet.
   {
@@ -433,7 +485,7 @@ TEST_F(RndisFunctionTest, Send) {
     buffer->operation()->data_size = sizeof(data);
 
     zx_status_t result;
-    device_->EthernetImplQueueTx(/*options=*/0, buffer->take(),
+    driver().EthernetImplQueueTx(/*options=*/0, buffer->take(),
                                  [](void* cookie, zx_status_t status, ethernet_netbuf_t* netbuf) {
                                    eth::Operation<> buffer(netbuf, kNetbufSize);
                                    *reinterpret_cast<zx_status_t*>(cookie) = status;
@@ -445,12 +497,12 @@ TEST_F(RndisFunctionTest, Send) {
   QueryOid(OID_GEN_RCV_OK, &transmit_ok, sizeof(transmit_ok), &actual);
   QueryOid(OID_GEN_RCV_ERROR, &transmit_errors, sizeof(transmit_errors), &actual);
   QueryOid(OID_GEN_RCV_NO_BUFFER, &transmit_no_buffer, sizeof(transmit_no_buffer), &actual);
-  EXPECT_EQ(transmit_ok, 8);
-  EXPECT_EQ(transmit_errors, 0);
-  EXPECT_EQ(transmit_no_buffer, 1);
+  EXPECT_EQ(transmit_ok, 8u);
+  EXPECT_EQ(transmit_errors, 0u);
+  EXPECT_EQ(transmit_no_buffer, 1u);
 
   // Drain the queue.
-  function_.pending_in_requests_.CompleteAll(ZX_OK, 0);
+  RunInFunctionContext([](auto& function) { function.pending_in_requests_.CompleteAll(ZX_OK, 0); });
 
   // We should be able to queue packets again, however usb requests are added back to the pool on
   // another thread so we should loop until at least one request has completed. We delay each
@@ -464,7 +516,7 @@ TEST_F(RndisFunctionTest, Send) {
     buffer->operation()->data_buffer = reinterpret_cast<uint8_t*>(&data);
     buffer->operation()->data_size = sizeof(data);
 
-    device_->EthernetImplQueueTx(/*options=*/0, buffer->take(),
+    driver().EthernetImplQueueTx(/*options=*/0, buffer->take(),
                                  [](void* cookie, zx_status_t status, ethernet_netbuf_t* netbuf) {
                                    eth::Operation<> buffer(netbuf, kNetbufSize);
                                    *reinterpret_cast<zx_status_t*>(cookie) = status;
@@ -481,14 +533,14 @@ TEST_F(RndisFunctionTest, Send) {
   QueryOid(OID_GEN_RCV_OK, &transmit_ok, sizeof(transmit_ok), &actual);
   QueryOid(OID_GEN_RCV_ERROR, &transmit_errors, sizeof(transmit_errors), &actual);
   QueryOid(OID_GEN_RCV_NO_BUFFER, &transmit_no_buffer, sizeof(transmit_no_buffer), &actual);
-  EXPECT_EQ(transmit_ok, 9);
-  EXPECT_EQ(transmit_errors, 0);
-  EXPECT_EQ(transmit_no_buffer, 1 + attempts);
+  EXPECT_EQ(transmit_ok, 9u);
+  EXPECT_EQ(transmit_errors, 0u);
+  EXPECT_EQ(transmit_no_buffer, 1u + attempts);
 }
 
 TEST_F(RndisFunctionTest, Receive) {
   // Start the interface and bring the device online.
-  zx_status_t status = device_->EthernetImplStart(ifc_.Protocol());
+  zx_status_t status = driver().EthernetImplStart(ifc().Protocol());
   ASSERT_OK(status);
 
   SetPacketFilter();
@@ -504,15 +556,15 @@ TEST_F(RndisFunctionTest, Receive) {
       sizeof(rndis_packet_header) - offsetof(rndis_packet_header, data_offset);
   payload.header.data_length = sizeof(payload.data);
 
-  ASSERT_FALSE(function_.pending_out_requests_.is_empty());
+  RunInFunctionContext([&payload](auto& function) {
+    ASSERT_FALSE(function.pending_out_requests_.is_empty());
+    auto request = function.pending_out_requests_.pop();
+    ssize_t copied = request->CopyTo(&payload, sizeof(payload), 0);
+    EXPECT_EQ(copied, static_cast<ssize_t>(sizeof(payload)));
+    request->Complete(ZX_OK, sizeof(payload));
+  });
 
-  auto request = function_.pending_out_requests_.pop();
-  ssize_t copied = request->CopyTo(&payload, sizeof(payload), 0);
-  EXPECT_EQ(copied, sizeof(payload));
-
-  request->Complete(ZX_OK, sizeof(payload));
-
-  EXPECT_OK(ifc_.WaitUntilPacketReceived());
+  EXPECT_OK(ifc().WaitUntilPacketReceived());
 }
 
 TEST_F(RndisFunctionTest, KeepAliveMessage) {
@@ -526,25 +578,25 @@ TEST_F(RndisFunctionTest, KeepAliveMessage) {
   rndis_header_complete response;
   ReadResponse(&response, sizeof(response));
 
-  EXPECT_EQ(response.msg_type, RNDIS_KEEPALIVE_CMPLT);
+  EXPECT_EQ(response.msg_type, static_cast<uint32_t>(RNDIS_KEEPALIVE_CMPLT));
   EXPECT_EQ(response.msg_length, sizeof(response));
-  EXPECT_EQ(response.request_id, 42);
-  EXPECT_EQ(response.status, RNDIS_STATUS_SUCCESS);
+  EXPECT_EQ(response.request_id, 42u);
+  EXPECT_EQ(response.status, static_cast<uint32_t>(RNDIS_STATUS_SUCCESS));
 }
 
 TEST_F(RndisFunctionTest, Halt) {
-  zx_status_t status = device_->EthernetImplStart(ifc_.Protocol());
+  zx_status_t status = driver().EthernetImplStart(ifc().Protocol());
   ASSERT_OK(status);
-  EXPECT_TRUE(ifc_.LastStatus().has_value());
-  EXPECT_EQ(ifc_.LastStatus().value(), 0);
+  EXPECT_TRUE(ifc().LastStatus().has_value());
+  EXPECT_EQ(ifc().LastStatus().value(), 0u);
 
-  status = device_->EthernetImplStart(ifc_.Protocol());
+  status = driver().EthernetImplStart(ifc().Protocol());
   EXPECT_EQ(status, ZX_ERR_ALREADY_BOUND);
 
   // Set a packet filter to put the device online.
   SetPacketFilter();
-  EXPECT_TRUE(ifc_.LastStatus().has_value());
-  EXPECT_EQ(ifc_.LastStatus().value(), ETHERNET_STATUS_ONLINE);
+  EXPECT_TRUE(ifc().LastStatus().has_value());
+  EXPECT_EQ(ifc().LastStatus().value(), ETHERNET_STATUS_ONLINE);
 
   rndis_header msg{
       msg.msg_type = RNDIS_HALT_MSG,
@@ -553,25 +605,25 @@ TEST_F(RndisFunctionTest, Halt) {
   };
   WriteCommand(&msg, sizeof(msg));
 
-  EXPECT_TRUE(ifc_.LastStatus().has_value());
-  EXPECT_EQ(ifc_.LastStatus().value(), 0);
+  EXPECT_TRUE(ifc().LastStatus().has_value());
+  EXPECT_EQ(ifc().LastStatus().value(), 0u);
 
-  EXPECT_EQ(function_.DisableEpCalls(), 3);
+  RunInFunctionContext([](auto& function) { EXPECT_EQ(function.DisableEpCalls(), 3u); });
 }
 
 TEST_F(RndisFunctionTest, Reset) {
-  zx_status_t status = device_->EthernetImplStart(ifc_.Protocol());
+  zx_status_t status = driver().EthernetImplStart(ifc().Protocol());
   ASSERT_OK(status);
-  EXPECT_TRUE(ifc_.LastStatus().has_value());
-  EXPECT_EQ(ifc_.LastStatus().value(), 0);
+  EXPECT_TRUE(ifc().LastStatus().has_value());
+  EXPECT_EQ(ifc().LastStatus().value(), 0u);
 
-  status = device_->EthernetImplStart(ifc_.Protocol());
+  status = driver().EthernetImplStart(ifc().Protocol());
   EXPECT_EQ(status, ZX_ERR_ALREADY_BOUND);
 
   // Set a packet filter to put the device online.
   SetPacketFilter();
-  EXPECT_TRUE(ifc_.LastStatus().has_value());
-  EXPECT_EQ(ifc_.LastStatus().value(), ETHERNET_STATUS_ONLINE);
+  EXPECT_TRUE(ifc().LastStatus().has_value());
+  EXPECT_EQ(ifc().LastStatus().value(), ETHERNET_STATUS_ONLINE);
 
   rndis_header msg{
       msg.msg_type = RNDIS_RESET_MSG,
@@ -580,14 +632,14 @@ TEST_F(RndisFunctionTest, Reset) {
   };
   WriteCommand(&msg, sizeof(msg));
 
-  EXPECT_TRUE(ifc_.LastStatus().has_value());
-  EXPECT_EQ(ifc_.LastStatus().value(), 0);
+  EXPECT_TRUE(ifc().LastStatus().has_value());
+  EXPECT_EQ(ifc().LastStatus().value(), 0u);
 
   rndis_reset_complete response;
   ReadResponse(&response, sizeof(response));
-  EXPECT_EQ(response.msg_type, RNDIS_RESET_CMPLT);
+  EXPECT_EQ(response.msg_type, static_cast<uint32_t>(RNDIS_RESET_CMPLT));
   EXPECT_EQ(response.msg_length, sizeof(rndis_reset_complete));
-  EXPECT_EQ(response.status, RNDIS_STATUS_SUCCESS);
+  EXPECT_EQ(response.status, static_cast<uint32_t>(RNDIS_STATUS_SUCCESS));
 }
 
 TEST_F(RndisFunctionTest, OidSupportedList) {
@@ -595,7 +647,7 @@ TEST_F(RndisFunctionTest, OidSupportedList) {
   size_t actual;
   QueryOid(OID_GEN_SUPPORTED_LIST, &supported_oids, sizeof(supported_oids), &actual);
   ASSERT_GE(actual, sizeof(uint32_t));
-  ASSERT_EQ(actual % sizeof(uint32_t), 0);
+  ASSERT_EQ(actual % sizeof(uint32_t), 0u);
 
   // Check that the list at least contains the list OID itself.
   bool contains_list_oid = false;
@@ -613,19 +665,19 @@ TEST_F(RndisFunctionTest, OidHardwareStatus) {
   size_t actual;
   QueryOid(OID_GEN_HARDWARE_STATUS, &hardware_status, sizeof(hardware_status), &actual);
   ASSERT_EQ(actual, sizeof(hardware_status));
-  EXPECT_EQ(hardware_status, RNDIS_HW_STATUS_READY);
+  EXPECT_EQ(hardware_status, static_cast<uint32_t>(RNDIS_HW_STATUS_READY));
 }
 
 TEST_F(RndisFunctionTest, OidLinkSpeed) {
   zx_status_t status =
-      device_->UsbFunctionInterfaceSetConfigured(/*configured=*/true, USB_SPEED_FULL);
+      driver().UsbFunctionInterfaceSetConfigured(/*configured=*/true, USB_SPEED_FULL);
   ASSERT_OK(status);
 
   uint32_t speed;
   size_t actual;
   QueryOid(OID_GEN_LINK_SPEED, &speed, sizeof(speed), &actual);
   ASSERT_EQ(actual, sizeof(speed));
-  EXPECT_EQ(speed, 120'000);
+  EXPECT_EQ(speed, 120'000u);
 }
 
 TEST_F(RndisFunctionTest, OidMediaConnectStatus) {
@@ -633,7 +685,7 @@ TEST_F(RndisFunctionTest, OidMediaConnectStatus) {
   size_t actual;
   QueryOid(OID_GEN_MEDIA_CONNECT_STATUS, &status, sizeof(status), &actual);
   ASSERT_EQ(actual, sizeof(status));
-  EXPECT_EQ(status, RNDIS_STATUS_MEDIA_CONNECT);
+  EXPECT_EQ(status, static_cast<uint32_t>(RNDIS_STATUS_MEDIA_CONNECT));
 }
 
 TEST_F(RndisFunctionTest, OidPhysicalMedium) {
@@ -641,7 +693,7 @@ TEST_F(RndisFunctionTest, OidPhysicalMedium) {
   size_t actual;
   QueryOid(OID_GEN_PHYSICAL_MEDIUM, &medium, sizeof(medium), &actual);
   ASSERT_EQ(actual, sizeof(medium));
-  EXPECT_EQ(medium, RNDIS_MEDIUM_802_3);
+  EXPECT_EQ(medium, static_cast<uint32_t>(RNDIS_MEDIUM_802_3));
 }
 
 TEST_F(RndisFunctionTest, OidMaximumSize) {
@@ -649,7 +701,7 @@ TEST_F(RndisFunctionTest, OidMaximumSize) {
   size_t actual;
   QueryOid(OID_GEN_MAXIMUM_TOTAL_SIZE, &size, sizeof(size), &actual);
   ASSERT_EQ(actual, sizeof(size));
-  EXPECT_EQ(size, RNDIS_MAX_DATA_SIZE);
+  EXPECT_EQ(size, static_cast<uint32_t>(RNDIS_MAX_DATA_SIZE));
 }
 
 TEST_F(RndisFunctionTest, OidMacAddress) {
@@ -658,7 +710,7 @@ TEST_F(RndisFunctionTest, OidMacAddress) {
   QueryOid(OID_802_3_PERMANENT_ADDRESS, mac_addr.data(), mac_addr.size(), &actual);
   ASSERT_EQ(actual, mac_addr.size());
 
-  std::array<uint8_t, ETH_MAC_SIZE> expected = mac_addr_;
+  std::array<uint8_t, ETH_MAC_SIZE> expected = kMacAddr;
   expected[5] ^= 1;
 
   ASSERT_EQ(mac_addr, expected);
