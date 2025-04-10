@@ -11,6 +11,7 @@ use fidl_fuchsia_samplertestcontroller::{SamplerTestControllerMarker, SamplerTes
 use fidl_test_persistence_factory::{ControllerMarker, ControllerProxy};
 use fuchsia_component_test::RealmInstance;
 use log::*;
+use pretty_assertions::{assert_eq, StrComparison};
 use serde_json::Value;
 use std::fs::File;
 use std::io::Read;
@@ -500,9 +501,9 @@ fn json_strings_match(observed: &str, expected: &str, context: &str) -> bool {
     }
 
     if observed_json != expected_json {
-        warn!("Observed != expected in {}", context);
-        warn!("Observed: {:?}", observed_json);
-        warn!("Expected: {:?}", expected_json);
+        let observed = serde_json::to_string_pretty(&observed_json).unwrap();
+        let expected = serde_json::to_string_pretty(&expected_json).unwrap();
+        warn!("Observed != expected in {}\n{}", context, StrComparison::new(&observed, &expected));
     }
     observed_json == expected_json
 }
