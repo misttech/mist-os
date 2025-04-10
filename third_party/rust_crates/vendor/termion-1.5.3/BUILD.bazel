@@ -72,13 +72,13 @@ rust_library(
         "//third_party/rust_crates/vendor/numtoa-0.1.0:numtoa",
     ] + select({
         "@rules_rust//rust/platform:aarch64-unknown-fuchsia": [
-            "//third_party/rust_crates/vendor/libc-0.2.169:libc",  # cfg(not(target_os = "redox"))
+            "//third_party/rust_crates/vendor/libc-0.2.171:libc",  # cfg(not(target_os = "redox"))
         ],
         "@rules_rust//rust/platform:x86_64-unknown-fuchsia": [
-            "//third_party/rust_crates/vendor/libc-0.2.169:libc",  # cfg(not(target_os = "redox"))
+            "//third_party/rust_crates/vendor/libc-0.2.171:libc",  # cfg(not(target_os = "redox"))
         ],
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [
-            "//third_party/rust_crates/vendor/libc-0.2.169:libc",  # cfg(not(target_os = "redox"))
+            "//third_party/rust_crates/vendor/libc-0.2.171:libc",  # cfg(not(target_os = "redox"))
         ],
         "//conditions:default": [],
     }),

@@ -77,17 +77,17 @@ rust_library(
         "//third_party/rust_crates/vendor/parking_lot-0.11.1:parking_lot",
     ] + select({
         "@rules_rust//rust/platform:aarch64-unknown-fuchsia": [
-            "//third_party/rust_crates/vendor/libc-0.2.169:libc",  # cfg(unix)
+            "//third_party/rust_crates/vendor/libc-0.2.171:libc",  # cfg(unix)
             "//third_party/rust_crates/vendor/mio-0.7.14:mio",  # cfg(unix)
             "//third_party/rust_crates/vendor/signal-hook-0.1.17:signal_hook",  # cfg(unix)
         ],
         "@rules_rust//rust/platform:x86_64-unknown-fuchsia": [
-            "//third_party/rust_crates/vendor/libc-0.2.169:libc",  # cfg(unix)
+            "//third_party/rust_crates/vendor/libc-0.2.171:libc",  # cfg(unix)
             "//third_party/rust_crates/vendor/mio-0.7.14:mio",  # cfg(unix)
             "//third_party/rust_crates/vendor/signal-hook-0.1.17:signal_hook",  # cfg(unix)
         ],
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [
-            "//third_party/rust_crates/vendor/libc-0.2.169:libc",  # cfg(unix)
+            "//third_party/rust_crates/vendor/libc-0.2.171:libc",  # cfg(unix)
             "//third_party/rust_crates/vendor/mio-0.7.14:mio",  # cfg(unix)
             "//third_party/rust_crates/vendor/signal-hook-0.1.17:signal_hook",  # cfg(unix)
         ],

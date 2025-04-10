@@ -1339,14 +1339,14 @@ alias(
 )
 
 alias(
-    name = "libc-0.2.169",
-    actual = "//third_party/rust_crates/vendor/libc-0.2.169:libc",
+    name = "libc-0.2.171",
+    actual = "//third_party/rust_crates/vendor/libc-0.2.171:libc",
     tags = ["manual"],
 )
 
 alias(
     name = "libc",
-    actual = "//third_party/rust_crates/vendor/libc-0.2.169:libc",
+    actual = "//third_party/rust_crates/vendor/libc-0.2.171:libc",
     tags = ["manual"],
 )
 

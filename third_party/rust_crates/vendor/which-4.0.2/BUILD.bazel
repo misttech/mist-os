@@ -69,7 +69,7 @@ rust_library(
     }),
     version = "4.0.2",
     deps = [
-        "//third_party/rust_crates/vendor/libc-0.2.169:libc",
+        "//third_party/rust_crates/vendor/libc-0.2.171:libc",
         "//third_party/rust_crates/vendor/thiserror-1.0.69:thiserror",
     ],
 )

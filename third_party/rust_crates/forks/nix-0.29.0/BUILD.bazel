@@ -105,7 +105,7 @@ rust_library(
     deps = [
         "//third_party/rust_crates/vendor/bitflags-2.8.0:bitflags",
         "//third_party/rust_crates/vendor/cfg-if-1.0.0:cfg_if",
-        "//third_party/rust_crates/vendor/libc-0.2.169:libc",
+        "//third_party/rust_crates/vendor/libc-0.2.171:libc",
         "//third_party/rust_crates/vendor/memoffset-0.9.1:memoffset",
     ],
 )

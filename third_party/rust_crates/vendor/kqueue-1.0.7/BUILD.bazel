@@ -70,6 +70,6 @@ rust_library(
     version = "1.0.7",
     deps = [
         "//third_party/rust_crates/vendor/kqueue-sys-1.0.3:kqueue_sys",
-        "//third_party/rust_crates/vendor/libc-0.2.169:libc",
+        "//third_party/rust_crates/vendor/libc-0.2.171:libc",
     ],
 )
