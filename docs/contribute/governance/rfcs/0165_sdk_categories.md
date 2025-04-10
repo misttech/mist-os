@@ -15,6 +15,9 @@ Categories][sdk-categories] for the current state of the world.
 
 ## Summary
 
+Note: [RFC-0268: SDK category updates][RFC-0268] replaced the set of categories
+defined in this RFC.
+
 Each SDK Atom has a category that defines which kinds of SDK consumers can see
 the Atom. As SDK Atoms mature, we can increase their visibility, which implies
 increasing their stability guarantees.
@@ -260,3 +263,4 @@ fewer audience gradations.
 
 [sdk-categories]: /docs/contribute/sdk/categories.md
 [IDK]: ../../../development/idk
+[RFC-0268]: /docs/contribute/governance/rfcs/0268_sdk_category_updates.md

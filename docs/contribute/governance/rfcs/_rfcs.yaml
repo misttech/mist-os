@@ -3491,3 +3491,16 @@
   reviewers: ['adanis@google.comm', 'eieio@google.com', 'gmtr@google.com', 'miguelfrde@google.com']
   submitted: '2025-01-07'
   reviewed: '2025-02-20'
+
+- name: 'RFC-0268'
+  title: 'SDK category updates'
+  short_description: 'Update the set of SDK categories and clarify their meanings.'
+  authors: ['ddorwin@google.com']
+  file: '0268_sdk_category_updates.md'
+  area: ['Developer']
+  issue: ['397525399']
+  gerrit_change_id: ['1211067']
+  status: 'Accepted'
+  reviewers: ['hjfreyer@google.com', "crjohns@google.com", 'wilkinsonclay@google.com']
+  submitted: '2025-02-20'
+  reviewed: '2025-04-02'
