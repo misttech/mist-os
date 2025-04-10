@@ -137,6 +137,7 @@ scenic_structured_config::Config GetConfig() {
   FX_LOGS(INFO) << "Scenic renderer: " << ToString(GetRendererType(values))
                 << " min_predicted_frame_duration(us): "
                 << values.frame_scheduler_min_predicted_frame_duration_in_us()
+                << " frame_prediction_margin(us): " << values.frame_prediction_margin_in_us()
                 << " pointer auto focus: " << values.pointer_auto_focus()
                 << " display_composition: " << values.display_composition()
                 << " i_can_haz_display_id: "
@@ -200,7 +201,8 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
           std::make_unique<scheduling::WindowedFramePredictor>(
               zx::usec(config_values_.frame_scheduler_min_predicted_frame_duration_in_us()),
               scheduling::DefaultFrameScheduler::kInitialRenderDuration,
-              scheduling::DefaultFrameScheduler::kInitialUpdateDuration),
+              scheduling::DefaultFrameScheduler::kInitialUpdateDuration,
+              zx::usec(config_values_.frame_prediction_margin_in_us())),
           inspect_node_.CreateChild("FrameScheduler"), &metrics_logger_),
       renderer_type_(GetRendererType(config_values_)),
       uber_struct_system_(std::make_shared<flatland::UberStructSystem>()),

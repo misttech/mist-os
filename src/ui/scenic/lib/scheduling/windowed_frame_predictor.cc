@@ -11,8 +11,10 @@ namespace scheduling {
 
 WindowedFramePredictor::WindowedFramePredictor(zx::duration min_predicted_frame_duration,
                                                zx::duration initial_render_duration_prediction,
-                                               zx::duration initial_update_duration_prediction)
+                                               zx::duration initial_update_duration_prediction,
+                                               zx::duration frame_prediction_margin)
     : min_predicted_frame_duration_(min_predicted_frame_duration),
+      frame_prediction_margin_(frame_prediction_margin),
       render_duration_predictor_(kRenderPredictionWindowSize, initial_render_duration_prediction),
       update_duration_predictor_(kUpdatePredictionWindowSize, initial_update_duration_prediction) {}
 
@@ -32,10 +34,10 @@ zx::duration WindowedFramePredictor::PredictTotalRequiredDuration() const {
   const zx::duration predicted_time_to_update = update_duration_predictor_.GetPrediction();
   const zx::duration predicted_time_to_render = render_duration_predictor_.GetPrediction();
 
-  const zx::duration predicted_frame_duration =
-      std::max(min_predicted_frame_duration_,
-               std::min(kMaxPredictedFrameDuration,
-                        predicted_time_to_update + predicted_time_to_render + kHardcodedMargin));
+  const zx::duration predicted_frame_duration = std::max(
+      min_predicted_frame_duration_,
+      std::min(kMaxPredictedFrameDuration,
+               predicted_time_to_update + predicted_time_to_render + frame_prediction_margin_));
 
   // Pretty print the times in milliseconds.
   TRACE_INSTANT("gfx", "WindowedFramePredictor::GetPrediction", TRACE_SCOPE_PROCESS,

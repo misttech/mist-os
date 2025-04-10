@@ -15,7 +15,8 @@ class WindowedFramePredictor : public FramePredictor {
  public:
   WindowedFramePredictor(zx::duration min_predicted_frame_duration,
                          zx::duration initial_render_duration_prediction,
-                         zx::duration initial_update_duration_prediction);
+                         zx::duration initial_update_duration_prediction,
+                         zx::duration frame_prediction_margin = zx::msec(3));
   ~WindowedFramePredictor();
 
   // |FramePredictor|
@@ -32,11 +33,6 @@ class WindowedFramePredictor : public FramePredictor {
   // update and render.
   zx::duration PredictTotalRequiredDuration() const;
 
-  // Safety margin added to prediction time to reduce impact of noise and
-  // misprediction. Unfortunately this means minimum possible latency is
-  // increased by the same amount.
-  const zx::duration kHardcodedMargin = zx::msec(3);  // 3ms
-
   // Rarely, it is possible for abnormally long GPU contexts to occur, and
   // when they occur we do not want them to mess up future predictions by
   // too much. We therefore clamp RenderDurations by this much.
@@ -45,6 +41,10 @@ class WindowedFramePredictor : public FramePredictor {
   // Lower bound for frame time prediction. It is useful when we want to set a fixed offset for
   // certain cases. It can be set specifically for the board via config.
   const zx::duration min_predicted_frame_duration_;
+
+  // Safety margin added to prediction time to reduce impact of noise and misprediction.
+  // Unfortunately this means minimum possible latency is increased by the same amount.
+  const zx::duration frame_prediction_margin_;
 
   // Render time prediction.
   const size_t kRenderPredictionWindowSize = 3;
