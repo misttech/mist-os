@@ -198,27 +198,6 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
     return result.status();
   }
 
-  block_server_.emplace(
-      block_server::PartitionInfo{
-          .block_count = block_info_.block_count,
-          .block_size = block_info_.block_size,
-      },
-      this);
-
-  if (auto result = parent_->driver_outgoing()->AddService<fuchsia_hardware_block_volume::Service>(
-          fuchsia_hardware_block_volume::Service::InstanceHandler({
-              .volume =
-                  [this](fidl::ServerEnd<fuchsia_hardware_block_volume::Volume> server_end) {
-                    fbl::AutoLock lock(&queue_lock_);
-                    if (block_server_)
-                      block_server_->Serve(std::move(server_end));
-                  },
-          }));
-      result.is_error()) {
-    FDF_LOGL(ERROR, logger(), "Failed to add service: %s", result.status_string());
-    return result.status_value();
-  }
-
   auto remove_device_on_error =
       fit::defer([&]() { [[maybe_unused]] auto result = controller_->Remove(); });
 
@@ -507,12 +486,11 @@ void SdmmcBlockDevice::StopWorkerDispatcher(std::optional<fdf::PrepareStopComple
   }
   rpmb_list_.clear();
 
-  if (block_server_) {
-    std::move(block_server_).value().DestroyAsync([completer = std::move(completer)]() mutable {
-      if (completer.has_value())
-        completer.value()(zx::ok());
-    });
-  } else if (completer.has_value()) {
+  for (auto& device : child_partition_devices_) {
+    device->StopBlockServer();
+  }
+
+  if (completer.has_value()) {
     completer.value()(zx::ok());
   }
 }
@@ -1235,34 +1213,7 @@ const inspect::Inspector& SdmmcBlockDevice::inspect() const {
 
 fdf::Logger& SdmmcBlockDevice::logger() const { return parent_->logger(); }
 
-void SdmmcBlockDevice::StartThread(block_server::Thread thread) {
-  if (auto server_dispatcher = fdf::SynchronizedDispatcher::Create(
-          fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "SDMMC Block Server",
-          [&](fdf_dispatcher_t* dispatcher) { fdf_dispatcher_destroy(dispatcher); });
-      server_dispatcher.is_ok()) {
-    async::PostTask(server_dispatcher->async_dispatcher(),
-                    [thread = std::move(thread)]() mutable { thread.Run(); });
-
-    // The dispatcher is destroyed in the shutdown handler.
-    server_dispatcher->release();
-  }
-}
-
-void SdmmcBlockDevice::OnNewSession(block_server::Session session) {
-  if (auto server_dispatcher = fdf::SynchronizedDispatcher::Create(
-          fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "Block Server Session",
-          [&](fdf_dispatcher_t* dispatcher) { fdf_dispatcher_destroy(dispatcher); });
-      server_dispatcher.is_ok()) {
-    async::PostTask(server_dispatcher->async_dispatcher(),
-                    [session = std::move(session)]() mutable { session.Run(); });
-
-    // The dispatcher is destroyed in the shutdown handler.
-    server_dispatcher->release();
-  }
-}
-
-// For now this only handles requests for the user partition.
-void SdmmcBlockDevice::OnRequests(const block_server::Session& session,
+void SdmmcBlockDevice::OnRequests(const block_server::Session& session, EmmcPartition partition,
                                   cpp20::span<block_server::Request> requests) {
   fbl::AutoLock lock(&worker_lock_);
   while (power_suspended_ && !shutdown_)
@@ -1272,9 +1223,10 @@ void SdmmcBlockDevice::OnRequests(const block_server::Session& session,
 
   class Packer {
    public:
-    Packer(SdmmcBlockDevice* device, const block_server::Session* session, size_t max_requests,
-           int max_bytes, uint32_t block_size)
+    Packer(SdmmcBlockDevice* device, EmmcPartition partition, const block_server::Session* session,
+           size_t max_requests, int max_bytes, uint32_t block_size)
         : device_(*device),
+          partition_(partition),
           session_(*session),
           max_requests_(max_requests),
           max_bytes_(max_bytes),
@@ -1327,8 +1279,7 @@ void SdmmcBlockDevice::OnRequests(const block_server::Session& session,
     zx::result<> Flush(bool split_last = false) TA_NO_THREAD_SAFETY_ANALYSIS {
       if (requests_.empty())
         return zx::ok();
-      zx::result<> result = zx::make_result(
-          device_.ReadWriteWithRetries(requests_, EmmcPartition::USER_DATA_PARTITION));
+      zx::result<> result = zx::make_result(device_.ReadWriteWithRetries(requests_, partition_));
       if (split_last && result.is_ok())
         requests_.pop_back();
       for (const block_server::Request& request : requests_) {
@@ -1341,6 +1292,7 @@ void SdmmcBlockDevice::OnRequests(const block_server::Session& session,
 
    private:
     SdmmcBlockDevice& device_;
+    const EmmcPartition partition_;
     const block_server::Session& session_;
     const size_t max_requests_;
     const uint64_t max_bytes_;
@@ -1350,9 +1302,11 @@ void SdmmcBlockDevice::OnRequests(const block_server::Session& session,
   };
 
   zx_status_t status;
-  Packer read_packer(this, &session, max_packed_reads_effective_, block_info_.max_transfer_size,
+  size_t max_reads = partition == USER_DATA_PARTITION ? max_packed_reads_effective_ : 1;
+  size_t max_writes = partition == USER_DATA_PARTITION ? max_packed_writes_effective_ : 1;
+  Packer read_packer(this, partition, &session, max_reads, block_info_.max_transfer_size,
                      block_info_.block_size);
-  Packer write_packer(this, &session, max_packed_writes_effective_, block_info_.max_transfer_size,
+  Packer write_packer(this, partition, &session, max_writes, block_info_.max_transfer_size,
                       block_info_.block_size);
 
   [[maybe_unused]] zx::result<> unused_result;
@@ -1391,7 +1345,7 @@ void SdmmcBlockDevice::OnRequests(const block_server::Session& session,
                 .length = request.operation.trim.block_count,
                 .offset_dev = request.operation.trim.device_block_offset,
             },
-            USER_DATA_PARTITION);
+            partition);
         session.SendReply(request.request_id, request.trace_flow_id, zx::make_result(status));
 
         TRACE_DURATION_END(

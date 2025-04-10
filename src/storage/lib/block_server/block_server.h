@@ -41,7 +41,6 @@ class Session {
 
   explicit Session(const internal::Session* session) : session_(session) {}
 
-  // NOTE: Do not add more members; there are casts in the implementation.
   const internal::Session* session_;
 };
 
