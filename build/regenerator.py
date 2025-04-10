@@ -153,7 +153,11 @@ def main() -> int:
         "--verbose",
         action="count",
         default=0,
-        help="Increase verbosity.",
+        help=(
+            "Increase verbosity. (To change the verbosity of this script "
+            "during `fx build`, run `fx gen` with the desired instances of "
+            "this argument.)"
+        ),
     )
     args = parser.parse_args()
 
@@ -260,6 +264,15 @@ def main() -> int:
             "--fuchsia-build-dir=.",
             f"--host-tag={args.host_tag}",
         ]
+
+        # Apply the current verbosity when Ninja calls this script.
+        # Note that this can only be changed by running `fx gen` because any
+        # call by Ninja will always pass the arguments specified the last time
+        # this script was run, regardless of the arguments to `fx build`.
+        if verbose >= 1:
+            regenerator_command_args += ["--verbose"]
+        if verbose >= 2:
+            regenerator_command_args += ["--verbose"]
         regenerator_command = " ".join(
             shlex.quote(str(a)) for a in regenerator_command_args
         )
