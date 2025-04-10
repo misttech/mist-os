@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use blob_writer::BlobWriter;
 use delivery_blob::{CompressionMode, Type1Blob};
 use fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobReaderMarker, BlobWriterProxy, CreateBlobError};
-use fuchsia_component::client::connect_to_protocol_at_dir_svc;
+use fuchsia_component_client::connect_to_protocol_at_dir_svc;
 use fuchsia_merkle::Hash;
 
 use fxfs::object_store::directory::Directory;

@@ -481,7 +481,7 @@ mod tests {
     use delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob};
     use fidl_fuchsia_fxfs::BlobReaderMarker;
     use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _};
-    use fuchsia_component::client::connect_to_protocol_at_dir_svc;
+    use fuchsia_component_client::connect_to_protocol_at_dir_svc;
     use fuchsia_fs::directory::{
         readdir_inclusive, DirEntry, DirentKind, WatchEvent, WatchMessage, Watcher,
     };

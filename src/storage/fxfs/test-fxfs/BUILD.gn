@@ -16,7 +16,7 @@ rustc_binary("bin") {
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
-    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-component/client",
     "//src/lib/fuchsia-runtime",
     "//src/lib/fuchsia-sync",
     "//src/storage/fxfs:lib",
@@ -25,12 +25,13 @@ rustc_binary("bin") {
     "//src/storage/fxfs/platform",
     "//src/storage/fxfs/test-fxfs/fidl/fuchsia.test.fxfs:fuchsia.test.fxfs_rust",
     "//src/storage/lib/storage_device",
-    "//src/storage/lib/vfs/rust:vfs",
+    "//src/storage/lib/vfs/rust:vfs_static",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
   ]
   sources = [ "src/main.rs" ]
+  assert_no_deps = [ "//src/storage/lib/vfs/rust:vfs" ]
   testonly = true
 }
 

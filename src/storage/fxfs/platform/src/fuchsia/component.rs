@@ -495,7 +495,7 @@ mod tests {
         StartupMarker, VolumesMarker,
     };
     use fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleProxy};
-    use fuchsia_component::client::connect_to_protocol_at_dir_svc;
+    use fuchsia_component_client::connect_to_protocol_at_dir_svc;
     use fuchsia_fs::directory::readdir;
     use futures::future::{BoxFuture, FusedFuture, FutureExt};
     use futures::{pin_mut, select};

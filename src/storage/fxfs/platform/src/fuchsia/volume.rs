@@ -819,7 +819,7 @@ mod tests {
     use delivery_blob::CompressionMode;
     use fidl_fuchsia_fs_startup::VolumeMarker;
     use fidl_fuchsia_fxfs::{BytesAndNodes, ProjectIdMarker};
-    use fuchsia_component::client::connect_to_protocol_at_dir_svc;
+    use fuchsia_component_client::connect_to_protocol_at_dir_svc;
     use fuchsia_fs::file;
     use fxfs::filesystem::FxFilesystem;
     use fxfs::fsck::{fsck, fsck_volume};

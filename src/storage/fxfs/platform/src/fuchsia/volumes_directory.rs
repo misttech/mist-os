@@ -829,7 +829,7 @@ mod tests {
     use fidl_fuchsia_fs::AdminMarker;
     use fidl_fuchsia_fs_startup::{MountOptions, VolumeMarker, VolumeProxy};
     use fidl_fuchsia_fxfs::KeyPurpose;
-    use fuchsia_component::client::connect_to_protocol_at_dir_svc;
+    use fuchsia_component_client::connect_to_protocol_at_dir_svc;
     use fuchsia_fs::file;
     use futures::join;
     use fxfs::errors::FxfsError;
