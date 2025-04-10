@@ -792,36 +792,6 @@ zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint6
   LockedParentWalker walker(parent);
 
   while (start_in_self < end_in_self) {
-    // Early out if the current node is empty.
-    // TODO(https://fxbug.dev/338300943): This early out shouldn't be necessary as long as the
-    // VmPageList iterator functions like `ForEveryPageInRange` early out instead. Microbenchmarks
-    // slightly regressed when we attempted this though. Investigate adding the `IsEmpty` early-out
-    // to the VMPageList methods and removing this block.
-    if (walker.current(self).page_list_.IsEmpty()) {
-      if (walker.current(self).is_parent_hidden_locked() &&
-          start_in_cur < walker.current(self).parent_limit_) {
-        // Some of this range within the parent node is still owned by `self`, so walk up and
-        // process the range from within the parent instead.
-        start_in_cur = start_in_cur + walker.current(self).parent_offset_;
-        end_in_cur = ktl::min(end_in_cur, walker.current(self).parent_limit_) +
-                     walker.current(self).parent_offset_;
-        walker.WalkUp(self);
-      } else {
-        // The range within the current node is owned by `self`, but the same range is not owned by
-        // `self` within the parent node. Either:
-        //  1. The parent is a visible node and owns all its pages, so `self` cannot own them.
-        //  2. This range within the parent is not visible to `self` due to the `parent_limit_`, and
-        //     thus it cannot be owned by `self` either.
-        // Mark the range as processed and restart another walk up from `self`.
-        start_in_self += end_in_cur - start_in_cur;
-        start_in_cur = start_in_self;
-        end_in_cur = end_in_self;
-        walker.reset();
-      }
-
-      continue;
-    }
-
     // We attempt to always inline these lambdas, as its a huge performance benefit and has minimal
     // impact on code size.
     bool stopped_early = false;
