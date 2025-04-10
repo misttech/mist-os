@@ -1213,7 +1213,8 @@ const inspect::Inspector& SdmmcBlockDevice::inspect() const {
 
 fdf::Logger& SdmmcBlockDevice::logger() const { return parent_->logger(); }
 
-void SdmmcBlockDevice::OnRequests(const block_server::Session& session, EmmcPartition partition,
+void SdmmcBlockDevice::OnRequests(const block_server::Session& session,
+                                  const PartitionDevice& partition,
                                   cpp20::span<block_server::Request> requests) {
   fbl::AutoLock lock(&worker_lock_);
   while (power_suspended_ && !shutdown_)
@@ -1302,16 +1303,24 @@ void SdmmcBlockDevice::OnRequests(const block_server::Session& session, EmmcPart
   };
 
   zx_status_t status;
-  size_t max_reads = partition == USER_DATA_PARTITION ? max_packed_reads_effective_ : 1;
-  size_t max_writes = partition == USER_DATA_PARTITION ? max_packed_writes_effective_ : 1;
-  Packer read_packer(this, partition, &session, max_reads, block_info_.max_transfer_size,
+  EmmcPartition part = partition.partition();
+  size_t max_reads = part == USER_DATA_PARTITION ? max_packed_reads_effective_ : 1;
+  size_t max_writes = part == USER_DATA_PARTITION ? max_packed_writes_effective_ : 1;
+  Packer read_packer(this, part, &session, max_reads, block_info_.max_transfer_size,
                      block_info_.block_size);
-  Packer write_packer(this, partition, &session, max_writes, block_info_.max_transfer_size,
+  Packer write_packer(this, part, &session, max_writes, block_info_.max_transfer_size,
                       block_info_.block_size);
 
   [[maybe_unused]] zx::result<> unused_result;
 
   for (block_server::Request& request : requests) {
+    if (zx_status_t status =
+            block_server::CheckIoRange(request, partition.block_info().block_count);
+        status != ZX_OK) {
+      FDF_LOGL(WARNING, logger(), "Invalid request range.");
+      session.SendReply(request.request_id, request.trace_flow_id, zx::make_result(status));
+      continue;
+    }
     switch (request.operation.tag) {
       case block_server::Operation::Tag::Read:
         read_packer.Push(request);
@@ -1345,7 +1354,7 @@ void SdmmcBlockDevice::OnRequests(const block_server::Session& session, EmmcPart
                 .length = request.operation.trim.block_count,
                 .offset_dev = request.operation.trim.device_block_offset,
             },
-            partition);
+            partition.partition());
         session.SendReply(request.request_id, request.trace_flow_id, zx::make_result(status));
 
         TRACE_DURATION_END(

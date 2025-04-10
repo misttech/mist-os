@@ -2394,19 +2394,35 @@ TEST_P(SdmmcBlockDeviceTest, BlockServer) {
         },
     };
 
-    EXPECT_OK(client->FifoTransaction(requests, 2));
+    EXPECT_OK(client->FifoTransaction(requests, 4));
 
     requests[0].command.opcode = BLOCK_OPCODE_READ;
     requests[0].vmo_offset += 2;
     requests[1].command.opcode = BLOCK_OPCODE_READ;
     requests[1].vmo_offset += 2;
 
-    EXPECT_OK(client->FifoTransaction(requests, 2));
+    EXPECT_OK(client->FifoTransaction(requests, 4));
 
     auto read_buffer = std::make_unique<uint8_t[]>(len);
     EXPECT_OK(vmo.read(read_buffer.get(), len, len));
 
     EXPECT_BYTES_EQ(read_buffer.get(), buffer.get(), len);
+
+    block_fifo_request_t bad_request{
+        .command =
+            {
+                .opcode = BLOCK_OPCODE_WRITE,
+            },
+        .vmoid = vmoid,
+        .length = 1,
+        .vmo_offset = 1,
+        .dev_offset = info.block_count,
+    };
+    EXPECT_STATUS(client->FifoTransaction(&bad_request, 1), ZX_ERR_OUT_OF_RANGE);
+    bad_request.command.opcode = BLOCK_OPCODE_READ;
+    EXPECT_STATUS(client->FifoTransaction(&bad_request, 1), ZX_ERR_OUT_OF_RANGE);
+    bad_request.command.opcode = BLOCK_OPCODE_TRIM;
+    EXPECT_STATUS(client->FifoTransaction(&bad_request, 1), ZX_ERR_OUT_OF_RANGE);
   };
   runtime_.PerformBlockingWork(test_fn);
   instance_name = "boot1";

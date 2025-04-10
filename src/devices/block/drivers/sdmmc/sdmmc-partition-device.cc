@@ -221,7 +221,7 @@ void PartitionDevice::OnNewSession(block_server::Session session) {
 
 void PartitionDevice::OnRequests(const block_server::Session& session,
                                  cpp20::span<block_server::Request> requests) {
-  sdmmc_parent_->OnRequests(session, partition_, requests);
+  sdmmc_parent_->OnRequests(session, *this, requests);
 }
 
 }  // namespace sdmmc

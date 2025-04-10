@@ -102,4 +102,33 @@ Request SplitRequest(Request& request, uint32_t block_offset, uint32_t block_siz
   return head;
 }
 
+zx_status_t CheckIoRange(const Request& request, uint64_t total_block_count) {
+  uint64_t start;
+  uint64_t length;
+  switch (request.operation.tag) {
+    case Operation::Tag::Read:
+      start = request.operation.read.device_block_offset;
+      length = request.operation.read.block_count;
+      break;
+    case Operation::Tag::Write:
+      start = request.operation.write.device_block_offset;
+      length = request.operation.write.block_count;
+      break;
+    case Operation::Tag::Trim:
+      start = request.operation.trim.device_block_offset;
+      length = request.operation.trim.block_count;
+      break;
+    case Operation::Tag::Flush:
+    case Operation::Tag::CloseVmo:
+      return ZX_OK;
+  }
+  if (length == 0 || length > total_block_count) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  if (start >= total_block_count || start > total_block_count - length) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  return ZX_OK;
+}
+
 }  // namespace block_server

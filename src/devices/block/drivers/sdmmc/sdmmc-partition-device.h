@@ -39,8 +39,10 @@ class PartitionDevice : public ddk::BlockImplProtocol<PartitionDevice>,
   zx_status_t BlockPartitionGetName(char* out_name, size_t capacity);
   zx_status_t BlockPartitionGetMetadata(partition_metadata_t* out_metadata);
 
-  // Visible for testing.
   EmmcPartition partition() const { return partition_; }
+  block_info_t block_info() const { return block_info_; }
+
+  // Visible for testing.
   const block_impl_protocol_ops_t& block_impl_protocol_ops() const {
     return block_impl_protocol_ops_;
   }
