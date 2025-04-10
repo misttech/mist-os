@@ -65,10 +65,10 @@ impl<'a> Iterator for RangeOverlapIter<'a> {
 }
 
 impl AllocatedRanges {
-    pub fn new(ranges_to_apply: Vec<Range<u64>>) -> Self {
+    pub fn new(ranges_to_apply: &[Range<u64>]) -> Self {
         let mut ranges = Vec::new();
         for range_to_apply in ranges_to_apply {
-            Self::apply_range_to(&mut ranges, range_to_apply);
+            Self::apply_range_to(&mut ranges, range_to_apply.clone());
         }
         Self { ranges: Mutex::new(ranges) }
     }
@@ -220,14 +220,14 @@ mod tests {
         ];
 
         for case in cases {
-            let ranges = AllocatedRanges::new(case.applied_ranges);
+            let ranges = AllocatedRanges::new(&case.applied_ranges);
             assert_eq!(*ranges.ranges.lock(), case.expected_ranges);
         }
     }
 
     #[fuchsia::test]
     fn test_allocated_ranges_overlap() {
-        let ranges = AllocatedRanges::new(Vec::new());
+        let ranges = AllocatedRanges::new(&[]);
         // With no overwrite ranges recorded, all overlap calls should return the same range
         // wrapped with Cow.
         assert_eq!(ranges.overlap(0..1).collect::<Vec<_>>(), vec![RangeType::Cow(0..1)]);
@@ -369,7 +369,7 @@ mod tests {
         ];
 
         for (i, case) in cases.into_iter().enumerate() {
-            let ranges = AllocatedRanges::new(case.applied);
+            let ranges = AllocatedRanges::new(&case.applied);
             assert_eq!(ranges.truncate(case.cutoff), case.dropped_all, "failed case # {}", i);
             assert_eq!(*ranges.ranges.lock(), case.expected, "failed case # {}", i);
         }

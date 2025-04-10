@@ -102,7 +102,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         fsverity_state: FsverityState,
         options: HandleOptions,
         trace: bool,
-        overwrite_ranges: Vec<Range<u64>>,
+        overwrite_ranges: &[Range<u64>],
     ) -> Self {
         Self {
             handle: StoreObjectHandle::new(owner, object_id, permanent_keys, options, trace),
