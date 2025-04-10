@@ -173,6 +173,10 @@ impl TargetAddrEntry {
     pub fn new(addr: TargetAddr, timestamp: DateTime<Utc>, status: TargetAddrStatus) -> Self {
         Self { addr, timestamp, status }
     }
+
+    pub fn is_ip(&self) -> bool {
+        matches!(self.addr, TargetAddr::Net(_))
+    }
 }
 
 /// This imple is intended mainly for testing.

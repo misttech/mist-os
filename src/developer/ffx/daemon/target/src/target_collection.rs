@@ -654,7 +654,7 @@ impl TargetCollection {
             let is_too_old = Utc::now().signed_duration_since(t.timestamp).num_milliseconds()
                 as i128
                 > MDNS_MAX_AGE.as_millis() as i128;
-            !is_too_old || t.is_manual()
+            !is_too_old || t.is_manual() || !t.is_ip()
         });
         to_update.update_boot_timestamp(new_target.boot_timestamp_nanos());
 
