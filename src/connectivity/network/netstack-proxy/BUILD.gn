@@ -11,6 +11,7 @@ network_unified_binary("bin") {
   edition = "2021"
 
   deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.net.stackmigrationdeprecated:fuchsia.net.stackmigrationdeprecated_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//sdk/rust/zx",
