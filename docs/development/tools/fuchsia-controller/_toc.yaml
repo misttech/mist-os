@@ -6,8 +6,8 @@
 # before making changes to this file, and add a member of the fuchsia.dev
 # team as reviewer.
 toc:
-- title: "Fuchsia Controller tutorial"
-  path: /docs/development/tools/fuchsia-controller/getting-started-in-tree.md
+- title: "Scripting remote interaction with a Fuchsia device"
+  path: /docs/development/tools/fuchsia-controller/scripting-remote-actions.md
 - title: "Best practices on using async Python in Fuchsia Controller"
   path: /docs/development/tools/fuchsia-controller/async-python.md
 - title: "FIDL bindings in Python"

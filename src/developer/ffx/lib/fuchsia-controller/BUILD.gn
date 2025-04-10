@@ -4,7 +4,6 @@
 
 import("//build/fidl/fidl.gni")
 import("//build/python/host.gni")
-import("//build/python/python_binary.gni")
 import("//build/python/python_host_test.gni")
 import("//build/python/python_library.gni")
 import("//build/rust/rustc_staticlib.gni")
@@ -135,21 +134,9 @@ python_host_test("fuchsia_controller_static_conformance_tests") {
   main_source = static_conformance_test_source
 }
 
-python_binary("example") {
-  testonly = true
-  main_source = "python/example.py"
-  deps = [
-    ":fidl_bindings",
-    ":fuchsia_controller_py",
-    "cpp:fidl_codec",
-    "//src/developer/ffx:ffx_tool",
-  ]
-}
-
 group("fuchsia-controller") {
   testonly = true
   deps = [
-    ":example",
     ":fuchsia_controller_py",
     "cpp:fidl_codec",
   ]

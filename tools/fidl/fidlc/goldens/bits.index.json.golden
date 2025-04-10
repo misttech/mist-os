@@ -5,8 +5,8 @@
       "is_virtual": false,
       "file": "../../tools/fidl/fidlc/testdata/bits.test.fidl",
       "data": "test.bits",
-      "start_offset": 8,
-      "end_offset": 17
+      "start_offset": 36,
+      "end_offset": 45
     }
   ],
   "using_declarations": [],

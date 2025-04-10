@@ -1,3 +1,4 @@
+// [START bindings_example]
 library test.bits;
 
 type MyBits = strict bits : uint32 {
@@ -6,6 +7,7 @@ type MyBits = strict bits : uint32 {
     // check for any collisions between the bitmask and a "mask" member
     MASK = 4;
 };
+// [END bindings_example]
 
 type StrictBits = strict bits : uint64 {
     SMALLEST = 1;

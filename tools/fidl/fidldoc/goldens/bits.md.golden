@@ -15,7 +15,7 @@
 ### EmptyBits [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#EmptyBits data-text="EmptyBits"}
 Type: <code>uint32</code>
 
-*Defined in [test.bits/bits.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/bits.test.fidl;l=20)*
+*Defined in [test.bits/bits.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/bits.test.fidl;l=22)*
 
 <table>
     <tr><th>Name</th><th>Value</th><th>Description</th></tr>
@@ -24,7 +24,7 @@ Type: <code>uint32</code>
 ### FlexibleBits [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#FlexibleBits data-text="FlexibleBits"}
 Type: <code>uint64</code>
 
-*Defined in [test.bits/bits.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/bits.test.fidl;l=15)*
+*Defined in [test.bits/bits.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/bits.test.fidl;l=17)*
 
 <table>
     <tr><th>Name</th><th>Value</th><th>Description</th></tr>
@@ -43,7 +43,7 @@ Type: <code>uint64</code>
 ### MyBits [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#MyBits data-text="MyBits"}
 Type: <code>uint32</code>
 
-*Defined in [test.bits/bits.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/bits.test.fidl;l=3)*
+*Defined in [test.bits/bits.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/bits.test.fidl;l=4)*
 
 <table>
     <tr><th>Name</th><th>Value</th><th>Description</th></tr>
@@ -67,7 +67,7 @@ Type: <code>uint32</code>
 ### StrictBits [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#StrictBits data-text="StrictBits"}
 Type: <code>uint64</code>
 
-*Defined in [test.bits/bits.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/bits.test.fidl;l=10)*
+*Defined in [test.bits/bits.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/bits.test.fidl;l=12)*
 
 <table>
     <tr><th>Name</th><th>Value</th><th>Description</th></tr>

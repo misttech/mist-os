@@ -83,7 +83,9 @@ class TestEchoer(ffx.EchoServer):
         self, request: ffx.EchoEchoStringRequest
     ) -> ffx.EchoEchoStringResponse:
         return ffx.EchoEchoStringResponse(response=request.value)
-        # [END echo_server_impl]
+
+
+# [END echo_server_impl]
 
 
 class AsyncEchoer(ffx.EchoServer):

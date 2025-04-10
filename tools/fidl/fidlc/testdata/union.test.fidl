@@ -1,3 +1,4 @@
+// [START bindings_example]
 library test.union;
 
 type Pizza = struct {
@@ -12,6 +13,7 @@ type PizzaOrPasta = strict union {
     1: pizza Pizza;
     2: pasta Pasta;
 };
+// [END bindings_example]
 
 type ExplicitPizzaOrPasta = strict union {
     1: pizza Pizza;
