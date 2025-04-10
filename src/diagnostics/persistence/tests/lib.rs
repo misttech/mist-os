@@ -47,10 +47,10 @@ static KEY_FROM_INSPECT_SOURCE: &str = "integer_1";
 pub(crate) const TEST_PERSISTENCE_SERVICE_NAME: &str =
     "fuchsia.diagnostics.persist.DataPersistence-test-service";
 
-enum Published {
+enum Published<'a> {
     Waiting,
     Empty,
-    Int(i32),
+    Int(&'a str, i32),
     SizeError,
 }
 
@@ -143,7 +143,7 @@ async fn diagnostics_persistence_integration() {
     let realm = realm.restart().await;
     verify_diagnostics_persistence_publication(Published::Waiting).await;
     realm.set_update_completed().await;
-    verify_diagnostics_persistence_publication(Published::Int(42)).await;
+    verify_diagnostics_persistence_publication(Published::Int("test-component-metric", 42)).await;
     expect_file_change(FileChange {
         old: FileState::None,
         new: FileState::None,
@@ -564,7 +564,7 @@ fn collapse_realm_builder_strings(data: &str) -> String {
 }
 
 /// Verify that the expected data is published by Persistence in its Inspect hierarchy.
-async fn verify_diagnostics_persistence_publication(published: Published) {
+async fn verify_diagnostics_persistence_publication<'a>(published: Published<'a>) {
     let mut inspect_fetcher = ArchiveReader::inspect();
     inspect_fetcher.retry(RetryConfig::never());
     inspect_fetcher.add_selector("realm_builder*/persistence:root");
@@ -622,7 +622,7 @@ fn expected_size_error() -> String {
     .to_string()
 }
 
-fn expected_diagnostics_persistence_inspect(published: Published) -> String {
+fn expected_diagnostics_persistence_inspect<'a>(published: Published<'a>) -> String {
     let variant = match published {
         Published::Waiting => "".to_string(),
         Published::Empty => r#""published":0,"persist":{}"#.to_string(),
@@ -635,20 +635,21 @@ fn expected_diagnostics_persistence_inspect(published: Published) -> String {
             }
             "#
         .replace("%SIZE_ERROR%", &expected_size_error()),
-        Published::Int(number) => {
+        Published::Int(tag, number) => {
             let number_str = number.to_string();
+            let persist_size = 96 + number_str.len();
             r#"
                 "published":0,
                 "persist": {
                     "test-service": {
-                        "test-component-metric": {
+                        "%TAG%": {
                             "@timestamps": {
                                 "before_utc":0,
                                 "after_utc":0,
                                 "before_monotonic":0,
                                 "after_monotonic":0
                             },
-                            "@persist_size": 98,
+                            "@persist_size": %PERSIST_SIZE%,
                             "realm_builder/single_counter": {
                                 "samples": {
                                     "optional": %NUMBER%,
@@ -659,6 +660,8 @@ fn expected_diagnostics_persistence_inspect(published: Published) -> String {
                     }
                 }
             "#
+            .replace("%TAG%", tag)
+            .replace("%PERSIST_SIZE%", &persist_size.to_string())
             .replace("%NUMBER%", &number_str)
         }
     };
