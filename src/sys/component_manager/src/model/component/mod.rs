@@ -692,6 +692,9 @@ impl ComponentInstance {
                 );
                 if !shut_down && !cleanly_stopped && self.on_terminate == fdecl::OnTerminate::Reboot
                 {
+                    // This log message is load-bearing server-side as it's used to extract the
+                    // critical component responsible for the reboot.
+                    // Please notify //src/developer/forensics/OWNERS upon changing.
                     warn!(
                         "Component with on_terminate=REBOOT terminated uncleanly: {} {:?}. \
                             Rebooting the system",
