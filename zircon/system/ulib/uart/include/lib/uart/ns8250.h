@@ -292,21 +292,13 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig, IoRegType
     return std::nullopt;
   }
 
-  static std::optional<Config<DriverImpl>> TryMatch(std::string_view str) {
+  static std::optional<Config<DriverImpl>> TryMatch(std::string_view string) {
     if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_I8250_PIO_UART) {
-      if (str == "legacy") {
+      if (string == "legacy") {
         return Config<DriverImpl>{kLegacyConfig};
       }
     }
-    return Base::TryMatch(str);
-  }
-
-  template <typename... Args>
-  static std::optional<DriverImpl> MaybeCreate(Args&&... args) {
-    if (std::optional config = TryMatch(std::forward<Args>(args)...)) {
-      return DriverImpl{*config};
-    }
-    return std::nullopt;
+    return Base::TryMatch(string);
   }
 
   template <typename... Args>

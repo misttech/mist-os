@@ -270,67 +270,71 @@ acpi_lite::AcpiDebugPortDescriptor kPioDebugPort = {
 };
 
 template <typename T, bool Matches, typename U>
-void CheckMaybeCreateFromAcpi(const U& debug_port) {
-  auto driver = T::MaybeCreate(debug_port);
+void CheckTryMatchFromAcpi(const U& debug_port) {
+  using ConfigType = uart::Config<T>;
+  std::optional<ConfigType> driver_config = T::TryMatch(debug_port);
 
   if constexpr (Matches) {
-    ASSERT_TRUE(driver);
-    if constexpr (std::is_same_v<decltype(driver->config()), zbi_dcfg_simple_t>) {
-      EXPECT_EQ(driver->config().mmio_phys, debug_port.address);
+    ASSERT_TRUE(driver_config);
+    auto config = **driver_config;
+    if constexpr (std::is_same_v<typename ConfigType::config_type, zbi_dcfg_simple_t>) {
+      EXPECT_EQ(config.mmio_phys, debug_port.address);
     }
 
-    if constexpr (std::is_same_v<decltype(driver->config()), zbi_dcfg_simple_pio_t>) {
-      EXPECT_EQ(driver->config().base, debug_port.address);
+    if constexpr (std::is_same_v<typename ConfigType::config_type, zbi_dcfg_simple_pio_t>) {
+      EXPECT_EQ(config.base, debug_port.address);
     }
   } else {
-    ASSERT_FALSE(driver);
+    ASSERT_FALSE(driver_config);
   }
 }
 
 TEST(ParsingTests, Ns8250MmioDriver) {
   {
-    auto driver = uart::ns8250::Mmio32Driver::MaybeCreate(kX86 ? "mmio,0xa,0xb" : "ns8250,0xa,0xb");
-    using uart_t = std::decay_t<decltype(*driver)>;
-    ASSERT_TRUE(driver.has_value());
-    EXPECT_STREQ(kX86 ? "mmio" : "ns8250", uart_t::kConfigName);
-    const zbi_dcfg_simple_t& config = driver->config();
+    auto driver_config =
+        uart::ns8250::Mmio32Driver::TryMatch(kX86 ? "mmio,0xa,0xb" : "ns8250,0xa,0xb");
+    ASSERT_TRUE(driver_config.has_value());
+    using ConfigType = std::decay_t<decltype(*driver_config)>;
+
+    EXPECT_STREQ(kX86 ? "mmio" : "ns8250", ConfigType::uart_type::kConfigName);
+    const zbi_dcfg_simple_t& config = **driver_config;
     EXPECT_EQ(0xa, config.mmio_phys);
     EXPECT_EQ(0xb, config.irq);
     EXPECT_EQ(0, config.flags);
   }
   {
-    auto driver =
-        uart::ns8250::Mmio32Driver::MaybeCreate(kX86 ? "mmio,0xa,0xb,0xc" : "ns8250,0xa,0xb,0xc");
-    using uart_t = std::decay_t<decltype(*driver)>;
-    ASSERT_TRUE(driver.has_value());
-    EXPECT_STREQ(kX86 ? "mmio" : "ns8250", uart_t::kConfigName);
-    const zbi_dcfg_simple_t& config = driver->config();
+    auto driver_config =
+        uart::ns8250::Mmio32Driver::TryMatch(kX86 ? "mmio,0xa,0xb,0xc" : "ns8250,0xa,0xb,0xc");
+
+    ASSERT_TRUE(driver_config.has_value());
+    using ConfigType = std::decay_t<decltype(*driver_config)>;
+
+    EXPECT_STREQ(kX86 ? "mmio" : "ns8250", ConfigType::uart_type::kConfigName);
+    const zbi_dcfg_simple_t& config = **driver_config;
     EXPECT_EQ(0xa, config.mmio_phys);
     EXPECT_EQ(0xb, config.irq);
     EXPECT_EQ(0xc, config.flags);
   }
-  CheckMaybeCreateFromAcpi<uart::ns8250::Mmio32Driver, true>(kMmioDebugPort);
-  CheckMaybeCreateFromAcpi<uart::ns8250::Mmio32Driver, false>(kPioDebugPort);
+  CheckTryMatchFromAcpi<uart::ns8250::Mmio32Driver, true>(kMmioDebugPort);
+  CheckTryMatchFromAcpi<uart::ns8250::Mmio32Driver, false>(kPioDebugPort);
 }
 
 TEST(ParsingTests, Ns82508BMmioDriver) {
   {
-    auto driver = uart::ns8250::Mmio8Driver::MaybeCreate("ns8250-8bit,0xa,0xb");
-    using uart_t = std::decay_t<decltype(*driver)>;
-    ASSERT_TRUE(driver.has_value());
-    EXPECT_STREQ("ns8250-8bit", uart_t::kConfigName);
-    const zbi_dcfg_simple_t& config = driver->config();
+    std::optional<uart::Config<uart::ns8250::Mmio8Driver>> driver_config =
+        uart::ns8250::Mmio8Driver::TryMatch("ns8250-8bit,0xa,0xb");
+    ASSERT_TRUE(driver_config.has_value());
+    zbi_dcfg_simple_t config = **driver_config;
     EXPECT_EQ(0xa, config.mmio_phys);
     EXPECT_EQ(0xb, config.irq);
     EXPECT_EQ(0, config.flags);
   }
 
   {
-    auto driver = uart::ns8250::Mmio8Driver::MaybeCreate("ns8250-8bit,0xa,0xb,0xc");
-    using uart_t = std::decay_t<decltype(*driver)>;
-    ASSERT_TRUE(driver.has_value());
-    EXPECT_STREQ("ns8250-8bit", uart_t::kConfigName);
-    const zbi_dcfg_simple_t& config = driver->config();
+    std::optional<uart::Config<uart::ns8250::Mmio8Driver>> driver_config =
+        uart::ns8250::Mmio8Driver::TryMatch("ns8250-8bit,0xa,0xb,0xc");
+    ASSERT_TRUE(driver_config.has_value());
+    zbi_dcfg_simple_t config = **driver_config;
     EXPECT_EQ(0xa, config.mmio_phys);
     EXPECT_EQ(0xb, config.irq);
     EXPECT_EQ(0xc, config.flags);
@@ -338,60 +342,65 @@ TEST(ParsingTests, Ns82508BMmioDriver) {
 }
 
 TEST(ParsingTests, Ns8250PioDriver) {
-  auto driver = uart::ns8250::PioDriver::MaybeCreate("ioport,0xa,0xb");
-  using uart_t = std::decay_t<decltype(*driver)>;
-  ASSERT_TRUE(driver.has_value());
-  EXPECT_STREQ("ioport", uart_t::kConfigName);
-  const zbi_dcfg_simple_pio_t& config = driver->config();
+  std::optional<uart::Config<uart::ns8250::PioDriver>> driver_config =
+      uart::ns8250::PioDriver::TryMatch("ioport,0xa,0xb");
+
+  ASSERT_TRUE(driver_config.has_value());
+  zbi_dcfg_simple_pio_t config = **driver_config;
   EXPECT_EQ(0xa, config.base);
   EXPECT_EQ(0xb, config.irq);
+  EXPECT_EQ(0, config.reserved);
 
-  CheckMaybeCreateFromAcpi<uart::ns8250::PioDriver, false>(kMmioDebugPort);
-  CheckMaybeCreateFromAcpi<uart::ns8250::PioDriver, true>(kPioDebugPort);
+  CheckTryMatchFromAcpi<uart::ns8250::PioDriver, false>(kMmioDebugPort);
+  CheckTryMatchFromAcpi<uart::ns8250::PioDriver, true>(kPioDebugPort);
 }
 
 TEST(ParsingTests, Ns8250LegacyDriver) {
-  auto driver = uart::ns8250::PioDriver::MaybeCreate("legacy");
-  using uart_t = std::decay_t<decltype(*driver)>;
-  ASSERT_TRUE(driver.has_value());
-  EXPECT_STREQ("ioport", uart_t::kConfigName);
-  const zbi_dcfg_simple_pio_t& config = driver->config();
+  std::optional driver_config = uart::ns8250::PioDriver::TryMatch("legacy");
+  using ConfigType = std::decay_t<decltype(*driver_config)>;
+  ASSERT_TRUE(driver_config.has_value());
+
+  EXPECT_STREQ("ioport", ConfigType::uart_type::kConfigName);
+  const zbi_dcfg_simple_pio_t& config = **driver_config;
   EXPECT_EQ(0x3f8, config.base);
   EXPECT_EQ(4, config.irq);
 }
 
 TEST(ParsingTests, Pl011Driver) {
   {
-    auto driver = uart::pl011::Driver::MaybeCreate("pl011,0xa,0xb");
-    using uart_t = std::decay_t<decltype(*driver)>;
-    ASSERT_TRUE(driver.has_value());
-    EXPECT_STREQ("pl011", uart_t::kConfigName);
-    const zbi_dcfg_simple_t& config = driver->config();
+    std::optional driver_config = uart::pl011::Driver::TryMatch("pl011,0xa,0xb");
+    using ConfigType = std::decay_t<decltype(*driver_config)>;
+    ASSERT_TRUE(driver_config.has_value());
+
+    EXPECT_STREQ("pl011", ConfigType::uart_type::kConfigName);
+    const zbi_dcfg_simple_t& config = **driver_config;
     EXPECT_EQ(0xa, config.mmio_phys);
     EXPECT_EQ(0xb, config.irq);
     EXPECT_EQ(0, config.flags);
   }
   {
-    auto driver = uart::pl011::Driver::MaybeCreate("pl011,0xa,0xb,0xc");
-    using uart_t = std::decay_t<decltype(*driver)>;
-    ASSERT_TRUE(driver.has_value());
-    EXPECT_STREQ("pl011", uart_t::kConfigName);
-    const zbi_dcfg_simple_t& config = driver->config();
+    std::optional driver_config = uart::pl011::Driver::TryMatch("pl011,0xa,0xb,0xc");
+    using ConfigType = std::decay_t<decltype(*driver_config)>;
+    ASSERT_TRUE(driver_config.has_value());
+
+    EXPECT_STREQ("pl011", ConfigType::uart_type::kConfigName);
+    const zbi_dcfg_simple_t& config = **driver_config;
     EXPECT_EQ(0xa, config.mmio_phys);
     EXPECT_EQ(0xb, config.irq);
     EXPECT_EQ(0xc, config.flags);
   }
 
-  CheckMaybeCreateFromAcpi<uart::pl011::Driver, false>(kMmioDebugPort);
-  CheckMaybeCreateFromAcpi<uart::pl011::Driver, false>(kPioDebugPort);
+  CheckTryMatchFromAcpi<uart::pl011::Driver, false>(kMmioDebugPort);
+  CheckTryMatchFromAcpi<uart::pl011::Driver, false>(kPioDebugPort);
 }
 
 TEST(ParsingTests, Pl011QemuDriver) {
-  auto driver = uart::pl011::Driver::MaybeCreate("qemu");
-  using uart_t = std::decay_t<decltype(*driver)>;
-  ASSERT_TRUE(driver.has_value());
-  EXPECT_STREQ("pl011", uart_t::kConfigName);
-  const zbi_dcfg_simple_t& config = driver->config();
+  std::optional driver_config = uart::pl011::Driver::TryMatch("qemu");
+  using ConfigType = std::decay_t<decltype(*driver_config)>;
+  ASSERT_TRUE(driver_config.has_value());
+
+  EXPECT_STREQ("pl011", ConfigType::uart_type::kConfigName);
+  const zbi_dcfg_simple_t& config = **driver_config;
   EXPECT_EQ(0x09000000, config.mmio_phys);
   EXPECT_EQ(33, config.irq);
   EXPECT_EQ(ZBI_KERNEL_DRIVER_IRQ_FLAGS_LEVEL_TRIGGERED | ZBI_KERNEL_DRIVER_IRQ_FLAGS_POLARITY_HIGH,
@@ -400,29 +409,31 @@ TEST(ParsingTests, Pl011QemuDriver) {
 
 TEST(ParsingTests, AmlogicDriver) {
   {
-    auto driver = uart::amlogic::Driver::MaybeCreate("amlogic,0xa,0xb");
-    using uart_t = std::decay_t<decltype(*driver)>;
-    ASSERT_TRUE(driver.has_value());
-    EXPECT_STREQ("amlogic", uart_t::kConfigName);
-    const zbi_dcfg_simple_t& config = driver->config();
+    std::optional driver_config = uart::amlogic::Driver::TryMatch("amlogic,0xa,0xb");
+    using ConfigType = std::decay_t<decltype(*driver_config)>;
+    ASSERT_TRUE(driver_config.has_value());
+
+    EXPECT_STREQ("amlogic", ConfigType::uart_type::kConfigName);
+    const zbi_dcfg_simple_t& config = **driver_config;
     EXPECT_EQ(0xa, config.mmio_phys);
     EXPECT_EQ(0xb, config.irq);
     EXPECT_EQ(0, config.flags);
   }
 
   {
-    auto driver = uart::amlogic::Driver::MaybeCreate("amlogic,0xa,0xb,0xc");
-    using uart_t = std::decay_t<decltype(*driver)>;
-    ASSERT_TRUE(driver.has_value());
-    EXPECT_STREQ("amlogic", uart_t::kConfigName);
-    const zbi_dcfg_simple_t& config = driver->config();
+    std::optional driver_config = uart::amlogic::Driver::TryMatch("amlogic,0xa,0xb,0xc");
+    using ConfigType = std::decay_t<decltype(*driver_config)>;
+    ASSERT_TRUE(driver_config.has_value());
+
+    EXPECT_STREQ("amlogic", ConfigType::uart_type::kConfigName);
+    const zbi_dcfg_simple_t& config = **driver_config;
     EXPECT_EQ(0xa, config.mmio_phys);
     EXPECT_EQ(0xb, config.irq);
     EXPECT_EQ(0xc, config.flags);
   }
 
-  CheckMaybeCreateFromAcpi<uart::amlogic::Driver, false>(kMmioDebugPort);
-  CheckMaybeCreateFromAcpi<uart::amlogic::Driver, false>(kPioDebugPort);
+  CheckTryMatchFromAcpi<uart::amlogic::Driver, false>(kMmioDebugPort);
+  CheckTryMatchFromAcpi<uart::amlogic::Driver, false>(kPioDebugPort);
 }
 
 }  // namespace

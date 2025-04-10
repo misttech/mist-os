@@ -253,39 +253,6 @@ class DriverBase {
     return {};
   }
 
-  // API to match a ZBI item describing this UART and instantiate a Driver directly.
-  //
-  // TODO(https://fxbug.dev/409114044): Remove this after all matching is done through config,
-  // then just initialize the driver from the configuration.
-  static std::optional<Driver> MaybeCreate(const zbi_header_t& header, const void* payload) {
-    if (auto config = TryMatch(header, payload)) {
-      return Driver{*config};
-    }
-    return std::nullopt;
-  }
-
-  // API to match a ZBI item describing this UART and instantiate a Driver directly.
-  //
-  // TODO(https://fxbug.dev/409114044): Remove this after all matching is done through config,
-  // then just initialize the driver from the configuration.
-  static std::optional<Driver> MaybeCreate(std::string_view str) {
-    if (auto config = TryMatch(str)) {
-      return Driver{*config};
-    }
-    return std::nullopt;
-  }
-
-  // API to match a ZBI item describing this UART and instantiate a Driver directly.
-  //
-  // TODO(https://fxbug.dev/409114044): Remove this after all matching is done through config,
-  // then just initialize the driver from the configuration.
-  static std::optional<Driver> MaybeCreate(const acpi_lite::AcpiDebugPortDescriptor& debug_port) {
-    if (auto config = TryMatch(debug_port)) {
-      return Driver{*config};
-    }
-    return std::nullopt;
-  }
-
   // API to match a devicetree bindings.
   static bool MatchDevicetree(const devicetree::PropertyDecoder& decoder) {
     if constexpr (Driver::kDevicetreeBindings.size() == 0) {
