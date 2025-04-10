@@ -13,7 +13,6 @@ cc_library(
     ],
     hdrs = [
         "globally-ordered-region.h",
-        "mock-mmio-range.h",
         "region.h",
         "register.h",
     ],
