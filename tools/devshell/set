@@ -156,8 +156,8 @@ function main {
   done
 
   if [[ "$(uname)" == [Dd]arwin ]]; then
-    fx-warn "Building Fuchsia on macOS is not officially supported."
-    fx-warn "Please see http://go/local-platform-support-prd for details."
+    fx-error "Building Fuchsia on macOS is not supported and will be removed soon."
+    fx-error "Please see http://go/local-platform-support-prd for details."
   fi
 
   # Cache the compiled executable for later invocations.

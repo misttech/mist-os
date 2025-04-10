@@ -218,8 +218,9 @@ function main {
   done
 
   if [[ "${HOST_OS}" == "mac" ]]; then
-    fx-warn "Building Fuchsia on macOS is not officially supported."
-    fx-warn "Please see http://go/local-platform-support-prd for details."
+    fx-error "Building Fuchsia on macOS is not supported and will be removed soon."
+    fx-error "Please see http://go/local-platform-support-prd for details."
+    exit 1
   fi
 
   if [[ -n "${fint_params_path}" ]]; then
