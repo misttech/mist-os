@@ -86,6 +86,26 @@
       "short": null,
       "description": "outputs the exact byte sizes, as opposed to a human-friendly format. Does not impact machine oriented outputs, such as CSV and JSON outputs.",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--stdin-input",
+      "short": null,
+      "description": "loads the unprocessed memory information as json from stdin.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "backend"
+        }
+      },
+      "optionality": "optional",
+      "long": "--backend",
+      "short": null,
+      "description": "selects where to read the memory information from. 'default', 'memory_monitor_1', or 'memory_monitor_2' are supported.",
+      "hidden": false
     }
   ],
   "notes": [],

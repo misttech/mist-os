@@ -16,22 +16,28 @@ use crate::write_human_readable_output::write_human_readable_output;
 use anyhow::Result;
 use async_trait::async_trait;
 use digest::{processed, raw};
-use ffx_profile_memory_args::MemoryCommand;
+use errors::ffx_bail;
+use ffx_optional_moniker::optional_moniker;
+use ffx_profile_memory_args::{Backend, MemoryCommand};
+use ffx_profile_memory_components::MemoryComponentsTool;
+use ffx_profile_memory_components_args::ComponentsCommand;
 use ffx_writer::{MachineWriter, ToolIO};
 use fho::{FfxMain, FfxTool};
+use fidl_fuchsia_memory_attribution_plugin as attribution_plugin;
 use fidl_fuchsia_memory_inspection::CollectorProxy;
 use futures::AsyncReadExt;
 use plugin_output::ProfileMemoryOutput;
 use std::io::Write;
 use std::time::Duration;
-use target_holders::moniker;
 
 #[derive(FfxTool)]
 pub struct MemoryTool {
     #[command]
     cmd: MemoryCommand,
-    #[with(moniker("/core/memory_monitor"))]
-    collector_proxy: CollectorProxy,
+    #[with(optional_moniker("/core/memory_monitor"))]
+    memory_monitor1: Option<CollectorProxy>,
+    #[with(optional_moniker("/core/memory_monitor2"))]
+    memory_monitor2: Option<attribution_plugin::MemoryMonitorProxy>,
 }
 
 fho::embedded_plugin!(MemoryTool);
@@ -41,8 +47,49 @@ impl FfxMain for MemoryTool {
     type Writer = MachineWriter<ProfileMemoryOutput>;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        plugin_entrypoint(&self.collector_proxy, self.cmd, writer).await?;
-        Ok(())
+        match (&self.cmd.backend, self.memory_monitor1, self.memory_monitor2) {
+            (Backend::MemoryMonitor1, Some(mm1), _) | (Backend::Default, Some(mm1), _) => {
+                plugin_entrypoint(&mm1, self.cmd, writer).await?;
+                Ok(())
+            }
+            (Backend::MemoryMonitor2, _, Some(mm2)) | (Backend::Default, _, Some(mm2)) => {
+                if !self.cmd.process_koids.is_empty() {
+                    ffx_bail!(
+                        "`--process_koids` argument not supported by memory_monitor_2 backend."
+                    );
+                }
+                if !self.cmd.process_names.is_empty() {
+                    ffx_bail!(
+                        "`--process_names` argument not supported by memory_monitor_2 backend."
+                    );
+                }
+                if let Some(_) = self.cmd.interval {
+                    ffx_bail!("`--interval` argument not supported by memory_monitor_2 backend.");
+                }
+                if self.cmd.buckets {
+                    ffx_bail!("`--buckets` argument not supported by memory_monitor_2 backend.");
+                }
+
+                if self.cmd.undigested {
+                    ffx_bail!("`--undigested` argument not supported by memory_monitor_2 backend.");
+                }
+                if self.cmd.exact_sizes {
+                    ffx_bail!(
+                        "`--exact_sizes` argument not supported by memory_monitor_2 backend."
+                    );
+                }
+                let tool = MemoryComponentsTool {
+                    cmd: ComponentsCommand {
+                        stdin_input: self.cmd.stdin_input,
+                        debug_json: self.cmd.debug_json,
+                        csv: self.cmd.csv,
+                    },
+                    monitor_proxy: mm2,
+                };
+                tool.run(writer).await
+            }
+            _ => ffx_bail!("Unable to connect to memory_monitor"),
+        }
     }
 }
 

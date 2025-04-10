@@ -14,7 +14,7 @@ use attribution_processing::summary::MemorySummary;
 use attribution_processing::{AttributionData, Principal, Resource};
 use errors::ffx_error;
 use ffx_profile_memory_components_args::ComponentsCommand;
-use ffx_writer::{SimpleWriter, ToolIO as _};
+use ffx_writer::{SimpleWriter, ToolIO};
 use fho::{AvailabilityFlag, FfxMain, FfxTool};
 use futures::AsyncReadExt;
 use json::JsonConvertible;
@@ -26,9 +26,9 @@ use fidl_fuchsia_memory_attribution_plugin as fplugin;
 #[check(AvailabilityFlag("ffx_profile_memory_components"))]
 pub struct MemoryComponentsTool {
     #[command]
-    cmd: ComponentsCommand,
+    pub cmd: ComponentsCommand,
     #[with(moniker("/core/memory_monitor2"))]
-    monitor_proxy: fplugin::MemoryMonitorProxy,
+    pub monitor_proxy: fplugin::MemoryMonitorProxy,
 }
 
 fho::embedded_plugin!(MemoryComponentsTool);
@@ -39,7 +39,13 @@ impl FfxMain for MemoryComponentsTool {
 
     /// Forwards the specified memory pressure level to the fuchsia.memory.debug.MemoryPressure FIDL
     /// interface.
-    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+        self.run(writer).await
+    }
+}
+
+impl MemoryComponentsTool {
+    pub async fn run(&self, mut writer: impl ToolIO) -> fho::Result<()> {
         let snapshot = match self.cmd.stdin_input {
             false => self.load_from_device().await?,
             true => {
@@ -57,9 +63,7 @@ impl FfxMain for MemoryComponentsTool {
         }
         Ok(())
     }
-}
 
-impl MemoryComponentsTool {
     async fn load_from_device(&self) -> fho::Result<fplugin::Snapshot> {
         let (client_end, server_end) = fidl::Socket::create_stream();
         let mut client_socket = fidl::AsyncSocket::from_socket(client_end);

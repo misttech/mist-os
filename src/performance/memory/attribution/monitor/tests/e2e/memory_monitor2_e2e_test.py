@@ -9,10 +9,12 @@ The test it verifies the features are availability, but does not verify the data
 import json
 import re
 import time
+import unittest
 from pathlib import Path
 
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.fuchsia_device import fuchsia_device
+from honeydew.transports.ffx import errors as ffx_errors
 from mobly import asserts, test_runner
 from trace_processing import trace_importing, trace_model, trace_utils
 
@@ -159,6 +161,43 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
                 "memory_stall",
             },
         )
+
+    def test_memory_monitor2_report(self) -> None:
+        profile = self.dut.ffx.run(
+            [
+                "profile",
+                "memory",
+                "--backend",
+                "memory_monitor_2",
+            ],
+            log_output=False,
+        )
+        # Verifies that the report comes from memory_monitor2.
+        assertContainsRegex(r"(?m)^ Principal name:", profile)
+
+    def test_memory_monitor2_incompatible_args(self) -> None:
+        INCOMPATIBLE_ARGS_LIST: list[list[str]] = [
+            ["--process_koids", "123"],
+            ["--process_names", "123"],
+            ["--interval", "123"],
+            ["--buckets"],
+            ["--undigested"],
+            ["--exact_sizes"],
+        ]
+        for incompatible_args in INCOMPATIBLE_ARGS_LIST:
+            with unittest.TestCase.assertRaises(
+                self, ffx_errors.FfxCommandError
+            ):
+                self.dut.ffx.run(
+                    [
+                        "profile",
+                        "memory",
+                        "--backend",
+                        "memory_monitor_2",
+                    ]
+                    + incompatible_args,
+                    log_output=False,
+                )
 
 
 if __name__ == "__main__":

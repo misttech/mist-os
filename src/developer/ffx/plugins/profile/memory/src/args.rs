@@ -2,9 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{bail, Result};
 use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 use ffx_profile_memory_sub_command::SubCommand;
+use std::str::FromStr;
+
+#[derive(Debug, PartialEq)]
+pub enum Backend {
+    // Read from memory monitor 1 if available, and fallback to memory monitor 2.
+    Default,
+    // Read memory monitor or fail. This is legacy behavior.
+    MemoryMonitor1,
+    // Read memory monitor or fail.
+    MemoryMonitor2,
+}
+impl FromStr for Backend {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self> {
+        match s.to_lowercase().as_str() {
+            "default" => Ok(Backend::Default),
+            "memory_monitor_1" => Ok(Backend::MemoryMonitor1),
+            "memory_monitor_2" => Ok(Backend::MemoryMonitor2),
+            _ => bail!("Unable to parse backend: {}. Value should be one of 'default', 'memory_monitor_1', or 'memory_monitor_2'.", s),
+        }
+    }
+}
 
 #[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -51,4 +74,15 @@ pub struct MemoryCommand {
         description = "outputs the exact byte sizes, as opposed to a human-friendly format. Does not impact machine oriented outputs, such as CSV and JSON outputs."
     )]
     pub exact_sizes: bool,
+
+    #[argh(switch, description = "loads the unprocessed memory information as json from stdin.")]
+    pub stdin_input: bool,
+
+    #[argh(
+        option,
+        default = "Backend::Default",
+        long = "backend",
+        description = "selects where to read the memory information from. 'default', 'memory_monitor_1', or 'memory_monitor_2' are supported."
+    )]
+    pub backend: Backend,
 }
