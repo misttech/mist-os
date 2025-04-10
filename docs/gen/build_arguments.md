@@ -1086,7 +1086,7 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
@@ -6518,7 +6518,7 @@ at worst, or incorrect log attribution at best.
 
 **Current value (from the default):** `false`
 
-From //src/storage/lib/vfs/rust/BUILD.gn:15
+From //src/storage/lib/vfs/rust/BUILD.gn:16
 
 ### vim3_mcu_fan_default_level
 
