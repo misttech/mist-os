@@ -12,6 +12,8 @@
 
 #include <vector>
 
+#include <src/lib/diagnostics/log/message/rust/cpp-log-decoder/log_decoder.h>
+
 namespace diagnostics::accessor2logger {
 
 // Prints formatted content to the log.
@@ -23,6 +25,10 @@ ConvertFormattedContentToLogMessages(fuchsia::diagnostics::FormattedContent cont
 // verbosity relative to the default severity and can be thought of
 // as incrementally "more vebose than" the baseline.
 fuchsia_logging::RawLogSeverity GetSeverityFromVerbosity(uint8_t verbosity);
+
+fpromise::result<std::vector<fpromise::result<fuchsia::logger::LogMessage, std::string>>,
+                 std::string>
+ConvertFormattedFXTToLogMessages(uint8_t* data, size_t size, bool expect_extended_attribution);
 
 }  // namespace diagnostics::accessor2logger
 

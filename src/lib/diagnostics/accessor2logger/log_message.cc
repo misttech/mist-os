@@ -17,8 +17,9 @@
 #include <src/lib/diagnostics/accessor2logger/log_message.h>
 #include <src/lib/fsl/vmo/strings.h>
 
+#include "src/lib/diagnostics/log/message/rust/cpp-log-decoder/log_decoder_api.h"
+
 using fuchsia::diagnostics::FormattedContent;
-using fuchsia::logger::LogMessage;
 
 namespace diagnostics::accessor2logger {
 
@@ -65,8 +66,9 @@ std::string GetComponentName(const std::string& moniker) {
   return moniker.substr(pos + 1);
 }
 
-inline fpromise::result<LogMessage, std::string> JsonToLogMessage(rapidjson::Value& value) {
-  LogMessage ret = {};
+inline fpromise::result<fuchsia::logger::LogMessage, std::string> JsonToLogMessage(
+    rapidjson::Value& value) {
+  fuchsia::logger::LogMessage ret = {};
   std::stringstream kv_mapping;
 
   if (!value.IsObject()) {
@@ -259,42 +261,65 @@ inline fpromise::result<LogMessage, std::string> JsonToLogMessage(rapidjson::Val
 
   return fpromise::ok(std::move(ret));
 }
+
 }  // namespace
 
 fpromise::result<std::vector<fpromise::result<fuchsia::logger::LogMessage, std::string>>,
                  std::string>
-ConvertFormattedContentToLogMessages(FormattedContent content) {
-  std::vector<fpromise::result<LogMessage, std::string>> output;
-
-  if (!content.is_json()) {
-    // Expecting JSON in all cases.
-    return fpromise::error("Expected json content");
+ConvertFormattedFXTToLogMessages(uint8_t* data, size_t size, bool expect_extended_attribution) {
+  auto log_messages =
+      fuchsia_decode_log_messages_to_struct(data, size, expect_extended_attribution);
+  std::vector<fpromise::result<fuchsia::logger::LogMessage, std::string>> output;
+  output.reserve(log_messages.messages.len);
+  for (size_t i = 0; i < log_messages.messages.len; i++) {
+    auto msg = log_messages.messages.ptr[i];
+    output.emplace_back(log_tester::ToFidlLogMessage(msg));
   }
-
-  std::string data;
-  if (!fsl::StringFromVmo(content.json(), &data)) {
-    return fpromise::error("Failed to read string from VMO");
-  }
-  content.json().vmo.reset();
-
-  rapidjson::Document d;
-  d.Parse(std::move(data));
-  if (d.HasParseError()) {
-    std::string error = "Failed to parse content as JSON. Offset " +
-                        std::to_string(d.GetErrorOffset()) + ": " +
-                        rapidjson::GetParseError_En(d.GetParseError());
-    return fpromise::error(std::move(error));
-  }
-
-  if (!d.IsArray()) {
-    return fpromise::error("Expected content to contain an array");
-  }
-
-  for (rapidjson::SizeType i = 0; i < d.Size(); ++i) {
-    output.emplace_back(JsonToLogMessage(d[i]));
-  }
-
+  fuchsia_free_log_messages(log_messages);
   return fpromise::ok(std::move(output));
+}
+
+fpromise::result<std::vector<fpromise::result<fuchsia::logger::LogMessage, std::string>>,
+                 std::string>
+ConvertFormattedContentToLogMessages(FormattedContent content) {
+  std::vector<fpromise::result<fuchsia::logger::LogMessage, std::string>> output;
+
+  if (content.is_fxt()) {
+    uint64_t size = 0;
+    content.fxt().get_prop_content_size(&size);
+    std::unique_ptr<unsigned char[]> data = std::make_unique<unsigned char[]>(size);
+    content.fxt().read(data.get(), 0, size);
+    auto ret = ConvertFormattedFXTToLogMessages(data.get(), size, true);
+    return ret;
+  } else if (content.is_json()) {
+    std::string data;
+    if (!fsl::StringFromVmo(content.json(), &data)) {
+      return fpromise::error("Failed to read string from VMO");
+    }
+    content.json().vmo.reset();
+
+    rapidjson::Document d;
+    d.Parse(std::move(data));
+    if (d.HasParseError()) {
+      std::string error = "Failed to parse content as JSON. Offset " +
+                          std::to_string(d.GetErrorOffset()) + ": " +
+                          rapidjson::GetParseError_En(d.GetParseError());
+      return fpromise::error(std::move(error));
+    }
+
+    if (!d.IsArray()) {
+      return fpromise::error("Expected content to contain an array");
+    }
+
+    for (rapidjson::SizeType i = 0; i < d.Size(); ++i) {
+      output.emplace_back(JsonToLogMessage(d[i]));
+    }
+
+    return fpromise::ok(std::move(output));
+  } else {
+    // Expecting JSON or FXT in all cases.
+    return fpromise::error("Expected json or FXT content");
+  }
 }
 
 fuchsia_logging::RawLogSeverity GetSeverityFromVerbosity(uint8_t verbosity) {
