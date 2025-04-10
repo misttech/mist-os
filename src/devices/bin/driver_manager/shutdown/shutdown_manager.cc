@@ -250,6 +250,9 @@ void ShutdownManager::OnBootShutdownComplete() {
 }
 
 void ShutdownManager::SignalPackageShutdown(fit::callback<void(zx_status_t)> cb) {
+  // Switch our logs to go to debuglog to ensure they are flushed and available in the crashlog.
+  driver_logger::GetLogger().SwitchToStdout();
+
   // Expected case: we get the call during kPackageStopping, or right before.
   // Store the completer for when we finish.
   if (shutdown_state_ == State::kRunning || shutdown_state_ == State::kPackageStopping) {

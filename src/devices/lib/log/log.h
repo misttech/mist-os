@@ -72,6 +72,8 @@ class Logger {
     return *this;
   }
 
+  void SwitchToStdout() { use_stdout_ = true; }
+
   // Gets the minimum severity of the logger
   FuchsiaLogSeverity GetSeverity() const { return severity_; }
 
@@ -95,6 +97,7 @@ class Logger {
   zx_koid_t pid_;
   std::vector<std::string> global_tags_;
   zx::socket socket_;
+  bool use_stdout_ = false;
 };
 
 // Creates a logger.
