@@ -43,7 +43,7 @@ void NodeShutdownCoordinator::Remove(std::shared_ptr<Node> node, RemovalSet remo
     if (!removal_tracker && node_shutdown_coordinator.removal_tracker_) {
       // TODO(https://fxbug.dev/42066485): Change this to an error when we track shutdown steps
       // better.
-      LOGF(WARNING, "Untracked Node::Remove() called on %s, indicating an error during shutdown",
+      LOGF(DEBUG, "Untracked Node::Remove() called on %s, indicating an error during shutdown",
            node->MakeTopologicalPath().c_str());
     }
 
@@ -60,7 +60,7 @@ void NodeShutdownCoordinator::Remove(std::shared_ptr<Node> node, RemovalSet remo
         (node_shutdown_coordinator.node_state() == NodeState::kPrestop &&
          removal_set == RemovalSet::kPackage)) {
       if (node->parents().size() <= 1) {
-        LOGF(WARNING, "Node::Remove() %s called late, already in state %s",
+        LOGF(DEBUG, "Node::Remove() %s called late, already in state %s",
              node->MakeComponentMoniker().c_str(), node_shutdown_coordinator.NodeStateAsString());
       }
       continue;

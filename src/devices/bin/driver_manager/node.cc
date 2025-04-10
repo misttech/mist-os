@@ -1499,7 +1499,7 @@ void Node::StopDriverComponent() {
                static_cast<int>(self->name_.size()), self->name_.data(), result->error_value());
         }
 
-        LOGF(INFO, "Destroyed driver component for %s", self->MakeComponentMoniker().c_str());
+        LOGF(DEBUG, "Destroyed driver component for %s", self->MakeComponentMoniker().c_str());
         self->driver_component_->state = DriverState::kStopped;
         self->GetNodeShutdownCoordinator().CheckNodeState();
       });
@@ -1518,7 +1518,7 @@ void Node::on_fidl_error(fidl::UnbindInfo info) {
   }
 
   if (GetNodeState() == NodeState::kWaitingOnDriver) {
-    LOGF(INFO, "Node: %s: realm channel had expected shutdown.", MakeComponentMoniker().c_str());
+    LOGF(DEBUG, "Node: %s: realm channel had expected shutdown.", MakeComponentMoniker().c_str());
     GetNodeShutdownCoordinator().CheckNodeState();
     return;
   }
