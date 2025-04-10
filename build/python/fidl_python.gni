@@ -90,6 +90,8 @@ template("fidl_python") {
         "--black",
         rebase_path("//prebuilt/third_party/black/linux-x64/black",
                     root_build_dir),
+        "--pyproject-toml",
+        rebase_path("//pyproject.toml", root_build_dir),
       ]
 
       deps = [ fidl_ir_target ]

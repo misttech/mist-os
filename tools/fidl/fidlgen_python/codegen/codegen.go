@@ -44,8 +44,8 @@ func IndentNonEmpty8(s string) string {
 	return fmt.Sprintf("        %s", s)
 }
 
-func NewGenerator(blackPath string) *Generator {
-	formatter := fidlgen.NewFormatter(blackPath, "--quiet", "-")
+func NewGenerator(blackPath string, pyprojectTomlPath string) *Generator {
+	formatter := fidlgen.NewFormatter(blackPath, "--quiet", "--config", pyprojectTomlPath, "-")
 
 	return &Generator{
 		Generator: fidlgen.NewGenerator("PythonTemplates", templates, formatter, template.FuncMap{
