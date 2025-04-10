@@ -382,6 +382,7 @@ void TouchSourceBase::SendPendingIfWaiting() {
   std::vector<AugmentedTouchEvent> events;
   for (size_t i = 0; !pending_events_.empty() && i < fuchsia::ui::pointer::TOUCH_MAX_EVENT; ++i) {
     auto [stream_id, event] = std::move(pending_events_.front());
+    TRACE_FLOW_END("input", "input_event_in_scenic", event.touch_event.trace_flow_id());
     TRACE_FLOW_BEGIN("input", "dispatch_event_to_client", event.touch_event.trace_flow_id());
 
     pending_events_.pop();
