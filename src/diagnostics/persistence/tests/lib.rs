@@ -280,7 +280,7 @@ async fn wait_for_inspect_source() {
 
 impl TestRealm {
     async fn create() -> TestRealm {
-        let instance = test_topology::create().await.expect("initialized topology");
+        let instance = test_topology::create().await;
         // Start up the Persistence component during realm creation - as happens during startup
         // in a real system - so that it can publish the previous boot's stored data, if any.
         let _persistence_binder = instance
@@ -323,7 +323,10 @@ impl TestRealm {
 
     /// Ask for a tag's associated data to be persisted.
     async fn request_persistence(&self, tag: &str) -> PersistResult {
-        self.persistence.persist(tag).await.unwrap()
+        self.persistence
+            .persist(tag)
+            .await
+            .unwrap_or_else(|e| panic!("persist should work for {tag:?}: {e:?}"))
     }
 
     /// Ask for a tag's associated data to be persisted.
@@ -331,7 +334,7 @@ impl TestRealm {
         self.persistence
             .persist_tags(&tags.iter().map(|t| t.to_string()).collect::<Vec<String>>())
             .await
-            .unwrap()
+            .unwrap_or_else(|e| panic!("persist should work for {tags:?}: {e:?}"))
     }
 
     /// Tear down the realm to make sure everything is gone before you restart it.
