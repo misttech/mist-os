@@ -367,6 +367,30 @@ alias(
 )
 
 alias(
+    name = "bt-common-0.0.1",
+    actual = "//third_party/rust_crates/vendor/bt-common-0.0.1:bt_common",
+    tags = ["manual"],
+)
+
+alias(
+    name = "bt-common",
+    actual = "//third_party/rust_crates/vendor/bt-common-0.0.1:bt_common",
+    tags = ["manual"],
+)
+
+alias(
+    name = "bt-gatt-0.0.1",
+    actual = "//third_party/rust_crates/vendor/bt-gatt-0.0.1:bt_gatt",
+    tags = ["manual"],
+)
+
+alias(
+    name = "bt-gatt",
+    actual = "//third_party/rust_crates/vendor/bt-gatt-0.0.1:bt_gatt",
+    tags = ["manual"],
+)
+
+alias(
     name = "bumpalo-3.2.1",
     actual = "//third_party/rust_crates/vendor/bumpalo-3.2.1:bumpalo",
     tags = ["manual"],

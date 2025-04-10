@@ -127,6 +127,14 @@ group("bstr") {
   public_deps = [ ":bstr-v1_5_0" ]
 }
 
+group("bt-common") {
+  public_deps = [ ":bt-common-v0_0_1" ]
+}
+
+group("bt-gatt") {
+  public_deps = [ ":bt-gatt-v0_0_1" ]
+}
+
 group("bumpalo") {
   public_deps = [ ":bumpalo-v3_2_1" ]
 }
@@ -2961,6 +2969,71 @@ rust_library("bstr-v1_5_0") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":bstr-v1_5_0.license" ]
+}
+
+license("bt-common-v0_0_1.license") {
+  public_package_name = "bt_common"
+  license_files =
+      [ "//third_party/rust_crates/forks/bluetooth/bt-common/LICENSE" ]
+}
+
+rust_library("bt-common-v0_0_1") {
+  crate_name = "bt_common"
+  crate_root = "//third_party/rust_crates/forks/bluetooth/bt-common/src/lib.rs"
+  output_name = "bt_common-bbbdc3b0d0c26c5b"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":futures-v0_3_30" ]
+  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":thiserror-v2_0_11" ]
+  deps += [ ":uuid-v1_1_2" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=bbbdc3b0d0c26c5b",
+    "-Cextra-filename=-bbbdc3b0d0c26c5b",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":bt-common-v0_0_1.license" ]
+}
+
+license("bt-gatt-v0_0_1.license") {
+  public_package_name = "bt_gatt"
+  license_files =
+      [ "//third_party/rust_crates/forks/bluetooth/bt-gatt/LICENSE" ]
+}
+
+rust_library("bt-gatt-v0_0_1") {
+  crate_name = "bt_gatt"
+  crate_root = "//third_party/rust_crates/forks/bluetooth/bt-gatt/src/lib.rs"
+  output_name = "bt_gatt-fc064e97b0828fb3"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":bt-common-v0_0_1" ]
+  deps += [ ":futures-v0_3_30" ]
+  deps += [ ":parking_lot-v0_12_0" ]
+  deps += [ ":thiserror-v2_0_11" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=fc064e97b0828fb3",
+    "-Cextra-filename=-fc064e97b0828fb3",
+    "--cfg=feature=\"default\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":bt-gatt-v0_0_1.license" ]
 }
 
 license("bumpalo-v3_2_1.license") {

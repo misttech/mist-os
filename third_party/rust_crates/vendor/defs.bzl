@@ -317,6 +317,8 @@ _NORMAL_DEPENDENCIES = {
             "bitflags": Label("//third_party/rust_crates/vendor/bitflags-2.8.0:bitflags"),
             "blocking": Label("//third_party/rust_crates/vendor/blocking-1.3.0:blocking"),
             "bstr": Label("//third_party/rust_crates/vendor/bstr-1.5.0:bstr"),
+            "bt-common": Label("//third_party/rust_crates/vendor/bt-common-0.0.1:bt_common"),
+            "bt-gatt": Label("//third_party/rust_crates/vendor/bt-gatt-0.0.1:bt_gatt"),
             "bumpalo": Label("//third_party/rust_crates/vendor/bumpalo-3.2.1:bumpalo"),
             "byteorder": Label("//third_party/rust_crates/vendor/byteorder-1.5.0:byteorder"),
             "bytes": Label("//third_party/rust_crates/vendor/bytes-1.10.0:bytes"),
