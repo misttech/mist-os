@@ -1086,7 +1086,7 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
+  clang_rt = ""
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
@@ -2317,6 +2317,14 @@ These take precedence over `profile_source_files`.
 **Current value (from the default):** `["//prebuilt/*"]`
 
 From //build/config/profile/config.gni:18
+
+### dtbo_label
+
+The label for the dtbo target. This is used by boot_tests
+
+**Current value (from the default):** `false`
+
+From //build/board.gni:47
 
 ### dwarf_version
 
@@ -5079,7 +5087,7 @@ provided value for 'board_configuration_label'
 
 **Current value (from the default):** `"//boards/arm64"`
 
-From //build/board.gni:53
+From //build/board.gni:56
 
 ### recovery_label
 
