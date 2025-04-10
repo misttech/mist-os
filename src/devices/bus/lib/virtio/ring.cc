@@ -82,8 +82,9 @@ zx_status_t Ring::Init(uint16_t index, uint16_t count) {
   zxlogf(TRACE, "%s: need %zu bytes", __func__, dma_buffer_size);
 
   std::unique_ptr<dma_buffer::BufferFactory> buffer_factory = dma_buffer::CreateBufferFactory();
-  zx_status_t status = buffer_factory->CreateContiguous(device_->bti(), dma_buffer_size,
-                                                        /*alignment_log2=*/0, &ring_buffer_);
+  zx_status_t status =
+      buffer_factory->CreateContiguous(device_->bti(), dma_buffer_size,
+                                       /*alignment_log2=*/0, /*enable_cache*/ true, &ring_buffer_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "failed to allocate ring buffer of size %zu: %s", dma_buffer_size,
            zx_status_get_string(status));

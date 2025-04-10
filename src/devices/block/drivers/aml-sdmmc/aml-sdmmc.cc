@@ -261,7 +261,7 @@ zx::result<> AmlSdmmc::InitResources(
     auto buffer_factory = dma_buffer::CreateBufferFactory();
     std::lock_guard<std::mutex> lock(lock_);
     zx_status_t status = buffer_factory->CreateContiguous(
-        bti_, kMaxDmaDescriptors * sizeof(aml_sdmmc_desc_t), 0, &descs_buffer_);
+        bti_, kMaxDmaDescriptors * sizeof(aml_sdmmc_desc_t), 0, true, &descs_buffer_);
     if (status != ZX_OK) {
       FDF_LOGL(ERROR, logger(), "Failed to allocate dma descriptors");
       return zx::error(status);

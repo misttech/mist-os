@@ -159,12 +159,36 @@ TEST(DmaBufferTests, InitWithCacheEnabled) {
     const size_t size = zx_system_get_page_size() * 4;
     const size_t alignment = 2;
     auto factory = CreateBufferFactory();
-    ASSERT_EQ(ZX_OK, factory->CreateContiguous(kFakeBti, size, alignment, &buffer));
+    ASSERT_EQ(ZX_OK, factory->CreateContiguous(kFakeBti, size, alignment, true, &buffer));
     auto test_f = [&buffer, size](fake_object::Object* obj) -> bool {
       auto vmo = static_cast<VmoWrapper*>(obj);
       ZX_ASSERT(vmo->metadata().alignment_log2 == alignment);
       ZX_ASSERT(vmo->metadata().bti_handle == kFakeBti.get());
       ZX_ASSERT(vmo->metadata().cache_policy == 0);
+      ZX_ASSERT(vmo->metadata().size == size);
+      ZX_ASSERT(buffer->virt() == vmo->metadata().virt);
+      ZX_ASSERT(buffer->size() == vmo->metadata().size);
+      ZX_ASSERT(buffer->phys() == vmo->metadata().start_phys);
+      return false;
+    };
+    fake_object::FakeHandleTable().ForEach(ZX_OBJ_TYPE_VMO, test_f);
+  }
+  ASSERT_TRUE(unpinned);
+}
+
+TEST(DmaBufferTests, InitContiguousWithCacheDisabled) {
+  unpinned = false;
+  {
+    std::unique_ptr<ContiguousBuffer> buffer;
+    const size_t size = zx_system_get_page_size() * 4;
+    const size_t alignment = 2;
+    auto factory = CreateBufferFactory();
+    ASSERT_EQ(ZX_OK, factory->CreateContiguous(kFakeBti, size, alignment, false, &buffer));
+    auto test_f = [&buffer, size](fake_object::Object* obj) -> bool {
+      auto vmo = static_cast<VmoWrapper*>(obj);
+      ZX_ASSERT(vmo->metadata().alignment_log2 == alignment);
+      ZX_ASSERT(vmo->metadata().bti_handle == kFakeBti.get());
+      ZX_ASSERT(vmo->metadata().cache_policy == ZX_CACHE_POLICY_UNCACHED_DEVICE);
       ZX_ASSERT(vmo->metadata().size == size);
       ZX_ASSERT(buffer->virt() == vmo->metadata().virt);
       ZX_ASSERT(buffer->size() == vmo->metadata().size);
@@ -203,7 +227,7 @@ TEST(DmaBufferTests, InitCachedMultiPageBuffer) {
     std::unique_ptr<ContiguousBuffer> buffer;
     auto factory = CreateBufferFactory();
     ASSERT_EQ(ZX_OK,
-              factory->CreateContiguous(kFakeBti, zx_system_get_page_size() * 4, 0, &buffer));
+              factory->CreateContiguous(kFakeBti, zx_system_get_page_size() * 4, 0, true, &buffer));
     auto test_f = [&buffer](fake_object::Object* object) -> bool {
       auto vmo = static_cast<VmoWrapper*>(object);
       ZX_ASSERT(vmo->metadata().alignment_log2 == 0);
@@ -220,9 +244,33 @@ TEST(DmaBufferTests, InitCachedMultiPageBuffer) {
   ASSERT_TRUE(unpinned);
 }
 
+TEST(DmaBufferTests, InitUncachedMultiPageBuffer) {
+  unpinned = false;
+  {
+    std::unique_ptr<ContiguousBuffer> buffer;
+    auto factory = CreateBufferFactory();
+    ASSERT_EQ(ZX_OK, factory->CreateContiguous(kFakeBti, zx_system_get_page_size() * 4, 0, false,
+                                               &buffer));
+    auto test_f = [&buffer](fake_object::Object* object) -> bool {
+      auto vmo = static_cast<VmoWrapper*>(object);
+      ZX_ASSERT(vmo->metadata().alignment_log2 == 0);
+      ZX_ASSERT(vmo->metadata().cache_policy == ZX_CACHE_POLICY_UNCACHED_DEVICE);
+      ZX_ASSERT(vmo->metadata().bti_handle == kFakeBti.get());
+      ZX_ASSERT(vmo->metadata().size == zx_system_get_page_size() * 4);
+      ZX_ASSERT(buffer->virt() == vmo->metadata().virt);
+      ZX_ASSERT(buffer->size() == vmo->metadata().size);
+      ZX_ASSERT(buffer->phys() == vmo->metadata().start_phys);
+      return false;
+    };
+    fake_object::FakeHandleTable().ForEach(ZX_OBJ_TYPE_VMO, test_f);
+  }
+  ASSERT_TRUE(unpinned);
+}
+
 using Param = struct {
   // The description here will get rendered in the test name, along with a stringified variant of
-  // the testing input. In total, it can be used to identify each individual test case in the suite.
+  // the testing input. In total, it can be used to identify each individual test case in the
+  // suite.
   const char* test_desc;
 
   // PhysIter ctor inputs.

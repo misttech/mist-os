@@ -148,7 +148,7 @@ zx_status_t PciBus::DmaBufferInit(std::unique_ptr<dma_buffer::ContiguousBuffer>*
   // Allocate memory for the command list, FIS receive area, command table and PRDT.
   const size_t buffer_size = fbl::round_up(size, zx_system_get_page_size());
   auto buffer_factory = dma_buffer::CreateBufferFactory();
-  zx_status_t status = buffer_factory->CreateContiguous(bti_, buffer_size, 0, buffer_out);
+  zx_status_t status = buffer_factory->CreateContiguous(bti_, buffer_size, 0, true, buffer_out);
   if (status != ZX_OK) {
     return status;
   }

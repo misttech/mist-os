@@ -16,7 +16,7 @@ zx_status_t Dwc3::Fifo::Init(zx::bti& bti) {
   }
 
   zx_status_t status =
-      dma_buffer::CreateBufferFactory()->CreateContiguous(bti, Fifo::kFifoSize, 12, &buffer);
+      dma_buffer::CreateBufferFactory()->CreateContiguous(bti, Fifo::kFifoSize, 12, true, &buffer);
   if (status != ZX_OK) {
     return status;
   }

@@ -547,7 +547,7 @@ zx_status_t ScsiDevice::Init() {
     const size_t buffer_size = fbl::round_up(request_buffers_size_, zx_system_get_page_size());
     auto buffer_factory = dma_buffer::CreateBufferFactory();
     for (int i = 0; i < MAX_IOS; i++) {
-      auto status = buffer_factory->CreateContiguous(bti(), buffer_size, 0,
+      auto status = buffer_factory->CreateContiguous(bti(), buffer_size, 0, true,
                                                      &scsi_io_slot_table_[i].request_buffer);
       if (status) {
         FDF_LOG(ERROR, "failed to allocate queue working memory");

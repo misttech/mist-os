@@ -267,7 +267,8 @@ zx_status_t Gvnic::CreateAdminQueue() {
   zx_status_t status;
 
   ZX_ASSERT_MSG(!admin_queue_, "Admin Queue alredy allocated.");
-  status = buffer_factory_->CreateContiguous(bti_, zx_system_get_page_size(), 0, &admin_queue_);
+  status =
+      buffer_factory_->CreateContiguous(bti_, zx_system_get_page_size(), 0, true, &admin_queue_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Couldn't create admin queue: %s", zx_status_get_string(status));
     return status;
@@ -275,7 +276,8 @@ zx_status_t Gvnic::CreateAdminQueue() {
   SET_LOCAL_REG_AND_WRITE_TO_MMIO(admin_queue_base_address, admin_queue_->phys());
   SET_LOCAL_REG_AND_WRITE_TO_MMIO(admin_queue_length, GVNIC_ADMINQ_SIZE);
   ZX_ASSERT_MSG(!scratch_page_, "Scratch page alredy allocated.");
-  status = buffer_factory_->CreateContiguous(bti_, zx_system_get_page_size(), 0, &scratch_page_);
+  status =
+      buffer_factory_->CreateContiguous(bti_, zx_system_get_page_size(), 0, true, &scratch_page_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Couldn't create scratch page: %s", zx_status_get_string(status));
     return status;
@@ -348,13 +350,14 @@ zx_status_t Gvnic::ConfigureDeviceResources() {
   ent->status = 0x0;  // Device will set this when the command completes.
 
   ZX_ASSERT_MSG(!counter_page_, "Counter page alredy allocated.");
-  status = buffer_factory_->CreateContiguous(bti_, zx_system_get_page_size(), 0, &counter_page_);
+  status =
+      buffer_factory_->CreateContiguous(bti_, zx_system_get_page_size(), 0, true, &counter_page_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Couldn't create counter page: %s", zx_status_get_string(status));
     return status;
   }
   if (!irq_doorbell_idx_page_) {
-    status = buffer_factory_->CreateContiguous(bti_, zx_system_get_page_size(), 0,
+    status = buffer_factory_->CreateContiguous(bti_, zx_system_get_page_size(), 0, true,
                                                &irq_doorbell_idx_page_);
     if (status != ZX_OK) {
       zxlogf(ERROR, "Couldn't create irq doorbell index page: %s", zx_status_get_string(status));
@@ -425,7 +428,7 @@ zx_status_t Gvnic::CreateTXQueue() {
   tx_queue_resources_ = GetQueueResourcesVirtAddr(qr_idx);
 
   if (!tx_ring_) {
-    status = buffer_factory_->CreateContiguous(bti_, zx_system_get_page_size(), 0, &tx_ring_);
+    status = buffer_factory_->CreateContiguous(bti_, zx_system_get_page_size(), 0, true, &tx_ring_);
     if (status != ZX_OK) {
       zxlogf(ERROR, "Couldn't create tx ring: %s", zx_status_get_string(status));
       return status;
@@ -463,7 +466,8 @@ zx_status_t Gvnic::CreateRXQueue() {
   rx_queue_resources_ = GetQueueResourcesVirtAddr(qr_idx);
 
   if (!rx_desc_ring_) {  // From NIC
-    status = buffer_factory_->CreateContiguous(bti_, zx_system_get_page_size(), 0, &rx_desc_ring_);
+    status =
+        buffer_factory_->CreateContiguous(bti_, zx_system_get_page_size(), 0, true, &rx_desc_ring_);
     if (status != ZX_OK) {
       zxlogf(ERROR, "Couldn't create rx desc ring: %s", zx_status_get_string(status));
       return status;
@@ -471,7 +475,8 @@ zx_status_t Gvnic::CreateRXQueue() {
   }
 
   if (!rx_data_ring_) {  // To NIC
-    status = buffer_factory_->CreateContiguous(bti_, zx_system_get_page_size(), 0, &rx_data_ring_);
+    status =
+        buffer_factory_->CreateContiguous(bti_, zx_system_get_page_size(), 0, true, &rx_data_ring_);
     if (status != ZX_OK) {
       zxlogf(ERROR, "Couldn't create rx data ring: %s", zx_status_get_string(status));
       return status;
@@ -567,8 +572,8 @@ uint32_t Gvnic::GetNextFreeDoorbellIndex() {
 uint32_t Gvnic::GetNextQueueResourcesIndex() {
   zx_status_t status;
   if (!queue_resources_) {
-    status =
-        buffer_factory_->CreateContiguous(bti_, zx_system_get_page_size(), 0, &queue_resources_);
+    status = buffer_factory_->CreateContiguous(bti_, zx_system_get_page_size(), 0, true,
+                                               &queue_resources_);
     ZX_ASSERT_MSG(status == ZX_OK, "Couldn't create queue resources: %s",
                   zx_status_get_string(status));
   }

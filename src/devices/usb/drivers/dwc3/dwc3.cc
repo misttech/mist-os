@@ -224,8 +224,8 @@ zx_status_t Dwc3::Init() {
   // Unfortunately, attempting to writeback and invalidate the cache before
   // reading anything from the buffer produces a page fault right if this buffer
   // is mapped read only, so for now, we keep the buffer mapped RW.
-  zx_status_t status = dma_buffer::CreateBufferFactory()->CreateContiguous(bti_, kEventBufferSize,
-                                                                           12, &event_buffer_);
+  zx_status_t status = dma_buffer::CreateBufferFactory()->CreateContiguous(
+      bti_, kEventBufferSize, 12, true, &event_buffer_);
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "dma_buffer init fails: %s", zx_status_get_string(status));
     return status;
@@ -239,8 +239,8 @@ zx_status_t Dwc3::Init() {
 
   {
     std::lock_guard<std::mutex> lock(ep0_.lock);
-    zx_status_t status =
-        dma_buffer::CreateBufferFactory()->CreateContiguous(bti_, kEp0BufferSize, 12, &ep0_.buffer);
+    zx_status_t status = dma_buffer::CreateBufferFactory()->CreateContiguous(
+        bti_, kEp0BufferSize, 12, true, &ep0_.buffer);
     if (status != ZX_OK) {
       FDF_LOG(ERROR, "ep0_buffer init failed: %s", zx_status_get_string(status));
       return status;

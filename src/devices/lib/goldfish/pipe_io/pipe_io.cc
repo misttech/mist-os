@@ -52,8 +52,8 @@ zx_status_t PipeIo::SetupPipe() {
 
   std::unique_ptr<dma_buffer::BufferFactory> buffer_factory = dma_buffer::CreateBufferFactory();
 
-  zx_status_t status =
-      buffer_factory->CreateContiguous(bti_, /*size=*/PAGE_SIZE, /*alignment_log2=*/0, &io_buffer_);
+  zx_status_t status = buffer_factory->CreateContiguous(
+      bti_, /*size=*/PAGE_SIZE, /*alignment_log2=*/0, /*enable_cache=*/true, &io_buffer_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to create contiguous IO buffer: %s", zx_status_get_string(status));
     return status;

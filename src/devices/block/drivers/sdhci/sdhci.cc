@@ -1138,12 +1138,12 @@ zx_status_t Sdhci::Init() {
     if (caps0.v3_64_bit_system_address_support()) {
       const size_t buffer_size =
           fbl::round_up(kDmaDescCount * sizeof(AdmaDescriptor96), zx_system_get_page_size());
-      status = buffer_factory->CreateContiguous(bti_, buffer_size, 0, &iobuf_);
+      status = buffer_factory->CreateContiguous(bti_, buffer_size, 0, true, &iobuf_);
       host_control1.set_dma_select(HostControl1::kDmaSelect64BitAdma2);
     } else {
       const size_t buffer_size =
           fbl::round_up(kDmaDescCount * sizeof(AdmaDescriptor64), zx_system_get_page_size());
-      status = buffer_factory->CreateContiguous(bti_, buffer_size, 0, &iobuf_);
+      status = buffer_factory->CreateContiguous(bti_, buffer_size, 0, true, &iobuf_);
       host_control1.set_dma_select(HostControl1::kDmaSelect32BitAdma2);
 
       if ((iobuf_->phys() & k32BitPhysAddrMask) != iobuf_->phys()) {

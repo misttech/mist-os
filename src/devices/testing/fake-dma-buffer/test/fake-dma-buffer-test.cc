@@ -17,20 +17,33 @@ constexpr auto kAlignmentLog2 = 12;
 TEST(FakeDmaBuffer, ContiguousBufferMultiPage) {
   auto factory = ddk_fake::CreateBufferFactory();
   std::unique_ptr<dma_buffer::ContiguousBuffer> buffer;
-  ASSERT_EQ(factory->CreateContiguous(kFakeBti, ZX_PAGE_SIZE * 2, 0, &buffer),
+  ASSERT_EQ(factory->CreateContiguous(kFakeBti, ZX_PAGE_SIZE * 2, 0, true, &buffer),
             ZX_ERR_NOT_SUPPORTED);
 }
 
 TEST(FakeDmaBuffer, ContiguousBuffer) {
   auto factory = ddk_fake::CreateBufferFactory();
   std::unique_ptr<dma_buffer::ContiguousBuffer> buffer;
-  ASSERT_OK(factory->CreateContiguous(kFakeBti, ZX_PAGE_SIZE, kAlignmentLog2, &buffer));
+  ASSERT_OK(factory->CreateContiguous(kFakeBti, ZX_PAGE_SIZE, kAlignmentLog2, true, &buffer));
   ASSERT_EQ(ddk_fake::PhysToVirt(buffer->phys()), buffer->virt());
   auto& page = ddk_fake::GetPage(buffer->phys());
   ASSERT_EQ(page.alignment_log2, kAlignmentLog2);
   ASSERT_EQ(page.bti, kFakeBti.get());
   ASSERT_TRUE(page.contiguous);
   ASSERT_TRUE(page.enable_cache);
+  ASSERT_EQ(page.size, ZX_PAGE_SIZE);
+}
+
+TEST(FakeDmaBuffer, UncachedContiguousBuffer) {
+  auto factory = ddk_fake::CreateBufferFactory();
+  std::unique_ptr<dma_buffer::ContiguousBuffer> buffer;
+  ASSERT_OK(factory->CreateContiguous(kFakeBti, ZX_PAGE_SIZE, kAlignmentLog2, false, &buffer));
+  ASSERT_EQ(ddk_fake::PhysToVirt(buffer->phys()), buffer->virt());
+  auto& page = ddk_fake::GetPage(buffer->phys());
+  ASSERT_EQ(page.alignment_log2, kAlignmentLog2);
+  ASSERT_EQ(page.bti, kFakeBti.get());
+  ASSERT_TRUE(page.contiguous);
+  ASSERT_FALSE(page.enable_cache);
   ASSERT_EQ(page.size, ZX_PAGE_SIZE);
 }
 

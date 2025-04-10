@@ -17,7 +17,8 @@ zx::result<> Queue::Init(zx::unowned_bti bti, uint32_t entries) {
   entry_count_ = entries;
 
   auto buffer_factory = dma_buffer::CreateBufferFactory();
-  zx_status_t status = buffer_factory->CreateContiguous(*bti, zx_system_get_page_size(), 0, &io_);
+  zx_status_t status =
+      buffer_factory->CreateContiguous(*bti, zx_system_get_page_size(), 0, true, &io_);
   if (status != ZX_OK) {
     return zx::error(status);
   }

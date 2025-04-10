@@ -60,6 +60,7 @@ class PagedBufferImpl : public dma_buffer::PagedBuffer {
 
 class BufferFactoryImpl : public dma_buffer::BufferFactory {
   zx_status_t CreateContiguous(const zx::bti& bti, size_t size, uint32_t alignment_log2,
+                               bool enable_cache,
                                std::unique_ptr<dma_buffer::ContiguousBuffer>* out) const override {
     if (size > ZX_PAGE_SIZE) {
       // TODO(https://fxbug.dev/42121490): We don't currently support contiguous buffers > 1 page.
@@ -82,7 +83,7 @@ class BufferFactoryImpl : public dma_buffer::BufferFactory {
     }
     auto fake = new ddk_fake::FakePage();
     fake->alignment_log2 = alignment_log2;
-    fake->enable_cache = true;
+    fake->enable_cache = enable_cache;
     fake->size = size;
     status = real_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &fake->backing_storage);
     if (status != ZX_OK) {

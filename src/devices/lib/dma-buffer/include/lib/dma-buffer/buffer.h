@@ -49,6 +49,7 @@ class PagedBuffer : public fbl::DoublyLinkedListable<std::unique_ptr<PagedBuffer
 class BufferFactory {
  public:
   virtual zx_status_t CreateContiguous(const zx::bti& bti, size_t size, uint32_t alignment_log2,
+                                       bool enable_cache,
                                        std::unique_ptr<ContiguousBuffer>* out) const = 0;
   virtual zx_status_t CreatePaged(const zx::bti& bti, size_t size, bool enable_cache,
                                   std::unique_ptr<PagedBuffer>* out) const = 0;

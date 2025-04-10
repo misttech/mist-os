@@ -60,8 +60,8 @@ zx::result<std::unique_ptr<QueuePair>> QueuePair::Create(zx::unowned_bti bti, ui
 zx_status_t QueuePair::PreallocatePrpBuffers() {
   auto buffer_factory = dma_buffer::CreateBufferFactory();
   for (auto& txn_data : txns_) {
-    zx_status_t status =
-        buffer_factory->CreateContiguous(*bti_, zx_system_get_page_size(), 0, &txn_data.prp_buffer);
+    zx_status_t status = buffer_factory->CreateContiguous(*bti_, zx_system_get_page_size(), 0, true,
+                                                          &txn_data.prp_buffer);
     if (status != ZX_OK) {
       return status;
     }
