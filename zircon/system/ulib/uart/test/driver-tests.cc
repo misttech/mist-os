@@ -406,36 +406,22 @@ struct PropertyBuilder {
   std::vector<uint8_t> string_block;
 };
 
-TEST(UartTests, MatchCompatible) {
+TEST(UartTests, ConfigSelect) {
   using AllDrivers =
       std::variant<uart::null::Driver, uart::pl011::Driver, uart::ns8250::Mmio32Driver,
                    uart::ns8250::Mmio8Driver, uart::ns8250::Dw8250Driver, uart::ns8250::PioDriver,
                    uart::amlogic::Driver>;
-  using AllDriver =
-      uart::all::KernelDriver<uart::mock::IoProvider, uart::UnsynchronizedPolicy, AllDrivers>;
+  using AllConfigs = uart::all::Config<AllDrivers>;
 
-  AllDriver driver;
-
-  zbi_dcfg_simple_t dcfg = {
-      .mmio_phys = 1,
-      .irq = 2,
-  };
-
-  auto visit = [](auto&& visitor) {
-    auto actual_visitor = [visitor = std::move(visitor)](auto&& driver) {
-      using DriverType = std::decay_t<decltype(driver)>::uart_type;
-      if constexpr (!std::is_same_v<uart::null::Driver, DriverType> &&
-                    !std::is_same_v<uart::internal::DummyDriver, DriverType>) {
-        if constexpr (std::is_same_v<zbi_dcfg_simple_t, std::decay_t<decltype(driver.config())>>) {
-          visitor(driver);
-        } else {
-          FAIL("Unexpected dcfg_simple_pio_t.");
-        }
-      } else {
-        FAIL("Unexpected uart::null::Driver.");
-      }
-    };
-    return actual_visitor;
+  static auto check_zeroed = []<typename ConfigType>(const ConfigType& cfg) {
+    if constexpr (std::is_same_v<ConfigType, zbi_dcfg_simple_t>) {
+      EXPECT_EQ(cfg.mmio_phys, 0);
+      EXPECT_EQ(cfg.irq, 0);
+      EXPECT_EQ(cfg.flags, 0);
+    } else if constexpr (std::is_same_v<ConfigType, zbi_dcfg_simple_pio_t>) {
+      EXPECT_EQ(cfg.base, 0);
+      EXPECT_EQ(cfg.irq, 0);
+    }
   };
 
   constexpr std::array kCompatibles = {"foo,bar"sv, "ns16550a"sv};
@@ -446,18 +432,13 @@ TEST(UartTests, MatchCompatible) {
     auto props = builder.Build();
     devicetree::PropertyDecoder decoder(props);
 
-    // Arbitrary range of string views.
-    auto emplacer = driver.MatchDevicetree(decoder);
-    EXPECT_TRUE(emplacer);
-    emplacer(dcfg);
+    std::optional config = AllConfigs::Select(decoder);
+    ASSERT_TRUE(config);
 
-    driver.Visit(visit([&](auto&& driver) {
-      using uart_t = typename std::decay_t<decltype(driver)>::uart_type;
-      EXPECT_EQ(uart_t::kExtra, ZBI_KERNEL_DRIVER_I8250_MMIO8_UART);
-      EXPECT_EQ(uart_t::kConfigName, uart::ns8250::Mmio8Driver::kConfigName);
-      EXPECT_EQ(driver.config().mmio_phys, 1);
-      EXPECT_EQ(driver.config().irq, 2);
-    }));
+    config->Visit([]<typename UartDriver>(const uart::Config<UartDriver>& cfg) {
+      ASSERT_TRUE((std::is_same_v<UartDriver, uart::ns8250::Mmio8Driver>));
+      check_zeroed(*cfg);
+    });
   }
 
   // Match with reg shift and io width
@@ -470,18 +451,13 @@ TEST(UartTests, MatchCompatible) {
     auto props = builder.Build();
     devicetree::PropertyDecoder decoder(props);
 
-    // Arbitrary range of string views.
-    auto emplacer = driver.MatchDevicetree(decoder);
-    EXPECT_TRUE(emplacer);
-    emplacer(dcfg);
+    std::optional config = AllConfigs::Select(decoder);
+    ASSERT_TRUE(config);
 
-    driver.Visit(visit([&](auto&& driver) {
-      using uart_t = typename std::decay_t<decltype(driver)>::uart_type;
-      EXPECT_EQ(uart_t::kExtra, ZBI_KERNEL_DRIVER_I8250_MMIO32_UART);
-      EXPECT_EQ(uart_t::kConfigName, uart::ns8250::Mmio32Driver::kConfigName);
-      EXPECT_EQ(driver.config().mmio_phys, 1);
-      EXPECT_EQ(driver.config().irq, 2);
-    }));
+    config->Visit([]<typename UartDriver>(const uart::Config<UartDriver>& cfg) {
+      ASSERT_TRUE((std::is_same_v<UartDriver, uart::ns8250::Mmio32Driver>));
+      check_zeroed(*cfg);
+    });
   }
 
   // Match Dw8250
@@ -492,8 +468,8 @@ TEST(UartTests, MatchCompatible) {
     auto props = builder.Build();
     devicetree::PropertyDecoder decoder(props);
 
-    // Arbitrary range of string views. Must provide io width and reg shift.
-    EXPECT_FALSE(driver.MatchDevicetree(decoder));
+    std::optional config = AllConfigs::Select(decoder);
+    ASSERT_FALSE(config);
   }
 
   {
@@ -505,18 +481,13 @@ TEST(UartTests, MatchCompatible) {
     auto props = builder.Build();
     devicetree::PropertyDecoder decoder(props);
 
-    // Arbitrary range of string views.
-    auto emplacer = driver.MatchDevicetree(decoder);
-    EXPECT_TRUE(emplacer);
-    emplacer(dcfg);
+    std::optional config = AllConfigs::Select(decoder);
+    ASSERT_TRUE(config);
 
-    driver.Visit(visit([&](auto&& driver) {
-      using uart_t = typename std::decay_t<decltype(driver)>::uart_type;
-      EXPECT_EQ(uart_t::kExtra, ZBI_KERNEL_DRIVER_DW8250_UART);
-      EXPECT_EQ(uart_t::kConfigName, uart::ns8250::Dw8250Driver::kConfigName);
-      EXPECT_EQ(driver.config().mmio_phys, 1);
-      EXPECT_EQ(driver.config().irq, 2);
-    }));
+    config->Visit([]<typename UartDriver>(const uart::Config<UartDriver>& cfg) {
+      ASSERT_TRUE((std::is_same_v<UartDriver, uart::ns8250::Dw8250Driver>));
+      check_zeroed(*cfg);
+    });
   }
 
   {
@@ -526,18 +497,13 @@ TEST(UartTests, MatchCompatible) {
     auto props = builder.Build();
     devicetree::PropertyDecoder decoder(props);
 
-    // Arbitrary range of string views.
-    auto emplacer = driver.MatchDevicetree(decoder);
-    EXPECT_TRUE(emplacer);
-    emplacer(dcfg);
+    std::optional config = AllConfigs::Select(decoder);
+    ASSERT_TRUE(config);
 
-    driver.Visit(visit([&](auto&& driver) {
-      using uart_t = typename std::decay_t<decltype(driver)>::uart_type;
-      EXPECT_EQ(uart_t::kExtra, ZBI_KERNEL_DRIVER_PL011_UART);
-      EXPECT_EQ(uart_t::kConfigName, uart::pl011::Driver::kConfigName);
-      EXPECT_EQ(driver.config().mmio_phys, 1);
-      EXPECT_EQ(driver.config().irq, 2);
-    }));
+    config->Visit([]<typename UartDriver>(const uart::Config<UartDriver>& cfg) {
+      ASSERT_TRUE((std::is_same_v<UartDriver, uart::pl011::Driver>));
+      check_zeroed(*cfg);
+    });
   }
 
   {
@@ -547,19 +513,13 @@ TEST(UartTests, MatchCompatible) {
     auto props = builder.Build();
     devicetree::PropertyDecoder decoder(props);
 
-    // Arbitrary range of string views.
-    auto emplacer = driver.MatchDevicetree(decoder);
+    std::optional config = AllConfigs::Select(decoder);
+    ASSERT_TRUE(config);
 
-    EXPECT_TRUE(emplacer);
-    emplacer(dcfg);
-
-    driver.Visit(visit([&](auto&& driver) {
-      using uart_t = typename std::decay_t<decltype(driver)>::uart_type;
-      EXPECT_EQ(uart_t::kExtra, ZBI_KERNEL_DRIVER_AMLOGIC_UART);
-      EXPECT_EQ(uart_t::kConfigName, uart::amlogic::Driver::kConfigName);
-      EXPECT_EQ(driver.config().mmio_phys, 1);
-      EXPECT_EQ(driver.config().irq, 2);
-    }));
+    config->Visit([]<typename UartDriver>(const uart::Config<UartDriver>& cfg) {
+      ASSERT_TRUE((std::is_same_v<UartDriver, uart::amlogic::Driver>));
+      check_zeroed(*cfg);
+    });
   }
 }
 

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_UART_UART_H_
-#define LIB_UART_UART_H_
+#ifndef ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_UART_H_
+#define ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_UART_H_
 
 #include <lib/arch/intrin.h>
 #include <lib/devicetree/devicetree.h>
@@ -254,7 +254,7 @@ class DriverBase {
   }
 
   // API to match a devicetree bindings.
-  static bool MatchDevicetree(const devicetree::PropertyDecoder& decoder) {
+  static bool TrySelect(const devicetree::PropertyDecoder& decoder) {
     if constexpr (Driver::kDevicetreeBindings.size() == 0) {
       return false;
     } else {
@@ -664,4 +664,4 @@ void UnparseConfig(const zbi_dcfg_simple_pio_t& config, FILE* out);
 
 }  // namespace uart
 
-#endif  // LIB_UART_UART_H_
+#endif  // ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_UART_H_

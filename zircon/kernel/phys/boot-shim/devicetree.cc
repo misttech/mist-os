@@ -127,8 +127,7 @@ void InitMemory(void* dtb, AddressSpace* aspace) {
   //
   // TODO(https://fxbug.dev/397523685): Match operation returns a config and matcher stores a config
   // instead of a driver object.
-  boot_options.serial =
-      uart::all::GetConfig(chosen.TakeUart().value_or(ktl::move(GetUartDriver()).TakeUart()));
+  boot_options.serial = chosen.uart_config().value_or(GetUartDriver().config());
   SetBootOptionsWithoutEntropy(boot_options, {}, chosen.cmdline().value_or(""));
   SetUartConsole(uart::all::MakeDriver(boot_options.serial));
 

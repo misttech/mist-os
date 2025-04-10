@@ -36,6 +36,7 @@ struct DummyDriver : public null::Driver {
   using config_type = StubConfig;
 
   using null::Driver::Driver;
+  using null::Driver::TrySelect;
 
   template <typename... Args>
   static std::optional<uart::Config<DummyDriver>> TryMatch(Args&&... args) {
@@ -56,6 +57,12 @@ concept MatchableDriver = requires(Args&&... args) {
   {
     Driver::TryMatch(std::forward<Args>(args)...)
   } -> std::convertible_to<std::optional<uart::Config<Driver>>>;
+};
+
+
+template<typename Driver, typename ...Args>
+concept SelectableDriver = requires(Args&& ... args) {
+  {Driver::TrySelect(std::forward<Args>(args)...)}-> std::convertible_to<bool>;
 };
 
 }  // namespace internal
@@ -145,6 +152,32 @@ class Config {
     };
 
     try_match_supported_driver(std::make_index_sequence<std::variant_size_v<UartDriver>>());
+
+    return all_configs;
+  }
+
+  // Returns an empty `Config` object if any supported driver provides a `TrySelect` static method that
+  // succeeds when invoked with `args`. Otherwise `std::nullopt` is returned. This allows separating driver
+  // type selection from the actual configuration, or partially filling the configuration.
+  //
+  // Note: The matching order is determined by the position in the list of the driver.
+  template <typename... Args>
+  static std::optional<Config> Select(Args&&... args) {
+    std::optional<Config> all_configs;
+    auto try_one = [&]<typename SupportedDriver>(std::optional<Config>& config) -> bool {
+      if (SupportedDriver::TrySelect(std::forward<Args>(args)...)) {
+        config = uart::Config<SupportedDriver>{};
+      }
+      return config.has_value();
+    };
+
+    // Turns variant size into a parameter pack and invokes extracts the variant arguments of
+    // `UartDriver` and attempts to match each.
+    auto try_select_supported_driver = [&]<size_t... Is>(std::index_sequence<Is...> is) {
+      static_assert((uart::internal::SelectableDriver<std::variant_alternative_t<Is, UartDriver>, Args...> && ...));
+      (try_one.template operator()<std::variant_alternative_t<Is, UartDriver>>(all_configs) || ...);
+    };
+    try_select_supported_driver(std::make_index_sequence<std::variant_size_v<UartDriver>>());
 
     return all_configs;
   }
@@ -275,16 +308,9 @@ class KernelDriver {
   // instantiate that driver and return true.
   bool Match(const acpi_lite::AcpiDebugPortDescriptor& debug_port) { return TryMatch(debug_port); }
 
-  // Returns an empty callable if no drivers match, otherwise returns a callable that will
-  // instantiate the selected instance with the supplied configuration object.
-  fit::inline_function<void(const zbi_dcfg_simple_t&)> MatchDevicetree(
-      const devicetree::PropertyDecoder& decoder) {
-    return DoMatch(decoder);
-  }
-
   // This is like Match, but instead of matching a ZBI item, it matches a
   // string value for the "kernel.serial" boot option.
-  bool Parse(std::string_view option) { return DoMatch(option); }
+  bool Parse(std::string_view option) { return TryMatch(option); }
 
   // Write out a string that Parse() can read back to recreate the driver
   // state.  This doesn't preserve the driver state, only the configuration.
@@ -333,35 +359,6 @@ class KernelDriver {
   struct OneDriverVariant<std::variant<Args...>> {
     using type = Variant<Args...>;
   };
-
-  template <size_t I>
-  fit::inline_function<void(const zbi_dcfg_simple_t&)> TryOneMatch(
-      const devicetree::PropertyDecoder& decoder) {
-    using Try = std::variant_alternative_t<I, decltype(variant_)>;
-
-    if constexpr (!std::is_same_v<Try, std::monostate>) {
-      using ConfigType = typename Try::uart_type::config_type;
-      if constexpr (std::is_same_v<ConfigType, zbi_dcfg_simple_t>) {
-        if (Try::uart_type::MatchDevicetree(decoder)) {
-          return [this](const zbi_dcfg_simple_t& config) { variant_.template emplace<I>(config); };
-        }
-      }
-    }
-    return nullptr;
-  }
-
-  template <size_t... I, typename... Args>
-  auto DoMatchHelper(std::index_sequence<I...>, Args&&... args) {
-    decltype(TryOneMatch<0>(std::forward<Args>(args)...)) result{};
-    ((result = TryOneMatch<I>(std::forward<Args>(args)...)) || ...);
-    return result;
-  }
-
-  template <typename... Args>
-  auto DoMatch(Args&&... args) {
-    constexpr auto n = std::variant_size_v<decltype(variant_)>;
-    return DoMatchHelper(std::make_index_sequence<n>(), std::forward<Args>(args)...);
-  }
 
   template <typename... Args>
   bool TryMatch(Args&&... args) {

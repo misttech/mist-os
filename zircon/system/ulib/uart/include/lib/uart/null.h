@@ -48,6 +48,8 @@ struct Driver {
     return std::nullopt;
   }
 
+  static bool TrySelect(const devicetree::PropertyDecoder& decoder) { return false; }
+
   Driver() = default;
   explicit Driver(const config_type& config) {}
 

@@ -301,15 +301,12 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig, IoRegType
     return Base::TryMatch(string);
   }
 
-  template <typename... Args>
-  explicit DriverImpl(Args&&... args) : Base(std::forward<Args>(args)...) {}
-
-  static bool MatchDevicetree(const devicetree::PropertyDecoder& decoder) {
+  static bool TrySelect(const devicetree::PropertyDecoder& decoder) {
     if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_I8250_PIO_UART) {
       return false;
     } else {
       // Check that the compatible property contains a compatible devicetree binding.
-      if (!Base::MatchDevicetree(decoder)) {
+      if (!Base::TrySelect(decoder)) {
         return false;
       }
 
@@ -333,6 +330,9 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig, IoRegType
       }
     }
   }
+
+  template <typename... Args>
+  explicit DriverImpl(Args&&... args) : Base(std::forward<Args>(args)...) {}
 
   template <class IoProvider>
   void Init(IoProvider& io) {
