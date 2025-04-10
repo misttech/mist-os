@@ -21,11 +21,9 @@ use {
 pub const MIN_BACKOFF_BETWEEN_ROAM_SCANS_ABSOLUTE: zx::MonotonicDuration =
     zx::MonotonicDuration::from_minutes(1);
 pub const MIN_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE: zx::MonotonicDuration =
-    zx::MonotonicDuration::from_minutes(5);
-const ADDITIONAL_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE: zx::MonotonicDuration =
-    zx::MonotonicDuration::from_minutes(10);
+    zx::MonotonicDuration::from_minutes(2);
 pub const MAX_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE: zx::MonotonicDuration =
-    zx::MonotonicDuration::from_minutes(35);
+    zx::MonotonicDuration::from_minutes(32);
 
 const LOCAL_ROAM_THRESHOLD_RSSI_2G: f64 = -72.0;
 const LOCAL_ROAM_THRESHOLD_RSSI_5G: f64 = -75.0;
@@ -158,10 +156,9 @@ impl StationaryMonitor {
                 // Reset roam scan backoff if there are new roam reasons.
                 self.scan_backoff_if_no_change = MIN_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE;
             } else {
-                // Otherwise, extend the roam scan backoff.
+                // Otherwise, exponentially extend the roam scan backoff.
                 self.scan_backoff_if_no_change = std::cmp::min(
-                    self.scan_backoff_if_no_change
-                        + ADDITIONAL_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE,
+                    self.scan_backoff_if_no_change * 2_i64,
                     MAX_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE,
                 );
             }
@@ -628,9 +625,9 @@ mod test {
             RoamTriggerDataOutcome::Noop
         );
 
-        // Advanced past the additional backoff.
+        // Advanced past the additional backoff (2x the minimum roam scan backoff)
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            ADDITIONAL_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE
+            MIN_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE
                 + fasync::MonotonicDuration::from_seconds(1),
         ));
         // Send trigger data, and verify that we will now scan, despite no RSSI or roam reason
