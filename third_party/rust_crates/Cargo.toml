@@ -217,7 +217,7 @@ simplelog = "0.10.2"
 siphasher = "0.3.10"
 slab = "0.4.9"
 smallvec = {version= "1.14.0", features = ["const_generics", "const_new", "union"]}
-socket2 = { version = "0.5.5", features = ["all"] }
+socket2 = { version = "0.5.9", features = ["all"] }
 splines = "2.2.0"
 static_assertions = "1.1.0"
 strsim = "0.11.1"
@@ -1062,7 +1062,7 @@ deps = [
   ":mio-v0_8_9",
   ":num_cpus-v1_16_0",
   ":signal-hook-registry-v1_4_1",
-  ":socket2-v0_5_5",
+  ":socket2-v0_5_9",
 ]
 rustflags = [
   "--cfg=feature=\\\"bytes\\\"",

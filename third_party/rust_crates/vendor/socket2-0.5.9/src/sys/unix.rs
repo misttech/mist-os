@@ -18,9 +18,12 @@ use std::net::{Ipv4Addr, Ipv6Addr};
     feature = "all",
     any(
         target_os = "ios",
+        target_os = "visionos",
         target_os = "macos",
         target_os = "tvos",
         target_os = "watchos",
+        target_os = "illumos",
+        target_os = "solaris",
     )
 ))]
 use std::num::NonZeroU32;
@@ -31,6 +34,7 @@ use std::num::NonZeroU32;
         target_os = "android",
         target_os = "freebsd",
         target_os = "ios",
+        target_os = "visionos",
         target_os = "linux",
         target_os = "macos",
         target_os = "tvos",
@@ -46,6 +50,7 @@ use std::os::unix::ffi::OsStrExt;
         target_os = "android",
         target_os = "freebsd",
         target_os = "ios",
+        target_os = "visionos",
         target_os = "linux",
         target_os = "macos",
         target_os = "tvos",
@@ -63,6 +68,7 @@ use std::{io, slice};
 
 #[cfg(not(any(
     target_os = "ios",
+    target_os = "visionos",
     target_os = "macos",
     target_os = "tvos",
     target_os = "watchos",
@@ -118,9 +124,27 @@ pub(crate) use libc::SO_OOBINLINE;
 // Used in `Socket`.
 #[cfg(not(target_os = "nto"))]
 pub(crate) use libc::ipv6_mreq as Ipv6Mreq;
+#[cfg(all(
+    feature = "all",
+    not(any(
+        target_os = "dragonfly",
+        target_os = "fuchsia",
+        target_os = "hurd",
+        target_os = "illumos",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "redox",
+        target_os = "solaris",
+        target_os = "haiku",
+        target_os = "espidf",
+        target_os = "vita",
+    ))
+))]
+pub(crate) use libc::IPV6_RECVHOPLIMIT;
 #[cfg(not(any(
     target_os = "dragonfly",
     target_os = "fuchsia",
+    target_os = "hurd",
     target_os = "illumos",
     target_os = "netbsd",
     target_os = "openbsd",
@@ -143,6 +167,7 @@ pub(crate) use libc::IP_HDRINCL;
     target_os = "redox",
     target_os = "solaris",
     target_os = "haiku",
+    target_os = "hurd",
     target_os = "nto",
     target_os = "espidf",
     target_os = "vita",
@@ -152,11 +177,13 @@ pub(crate) use libc::IP_RECVTOS;
     target_os = "fuchsia",
     target_os = "redox",
     target_os = "solaris",
+    target_os = "haiku",
     target_os = "illumos",
 )))]
 pub(crate) use libc::IP_TOS;
 #[cfg(not(any(
     target_os = "ios",
+    target_os = "visionos",
     target_os = "macos",
     target_os = "tvos",
     target_os = "watchos",
@@ -164,11 +191,14 @@ pub(crate) use libc::IP_TOS;
 pub(crate) use libc::SO_LINGER;
 #[cfg(any(
     target_os = "ios",
+    target_os = "visionos",
     target_os = "macos",
     target_os = "tvos",
     target_os = "watchos",
 ))]
 pub(crate) use libc::SO_LINGER_SEC as SO_LINGER;
+#[cfg(target_os = "linux")]
+pub(crate) use libc::SO_PASSCRED;
 pub(crate) use libc::{
     ip_mreq as IpMreq, linger, IPPROTO_IP, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, IPV6_MULTICAST_IF,
     IPV6_MULTICAST_LOOP, IPV6_UNICAST_HOPS, IPV6_V6ONLY, IP_ADD_MEMBERSHIP, IP_DROP_MEMBERSHIP,
@@ -179,6 +209,7 @@ pub(crate) use libc::{
 #[cfg(not(any(
     target_os = "dragonfly",
     target_os = "haiku",
+    target_os = "hurd",
     target_os = "netbsd",
     target_os = "openbsd",
     target_os = "redox",
@@ -196,6 +227,7 @@ pub(crate) use libc::{
     target_os = "haiku",
     target_os = "illumos",
     target_os = "ios",
+    target_os = "visionos",
     target_os = "macos",
     target_os = "netbsd",
     target_os = "nto",
@@ -211,6 +243,7 @@ pub(crate) use libc::{IPV6_ADD_MEMBERSHIP, IPV6_DROP_MEMBERSHIP};
     target_os = "haiku",
     target_os = "illumos",
     target_os = "ios",
+    target_os = "visionos",
     target_os = "macos",
     target_os = "netbsd",
     target_os = "openbsd",
@@ -230,6 +263,7 @@ pub(crate) use libc::{
         target_os = "fuchsia",
         target_os = "illumos",
         target_os = "ios",
+        target_os = "visionos",
         target_os = "linux",
         target_os = "macos",
         target_os = "netbsd",
@@ -244,6 +278,7 @@ pub(crate) type Bool = c_int;
 
 #[cfg(any(
     target_os = "ios",
+    target_os = "visionos",
     target_os = "macos",
     target_os = "nto",
     target_os = "tvos",
@@ -253,6 +288,7 @@ use libc::TCP_KEEPALIVE as KEEPALIVE_TIME;
 #[cfg(not(any(
     target_os = "haiku",
     target_os = "ios",
+    target_os = "visionos",
     target_os = "macos",
     target_os = "nto",
     target_os = "openbsd",
@@ -278,6 +314,7 @@ macro_rules! syscall {
 /// Maximum size of a buffer passed to system call like `recv` and `send`.
 #[cfg(not(any(
     target_os = "ios",
+    target_os = "visionos",
     target_os = "macos",
     target_os = "tvos",
     target_os = "watchos",
@@ -294,6 +331,7 @@ const MAX_BUF_LEN: usize = ssize_t::MAX as usize;
 // both platforms.
 #[cfg(any(
     target_os = "ios",
+    target_os = "visionos",
     target_os = "macos",
     target_os = "tvos",
     target_os = "watchos",
@@ -321,6 +359,7 @@ type IovLen = usize;
         target_os = "linux",
         any(
             target_env = "musl",
+            target_env = "ohos",
             all(target_env = "uclibc", target_pointer_width = "32")
         )
     ),
@@ -329,8 +368,10 @@ type IovLen = usize;
     target_os = "freebsd",
     target_os = "fuchsia",
     target_os = "haiku",
+    target_os = "hurd",
     target_os = "illumos",
     target_os = "ios",
+    target_os = "visionos",
     target_os = "macos",
     target_os = "netbsd",
     target_os = "nto",
@@ -429,6 +470,7 @@ impl Type {
             target_os = "dragonfly",
             target_os = "freebsd",
             target_os = "fuchsia",
+            target_os = "hurd",
             target_os = "illumos",
             target_os = "linux",
             target_os = "netbsd",
@@ -446,6 +488,7 @@ impl Type {
                 target_os = "dragonfly",
                 target_os = "freebsd",
                 target_os = "fuchsia",
+                target_os = "hurd",
                 target_os = "illumos",
                 target_os = "linux",
                 target_os = "netbsd",
@@ -464,6 +507,7 @@ impl Type {
         target_os = "dragonfly",
         target_os = "freebsd",
         target_os = "fuchsia",
+        target_os = "hurd",
         target_os = "illumos",
         target_os = "linux",
         target_os = "netbsd",
@@ -564,6 +608,37 @@ impl RecvFlags {
     pub const fn is_out_of_band(self) -> bool {
         self.0 & libc::MSG_OOB != 0
     }
+
+    /// Check if the confirm flag is set.
+    ///
+    /// This is used by SocketCAN to indicate a frame was sent via the
+    /// socket it is received on. This flag can be interpreted as a
+    /// 'transmission confirmation'.
+    ///
+    /// On Unix this corresponds to the `MSG_CONFIRM` flag.
+    #[cfg(all(feature = "all", any(target_os = "android", target_os = "linux")))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(all(feature = "all", any(target_os = "android", target_os = "linux"))))
+    )]
+    pub const fn is_confirm(self) -> bool {
+        self.0 & libc::MSG_CONFIRM != 0
+    }
+
+    /// Check if the don't route flag is set.
+    ///
+    /// This is used by SocketCAN to indicate a frame was created
+    /// on the local host.
+    ///
+    /// On Unix this corresponds to the `MSG_DONTROUTE` flag.
+    #[cfg(all(feature = "all", any(target_os = "android", target_os = "linux")))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(all(feature = "all", any(target_os = "android", target_os = "linux"))))
+    )]
+    pub const fn is_dontroute(self) -> bool {
+        self.0 & libc::MSG_DONTROUTE != 0
+    }
 }
 
 #[cfg(not(target_os = "redox"))]
@@ -575,6 +650,10 @@ impl std::fmt::Debug for RecvFlags {
         s.field("is_out_of_band", &self.is_out_of_band());
         #[cfg(not(target_os = "espidf"))]
         s.field("is_truncated", &self.is_truncated());
+        #[cfg(all(feature = "all", any(target_os = "android", target_os = "linux")))]
+        s.field("is_confirm", &self.is_confirm());
+        #[cfg(all(feature = "all", any(target_os = "android", target_os = "linux")))]
+        s.field("is_dontroute", &self.is_dontroute());
         s.finish()
     }
 }
@@ -692,6 +771,11 @@ pub(crate) fn set_msghdr_flags(msg: &mut msghdr, flags: libc::c_int) {
 #[cfg(not(target_os = "redox"))]
 pub(crate) fn msghdr_flags(msg: &msghdr) -> RecvFlags {
     RecvFlags(msg.msg_flags)
+}
+
+#[cfg(not(target_os = "redox"))]
+pub(crate) fn msghdr_control_len(msg: &msghdr) -> usize {
+    msg.msg_controllen as _
 }
 
 /// Unix only API.
@@ -1180,8 +1264,10 @@ pub(crate) fn set_tcp_keepalive(fd: Socket, keepalive: &TcpKeepalive) -> io::Res
         target_os = "dragonfly",
         target_os = "freebsd",
         target_os = "fuchsia",
+        target_os = "hurd",
         target_os = "illumos",
         target_os = "ios",
+        target_os = "visionos",
         target_os = "linux",
         target_os = "macos",
         target_os = "netbsd",
@@ -1339,6 +1425,47 @@ pub(crate) const fn to_mreqn(
     }
 }
 
+#[cfg(all(
+    feature = "all",
+    any(target_os = "android", target_os = "fuchsia", target_os = "linux")
+))]
+pub(crate) fn original_dst(fd: Socket) -> io::Result<SockAddr> {
+    // Safety: `getsockopt` initialises the `SockAddr` for us.
+    unsafe {
+        SockAddr::try_init(|storage, len| {
+            syscall!(getsockopt(
+                fd,
+                libc::SOL_IP,
+                libc::SO_ORIGINAL_DST,
+                storage.cast(),
+                len
+            ))
+        })
+    }
+    .map(|(_, addr)| addr)
+}
+
+/// Get the value for the `IP6T_SO_ORIGINAL_DST` option on this socket.
+///
+/// This value contains the original destination IPv6 address of the connection
+/// redirected using `ip6tables` `REDIRECT` or `TPROXY`.
+#[cfg(all(feature = "all", any(target_os = "android", target_os = "linux")))]
+pub(crate) fn original_dst_ipv6(fd: Socket) -> io::Result<SockAddr> {
+    // Safety: `getsockopt` initialises the `SockAddr` for us.
+    unsafe {
+        SockAddr::try_init(|storage, len| {
+            syscall!(getsockopt(
+                fd,
+                libc::SOL_IPV6,
+                libc::IP6T_SO_ORIGINAL_DST,
+                storage.cast(),
+                len
+            ))
+        })
+    }
+    .map(|(_, addr)| addr)
+}
+
 /// Unix only API.
 impl crate::Socket {
     /// Accept a new incoming connection from this listener.
@@ -1410,6 +1537,7 @@ impl crate::Socket {
     #[cfg_attr(
         any(
             target_os = "ios",
+            target_os = "visionos",
             target_os = "macos",
             target_os = "tvos",
             target_os = "watchos"
@@ -1446,6 +1574,7 @@ impl crate::Socket {
         feature = "all",
         any(
             target_os = "ios",
+            target_os = "visionos",
             target_os = "macos",
             target_os = "tvos",
             target_os = "watchos",
@@ -1457,6 +1586,7 @@ impl crate::Socket {
             feature = "all",
             any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos",
@@ -1469,6 +1599,7 @@ impl crate::Socket {
 
     #[cfg(any(
         target_os = "ios",
+        target_os = "visionos",
         target_os = "macos",
         target_os = "tvos",
         target_os = "watchos",
@@ -1905,6 +2036,7 @@ impl crate::Socket {
         feature = "all",
         any(
             target_os = "ios",
+            target_os = "visionos",
             target_os = "macos",
             target_os = "tvos",
             target_os = "watchos",
@@ -1916,6 +2048,7 @@ impl crate::Socket {
             feature = "all",
             any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos",
@@ -1941,9 +2074,12 @@ impl crate::Socket {
         feature = "all",
         any(
             target_os = "ios",
+            target_os = "visionos",
             target_os = "macos",
             target_os = "tvos",
             target_os = "watchos",
+            target_os = "illumos",
+            target_os = "solaris",
         )
     ))]
     #[cfg_attr(
@@ -1952,6 +2088,7 @@ impl crate::Socket {
             feature = "all",
             any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos",
@@ -1977,9 +2114,12 @@ impl crate::Socket {
         feature = "all",
         any(
             target_os = "ios",
+            target_os = "visionos",
             target_os = "macos",
             target_os = "tvos",
             target_os = "watchos",
+            target_os = "illumos",
+            target_os = "solaris",
         )
     ))]
     #[cfg_attr(
@@ -1988,6 +2128,7 @@ impl crate::Socket {
             feature = "all",
             any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos",
@@ -2008,9 +2149,12 @@ impl crate::Socket {
         feature = "all",
         any(
             target_os = "ios",
+            target_os = "visionos",
             target_os = "macos",
             target_os = "tvos",
             target_os = "watchos",
+            target_os = "illumos",
+            target_os = "solaris",
         )
     ))]
     #[cfg_attr(
@@ -2019,6 +2163,7 @@ impl crate::Socket {
             feature = "all",
             any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos",
@@ -2036,6 +2181,7 @@ impl crate::Socket {
         feature = "all",
         any(
             target_os = "ios",
+            target_os = "visionos",
             target_os = "macos",
             target_os = "tvos",
             target_os = "watchos",
@@ -2047,6 +2193,7 @@ impl crate::Socket {
             feature = "all",
             any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos",
@@ -2067,9 +2214,12 @@ impl crate::Socket {
         feature = "all",
         any(
             target_os = "ios",
+            target_os = "visionos",
             target_os = "macos",
             target_os = "tvos",
             target_os = "watchos",
+            target_os = "illumos",
+            target_os = "solaris",
         )
     ))]
     #[cfg_attr(
@@ -2078,6 +2228,7 @@ impl crate::Socket {
             feature = "all",
             any(
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "macos",
                 target_os = "tvos",
                 target_os = "watchos",
@@ -2319,62 +2470,6 @@ impl crate::Socket {
         }
     }
 
-    /// Get the value for the `SO_ORIGINAL_DST` option on this socket.
-    ///
-    /// This value contains the original destination IPv4 address of the connection
-    /// redirected using `iptables` `REDIRECT` or `TPROXY`.
-    #[cfg(all(
-        feature = "all",
-        any(target_os = "android", target_os = "fuchsia", target_os = "linux")
-    ))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(
-            feature = "all",
-            any(target_os = "android", target_os = "fuchsia", target_os = "linux")
-        )))
-    )]
-    pub fn original_dst(&self) -> io::Result<SockAddr> {
-        // Safety: `getsockopt` initialises the `SockAddr` for us.
-        unsafe {
-            SockAddr::try_init(|storage, len| {
-                syscall!(getsockopt(
-                    self.as_raw(),
-                    libc::SOL_IP,
-                    libc::SO_ORIGINAL_DST,
-                    storage.cast(),
-                    len
-                ))
-            })
-        }
-        .map(|(_, addr)| addr)
-    }
-
-    /// Get the value for the `IP6T_SO_ORIGINAL_DST` option on this socket.
-    ///
-    /// This value contains the original destination IPv6 address of the connection
-    /// redirected using `ip6tables` `REDIRECT` or `TPROXY`.
-    #[cfg(all(feature = "all", any(target_os = "android", target_os = "linux")))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(feature = "all", any(target_os = "android", target_os = "linux"))))
-    )]
-    pub fn original_dst_ipv6(&self) -> io::Result<SockAddr> {
-        // Safety: `getsockopt` initialises the `SockAddr` for us.
-        unsafe {
-            SockAddr::try_init(|storage, len| {
-                syscall!(getsockopt(
-                    self.as_raw(),
-                    libc::SOL_IPV6,
-                    libc::IP6T_SO_ORIGINAL_DST,
-                    storage.cast(),
-                    len
-                ))
-            })
-        }
-        .map(|(_, addr)| addr)
-    }
-
     /// Copies data between a `file` and this socket using the `sendfile(2)`
     /// system call. Because this copying is done within the kernel,
     /// `sendfile()` is more efficient than the combination of `read(2)` and
@@ -2401,6 +2496,7 @@ impl crate::Socket {
             target_os = "android",
             target_os = "freebsd",
             target_os = "ios",
+            target_os = "visionos",
             target_os = "linux",
             target_os = "macos",
             target_os = "tvos",
@@ -2416,6 +2512,7 @@ impl crate::Socket {
                 target_os = "android",
                 target_os = "freebsd",
                 target_os = "ios",
+                target_os = "visionos",
                 target_os = "linux",
                 target_os = "macos",
                 target_os = "tvos",
@@ -2439,6 +2536,7 @@ impl crate::Socket {
         feature = "all",
         any(
             target_os = "ios",
+            target_os = "visionos",
             target_os = "macos",
             target_os = "tvos",
             target_os = "watchos",
