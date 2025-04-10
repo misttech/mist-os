@@ -49,6 +49,7 @@ pub use internal::socket::{
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
     pub use crate::internal::buffer::testutil::{
-        ClientBuffers, ProvidedBuffers, RingBuffer, TestSendBuffer, WriteBackClientBuffers,
+        ClientBuffers, InfiniteSendBuffer, ProvidedBuffers, RepeatingSendBuffer, RingBuffer,
+        TestSendBuffer, WriteBackClientBuffers,
     };
 }

@@ -1004,9 +1004,10 @@ impl SackRecovery {
             if let Some(right_edge) = sack_scoreboard.right_edge() {
                 let left = right_edge.latest(snd_nxt - congestion_limit);
                 // This can't send any new data, so figure out how much space we
-                // have left. Unwrap is safe here because the right edge of the
-                // scoreboard can't be after snd_nxt.
-                let congestion_limit = u32::try_from(snd_nxt - left).unwrap();
+                // have left. If SND.NXT got rewound and is now before the right
+                // edge, unwrap the calculation to zero to avoid sending the
+                // rescue segment.
+                let congestion_limit = u32::try_from(snd_nxt - left).unwrap_or(0);
                 if congestion_limit > 0 {
                     *rescue_rxt = Some(*recovery_point);
                     return Some(CongestionControlSendOutcome {
@@ -1992,6 +1993,47 @@ mod test {
                     mode: LossRecoveryMode::SackRecovery,
                 }
             })
+        );
+    }
+
+    // Parts of the state machine may end up rewinding SND.NXT to SND.UNA.
+    // Ensure that NextSeg rule 4 implementation in SackRecovery (which is
+    // sensitive to SND.NXT) gracefully handles that.
+    #[test]
+    fn sack_snd_nxt_rewind() {
+        let mut scoreboard = SackScoreboard::default();
+        let mss = DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE;
+        let snd_una = SeqNum::new(1);
+
+        let recovery_point = nth_segment_from(snd_una, mss, 100).start;
+        let snd_nxt = nth_segment_from(recovery_point, mss, 100).start;
+
+        let mut recovery = SackRecovery {
+            dup_acks: DUP_ACK_THRESHOLD,
+            recovery: SackRecoveryState::InRecovery(SackInRecoveryState {
+                recovery_point,
+                high_rxt: recovery_point,
+                rescue_rxt: None,
+            }),
+        };
+        let sack_block = SackBlock::try_from(nth_range(snd_una, mss, 1..5)).unwrap();
+        assert!(scoreboard.process_ack(
+            snd_una,
+            snd_nxt,
+            Some(recovery_point),
+            &[sack_block].into_iter().collect(),
+            mss,
+        ));
+        // Rewind.
+        let snd_nxt = snd_una;
+
+        let cwnd = CongestionWindow::new(u32::MAX, mss);
+        let snd_wnd = WindowSize::ZERO;
+        let available_bytes = 0;
+
+        assert_eq!(
+            recovery.poll_send(cwnd, snd_una, snd_nxt, snd_wnd, available_bytes, &scoreboard),
+            None
         );
     }
 }

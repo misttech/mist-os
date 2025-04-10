@@ -1393,11 +1393,11 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         // First calculate the unused window, note that if our peer has shrank
         // their window (it is strongly discouraged), the following conversion
         // will fail and we return early.
-        let unused_window =
-            u32::try_from(*snd_una + *snd_wnd - next_seg).ok_checked::<TryFromIntError>()?;
+        let snd_limit = *snd_una + *snd_wnd;
+        let unused_window = u32::try_from(snd_limit - next_seg).ok_checked::<TryFromIntError>()?;
         let offset =
             usize::try_from(next_seg - *snd_una).unwrap_or_else(|TryFromIntError { .. }| {
-                panic!("next_seg({:?}) should never fall behind snd.una({:?})", *snd_nxt, *snd_una);
+                panic!("next_seg({:?}) should never fall behind snd.una({:?})", next_seg, *snd_una);
             });
         let available = u32::try_from(readable_bytes + usize::from(FIN_QUEUED) - offset)
             .unwrap_or_else(|_| WindowSize::MAX.into());
@@ -1672,16 +1672,18 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             return (Some(rcv.make_ack(*snd_max)), DataAcked::No);
         }
 
+        let bytes_acked = match u32::try_from(seg_ack - *snd_una) {
+            Ok(acked) => NonZeroU32::new(acked),
+            Err(TryFromIntError { .. }) => {
+                // We've received an ACK prior to SND.UNA. This must be an out
+                // of order acknowledgement. Ignore it.
+                return (None, DataAcked::No);
+            }
+        };
+
         let is_dup_ack_by_sack =
             congestion_control.preprocess_ack(seg_ack, *snd_nxt, seg_sack_blocks);
-        let (is_dup_ack, data_acked) = if seg_ack.after(*snd_una) {
-            // The unwrap is safe because the result must be positive.
-            let acked = u32::try_from(seg_ack - *snd_una)
-                .ok_checked::<TryFromIntError>()
-                .and_then(NonZeroU32::new)
-                .unwrap_or_else(|| {
-                    panic!("seg_ack({:?}) - snd_una({:?}) must be positive", seg_ack, snd_una);
-                });
+        let (is_dup_ack, data_acked) = if let Some(acked) = bytes_acked {
             let BufferLimits { len, capacity: _ } = buffer.limits();
             let fin_acked = FIN_QUEUED && seg_ack == *snd_una + len + 1;
             // Remove the acked bytes from the send buffer. The following
@@ -3613,7 +3615,7 @@ mod test {
 
     use super::*;
     use crate::internal::base::DEFAULT_FIN_WAIT2_TIMEOUT;
-    use crate::internal::buffer::testutil::{InfiniteSendBuffer, RingBuffer};
+    use crate::internal::buffer::testutil::{InfiniteSendBuffer, RepeatingSendBuffer, RingBuffer};
     use crate::internal::buffer::Buffer;
     use crate::internal::congestion::DUP_ACK_THRESHOLD;
     use crate::internal::counters::testutil::CounterExpectations;
@@ -9308,6 +9310,145 @@ mod test {
         assert!(
             avg_sent >= low_range && avg_sent <= high_range,
             "{low_range} <= {avg_sent} <= {high_range}"
+        );
+    }
+
+    // Tests that out of order ACKs including SACK blocks are discarded. This is
+    // a regression test for https://fxbug.dev/409599338.
+    #[test]
+    fn out_of_order_ack_with_sack_blocks() {
+        let send_segments = u32::from(DUP_ACK_THRESHOLD + 2);
+        let mss = DEVICE_MAXIMUM_SEGMENT_SIZE;
+
+        let send_bytes = send_segments * u32::from(mss);
+        // Ensure we're not going to ever be blocked by the receiver window.
+        let snd_wnd = WindowSize::from_u32(send_bytes).unwrap();
+        let wnd_scale = snd_wnd.scale();
+        let mut congestion_control = CongestionControl::cubic_with_mss(mss);
+        congestion_control.inflate_cwnd(snd_wnd.into());
+
+        let start = ISS_1 + 1;
+
+        let mut state = State::<FakeInstant, _, _, ()>::Established(Established {
+            snd: Send {
+                nxt: start,
+                max: start,
+                una: start,
+                wnd: snd_wnd,
+                wnd_max: snd_wnd,
+                buffer: RepeatingSendBuffer::new(usize::try_from(send_bytes).unwrap()),
+                wl1: ISS_2 + 1,
+                wl2: start,
+                rtt_estimator: Estimator::default(),
+                rtt_sampler: RttSampler::default(),
+                timer: None,
+                congestion_control,
+                wnd_scale,
+            }
+            .into(),
+            rcv: Recv {
+                buffer: RecvBufferState::Open {
+                    buffer: RingBuffer::default(),
+                    assembler: Assembler::new(ISS_2 + 1),
+                },
+                timer: None,
+                mss,
+                // quickacks start at zero.
+                remaining_quickacks: 0,
+                last_segment_at: None,
+                wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
+                sack_permitted: SACK_PERMITTED,
+            }
+            .into(),
+        });
+        let socket_options = SocketOptions::default_for_state_tests();
+        let clock = FakeInstantCtx::default();
+        let counters = FakeTcpCounters::default();
+        let sent = core::iter::from_fn(|| {
+            match state.poll_send(
+                &FakeStateMachineDebugId,
+                &counters.refs(),
+                u32::MAX,
+                clock.now(),
+                &socket_options,
+            ) {
+                Ok(seg) => Some(seg.len()),
+                Err(newly_closed) => {
+                    assert_eq!(newly_closed, NewlyClosed::No);
+                    None
+                }
+            }
+        })
+        .sum::<u32>();
+        assert_eq!(sent, send_segments * u32::from(mss));
+
+        // First receive a cumulative ACK for the entire transfer.
+        let end = state.assert_established().snd.nxt;
+        let seg = Segment::<()>::ack(ISS_2 + 1, end, snd_wnd >> wnd_scale);
+        assert_eq!(
+            state.on_segment::<_, ClientlessBufferProvider>(
+                &FakeStateMachineDebugId,
+                &counters.refs(),
+                seg,
+                clock.now(),
+                &socket_options,
+                false
+            ),
+            (None, None, DataAcked::Yes, NewlyClosed::No)
+        );
+        assert_eq!(state.assert_established().snd.congestion_control.pipe(), 0);
+        assert_matches!(
+            state.poll_send(
+                &FakeStateMachineDebugId,
+                &counters.refs(),
+                u32::MAX,
+                clock.now(),
+                &socket_options
+            ),
+            Err(NewlyClosed::No)
+        );
+
+        // Then receive an out of order ACK that only acknowledges the
+        // DUP_ACK_THRESHOLD segments after the first one.
+        let sack_block = SackBlock::try_new(
+            start + u32::from(mss),
+            start + u32::from(DUP_ACK_THRESHOLD + 1) * u32::from(mss),
+        )
+        .unwrap();
+        assert!(sack_block.right().before(end));
+        let seg = Segment::<()>::ack_with_options(
+            ISS_2 + 1,
+            start,
+            snd_wnd >> wnd_scale,
+            SegmentOptions { sack_blocks: [sack_block].into_iter().collect() }.into(),
+        );
+        assert_eq!(
+            state.on_segment::<_, ClientlessBufferProvider>(
+                &FakeStateMachineDebugId,
+                &counters.refs(),
+                seg,
+                clock.now(),
+                &socket_options,
+                false
+            ),
+            (None, None, DataAcked::No, NewlyClosed::No)
+        );
+        // The out of order ACK should not be considered in the scoreboard for
+        // bytes in flight and we should not be in recovery mode.
+        let congestion_control = &state.assert_established().snd.congestion_control;
+        assert_eq!(congestion_control.pipe(), 0);
+        assert_eq!(congestion_control.inspect_loss_recovery_mode(), None);
+        // No more segments should be generated.
+        assert_matches!(
+            state.poll_send(
+                &FakeStateMachineDebugId,
+                &counters.refs(),
+                u32::MAX,
+                clock.now(),
+                &socket_options
+            ),
+            Err(NewlyClosed::No)
         );
     }
 }

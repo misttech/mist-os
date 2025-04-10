@@ -753,6 +753,54 @@ pub(crate) mod testutil {
             f(RepeatingPayload { len: Self::LEN - offset })
         }
     }
+
+    /// A buffer that has a controllable amount of [`RepeatingPayload`] bytes
+    /// available to read.
+    #[derive(Default, Debug, Eq, PartialEq)]
+    pub struct RepeatingSendBuffer(usize);
+
+    impl RepeatingSendBuffer {
+        /// Creates a new buffer with the provided `length`.
+        pub fn new(length: usize) -> Self {
+            Self(length)
+        }
+    }
+
+    impl Buffer for RepeatingSendBuffer {
+        fn capacity_range() -> (usize, usize) {
+            (0, usize::MAX)
+        }
+
+        fn limits(&self) -> BufferLimits {
+            let Self(len) = self;
+            BufferLimits { capacity: usize::MAX, len: *len }
+        }
+
+        fn target_capacity(&self) -> usize {
+            usize::MAX
+        }
+
+        fn request_capacity(&mut self, size: usize) {
+            unimplemented!("can't change capacity of repeatable send buffer to {size}")
+        }
+    }
+
+    impl SendBuffer for RepeatingSendBuffer {
+        type Payload<'a> = RepeatingPayload;
+
+        fn mark_read(&mut self, count: usize) {
+            let Self(len) = self;
+            *len = *len - count;
+        }
+
+        fn peek_with<'a, F, R>(&'a mut self, offset: usize, f: F) -> R
+        where
+            F: FnOnce(Self::Payload<'a>) -> R,
+        {
+            let Self(len) = self;
+            f(RepeatingPayload { len: *len - offset })
+        }
+    }
 }
 
 #[cfg(test)]
