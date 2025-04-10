@@ -17,12 +17,11 @@ use crate::vfs::{
     LookupContext, Message, UcredPtr,
 };
 use ebpf::{
-    BpfProgramContext, BpfValue, CbpfConfig, DataWidth, EbpfProgram, FieldMapping, Packet,
-    ProgramArgument, StructMapping, Type,
+    BpfProgramContext, BpfValue, CbpfConfig, DataWidth, EbpfProgram, Packet, ProgramArgument, Type,
 };
 use ebpf_api::{
-    get_socket_filter_helpers, PinnedMap, ProgramType, SocketFilterContext, SK_BUF_ID, SK_BUF_TYPE,
-    SOCKET_FILTER_CBPF_CONFIG,
+    get_socket_filter_helpers, PinnedMap, ProgramType, SocketFilterContext,
+    SOCKET_FILTER_CBPF_CONFIG, SOCKET_FILTER_SK_BUF_TYPE,
 };
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, Unlocked};
@@ -34,11 +33,11 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    __sk_buff, errno, error, gid_t, socklen_t, uapi, ucred, uid_t, uref, FIONREAD, SOL_SOCKET,
+    __sk_buff, errno, error, gid_t, socklen_t, uapi, ucred, uid_t, FIONREAD, SOL_SOCKET,
     SO_ACCEPTCONN, SO_ATTACH_BPF, SO_BROADCAST, SO_ERROR, SO_KEEPALIVE, SO_LINGER, SO_NO_CHECK,
     SO_PASSCRED, SO_PEERCRED, SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR, SO_REUSEPORT, SO_SNDBUF,
 };
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 use zerocopy::IntoBytes;
 
 // From unix.go in gVisor.
@@ -780,7 +779,7 @@ impl SocketOps for UnixSocket {
 
                     let linked_program = program.link(
                         ProgramType::SocketFilter,
-                        &[SK_BUF_MAPPING.clone()],
+                        &[],
                         &get_socket_filter_helpers::<UnixSocketEbpfContext>()[..],
                     )?;
 
@@ -1028,12 +1027,7 @@ where
 #[repr(C)]
 #[derive(Default)]
 struct SkBuf {
-    // `data` and `data_end` fields in `__sk_buff` are remapped to the 64-bit fields below.
     sk_buff: __sk_buff,
-
-    // Actual references to the buffer, remapped from the original 32-bit fields above.
-    data: uref<u8>,
-    data_end: uref<u8>,
 }
 
 impl Packet for &mut SkBuf {
@@ -1042,20 +1036,6 @@ impl Packet for &mut SkBuf {
         None
     }
 }
-
-static SK_BUF_MAPPING: LazyLock<StructMapping> = LazyLock::new(|| StructMapping {
-    memory_id: SK_BUF_ID.clone(),
-    fields: vec![
-        FieldMapping {
-            source_offset: std::mem::offset_of!(__sk_buff, data),
-            target_offset: std::mem::offset_of!(SkBuf, data),
-        },
-        FieldMapping {
-            source_offset: std::mem::offset_of!(__sk_buff, data_end),
-            target_offset: std::mem::offset_of!(SkBuf, data_end),
-        },
-    ],
-});
 
 struct UnixSocketEbpfHelpersContext {}
 
@@ -1074,7 +1054,7 @@ impl SocketFilterContext for UnixSocketEbpfHelpersContext {
 
 impl ProgramArgument for &'_ mut SkBuf {
     fn get_type() -> &'static Type {
-        &*SK_BUF_TYPE
+        &*SOCKET_FILTER_SK_BUF_TYPE
     }
 }
 

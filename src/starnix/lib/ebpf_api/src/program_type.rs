@@ -600,12 +600,20 @@ fn scalar_field(offset: usize, size: usize) -> FieldDescriptor {
     FieldDescriptor { offset, field_type: FieldType::Scalar { size } }
 }
 
-fn scalar_mut_field(offset: usize, size: usize) -> FieldDescriptor {
-    FieldDescriptor { offset, field_type: FieldType::MutableScalar { size } }
+fn scalar_range(offset: usize, end_offset: usize) -> FieldDescriptor {
+    FieldDescriptor { offset, field_type: FieldType::Scalar { size: end_offset - offset } }
+}
+
+fn scalar_mut_range(offset: usize, end_offset: usize) -> FieldDescriptor {
+    FieldDescriptor { offset, field_type: FieldType::MutableScalar { size: end_offset - offset } }
 }
 
 fn scalar_u32_field(offset: usize) -> FieldDescriptor {
     FieldDescriptor { offset, field_type: FieldType::Scalar { size: std::mem::size_of::<u32>() } }
+}
+
+fn scalar_u64_field(offset: usize) -> FieldDescriptor {
+    FieldDescriptor { offset, field_type: FieldType::Scalar { size: std::mem::size_of::<u64>() } }
 }
 
 fn array_start_32_field(offset: usize, id: MemoryId) -> FieldDescriptor {
@@ -613,7 +621,7 @@ fn array_start_32_field(offset: usize, id: MemoryId) -> FieldDescriptor {
 }
 
 fn array_end_32_field(offset: usize, id: MemoryId) -> FieldDescriptor {
-    FieldDescriptor { offset, field_type: FieldType::PtrToArray { id, is_32_bit: true } }
+    FieldDescriptor { offset, field_type: FieldType::PtrToEndArray { id, is_32_bit: true } }
 }
 
 fn ptr_to_struct_type(id: MemoryId, fields: Vec<FieldDescriptor>) -> Type {
@@ -627,29 +635,72 @@ fn ptr_to_mem_type<T: IntoBytes>(id: MemoryId) -> Type {
 static RING_BUFFER_RESERVATION: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 
 pub static SK_BUF_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
-pub static SK_BUF_TYPE: LazyLock<Type> = LazyLock::new(|| {
-    let cb_offset = offset_of!(__sk_buff, cb);
-    let hash_offset = offset_of!(__sk_buff, hash);
-    let data_id = MemoryId::new();
 
+/// Type for the `__sk_buff` passed to `BPF_PROG_TYPE_SOCKET_FILTER` programs.
+pub static SOCKET_FILTER_SK_BUF_TYPE: LazyLock<Type> = LazyLock::new(|| {
     ptr_to_struct_type(
         SK_BUF_ID.clone(),
         vec![
             // All fields from the start of `__sk_buff` to `cb` are read-only scalars.
-            scalar_field(0, cb_offset),
+            scalar_range(0, offset_of!(__sk_buff, cb)),
             // `cb` is a mutable array.
-            scalar_mut_field(cb_offset, hash_offset - cb_offset),
+            scalar_mut_range(offset_of!(__sk_buff, cb), offset_of!(__sk_buff, hash)),
             scalar_u32_field(offset_of!(__sk_buff, hash)),
             scalar_u32_field(offset_of!(__sk_buff, napi_id)),
             scalar_u32_field(offset_of!(__sk_buff, tstamp)),
             scalar_u32_field(offset_of!(__sk_buff, gso_segs)),
             scalar_u32_field(offset_of!(__sk_buff, gso_size)),
-            array_start_32_field(offset_of!(__sk_buff, data), data_id.clone()),
-            array_end_32_field(offset_of!(__sk_buff, data_end), data_id),
         ],
     )
 });
-pub static SK_BUF_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| vec![SK_BUF_TYPE.clone()]);
+pub static SOCKET_FILTER_ARGS: LazyLock<Vec<Type>> =
+    LazyLock::new(|| vec![SOCKET_FILTER_SK_BUF_TYPE.clone()]);
+
+/// Type for the `__sk_buff` passed to `BPF_PROG_TYPE_SCHED_CLS` and
+/// `BPF_PROG_TYPE_SCHED_ACT` programs.
+pub static SCHED_ARG_TYPE: LazyLock<Type> = LazyLock::new(|| {
+    let data_id = MemoryId::new();
+    ptr_to_struct_type(
+        SK_BUF_ID.clone(),
+        vec![
+            // All fields from the start of `__sk_buff` to `cb` are read-only scalars.
+            scalar_range(0, offset_of!(__sk_buff, cb)),
+            // `cb` is a mutable array.
+            scalar_mut_range(offset_of!(__sk_buff, cb), offset_of!(__sk_buff, hash)),
+            scalar_u32_field(offset_of!(__sk_buff, hash)),
+            scalar_u32_field(offset_of!(__sk_buff, tc_classid)),
+            array_start_32_field(offset_of!(__sk_buff, data), data_id.clone()),
+            array_end_32_field(offset_of!(__sk_buff, data_end), data_id),
+            scalar_u32_field(offset_of!(__sk_buff, napi_id)),
+            scalar_u32_field(offset_of!(__sk_buff, data_meta)),
+            scalar_range(offset_of!(__sk_buff, tstamp), size_of::<__sk_buff>()),
+        ],
+    )
+});
+pub static SCHED_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| vec![SCHED_ARG_TYPE.clone()]);
+
+/// Type for the `__sk_buff` passed to `BPF_PROG_TYPE_CGROUP_SKB` programs.
+pub static CGROUP_SKB_SK_BUF_TYPE: LazyLock<Type> = LazyLock::new(|| {
+    let data_id = MemoryId::new();
+    ptr_to_struct_type(
+        SK_BUF_ID.clone(),
+        vec![
+            // All fields from the start of `__sk_buff` to `cb` are read-only scalars.
+            scalar_range(0, offset_of!(__sk_buff, cb)),
+            // `cb` is a mutable array.
+            scalar_mut_range(offset_of!(__sk_buff, cb), offset_of!(__sk_buff, hash)),
+            scalar_u32_field(offset_of!(__sk_buff, hash)),
+            array_start_32_field(offset_of!(__sk_buff, data), data_id.clone()),
+            array_end_32_field(offset_of!(__sk_buff, data_end), data_id),
+            scalar_range(offset_of!(__sk_buff, napi_id), offset_of!(__sk_buff, data_meta)),
+            scalar_u64_field(offset_of!(__sk_buff, tstamp)),
+            scalar_range(offset_of!(__sk_buff, gso_segs), offset_of!(__sk_buff, tstamp_type)),
+            scalar_u64_field(offset_of!(__sk_buff, hwtstamp)),
+        ],
+    )
+});
+pub static CGROUP_SKB_ARGS: LazyLock<Vec<Type>> =
+    LazyLock::new(|| vec![CGROUP_SKB_SK_BUF_TYPE.clone()]);
 
 static XDP_MD_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 static XDP_MD_TYPE: LazyLock<Type> = LazyLock::new(|| {
@@ -947,12 +998,12 @@ impl ProgramType {
         expected_attach_type: AttachType,
     ) -> Result<&'static [Type], EbpfApiError> {
         let args = match self {
-            Self::SchedAct | Self::SchedCls | Self::SocketFilter => &SK_BUF_ARGS,
-
+            Self::SocketFilter => &SOCKET_FILTER_ARGS,
+            Self::SchedAct | Self::SchedCls => &SCHED_ARGS,
             Self::CgroupSkb => match expected_attach_type {
                 AttachType::Unspecified
                 | AttachType::CgroupInetIngress
-                | AttachType::CgroupInetEgress => &SK_BUF_ARGS,
+                | AttachType::CgroupInetEgress => &CGROUP_SKB_ARGS,
                 _ => return Err(EbpfApiError::InvalidExpectedAttachType(expected_attach_type)),
             },
 
@@ -1029,9 +1080,8 @@ impl ProgramType {
     ) -> Result<CallingContext, EbpfApiError> {
         let args = self.get_args(expected_attach_type)?.to_vec();
         let packet_type = match self {
-            Self::CgroupSkb | Self::SchedAct | Self::SchedCls | Self::SocketFilter => {
-                Some(SK_BUF_TYPE.clone())
-            }
+            Self::SocketFilter => Some(SOCKET_FILTER_SK_BUF_TYPE.clone()),
+            Self::SchedAct | Self::SchedCls => Some(SCHED_ARG_TYPE.clone()),
             _ => None,
         };
         Ok(CallingContext { maps, helpers: self.get_helpers(), args, packet_type })
