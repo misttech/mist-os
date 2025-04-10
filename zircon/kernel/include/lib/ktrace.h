@@ -969,8 +969,13 @@ class KTraceImpl {
   const bool disable_diagnostic_logs_{false};
 };
 
-// Default KTrace to use the single buffer implementation.
+// Utilize the per-CPU implementation of ktrace if streaming has been enabled.
+// Otherwise, default to using the single buffer version.
+#if EXPERIMENTAL_KTRACE_STREAMING_ENABLED
+using KTrace = KTraceImpl<BufferMode::kPerCpu>;
+#else
 using KTrace = KTraceImpl<BufferMode::kSingle>;
+#endif
 
 void ktrace_report_live_threads();
 void ktrace_report_live_processes();
