@@ -3340,6 +3340,25 @@ std::vector<fuchsia_wlan_stats::wire::UnnamedCounter> brcmf_sdio_get_counters(
   return counters;
 }
 
+std::vector<fuchsia_wlan_stats::wire::UnnamedGauge> brcmf_sdio_get_gauges(
+    struct brcmf_bus* bus_if) {
+  struct brcmf_sdio_dev* sdiodev = bus_if->bus_priv.sdio;
+  struct brcmf_sdio* bus = sdiodev->bus;
+
+  std::vector<fuchsia_wlan_stats::wire::UnnamedGauge> gauges;
+  gauges.push_back(GaugeConfigs::SDIO_TX_SEQ.unnamed(bus->tx_seq));
+  gauges.push_back(GaugeConfigs::SDIO_TX_MAX.unnamed(bus->tx_max));
+
+  std::lock_guard lock(bus->tx_queue->txq_lock);
+  gauges.push_back(GaugeConfigs::SDIO_TX_QUEUE_LEN.unnamed(bus->tx_queue->tx_queue.size()));
+  gauges.push_back(GaugeConfigs::SDIO_TX_QUEUE_0_LEN.unnamed(bus->tx_queue->tx_queue.size(1 << 0)));
+  gauges.push_back(GaugeConfigs::SDIO_TX_QUEUE_1_LEN.unnamed(bus->tx_queue->tx_queue.size(1 << 1)));
+  gauges.push_back(GaugeConfigs::SDIO_TX_QUEUE_2_LEN.unnamed(bus->tx_queue->tx_queue.size(1 << 2)));
+  gauges.push_back(GaugeConfigs::SDIO_TX_QUEUE_3_LEN.unnamed(bus->tx_queue->tx_queue.size(1 << 3)));
+
+  return gauges;
+}
+
 void brcmf_sdio_oob_irqhandler(brcmf_sdio_dev* sdiodev) {
   struct brcmf_sdio* bus = sdiodev->bus;
   zx_status_t status;
@@ -3826,6 +3845,7 @@ static const struct brcmf_bus_ops brcmf_sdio_bus_ops = {
     .recovery = brcmf_sdio_recovery,
     .log_stats = brcmf_sdio_log_stats,
     .get_counters = brcmf_sdio_get_counters,
+    .get_gauges = brcmf_sdio_get_gauges,
     .prepare_vmo = brcmf_sdio_prepare_vmo,
     .release_vmo = brcmf_sdio_release_vmo,
     .queue_rx_space = brcmf_sdio_queue_rx_space,

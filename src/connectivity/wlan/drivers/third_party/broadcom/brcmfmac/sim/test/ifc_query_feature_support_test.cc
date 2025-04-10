@@ -50,7 +50,8 @@ TEST_F(SimTest, ClientIfcQuerySpectrumManagementSupport) {
   EXPECT_TRUE(resp.dfs.supported);
 }
 
-// Verify that there's no duplicate counter ID or counter name returned in QueryTelemetrySupport
+// Verify that there's no duplicate counter/gauge ID or counter/gauge name returned
+// in QueryTelemetrySupport
 TEST_F(SimTest, ClientIfcQueryTelemetrySupport_NoDuplicate) {
   ASSERT_EQ(Init(), ZX_OK);
 
@@ -76,6 +77,22 @@ TEST_F(SimTest, ClientIfcQueryTelemetrySupport_NoDuplicate) {
       ASSERT_TRUE(false, "Duplicate counter name %s", counter_name.c_str());
     }
     counter_names.insert(counter_name);
+  }
+
+  auto gauge_configs = resp.inspect_gauge_configs();
+  std::set<uint16_t> gauge_ids;
+  std::set<std::string> gauge_names;
+  for (auto config : gauge_configs) {
+    if (gauge_ids.contains(config.gauge_id())) {
+      ASSERT_TRUE(false, "Duplicate gauge id %u", config.gauge_id());
+    }
+    gauge_ids.insert(config.gauge_id());
+
+    std::string gauge_name(config.gauge_name().get());
+    if (gauge_names.contains(gauge_name)) {
+      ASSERT_TRUE(false, "Duplicate gauge name %s", gauge_name.c_str());
+    }
+    gauge_names.insert(gauge_name);
   }
 }
 

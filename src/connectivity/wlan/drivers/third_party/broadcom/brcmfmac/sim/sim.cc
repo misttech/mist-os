@@ -86,6 +86,8 @@ static const struct brcmf_bus_ops brcmf_sim_bus_ops = {
     .log_stats = [](brcmf_bus* bus) { BRCMF_INFO("Simulated bus, no stats to log"); },
     .get_counters =
         [](brcmf_bus* bus) { return std::vector<fuchsia_wlan_stats::wire::UnnamedCounter>(); },
+    .get_gauges =
+        [](brcmf_bus* bus) { return std::vector<fuchsia_wlan_stats::wire::UnnamedGauge>(); },
     .prepare_vmo = [](brcmf_bus*, uint8_t, zx_handle_t, uint8_t*, size_t) { return ZX_OK; },
     .queue_rx_space =
         [](brcmf_bus* bus,

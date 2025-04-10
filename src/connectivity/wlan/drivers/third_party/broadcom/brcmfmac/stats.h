@@ -102,4 +102,45 @@ struct CounterConfigs {
   static constexpr CounterConfig SDIO_TX_ENQUEUE_COUNT{62, "sdio_tx_enqueue_count"};
 };
 
+template <size_t N>
+class GaugeConfig {
+ public:
+  constexpr GaugeConfig(uint16_t id, const char* name,
+                        const std::array<fuchsia_wlan_stats::wire::GaugeStatistic, N> statistics)
+      : id_(id), name_(name), statistics_(statistics) {}
+  fuchsia_wlan_stats::wire::InspectGaugeConfig toFidl(fidl::AnyArena& arena) const {
+    return fuchsia_wlan_stats::wire::InspectGaugeConfig::Builder(arena)
+        .gauge_id(id_)
+        .gauge_name(name_)
+        .statistics(fidl::VectorView<fuchsia_wlan_stats::wire::GaugeStatistic>(
+            arena, statistics_.begin(), statistics_.end()))
+        .Build();
+  }
+  fuchsia_wlan_stats::wire::UnnamedGauge unnamed(int64_t value) const {
+    return fuchsia_wlan_stats::wire::UnnamedGauge{.id = id_, .value = value};
+  }
+
+ private:
+  uint16_t id_;
+  const char* name_;
+  const std::array<fuchsia_wlan_stats::wire::GaugeStatistic, N> statistics_;
+};
+
+struct GaugeConfigs {
+  static constexpr GaugeConfig<1> SDIO_TX_SEQ{
+      1, "sdio_tx_seq", {fuchsia_wlan_stats::wire::GaugeStatistic::kLast}};
+  static constexpr GaugeConfig<1> SDIO_TX_MAX{
+      2, "sdio_tx_max", {fuchsia_wlan_stats::wire::GaugeStatistic::kLast}};
+  static constexpr GaugeConfig<1> SDIO_TX_QUEUE_LEN{
+      3, "sdio_tx_queue_len", {fuchsia_wlan_stats::wire::GaugeStatistic::kMean}};
+  static constexpr GaugeConfig<1> SDIO_TX_QUEUE_0_LEN{
+      4, "sdio_tx_queue_0_len", {fuchsia_wlan_stats::wire::GaugeStatistic::kMean}};
+  static constexpr GaugeConfig<1> SDIO_TX_QUEUE_1_LEN{
+      5, "sdio_tx_queue_1_len", {fuchsia_wlan_stats::wire::GaugeStatistic::kMean}};
+  static constexpr GaugeConfig<1> SDIO_TX_QUEUE_2_LEN{
+      6, "sdio_tx_queue_2_len", {fuchsia_wlan_stats::wire::GaugeStatistic::kMean}};
+  static constexpr GaugeConfig<1> SDIO_TX_QUEUE_3_LEN{
+      7, "sdio_tx_queue_3_len", {fuchsia_wlan_stats::wire::GaugeStatistic::kMean}};
+};
+
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_STATS_H_

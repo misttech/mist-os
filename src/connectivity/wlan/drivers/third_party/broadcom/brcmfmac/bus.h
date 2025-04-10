@@ -80,6 +80,7 @@ struct brcmf_bus_ops {
   zx_status_t (*recovery)(brcmf_bus* bus);
   void (*log_stats)(brcmf_bus* bus);
   std::vector<fuchsia_wlan_stats::wire::UnnamedCounter> (*get_counters)(brcmf_bus* bus);
+  std::vector<fuchsia_wlan_stats::wire::UnnamedGauge> (*get_gauges)(brcmf_bus* bus);
   zx_status_t (*prepare_vmo)(brcmf_bus* bus, uint8_t vmo_id, zx_handle_t vmo, uint8_t* mapped_addr,
                              size_t mapped_size);
   zx_status_t (*release_vmo)(brcmf_bus* bus, uint8_t vmo_id);
@@ -185,6 +186,11 @@ static inline void brcmf_bus_log_stats(struct brcmf_bus* bus) { bus->ops->log_st
 static inline std::vector<fuchsia_wlan_stats::wire::UnnamedCounter> brcmf_bus_get_counters(
     struct brcmf_bus* bus) {
   return bus->ops->get_counters(bus);
+}
+
+static inline std::vector<fuchsia_wlan_stats::wire::UnnamedGauge> brcmf_bus_get_gauges(
+    struct brcmf_bus* bus) {
+  return bus->ops->get_gauges(bus);
 }
 
 static inline zx_status_t brcmf_bus_prepare_vmo(struct brcmf_bus* bus, uint8_t vmo_id,
