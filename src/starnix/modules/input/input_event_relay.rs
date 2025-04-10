@@ -224,7 +224,7 @@ impl InputEventsRelay {
                                 Some(trace_flow_id)=>{
                                     trace_flow_end!(
                                         c"input",
-                                        c"dispatch_event_to_app",
+                                        c"dispatch_event_to_client",
                                         trace_flow_id.into());
                                 }
                                 None => {
