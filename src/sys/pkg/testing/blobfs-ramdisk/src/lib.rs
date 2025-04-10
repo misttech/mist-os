@@ -8,7 +8,7 @@
 //! Test utilities for starting a blobfs server.
 
 use anyhow::{anyhow, Context as _, Error};
-use delivery_blob::{CompressionMode, Type1Blob};
+use delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob};
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
 use fuchsia_merkle::Hash;
@@ -239,14 +239,7 @@ impl ServingFilesystem {
     /// None if the filesystem does not expose any services.
     fn svc_dir(&self) -> Result<Option<fio::DirectoryProxy>, Error> {
         match self {
-            Self::SingleVolume(_) => Ok(Some(
-                fuchsia_fs::directory::open_directory_async(
-                    self.exposed_dir()?,
-                    ".",
-                    fio::PERM_READABLE,
-                )
-                .context("opening svc dir")?,
-            )),
+            Self::SingleVolume(_) => Ok(None),
             Self::MultiVolume(_) => Ok(Some(
                 fuchsia_fs::directory::open_directory_async(
                     self.exposed_dir()?,
@@ -399,23 +392,44 @@ impl BlobfsRamdisk {
     /// uncompressed. Ignores AlreadyExists errors.
     pub async fn write_blob(&self, merkle: Hash, bytes: &[u8]) -> Result<(), Error> {
         let compressed_data = Type1Blob::generate(bytes, CompressionMode::Attempt);
-        let blob_creator = self
-            .blob_creator_proxy()?
-            .ok_or_else(|| anyhow!("The filesystem does not expose the BlobCreator service"))?;
-        let writer_client_end = match blob_creator.create(&merkle.into(), false).await? {
-            Ok(writer_client_end) => writer_client_end,
-            Err(ffxfs::CreateBlobError::AlreadyExists) => {
-                return Ok(());
+        match self.fs {
+            ServingFilesystem::SingleVolume(_) => {
+                use std::io::Write as _;
+                let mut file =
+                    match self.root_dir().unwrap().new_file(delivery_blob_path(merkle), 0o600) {
+                        Ok(file) => file,
+                        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                            // blob is being written or already written
+                            return Ok(());
+                        }
+                        Err(e) => {
+                            return Err(e.into());
+                        }
+                    };
+                file.set_len(compressed_data.len().try_into().unwrap())?;
+                file.write_all(&compressed_data)?;
             }
-            Err(e) => {
-                return Err(anyhow!("create blob error {:?}", e));
+            ServingFilesystem::MultiVolume(_) => {
+                let blob_creator = self.blob_creator_proxy()?.ok_or_else(|| {
+                    anyhow!("The filesystem does not expose the BlobCreator service")
+                })?;
+                let writer_client_end = match blob_creator.create(&merkle.into(), false).await? {
+                    Ok(writer_client_end) => writer_client_end,
+                    Err(ffxfs::CreateBlobError::AlreadyExists) => {
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        return Err(anyhow!("create blob error {:?}", e));
+                    }
+                };
+                let writer = writer_client_end.into_proxy();
+                let mut blob_writer =
+                    blob_writer::BlobWriter::create(writer, compressed_data.len() as u64)
+                        .await
+                        .context("failed to create BlobWriter")?;
+                blob_writer.write(&compressed_data).await?;
             }
-        };
-        let writer = writer_client_end.into_proxy();
-        let mut blob_writer = blob_writer::BlobWriter::create(writer, compressed_data.len() as u64)
-            .await
-            .context("failed to create BlobWriter")?;
-        blob_writer.write(&compressed_data).await?;
+        }
         Ok(())
     }
 
@@ -515,7 +529,6 @@ impl FormattedRamdisk {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use delivery_blob::delivery_blob_path;
     use std::io::Write as _;
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -665,19 +678,19 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn blobfs_supports_blob_creator_api() {
+    async fn blobfs_does_not_support_blob_creator_api() {
         let blobfs = BlobfsRamdisk::builder().cpp_blobfs().start().await.unwrap();
 
-        assert!(blobfs.blob_creator_proxy().unwrap().is_some());
+        assert!(blobfs.blob_creator_proxy().unwrap().is_none());
 
         blobfs.stop().await.unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn blobfs_supports_blob_reader_api() {
+    async fn blobfs_does_not_support_blob_reader_api() {
         let blobfs = BlobfsRamdisk::builder().cpp_blobfs().start().await.unwrap();
 
-        assert!(blobfs.blob_reader_proxy().unwrap().is_some());
+        assert!(blobfs.blob_reader_proxy().unwrap().is_none());
 
         blobfs.stop().await.unwrap();
     }

@@ -748,7 +748,7 @@ async fn open_blob(
         }
         Err(BlobCreator(error)) => {
             warn!(error:?, blob_id:%; "error calling blob creator");
-            (Err(fErr::UnspecifiedIo), Ok(Needed))
+            (Err(fErr::Internal), Ok(Needed))
         }
     };
     let () = responder.send(fidl_resp).map_err(ServeNeededBlobsError::SendResponse)?;

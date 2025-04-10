@@ -182,23 +182,24 @@ impl PkgDirRealm {
             )
             .await
             .unwrap();
-        let svc_path = if fxblob {
-            format!("/blob/svc/{}", fidl_fuchsia_fxfs::BlobReaderMarker::PROTOCOL_NAME)
-        } else {
-            format!("/blob/{}", fidl_fuchsia_fxfs::BlobReaderMarker::PROTOCOL_NAME)
-        };
-        builder
-            .add_route(
-                Route::new()
-                    .capability(
-                        Capability::protocol::<fidl_fuchsia_fxfs::BlobReaderMarker>()
-                            .path(svc_path),
-                    )
-                    .from(&service_reflector)
-                    .to(&pkgdir),
-            )
-            .await
-            .unwrap();
+        if fxblob {
+            builder
+                .add_route(
+                    Route::new()
+                        .capability(
+                            Capability::protocol::<fidl_fuchsia_fxfs::BlobReaderMarker>().path(
+                                format!(
+                                    "/blob/svc/{}",
+                                    fidl_fuchsia_fxfs::BlobReaderMarker::PROTOCOL_NAME
+                                ),
+                            ),
+                        )
+                        .from(&service_reflector)
+                        .to(&pkgdir),
+                )
+                .await
+                .unwrap();
+        }
         let realm = builder.build().await.expect("realm build failed");
         Self { realm }
     }

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use super::{OpenBlobError, TruncateBlobError, WriteBlobError};
-use anyhow::anyhow;
+use anyhow::Context as _;
 use zx_status::Status;
 use {fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg};
 
@@ -138,12 +138,10 @@ impl Writer for FxBlob {
     async fn truncate(&mut self, size: u64) -> Result<(), TruncateBlobError> {
         *self = match std::mem::replace(self, Self::Invalid) {
             Self::NeedsTruncate(proxy) => Self::NeedsBytes(
-                blob_writer::BlobWriter::create(proxy, size).await.map_err(|e| match e {
-                    blob_writer::CreateError::GetVmo(status) => {
-                        TruncateBlobError::UnexpectedResponse(status)
-                    }
-                    e => TruncateBlobError::Other(anyhow!(e).context("creating a BlobWriter")),
-                })?,
+                blob_writer::BlobWriter::create(proxy, size)
+                    .await
+                    .context("creating a BlobWriter")
+                    .map_err(TruncateBlobError::Other)?,
             ),
             Self::NeedsBytes(_) => {
                 return Err(TruncateBlobError::AlreadyTruncated(self.state_str()))
@@ -167,10 +165,10 @@ impl Writer for FxBlob {
         let res = fut.await;
         let () = after_write_ack();
         res.map_err(|e| match e {
-            blob_writer::WriteError::BytesReady(s) => match s {
+            e @ blob_writer::WriteError::BytesReady(s) => match s {
                 Status::IO_DATA_INTEGRITY => WriteBlobError::Corrupt,
                 Status::NO_SPACE => WriteBlobError::NoSpace,
-                _ => WriteBlobError::UnexpectedResponse(s),
+                _ => WriteBlobError::FxBlob(e),
             },
             e => WriteBlobError::FxBlob(e),
         })

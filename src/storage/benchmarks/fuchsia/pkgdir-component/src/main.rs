@@ -15,8 +15,12 @@ enum IncomingService {
 #[fuchsia::main]
 async fn main() -> anyhow::Result<()> {
     fuchsia_trace_provider::trace_provider_create_with_fdio();
-    let blobfs =
-        blobfs::Client::builder().readable().build().await.context("creating blobfs client")?;
+    let use_fxblob = pkgdir_config::Config::take_from_startup_handle().use_fxblob;
+    let builder = blobfs::Client::builder().readable();
+    let blobfs = if use_fxblob { builder.use_reader() } else { builder }
+        .build()
+        .await
+        .context("creating blobfs client")?;
     let mut service_fs = fuchsia_component::server::ServiceFs::new_local();
     service_fs.dir("svc").add_fidl_service(IncomingService::PkgDir);
     service_fs.take_and_serve_directory_handle().context("failed to serve outgoing namespace")?;

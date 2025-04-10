@@ -162,56 +162,80 @@ impl TestEnvBuilder {
             .unwrap();
 
         builder.init_mutable_config_from_package(&pkg_cache).await.unwrap();
-        builder
-            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
-                name: "fuchsia.pkgcache.UseFxblob".parse().unwrap(),
-                value: true.into(),
-            }))
-            .await
-            .unwrap();
+        match BLOB_IMPLEMENTATION {
+            blobfs_ramdisk::Implementation::Fxblob => {
+                builder
+                    .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                        name: "fuchsia.pkgcache.UseFxblob".parse().unwrap(),
+                        value: true.into(),
+                    }))
+                    .await
+                    .unwrap();
 
-        let svc_dir = vfs::remote::remote_dir(blobfs.svc_dir().unwrap().unwrap());
-        let service_reflector = builder
-            .add_local_child(
-                "service_reflector",
-                move |handles| {
-                    let out_dir = vfs::pseudo_directory! {
-                        "blob-svc" => svc_dir.clone(),
-                    };
-                    let scope = vfs::execution_scope::ExecutionScope::new();
-                    OUT_DIR_FLAGS.to_object_request(handles.outgoing_dir).handle(|request| {
-                        out_dir.open3(scope.clone(), vfs::Path::dot(), OUT_DIR_FLAGS, request)
-                    });
-                    async move {
-                        scope.wait().await;
-                        Ok(())
-                    }
-                    .boxed()
-                },
-                ChildOptions::new(),
-            )
-            .await
-            .unwrap();
-
-        builder
-            .add_route(
-                Route::new()
-                    .capability(
-                        Capability::protocol::<fidl_fuchsia_fxfs::BlobCreatorMarker>().path(
-                            format!(
-                                "/blob-svc/{}",
-                                fidl_fuchsia_fxfs::BlobCreatorMarker::PROTOCOL_NAME
-                            ),
-                        ),
+                let svc_dir = vfs::remote::remote_dir(blobfs.svc_dir().unwrap().unwrap());
+                let service_reflector = builder
+                    .add_local_child(
+                        "service_reflector",
+                        move |handles| {
+                            let out_dir = vfs::pseudo_directory! {
+                                "blob-svc" => svc_dir.clone(),
+                            };
+                            let scope = vfs::execution_scope::ExecutionScope::new();
+                            OUT_DIR_FLAGS.to_object_request(handles.outgoing_dir).handle(
+                                |request| {
+                                    out_dir.open3(
+                                        scope.clone(),
+                                        vfs::Path::dot(),
+                                        OUT_DIR_FLAGS,
+                                        request,
+                                    )
+                                },
+                            );
+                            async move {
+                                scope.wait().await;
+                                Ok(())
+                            }
+                            .boxed()
+                        },
+                        ChildOptions::new(),
                     )
-                    .capability(Capability::protocol::<fidl_fuchsia_fxfs::BlobReaderMarker>().path(
-                        format!("/blob-svc/{}", fidl_fuchsia_fxfs::BlobReaderMarker::PROTOCOL_NAME),
-                    ))
-                    .from(&service_reflector)
-                    .to(&pkg_cache),
-            )
-            .await
-            .unwrap();
+                    .await
+                    .unwrap();
+
+                builder
+                    .add_route(
+                        Route::new()
+                            .capability(
+                                Capability::protocol::<fidl_fuchsia_fxfs::BlobCreatorMarker>()
+                                    .path(format!(
+                                        "/blob-svc/{}",
+                                        fidl_fuchsia_fxfs::BlobCreatorMarker::PROTOCOL_NAME
+                                    )),
+                            )
+                            .capability(
+                                Capability::protocol::<fidl_fuchsia_fxfs::BlobReaderMarker>().path(
+                                    format!(
+                                        "/blob-svc/{}",
+                                        fidl_fuchsia_fxfs::BlobReaderMarker::PROTOCOL_NAME
+                                    ),
+                                ),
+                            )
+                            .from(&service_reflector)
+                            .to(&pkg_cache),
+                    )
+                    .await
+                    .unwrap();
+            }
+            blobfs_ramdisk::Implementation::CppBlobfs => {
+                builder
+                    .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                        name: "fuchsia.pkgcache.UseFxblob".parse().unwrap(),
+                        value: false.into(),
+                    }))
+                    .await
+                    .unwrap();
+            }
+        }
         builder
             .add_route(
                 Route::new()

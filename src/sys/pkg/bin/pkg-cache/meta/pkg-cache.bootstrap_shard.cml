@@ -70,11 +70,13 @@
             protocol: "fuchsia.fxfs.BlobCreator",
             from: "#fshost",
             to: "#pkg-cache",
+            availability: "optional",
         },
         {
             protocol: "fuchsia.fxfs.BlobReader",
             from: "#fshost",
             to: "#pkg-cache",
+            availability: "optional",
         },
         {
             directory: "boot",
