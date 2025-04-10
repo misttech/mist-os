@@ -7,7 +7,7 @@ use fuchsia_async::{self as fasync, TaskGroup};
 use fuchsia_sync::Mutex;
 
 use persistence_config::{Config, ServiceName, Tag, TagConfig};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 // This contains the logic to decide which tags to fetch at what times. It contains the state of
@@ -64,8 +64,12 @@ impl Scheduler {
             return;
         };
 
+        // Filter tags that need to be fetch now from those that need to be
+        // fetched later. Group later tags by their next_fetch time using a
+        // b-tree, making it efficient to iterate over these batches in
+        // order of next_fetch time.
         let mut now_tags = vec![];
-        let mut later_tags: Vec<(zx::MonotonicInstant, Tag)> = vec![];
+        let mut later_tags: BTreeMap<zx::MonotonicInstant, Vec<Tag>> = BTreeMap::new();
         for tag in tags {
             let Some(tag_state) = service_info.get_mut(&tag) else {
                 return;
@@ -80,32 +84,16 @@ impl Scheduler {
                 let next_fetch = tag_state.last_fetched + tag_state.backoff;
                 tag_state.last_fetched = next_fetch;
                 tag_state.state = FetchState::Pending;
-                later_tags.push((next_fetch, tag));
+                later_tags.entry(next_fetch).or_default().push(tag);
             }
         }
         if !now_tags.is_empty() {
             state.fetcher.send(FetchCommand { service: service.clone(), tags: now_tags });
         }
-        // later_tags may not all be fetchable at the same time. Batch the ones that are.
-        later_tags.sort_by(|a, b| a.0.cmp(&b.0));
-        while !later_tags.is_empty() {
-            // This is N^2 but N will be too small to matter.
-            let first_time = later_tags[0].0;
-            let mut first_tags = vec![];
-            let mut remaining_tags = vec![];
-            for (next_fetch, tag) in later_tags {
-                if next_fetch == first_time {
-                    first_tags.push(tag);
-                } else {
-                    remaining_tags.push((next_fetch, tag));
-                }
-            }
-            later_tags = remaining_tags;
-            self.enqueue(
-                &mut state,
-                first_time,
-                FetchCommand { service: service.clone(), tags: first_tags },
-            );
+
+        // Schedule tags that need to be fetch later.
+        while let Some((next_fetch, tags)) = later_tags.pop_first() {
+            self.enqueue(&mut state, next_fetch, FetchCommand { service: service.clone(), tags });
         }
     }
 
