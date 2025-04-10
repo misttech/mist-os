@@ -46,7 +46,7 @@ void UsbAdbDevice::StartAdb(StartAdbRequestView request, StartAdbCompleter::Sync
       zxlogf(WARNING, "ADB connected while stopping");
       completer.ReplyError(ZX_ERR_BAD_STATE);
       return;
-    case State::kConnected:
+    case State::kOnline:
       // We're already online, so send the status change immediately.
       if (auto result =
               fidl::WireSendEvent(request->interface)->OnStatusChanged(fadb::StatusFlags::kOnline);
@@ -82,7 +82,7 @@ void UsbAdbDevice::ResetOrStopUsb() {
     case State::kStoppingUsb:
       zxlogf(INFO, "Stop requested, but already stopping");
       return;
-    case State::kConnected:
+    case State::kOnline:
       zxlogf(INFO, "Stopping USB");
       break;
     case State::kAwaitingUsbConnection:
@@ -118,7 +118,7 @@ void UsbAdbDevice::ResetOrStopUsb() {
 }
 
 void UsbAdbDevice::SendQueued() {
-  if (state_ != State::kConnected) {
+  if (state_ != State::kOnline) {
     ZX_PANIC("Unexpected state: %d", state_);
   }
   while (SendQueuedOnce()) {
@@ -177,7 +177,7 @@ bool UsbAdbDevice::SendQueuedOnce() {
 }
 
 void UsbAdbDevice::ReceiveQueued() {
-  if (state_ != State::kConnected) {
+  if (state_ != State::kOnline) {
     ZX_PANIC("Unexpected state: %d", state_);
   }
   while (ReceiveQueuedOnce()) {
@@ -243,7 +243,7 @@ void UsbAdbDevice::QueueTx(QueueTxRequest& request, QueueTxCompleter::Sync& comp
       // Return early during shutdown.
       completer.Reply(fit::error(ZX_ERR_BAD_STATE));
       return;
-    case State::kConnected:
+    case State::kOnline:
     case State::kAwaitingUsbConnection:
       tx_pending_reqs_.emplace(
           txn_req_t{.request = std::move(request), .start = 0, .completer = completer.ToAsync()});
@@ -261,7 +261,7 @@ void UsbAdbDevice::Receive(ReceiveCompleter::Sync& completer) {
     case State::kAwaitingUsbConnection:
       rx_requests_.emplace(completer.ToAsync());
       break;
-    case State::kConnected:
+    case State::kOnline:
       rx_requests_.emplace(completer.ToAsync());
       ReceiveQueued();
       break;
@@ -279,7 +279,7 @@ void UsbAdbDevice::RxComplete(fendpoint::Completion completion) {
       bulk_out_ep_.PutRequest(usb::FidlRequest(std::move(completion.request().value())));
       CheckUsbStopComplete();
       return;
-    case State::kConnected:
+    case State::kOnline:
       pending_replies_.push(std::move(completion));
       ReceiveQueued();
       return;
@@ -294,7 +294,7 @@ void UsbAdbDevice::TxComplete(fendpoint::Completion completion) {
       bulk_in_ep_.PutRequest(usb::FidlRequest(std::move(completion.request().value())));
       CheckUsbStopComplete();
       return;
-    case State::kConnected:
+    case State::kOnline:
       bulk_in_ep_.PutRequest(usb::FidlRequest(std::move(completion.request().value())));
 
       // Do not queue requests if status is ZX_ERR_IO_NOT_PRESENT, as the underlying connection
@@ -342,7 +342,7 @@ zx_status_t UsbAdbDevice::UsbFunctionInterfaceControl(const usb_setup_t* setup,
 }
 void UsbAdbDevice::EnableEndpoints() {
   switch (state_) {
-    case State::kConnected:
+    case State::kOnline:
       zxlogf(INFO, "USB endpoints already enabled");
       return;
     case State::kStoppingUsb:
@@ -386,8 +386,8 @@ void UsbAdbDevice::EnableEndpoints() {
     }
   }
 
-  zxlogf(INFO, "state_ = State::kConnected");
-  state_ = State::kConnected;
+  zxlogf(INFO, "state_ = State::kOnline");
+  state_ = State::kOnline;
 }
 
 zx_status_t UsbAdbDevice::UsbFunctionInterfaceSetConfigured(bool configured, usb_speed_t speed) {
@@ -402,7 +402,7 @@ zx_status_t UsbAdbDevice::UsbFunctionInterfaceSetConfigured(bool configured, usb
           // It's normal to receive SetConfigured(false) while the connection is
           // starting up - ignore it.
           break;
-        case State::kConnected:
+        case State::kOnline:
           ResetOrStopUsb();
           break;
         case State::kStoppingUsb:
