@@ -108,6 +108,7 @@ template("_boot_test") {
     is_boot_test = true
     product_bundle = name
     expects_ssh = false
+    disable_fastboot = true
 
     forward_variables_from(invoker,
                            [
@@ -117,38 +118,6 @@ template("_boot_test") {
                              "environments",
                              "visibility",
                            ])
-
-    # The General Bootloader on fastboot devices does not support fastboot boot.
-    # This causes boot tests to fail on NUCs in fastboot TCP.
-    # For now, boot tests should only run on NUCs in zedboot.
-    # TODO (betramlalusha): Remove once b/406524915 is fixed.
-    if (defined(invoker.environments)) {
-      # Create new environments list
-      environments = []
-      foreach(invoker_env, invoker.environments) {
-        dim = {
-        }
-        dim = invoker_env.dimensions
-        if (defined(dim.device_type) &&
-            dim.device_type == "Intel NUC Kit NUC11TNHv5") {
-          dim.fastboot_enabled = "0"
-        }
-
-        # create a new 'env' object for each iteration.
-        env = {
-        }
-
-        # assign env object
-        env = {
-          # copy all fields form invoker_env _except_ for 'dimensions'
-          forward_variables_from(invoker_env, "*", [ "dimensions" ])
-
-          # Set that to the one altered above.
-          dimensions = dim
-        }
-        environments += [ env ]
-      }
-    }
 
     if ((defined(invoker.disabled) && invoker.disabled) || disable_boot_tests) {
       # A disabled test is marked by an empty environments list.

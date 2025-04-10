@@ -126,6 +126,7 @@ template("fuchsia_test_package") {
     if (defined(invoker.is_bootfs) && invoker.is_bootfs) {
       test_specs.build_rule = "fuchsia_bootfs_test_package"
       test_specs.expects_ssh = false
+      test_specs.disable_fastboot = true
     }
 
     # test packages won't be configured by assembly tools, so we can check their config earlier
