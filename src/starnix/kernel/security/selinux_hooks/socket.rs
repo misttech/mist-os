@@ -63,11 +63,11 @@ pub(in crate::security) fn socket_post_create(socket: &Socket, socket_node: &FsN
         SocketDomain::Inet | SocketDomain::Inet6 => match socket.socket_type {
             SocketType::Stream => match socket.protocol {
                 SocketProtocol::IP | SocketProtocol::TCP => SocketClass::Tcp,
-                _ => SocketClass::Socket,
+                _ => SocketClass::RawIp,
             },
             SocketType::Datagram => match socket.protocol {
                 SocketProtocol::IP | SocketProtocol::UDP => SocketClass::Udp,
-                _ => SocketClass::Socket,
+                _ => SocketClass::RawIp,
             },
             SocketType::Raw
             | SocketType::Rdm
