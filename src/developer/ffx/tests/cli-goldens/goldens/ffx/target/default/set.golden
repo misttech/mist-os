@@ -2,7 +2,7 @@
   "name": "set",
   "description": "Set the default target",
   "examples": [
-    "To set the default target:\n\n   $ ffx target default set <target name>\n\nTo set the 'target.default` key at the global configuration:\n\n   $ ffx target default set -l global <target name>\n\nTo specify a default target for a specific build directory:\n\n   $ ffx target default set -l build -b ~/fuchsia/out <target name>"
+    "To set the default target:\n\n   $ ffx target default set <target name>"
   ],
   "flags": [
     {
@@ -12,34 +12,10 @@
       "short": null,
       "description": "display usage information",
       "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
-          "arg_name": "level"
-        }
-      },
-      "optionality": "optional",
-      "long": "--level",
-      "short": "l",
-      "description": "config level, such as 'user', 'build', or 'global'",
-      "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
-          "arg_name": "build-dir"
-        }
-      },
-      "optionality": "optional",
-      "long": "--build-dir",
-      "short": "b",
-      "description": "optional directory to associate the provided build config",
-      "hidden": false
     }
   ],
   "notes": [
-    "Sets the `target.default` configuration key. By default sets the key in\nthe 'User Configuration'. Can be used in conjuction with `ffx target list`\nto list the names of the discovered targets.\n\nAfter setting the default target, `ffx target list` will mark the default\nwith a `*` in the output list."
+    "Sets the `target.default` configuration key in 'User Configuration'\nscope.\n\nAfter setting the default target, `ffx target list` will mark the default\nwith a `*` in the output list."
   ],
   "commands": [],
   "positionals": [

@@ -22,7 +22,7 @@ use std::sync::Arc;
 use thiserror::Error;
 
 /// A name for the type used as an environment variable mapping for isolation override
-type EnvVars = HashMap<String, String>;
+pub type EnvVars = HashMap<String, String>;
 
 /// Contextual information about where this instance of ffx is running
 #[derive(Clone, Debug)]
@@ -213,6 +213,13 @@ impl EnvironmentContext {
         match self.kind {
             EnvironmentKind::ConfigDomain { isolate_root: Some(..), .. }
             | EnvironmentKind::Isolated { .. } => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_in_tree(&self) -> bool {
+        match self.kind {
+            EnvironmentKind::InTree { .. } => true,
             _ => false,
         }
     }
@@ -578,9 +585,11 @@ mod test {
             }
         }
     }
+
     fn domains_test_data_path() -> &'static Utf8Path {
         Utf8Path::new(DOMAINS_TEST_DATA_PATH)
     }
+
     #[fuchsia::test]
     fn test_config_domain_context() {
         let domain_root = domains_test_data_path().join("basic_example");
@@ -683,6 +692,21 @@ mod test {
         .expect("Isolated context");
 
         check_isolated_paths(&context, &isolate_dir.path());
+    }
+
+    #[fuchsia::test]
+    fn test_in_tree_context() {
+        let tree_root = tempdir().expect("output directory");
+        let context = EnvironmentContext::in_tree(
+            ExecutableKind::Test,
+            tree_root.path().to_path_buf(),
+            None,
+            Default::default(),
+            None,
+            false,
+        );
+
+        assert!(context.is_in_tree());
     }
 
     fn check_config_domain_paths(context: &EnvironmentContext, domain_root: &Utf8Path) {

@@ -14,6 +14,8 @@ pub use query::ConfigQuery;
 pub use value::ConfigValue;
 use value::TryConvert;
 
+use crate::ConfigLevel;
+
 #[derive(Debug, Error)]
 #[error("Configuration error")]
 pub enum ConfigError {
@@ -23,6 +25,8 @@ pub enum ConfigError {
     KeyNotFound,
     #[error("Can't remove empty key")]
     EmptyKey,
+    #[error("Cannot access unconfigured {level} level configuration")]
+    UnconfiguredLevel { level: ConfigLevel },
     #[error("Bad value: {value}: {reason}")]
     BadValue { value: Value, reason: String },
 }
