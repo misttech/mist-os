@@ -116,11 +116,8 @@ TEST(DebugDataTests, PublishDataWithBadSvc) {
 // instead defines a local set of a few constants and structure definition in
 // fuchsia-io-constants.h to call fuchsia.io.Directory/Open(). Confirm that the
 // local copy matches the canonical definition here.
-// TODO(https://fxbug.dev/324111518): Migrate this to fuchsia.io/Directory.Open3.
-static_assert(fuchsia_io_DirectoryDeprecatedOpenOrdinal ==
-              fuchsia_io::Directory::DeprecatedOpen::kOrdinal);
-static_assert(fidl::TypeTraits<fidl::internal::TransactionalRequest<
-                  fuchsia_io::Directory::DeprecatedOpen>>::kPrimarySize ==
-              sizeof(fuchsia_io_DirectoryDeprecatedOpenRequest));
+static_assert(fuchsia_io_DirectoryOpenOrdinal == fuchsia_io::Directory::Open::kOrdinal);
+static_assert(fidl::TypeTraits<fidl::internal::TransactionalRequest<fuchsia_io::Directory::Open>>::
+                  kPrimarySize == sizeof(fuchsia_io_DirectoryOpenRequest));
 
 }  // anonymous namespace

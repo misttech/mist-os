@@ -15,14 +15,13 @@ constexpr uint64_t fuchsia_io_MAX_NAME_LENGTH = 255;
 
 // This definition of a bit of fuchsia.io.Directory/Open is here because llcpp has dependencies on
 // new/delete, which aren't possible when this code is used in libc.
-// TODO(https://fxbug.dev/324111518): Migrate this to fuchsia.io/Directory.Open3.
-constexpr uint64_t fuchsia_io_DirectoryDeprecatedOpenOrdinal = 0x2C5044561D685EC0ull;
-struct fuchsia_io_DirectoryDeprecatedOpenRequest {
+constexpr uint64_t fuchsia_io_DirectoryOpenOrdinal = 0x568ddcb9a9cbb6d9lu;
+struct fuchsia_io_DirectoryOpenRequest {
   FIDL_ALIGNDECL
   fidl_message_header_t hdr;
-  uint32_t flags;
-  uint32_t mode;
   fidl_string_t path;
+  uint64_t flags;
+  fidl_table_t options;
   zx_handle_t object;
 };
 

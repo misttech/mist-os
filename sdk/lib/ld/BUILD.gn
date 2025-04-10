@@ -571,10 +571,7 @@ library_headers("fuchsia-debugdata.headers") {
 
 static_library("fuchsia-debugdata") {
   public_deps = [ ":fuchsia-debugdata.headers" ]
-  sources = [
-    "fuchsia-debugdata-forward.cc",
-    "fuchsia-debugdata.cc",
-  ]
+  sources = [ "fuchsia-debugdata.cc" ]
   deps = [
     "//sdk/lib/fidl_base",
     "//zircon/system/ulib/zx",
