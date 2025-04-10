@@ -98,12 +98,11 @@ bool LegacyBootShim::IsProperZbi() const {
 ktl::optional<uart::all::Driver> GetUartFromRange(  //
     LegacyBootShim::InputZbi::iterator start, LegacyBootShim::InputZbi::iterator end) {
   ktl::optional<uart::all::Driver> uart;
-  UartDriver driver;
   while (start != end && start != start.view().end()) {
     auto& [header, payload] = *start;
     if (header->type == ZBI_TYPE_KERNEL_DRIVER) {
-      if (driver.Match(*header, payload.data())) {
-        uart = ktl::move(driver).TakeUart();
+      if (ktl::optional config = uart::all::Config<>::Match(*header, payload.data())) {
+        uart = uart::all::MakeDriver(*config);
       }
     }
     start++;

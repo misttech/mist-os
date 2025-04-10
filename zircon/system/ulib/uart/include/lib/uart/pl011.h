@@ -9,7 +9,6 @@
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/zbi.h>
 
-#include <array>
 #include <cstdint>
 #include <string_view>
 

@@ -300,12 +300,11 @@ TEST(UartTests, Null) {
 }
 
 TEST(UartTests, All) {
+  using AllConfig = uart::all::Config<>;
   using AllDriver = uart::all::KernelDriver<uart::mock::IoProvider, uart::UnsynchronizedPolicy>;
 
-  AllDriver driver;
-
-  // Match against ZBI items to instantiate.
-  EXPECT_FALSE(driver.Match(zbi_header_t{}, nullptr));
+  // Default constructed `configuration` should default to being the `null::Driver`.
+  AllDriver driver(AllConfig{});
 
   // Make sure Unparse is instantiated.
   driver.Unparse();

@@ -59,8 +59,8 @@ void InitAcpi(LegacyBoot& boot_info) {
   boot_info.acpi_rsdp = acpi_parser->rsdp_pa();
 
   if (auto debug_port = acpi_lite::GetDebugPort(*acpi_parser); debug_port.is_ok()) {
-    if (UartDriver driver; driver.Match(*debug_port)) {
-      boot_info.uart = ktl::move(driver).TakeUart();
+    if (ktl::optional config = uart::all::Config<>::Match(*debug_port)) {
+      boot_info.uart = uart::all::MakeDriver(*config);
       SetUartConsole(boot_info.uart);
     }
   }

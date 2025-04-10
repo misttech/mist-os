@@ -16,6 +16,7 @@
 #include <explicit-memory/bytes.h>
 #include <ktl/algorithm.h>
 #include <ktl/move.h>
+#include <ktl/optional.h>
 #include <ktl/string_view.h>
 
 #include <ktl/enforce.h>
@@ -24,12 +25,10 @@ void SetBootOptions(BootOptions& boot_opts, zbitl::ByteView zbi, ktl::string_vie
   {
     // Select UART configuration from a UART driver item in the ZBI.
     zbitl::View view(zbi);
-    // The |IoProvider| and |SyncPolicy| choice in the driver below aren't relevant, and the sole
-    // purpose of |driver| is performing a match.
-    uart::all::KernelDriver<uart::BasicIoProvider, uart::UnsynchronizedPolicy> driver;
+
     for (auto [header, payload] : view) {
-      if (driver.Match(*header, payload.data())) {
-        boot_opts.serial = driver.config();
+      if (ktl::optional config = uart::all::Config<>::Match(*header, payload.data())) {
+        boot_opts.serial = *config;
       }
     }
     view.ignore_error();

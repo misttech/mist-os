@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_UART_ALL_H_
-#define LIB_UART_ALL_H_
+#ifndef ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_ALL_H_
+#define ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_ALL_H_
 
 #include <lib/fit/function.h>
 #include <lib/zbi-format/driver-config.h>
@@ -33,12 +33,14 @@ namespace uart {
 namespace internal {
 
 struct DummyDriver : public null::Driver {
-  template <typename... Args>
-  static std::optional<DummyDriver> MaybeCreate(Args&&...) {
-    return {};
-  }
+  using config_type = StubConfig;
 
   using null::Driver::Driver;
+
+  template <typename... Args>
+  static std::optional<uart::Config<DummyDriver>> TryMatch(Args&&... args) {
+    return std::nullopt;
+  }
 
   void Unparse(FILE*) const { ZX_PANIC("DummyDriver should never be called!"); }
 };
@@ -48,6 +50,13 @@ struct DummyDriver : public null::Driver {
 // steal that instead of copying the implementation here, since there isn't
 // any particularly good "public" place to move it into instead.
 using hwreg::internal::Visit;
+
+template <typename Driver, typename... Args>
+concept MatchableDriver = requires(Args&&... args) {
+  {
+    Driver::TryMatch(std::forward<Args>(args)...)
+  } -> std::convertible_to<std::optional<uart::Config<Driver>>>;
+};
 
 }  // namespace internal
 
@@ -93,13 +102,53 @@ using Driver = WithAllDrivers<std::variant>;
 // The provided configuration object has the following properties:
 //    * `uart_type` alias for the uart driver type.
 //    * `config_type` alias for `uart_type::config_type`.
-//    * `operator()*` and `operator()->` return reference and pointer to the underlying
+//    * `operator*()` and `operator()->` return reference and pointer to the underlying
 //    `config_type` object.
 //
 // Note: There is no driver `state` being held in this object, just the configuration.
 template <typename UartDriver = Driver>
 class Config {
  public:
+  // Returns a `Config` object if any supported driver provides a `TryMatch` static method that can
+  // be invoked with the provided arguments `args`. Otherwise `std::nullopt` is returned.
+  //
+  // Note: The matching order is determined by the position in the list of drivers.
+  template <typename... Args>
+  static std::optional<Config> Match(Args&&... args) {
+    std::optional<Config> all_configs;
+
+    // Collapse `std::optional<T>` to `std::optional<Config<...., T, ...>`.
+    auto to_all_config =
+        []<typename UartType>(
+            const std::optional<uart::Config<UartType>>& config) -> std::optional<Config> {
+      printf("atemmpted match to %s", UartType::kConfigName.data());
+      if (config) {
+        printf(" OK\n");
+        return {*config};
+      }
+      printf(" FAIL\n");
+      return std::nullopt;
+    };
+
+    // Turns variant size into a parameter pack and invokes extracts the variant arguments of
+    // `UartDriver` and attempts to match each.
+    auto try_match_supported_driver = [&]<size_t... Is>(std::index_sequence<Is...> is) {
+      static_assert(
+          (uart::internal::MatchableDriver<std::variant_alternative_t<Is, UartDriver>, Args...> &&
+           ...));
+      // Expand the parameter pack and abuse `std::optional` boolean evaluation, leading to chaining
+      // matches until the first time a Driver in the list returns a non-nullopt
+      // `std::optional<uart::Config<Driver>>` object.
+      ((all_configs =
+            to_all_config(std::variant_alternative_t<Is, UartDriver>::TryMatch(args...))) ||
+       ...);
+    };
+
+    try_match_supported_driver(std::make_index_sequence<std::variant_size_v<UartDriver>>());
+
+    return all_configs;
+  }
+
   Config() = default;
   Config(const Config&) = default;
   Config(Config&&) = default;
@@ -220,11 +269,11 @@ class KernelDriver {
   // in place and return false.  The expected procedure is to apply this to
   // each ZBI item in order, so that the latest one wins (e.g. one appended by
   // the boot loader will supersede one embedded in the original ZBI).
-  bool Match(const zbi_header_t& header, const void* payload) { return DoMatch(header, payload); }
+  bool Match(const zbi_header_t& header, const void* payload) { return TryMatch(header, payload); }
 
   // If |debug_port| (DBG2 Acpi Table) contains a configuration matching any existing driver,
   // instantiate that driver and return true.
-  bool Match(const acpi_lite::AcpiDebugPortDescriptor& debug_port) { return DoMatch(debug_port); }
+  bool Match(const acpi_lite::AcpiDebugPortDescriptor& debug_port) { return TryMatch(debug_port); }
 
   // Returns an empty callable if no drivers match, otherwise returns a callable that will
   // instantiate the selected instance with the supplied configuration object.
@@ -285,18 +334,6 @@ class KernelDriver {
     using type = Variant<Args...>;
   };
 
-  template <size_t I, typename... Args>
-  bool TryOneMatch(Args&&... args) {
-    using Try = std::variant_alternative_t<I, decltype(variant_)>;
-    if constexpr (!std::is_same_v<Try, std::monostate>) {
-      if (auto driver = Try::uart_type::MaybeCreate(std::forward<Args>(args)...)) {
-        variant_.template emplace<I>(*driver);
-        return true;
-      }
-    }
-    return false;
-  }
-
   template <size_t I>
   fit::inline_function<void(const zbi_dcfg_simple_t&)> TryOneMatch(
       const devicetree::PropertyDecoder& decoder) {
@@ -326,6 +363,18 @@ class KernelDriver {
     return DoMatchHelper(std::make_index_sequence<n>(), std::forward<Args>(args)...);
   }
 
+  template <typename... Args>
+  bool TryMatch(Args&&... args) {
+    std::optional<uart::all::Config<UartDriver>> config =
+        uart::all::Config<UartDriver>::Match(std::forward<Args>(args)...);
+    if (config) {
+      config->Visit([this]<typename UartType>(uart::Config<UartType>& config) {
+        variant_.template emplace<OneDriver<UartType>>(config);
+      });
+    }
+    return config.has_value();
+  }
+
   // The VariantVisitor can be called exactly once, so its call operator has
   // only the rvalue overload.  When called on the std::monostate, it always
   // crashes rather than invoking the delegate object.
@@ -353,4 +402,4 @@ class KernelDriver {
 }  // namespace all
 }  // namespace uart
 
-#endif  // LIB_UART_ALL_H_
+#endif  // ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_ALL_H_

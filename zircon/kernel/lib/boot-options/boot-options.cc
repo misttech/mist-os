@@ -282,7 +282,7 @@ struct UartParser {
 
   template <typename OneConfig>
   bool MaybeCreate(std::string_view value) {
-    if (auto config = OneConfig::MaybeCreate(value)) {
+    if (auto config = OneConfig::TryMatch(value)) {
       result_ = std::move(*config);
       return true;
     }
@@ -354,13 +354,15 @@ void BootOptions::PrintValue(const RedactedHex& value, FILE* out) {
 }
 
 bool BootOptions::Parse(std::string_view value, uart::all::Config<> BootOptions::* member) {
-  if (!uart::all::WithAllDrivers<UartParser>{this->*member}.Parse(value)) {
-    // Probably has nowhere to go, but anyway.
-    printf("WARN: Unrecognized serial console setting '%.*s' ignored\n",
-           static_cast<int>(value.size()), value.data());
-    return false;
+  if (std::optional config = uart::all::Config<>::Match(value)) {
+    this->*member = *config;
+    return true;
   }
-  return true;
+
+  // Probably has nowhere to go, but anyway.
+  printf("WARN: Unrecognized serial console setting '%.*s' ignored\n",
+         static_cast<int>(value.size()), value.data());
+  return false;
 }
 
 void BootOptions::PrintValue(const uart::all::Config<>& value, FILE* out) {
