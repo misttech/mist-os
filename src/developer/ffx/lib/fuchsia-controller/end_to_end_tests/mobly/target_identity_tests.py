@@ -6,10 +6,10 @@ import asyncio
 from collections import deque
 from typing import Any, List
 
-import fidl.fuchsia_device as device
-import fidl.fuchsia_feedback as feedback
-import fidl.fuchsia_hwinfo as hwinfo
-import fidl.fuchsia_io as io
+import fidl_fuchsia_device as device
+import fidl_fuchsia_feedback as feedback
+import fidl_fuchsia_hwinfo as hwinfo
+import fidl_fuchsia_io as io
 from fuchsia_controller_py import Channel, ZxStatus
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 from mobly import asserts, base_test, test_runner
@@ -38,9 +38,7 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
                 "/bootstrap/device_name_provider", device.NameProviderMarker
             )
         )
-        res = await device_proxy.get_device_name()
-        asserts.assert_not_equal(res.response, None, extras=res)
-        name = res.response.name
+        name = (await device_proxy.get_device_name()).unwrap().name
         asserts.assert_equal(name, self.device.config["name"])
 
     @asyncmethod
@@ -119,9 +117,7 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         asserts.assert_equal(attr_res.s, ZxStatus.ZX_OK)
         data = bytearray()
         while True:
-            response = await file.read(count=io.MAX_BUF)
-            asserts.assert_not_equal(response.response, None, extras=response)
-            response = response.response
+            response = (await file.read(count=io.MAX_BUF)).unwrap()
             if not response.data:
                 break
             data.extend(response.data)

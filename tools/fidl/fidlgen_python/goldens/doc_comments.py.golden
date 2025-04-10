@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.doccomments"]
+_ir_path = get_fidl_ir_map()["test.doccomments"]
 add_ir_path(_ir_path)
 
 
@@ -338,12 +339,20 @@ MyStrictBits = enum.IntFlag(
 C: int = 4
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class InterfaceServer(fidl._server.ServerBase, ABC):
+class InterfaceServer(ServerBase, ABC):
     """
     interface comment #1
 
@@ -367,6 +376,8 @@ class InterfaceServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -389,7 +400,7 @@ class InterfaceServer(fidl._server.ServerBase, ABC):
         self._send_event(28780186509098736, "test.doccomments", msg)
 
 
-class InterfaceClient(fidl._client.FidlClient):
+class InterfaceClient(FidlClient):
     """
     interface comment #1
 
@@ -403,6 +414,8 @@ class InterfaceClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -420,7 +433,7 @@ class InterfaceClient(fidl._client.FidlClient):
         )
 
 
-class InterfaceEventHandler(fidl._client.EventHandlerBase, ABC):
+class InterfaceEventHandler(EventHandlerBase, ABC):
     """
     interface comment #1
 
@@ -444,6 +457,8 @@ class InterfaceEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -455,6 +470,6 @@ class InterfaceEventHandler(fidl._client.EventHandlerBase, ABC):
         ...
 
 
-InterfaceMarker = fidl._library.ProtocolMarker(
+InterfaceMarker = FidlProtocolMarker(
     "(nondiscoverable) test.doccomments/Interface"
 )

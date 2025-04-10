@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.experimentalmaybefromalias"]
+_ir_path = get_fidl_ir_map()["test.experimentalmaybefromalias"]
 add_ir_path(_ir_path)
 
 
@@ -115,12 +116,20 @@ U64 = int
 Vector = typing.Optional[typing.Sequence[int]]
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class MyProtocolServer(fidl._server.ServerBase, ABC):
+class MyProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.experimentalmaybefromalias"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -129,12 +138,14 @@ class MyProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-class MyProtocolClient(fidl._client.FidlClient):
+class MyProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.experimentalmaybefromalias"
 
@@ -142,12 +153,14 @@ class MyProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-class MyProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
+class MyProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.experimentalmaybefromalias"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -156,11 +169,13 @@ class MyProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-MyProtocolMarker = fidl._library.ProtocolMarker(
+MyProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.experimentalmaybefromalias/MyProtocol"
 )

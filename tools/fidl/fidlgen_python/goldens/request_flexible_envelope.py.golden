@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.requestflexibleenvelope"]
+_ir_path = get_fidl_ir_map()["test.requestflexibleenvelope"]
 add_ir_path(_ir_path)
 
 
@@ -318,12 +319,20 @@ class StrictFoo:
         return cls(_empty=())
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class ProtocolServer(fidl._server.ServerBase, ABC):
+class ProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.requestflexibleenvelope"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -349,6 +358,8 @@ class ProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -390,7 +401,7 @@ class ProtocolServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class ProtocolClient(fidl._client.FidlClient):
+class ProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.requestflexibleenvelope"
 
@@ -398,6 +409,8 @@ class ProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -416,7 +429,7 @@ class ProtocolClient(fidl._client.FidlClient):
             700529454616207123,
             "test.requestflexibleenvelope",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.requestflexibleenvelope/ProtocolRequestStrictResponseFlexibleResponse"
             ),
         )
@@ -435,13 +448,13 @@ class ProtocolClient(fidl._client.FidlClient):
             5191655763393883319,
             "test.requestflexibleenvelope",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.requestflexibleenvelope/ProtocolRequestFlexibleResponseStrictResponse"
             ),
         )
 
 
-class ProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
+class ProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.requestflexibleenvelope"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -450,11 +463,13 @@ class ProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-ProtocolMarker = fidl._library.ProtocolMarker(
+ProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.requestflexibleenvelope/Protocol"
 )

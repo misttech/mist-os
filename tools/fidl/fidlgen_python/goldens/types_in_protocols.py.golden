@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.typesinprotocols"]
+_ir_path = get_fidl_ir_map()["test.typesinprotocols"]
 add_ir_path(_ir_path)
 
 
@@ -1721,12 +1722,20 @@ Bits = enum.IntFlag(
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class ProtocolServer(fidl._server.ServerBase, ABC):
+class ProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.typesinprotocols"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -1952,6 +1961,8 @@ class ProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -2603,7 +2614,7 @@ class ProtocolServer(fidl._server.ServerBase, ABC):
         self._send_event(5745997765922613643, "test.typesinprotocols", msg)
 
 
-class ProtocolClient(fidl._client.FidlClient):
+class ProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.typesinprotocols"
 
@@ -2611,6 +2622,8 @@ class ProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -2687,9 +2700,7 @@ class ProtocolClient(fidl._client.FidlClient):
             2331618702752598159,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.typesinprotocols/Basic"
-            ),
+            normalize_identifier("test.typesinprotocols/Basic"),
         )
 
     def error_basic(
@@ -2700,7 +2711,7 @@ class ProtocolClient(fidl._client.FidlClient):
             5016634351643393939,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.typesinprotocols/Protocol_ErrorBasic_Result"
             ),
         )
@@ -2757,9 +2768,7 @@ class ProtocolClient(fidl._client.FidlClient):
             8787219719097524529,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.typesinprotocols/Compound"
-            ),
+            normalize_identifier("test.typesinprotocols/Compound"),
         )
 
     def error_compound(
@@ -2770,7 +2779,7 @@ class ProtocolClient(fidl._client.FidlClient):
             2990809657626249085,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.typesinprotocols/Protocol_ErrorCompound_Result"
             ),
         )
@@ -2847,9 +2856,7 @@ class ProtocolClient(fidl._client.FidlClient):
             5309034178175279380,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.typesinprotocols/ArrayBasic"
-            ),
+            normalize_identifier("test.typesinprotocols/ArrayBasic"),
         )
 
     def error_array_basic(
@@ -2862,7 +2869,7 @@ class ProtocolClient(fidl._client.FidlClient):
             1084731895342694265,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.typesinprotocols/Protocol_ErrorArrayBasic_Result"
             ),
         )
@@ -2919,9 +2926,7 @@ class ProtocolClient(fidl._client.FidlClient):
             849744466051983995,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.typesinprotocols/ArrayCompound"
-            ),
+            normalize_identifier("test.typesinprotocols/ArrayCompound"),
         )
 
     def error_array_compound(
@@ -2934,7 +2939,7 @@ class ProtocolClient(fidl._client.FidlClient):
             5919277476782807556,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.typesinprotocols/Protocol_ErrorArrayCompound_Result"
             ),
         )
@@ -3011,9 +3016,7 @@ class ProtocolClient(fidl._client.FidlClient):
             8674156353091415668,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.typesinprotocols/VectorBasic"
-            ),
+            normalize_identifier("test.typesinprotocols/VectorBasic"),
         )
 
     def error_vector_basic(
@@ -3026,7 +3029,7 @@ class ProtocolClient(fidl._client.FidlClient):
             875941614196965234,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.typesinprotocols/Protocol_ErrorVectorBasic_Result"
             ),
         )
@@ -3083,9 +3086,7 @@ class ProtocolClient(fidl._client.FidlClient):
             3968024057912959924,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.typesinprotocols/VectorCompound"
-            ),
+            normalize_identifier("test.typesinprotocols/VectorCompound"),
         )
 
     def error_vector_compound(
@@ -3098,7 +3099,7 @@ class ProtocolClient(fidl._client.FidlClient):
             8506780203315865989,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.typesinprotocols/Protocol_ErrorVectorCompound_Result"
             ),
         )
@@ -3147,9 +3148,7 @@ class ProtocolClient(fidl._client.FidlClient):
             1030024737742222323,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.typesinprotocols/VectorOptional"
-            ),
+            normalize_identifier("test.typesinprotocols/VectorOptional"),
         )
 
     def error_vector_optional(
@@ -3162,7 +3161,7 @@ class ProtocolClient(fidl._client.FidlClient):
             6406191217027936606,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.typesinprotocols/Protocol_ErrorVectorOptional_Result"
             ),
         )
@@ -3207,9 +3206,7 @@ class ProtocolClient(fidl._client.FidlClient):
             5351275678438791132,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.typesinprotocols/ArrayVectorNested"
-            ),
+            normalize_identifier("test.typesinprotocols/ArrayVectorNested"),
         )
 
     def error_array_vector_nested(
@@ -3222,7 +3219,7 @@ class ProtocolClient(fidl._client.FidlClient):
             9085604921605802151,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.typesinprotocols/Protocol_ErrorArrayVectorNested_Result"
             ),
         )
@@ -3359,9 +3356,7 @@ class ProtocolClient(fidl._client.FidlClient):
             1802709005492464987,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.typesinprotocols/Resource"
-            ),
+            normalize_identifier("test.typesinprotocols/Resource"),
         )
 
     def error_resource(
@@ -3372,13 +3367,13 @@ class ProtocolClient(fidl._client.FidlClient):
             6568609240497354166,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.typesinprotocols/Protocol_ErrorResource_Result"
             ),
         )
 
 
-class ProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
+class ProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.typesinprotocols"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -3460,6 +3455,8 @@ class ProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -3528,6 +3525,6 @@ class ProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
         ...
 
 
-ProtocolMarker = fidl._library.ProtocolMarker(
+ProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.typesinprotocols/Protocol"
 )

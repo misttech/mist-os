@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.newtype"]
+_ir_path = get_fidl_ir_map()["test.newtype"]
 add_ir_path(_ir_path)
 
 
@@ -231,12 +232,20 @@ Bits = enum.IntFlag(
 Alias = Struct
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class CalculatorServer(fidl._server.ServerBase, ABC):
+class CalculatorServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.newtype"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -254,6 +263,8 @@ class CalculatorServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -271,7 +282,7 @@ class CalculatorServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class CalculatorClient(fidl._client.FidlClient):
+class CalculatorClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.newtype"
 
@@ -279,6 +290,8 @@ class CalculatorClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -297,13 +310,11 @@ class CalculatorClient(fidl._client.FidlClient):
             7893336915889044876,
             "test.newtype",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.newtype/CalculatorAddResponse"
-            ),
+            normalize_identifier("test.newtype/CalculatorAddResponse"),
         )
 
 
-class CalculatorEventHandler(fidl._client.EventHandlerBase, ABC):
+class CalculatorEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.newtype"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -312,11 +323,13 @@ class CalculatorEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-CalculatorMarker = fidl._library.ProtocolMarker(
+CalculatorMarker = FidlProtocolMarker(
     "(nondiscoverable) test.newtype/Calculator"
 )

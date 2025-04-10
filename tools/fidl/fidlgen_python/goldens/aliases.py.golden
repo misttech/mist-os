@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.aliases"]
+_ir_path = get_fidl_ir_map()["test.aliases"]
 add_ir_path(_ir_path)
 
 import fidl_test_someotherlibrary

@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.bindingsdenylist"]
+_ir_path = get_fidl_ir_map()["test.bindingsdenylist"]
 add_ir_path(_ir_path)
 
 
@@ -1024,12 +1025,20 @@ class DenyEachBindingOnlyDenySyzkallerResult:
 ALL_BINDINGS: int = 0
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class AllowedServer(fidl._server.ServerBase, ABC):
+class AllowedServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.bindingsdenylist"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -1038,12 +1047,14 @@ class AllowedServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-class AllowedClient(fidl._client.FidlClient):
+class AllowedClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.bindingsdenylist"
 
@@ -1051,12 +1062,14 @@ class AllowedClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-class AllowedEventHandler(fidl._client.EventHandlerBase, ABC):
+class AllowedEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.bindingsdenylist"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -1065,22 +1078,32 @@ class AllowedEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-AllowedMarker = fidl._library.ProtocolMarker(
+AllowedMarker = FidlProtocolMarker(
     "(nondiscoverable) test.bindingsdenylist/Allowed"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class DenyEachBindingServer(fidl._server.ServerBase, ABC):
+class DenyEachBindingServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.bindingsdenylist"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -1130,6 +1153,8 @@ class DenyEachBindingServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -1212,7 +1237,7 @@ class DenyEachBindingServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class DenyEachBindingClient(fidl._client.FidlClient):
+class DenyEachBindingClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.bindingsdenylist"
 
@@ -1220,6 +1245,8 @@ class DenyEachBindingClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -1238,7 +1265,7 @@ class DenyEachBindingClient(fidl._client.FidlClient):
             2957648440141224850,
             "test.bindingsdenylist",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.bindingsdenylist/DenyEachBinding_OnlyDenyCpp_Result"
             ),
         )
@@ -1257,7 +1284,7 @@ class DenyEachBindingClient(fidl._client.FidlClient):
             8446571910689294295,
             "test.bindingsdenylist",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.bindingsdenylist/DenyEachBinding_OnlyDenyDart_Result"
             ),
         )
@@ -1276,7 +1303,7 @@ class DenyEachBindingClient(fidl._client.FidlClient):
             7311125300308839833,
             "test.bindingsdenylist",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.bindingsdenylist/DenyEachBinding_OnlyDenyGo_Result"
             ),
         )
@@ -1295,7 +1322,7 @@ class DenyEachBindingClient(fidl._client.FidlClient):
             3719805222870932662,
             "test.bindingsdenylist",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Result"
             ),
         )
@@ -1314,13 +1341,13 @@ class DenyEachBindingClient(fidl._client.FidlClient):
             2319043834522757514,
             "test.bindingsdenylist",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.bindingsdenylist/DenyEachBinding_OnlyDenySyzkaller_Result"
             ),
         )
 
 
-class DenyEachBindingEventHandler(fidl._client.EventHandlerBase, ABC):
+class DenyEachBindingEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.bindingsdenylist"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -1329,22 +1356,32 @@ class DenyEachBindingEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-DenyEachBindingMarker = fidl._library.ProtocolMarker(
+DenyEachBindingMarker = FidlProtocolMarker(
     "(nondiscoverable) test.bindingsdenylist/DenyEachBinding"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class ImportsSameNameContextServer(fidl._server.ServerBase, ABC):
+class ImportsSameNameContextServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.bindingsdenylist"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -1370,6 +1407,8 @@ class ImportsSameNameContextServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -1401,7 +1440,7 @@ class ImportsSameNameContextServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class ImportsSameNameContextClient(fidl._client.FidlClient):
+class ImportsSameNameContextClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.bindingsdenylist"
 
@@ -1409,6 +1448,8 @@ class ImportsSameNameContextClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -1438,7 +1479,7 @@ class ImportsSameNameContextClient(fidl._client.FidlClient):
         )
 
 
-class ImportsSameNameContextEventHandler(fidl._client.EventHandlerBase, ABC):
+class ImportsSameNameContextEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.bindingsdenylist"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -1447,11 +1488,13 @@ class ImportsSameNameContextEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-ImportsSameNameContextMarker = fidl._library.ProtocolMarker(
+ImportsSameNameContextMarker = FidlProtocolMarker(
     "(nondiscoverable) test.bindingsdenylist/ImportsSameNameContext"
 )

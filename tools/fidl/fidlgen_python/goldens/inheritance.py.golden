@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.inheritance"]
+_ir_path = get_fidl_ir_map()["test.inheritance"]
 add_ir_path(_ir_path)
 
 
@@ -80,12 +81,20 @@ class SuperFooResponse:
         )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class SubServer(fidl._server.ServerBase, ABC):
+class SubServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.inheritance"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -103,6 +112,8 @@ class SubServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -120,7 +131,7 @@ class SubServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class SubClient(fidl._client.FidlClient):
+class SubClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.inheritance"
 
@@ -128,6 +139,8 @@ class SubClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -144,13 +157,11 @@ class SubClient(fidl._client.FidlClient):
             7540745593380780216,
             "test.inheritance",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.inheritance/SuperFooResponse"
-            ),
+            normalize_identifier("test.inheritance/SuperFooResponse"),
         )
 
 
-class SubEventHandler(fidl._client.EventHandlerBase, ABC):
+class SubEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.inheritance"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -159,22 +170,30 @@ class SubEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-SubMarker = fidl._library.ProtocolMarker(
-    "(nondiscoverable) test.inheritance/sub"
+SubMarker = FidlProtocolMarker("(nondiscoverable) test.inheritance/sub")
+
+
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
 )
 
-
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
 from abc import abstractmethod, ABC
 
 
-class SuperServer(fidl._server.ServerBase, ABC):
+class SuperServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.inheritance"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -192,6 +211,8 @@ class SuperServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -209,7 +230,7 @@ class SuperServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class SuperClient(fidl._client.FidlClient):
+class SuperClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.inheritance"
 
@@ -217,6 +238,8 @@ class SuperClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -233,13 +256,11 @@ class SuperClient(fidl._client.FidlClient):
             7540745593380780216,
             "test.inheritance",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.inheritance/SuperFooResponse"
-            ),
+            normalize_identifier("test.inheritance/SuperFooResponse"),
         )
 
 
-class SuperEventHandler(fidl._client.EventHandlerBase, ABC):
+class SuperEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.inheritance"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -248,11 +269,11 @@ class SuperEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-SuperMarker = fidl._library.ProtocolMarker(
-    "(nondiscoverable) test.inheritance/super"
-)
+SuperMarker = FidlProtocolMarker("(nondiscoverable) test.inheritance/super")

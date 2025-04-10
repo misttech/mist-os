@@ -8,7 +8,7 @@ import sys
 import typing
 import unittest
 
-import fidl.fuchsia_developer_ffx as ffx_fidl
+import fidl_fuchsia_developer_ffx as ffx_fidl
 from fidl_codec import encode_fidl_message, method_ordinal
 from fuchsia_controller_py import Channel, Context, IsolateDir
 

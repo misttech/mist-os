@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.errorsyntax"]
+_ir_path = get_fidl_ir_map()["test.errorsyntax"]
 add_ir_path(_ir_path)
 
 import fidl_test_errorsyntax_parent
@@ -204,12 +205,20 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailResult:
         return cls(_empty=())
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class ExampleUseOfErrorSyntaxServer(fidl._server.ServerBase, ABC):
+class ExampleUseOfErrorSyntaxServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.errorsyntax"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -235,6 +244,8 @@ class ExampleUseOfErrorSyntaxServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -274,7 +285,7 @@ class ExampleUseOfErrorSyntaxServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class ExampleUseOfErrorSyntaxClient(fidl._client.FidlClient):
+class ExampleUseOfErrorSyntaxClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.errorsyntax"
 
@@ -282,6 +293,8 @@ class ExampleUseOfErrorSyntaxClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -302,7 +315,7 @@ class ExampleUseOfErrorSyntaxClient(fidl._client.FidlClient):
             3565108794310607393,
             "test.errorsyntax",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.errorsyntax.parent/ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result"
             ),
         )
@@ -321,13 +334,13 @@ class ExampleUseOfErrorSyntaxClient(fidl._client.FidlClient):
             3757408930698888354,
             "test.errorsyntax",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.errorsyntax/ExampleUseOfErrorSyntax_CallWhichMayFail_Result"
             ),
         )
 
 
-class ExampleUseOfErrorSyntaxEventHandler(fidl._client.EventHandlerBase, ABC):
+class ExampleUseOfErrorSyntaxEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.errorsyntax"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -336,11 +349,13 @@ class ExampleUseOfErrorSyntaxEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-ExampleUseOfErrorSyntaxMarker = fidl._library.ProtocolMarker(
+ExampleUseOfErrorSyntaxMarker = FidlProtocolMarker(
     "(nondiscoverable) test.errorsyntax/ExampleUseOfErrorSyntax"
 )

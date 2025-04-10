@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.protocolpayloads"]
+_ir_path = get_fidl_ir_map()["test.protocolpayloads"]
 add_ir_path(_ir_path)
 
 import fidl_test_protocolpayloads_imported
@@ -612,12 +613,20 @@ class MainProtocolTwoWayLocalWithErrorResult:
         return cls(_empty=())
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class MainProtocolServer(fidl._server.ServerBase, ABC):
+class MainProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocolpayloads"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -723,6 +732,8 @@ class MainProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -948,7 +959,7 @@ class MainProtocolServer(fidl._server.ServerBase, ABC):
         self._send_event(4815229650203439104, "test.protocolpayloads", msg)
 
 
-class MainProtocolClient(fidl._client.FidlClient):
+class MainProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocolpayloads"
 
@@ -956,6 +967,8 @@ class MainProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -992,7 +1005,7 @@ class MainProtocolClient(fidl._client.FidlClient):
             2542459230546612144,
             "test.protocolpayloads",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocolpayloads.imported/ImportStructPayload"
             ),
         )
@@ -1013,7 +1026,7 @@ class MainProtocolClient(fidl._client.FidlClient):
             7681984876526769495,
             "test.protocolpayloads",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocolpayloads.imported/ComposedProtocol_TwoWayComposedWithError_Result"
             ),
         )
@@ -1050,9 +1063,7 @@ class MainProtocolClient(fidl._client.FidlClient):
             8374292137648566031,
             "test.protocolpayloads",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.protocolpayloads/LocalStructPayload"
-            ),
+            normalize_identifier("test.protocolpayloads/LocalStructPayload"),
         )
 
     def two_way_local_with_error(
@@ -1071,7 +1082,7 @@ class MainProtocolClient(fidl._client.FidlClient):
             2898559119954589948,
             "test.protocolpayloads",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocolpayloads/MainProtocol_TwoWayLocalWithError_Result"
             ),
         )
@@ -1108,7 +1119,7 @@ class MainProtocolClient(fidl._client.FidlClient):
             2374708679656510579,
             "test.protocolpayloads",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocolpayloads.imported/ImportStructPayload"
             ),
         )
@@ -1127,7 +1138,7 @@ class MainProtocolClient(fidl._client.FidlClient):
             4286143084949642173,
             "test.protocolpayloads",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocolpayloads/MainProtocol_TwoWayImportWithError_Result"
             ),
         )
@@ -1166,7 +1177,7 @@ class MainProtocolClient(fidl._client.FidlClient):
             629880979996923737,
             "test.protocolpayloads",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocolpayloads/MainProtocolTwoWayAnonResponse"
             ),
         )
@@ -1187,13 +1198,13 @@ class MainProtocolClient(fidl._client.FidlClient):
             6368863385719175734,
             "test.protocolpayloads",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocolpayloads/MainProtocol_TwoWayAnonWithError_Result"
             ),
         )
 
 
-class MainProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
+class MainProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocolpayloads"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -1235,6 +1246,8 @@ class MainProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -1268,6 +1281,6 @@ class MainProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
         ...
 
 
-MainProtocolMarker = fidl._library.ProtocolMarker(
+MainProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.protocolpayloads/MainProtocol"
 )

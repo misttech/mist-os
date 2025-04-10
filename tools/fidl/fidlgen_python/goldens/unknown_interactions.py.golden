@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.unknowninteractions"]
+_ir_path = get_fidl_ir_map()["test.unknowninteractions"]
 add_ir_path(_ir_path)
 
 
@@ -4278,12 +4279,20 @@ class UnknownInteractionsProtocolStrictTwoWayUnionErrResult:
         return cls(_empty=())
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class UnknownInteractionsAjarProtocolServer(fidl._server.ServerBase, ABC):
+class UnknownInteractionsAjarProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.unknowninteractions"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -4373,6 +4382,8 @@ class UnknownInteractionsAjarProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -4594,7 +4605,7 @@ class UnknownInteractionsAjarProtocolServer(fidl._server.ServerBase, ABC):
         self._send_event(705539350563403440, "test.unknowninteractions", msg)
 
 
-class UnknownInteractionsAjarProtocolClient(fidl._client.FidlClient):
+class UnknownInteractionsAjarProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.unknowninteractions"
 
@@ -4602,6 +4613,8 @@ class UnknownInteractionsAjarProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -4653,7 +4666,7 @@ class UnknownInteractionsAjarProtocolClient(fidl._client.FidlClient):
             1821674633227946298,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse"
             ),
         )
@@ -4670,7 +4683,7 @@ class UnknownInteractionsAjarProtocolClient(fidl._client.FidlClient):
             5870221221557233361,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse"
             ),
         )
@@ -4687,7 +4700,7 @@ class UnknownInteractionsAjarProtocolClient(fidl._client.FidlClient):
             8038805778859962068,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictTwoWayTableResponse"
             ),
         )
@@ -4704,7 +4717,7 @@ class UnknownInteractionsAjarProtocolClient(fidl._client.FidlClient):
             6577335136969723910,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result"
             ),
         )
@@ -4721,7 +4734,7 @@ class UnknownInteractionsAjarProtocolClient(fidl._client.FidlClient):
             595881957484758745,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result"
             ),
         )
@@ -4738,7 +4751,7 @@ class UnknownInteractionsAjarProtocolClient(fidl._client.FidlClient):
             3224530777258896533,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result"
             ),
         )
@@ -4755,15 +4768,13 @@ class UnknownInteractionsAjarProtocolClient(fidl._client.FidlClient):
             3515589146717969463,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result"
             ),
         )
 
 
-class UnknownInteractionsAjarProtocolEventHandler(
-    fidl._client.EventHandlerBase, ABC
-):
+class UnknownInteractionsAjarProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.unknowninteractions"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -4837,6 +4848,8 @@ class UnknownInteractionsAjarProtocolEventHandler(
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -4896,17 +4909,25 @@ class UnknownInteractionsAjarProtocolEventHandler(
         ...
 
 
-UnknownInteractionsAjarProtocolMarker = fidl._library.ProtocolMarker(
+UnknownInteractionsAjarProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.unknowninteractions/UnknownInteractionsAjarProtocol"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class UnknownInteractionsClosedProtocolServer(fidl._server.ServerBase, ABC):
+class UnknownInteractionsClosedProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.unknowninteractions"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -4988,6 +5009,8 @@ class UnknownInteractionsClosedProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -5160,7 +5183,7 @@ class UnknownInteractionsClosedProtocolServer(fidl._server.ServerBase, ABC):
         self._send_event(2871682464255309246, "test.unknowninteractions", msg)
 
 
-class UnknownInteractionsClosedProtocolClient(fidl._client.FidlClient):
+class UnknownInteractionsClosedProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.unknowninteractions"
 
@@ -5168,6 +5191,8 @@ class UnknownInteractionsClosedProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -5207,7 +5232,7 @@ class UnknownInteractionsClosedProtocolClient(fidl._client.FidlClient):
             1379139029283639891,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse"
             ),
         )
@@ -5224,7 +5249,7 @@ class UnknownInteractionsClosedProtocolClient(fidl._client.FidlClient):
             7544414847426850727,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse"
             ),
         )
@@ -5241,7 +5266,7 @@ class UnknownInteractionsClosedProtocolClient(fidl._client.FidlClient):
             7947328131967870853,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictTwoWayTableResponse"
             ),
         )
@@ -5258,7 +5283,7 @@ class UnknownInteractionsClosedProtocolClient(fidl._client.FidlClient):
             5738532966428790074,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result"
             ),
         )
@@ -5275,7 +5300,7 @@ class UnknownInteractionsClosedProtocolClient(fidl._client.FidlClient):
             802395819586836733,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result"
             ),
         )
@@ -5292,7 +5317,7 @@ class UnknownInteractionsClosedProtocolClient(fidl._client.FidlClient):
             925029359463709824,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result"
             ),
         )
@@ -5309,15 +5334,13 @@ class UnknownInteractionsClosedProtocolClient(fidl._client.FidlClient):
             1260407702860823440,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result"
             ),
         )
 
 
-class UnknownInteractionsClosedProtocolEventHandler(
-    fidl._client.EventHandlerBase, ABC
-):
+class UnknownInteractionsClosedProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.unknowninteractions"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -5359,6 +5382,8 @@ class UnknownInteractionsClosedProtocolEventHandler(
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -5391,17 +5416,25 @@ class UnknownInteractionsClosedProtocolEventHandler(
         ...
 
 
-UnknownInteractionsClosedProtocolMarker = fidl._library.ProtocolMarker(
+UnknownInteractionsClosedProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.unknowninteractions/UnknownInteractionsClosedProtocol"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class UnknownInteractionsProtocolServer(fidl._server.ServerBase, ABC):
+class UnknownInteractionsProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.unknowninteractions"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -5555,6 +5588,8 @@ class UnknownInteractionsProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -5910,7 +5945,7 @@ class UnknownInteractionsProtocolServer(fidl._server.ServerBase, ABC):
         self._send_event(5724881371349617120, "test.unknowninteractions", msg)
 
 
-class UnknownInteractionsProtocolClient(fidl._client.FidlClient):
+class UnknownInteractionsProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.unknowninteractions"
 
@@ -5918,6 +5953,8 @@ class UnknownInteractionsProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -5969,7 +6006,7 @@ class UnknownInteractionsProtocolClient(fidl._client.FidlClient):
             3697260130745060067,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsProtocolStrictTwoWayFieldsResponse"
             ),
         )
@@ -5986,7 +6023,7 @@ class UnknownInteractionsProtocolClient(fidl._client.FidlClient):
             2455165891480464557,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsProtocolStrictTwoWayUnionResponse"
             ),
         )
@@ -6003,7 +6040,7 @@ class UnknownInteractionsProtocolClient(fidl._client.FidlClient):
             8389853739594228663,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsProtocolStrictTwoWayTableResponse"
             ),
         )
@@ -6018,7 +6055,7 @@ class UnknownInteractionsProtocolClient(fidl._client.FidlClient):
             7862264614495172967,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsProtocol_StrictTwoWayErr_Result"
             ),
         )
@@ -6035,7 +6072,7 @@ class UnknownInteractionsProtocolClient(fidl._client.FidlClient):
             2414673307948662059,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result"
             ),
         )
@@ -6052,7 +6089,7 @@ class UnknownInteractionsProtocolClient(fidl._client.FidlClient):
             4988571416540160202,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result"
             ),
         )
@@ -6069,7 +6106,7 @@ class UnknownInteractionsProtocolClient(fidl._client.FidlClient):
             5487292735562672344,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsProtocol_StrictTwoWayTableErr_Result"
             ),
         )
@@ -6084,7 +6121,7 @@ class UnknownInteractionsProtocolClient(fidl._client.FidlClient):
             334879577560091516,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWay_Result"
             ),
         )
@@ -6101,7 +6138,7 @@ class UnknownInteractionsProtocolClient(fidl._client.FidlClient):
             4257018954691721778,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayFields_Result"
             ),
         )
@@ -6118,7 +6155,7 @@ class UnknownInteractionsProtocolClient(fidl._client.FidlClient):
             4913460516188409782,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result"
             ),
         )
@@ -6135,7 +6172,7 @@ class UnknownInteractionsProtocolClient(fidl._client.FidlClient):
             9171907422498283911,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayTable_Result"
             ),
         )
@@ -6152,7 +6189,7 @@ class UnknownInteractionsProtocolClient(fidl._client.FidlClient):
             6999736795697216519,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayErr_Result"
             ),
         )
@@ -6169,7 +6206,7 @@ class UnknownInteractionsProtocolClient(fidl._client.FidlClient):
             1093132337162001157,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result"
             ),
         )
@@ -6186,7 +6223,7 @@ class UnknownInteractionsProtocolClient(fidl._client.FidlClient):
             2410151523245950935,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result"
             ),
         )
@@ -6203,15 +6240,13 @@ class UnknownInteractionsProtocolClient(fidl._client.FidlClient):
             7893309626427980786,
             "test.unknowninteractions",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result"
             ),
         )
 
 
-class UnknownInteractionsProtocolEventHandler(
-    fidl._client.EventHandlerBase, ABC
-):
+class UnknownInteractionsProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.unknowninteractions"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -6285,6 +6320,8 @@ class UnknownInteractionsProtocolEventHandler(
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -6344,6 +6381,6 @@ class UnknownInteractionsProtocolEventHandler(
         ...
 
 
-UnknownInteractionsProtocolMarker = fidl._library.ProtocolMarker(
+UnknownInteractionsProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.unknowninteractions/UnknownInteractionsProtocol"
 )

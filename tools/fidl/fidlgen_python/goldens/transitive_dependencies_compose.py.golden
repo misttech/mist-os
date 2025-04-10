@@ -11,19 +11,28 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.transitivedependenciescompose"]
+_ir_path = get_fidl_ir_map()["test.transitivedependenciescompose"]
 add_ir_path(_ir_path)
 
 import fidl_test_bottom
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class TopServer(fidl._server.ServerBase, ABC):
+class TopServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.transitivedependenciescompose"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -41,6 +50,8 @@ class TopServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -59,7 +70,7 @@ class TopServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class TopClient(fidl._client.FidlClient):
+class TopClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.transitivedependenciescompose"
 
@@ -67,6 +78,8 @@ class TopClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -81,13 +94,11 @@ class TopClient(fidl._client.FidlClient):
             2618685789258237543,
             "test.transitivedependenciescompose",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.bottom/BottomGetFooResponse"
-            ),
+            normalize_identifier("test.bottom/BottomGetFooResponse"),
         )
 
 
-class TopEventHandler(fidl._client.EventHandlerBase, ABC):
+class TopEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.transitivedependenciescompose"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -96,11 +107,13 @@ class TopEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-TopMarker = fidl._library.ProtocolMarker(
+TopMarker = FidlProtocolMarker(
     "(nondiscoverable) test.transitivedependenciescompose/Top"
 )

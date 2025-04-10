@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.handles"]
+_ir_path = get_fidl_ir_map()["test.handles"]
 add_ir_path(_ir_path)
 
 
@@ -156,12 +157,20 @@ AliasedRightsHandle = int
 AliasedSubtypeHandle = int
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class SomeProtocolServer(fidl._server.ServerBase, ABC):
+class SomeProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.handles"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -170,12 +179,14 @@ class SomeProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-class SomeProtocolClient(fidl._client.FidlClient):
+class SomeProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.handles"
 
@@ -183,12 +194,14 @@ class SomeProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-class SomeProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
+class SomeProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.handles"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -197,11 +210,13 @@ class SomeProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-SomeProtocolMarker = fidl._library.ProtocolMarker(
+SomeProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.handles/SomeProtocol"
 )

@@ -6,11 +6,7 @@
 
 import fuchsia_controller_py
 from fuchsia_controller_py import BaseHandle, Channel, Event, Handle, Socket
-{{- if .StaticFidlgen }}
 import fidl_test_conformance as test_conformance
-{{- else }}
-import fidl.test_conformance as test_conformance
-{{- end }}
 
 import struct
 import unittest

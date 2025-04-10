@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.emptystruct"]
+_ir_path = get_fidl_ir_map()["test.emptystruct"]
 add_ir_path(_ir_path)
 
 
@@ -178,12 +179,20 @@ class EmptyProtocolSendRequest:
         )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class EmptyProtocolServer(fidl._server.ServerBase, ABC):
+class EmptyProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.emptystruct"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -209,6 +218,8 @@ class EmptyProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -252,7 +263,7 @@ class EmptyProtocolServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class EmptyProtocolClient(fidl._client.FidlClient):
+class EmptyProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.emptystruct"
 
@@ -260,6 +271,8 @@ class EmptyProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -294,13 +307,13 @@ class EmptyProtocolClient(fidl._client.FidlClient):
             534401212734647530,
             "test.emptystruct",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.emptystruct/EmptyProtocolSendAndReceiveResponse"
             ),
         )
 
 
-class EmptyProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
+class EmptyProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.emptystruct"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -318,6 +331,8 @@ class EmptyProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -330,6 +345,6 @@ class EmptyProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
         ...
 
 
-EmptyProtocolMarker = fidl._library.ProtocolMarker(
+EmptyProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.emptystruct/EmptyProtocol"
 )

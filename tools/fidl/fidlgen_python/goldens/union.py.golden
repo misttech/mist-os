@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.union"]
+_ir_path = get_fidl_ir_map()["test.union"]
 add_ir_path(_ir_path)
 
 
@@ -2046,12 +2047,20 @@ class UnionWithAttributes:
         return cls(_empty=())
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class TestProtocolServer(fidl._server.ServerBase, ABC):
+class TestProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.union"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -2077,6 +2086,8 @@ class TestProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -2116,7 +2127,7 @@ class TestProtocolServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class TestProtocolClient(fidl._client.FidlClient):
+class TestProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.union"
 
@@ -2124,6 +2135,8 @@ class TestProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -2140,7 +2153,7 @@ class TestProtocolClient(fidl._client.FidlClient):
             6628358876445129155,
             "test.union",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.union/TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse"
             ),
         )
@@ -2157,13 +2170,13 @@ class TestProtocolClient(fidl._client.FidlClient):
             7588545459451501794,
             "test.union",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.union/TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse"
             ),
         )
 
 
-class TestProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
+class TestProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.union"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -2172,11 +2185,13 @@ class TestProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-TestProtocolMarker = fidl._library.ProtocolMarker(
+TestProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.union/TestProtocol"
 )

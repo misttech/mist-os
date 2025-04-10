@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.protocols"]
+_ir_path = get_fidl_ir_map()["test.protocols"]
 add_ir_path(_ir_path)
 
 
@@ -1636,12 +1637,20 @@ ErrorEnum = enum.IntEnum(
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class AnotherDiscoverableProtocolServer(fidl._server.ServerBase, ABC):
+class AnotherDiscoverableProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocols"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -1650,12 +1659,14 @@ class AnotherDiscoverableProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-class AnotherDiscoverableProtocolClient(fidl._client.FidlClient):
+class AnotherDiscoverableProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocols"
 
@@ -1663,14 +1674,14 @@ class AnotherDiscoverableProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-class AnotherDiscoverableProtocolEventHandler(
-    fidl._client.EventHandlerBase, ABC
-):
+class AnotherDiscoverableProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocols"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -1679,22 +1690,32 @@ class AnotherDiscoverableProtocolEventHandler(
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-AnotherDiscoverableProtocolMarker = fidl._library.ProtocolMarker(
+AnotherDiscoverableProtocolMarker = FidlProtocolMarker(
     "fake.library.FakeProtocol"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class ChannelProtocolServer(fidl._server.ServerBase, ABC):
+class ChannelProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocols"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -1736,6 +1757,8 @@ class ChannelProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -1803,7 +1826,7 @@ class ChannelProtocolServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class ChannelProtocolClient(fidl._client.FidlClient):
+class ChannelProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocols"
 
@@ -1811,6 +1834,8 @@ class ChannelProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -1849,7 +1874,7 @@ class ChannelProtocolClient(fidl._client.FidlClient):
             8903004957800778182,
             "test.protocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocols/ChannelProtocolMethodBResponse"
             ),
         )
@@ -1883,13 +1908,13 @@ class ChannelProtocolClient(fidl._client.FidlClient):
             7411742788430590287,
             "test.protocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocols/ChannelProtocolMutateSocketResponse"
             ),
         )
 
 
-class ChannelProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
+class ChannelProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocols"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -1907,6 +1932,8 @@ class ChannelProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -1919,17 +1946,25 @@ class ChannelProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
         ...
 
 
-ChannelProtocolMarker = fidl._library.ProtocolMarker(
+ChannelProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.protocols/ChannelProtocol"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class DiscoverableProtocolServer(fidl._server.ServerBase, ABC):
+class DiscoverableProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocols"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -1947,6 +1982,8 @@ class DiscoverableProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -1963,7 +2000,7 @@ class DiscoverableProtocolServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class DiscoverableProtocolClient(fidl._client.FidlClient):
+class DiscoverableProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocols"
 
@@ -1971,6 +2008,8 @@ class DiscoverableProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -1988,7 +2027,7 @@ class DiscoverableProtocolClient(fidl._client.FidlClient):
         )
 
 
-class DiscoverableProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
+class DiscoverableProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocols"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -1997,22 +2036,32 @@ class DiscoverableProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-DiscoverableProtocolMarker = fidl._library.ProtocolMarker(
+DiscoverableProtocolMarker = FidlProtocolMarker(
     "test.protocols.DiscoverableProtocol"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class HandleRightsProtocolServer(fidl._server.ServerBase, ABC):
+class HandleRightsProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocols"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -2038,6 +2087,8 @@ class HandleRightsProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -2083,7 +2134,7 @@ class HandleRightsProtocolServer(fidl._server.ServerBase, ABC):
         self._send_event(476727631355490611, "test.protocols", msg)
 
 
-class HandleRightsProtocolClient(fidl._client.FidlClient):
+class HandleRightsProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocols"
 
@@ -2091,6 +2142,8 @@ class HandleRightsProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -2125,13 +2178,13 @@ class HandleRightsProtocolClient(fidl._client.FidlClient):
             5956276128041940295,
             "test.protocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocols/HandleRightsProtocolResponseMethodResponse"
             ),
         )
 
 
-class HandleRightsProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
+class HandleRightsProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocols"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -2149,6 +2202,8 @@ class HandleRightsProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -2161,17 +2216,25 @@ class HandleRightsProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
         ...
 
 
-HandleRightsProtocolMarker = fidl._library.ProtocolMarker(
+HandleRightsProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.protocols/HandleRightsProtocol"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class ManyParametersServer(fidl._server.ServerBase, ABC):
+class ManyParametersServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocols"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -2189,6 +2252,8 @@ class ManyParametersServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -2206,7 +2271,7 @@ class ManyParametersServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class ManyParametersClient(fidl._client.FidlClient):
+class ManyParametersClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocols"
 
@@ -2214,6 +2279,8 @@ class ManyParametersClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -2263,7 +2330,7 @@ class ManyParametersClient(fidl._client.FidlClient):
         )
 
 
-class ManyParametersEventHandler(fidl._client.EventHandlerBase, ABC):
+class ManyParametersEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocols"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -2272,22 +2339,32 @@ class ManyParametersEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-ManyParametersMarker = fidl._library.ProtocolMarker(
+ManyParametersMarker = FidlProtocolMarker(
     "(nondiscoverable) test.protocols/ManyParameters"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class MethodWithUnionServer(fidl._server.ServerBase, ABC):
+class MethodWithUnionServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocols"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -2305,6 +2382,8 @@ class MethodWithUnionServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -2324,7 +2403,7 @@ class MethodWithUnionServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class MethodWithUnionClient(fidl._client.FidlClient):
+class MethodWithUnionClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocols"
 
@@ -2332,6 +2411,8 @@ class MethodWithUnionClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -2350,13 +2431,13 @@ class MethodWithUnionClient(fidl._client.FidlClient):
             4124874338266649112,
             "test.protocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocols/MethodWithUnionUnionMethodResponse"
             ),
         )
 
 
-class MethodWithUnionEventHandler(fidl._client.EventHandlerBase, ABC):
+class MethodWithUnionEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocols"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -2365,22 +2446,32 @@ class MethodWithUnionEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-MethodWithUnionMarker = fidl._library.ProtocolMarker(
+MethodWithUnionMarker = FidlProtocolMarker(
     "(nondiscoverable) test.protocols/MethodWithUnion"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class PlatformServerServer(fidl._server.ServerBase, ABC):
+class PlatformServerServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocols"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -2389,12 +2480,14 @@ class PlatformServerServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-class PlatformServerClient(fidl._client.FidlClient):
+class PlatformServerClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocols"
 
@@ -2402,12 +2495,14 @@ class PlatformServerClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-class PlatformServerEventHandler(fidl._client.EventHandlerBase, ABC):
+class PlatformServerEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocols"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -2416,22 +2511,30 @@ class PlatformServerEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-PlatformServerMarker = fidl._library.ProtocolMarker(
-    "test.protocols.PlatformServer"
+PlatformServerMarker = FidlProtocolMarker("test.protocols.PlatformServer")
+
+
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
 )
 
-
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
 from abc import abstractmethod, ABC
 
 
-class WithAndWithoutRequestResponseServer(fidl._server.ServerBase, ABC):
+class WithAndWithoutRequestResponseServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocols"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -2489,6 +2592,8 @@ class WithAndWithoutRequestResponseServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -2595,7 +2700,7 @@ class WithAndWithoutRequestResponseServer(fidl._server.ServerBase, ABC):
         self._send_event(5811598563493228968, "test.protocols", msg)
 
 
-class WithAndWithoutRequestResponseClient(fidl._client.FidlClient):
+class WithAndWithoutRequestResponseClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocols"
 
@@ -2603,6 +2708,8 @@ class WithAndWithoutRequestResponseClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -2642,7 +2749,7 @@ class WithAndWithoutRequestResponseClient(fidl._client.FidlClient):
             9037369643591427517,
             "test.protocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocols/WithAndWithoutRequestResponseNoRequestWithResponseResponse"
             ),
         )
@@ -2694,15 +2801,13 @@ class WithAndWithoutRequestResponseClient(fidl._client.FidlClient):
             6417226585456833969,
             "test.protocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocols/WithAndWithoutRequestResponseWithRequestWithResponseResponse"
             ),
         )
 
 
-class WithAndWithoutRequestResponseEventHandler(
-    fidl._client.EventHandlerBase, ABC
-):
+class WithAndWithoutRequestResponseEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocols"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -2728,6 +2833,8 @@ class WithAndWithoutRequestResponseEventHandler(
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -2746,17 +2853,25 @@ class WithAndWithoutRequestResponseEventHandler(
         ...
 
 
-WithAndWithoutRequestResponseMarker = fidl._library.ProtocolMarker(
+WithAndWithoutRequestResponseMarker = FidlProtocolMarker(
     "(nondiscoverable) test.protocols/WithAndWithoutRequestResponse"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class WithErrorSyntaxServer(fidl._server.ServerBase, ABC):
+class WithErrorSyntaxServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocols"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -2798,6 +2913,8 @@ class WithErrorSyntaxServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -2865,7 +2982,7 @@ class WithErrorSyntaxServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class WithErrorSyntaxClient(fidl._client.FidlClient):
+class WithErrorSyntaxClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocols"
 
@@ -2873,6 +2990,8 @@ class WithErrorSyntaxClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -2887,7 +3006,7 @@ class WithErrorSyntaxClient(fidl._client.FidlClient):
             268248568430741139,
             "test.protocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocols/WithErrorSyntax_ResponseAsStruct_Result"
             ),
         )
@@ -2902,7 +3021,7 @@ class WithErrorSyntaxClient(fidl._client.FidlClient):
             6930994461233198567,
             "test.protocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocols/WithErrorSyntax_ErrorAsPrimitive_Result"
             ),
         )
@@ -2917,7 +3036,7 @@ class WithErrorSyntaxClient(fidl._client.FidlClient):
             5491891352371277635,
             "test.protocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocols/WithErrorSyntax_ErrorAsEnum_Result"
             ),
         )
@@ -2932,13 +3051,13 @@ class WithErrorSyntaxClient(fidl._client.FidlClient):
             1371676333068455103,
             "test.protocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocols/WithErrorSyntax_HandleInResult_Result"
             ),
         )
 
 
-class WithErrorSyntaxEventHandler(fidl._client.EventHandlerBase, ABC):
+class WithErrorSyntaxEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocols"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -2947,22 +3066,32 @@ class WithErrorSyntaxEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-WithErrorSyntaxMarker = fidl._library.ProtocolMarker(
+WithErrorSyntaxMarker = FidlProtocolMarker(
     "(nondiscoverable) test.protocols/WithErrorSyntax"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class WithProtocolEndsServer(fidl._server.ServerBase, ABC):
+class WithProtocolEndsServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocols"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -2996,6 +3125,8 @@ class WithProtocolEndsServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -3045,7 +3176,7 @@ class WithProtocolEndsServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class WithProtocolEndsClient(fidl._client.FidlClient):
+class WithProtocolEndsClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocols"
 
@@ -3053,6 +3184,8 @@ class WithProtocolEndsClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -3071,7 +3204,7 @@ class WithProtocolEndsClient(fidl._client.FidlClient):
             5870448041025163330,
             "test.protocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocols/WithProtocolEndsClientEndsResponse"
             ),
         )
@@ -3090,7 +3223,7 @@ class WithProtocolEndsClient(fidl._client.FidlClient):
             8115535094437022259,
             "test.protocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocols/WithProtocolEndsServerEndsResponse"
             ),
         )
@@ -3109,13 +3242,13 @@ class WithProtocolEndsClient(fidl._client.FidlClient):
             4076866772260025813,
             "test.protocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocols/WithProtocolEndsStructContainingEndsResponse"
             ),
         )
 
 
-class WithProtocolEndsEventHandler(fidl._client.EventHandlerBase, ABC):
+class WithProtocolEndsEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocols"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -3124,11 +3257,13 @@ class WithProtocolEndsEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-WithProtocolEndsMarker = fidl._library.ProtocolMarker(
+WithProtocolEndsMarker = FidlProtocolMarker(
     "(nondiscoverable) test.protocols/WithProtocolEnds"
 )

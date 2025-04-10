@@ -13,29 +13,6 @@ import("//tools/fidl/gidl/gidl.gni")
 
 assert(is_host, "The fuchsia-controller framework is for host tools only")
 
-conformance_test_source = "$target_gen_dir/conformance_test.py"
-
-gidl("conformance_tests_py") {
-  type = "conformance"
-  language = "fuchsia_controller"
-  inputs = conformance_suite_gidl_files
-  fidl = conformance_suite_fidl_target
-  output = conformance_test_source
-}
-
-python_host_test("fuchsia_controller_conformance_tests") {
-  libraries = [
-    ":fidl_bindings",
-    ":fuchsia_controller_py",
-  ]
-  deps = [ ":conformance_tests_py" ]
-  test_data_deps = [
-    "tests:fuchsia_controller_host_test_data",
-    "//src/tests/fidl/conformance_suite:conformance_fidl_host_test_data",
-  ]
-  main_source = conformance_test_source
-}
-
 rustc_staticlib("lib") {
   output_name = "fuchsia_controller"
   edition = "2021"
@@ -108,9 +85,8 @@ python_library("fidl_bindings") {
     "_client.py",
     "_construct.py",
     "_fidl_common.py",
-    "_import.py",
     "_ipc.py",
-    "_library.py",
+    "_ir.py",
     "_server.py",
   ]
 }
@@ -155,17 +131,10 @@ group("tests") {
   # because of the infra machines running OSX 10.15
   if (host_os != "mac") {
     deps += [
-      ":fuchsia_controller_conformance_tests",
       ":fuchsia_controller_static_conformance_tests",
       "tests:fuchsia_controller_errors_test",
       "tests:fuchsia_controller_fidl_channel_test",
-      "tests:fuchsia_controller_fidl_client_test",
       "tests:fuchsia_controller_fidl_common_test",
-      "tests:fuchsia_controller_fidl_construct_test",
-      "tests:fuchsia_controller_fidl_reserved_names_test",
-      "tests:fuchsia_controller_fidl_server_test",
-      "tests:fuchsia_controller_fidl_union_test",
-      "tests:fuchsia_controller_importing_test",
       "tests:fuchsia_controller_isolate_directory_test",
       "tests:fuchsia_controller_socket_test",
     ]

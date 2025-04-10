@@ -6,8 +6,8 @@ import asyncio
 import json
 import subprocess
 
-import fidl.fuchsia_tracing as tracing
-import fidl.fuchsia_tracing_controller as tracing_controller
+import fidl_fuchsia_tracing as tracing
+import fidl_fuchsia_tracing_controller as tracing_controller
 from fuchsia_controller_py import Channel, Socket
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 from mobly import asserts, base_test, test_runner
@@ -35,12 +35,12 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
             "core/trace_manager", tracing_controller.ProvisionerMarker
         )
         controller = tracing_controller.ProvisionerClient(ch)
-        res = await controller.get_known_categories()
-        asserts.assert_true(
-            res.response,
-            msg="Error retrieving known categories",
-        )
-        categories = res.response.categories
+        try:
+            response = (await controller.get_known_categories()).unwrap()
+        except AssertionError as e:
+            raise AssertionError("Error retrieving known categories") from e
+
+        categories = response.categories
         found_kernel_category = False
         for category in categories:
             if category.name == "kernel:vm":
@@ -83,15 +83,18 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         await controller.start_tracing()
         socket_task = asyncio.get_running_loop().create_task(client.read_all())
         await asyncio.sleep(10)
-        stop_res = await controller.stop_tracing(write_results=True)
-        asserts.assert_true(
-            stop_res.response,
-            msg="Error stopping tracing",
-        )
+        try:
+            stop_tracing_response = (
+                await controller.stop_tracing(write_results=True)
+            ).unwrap()
+        except AssertionError as e:
+            raise AssertionError("Error stopping tracing") from e
 
-        stop_result = stop_res.response
+        assert (
+            stop_tracing_response.provider_stats is not None
+        ), "Stop result provider stats should not be None."
         asserts.assert_true(
-            len(stop_result.provider_stats) > 0,
+            len(stop_tracing_response.provider_stats) > 0,
             msg="Stop result provider stats should not be empty.",
         )
 

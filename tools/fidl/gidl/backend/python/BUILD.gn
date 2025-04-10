@@ -6,7 +6,7 @@ import("//build/go/go_library.gni")
 
 assert(is_host, "GIDL only runs on host")
 
-go_library("fuchsia_controller") {
+go_library("python") {
   deps = [
     "//tools/fidl/gidl/lib/config",
     "//tools/fidl/gidl/lib/ir",

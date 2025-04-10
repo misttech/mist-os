@@ -685,7 +685,7 @@ var pythonReservedWords = map[string]struct{}{
 	"yield":                     {}, //
 	"zip":                       {}, //
 	// keep-sorted end
-	// LINT.ThenChange(//src/developer/ffx/lib/fuchsia-controller/cpp/fidl_codec/utils.h, //src/developer/ffx/lib/fuchsia-controller/python/fidl/_library.py, //tools/fidl/fidlgen_python/codegen/ir.go, //tools/fidl/gidl/backend/fuchsia_controller/conformance.go)
+	// LINT.ThenChange(//src/developer/ffx/lib/fuchsia-controller/cpp/fidl_codec/utils.h, //tools/fidl/fidlgen_python/codegen/ir.go, //tools/fidl/gidl/backend/python/conformance.go)
 }
 
 func changeIfReserved(s string) string {

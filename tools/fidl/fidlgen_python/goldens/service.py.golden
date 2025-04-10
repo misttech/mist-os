@@ -11,17 +11,26 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.service"]
+_ir_path = get_fidl_ir_map()["test.service"]
 add_ir_path(_ir_path)
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class FirstProtocolServer(fidl._server.ServerBase, ABC):
+class FirstProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.service"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -39,6 +48,8 @@ class FirstProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -57,7 +68,7 @@ class FirstProtocolServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class FirstProtocolClient(fidl._client.FidlClient):
+class FirstProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.service"
 
@@ -65,6 +76,8 @@ class FirstProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -82,7 +95,7 @@ class FirstProtocolClient(fidl._client.FidlClient):
         )
 
 
-class FirstProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
+class FirstProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.service"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -91,22 +104,32 @@ class FirstProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-FirstProtocolMarker = fidl._library.ProtocolMarker(
+FirstProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.service/FirstProtocol"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class SecondProtocolServer(fidl._server.ServerBase, ABC):
+class SecondProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.service"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -124,6 +147,8 @@ class SecondProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -142,7 +167,7 @@ class SecondProtocolServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class SecondProtocolClient(fidl._client.FidlClient):
+class SecondProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.service"
 
@@ -150,6 +175,8 @@ class SecondProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -167,7 +194,7 @@ class SecondProtocolClient(fidl._client.FidlClient):
         )
 
 
-class SecondProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
+class SecondProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.service"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -176,11 +203,13 @@ class SecondProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-SecondProtocolMarker = fidl._library.ProtocolMarker(
+SecondProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.service/SecondProtocol"
 )

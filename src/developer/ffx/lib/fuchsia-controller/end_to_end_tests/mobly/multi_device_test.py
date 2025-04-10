@@ -5,8 +5,8 @@
 import asyncio
 import logging
 
-import fidl.fuchsia_bluetooth as bluetooth
-import fidl.fuchsia_bluetooth_sys as bluetooth_sys
+import fidl_fuchsia_bluetooth as bluetooth
+import fidl_fuchsia_bluetooth_sys as bluetooth_sys
 from fuchsia_controller_py import Channel, ZxStatus
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 from mobly import base_test, test_runner

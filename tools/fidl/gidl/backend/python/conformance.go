@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-package fuchsia_controller
+package python
 
 import (
 	"bytes"
@@ -17,13 +17,6 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
-type FidlgenMode int
-
-const (
-	Dynamic FidlgenMode = iota
-	Static
-)
-
 var (
 	//go:embed conformance.tmpl
 	conformanceTmplText string
@@ -31,7 +24,6 @@ var (
 )
 
 type conformanceTmplInput struct {
-	StaticFidlgen      bool
 	EncodeSuccessCases []encodeSuccessCase
 	DecodeSuccessCases []decodeSuccessCase
 	EncodeFailureCases []encodeFailureCase
@@ -50,15 +42,7 @@ type encodeFailureCase struct{}
 
 type decodeFailureCase struct{}
 
-func GenerateConformanceTestsStatic(gidl ir.All, fidl fidlgen.Root, config config.GeneratorConfig) ([]byte, error) {
-	return GenerateConformanceTests(gidl, fidl, config, Static)
-}
-
-func GenerateConformanceTestsDynamic(gidl ir.All, fidl fidlgen.Root, config config.GeneratorConfig) ([]byte, error) {
-	return GenerateConformanceTests(gidl, fidl, config, Dynamic)
-}
-
-func GenerateConformanceTests(gidl ir.All, fidl fidlgen.Root, config config.GeneratorConfig, mode FidlgenMode) ([]byte, error) {
+func GenerateConformanceTests(gidl ir.All, fidl fidlgen.Root, config config.GeneratorConfig) ([]byte, error) {
 	schema := mixer.BuildSchema(fidl)
 	encodeSuccessCases, err := encodeSuccessCases(gidl.EncodeSuccess, schema)
 	if err != nil {
@@ -70,7 +54,6 @@ func GenerateConformanceTests(gidl ir.All, fidl fidlgen.Root, config config.Gene
 	}
 	var buf bytes.Buffer
 	err = conformanceTmpl.Execute(&buf, conformanceTmplInput{
-		StaticFidlgen:      mode == Static,
 		EncodeSuccessCases: encodeSuccessCases,
 		DecodeSuccessCases: decodeSuccessCases,
 	})
@@ -449,7 +432,7 @@ var pythonReservedWords = map[string]struct{}{
 	"yield":                     {}, //
 	"zip":                       {}, //
 	// keep-sorted end
-	// LINT.ThenChange(//src/developer/ffx/lib/fuchsia-controller/cpp/fidl_codec/utils.h, //src/developer/ffx/lib/fuchsia-controller/python/fidl/_library.py, //tools/fidl/fidlgen_python/codegen/ir.go, //tools/fidl/gidl/backend/fuchsia_controller/conformance.go)
+	// LINT.ThenChange(//src/developer/ffx/lib/fuchsia-controller/cpp/fidl_codec/utils.h, //tools/fidl/fidlgen_python/codegen/ir.go, //tools/fidl/gidl/backend/python/conformance.go)
 }
 
 func changeIfReserved(s string) string {

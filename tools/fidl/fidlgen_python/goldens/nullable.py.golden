@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.nullable"]
+_ir_path = get_fidl_ir_map()["test.nullable"]
 add_ir_path(_ir_path)
 
 
@@ -419,12 +420,20 @@ class SimpleUnion:
         return cls(_empty=())
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class SimpleProtocolServer(fidl._server.ServerBase, ABC):
+class SimpleProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.nullable"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -442,6 +451,8 @@ class SimpleProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -459,7 +470,7 @@ class SimpleProtocolServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class SimpleProtocolClient(fidl._client.FidlClient):
+class SimpleProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.nullable"
 
@@ -467,6 +478,8 @@ class SimpleProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -485,13 +498,11 @@ class SimpleProtocolClient(fidl._client.FidlClient):
             9142761280038437494,
             "test.nullable",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.nullable/SimpleProtocolAddResponse"
-            ),
+            normalize_identifier("test.nullable/SimpleProtocolAddResponse"),
         )
 
 
-class SimpleProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
+class SimpleProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.nullable"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -500,11 +511,13 @@ class SimpleProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-SimpleProtocolMarker = fidl._library.ProtocolMarker(
+SimpleProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.nullable/SimpleProtocol"
 )
