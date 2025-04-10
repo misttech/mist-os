@@ -18,16 +18,14 @@ use {
     fuchsia_async as fasync,
 };
 
-/// Minimum wait time between roam scans if there are no new roam reasons. The time between roam
-/// scans increases with a backoff, since subsequent scans are unlikely to have a different result.
-pub const TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE_MIN: zx::MonotonicDuration =
-    zx::MonotonicDuration::from_minutes(5);
-const TIME_BETWEEN_ROAM_SCANS_BACKOFF: zx::MonotonicDuration =
-    zx::MonotonicDuration::from_minutes(10);
-pub const TIME_BETWEEN_ROAM_SCANS_MAX: zx::MonotonicDuration =
-    zx::MonotonicDuration::from_minutes(35);
-pub const MIN_TIME_BETWEEN_ROAM_SCANS: zx::MonotonicDuration =
+pub const MIN_BACKOFF_BETWEEN_ROAM_SCANS_ABSOLUTE: zx::MonotonicDuration =
     zx::MonotonicDuration::from_minutes(1);
+pub const MIN_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_minutes(5);
+const ADDITIONAL_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_minutes(10);
+pub const MAX_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_minutes(35);
 
 const LOCAL_ROAM_THRESHOLD_RSSI_2G: f64 = -72.0;
 const LOCAL_ROAM_THRESHOLD_RSSI_5G: f64 = -75.0;
@@ -48,8 +46,7 @@ pub struct StationaryMonitor {
     pub connection_data: RoamingConnectionData,
     pub telemetry_sender: TelemetrySender,
     saved_networks: Arc<dyn SavedNetworksManagerApi>,
-    // The time between scans has a back off that resets at the beginning of a connection.
-    time_between_scans: zx::MonotonicDuration,
+    scan_backoff_if_no_change: zx::MonotonicDuration,
     /// To be used to limit how often roams can happen to avoid thrashing between APs.
     past_roams: Arc<Mutex<PastRoamList>>,
 }
@@ -73,8 +70,13 @@ impl StationaryMonitor {
                 STATIONARY_ROAMING_EWMA_SMOOTHING_FACTOR,
             ),
         );
-        let time_between_scans = TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE_MIN;
-        Self { connection_data, telemetry_sender, saved_networks, time_between_scans, past_roams }
+        Self {
+            connection_data,
+            telemetry_sender,
+            saved_networks,
+            scan_backoff_if_no_change: MIN_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE,
+            past_roams,
+        }
     }
 
     // Handle signal report indiciations. Update internal connection data, if necessary. Returns
@@ -136,31 +138,32 @@ impl StationaryMonitor {
         if roam_reasons.is_empty()
             || now
                 < self.connection_data.previous_roam_scan_data.time_prev_roam_scan
-                    + MIN_TIME_BETWEEN_ROAM_SCANS
+                    + MIN_BACKOFF_BETWEEN_ROAM_SCANS_ABSOLUTE
         {
             return RoamTriggerDataOutcome::Noop;
         }
 
         let is_scan_old = now
             > self.connection_data.previous_roam_scan_data.time_prev_roam_scan
-                + self.time_between_scans;
+                + self.scan_backoff_if_no_change;
         let has_new_reason = roam_reasons.iter().any(|r| {
             !self.connection_data.previous_roam_scan_data.roam_reasons_prev_scan.contains(r)
         });
         let rssi = self.connection_data.signal_data.ewma_rssi.get();
 
-        // Only initiate roam search if there are new roam reasons, a changed RSSI, or a significant
-        // amount of time has passed.
+        // Only initiate roam search if there are new roam reasons, or the roam scan backoff has
+        // passed.
         if is_scan_old || has_new_reason {
-            // Add backoff to time between roam scans if the scan is old, or reset if there are new
-            // reasons to roam.
-            if is_scan_old {
-                self.time_between_scans = std::cmp::min(
-                    self.time_between_scans + TIME_BETWEEN_ROAM_SCANS_BACKOFF,
-                    TIME_BETWEEN_ROAM_SCANS_MAX,
+            if has_new_reason {
+                // Reset roam scan backoff if there are new roam reasons.
+                self.scan_backoff_if_no_change = MIN_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE;
+            } else {
+                // Otherwise, extend the roam scan backoff.
+                self.scan_backoff_if_no_change = std::cmp::min(
+                    self.scan_backoff_if_no_change
+                        + ADDITIONAL_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE,
+                    MAX_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE,
                 );
-            } else if has_new_reason {
-                self.time_between_scans = TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE_MIN;
             }
 
             // Updated fields for tracking roam scan decisions and initiated roam search.
@@ -271,7 +274,7 @@ mod test {
             connection_data,
             telemetry_sender,
             saved_networks: saved_networks.clone(),
-            time_between_scans: MIN_TIME_BETWEEN_ROAM_SCANS,
+            scan_backoff_if_no_change: MIN_BACKOFF_BETWEEN_ROAM_SCANS_ABSOLUTE,
             past_roams: past_roams.clone(),
         };
         TestValues { monitor, telemetry_receiver, saved_networks, past_roams }
@@ -286,7 +289,7 @@ mod test {
             connection_data,
             telemetry_sender,
             saved_networks: saved_networks.clone(),
-            time_between_scans: MIN_TIME_BETWEEN_ROAM_SCANS,
+            scan_backoff_if_no_change: MIN_BACKOFF_BETWEEN_ROAM_SCANS_ABSOLUTE,
             past_roams: past_roams.clone(),
         };
         TestValues { monitor, telemetry_receiver, saved_networks, past_roams }
@@ -472,7 +475,7 @@ mod test {
 
         // Advance the time less than the minimum between roam scans.
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            MIN_TIME_BETWEEN_ROAM_SCANS - fasync::MonotonicDuration::from_seconds(1),
+            MIN_BACKOFF_BETWEEN_ROAM_SCANS_ABSOLUTE - fasync::MonotonicDuration::from_seconds(1),
         ));
 
         // Generate trigger data that would add a new roam reason for the RSSI. This ensures we
@@ -538,7 +541,9 @@ mod test {
         // Advance the time so its past the minimum between roam scans, but not the time between
         // scans if there are no other changes.
         exec.set_fake_time(
-            initial_time + MIN_TIME_BETWEEN_ROAM_SCANS + fasync::MonotonicDuration::from_seconds(1),
+            initial_time
+                + MIN_BACKOFF_BETWEEN_ROAM_SCANS_ABSOLUTE
+                + fasync::MonotonicDuration::from_seconds(1),
         );
 
         // Send identical trigger data, and verify that we don't scan, because the RSSI is unchanged,
@@ -578,34 +583,58 @@ mod test {
             RoamTriggerDataOutcome::Noop
         );
 
-        // Advance the time so that we allow roam scanning.
+        // Advanced time past the absolute minimum wait time between roam scans.
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE_MIN + fasync::MonotonicDuration::from_seconds(1),
+            MIN_BACKOFF_BETWEEN_ROAM_SCANS_ABSOLUTE + fasync::MonotonicDuration::from_seconds(1),
         ));
-
         // Send trigger data, and verify that we would be told to roam scan.
         assert_variant!(
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
             RoamTriggerDataOutcome::RoamSearch { .. }
         );
 
-        // If the time is only advanced by the minimum wait time, nothing should happen since a roam
-        // scan has already happened this connection and the time between scans should be a backoff.
+        // Advanced time past the absolute minimum wait time between roam scans, but not past the
+        // minimum time if there is no change.
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE_MIN + fasync::MonotonicDuration::from_seconds(1),
+            MIN_BACKOFF_BETWEEN_ROAM_SCANS_ABSOLUTE + fasync::MonotonicDuration::from_seconds(1),
         ));
+        // No roam scan should occur, since last scan too recent given there were no changes.
         assert_variant!(
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
             RoamTriggerDataOutcome::Noop
         );
 
-        // Advance the time so its past the time between roam scans, even if no change.
+        // Advance the time so its past the time between roam scans, even if there are no changes.
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            TIME_BETWEEN_ROAM_SCANS_BACKOFF + fasync::MonotonicDuration::from_seconds(1),
+            MIN_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE
+                + fasync::MonotonicDuration::from_seconds(1),
         ));
-
         // Send trigger data, and verify that we will now scan, despite no RSSI or roam reason
-        // change, because the last scan is considered old.
+        // change, because the last scan now is considered old.
+        assert_variant!(
+            run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
+            RoamTriggerDataOutcome::RoamSearch { .. }
+        );
+
+        // Advance the time so its past the time between roam scans, even if there are no changes.
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            MIN_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE
+                + fasync::MonotonicDuration::from_seconds(1),
+        ));
+        // No roam scan should occur, because now there is an additional backoff, due to repeated
+        // actionless roam scans with no change.
+        assert_variant!(
+            run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
+            RoamTriggerDataOutcome::Noop
+        );
+
+        // Advanced past the additional backoff.
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            ADDITIONAL_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE
+                + fasync::MonotonicDuration::from_seconds(1),
+        ));
+        // Send trigger data, and verify that we will now scan, despite no RSSI or roam reason
+        // change, because the last scan now is considered old.
         assert_variant!(
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
             RoamTriggerDataOutcome::RoamSearch { .. }
@@ -647,27 +676,40 @@ mod test {
 
         // Advance the time so that we allow roam scanning.
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE_MIN + fasync::MonotonicDuration::from_seconds(1),
+            MIN_BACKOFF_BETWEEN_ROAM_SCANS_ABSOLUTE + fasync::MonotonicDuration::from_seconds(1),
         ));
-
         // Send trigger data, and verify that we would be told to roam scan.
         assert_variant!(
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
             RoamTriggerDataOutcome::RoamSearch { .. }
         );
 
-        // If the time is only advanced by the minimum wait time, nothing should happen since a roam
-        // scan has already happened this connection and the time between scans should be a backoff.
+        // Advance the time so its past the time between roam scans, even if there are no changes.
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE_MIN + fasync::MonotonicDuration::from_seconds(1),
+            MIN_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE
+                + fasync::MonotonicDuration::from_seconds(1),
         ));
+        // Send trigger data, and verify that we will now scan, despite no RSSI or roam reason
+        // change, because the last scan now is considered old.
+        assert_variant!(
+            run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
+            RoamTriggerDataOutcome::RoamSearch { .. }
+        );
+
+        // Advance the time so its past the time between roam scans, even if there are no changes.
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            MIN_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE
+                + fasync::MonotonicDuration::from_seconds(1),
+        ));
+        // Now now roam scan should occur, because there should be an additional backoff due to
+        // repeated roam scans with no change.
         assert_variant!(
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
             RoamTriggerDataOutcome::Noop
         );
 
-        // Send trigger data that would have a different roam reason, and verify that we would be
-        // told to roam scan. Lower SNR a lot to account for EWMA smoothing
+        // Send trigger data that would have a different roam reason. Lower SNR a lot to account for
+        // EWMA smoothing
         let rssi = LOCAL_ROAM_THRESHOLD_RSSI_5G - 1.0;
         let snr = LOCAL_ROAM_THRESHOLD_SNR_5G - 10.0;
         let trigger_data =
@@ -675,18 +717,18 @@ mod test {
                 rssi_dbm: rssi as i8,
                 snr_db: snr as i8,
             });
-
+        // We should now be able to roam scan, since there are new roam reasons.
         assert_variant!(
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
             RoamTriggerDataOutcome::RoamSearch { .. }
         );
 
-        // The scan backoff should be reset, so another scan could happen after the starting amount
+        // The scan backoff should be reset, so another scan could happen after the base amount
         // of time without a change in roam reason.
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE_MIN + fasync::MonotonicDuration::from_seconds(1),
+            MIN_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE
+                + fasync::MonotonicDuration::from_seconds(1),
         ));
-
         assert_variant!(
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
             RoamTriggerDataOutcome::RoamSearch { .. }
@@ -728,7 +770,9 @@ mod test {
 
         // Advance the time so its past the minimum between roam scans.
         exec.set_fake_time(
-            initial_time + MIN_TIME_BETWEEN_ROAM_SCANS + fasync::MonotonicDuration::from_seconds(1),
+            initial_time
+                + MIN_BACKOFF_BETWEEN_ROAM_SCANS_ABSOLUTE
+                + fasync::MonotonicDuration::from_seconds(1),
         );
 
         // Change the SNR so that we will now get an SNR threshold roam reason.
@@ -900,7 +944,9 @@ mod test {
         // Record enough roam attempts to prevent roaming for a while.
         for _ in 0..NUM_MAX_ROAMS_PER_DAY {
             test_values.past_roams.try_lock().unwrap().add(RoamEvent::new_roam_now());
-            exec.set_fake_time(fasync::MonotonicInstant::after(TIME_BETWEEN_ROAM_SCANS_MAX));
+            exec.set_fake_time(fasync::MonotonicInstant::after(
+                MAX_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE,
+            ));
         }
 
         let trigger_data =
@@ -910,7 +956,7 @@ mod test {
             });
 
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            TIME_BETWEEN_ROAM_SCANS_MAX + zx::MonotonicDuration::from_seconds(1),
+            MAX_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE + zx::MonotonicDuration::from_seconds(1),
         ));
 
         // The limit on roams per day has been hit, no roam scan should be recommended.

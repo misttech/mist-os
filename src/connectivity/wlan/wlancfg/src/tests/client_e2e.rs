@@ -2633,7 +2633,7 @@ fn test_roam_profile_scans_obey_wait_time<F>(
     // Advance past the minimum wait time between roam scans. This should never use a catch-all
     // branch, to ensure it is updated for future profiles.
     let wait_time = match roaming_profile {
-        RoamingProfile::Stationary => stationary_monitor::MIN_TIME_BETWEEN_ROAM_SCANS,
+        RoamingProfile::Stationary => stationary_monitor::MIN_BACKOFF_BETWEEN_ROAM_SCANS_ABSOLUTE,
     };
     exec.set_fake_time(
         fasync::MonotonicInstant::after(wait_time) + fasync::MonotonicDuration::from_seconds(1),
@@ -2652,7 +2652,9 @@ fn test_roam_profile_scans_obey_wait_time<F>(
     // Advance past the maximum backoff time between roam scans. This should never use a catch-all
     // branch, to ensure it is updated for future profiles.
     let wait_time = match roaming_profile {
-        RoamingProfile::Stationary => stationary_monitor::TIME_BETWEEN_ROAM_SCANS_MAX,
+        RoamingProfile::Stationary => {
+            stationary_monitor::MAX_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE
+        }
     };
     exec.set_fake_time(
         fasync::MonotonicInstant::after(wait_time) + fasync::MonotonicDuration::from_seconds(1),
@@ -2806,7 +2808,9 @@ fn test_roam_profile_obeys_max_roams_per_day<F>(
     // Get max backoff time between roam scans constant. This should never use a catch-all branch, to
     // ensure it is updated for future profiles.
     let max_roam_scan_backoff_time = match roaming_profile {
-        RoamingProfile::Stationary => stationary_monitor::TIME_BETWEEN_ROAM_SCANS_MAX,
+        RoamingProfile::Stationary => {
+            stationary_monitor::MAX_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE
+        }
     };
 
     // Create a mock scan result with a very strong BSS roam candidate.
@@ -2925,7 +2929,7 @@ fn test_autconnect_starts_after_roam_error() {
 
     // Advance fake time past max roam scan backoff time.
     exec.set_fake_time(fasync::MonotonicInstant::after(
-        stationary_monitor::TIME_BETWEEN_ROAM_SCANS_MAX
+        stationary_monitor::MAX_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE
             + fasync::MonotonicDuration::from_seconds(1),
     ));
 
