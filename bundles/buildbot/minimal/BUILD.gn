@@ -26,10 +26,10 @@ group("non-hermetic_tests") {
   public_deps = []
   data_deps = []
 
-  # Ensure that no tests are added to the non-hermetic tests group
+  # Ensure that no tests are added to the non-hermetic_tests group
   assert(
       deps + public_deps + data_deps == [],
-      "The minimal product does not support the running of non-hermetic tests in infra.")
+      "The minimal product does not support running the `non-hermetic_tests` group in infra.")
 }
 
 # For use with the 'e2e_test_labels' GN build argument.
@@ -40,10 +40,10 @@ group("e2e_tests") {
   public_deps = []
   data_deps = []
 
-  # Ensure that no tests are added to the e2e_tests tests group
+  # Ensure that no tests are added to the e2e_tests group
   assert(
       deps + public_deps + data_deps == [],
-      "The minimal product does not support the running of end-to-end tests in infra.")
+      "The minimal product does not support running the `e2e_tests` group in infra.")
 }
 
 # WARNING: Known to infrastructure
@@ -74,6 +74,8 @@ group("minimal") {
     "//src/hwinfo:tests",
     "//src/intl:tests",
     "//src/lib:tests",
+    "//src/media/audio/drivers/tests:admin",
+    "//src/media/audio/drivers/tests:basic",
     "//src/performance:tests",
     "//src/power:tests",
     "//src/starnix:tests",

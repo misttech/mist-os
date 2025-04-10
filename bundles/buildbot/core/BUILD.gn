@@ -51,7 +51,9 @@ group("core") {
   if (has_board) {
     deps += [
       "//src:e2e_tests",
-      # TODO(https://fxbug.dev/42066250) Re-instate these tests when they correctly
+      "//src/media/audio/drivers/tests:basic",
+
+      # TODO(https://fxbug.dev/42066250) Reinstate these tests when they correctly
       # select the environments that they can run on.
       #
       # "//tools:e2e_tests",
