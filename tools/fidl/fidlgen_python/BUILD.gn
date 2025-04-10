@@ -66,8 +66,7 @@ golden_files("fidlgen_python_golden_tests") {
       comparisons += [
         {
           golden = "goldens/${info.name}.py.golden"
-          candidate =
-              "${info.fidl_gen_dir}/${info.target_name}/python/__init__.py"
+          candidate = "${info.fidl_gen_dir}/${info.target_name}/python/fidl_${_library_underscore}/__init__.py"
         },
       ]
     }
@@ -80,7 +79,7 @@ golden_files("fidlgen_python_golden_tests") {
     {
       golden = "goldens/clientsuite.py.golden"
       candidate = get_label_info("${dynsuite_label}", "target_gen_dir") +
-                  "/fidl.clientsuite/python/__init__.py"
+                  "/fidl.clientsuite/python/fidl_fidl_clientsuite/__init__.py"
     },
   ]
 }

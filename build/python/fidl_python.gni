@@ -47,12 +47,13 @@ template("fidl_python") {
 
   forward_variables_from(invoker, [ "fidl_gen_dir" ])
 
+  python_library_name = "fidl_" + string_replace(invoker.library_name, ".", "_")
+
   if (is_fidl_toolchain) {
     not_needed(invoker,
                [
                  "deps",
                  "visibility",
-                 "library_name",
                  "fidl_target",
                ])
     compiled_action(generation_target) {
@@ -79,7 +80,7 @@ template("fidl_python") {
         "//pyproject.toml",
       ]
 
-      output = "$fidl_gen_dir/__init__.py"
+      output = "$fidl_gen_dir/$python_library_name/__init__.py"
       outputs = [ output ]
 
       args = [
@@ -118,8 +119,8 @@ template("fidl_python") {
                                "fidl_target",
                              ])
 
-      library_name = "fidl_" + string_replace(library_name, ".", "_")
-      source_root = "$fidl_gen_dir"
+      library_name = python_library_name
+      source_root = "$fidl_gen_dir/$python_library_name"
 
       # TODO(https://fxbug.dev/394425397): These dependencies should be lifted into proper
       # locations adjacent or within fidlgen_python. Ideally, this can be done when the dependency
