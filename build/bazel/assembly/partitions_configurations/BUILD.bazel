@@ -128,6 +128,9 @@ alias(
 fuchsia_partitions_configuration(
     name = "riscv64",
     hardware_revision = "riscv64",
+    partitions = [
+        ":zircon_r",
+    ],
 )
 
 fuchsia_partitions_configuration(
@@ -147,7 +150,10 @@ fuchsia_partitions_configuration(
     hardware_revision = "",
 )
 
-alias(
+fuchsia_partitions_configuration(
     name = "qemu-arm64",
-    actual = ":default",
+    hardware_revision = "",
+    partitions = [
+        ":zircon_r",
+    ],
 )
