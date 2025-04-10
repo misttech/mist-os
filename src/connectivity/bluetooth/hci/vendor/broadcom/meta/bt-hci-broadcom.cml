@@ -18,5 +18,6 @@
     use: [
         { service: "fuchsia.hardware.bluetooth.HciService" },
         { service: "fuchsia.hardware.serialimpl.Service" },
+        { service: "fuchsia.boot.metadata.MacAddressMetadata" },
     ],
 }

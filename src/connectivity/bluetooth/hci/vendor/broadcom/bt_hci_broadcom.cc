@@ -6,16 +6,15 @@
 
 #include <assert.h>
 #include <endian.h>
-#include <fidl/fuchsia.driver.compat/cpp/wire.h>
+#include <fidl/fuchsia.boot.metadata/cpp/fidl.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/driver.h>
-#include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/metadata/cpp/metadata.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -353,46 +352,6 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::SetDefaultPowerCaps() {
       });
 }
 
-fpromise::result<std::array<uint8_t, kMacAddrLen>, zx_status_t>
-BtHciBroadcom::GetBdaddrFromBootloader() {
-  std::array<uint8_t, kMacAddrLen> mac_addr;
-  size_t actual_len;
-
-  zx::result compat_device = incoming()->Connect<fuchsia_driver_compat::Service::Device>();
-  if (compat_device.is_error()) {
-    return fpromise::error(compat_device.status_value());
-  }
-
-  fidl::WireResult metadata = fidl::WireCall(compat_device.value())->GetMetadata();
-  if (!metadata.ok()) {
-    FDF_LOG(WARNING, "GetMetadata failed: %s", metadata.FormatDescription().c_str());
-    return fpromise::error(metadata.error().status());
-  }
-
-  if (metadata.value().is_error()) {
-    FDF_LOG(WARNING, "GetMetadata failed: %s",
-            zx_status_get_string(metadata.value().error_value()));
-    return fpromise::error(metadata.value().error_value());
-  }
-
-  auto meta_vec = metadata.value().value();
-  for (auto& entry : meta_vec->metadata) {
-    if (entry.type == DEVICE_METADATA_MAC_ADDRESS) {
-      entry.data.get_size(&actual_len);
-      if (actual_len < kMacAddrLen) {
-        return fpromise::error(ZX_ERR_INTERNAL);
-      }
-      entry.data.read(mac_addr.data(), 0, kMacAddrLen);
-      break;
-    }
-  }
-
-  FDF_LOG(INFO, "got bootloader mac address %02x:%02x:%02x:%02x:%02x:%02x", mac_addr[0],
-          mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
-
-  return fpromise::ok(mac_addr);
-}
-
 fpromise::promise<> BtHciBroadcom::LogControllerFallbackBdaddr() {
   return SendCommand(&kReadBdaddrCmd, sizeof(kReadBdaddrCmd))
       .then([](fpromise::result<std::vector<uint8_t>, zx_status_t>& result) {
@@ -417,7 +376,6 @@ constexpr auto kOpenFlags = fuchsia_io::Flags::kPermRead | fuchsia_io::Flags::kP
 fpromise::promise<void, zx_status_t> BtHciBroadcom::LoadFirmware() {
   zx::vmo fw_vmo;
   size_t fw_size;
-
 
   // If there's no firmware for this PID, we don't expect the bind to happen without a
   // corresponding entry in the firmware table. Please double-check the PID value and add an entry
@@ -605,19 +563,26 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::Initialize() {
         return SendCommand(&kResetCmd, sizeof(kResetCmd));
       })
       .and_then([this](std::vector<uint8_t>&) -> fpromise::promise<void, zx_status_t> {
-        FDF_LOG(DEBUG, "setting BDADDR to value from bootloader");
-        fpromise::result<std::array<uint8_t, kMacAddrLen>, zx_status_t> bdaddr =
-            GetBdaddrFromBootloader();
-
-        if (bdaddr.is_error()) {
+        FDF_LOG(DEBUG, "Getting mac address");
+        zx::result metadata =
+            fdf_metadata::GetMetadata<fuchsia_boot_metadata::MacAddressMetadata>(*incoming());
+        if (metadata.is_error()) {
           return LogControllerFallbackBdaddr().then(
               [](fpromise::result<>&) -> fpromise::result<void, zx_status_t> {
                 return fpromise::ok();
               });
         }
 
+        if (!metadata.value().mac_address().has_value()) {
+          FDF_LOG(ERROR, "Mac address metadata missing mac address");
+          return fpromise::make_error_promise(ZX_ERR_INTERNAL);
+        }
+        const auto& octets = metadata.value().mac_address().value().octets();
+        FDF_LOG(INFO, "Got mac address %02x:%02x:%02x:%02x:%02x:%02x", octets[0], octets[1],
+                octets[2], octets[3], octets[4], octets[5]);
+
         // send Set BDADDR command
-        return SetBdaddr(bdaddr.value());
+        return SetBdaddr(octets);
       })
       .and_then([this]() { return SetDefaultPowerCaps(); })
       .and_then([this]() { return AddNode(); })

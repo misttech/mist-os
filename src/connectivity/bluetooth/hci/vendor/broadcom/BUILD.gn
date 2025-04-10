@@ -33,9 +33,11 @@ source_set("common") {
 
   deps = [
     ":bcm_hci_bind",
+    "//sdk/fidl/fuchsia.boot.metadata:fuchsia.boot.metadata_cpp",
     "//sdk/lib/async-default",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/fidl",
     "//src/devices/lib/driver:driver_runtime",
     "//zircon/system/ulib/sync",
@@ -43,11 +45,9 @@ source_set("common") {
   ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
     "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
     "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_cpp",
-    "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/devfs/cpp:cpp",
     "//src/lib/ddk",

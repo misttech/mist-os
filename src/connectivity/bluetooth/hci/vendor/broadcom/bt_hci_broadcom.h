@@ -90,8 +90,6 @@ class BtHciBroadcom final
 
   fpromise::promise<void, zx_status_t> SetDefaultPowerCaps();
 
-  fpromise::result<std::array<uint8_t, kMacAddrLen>, zx_status_t> GetBdaddrFromBootloader();
-
   fpromise::promise<> LogControllerFallbackBdaddr();
 
   fpromise::promise<void, zx_status_t> LoadFirmware();
