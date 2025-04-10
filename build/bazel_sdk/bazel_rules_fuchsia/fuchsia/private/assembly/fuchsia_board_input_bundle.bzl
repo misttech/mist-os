@@ -62,6 +62,7 @@ def _fuchsia_board_input_bundle_impl(ctx):
 
     # Add single-file configs
     for (arg, file) in [
+        ("--energy-model-config", "energy_model_config"),
         ("--cpu-manager-config", "cpu_manager_config"),
         ("--power-manager-config", "power_manager_config"),
         ("--power-metrics-recorder-config", "power_metrics_recorder_config"),
@@ -163,6 +164,10 @@ fuchsia_board_input_bundle = rule(
             doc = "Bootfs packages to include in board.",
             providers = [FuchsiaPackageInfo],
             default = [],
+        ),
+        "energy_model_config": attr.label(
+            doc = "Path to energy model configuration",
+            allow_single_file = True,
         ),
         "cpu_manager_config": attr.label(
             doc = "Path to cpu_manager configuration",
