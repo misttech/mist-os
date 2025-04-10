@@ -206,7 +206,7 @@ mod tests {
 
         let scope = ExecutionScope::new();
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
-        dir.clone().deprecated_open(
+        dir.clone().open(
             scope.clone(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
             Path::validate_and_split("test").unwrap(),

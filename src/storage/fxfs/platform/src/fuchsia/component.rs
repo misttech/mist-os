@@ -203,7 +203,7 @@ impl Component {
             | fio::PERM_WRITABLE
             | fio::PERM_EXECUTABLE
             | fio::Flags::PROTOCOL_DIRECTORY;
-        self.export_dir.clone().open(
+        self.export_dir.clone().open3(
             self.scope.clone(),
             Path::dot(),
             flags,

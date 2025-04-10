@@ -621,7 +621,7 @@ struct DevfsDevice {
 
 // TODO(https://fxbug.dev/326325522): This is an abuse of directories.
 impl RemoteLike for DevfsDevice {
-    fn deprecated_open(
+    fn open(
         self: Arc<Self>,
         _scope: vfs::execution_scope::ExecutionScope,
         _flags: fidl_fuchsia_io::OpenFlags,
@@ -646,7 +646,7 @@ impl RemoteLike for DevfsDevice {
         error!("failed to serve device or controller: Bad path {}", path.as_ref());
     }
 
-    fn open(
+    fn open3(
         self: Arc<Self>,
         _scope: vfs::execution_scope::ExecutionScope,
         path: vfs::path::Path,
@@ -736,7 +736,7 @@ impl ManagedRealm {
                 ManagedRealmRequest::GetDevfs { devfs: server_end, control_handle: _ } => {
                     let flags = fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY;
                     // On errors `server_end` will be closed with an epitaph.
-                    let _ = devfs.clone().open(
+                    let _ = devfs.clone().open3(
                         vfs::execution_scope::ExecutionScope::new(),
                         vfs::path::Path::dot(),
                         flags,

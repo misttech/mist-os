@@ -132,7 +132,7 @@ async fn open_requests_go_to_the_same_directory_connection() {
         }
     }
     impl RemoteLike for MockDir {
-        fn deprecated_open(
+        fn open(
             self: Arc<Self>,
             _scope: ExecutionScope,
             _flags: fio::OpenFlags,
@@ -142,7 +142,7 @@ async fn open_requests_go_to_the_same_directory_connection() {
             panic!("fuchsia.io/Directory.DeprecatedOpen should never be called in these tests.");
         }
 
-        fn open(
+        fn open3(
             self: Arc<Self>,
             _scope: ExecutionScope,
             relative_path: vfs::path::Path,

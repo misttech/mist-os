@@ -515,7 +515,7 @@ where
         .map_err(|e| ComponentError::ServeRuntimeDir(anyhow!("cannot add elf/job_id: {}", e)))?;
     let object_request = fio::PERM_READABLE.to_object_request(runtime_dir.into_channel());
     object_request.handle(|request| {
-        runtime_dir_builder.build().open(
+        runtime_dir_builder.build().open3(
             ExecutionScope::new(),
             vfs::path::Path::dot(),
             fio::PERM_READABLE,

@@ -224,7 +224,7 @@ pub(crate) async fn resolve_package(
         .map_err(ResolverError::ServePackageDirectory)?;
 
     let request = vfs::ObjectRequest::new(FLAGS, &Default::default(), dir.into_channel());
-    request.handle(|request| root.open(scope, vfs::path::Path::dot(), FLAGS, request));
+    request.handle(|request| root.open3(scope, vfs::path::Path::dot(), FLAGS, request));
     Ok(hash)
 }
 
@@ -269,7 +269,7 @@ async fn resolve_subpackage(
         .await
         .map_err(ResolverError::ServePackageDirectory)?;
     let request = vfs::ObjectRequest::new(FLAGS, &Default::default(), dir.into_channel());
-    request.handle(|request| root.open(scope, vfs::path::Path::dot(), FLAGS, request));
+    request.handle(|request| root.open3(scope, vfs::path::Path::dot(), FLAGS, request));
     Ok(authenticator.create(&subpackage))
 }
 

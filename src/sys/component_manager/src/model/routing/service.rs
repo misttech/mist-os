@@ -956,7 +956,7 @@ mod tests {
     fn open_dir(execution_scope: ExecutionScope, dir: Arc<dyn Directory>) -> fio::DirectoryProxy {
         let (dir_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
-        dir.deprecated_open(
+        dir.open(
             execution_scope,
             fio::OpenFlags::DIRECTORY,
             vfs::path::Path::dot(),

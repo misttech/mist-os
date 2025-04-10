@@ -308,7 +308,7 @@ pub mod test {
     fn open_root(dev: &FatDevice) -> fio::DirectoryProxy {
         let (proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let root = dev.get_root().unwrap();
-        let () = root.clone().deprecated_open(
+        let () = root.clone().open(
             dev.scope.clone(),
             fio::OpenFlags::RIGHT_READABLE,
             Path::dot(),

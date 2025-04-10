@@ -52,7 +52,7 @@ async fn serve_boot_items(handles: LocalComponentHandles) -> Result<(), Error> {
 
     let scope = ExecutionScope::new();
     fio::PERM_READABLE.to_object_request(handles.outgoing_dir.into_channel()).handle(|request| {
-        export.open(scope.clone(), vfs::Path::dot(), fio::PERM_READABLE, request)
+        export.open3(scope.clone(), vfs::Path::dot(), fio::PERM_READABLE, request)
     });
 
     scope.wait().await;

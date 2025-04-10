@@ -403,7 +403,7 @@ async fn main_inner() -> Result<(), Error> {
             .context("taking startup handle")?
             .into(),
     )
-    .handle(|request| out_dir.open(scope.clone(), vfs::path::Path::dot(), flags, request));
+    .handle(|request| out_dir.open3(scope.clone(), vfs::path::Path::dot(), flags, request));
 
     let () = scope.wait().await;
     cobalt_fut.await;

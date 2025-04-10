@@ -145,7 +145,7 @@ pub async fn run(
         };
 
         let scope = ExecutionScope::new();
-        let () = dir.deprecated_open(
+        let () = dir.open(
             scope.clone(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
             Path::dot(),

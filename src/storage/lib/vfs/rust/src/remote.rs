@@ -17,8 +17,15 @@ use std::sync::Arc;
 use zx_status::Status;
 
 pub trait RemoteLike {
-    /// Called when a fuchsia.io/Directory.Open request should be forwarded to the remote node.
     fn open(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        flags: fio::OpenFlags,
+        path: Path,
+        server_end: ServerEnd<fio::NodeMarker>,
+    );
+
+    fn open3(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: Path,
@@ -33,26 +40,16 @@ pub trait RemoteLike {
     fn lazy(&self, _path: &Path) -> bool {
         false
     }
-
-    /// DEPRECATED - Do not implement unless required for backwards compatibility. Called when
-    /// forwarding fuchsia.io/Directory.DeprecatedOpen requests.
-    fn deprecated_open(
-        self: Arc<Self>,
-        _scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        _path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        flags.to_object_request(server_end.into_channel()).shutdown(Status::NOT_SUPPORTED);
-    }
 }
 
-/// Creates a new node that forwards open requests a remote directory server.
+/// Create a new [`Remote`] node that forwards open requests to the provided [`DirectoryProxy`],
+/// effectively handing off the handling of any further requests to the remote fidl server.
 pub fn remote_dir(dir: fio::DirectoryProxy) -> Arc<impl DirectoryEntry + RemoteLike> {
     Arc::new(RemoteDir { dir })
 }
 
-/// [`RemoteDir`] implements [`RemoteLike`]` by forwarding open requests to a remote directory.
+/// [`RemoteDir`] implements [`RemoteLike`]` which forwards open/open2 requests to a remote
+/// directory.
 struct RemoteDir {
     dir: fio::DirectoryProxy,
 }
@@ -82,7 +79,7 @@ impl<T: GetRemoteDir + Send + Sync + 'static> DirectoryEntry for T {
 }
 
 impl<T: GetRemoteDir> RemoteLike for T {
-    fn deprecated_open(
+    fn open(
         self: Arc<Self>,
         _scope: ExecutionScope,
         flags: fio::OpenFlags,
@@ -108,7 +105,7 @@ impl<T: GetRemoteDir> RemoteLike for T {
         });
     }
 
-    fn open(
+    fn open3(
         self: Arc<Self>,
         _scope: ExecutionScope,
         path: Path,

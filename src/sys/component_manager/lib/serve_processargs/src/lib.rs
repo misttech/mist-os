@@ -213,7 +213,7 @@ mod test_util {
         }
 
         impl RemoteLike for Sender {
-            fn deprecated_open(
+            fn open(
                 self: Arc<Self>,
                 _scope: ExecutionScope,
                 _flags: fio::OpenFlags,
@@ -223,7 +223,7 @@ mod test_util {
                 panic!("fuchsia.io/Directory.DeprecatedOpen should not be called from these tests")
             }
 
-            fn open(
+            fn open3(
                 self: Arc<Self>,
                 scope: ExecutionScope,
                 relative_path: Path,

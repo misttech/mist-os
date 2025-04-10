@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use log::{error, info};
 use std::collections::HashSet;
@@ -86,6 +87,16 @@ impl vfs::node::Node for Validation {
 
 impl vfs::directory::entry_container::Directory for Validation {
     fn open(
+        self: Arc<Self>,
+        _scope: ExecutionScope,
+        _flags: fio::OpenFlags,
+        _path: VfsPath,
+        _server_end: ServerEnd<fio::NodeMarker>,
+    ) {
+        panic!("fuchsia.io/Directory.DeprecatedOpen should not be called from these tests")
+    }
+
+    fn open3(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: VfsPath,

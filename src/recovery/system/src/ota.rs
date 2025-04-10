@@ -259,7 +259,7 @@ pub async fn run_devhost_ota(
 
     let scope = vfs::execution_scope::ExecutionScope::new();
     SERVE_FLAGS.to_object_request(out_dir.into_channel()).handle(|request| {
-        outgoing_dir_vfs.clone().open(scope.clone(), vfs::Path::dot(), SERVE_FLAGS, request)
+        outgoing_dir_vfs.clone().open3(scope.clone(), vfs::Path::dot(), SERVE_FLAGS, request)
     });
     fasync::Task::local(async move { scope.wait().await }).detach();
 
@@ -539,7 +539,12 @@ mod tests {
 
             let scope = vfs::execution_scope::ExecutionScope::new();
             SERVE_FLAGS.to_object_request(outgoing_dir).handle(|request| {
-                outgoing_dir_vfs.clone().open(scope.clone(), vfs::Path::dot(), SERVE_FLAGS, request)
+                outgoing_dir_vfs.clone().open3(
+                    scope.clone(),
+                    vfs::Path::dot(),
+                    SERVE_FLAGS,
+                    request,
+                )
             });
             fasync::Task::local(async move { scope.wait().await }).detach();
 

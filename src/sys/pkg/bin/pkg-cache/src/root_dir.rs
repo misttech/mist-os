@@ -60,7 +60,7 @@ impl BootfsThenBlobfs {
 }
 
 impl package_directory::NonMetaStorage for BootfsThenBlobfs {
-    fn deprecated_open(
+    fn open(
         &self,
         blob: &fuchsia_hash::Hash,
         flags: fio::OpenFlags,
@@ -68,25 +68,13 @@ impl package_directory::NonMetaStorage for BootfsThenBlobfs {
         server_end: fidl::endpoints::ServerEnd<fio::NodeMarker>,
     ) -> Result<(), package_directory::NonMetaStorageError> {
         if self.0.bootfs_contents.contains(blob) {
-            package_directory::NonMetaStorage::deprecated_open(
-                &self.0.bootfs,
-                blob,
-                flags,
-                scope,
-                server_end,
-            )
+            package_directory::NonMetaStorage::open(&self.0.bootfs, blob, flags, scope, server_end)
         } else {
-            package_directory::NonMetaStorage::deprecated_open(
-                &self.0.blobfs,
-                blob,
-                flags,
-                scope,
-                server_end,
-            )
+            package_directory::NonMetaStorage::open(&self.0.blobfs, blob, flags, scope, server_end)
         }
     }
 
-    fn open(
+    fn open3(
         &self,
         blob: &fuchsia_hash::Hash,
         flags: fio::Flags,
@@ -107,7 +95,7 @@ impl package_directory::NonMetaStorage for BootfsThenBlobfs {
                     zx::Status::INTERNAL
                 })
         } else {
-            package_directory::NonMetaStorage::open(
+            package_directory::NonMetaStorage::open3(
                 &self.0.blobfs,
                 blob,
                 flags,

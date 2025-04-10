@@ -116,7 +116,7 @@ impl RuntimeDirBuilder {
         let object_request = SERVE_FLAGS.to_object_request(self.server_end.into_channel());
         let dir = runtime_directory.clone();
         object_request.handle(|request| {
-            dir.open(ExecutionScope::new(), vfs::Path::dot(), SERVE_FLAGS, request)
+            dir.open3(ExecutionScope::new(), vfs::Path::dot(), SERVE_FLAGS, request)
         });
         RuntimeDirectory(runtime_directory)
     }

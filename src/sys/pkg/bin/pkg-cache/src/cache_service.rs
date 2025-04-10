@@ -355,7 +355,7 @@ async fn get_impl(
 
     let flags = executability_status(executability_restrictions, base_packages, pkg).into();
     let request = vfs::ObjectRequest::new(flags, &Default::default(), dir.into_channel());
-    request.handle(|request| root_dir.open(scope, vfs::path::Path::dot(), flags, request));
+    request.handle(|request| root_dir.open3(scope, vfs::path::Path::dot(), flags, request));
 
     cobalt_sender.open_success();
     Ok(())
@@ -820,7 +820,7 @@ async fn get_subpackage(
     })?;
     let flags = executability_status(executability_restrictions, base_packages, *hash).into();
     let request = vfs::ObjectRequest::new(flags, &Default::default(), dir.into_channel());
-    request.handle(|request| root.open(scope, vfs::path::Path::dot(), flags, request));
+    request.handle(|request| root.open3(scope, vfs::path::Path::dot(), flags, request));
 
     Ok(())
 }

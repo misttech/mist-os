@@ -724,7 +724,7 @@ where
                         .expect("mock component should only be launched once");
                     let scope = vfs::execution_scope::ExecutionScope::new();
                     OUT_DIR_FLAGS.to_object_request(handles.outgoing_dir).handle(|request| {
-                        local_child_out_dir.open(
+                        local_child_out_dir.open3(
                             scope.clone(),
                             vfs::Path::dot(),
                             OUT_DIR_FLAGS,

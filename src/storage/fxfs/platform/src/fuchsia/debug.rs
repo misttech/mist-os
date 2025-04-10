@@ -311,7 +311,7 @@ impl Node for ObjectDirectory {
 }
 
 impl Directory for ObjectDirectory {
-    fn deprecated_open(
+    fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
@@ -341,7 +341,7 @@ impl Directory for ObjectDirectory {
         });
     }
 
-    fn open(
+    fn open3(
         self: Arc<Self>,
         scope: ExecutionScope,
         mut path: vfs::path::Path,

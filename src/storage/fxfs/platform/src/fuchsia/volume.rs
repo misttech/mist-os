@@ -1466,7 +1466,7 @@ mod tests {
 
             // TODO(https://fxbug.dev/378924259): Migrate to open3.
             let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
-            volumes_directory.directory_node().clone().deprecated_open(
+            volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
                 Path::validate_and_split(VOLUME_NAME).unwrap(),
@@ -1581,7 +1581,7 @@ mod tests {
                 .expect("mount unencrypted volume failed");
             // TODO(https://fxbug.dev/378924259): Migrate to open3.
             let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
-            volumes_directory.directory_node().clone().deprecated_open(
+            volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
                 Path::validate_and_split(VOLUME_NAME).unwrap(),
@@ -1702,7 +1702,7 @@ mod tests {
 
             // TODO(https://fxbug.dev/378924259): Migrate to open3.
             let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
-            volumes_directory.directory_node().clone().deprecated_open(
+            volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
                 Path::validate_and_split(VOLUME_NAME).unwrap(),
@@ -1833,7 +1833,7 @@ mod tests {
 
             // TODO(https://fxbug.dev/378924259): Migrate to open3.
             let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
-            volumes_directory.directory_node().clone().deprecated_open(
+            volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
                 Path::validate_and_split(VOLUME_NAME).unwrap(),
@@ -2003,7 +2003,7 @@ mod tests {
 
             // TODO(https://fxbug.dev/378924259): Migrate to open3.
             let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
-            volumes_directory.directory_node().clone().deprecated_open(
+            volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
                 Path::validate_and_split(VOLUME_NAME).unwrap(),
@@ -2165,7 +2165,7 @@ mod tests {
 
             // TODO(https://fxbug.dev/378924259): Migrate to open3.
             let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
-            volumes_directory.directory_node().clone().deprecated_open(
+            volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
                 Path::validate_and_split(VOLUME_NAME).unwrap(),

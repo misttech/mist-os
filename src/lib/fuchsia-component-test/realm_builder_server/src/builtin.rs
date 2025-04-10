@@ -62,7 +62,7 @@ pub async fn read_only_directory_helper(
         warn!("nonexistent path {:?} accessed in read only directory {:?}", path, directory_name);
     }));
     let flags = fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY;
-    top_directory.open(
+    top_directory.open3(
         execution_scope_dropper.execution_scope.clone(),
         VfsPath::dot(),
         flags.clone(),

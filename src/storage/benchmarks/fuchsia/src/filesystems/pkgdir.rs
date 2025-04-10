@@ -132,7 +132,7 @@ impl PkgDirRealm {
                 "service_reflector",
                 move |handles| {
                     let scope = vfs::execution_scope::ExecutionScope::new();
-                    let () = exposed_dir.clone().deprecated_open(
+                    let () = exposed_dir.clone().open(
                         scope.clone(),
                         fio::OpenFlags::RIGHT_READABLE,
                         vfs::path::Path::dot(),

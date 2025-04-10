@@ -343,13 +343,14 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             }
         };
 
-        self.directory.clone().deprecated_open(self.scope.clone(), flags, Path::dot(), server_end);
+        self.directory.clone().open(self.scope.clone(), flags, Path::dot(), server_end);
     }
 
     fn handle_clone(&mut self, object: fidl::Channel) {
         let flags = fio::Flags::from(&self.options);
-        ObjectRequest::new(flags, &Default::default(), object)
-            .handle(|req| self.directory.clone().open(self.scope.clone(), Path::dot(), flags, req));
+        ObjectRequest::new(flags, &Default::default(), object).handle(|req| {
+            self.directory.clone().open3(self.scope.clone(), Path::dot(), flags, req)
+        });
     }
 
     fn handle_deprecated_open(
@@ -392,7 +393,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
 
         // It is up to the open method to handle OPEN_FLAG_DESCRIBE from this point on.
         let directory = self.directory.clone();
-        directory.deprecated_open(self.scope.clone(), flags, path, server_end);
+        directory.open(self.scope.clone(), flags, path, server_end);
     }
 
     async fn handle_open(
@@ -466,7 +467,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             return Err(Status::ALREADY_EXISTS);
         }
 
-        self.directory.clone().open_async(self.scope.clone(), path, flags, object_request).await
+        self.directory.clone().open3_async(self.scope.clone(), path, flags, object_request).await
     }
 
     async fn handle_read_dirents(&mut self, max_bytes: u64) -> (Status, Vec<u8>) {
@@ -566,7 +567,7 @@ mod tests {
         let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let dir = Simple::new();
-        dir.deprecated_open(
+        dir.open(
             ExecutionScope::new(),
             fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
             Path::dot(),
@@ -602,7 +603,7 @@ mod tests {
         let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let dir = Simple::new();
-        dir.deprecated_open(
+        dir.open(
             ExecutionScope::new(),
             fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
             Path::dot(),
@@ -640,7 +641,7 @@ mod tests {
         let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let dir = Simple::new();
-        dir.deprecated_open(
+        dir.open(
             ExecutionScope::new(),
             fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
             Path::dot(),
@@ -678,7 +679,7 @@ mod tests {
         let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let dir = Simple::new();
-        dir.deprecated_open(
+        dir.open(
             ExecutionScope::new(),
             fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
             Path::dot(),

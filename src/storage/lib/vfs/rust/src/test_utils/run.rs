@@ -218,7 +218,7 @@ where
         let root = Simple::new();
         root.add_entry("server", self.server).unwrap();
 
-        root.deprecated_open(
+        root.open(
             ExecutionScope::new(),
             self.flags,
             Path::validate_and_split("server").unwrap(),

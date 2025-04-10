@@ -559,7 +559,7 @@ impl VolumesDirectory {
         if as_blob {
             flags |= fio::PERM_EXECUTABLE;
         }
-        entry_container::Directory::open(
+        entry_container::Directory::open3(
             outgoing_dir,
             scope,
             Path::dot(),
@@ -921,7 +921,7 @@ mod tests {
             vol.root()
                 .clone()
                 .as_directory()
-                .open(
+                .open3(
                     vol.volume().scope().clone(),
                     Path::dot(),
                     flags,
@@ -1159,7 +1159,7 @@ mod tests {
         volumes_directory
             .directory_node()
             .clone()
-            .open(
+            .open3(
                 ExecutionScope::new(),
                 Path::dot(),
                 flags,
@@ -1243,7 +1243,7 @@ mod tests {
 
         let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
         // TODO(https://fxbug.dev/378924259): Migrate this to open3.
-        volumes_directory.directory_node().clone().deprecated_open(
+        volumes_directory.directory_node().clone().open(
             ExecutionScope::new(),
             fio::OpenFlags::empty(),
             Path::validate_and_split("encrypted").unwrap(),
@@ -1359,7 +1359,7 @@ mod tests {
 
         let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
         // TODO(https://fxbug.dev/378924259): Migrate this to open3.
-        volumes_directory.directory_node().clone().deprecated_open(
+        volumes_directory.directory_node().clone().open(
             ExecutionScope::new(),
             fio::OpenFlags::empty(),
             Path::validate_and_split("encrypted").unwrap(),
@@ -1541,7 +1541,7 @@ mod tests {
 
             let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
             // TODO(https://fxbug.dev/378924259): Migrate this to open3.
-            volumes_directory.directory_node().clone().deprecated_open(
+            volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::empty(),
                 Path::validate_and_split(VOLUME_NAME).unwrap(),
@@ -1622,7 +1622,7 @@ mod tests {
 
             let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
             // TODO(https://fxbug.dev/378924259): Migrate this to Open3.
-            volumes_directory.directory_node().clone().deprecated_open(
+            volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::empty(),
                 Path::validate_and_split(name).unwrap(),

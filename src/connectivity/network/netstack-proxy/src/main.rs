@@ -104,7 +104,7 @@ pub async fn main() -> std::process::ExitCode {
     let flags = fidl_fuchsia_io::PERM_READABLE
         | fidl_fuchsia_io::PERM_WRITABLE
         | fidl_fuchsia_io::PERM_EXECUTABLE;
-    svc.open(
+    svc.open3(
         scope.clone(),
         vfs::path::Path::dot(),
         flags.clone(),

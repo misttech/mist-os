@@ -41,7 +41,7 @@ async fn boot_resolver_can_be_routed_from_component_manager() {
                     FLAGS.to_object_request(mock_handles.outgoing_dir.into_channel());
                 let scope_clone = scope.clone();
                 object_request
-                    .handle(|request| dir.open(scope_clone, vfs::Path::dot(), FLAGS, request));
+                    .handle(|request| dir.open3(scope_clone, vfs::Path::dot(), FLAGS, request));
                 async move { Ok(scope.wait().await) }.boxed()
             },
             ChildOptions::new(),

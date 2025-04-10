@@ -265,7 +265,7 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for RootDir<S> {
 }
 
 impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for RootDir<S> {
-    fn deprecated_open(
+    fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
@@ -322,12 +322,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
                     vfs::file::serve(file, scope, &flags, object_request)
                 });
             } else {
-                let () = MetaAsDir::new(self).deprecated_open(
-                    scope,
-                    flags,
-                    vfs::Path::dot(),
-                    server_end,
-                );
+                let () = MetaAsDir::new(self).open(scope, flags, vfs::Path::dot(), server_end);
             }
             return;
         }
@@ -348,7 +343,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
             }
 
             if let Some(subdir) = self.get_meta_subdir(canonical_path.to_string() + "/") {
-                let () = subdir.deprecated_open(scope, flags, vfs::Path::dot(), server_end);
+                let () = subdir.open(scope, flags, vfs::Path::dot(), server_end);
                 return;
             }
 
@@ -357,24 +352,22 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
         }
 
         if let Some(blob) = self.non_meta_files.get(canonical_path) {
-            let () = self
-                .non_meta_storage
-                .deprecated_open(blob, flags, scope, server_end)
-                .unwrap_or_else(|e| {
+            let () =
+                self.non_meta_storage.open(blob, flags, scope, server_end).unwrap_or_else(|e| {
                     error!("Error forwarding content blob open to blobfs: {:#}", anyhow::anyhow!(e))
                 });
             return;
         }
 
         if let Some(subdir) = self.get_non_meta_subdir(canonical_path.to_string() + "/") {
-            let () = subdir.deprecated_open(scope, flags, vfs::Path::dot(), server_end);
+            let () = subdir.open(scope, flags, vfs::Path::dot(), server_end);
             return;
         }
 
         let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
     }
 
-    fn open(
+    fn open3(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: vfs::Path,
@@ -417,7 +410,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
                 })?;
                 return vfs::file::serve(file, scope, &flags, object_request);
             }
-            return MetaAsDir::new(self).open(scope, vfs::Path::dot(), flags, object_request);
+            return MetaAsDir::new(self).open3(scope, vfs::Path::dot(), flags, object_request);
         }
 
         if canonical_path.starts_with("meta/") {
@@ -429,7 +422,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
             }
 
             if let Some(subdir) = self.get_meta_subdir(canonical_path.to_string() + "/") {
-                return subdir.open(scope, vfs::Path::dot(), flags, object_request);
+                return subdir.open3(scope, vfs::Path::dot(), flags, object_request);
             }
             return Err(zx::Status::NOT_FOUND);
         }
@@ -438,11 +431,11 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
             if path.is_dir() {
                 return Err(zx::Status::NOT_DIR);
             }
-            return self.non_meta_storage.open(blob, flags, scope, object_request);
+            return self.non_meta_storage.open3(blob, flags, scope, object_request);
         }
 
         if let Some(subdir) = self.get_non_meta_subdir(canonical_path.to_string() + "/") {
-            return subdir.open(scope, vfs::Path::dot(), flags, object_request);
+            return subdir.open3(scope, vfs::Path::dot(), flags, object_request);
         }
 
         Err(zx::Status::NOT_FOUND)
@@ -770,7 +763,7 @@ mod tests {
         let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let request = fio::PERM_WRITABLE.to_object_request(server);
         request.handle(|request: &mut vfs::ObjectRequest| {
-            root_dir.open(ExecutionScope::new(), vfs::Path::dot(), fio::PERM_WRITABLE, request)
+            root_dir.open3(ExecutionScope::new(), vfs::Path::dot(), fio::PERM_WRITABLE, request)
         });
         assert_matches!(
             proxy.take_event_stream().try_next().await,

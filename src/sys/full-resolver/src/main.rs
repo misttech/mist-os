@@ -402,7 +402,7 @@ mod tests {
                 fpkg::PackageResolverRequest::Resolve { package_url, dir, responder } => {
                     assert_eq!(package_url, "fuchsia-pkg://fuchsia.example/test");
                     fio::PERM_READABLE.to_object_request(dir).handle(|request| {
-                        fs.clone().open(
+                        fs.clone().open3(
                             ExecutionScope::new(),
                             Path::dot(),
                             fio::PERM_READABLE,
@@ -459,7 +459,7 @@ mod tests {
                         fpkg::ResolutionContext { bytes: b"incoming-context".to_vec() }
                     );
                     fio::PERM_READABLE.to_object_request(dir).handle(|request| {
-                        fs.clone().open(
+                        fs.clone().open3(
                             ExecutionScope::new(),
                             Path::dot(),
                             fio::PERM_READABLE,

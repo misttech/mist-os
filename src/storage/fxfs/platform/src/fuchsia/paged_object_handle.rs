@@ -1302,7 +1302,7 @@ mod tests {
             .root()
             .clone()
             .as_directory()
-            .open(
+            .open3(
                 volume.volume().scope().clone(),
                 Path::dot(),
                 flags,

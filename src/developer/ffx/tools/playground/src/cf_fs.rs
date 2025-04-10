@@ -392,7 +392,7 @@ impl Node for CFDirectory {
 }
 
 impl Directory for CFDirectory {
-    fn open(
+    fn open3(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: vfs::path::Path,
@@ -403,7 +403,7 @@ impl Directory for CFDirectory {
         Ok(())
     }
 
-    fn deprecated_open(
+    fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,

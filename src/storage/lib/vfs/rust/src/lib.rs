@@ -101,7 +101,7 @@ pub fn serve_directory<D: Directory + ?Sized>(
 ) -> fio::DirectoryProxy {
     let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let request = flags.to_object_request(server);
-    request.handle(|request| root.open(ExecutionScope::new(), path, flags, request));
+    request.handle(|request| root.open3(ExecutionScope::new(), path, flags, request));
     proxy
 }
 
@@ -117,6 +117,6 @@ pub fn serve_file<D: Directory + ?Sized>(
 ) -> fio::FileProxy {
     let (proxy, server) = fidl::endpoints::create_proxy::<fio::FileMarker>();
     let request = flags.to_object_request(server);
-    request.handle(|request| root.open(ExecutionScope::new(), path, flags, request));
+    request.handle(|request| root.open3(ExecutionScope::new(), path, flags, request));
     proxy
 }

@@ -368,7 +368,7 @@ impl DiskBuilder {
             let (dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
             ObjectRequest::new(flags, &fio::Options::default(), server_end.into_channel())
-                .handle(|request| partitions_dir.open(scope.clone(), Path::dot(), flags, request));
+                .handle(|request| partitions_dir.open3(scope.clone(), Path::dot(), flags, request));
             gpt = Some(manager);
             Box::new(DirBasedBlockConnector::new(dir, String::from("part-000/volume")))
         } else {

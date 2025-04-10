@@ -880,7 +880,7 @@ impl vfs::node::Node for FatDirectory {
 }
 
 impl Directory for FatDirectory {
-    fn deprecated_open(
+    fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
@@ -911,7 +911,7 @@ impl Directory for FatDirectory {
         });
     }
 
-    fn open(
+    fn open3(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: Path,
@@ -1244,7 +1244,7 @@ mod tests {
     }
 
     #[fuchsia::test(allow_stalls = false)]
-    async fn test_deprecated_reopen_root() {
+    async fn test_reopen_root() {
         let disk = TestFatDisk::empty_disk(TEST_DISK_SIZE);
         let structure = TestDiskContents::dir().add_child("test", "Hello".into());
         structure.create(&disk.root_dir());
@@ -1254,12 +1254,7 @@ mod tests {
 
         let scope = ExecutionScope::new();
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
-        dir.clone().deprecated_open(
-            scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE,
-            Path::dot(),
-            server_end,
-        );
+        dir.clone().open(scope.clone(), fio::OpenFlags::RIGHT_READABLE, Path::dot(), server_end);
         let scope_clone = scope.clone();
 
         proxy
@@ -1269,7 +1264,7 @@ mod tests {
             .map_err(Status::from_raw)
             .expect("First close OK");
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
-        dir.clone().deprecated_open(
+        dir.clone().open(
             scope_clone,
             fio::OpenFlags::RIGHT_READABLE,
             Path::validate_and_split("test").unwrap(),
@@ -1285,7 +1280,7 @@ mod tests {
     }
 
     #[fuchsia::test(allow_stalls = false)]
-    async fn test_reopen_root() {
+    async fn test_reopen3_root() {
         let disk = TestFatDisk::empty_disk(TEST_DISK_SIZE);
         let structure = TestDiskContents::dir().add_child("test", "Hello".into());
         structure.create(&disk.root_dir());
@@ -1299,7 +1294,7 @@ mod tests {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         let flags = fio::Flags::PERM_READ;
         ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
-            .handle(|request| root.clone().open(scope.clone(), Path::dot(), flags, request));
+            .handle(|request| root.clone().open3(scope.clone(), Path::dot(), flags, request));
         proxy
             .close()
             .await
@@ -1310,7 +1305,7 @@ mod tests {
         // Re-open and close root at "test".
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         ObjectRequest::new(flags, &fio::Options::default(), server_end.into()).handle(|request| {
-            root.clone().open(
+            root.clone().open3(
                 scope.clone(),
                 Path::validate_and_split("test").unwrap(),
                 flags,
@@ -1328,7 +1323,7 @@ mod tests {
     }
 
     #[fuchsia::test(allow_stalls = false)]
-    async fn test_open_already_exists() {
+    async fn test_open3_already_exists() {
         let disk = TestFatDisk::empty_disk(TEST_DISK_SIZE);
         let structure = TestDiskContents::dir().add_child("test", "Hello".into());
         structure.create(&disk.root_dir());
@@ -1342,7 +1337,7 @@ mod tests {
             | fio::Flags::FLAG_MUST_CREATE
             | fio::Flags::FLAG_SEND_REPRESENTATION;
         ObjectRequest::new(flags, &fio::Options::default(), server_end.into()).handle(|request| {
-            root.clone().open(
+            root.clone().open3(
                 scope.clone(),
                 Path::validate_and_split("test").unwrap(),
                 flags,
@@ -1374,7 +1369,12 @@ mod tests {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let flags = fio::Flags::PERM_READ | fio::Flags::PERM_SET_ATTRIBUTES;
         ObjectRequest::new(flags, &fio::Options::default(), server_end.into()).handle(|request| {
-            root.clone().open(scope.clone(), Path::validate_and_split(".").unwrap(), flags, request)
+            root.clone().open3(
+                scope.clone(),
+                Path::validate_and_split(".").unwrap(),
+                flags,
+                request,
+            )
         });
 
         let mut new_attrs = fio::MutableNodeAttributes {
@@ -1420,7 +1420,7 @@ mod tests {
         let flags =
             fio::Flags::PERM_READ | fio::Flags::PERM_SET_ATTRIBUTES | fio::Flags::PROTOCOL_FILE;
         ObjectRequest::new(flags, &fio::Options::default(), server_end.into()).handle(|request| {
-            root.clone().open(
+            root.clone().open3(
                 scope.clone(),
                 Path::validate_and_split("test_file").unwrap(),
                 flags,

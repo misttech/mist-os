@@ -409,7 +409,7 @@ impl vfs::node::Node for BlobDirectory {
 
 /// Implements VFS entry container trait for directories, allowing manipulation of their contents.
 impl VfsDirectory for BlobDirectory {
-    fn deprecated_open(
+    fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
@@ -421,7 +421,7 @@ impl VfsDirectory for BlobDirectory {
         ));
     }
 
-    fn open(
+    fn open3(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: Path,
@@ -434,7 +434,7 @@ impl VfsDirectory for BlobDirectory {
         Ok(())
     }
 
-    async fn open_async(
+    async fn open3_async(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: Path,

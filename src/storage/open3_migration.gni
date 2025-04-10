@@ -6,5 +6,5 @@
 declare_args() {
   # Temporary variable used to transition Rust VFS methods during renaming from
   # open -> deprecated_open, and open3 -> open.
-  open3_rename_complete = true
+  open3_rename_complete = false
 }

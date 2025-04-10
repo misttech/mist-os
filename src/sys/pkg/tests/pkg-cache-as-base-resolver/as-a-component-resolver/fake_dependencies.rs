@@ -83,7 +83,7 @@ async fn main() {
             .into();
     OUT_DIR_FLAGS
         .to_object_request(dir_server)
-        .handle(|request| out_dir.open(scope.clone(), vfs::Path::dot(), OUT_DIR_FLAGS, request));
+        .handle(|request| out_dir.open3(scope.clone(), vfs::Path::dot(), OUT_DIR_FLAGS, request));
     let () = scope.wait().await;
 }
 

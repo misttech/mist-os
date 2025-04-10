@@ -49,7 +49,7 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for MetaAsDir<S> {
 }
 
 impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for MetaAsDir<S> {
-    fn deprecated_open(
+    fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
@@ -121,14 +121,14 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
         }
 
         if let Some(subdir) = self.root_dir.get_meta_subdir(file_path + "/") {
-            let () = subdir.deprecated_open(scope, flags, vfs::Path::dot(), server_end);
+            let () = subdir.open(scope, flags, vfs::Path::dot(), server_end);
             return;
         }
 
         let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
     }
 
-    fn open(
+    fn open3(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: vfs::Path,
@@ -170,7 +170,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
         }
 
         if let Some(subdir) = self.root_dir.get_meta_subdir(file_path + "/") {
-            return subdir.open(scope, vfs::Path::dot(), flags, object_request);
+            return subdir.open3(scope, vfs::Path::dot(), flags, object_request);
         }
 
         Err(zx::Status::NOT_FOUND)
@@ -255,7 +255,7 @@ mod tests {
             let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             let request = flags.to_object_request(server);
             request.handle(|request: &mut vfs::ObjectRequest| {
-                meta_as_dir.clone().open(ExecutionScope::new(), vfs::Path::dot(), flags, request)
+                meta_as_dir.clone().open3(ExecutionScope::new(), vfs::Path::dot(), flags, request)
             });
             assert_matches!(
                 proxy.take_event_stream().try_next().await,

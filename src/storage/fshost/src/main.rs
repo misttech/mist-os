@@ -174,7 +174,7 @@ async fn main() -> Result<(), Error> {
     let _ = service::handle_lifecycle_requests(shutdown_tx)?;
 
     let scope = ExecutionScope::new();
-    export.deprecated_open(
+    export.open(
         scope.clone(),
         fio::OpenFlags::RIGHT_READABLE
             | fio::OpenFlags::RIGHT_WRITABLE

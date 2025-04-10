@@ -325,7 +325,7 @@ impl Node for HostDirectory {
 }
 
 impl Directory for HostDirectory {
-    fn deprecated_open(
+    fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
@@ -337,7 +337,7 @@ impl Directory for HostDirectory {
             .handle(|object_request| self.do_open(scope, path, flags, object_request));
     }
 
-    fn open(
+    fn open3(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: VfsPath,
