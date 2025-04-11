@@ -200,6 +200,8 @@ impl WindowSize {
     pub const MAX: WindowSize = WindowSize(1 << 30 - 1);
     /// The smallest possible window size.
     pub const ZERO: WindowSize = WindowSize(0);
+    /// A window size of 1, the smallest nonzero window size.
+    pub const ONE: WindowSize = WindowSize(1);
 
     /// The Netstack3 default window size.
     // TODO(https://github.com/rust-lang/rust/issues/67441): put this constant
@@ -250,6 +252,12 @@ impl WindowSize {
         let effective_bits = u8::try_from(32 - u32::leading_zeros(size)).unwrap();
         let scale = WindowScale(effective_bits.saturating_sub(16));
         scale
+    }
+
+    /// Returns this `WindowSize` with a halved value
+    pub fn halved(self) -> WindowSize {
+        let WindowSize(size) = self;
+        WindowSize(size >> 1)
     }
 }
 

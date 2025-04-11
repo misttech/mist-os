@@ -1198,6 +1198,15 @@ mod test {
             ; "syn with mss")]
     #[test_case(Segment::ack(SEQ, ACK, UnscaledWindowSize::from(u16::MAX)), &[]; "ack")]
     #[test_case(Segment::with_fake_data(SEQ, ACK, FAKE_DATA), FAKE_DATA; "data")]
+    #[test_case(Segment::new_assert_no_discard(SegmentHeader {
+            seq: SEQ,
+            ack: Some(ACK),
+            push: true,
+            wnd: UnscaledWindowSize::from(u16::MAX),
+            ..Default::default()
+        },
+        FAKE_DATA
+    ), FAKE_DATA; "push")]
     fn tcp_serialize_segment<I: TestIpExt>(segment: Segment<&[u8]>, expected_body: &[u8]) {
         const SOURCE_PORT: NonZeroU16 = NonZeroU16::new(1111).unwrap();
         const DEST_PORT: NonZeroU16 = NonZeroU16::new(2222).unwrap();
@@ -1223,6 +1232,7 @@ mod test {
         assert_eq!(parsed_segment.src_port(), SOURCE_PORT);
         assert_eq!(parsed_segment.dst_port(), DEST_PORT);
         assert_eq!(parsed_segment.seq_num(), u32::from(SEQ));
+        assert_eq!(parsed_segment.psh(), header.push);
         assert_eq!(
             UnscaledWindowSize::from(parsed_segment.window_size()),
             UnscaledWindowSize::from(u16::MAX)
