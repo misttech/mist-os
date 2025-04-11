@@ -27,31 +27,23 @@ the core IDK is still created by GN. In order to build the bazel SDK you must
 invoke a gn build via fx.
 
 ```bash
-fx build final_fuchsia_sdk
+fx build //sdk:final_fuchsia_sdk
 ```
 
-NOTE: By default this target will only build the Bazel SDK for the `target_cpu`.
-Additionally, certain product-board configurations may limit the number of
-target api levels to build support for.
-If you need a build a full Bazel SDK locally, use `fx args` to add the following
-GN arguments:
+NOTE: By default this target will build the Bazel SDK with for the all Supported
+API levels and CPU architectures.
+
+If you would like to build support for a subset of Supported API levels and CPU
+arechiectures, you can override GN args to specify a list of each to build. For
+example:
 
 ```
-bazel_fuchsia_sdk_all_cpus = true
-bazel_fuchsia_sdk_all_api_levels = true
+override_idk_buildable_api_levels = [26, "NEXT"]
+override_idk_target_cpus = [ "x64" ]
 ```
 
-If you would like to build a subset of the API levels you can override a GN arg
-to specify a list of levels to build.
-
-```
-override_idk_buildable_api_levels = [24, 25]
-```
-
-Running this command will create the core SDK and run the generators which
-create the Bazel SDK. This will only build for the current architecture so is
-not the exact same build which is created by infrastructure but it is sufficient
-enough for local development.
+Running this command will create the Fuchsia SDK and run the generators that
+create the Bazel SDK.
 
 The output of the build can be found by running the following command from the root
 of the repository. This path is relative to the current out directory.
