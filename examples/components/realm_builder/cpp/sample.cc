@@ -6,7 +6,7 @@
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 // [END import_statement_cpp]
 
-#include <fidl/examples/routing/echo/cpp/fidl.h>
+#include <fidl/fidl.examples.routing.echo/cpp/fidl.h>
 #include <fuchsia/component/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -29,7 +29,7 @@ class RealmBuilderTest : public ::gtest::RealLoopFixture {};
 // and verifying the `fidl.examples.routing.Echo` protocol.
 TEST_F(RealmBuilderTest, RoutesFromEcho) {
   // [START init_realm_builder_cpp]
-  auto builder = RealmBuilder::Create();
+  RealmBuilder builder = RealmBuilder::Create();
   // [END init_realm_builder_cpp]
 
   // [START add_component_cpp]
@@ -46,41 +46,46 @@ TEST_F(RealmBuilderTest, RoutesFromEcho) {
   // [END add_component_cpp]
 
   // [START route_between_children_cpp]
-  builder.AddRoute(Route{.capabilities = {Protocol{"fidl.examples.routing.echo.Echo"}},
+  builder.AddRoute(Route{.capabilities = {Protocol{.name = "fidl.examples.routing.echo.Echo"}},
                          .source = ChildRef{"echo_server"},
                          .targets = {ChildRef{"echo_client"}}});
   // [END route_between_children_cpp]
 
   // [START route_to_test_cpp]
-  builder.AddRoute(Route{.capabilities = {Protocol{"fidl.examples.routing.echo.Echo"}},
+  builder.AddRoute(Route{.capabilities = {Protocol{.name = "fidl.examples.routing.echo.Echo"}},
                          .source = ChildRef{"echo_server"},
                          .targets = {ParentRef()}});
   // [END route_to_test_cpp]
 
   // [START route_from_test_cpp]
-  builder.AddRoute(Route{.capabilities = {Protocol{"fuchsia.logger.LogSink"}},
+  builder.AddRoute(Route{.capabilities = {Protocol{.name = "fuchsia.logger.LogSink"}},
                          .source = ParentRef(),
                          .targets = {ChildRef{"echo_server"}, ChildRef{"echo_client"}}});
   // [END route_from_test_cpp]
 
   // [START build_realm_cpp]
-  auto realm = builder.Build(dispatcher());
+  RealmRoot realm = builder.Build(dispatcher());
   // [END build_realm_cpp]
 
   // [START get_child_name_cpp]
-  std::cout << "Child Name: " << realm.component().GetChildName() << std::endl;
+  std::cout << "Child Name: " << realm.component().GetChildName() << '\n';
   // [END get_child_name_cpp]
 
   // [START call_echo_cpp]
-  auto echo = realm.component().ConnectSync<fidl::examples::routing::echo::Echo>();
-  fidl::StringPtr response;
-  echo->EchoString("hello", &response);
-  ASSERT_EQ(response, "hello");
+  zx::result<fidl::ClientEnd<fidl_examples_routing_echo::Echo>> client_end =
+      realm.component().Connect<fidl_examples_routing_echo::Echo>();
+  ASSERT_FALSE(client_end.is_error()) << client_end.status_string();
+  fidl::SyncClient echo_client(std::move(*client_end));
+
+  fidl::Result<::fidl_examples_routing_echo::Echo::EchoString> result =
+      echo_client->EchoString({"hello"});
+  ASSERT_EQ(result->response(), "hello");
   // [END call_echo_cpp]
 }
 
 // [START mock_component_impl_cpp]
-class LocalEchoServerImpl : public fidl::examples::routing::echo::Echo, public LocalComponentImpl {
+class LocalEchoServerImpl : public fidl::Server<fidl_examples_routing_echo::Echo>,
+                            public LocalCppComponent {
  public:
   explicit LocalEchoServerImpl(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
@@ -88,25 +93,28 @@ class LocalEchoServerImpl : public fidl::examples::routing::echo::Echo, public L
   void OnStart() override {
     // When `OnStart()` is called, this implementation can call methods to
     // access handles to the component's incoming capabilities (`ns()` and
-    // `svc()`) and outgoing capabilities (`outgoing()`).
-    ASSERT_EQ(outgoing()->AddPublicService(bindings_.GetHandler(this, dispatcher_)), ZX_OK);
+    // `svc()`) and outgoing capabilities (`outgoing()`).;
+    zx::result<> result = outgoing()->AddUnmanagedProtocol<fidl_examples_routing_echo::Echo>(
+        bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
+    if (result.is_error()) {
+      ZX_PANIC("%s", result.status_string());
+    }
   }
 
-  // Override `EchoString` from `Echo` protocol.
-  void EchoString(::fidl::StringPtr value, EchoStringCallback callback) override {
-    callback(std::move(value));
+  void EchoString(EchoStringRequest& request, EchoStringCompleter::Sync& completer) override {
+    completer.Reply({{.response = request.value()}});
   }
 
  private:
   async_dispatcher_t* dispatcher_;
-  fidl::BindingSet<fidl::examples::routing::echo::Echo> bindings_;
+  fidl::ServerBindingGroup<fidl_examples_routing_echo::Echo> bindings_;
 };
 // [END mock_component_impl_cpp]
 
 // This test demonstrates constructing a realm with a mocked LocalComponent
 // implementation of the `fidl.examples.routing.Echo` protocol.
 TEST_F(RealmBuilderTest, RoutesFromMockEcho) {
-  auto builder = RealmBuilder::Create();
+  RealmBuilder builder = RealmBuilder::Create();
 
   // [START add_mock_component_cpp]
   // Add component to the realm, providing a mock implementation
@@ -114,26 +122,35 @@ TEST_F(RealmBuilderTest, RoutesFromMockEcho) {
                         [&]() { return std::make_unique<LocalEchoServerImpl>(dispatcher()); });
   // [END add_mock_component_cpp]
 
-  builder.AddRoute(Route{.capabilities = {Protocol{"fuchsia.logger.LogSink"}},
+  builder.AddRoute(Route{.capabilities = {Protocol{.name = "fuchsia.logger.LogSink"}},
                          .source = ParentRef(),
                          .targets = {ChildRef{"echo_server"}}});
 
-  builder.AddRoute(Route{.capabilities = {Protocol{"fidl.examples.routing.echo.Echo"}},
+  builder.AddRoute(Route{.capabilities = {Protocol{.name = "fidl.examples.routing.echo.Echo"}},
                          .source = ChildRef{"echo_server"},
                          .targets = {ParentRef()}});
 
-  auto realm = builder.Build(dispatcher());
+  RealmRoot realm = builder.Build(dispatcher());
   auto cleanup = fit::defer([&]() {
     bool complete = false;
     realm.Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
     RunLoopUntil([&]() { return complete; });
   });
 
-  auto echo = realm.component().Connect<fidl::examples::routing::echo::Echo>();
+  zx::result<fidl::ClientEnd<fidl_examples_routing_echo::Echo>> client_end =
+      realm.component().Connect<fidl_examples_routing_echo::Echo>();
+
+  ASSERT_FALSE(client_end.is_error()) << client_end.status_string();
+
+  fidl::Client echo_client(std::move(*client_end), dispatcher());
+
   bool was_called = false;
-  echo->EchoString("hello", [&](const fidl::StringPtr& response) {
-    was_called = true;
-    ASSERT_EQ(response, "hello");
-  });
+  echo_client->EchoString({{.value = "hello"}})
+      .ThenExactlyOnce([&](fidl::Result<fidl_examples_routing_echo::Echo::EchoString>& result) {
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        auto response = *result->response();
+        was_called = true;
+        ASSERT_EQ(response, "hello");
+      });
   RunLoopUntil([&]() { return was_called; });
 }

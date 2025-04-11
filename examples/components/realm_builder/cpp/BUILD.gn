@@ -12,11 +12,11 @@ test("bin") {
     "//sdk/lib/sys/component/cpp/testing:cpp",
 
     # [START_EXCLUDE]
-    "//examples/components/routing/fidl:echo_hlcpp",
+    "//examples/components/routing/fidl:echo_cpp",
     "//sdk/lib/async:async-cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
-    "//sdk/lib/fidl/hlcpp",
+    "//sdk/lib/fidl/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture:gtest",
 
