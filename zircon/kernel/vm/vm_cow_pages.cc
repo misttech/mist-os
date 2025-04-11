@@ -2162,30 +2162,30 @@ void VmCowPages::ReleaseOwnedPagesLocked(uint64_t start, const LockedPtr& parent
 
 void VmCowPages::FindPageContentLocked(uint64_t offset, uint64_t max_owner_length,
                                        PageLookup* out) {
-  VmCowPages* cur = this;
-  AssertHeld(cur->lock_ref());
   const uint64_t this_offset = offset;
 
   // Search up the clone chain for any committed pages. cur_offset is the offset
   // into cur we care about. The loop terminates either when that offset contains
   // a committed page or when that offset can't reach into the parent.
-  while (offset < cur->parent_limit_) {
-    VmCowPages* parent = cur->parent_.get();
+  LockedPtr cur;
+  while (offset < cur.locked_or(this).parent_limit_) {
+    VmCowPages* parent = cur.locked_or(this).parent_.get();
     DEBUG_ASSERT(parent);
 
-    __UNINITIALIZED VMPLCursor cursor = cur->page_list_.LookupNearestMutableCursor(offset);
+    __UNINITIALIZED VMPLCursor cursor =
+        cur.locked_or(this).page_list_.LookupNearestMutableCursor(offset);
     VmPageOrMarkerRef p = cursor.current();
-    if (p && !p->IsEmpty() && cursor.offset(cur->page_list_.GetSkew()) == offset) {
-      *out = {cursor, cur, offset, max_owner_length + this_offset};
+    if (p && !p->IsEmpty() && cursor.offset(cur.locked_or(this).page_list_.GetSkew()) == offset) {
+      *out = {cursor, &cur.locked_or(this), offset, max_owner_length + this_offset};
       return;
     }
 
     // Need to walk up, see if we need to trim the owner length.
     if (max_owner_length > PAGE_SIZE) {
       // First trim to the parent limit.
-      max_owner_length = ktl::min(max_owner_length, cur->parent_limit_ - offset);
+      max_owner_length = ktl::min(max_owner_length, cur.locked_or(this).parent_limit_ - offset);
       if (max_owner_length > PAGE_SIZE && p) {
-        cur->page_list_.ForEveryPageInCursorRange(
+        cur.locked_or(this).page_list_.ForEveryPageInCursorRange(
             [&offset, &max_owner_length](const VmPageOrMarker* slot, uint64_t slot_offset) {
               DEBUG_ASSERT(!slot->IsEmpty() && slot_offset >= offset);
               const uint64_t new_owner_length = slot_offset - offset;
@@ -2197,10 +2197,11 @@ void VmCowPages::FindPageContentLocked(uint64_t offset, uint64_t max_owner_lengt
       }
     }
 
-    offset += cur->parent_offset_;
-    cur = parent;
+    offset += cur.locked_or(this).parent_offset_;
+    cur = LockedPtr(parent, VmLockAcquireMode::Reentrant);
   }
-  *out = {cur->page_list_.LookupMutableCursor(offset), cur, offset, max_owner_length + this_offset};
+  *out = {cur.locked_or(this).page_list_.LookupMutableCursor(offset), &cur.locked_or(this), offset,
+          max_owner_length + this_offset};
 }
 
 void VmCowPages::FindInitialPageContentLocked(uint64_t offset, PageLookup* out) {
