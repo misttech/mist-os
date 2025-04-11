@@ -266,11 +266,22 @@ impl AttributionClientImpl {
                         );
 
                         let introspector = &client.introspector;
-                        let description = AttributionClientImpl::new_principal_description(
+                        let description = match AttributionClientImpl::new_principal_description(
                             new_principal.description,
                             introspector,
                         )
-                        .await?;
+                        .await
+                        {
+                            Ok(description) => description,
+                            Err(AttributionClientError::FailToGetMoniker(err)) => {
+                                error!(
+                                    "Unable to get moniker for principal {:?}: {:?}",
+                                    new_principal.identifier, err
+                                );
+                                continue;
+                            }
+                            Err(err) => return Err(err.into()),
+                        };
                         let principal_type = AttributionClientImpl::new_principal_type(
                             new_principal.principal_type.ok_or_else(|| {
                                 AttributionClientError::MissingField(
@@ -461,6 +472,7 @@ mod tests {
         let state = attribution_client.attribution_state.lock().attribution_providers.clone();
         assert_eq!(state.0.len(), 1);
         let (_, provider) = state.0.iter().next().unwrap();
+        assert_eq!(provider.definitions.len(), 2);
         assert_eq!(
             provider.definitions.get(&LocalPrincipalIdentifier(2)),
             Some(&PrincipalDefinition {
@@ -487,5 +499,62 @@ mod tests {
             }
         }
         Ok(())
+    }
+
+    /// Tests a two-level attribution hierarchy with one moniker request failing.
+    #[test]
+    fn test_attribute_memory_moniker_fail() {
+        let mut exec = fasync::TestExecutor::new();
+        let (root_provider, snapshot_request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>();
+        let (introspector, mut introspector_request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fcomponent::IntrospectorMarker>();
+
+        let root_job_koid = zx::Koid::from_raw(1);
+        let attribution_client =
+            AttributionClientImpl::new(root_provider, introspector, root_job_koid);
+
+        let server = attribution_server::AttributionServer::new(Box::new(|| {
+            let new_principal = fattribution::NewPrincipal {
+                identifier: Some(2),
+                description: Some(fattribution::Description::Component(zx::Event::create())),
+                principal_type: Some(fattribution::PrincipalType::Runnable),
+                detailed_attribution: None,
+                ..Default::default()
+            };
+            vec![fattribution::AttributionUpdate::Add(new_principal)]
+        }));
+
+        let observer = server.new_observer(snapshot_request_stream.control_handle());
+        fasync::Task::spawn(async move {
+            serve(observer, snapshot_request_stream).await.unwrap();
+        })
+        .detach();
+
+        fasync::Task::spawn(async move {
+            while let Some(request) = introspector_request_stream.try_next().await.unwrap() {
+                match request {
+                    fcomponent::IntrospectorRequest::GetMoniker {
+                        component_instance: _,
+                        responder,
+                    } => {
+                        responder.send(Err(fcomponent::Error::InstanceNotFound)).unwrap();
+                    }
+                    fcomponent::IntrospectorRequest::_UnknownMethod { ordinal, .. } => {
+                        unimplemented!("Unknown method {}", ordinal)
+                    }
+                }
+            }
+        })
+        .detach();
+
+        let mut never_finishing_future = std::future::pending::<()>();
+        let _ = exec.run_until_stalled(&mut never_finishing_future);
+
+        let state = attribution_client.attribution_state.lock().attribution_providers.clone();
+        assert_eq!(state.0.len(), 1);
+        let (_, provider) = state.0.iter().next().unwrap();
+        // Only one principal is recorded.
+        assert_eq!(provider.definitions.len(), 1);
     }
 }
