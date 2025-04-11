@@ -1417,7 +1417,7 @@ mod test {
 
         let err = result.expect_err("Expected an error but did not get one");
 
-        let expected: String = "Target specification \"unspecified\" was not found. Use `ffx target list` to list known targets, and use a different matcher.".into();
+        let expected: String = "No devices/emulators found. Please ensure the device you want to use is connected and reachable, or an emulator is started.".into();
         assert_eq!(err.to_string(), expected);
     }
 

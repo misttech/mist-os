@@ -41,11 +41,16 @@ pub enum FfxTargetError {
             OpenTargetError::FailedDiscovery => format!("Could not resolve specification {} due to discovery failure", target_string(.target)),
             OpenTargetError::QueryAmbiguous => {
                 match target_string(.target) {
-                    target if target == "\"unspecified\"" => format!("More than one device/emulator found. Use `ffx target list` to list known targets and choose a target with `ffx -t`."),
+                    target if target == UNSPECIFIED_TARGET_NAME => format!("More than one device/emulator found. Use `ffx target list` to list known targets and choose a target with `ffx -t`."),
                     target => format!("Target specification {} matched multiple targets. Use `ffx target list` to list known targets, and use a more specific matcher.", target),
                 }
             },
-            OpenTargetError::TargetNotFound => format!("Target specification {} was not found. Use `ffx target list` to list known targets, and use a different matcher.", target_string(.target))
+            OpenTargetError::TargetNotFound => {
+                match target_string(.target) {
+                    target if target == UNSPECIFIED_TARGET_NAME => format!("No devices/emulators found. Please ensure the device you want to use is connected and reachable, or an emulator is started."),
+                    target => format!("Target specification {} was not found. Use `ffx target list` to list known targets, and use a different matcher.", .target),
+                }
+            }
         })]
     OpenTargetError { err: OpenTargetError, target: Option<String> },
 
@@ -89,10 +94,9 @@ pub enum FfxTargetError {
 }
 
 pub fn target_string(matcher: &Option<String>) -> String {
-    match matcher {
-        &None => "\"unspecified\"".to_string(),
-        &Some(ref s) if s.is_empty() => "\"unspecified\"".to_string(),
-        &Some(ref s) => format!("\"{s}\""),
+    match matcher.as_ref().map(|s| s.as_str()) {
+        None | Some("") => UNSPECIFIED_TARGET_NAME.to_string(),
+        Some(spec) => format!("\"{spec}\""),
     }
 }
 
@@ -227,17 +231,44 @@ mod cw {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use regex::Regex;
+
     #[test]
     fn test_daemon_error_strings_containing_target_name() {
         fn assert_contains_target_name(err: DaemonError) {
             let name: Option<String> = Some("fuchsia-f00d".to_string());
-            assert!(format!("{}", FfxError::DaemonError { err, target: name.clone() })
+            assert!(format!("{}", FfxTargetError::DaemonError { err, target: name.clone() })
                 .contains(name.as_ref().unwrap()));
         }
+
         assert_contains_target_name(DaemonError::Timeout);
         assert_contains_target_name(DaemonError::TargetAmbiguous);
         assert_contains_target_name(DaemonError::TargetNotFound);
     }
+
+    #[test]
+    fn test_open_target_error_string_display() {
+        fn error_message(err: OpenTargetError, target: Option<&str>) -> String {
+            format!(
+                "{}",
+                FfxTargetError::OpenTargetError { err, target: target.map(|s| s.to_owned()) }
+            )
+        }
+
+        assert!(error_message(OpenTargetError::QueryAmbiguous, Some("ambigious-query"))
+            .contains("Target specification \"ambigious-query\" matched multiple targets"));
+        assert!(!Regex::new(r"Target specification .* matched multiple targets")
+            .unwrap()
+            .is_match(error_message(OpenTargetError::QueryAmbiguous, None).as_str()));
+
+        assert!(error_message(OpenTargetError::TargetNotFound, Some("nonexistent-target"))
+            .contains("Target specification \"nonexistent-target\" was not found"));
+        assert!(!Regex::new(r"Target specification .* was not found")
+            .unwrap()
+            .is_match(error_message(OpenTargetError::TargetNotFound, None).as_str()));
+    }
+
     #[test]
     fn test_target_string() {
         assert_eq!(target_string(&None), UNSPECIFIED_TARGET_NAME);

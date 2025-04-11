@@ -36,6 +36,7 @@ libs = [
   "target",
   "target/connector",
   "target/holders",
+  "target_errors",
   "tasks",
   "testing",
   "timeout",
