@@ -7,15 +7,15 @@
 #include <phys/stdio.h>
 #include <phys/uart.h>
 
-#include "lib/boot-options/boot-options.h"
+#include <ktl/enforce.h>
 
 UartDriver& GetUartDriver() {
   static UartDriver uart;
   return uart;
 }
 
-void SetUartConsole(const uart::all::Driver& uart) {
-  GetUartDriver() = uart;
+void SetUartConsole(const uart::all::Config<>& uart_config) {
+  GetUartDriver() = uart::all::MakeDriver(uart_config);
   GetUartDriver().Visit([](auto&& driver) {
     driver.Init();
 

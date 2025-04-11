@@ -167,8 +167,8 @@ ktl::optional<uart::all::Config<>> GetUartFromLegacyUart(LegacyBootShim::InputZb
 void LegacyBootQuirks() { FixRamdiskSize(); }
 
 // Overrides the default, weak definition.
-void LegacyBootSetUartConsole(const uart::all::Driver& uart) {
-  SetUartConsole(uart);
+void LegacyBootSetUartConsole(const uart::all::Config<>& uart_config) {
+  SetUartConsole(uart_config);
   GetUartDriver().Visit([](auto&& driver) { driver.SetLineControl(); });
 }
 

@@ -56,7 +56,7 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
     boot_options.serial = *uart_config;
   }
   SetBootOptions(boot_options, chosen.zbi(), chosen.cmdline().value_or(""));
-  SetUartConsole(uart::all::MakeDriver(boot_options.serial));
+  SetUartConsole(boot_options.serial);
 
   ArchSetUp(nullptr);
 

@@ -42,7 +42,7 @@ void PhysMain(void* ptr, arch::EarlyTicks boot_ticks) {
   const ktl::span ramdisk = ktl::as_bytes(gLegacyBoot.ramdisk);
   UartFromZbi(LegacyBootShim::InputZbi(ramdisk), gLegacyBoot.uart_config);
   UartFromCmdLine(gLegacyBoot.cmdline, gLegacyBoot.uart_config);
-  LegacyBootSetUartConsole(uart::all::MakeDriver(gLegacyBoot.uart_config));
+  LegacyBootSetUartConsole(gLegacyBoot.uart_config);
 
   LegacyBootShim shim(symbolize.name(), gLegacyBoot);
   shim.set_build_id(symbolize.build_id());

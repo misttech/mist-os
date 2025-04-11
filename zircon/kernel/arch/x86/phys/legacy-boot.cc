@@ -61,7 +61,7 @@ void InitAcpi(LegacyBoot& boot_info) {
   if (auto debug_port = acpi_lite::GetDebugPort(*acpi_parser); debug_port.is_ok()) {
     if (ktl::optional config = uart::all::Config<>::Match(*debug_port)) {
       boot_info.uart_config = *config;
-      SetUartConsole(uart::all::MakeDriver(boot_info.uart_config));
+      SetUartConsole(boot_info.uart_config);
     }
   }
 }
@@ -86,7 +86,9 @@ void InitSmbios(LegacyBoot& boot_info) {
 
 // A default, weak definition that may be overrode to perform other relevant
 // initialization.
-[[gnu::weak]] void LegacyBootSetUartConsole(const uart::all::Driver& uart) { SetUartConsole(uart); }
+[[gnu::weak]] void LegacyBootSetUartConsole(const uart::all::Config<>& uart_config) {
+  SetUartConsole(uart_config);
+}
 
 void LegacyBootInitMemory(AddressSpace* aspace) {
   // Note that these are done before paging is enabled (at all for 32-bit) with
