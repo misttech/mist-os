@@ -66,6 +66,13 @@ impl<R: Read + Seek> SparseReader<R> {
         None
     }
 
+    pub fn is_sparse_file(reader: &mut R) -> Result<bool> {
+        let header: SparseHeader = deserialize_from(reader)?;
+        let res = header.valid();
+        reader.seek(SeekFrom::Start(0)).context("Failed to rewind reader")?;
+        Ok(res)
+    }
+
     #[cfg(test)]
     pub(crate) fn chunks(self) -> Vec<(Chunk, Option<u64>)> {
         self.chunks
@@ -174,6 +181,37 @@ mod test {
         let mut unsparsed_bytes = vec![];
         reader.read_to_end(&mut unsparsed_bytes).expect("Failed to read unsparsed image");
         assert_eq!(unsparsed_bytes.len(), 0);
+    }
+
+    #[test]
+    fn is_sparse_file() {
+        let tmpdir = TempDir::new().unwrap();
+
+        let data = {
+            let mut data = Box::new([0u8; 8192]);
+            let mut i: u8 = 0;
+            for d in data.as_mut() {
+                *d = i;
+                i = i.wrapping_add(1);
+            }
+            data
+        };
+
+        let mut sparse_file = NamedTempFile::new_in(&tmpdir).unwrap().into_file();
+        SparseImageBuilder::new()
+            .add_chunk(DataSource::Buffer(data))
+            .build(&mut sparse_file)
+            .expect("Build sparse image failed");
+        sparse_file.seek(SeekFrom::Start(0)).unwrap();
+
+        assert!(SparseReader::is_sparse_file(&mut sparse_file).expect("Should be a sparse file"));
+
+        let mut garbage_file = NamedTempFile::new_in(&tmpdir).unwrap().into_file();
+        let garbage_data = vec![1; 4096];
+        garbage_file.write_all(&garbage_data).expect("Writing garbage file");
+        garbage_file.seek(SeekFrom::Start(0)).unwrap();
+
+        assert!(!SparseReader::is_sparse_file(&mut garbage_file).unwrap());
     }
 
     #[test]

@@ -16,8 +16,11 @@ use futures::prelude::*;
 use futures::try_join;
 use pbms::is_local_product_bundle;
 use sdk::SdkVersion;
-use sparse::build_sparse_files;
+use sparse::reader::SparseReader;
+use sparse::{build_sparse_files, unsparse};
+use std::fs::File;
 use std::path::PathBuf;
+use tempfile::NamedTempFile;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -119,7 +122,6 @@ pub async fn stage_file<F: FileResolver + Sync, T: FastbootInterface>(
     Ok(())
 }
 
-#[tracing::instrument()]
 async fn do_flash<F: FastbootInterface>(
     name: &str,
     messenger: &Sender<Event>,
@@ -155,7 +157,6 @@ async fn do_flash<F: FastbootInterface>(
     Ok(())
 }
 
-#[tracing::instrument()]
 async fn flash_partition_sparse<F: FastbootInterface>(
     name: &str,
     messenger: &Sender<Event>,
@@ -180,7 +181,6 @@ async fn flash_partition_sparse<F: FastbootInterface>(
     Ok(())
 }
 
-#[tracing::instrument(skip(file_resolver))]
 pub async fn flash_partition<F: FileResolver + Sync, T: FastbootInterface>(
     messenger: &Sender<Event>,
     file_resolver: &mut F,
@@ -196,12 +196,10 @@ pub async fn flash_partition<F: FileResolver + Sync, T: FastbootInterface>(
 
     // If the given file to flash is bigger than what the device can download
     // at once, we need to make a sparse image out of the given file
-    let file_handle = async_fs::File::open(&file_to_upload)
-        .await
+    let mut file_handle = File::open(&file_to_upload)
         .map_err(|e| anyhow!("Got error trying to open file \"{}\": {}", file_to_upload, e))?;
     let file_size = file_handle
         .metadata()
-        .await
         .map_err(|e| {
             anyhow!("Got error retrieving metadata for file \"{}\": {}", file_to_upload, e)
         })?
@@ -233,15 +231,48 @@ pub async fn flash_partition<F: FileResolver + Sync, T: FastbootInterface>(
     let start_time = Utc::now();
 
     if u64::from(max_download_size) < file_size {
-        flash_partition_sparse(
-            name,
-            messenger,
-            &file_to_upload,
-            fastboot_interface,
-            max_download_size,
-            timeout,
-        )
-        .await?;
+        // Next check if the file given is ALREADY in the sparse image format
+        match SparseReader::is_sparse_file(&mut file_handle) {
+            Ok(true) => {
+                tracing::debug!(
+                    "Image is too big to fit into target RAM and is a sparse image. Re-sparsing"
+                );
+
+                // First unsparse it to a temporary file
+                let (mut unsparsed_file, unsparsed_temp_path) =
+                    NamedTempFile::new_in(std::env::temp_dir().as_path())?.into_parts();
+                tracing::debug!(
+                    "Unsparsing file: {} to: {}",
+                    file_to_upload,
+                    unsparsed_temp_path.to_str().unwrap()
+                );
+                unsparse(&mut file_handle, &mut unsparsed_file)?;
+
+                flash_partition_sparse(
+                    name,
+                    messenger,
+                    &unsparsed_temp_path.to_str().unwrap(),
+                    fastboot_interface,
+                    max_download_size,
+                    timeout,
+                )
+                .await?;
+            }
+            Err(_) | Ok(false) => {
+                tracing::debug!(
+                    "Image is  too big to fit into target RAM; flashing in sparse mode"
+                );
+                flash_partition_sparse(
+                    name,
+                    messenger,
+                    &file_to_upload,
+                    fastboot_interface,
+                    max_download_size,
+                    timeout,
+                )
+                .await?;
+            }
+        }
     } else {
         do_flash(name, messenger, fastboot_interface, &file_to_upload, timeout).await?;
     }
@@ -289,7 +320,6 @@ pub async fn verify_variable_value(
         .map(|res| res == value)
 }
 
-#[tracing::instrument(skip(messenger))]
 pub async fn reboot_bootloader<F: FastbootInterface>(
     messenger: &Sender<Event>,
     fastboot_interface: &mut F,
@@ -358,7 +388,6 @@ pub async fn set_slot_a_active(fastboot_interface: &mut impl FastbootInterface) 
     fastboot_interface.set_active("a").await.map_err(|_| anyhow!("Could not set active slot"))
 }
 
-#[tracing::instrument(skip(file_resolver, partitions))]
 pub async fn flash_partitions<F: FileResolver + Sync, P: Partition, T: FastbootInterface>(
     messenger: &Sender<Event>,
     file_resolver: &mut F,
@@ -400,7 +429,6 @@ pub async fn flash_partitions<F: FileResolver + Sync, P: Partition, T: FastbootI
     Ok(())
 }
 
-#[tracing::instrument(skip(file_resolver, product, cmd))]
 pub async fn flash<F, Part, P, T>(
     messenger: &Sender<Event>,
     file_resolver: &mut F,
@@ -427,7 +455,6 @@ pub async fn is_userspace_fastboot(
     }
 }
 
-#[tracing::instrument(skip(file_resolver, cmd, product))]
 pub async fn flash_bootloader<F, Part, P, T>(
     messenger: &Sender<Event>,
     file_resolver: &mut F,
@@ -460,7 +487,6 @@ where
     Ok(())
 }
 
-#[tracing::instrument(skip(file_resolver, cmd, product))]
 pub async fn flash_product<F, Part, P, T>(
     messenger: &Sender<Event>,
     file_resolver: &mut F,
@@ -490,7 +516,6 @@ where
     stage_oem_files(messenger, file_resolver, true, product.oem_files(), fastboot_interface).await
 }
 
-#[tracing::instrument(skip(file_resolver, cmd, product))]
 pub async fn flash_and_reboot<F, Part, P, T>(
     messenger: &Sender<Event>,
     file_resolver: &mut F,
