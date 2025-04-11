@@ -126,7 +126,10 @@ fn duplicate_capability_check<'a>(
 }
 
 fn offer_can_have_dependency(offer: &Offer) -> bool {
-    offer.directory.is_some() || offer.protocol.is_some() || offer.service.is_some()
+    offer.directory.is_some()
+        || offer.protocol.is_some()
+        || offer.service.is_some()
+        || offer.dictionary.is_some()
 }
 
 fn offer_dependency(offer: &Offer) -> DependencyType {
