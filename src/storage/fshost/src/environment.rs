@@ -787,6 +787,14 @@ impl Environment for FshostEnvironment {
         let serving_fs =
             self.launcher.serve_fxblob(device.block_connector()?, Box::new(config)).await?;
         self.container = Some(Box::new(FxfsContainer::new(serving_fs)));
+        if !self.gpt.is_serving() && !device.is_fshost_ramdisk() {
+            // NB: If we've already found the system container, but not the GPT, we are probably
+            // dealing with a system like QEMU where the block device is directly Fxfs-formatted,
+            // rather than having a GPT.  Since clients might be blocking on the GPT appearing,
+            // explicitly error them out.
+            // This call won't fail because we just checked that the gpt is not serving.
+            self.gpt.shutdown(None).await.unwrap();
+        }
         Ok(())
     }
 
@@ -800,6 +808,10 @@ impl Environment for FshostEnvironment {
         let serving_fs =
             self.launcher.serve_fvm(device.block_connector()?, Box::new(config)).await?;
         self.container = Some(Box::new(FvmContainer::new(serving_fs, device.is_fshost_ramdisk())));
+        if !self.gpt.is_serving() && !device.is_fshost_ramdisk() {
+            // See comment in `mount_fxblob`.
+            self.gpt.shutdown(None).await.unwrap();
+        }
         Ok(())
     }
 
