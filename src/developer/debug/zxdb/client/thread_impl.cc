@@ -497,6 +497,20 @@ void ThreadImpl::SyncFramesForStack(const Stack::SyncFrameOptions& options,
           return weak_this->SyncFramesFromTarget(std::move(cb));
         }
 
+        if (weak_this->GetProcess()->GetSymbolStatus() == Process::SymbolStatus::kInProgress) {
+          // The unwinder requires debuginfo to be present to unwind on the host. If there is a
+          // download in progress we have to wait until the download is finished before continuing.
+          return weak_this->session()->system().AddPostDownloadTask(
+              [weak_this, regs = reply.registers, cb = std::move(cb)]() mutable {
+                if (!weak_this) {
+                  return cb(Err("Thread disappeared while waiting for downloads!"));
+                }
+
+                weak_this->UnwindWithRegisters(
+                    debug_ipc::ConvertRegisters(weak_this->session()->arch(), regs), std::move(cb));
+              });
+        }
+
         weak_this->UnwindWithRegisters(
             debug_ipc::ConvertRegisters(weak_this->session()->arch(), reply.registers),
             std::move(cb));

@@ -80,6 +80,40 @@ class Process : public ClientObject, public unwinder::AsyncMemory::Delegate {
   // Returns true if this process has loaded at least one module, false otherwise.
   virtual bool HasLoadedSymbols() const = 0;
 
+  // This enum represents the possible states of loading symbols for a particular module in a
+  // particular process. The transition edges are as follows:
+  //    kNone -> kLoaded when symbols are loaded synchronously.
+  //    kNone -> kInProgrses when symbols need to be downloaded.
+  //    kInProgress -> kNotLoaded when the symbols aren't found on any symbol servers or indexing
+  //                   failed.
+  enum class SymbolStatus {
+    kNone = 1,
+    // All symbols are loaded for this process, there are no pending downloads or indexing
+    // operations.
+    kLoaded,
+    // Symbols are currently being downloaded and/or indexed. Callers interested in doing operations
+    // with symbols should use |AddPostDownloadTask| so their operation is completed after all
+    // symbol files have been downloaded and indexed.
+    kInProgress,
+    // Some module does not have loaded symbols for some reason. Query the ProcessSymbols object for
+    // more detailed information.
+    kNotLoaded,
+  };
+
+  // Provides a high level "how are symbols doing" for this process. In the happy case, where
+  // everything is loaded and ready to go, this function will return |kLoaded|.
+  //
+  // In certain cases, such as when running as part of a script or tests that run many operations
+  // faster than a user would normally type them, or when downloading large symbol files, this
+  // function may return |kInProgress|. Callers should use that signal to register a post-download
+  // task with the System object.
+  //
+  // If there are any symbols that are not loaded and there are no pending indexing operations or
+  // downloads, this function returns |kNotLoaded|. Note that just one module missing symbols would
+  // trigger this return value, and some operations that do not depend on that particular module's
+  // symbols could still work.
+  virtual SymbolStatus GetSymbolStatus() = 0;
+
   // Queries the process for the currently-loaded modules (this always recomputes the list). The
   // force_reload_symbols flag will force-reload all symbol information for all modules, regardless
   // of whether it may already have symbols.

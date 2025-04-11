@@ -46,6 +46,7 @@ class ProcessImpl : public Process, public ProcessSymbols::Notifications {
   }
   ProcessSymbols* GetSymbols() override { return &symbols_; }
   bool HasLoadedSymbols() const override;
+  SymbolStatus GetSymbolStatus() override;
   void GetModules(bool force_reload_symbols,
                   fit::callback<void(const Err&, std::vector<debug_ipc::Module>)>) override;
   void GetAspace(

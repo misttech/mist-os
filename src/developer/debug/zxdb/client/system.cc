@@ -273,6 +273,7 @@ System::System(Session* session)
   AddNewTarget(std::make_unique<TargetImpl>(this));
 
   session->AddObserver(this);
+  session->AddDownloadObserver(this);
 
   // The system is the one holding the system symbols and is the one who will be updating the
   // symbols once we get a symbol change, so the System will be listening to its own options. We
@@ -303,6 +304,7 @@ System::~System() {
 
   targets_.clear();
 
+  session()->RemoveDownloadObserver(this);
   session()->RemoveObserver(this);
 }
 
@@ -831,6 +833,12 @@ void System::HandlePreviousConnectedProcesses(const std::vector<debug_ipc::Proce
   }
 }
 
+void System::OnDownloadsStopped(size_t num_succeeded, size_t num_failed) {
+  for (auto& task : post_download_tasks_) {
+    debug::MessageLoop::Current()->PostTask(FROM_HERE, [cb = std::move(task)]() mutable { cb(); });
+  }
+}
+
 void System::AddSymbolServer(std::unique_ptr<SymbolServer> unique_server) {
   SymbolServer* server = unique_server.get();
   symbol_servers_.push_back(std::move(unique_server));
@@ -883,4 +891,17 @@ void System::DetachFromAllTargets(fit::callback<void(int)> cb) {
     cb(results.size());
   });
 }
+
+bool System::HasDownload(const std::string& build_id) {
+  return download_manager_.HasDownload(build_id);
+}
+
+void System::AddPostDownloadTask(fit::callback<void()> cb) {
+  if (!download_manager_.DownloadsInProgress()) {
+    return cb();
+  }
+
+  post_download_tasks_.emplace_back(std::move(cb));
+}
+
 }  // namespace zxdb

@@ -43,6 +43,8 @@ class DownloadManager : public SystemObserver {
   // Abandons a download injected with |InjectDownloadForTesting|.
   void AbandonTestingDownload(const std::string& build_id);
 
+  bool DownloadsInProgress() const { return !downloads_.empty(); }
+
  private:
   using DownloadIdentifier = std::pair<std::string, DebugSymbolFileType>;
 
