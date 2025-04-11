@@ -1234,9 +1234,25 @@ def main() -> int:
         # graph dependencies, and thus the query results.
 
         cache_key_args = [query_type] + query_args
+        cache_key_inputs = cache_key_args[:]
+
+        # If a --starlark:file PATH is used, add the content of PATH
+        # to compute the cache key. This ensure stale cache entries
+        # are not reused when only this file changes during development.
+        starlark_file_option = "--starlark:file"
+        for n, arg in enumerate(query_args):
+            input_path = None
+            if arg == starlark_file_option and n + 1 < len(query_args):
+                input_path = query_args[n + 1]
+            elif arg.startswith(f"{starlark_file_option}="):
+                input_path = arg[len(starlark_file_option) + 1 :]
+            if input_path:
+                with open(input_path, "rt") as f:
+                    cache_key_inputs.append(f.read())
+
         cache_key = hashlib.sha256(
-            repr(cache_key_args).encode("utf-8")
-        ).hexdigest()
+            repr(cache_key_inputs).encode("utf-8")
+        ).hexdigest()[:12]
         cache_file = os.path.join(
             args.workspace_dir,
             f"fuchsia_build_generated/bazel_query_cache/{cache_key}.json",
@@ -1248,13 +1264,13 @@ def main() -> int:
                 assert cache_value["key_args"] == cache_key_args
                 if _DEBUG_BAZEL_QUERIES:
                     print(
-                        f"DEBUG: Found cached values for query: {cache_key_args}",
+                        f"DEBUG: Found cached values for query {cache_key}: {cache_key_args}",
                         file=sys.stderr,
                     )
                 return cache_value["output_lines"]
             except Exception as e:
                 print(
-                    f"WARNING: Error when reading cached values for query: {cache_key_args}:\n{e}",
+                    f"WARNING: Error when reading cached values for query {cache_key}: {cache_key_args}:\n{e}",
                     file=sys.stderr,
                 )
 
@@ -1274,12 +1290,12 @@ def main() -> int:
         }
         if _DEBUG_BAZEL_QUERIES:
             print(
-                f"DEBUG: Query took %.1f seconds for: {cache_key_args}"
-                % (time.time() - query_start_time),
+                "DEBUG: Query took %.1f seconds for query %s"
+                % (time.time() - query_start_time, cache_key_args),
                 file=sys.stderr,
             )
             print(
-                f"DEBUG: Writing query values to cache1 for: {cache_key_args}:\n",
+                f"DEBUG: Writing query values to cache for query {cache_key}\n",
                 file=sys.stderr,
             )
 
