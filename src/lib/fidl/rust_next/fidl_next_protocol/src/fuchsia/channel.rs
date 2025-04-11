@@ -71,14 +71,26 @@ impl Clone for Sender {
 }
 
 /// A channel buffer.
+#[derive(Default)]
 pub struct Buffer {
     handles: Vec<Handle>,
     chunks: Vec<Chunk>,
 }
 
 impl Buffer {
-    fn new() -> Self {
-        Self { handles: Vec::new(), chunks: Vec::new() }
+    /// New buffer.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Retrieve the handles for conformance testing.
+    pub fn handles_for_conformance_test(&self) -> &[Handle] {
+        &self.handles
+    }
+
+    /// Retrieve the chunks for conformance testing.
+    pub fn chunks_for_conformance_test(&self) -> &[Chunk] {
+        &self.chunks
     }
 }
 
