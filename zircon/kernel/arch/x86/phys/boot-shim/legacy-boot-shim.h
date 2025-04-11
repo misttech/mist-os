@@ -80,7 +80,7 @@ class LegacyBootShim : public LegacyBootShimBase {
 };
 
 // If |zbi| contains a uart driver, |uart| is overwritten with such configuration.
-void UartFromZbi(LegacyBootShim::InputZbi zbi, uart::all::Config<>& uart_config);
+uart::all::Config<> UartFromZbi(LegacyBootShim::InputZbi zbi, const uart::all::Config<>& uart_config);
 
 std::optional<uart::all::Config<>> GetUartFromRange(LegacyBootShim::InputZbi::iterator start,
                                                     LegacyBootShim::InputZbi::iterator end);

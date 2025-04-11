@@ -176,7 +176,7 @@ bool LegacyBootShim::BootQuirksLoad(BootZbi& boot) {
   return !IsProperZbi() && LoadDepthchargeZbi(*this, boot);
 }
 
-void UartFromZbi(LegacyBootShim::InputZbi zbi, uart::all::Config<>& uart_config) {
+uart::all::Config<> UartFromZbi(LegacyBootShim::InputZbi zbi, const uart::all::Config<>& uart_config) {
   auto check_and_print_error = [&zbi]() {
     if (auto maybe_error = zbi.take_error(); maybe_error.is_error()) {
       zbitl::PrintViewError(maybe_error.error_value());
@@ -188,43 +188,39 @@ void UartFromZbi(LegacyBootShim::InputZbi zbi, uart::all::Config<>& uart_config)
   auto first = zbi.begin();
   auto last = zbi.end();
 
-  UartDriver driver;
   auto kernel_it = zbi.find(arch::kZbiBootKernelType);
   if (check_and_print_error()) {
-    return;
+    return uart_config;
   }
 
   if (kernel_it == last) {
     printf("No kernel item in ZBI.\n");
-    return;
+    return uart_config;
   }
 
-  uart_config = GetUartFromRange(ktl::next(kernel_it), last).value_or(uart_config);
+  std::optional new_uart_config = GetUartFromRange(ktl::next(kernel_it), last).value_or(uart_config);
   if (check_and_print_error()) {
-    return;
+    return new_uart_config.value_or(uart_config);
   }
 
   // If we are not in a proper zbi, the bootloader prepended items,
   // So we need to look for them.
   if (kernel_it != first) {
-    auto bootloader_uart = GetUartFromRange(first, kernel_it);
+    new_uart_config = GetUartFromRange(first, kernel_it);
 
     if (check_and_print_error()) {
-      return;
-    }
-
-    // If we have a valid uart at this point
-    if (bootloader_uart) {
-      uart_config = *bootloader_uart;
-      return;
+      return new_uart_config.value_or(uart_config);
     }
 
     // Look for legacy uart items, if non current version items where found.
     for (auto it = zbi.begin(); it != kernel_it && it != zbi.end(); ++it) {
-      if (auto maybe_legacy_uart_dcfg = GetUartFromLegacyUart(it)) {
-        uart_config = *maybe_legacy_uart_dcfg;
+      if (std::optional legacy_uart_config = GetUartFromLegacyUart(it)) {
+        new_uart_config = *legacy_uart_config;
       }
     }
     check_and_print_error();
+    return new_uart_config.value_or(uart_config);
   }
+
+  return uart_config;
 }
