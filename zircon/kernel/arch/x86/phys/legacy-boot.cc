@@ -98,7 +98,7 @@ void LegacyBootInitMemory(AddressSpace* aspace) {
   InitSmbios(gLegacyBoot);
 
   constexpr auto as_memrange =
-      [](auto obj, memalloc::Type type = memalloc::Type::kLegacyBootData) -> memalloc::Range {
+      [](const auto& obj, memalloc::Type type = memalloc::Type::kLegacyBootData) -> memalloc::Range {
     auto bytes = AsBytes(obj);
     return {
         .addr = reinterpret_cast<uint64_t>(bytes.data()),
@@ -112,7 +112,7 @@ void LegacyBootInitMemory(AddressSpace* aspace) {
                                                 : reinterpret_cast<uint64_t>(PHYS_LOAD_ADDRESS);
   uint64_t phys_end = reinterpret_cast<uint64_t>(_end);
 
-  auto in_load_image = [phys_start, phys_end](auto obj) -> bool {
+  auto in_load_image = [phys_start, phys_end](const auto& obj) -> bool {
     auto bytes = AsBytes(obj);
     uint64_t start = reinterpret_cast<uint64_t>(bytes.data());
     uint64_t end = start + bytes.size();
