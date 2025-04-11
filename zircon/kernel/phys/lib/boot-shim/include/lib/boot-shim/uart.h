@@ -21,12 +21,6 @@ class UartItem : public boot_shim::ItemBase {
  public:
   void Init(const AllConfigs& config) { config_ = config; }
 
-  // TODO(https://fxbug.dev/407766571): Remove after soft-migration.
-  template <typename AllDrivers = uart::all::Driver>
-  void Init(const AllDrivers& driver) {
-    config_ = uart::all::GetConfig(driver);
-  }
-
   constexpr size_t size_bytes() const { return ItemSize(zbi_dcfg_size()); }
 
   fit::result<DataZbi::Error> AppendItems(DataZbi& zbi) const {
