@@ -1259,6 +1259,26 @@ impl Target {
         self.preferred_ssh_address.borrow_mut().take();
     }
 
+    /// SSHs into the target just to update the `ssh_host_address` field,
+    /// without starting a host pipe.
+    pub fn refresh_ssh_host_addr(self: &Rc<Self>) {
+        let Some(addr) = self.ssh_address() else {
+            return;
+        };
+
+        let host_pipe_child_builder = HostPipeChildDefaultBuilder { ssh_path: String::from("ssh") };
+        let target = Rc::clone(self);
+        fuchsia_async::Task::local(async move {
+            match host_pipe_child_builder.get_host_addr(addr).await {
+                Ok(addr) => {
+                    target.ssh_host_address.replace(Some(addr.into()));
+                }
+                Err(error) => tracing::debug!(error = ?error, "Error fetching ssh host address"),
+            }
+        })
+        .detach();
+    }
+
     pub fn run_host_pipe(self: &Rc<Self>, overnet_node: &Arc<overnet_core::Router>) {
         self.run_host_pipe_with_sender(overnet_node, None)
     }
@@ -1387,6 +1407,10 @@ impl Target {
                                 let _ = waiter.send(None);
                             }
                         }
+                    }
+
+                    if target.ssh_address().is_some() {
+                        target.refresh_ssh_host_addr();
                     }
                 }
 
@@ -2728,6 +2752,13 @@ mod test {
                     self.overnet_id,
                 ),
             ))
+        }
+
+        async fn get_host_addr(
+            &self,
+            _addr: SocketAddr,
+        ) -> Result<String, ffx_ssh::parse::PipeError> {
+            Ok("127.0.0.1".into())
         }
 
         fn ssh_path(&self) -> &str {

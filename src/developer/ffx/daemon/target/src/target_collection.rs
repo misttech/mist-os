@@ -686,14 +686,18 @@ impl TargetCollection {
             }
         } else {
             if to_update.ssh_host_address.borrow().is_none() {
-                tracing::debug!(
-                    "Setting ssh_host_address to {:?} for {}@{}",
-                    new_target.ssh_host_address,
-                    to_update.nodename_str(),
-                    to_update.id()
-                );
-                *to_update.ssh_host_address.borrow_mut() =
-                    new_target.ssh_host_address.borrow().clone();
+                if new_target.ssh_host_address.borrow().is_some() {
+                    tracing::debug!(
+                        "Setting ssh_host_address to {:?} for {}@{}",
+                        new_target.ssh_host_address,
+                        to_update.nodename_str(),
+                        to_update.id()
+                    );
+                    *to_update.ssh_host_address.borrow_mut() =
+                        new_target.ssh_host_address.borrow().clone();
+                } else if to_update.ssh_address().is_some() {
+                    to_update.refresh_ssh_host_addr();
+                }
             }
         }
 
