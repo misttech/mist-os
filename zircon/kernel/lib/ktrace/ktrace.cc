@@ -22,6 +22,7 @@
 #include <fbl/alloc_checker.h>
 #include <hypervisor/ktrace.h>
 #include <kernel/koid.h>
+#include <kernel/mp.h>
 #include <ktl/atomic.h>
 #include <ktl/iterator.h>
 #include <lk/init.h>
@@ -640,6 +641,28 @@ zx::result<size_t> KTraceImpl<BufferMode::kSingle>::ReadUser(user_out_ptr<void> 
 //
 // TODO(https://fxbug.dev/404539312): Implement the per-CPU buffer specializations for KTraceImpl.
 //
+
+template <>
+void KTraceImpl<BufferMode::kPerCpu>::DisableWrites() {
+  // Start off by disabling writes.
+  // It may be possible to do this with relaxed semantics, but we do it with release semantics
+  // out of an abundance of caution.
+  writes_enabled_.store(false, ktl::memory_order_release);
+
+  // Wait for any in-progress writes to complete.
+  // We accomplish this by:
+  // 1. Disabling interrupts on this core, thus preventing this thread from being migrated across
+  //    CPUs. We could alternatively just disable preemption, but mp_sync_exec requires interrupts
+  //    to be disabled when using MP_IPI_TARGET_ALL_BUT_LOCAL.
+  // 2. Sending an IPI that runs a no-op to all other cores. Since writes run with interrupts
+  //    disabled, the mere fact that a core is able to process an IPI means that it is not
+  //    currently performing a trace record write. Additionally, mp_sync_exec issues a memory
+  //    barrier that ensures that every other core will see that writes are disabled after
+  //    processing the IPI.
+  InterruptDisableGuard irq_guard;
+  auto wait_for_write_completion = [](void*) {};
+  mp_sync_exec(MP_IPI_TARGET_ALL_BUT_LOCAL, 0, wait_for_write_completion, nullptr);
+}
 
 // The InitHook is the same for both the single and per-CPU buffer implementation of KTrace.
 template <BufferMode Mode>

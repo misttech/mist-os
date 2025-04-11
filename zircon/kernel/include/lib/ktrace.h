@@ -928,6 +928,8 @@ class KTraceImpl {
   // Start collecting trace data.
   // `action` must be one of KTRACE_ACTION_START or KTRACE_ACTION_START_CIRCULAR.
   // `categories` is the set of categories to trace. Cannot be zero.
+  // TODO(https://fxbug.dev/404539312): The `action` argument is unnecessary once we switch to
+  // the per-CPU streaming implementation by default.
   zx_status_t Start(uint32_t action, uint32_t categories);
   // Stop collecting trace data.
   zx_status_t Stop();
@@ -959,14 +961,37 @@ class KTraceImpl {
     categories_bitmask_.store(new_mask, ktl::memory_order_release);
   }
 
-  // The internal ring buffer implementation. It also currently Stops, Starts, and Rewinds tracing.
-  internal::KTraceState internal_state_;
+  // Enables writes to the ktrace buffer.
+  // This uses release semantics to synchronize with writers when they check if writes are enabled,
+  // which in turn ensures that operations to initialize the buffer during Init are not reordered
+  // after the call to EnableWrites. Without this synchronization, it would be possible for a writer
+  // to begin a write before the backing buffer has been allocated.
+  void EnableWrites() { writes_enabled_.store(true, ktl::memory_order_release); }
+
+  // Disables writes to the ktrace buffer and wait for any ongoing writes to complete.
+  void DisableWrites();
+
+  // Returns true if writes are currently enabled.
+  // This uses acquire semantics to ensure that it synchronizes with EnableWrites as described in
+  // that method comment.
+  bool WritesEnabled() const { return writes_enabled_.load(ktl::memory_order_acquire); }
+
   // A mapping of KOIDs to CPUs, used to annotate trace records.
   CpuContextMap cpu_context_map_;
   // A bitmask of categories to trace. Bits set to 1 indicate a category that should be traced.
   ktl::atomic<uint32_t> categories_bitmask_{0};
   // True if diagnostic log messages should not be printed. Set to true in tests to avoid logspam.
   const bool disable_diagnostic_logs_{false};
+
+  // The internal ring buffer implementation when using BufferMode::kSingle.
+  internal::KTraceState internal_state_;
+
+  //
+  // The following fields are only used when using BufferMode::kPerCpu.
+  //
+
+  // Stores whether writes are currently enabled.
+  ktl::atomic<bool> writes_enabled_{false};
 };
 
 // Utilize the per-CPU implementation of ktrace if streaming has been enabled.
