@@ -65,7 +65,7 @@ workbench_platform_config = {
         "enabled": True,
     },
     "ui": {
-        "display_composition": False,  # JJOSH: DO NOT SUBMIT, SHOULD BE True
+        "display_composition": True,
         "enabled": True,
         "supported_input_devices": [
             "button",
