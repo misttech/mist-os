@@ -1280,8 +1280,8 @@ class VmCowPages final : public VmHierarchyBase,
     uint64_t owner_offset = 0;
     uint64_t visible_end = 0;
   };
-  template <typename T>
-  void FindPageContentLocked(uint64_t offset, uint64_t max_owner_length, T* out) TA_REQ(lock());
+  void FindPageContentLocked(uint64_t offset, uint64_t max_owner_length, PageLookup* out)
+      TA_REQ(lock());
 
   // Searches for the initial content, i.e. the content that would be used to initially populate the
   // page, of |this| at |offset|. Whether there is presently any content populated in |this| is
@@ -1847,19 +1847,19 @@ class VmCowPages::LookupCursor {
   // recalculating.
   __ALWAYS_INLINE void IncrementCursor() TA_REQ(lock()) {
     offset_ += PAGE_SIZE;
-    if (offset_ == owner_info_.visible_end_) {
+    if (offset_ == owner_info_.visible_end) {
       // Have reached either the end of the valid iteration range, or the end of the visible portion
       // of the owner. In the latter case we set owner_ to null as we need to walk up the hierarchy
       // again to find the next owner that applies to this slot.
       // In the case where we have reached the end of the range, i.e. offset_ is also equal to
       // end_offset_, there is nothing we need to do, but to ensure that an error is generated if
       // the user incorrectly attempts to get another page we also set the owner to the nullptr.
-      owner_info_.owner_ = nullptr;
+      owner_info_.owner = nullptr;
     } else {
       // Increment the owner offset and step the page list cursor to the next slot.
-      owner_info_.owner_offset_ += PAGE_SIZE;
-      owner_info_.owner_pl_cursor_.step();
-      owner_cursor_ = owner_info_.owner_pl_cursor_.current();
+      owner_info_.owner_offset += PAGE_SIZE;
+      owner_info_.cursor.step();
+      owner_cursor_ = owner_info_.cursor.current();
 
       // When iterating, it's possible that we need to find a new owner even before we hit the
       // visible_end_. This happens since even if we have no content at our cursor, we might have a
@@ -1874,7 +1874,7 @@ class VmCowPages::LookupCursor {
       // a nullptr we cannot know where the next content might be. To make things simpler we just
       // invalidate owner_ if we hit this case and re-walk from the bottom again.
       if (!owner_cursor_ || (owner_cursor_->IsEmpty() && owner()->parent_)) {
-        owner_info_.owner_ = nullptr;
+        owner_info_.owner = nullptr;
       }
     }
   }
@@ -1887,7 +1887,7 @@ class VmCowPages::LookupCursor {
   bool IsCursorValid() const {
     // The owner being set is used to indicate whether the cursor is valid or not. Any operations
     // that would invalidate the cursor will always clear owner_.
-    return owner_info_.owner_;
+    return owner_info_.owner;
   }
 
   // Calculates the current cursor, finding the correct owner, owner offset etc. There is always an
@@ -1906,7 +1906,7 @@ class VmCowPages::LookupCursor {
   // zero interval.
   bool CursorIsInIntervalZero() const TA_REQ(lock()) {
     return CursorIsIntervalZero() ||
-           owner()->page_list_.IsOffsetInZeroInterval(owner_info_.owner_offset_);
+           owner()->page_list_.IsOffsetInZeroInterval(owner_info_.owner_offset);
   }
 
   // The cursor can be considered to have content of zero if either it points at a zero marker, or
@@ -1921,7 +1921,7 @@ class VmCowPages::LookupCursor {
   // A usable page is either just any page, if not writing, or if writing, a page that is owned by
   // the target and doesn't need any dirty transitions. i.e., a page that is ready to use right now.
   bool CursorIsUsablePage(bool writing) {
-    return CursorIsPage() && (!writing || (owner_info_.owner_ == target_ && !TargetDirtyTracked()));
+    return CursorIsPage() && (!writing || (owner_info_.owner == target_ && !TargetDirtyTracked()));
   }
 
   // Determines whether the zero content at the current cursor should be supplied as dirty or not.
@@ -1948,7 +1948,7 @@ class VmCowPages::LookupCursor {
     // Inform PageAsResult whether the owner_ is the target_, but otherwise let it calculate the
     // actual writability of the page.
     RequireResult result =
-        PageAsResultNoIncrement(owner_cursor_->Page(), owner_info_.owner_ == target_);
+        PageAsResultNoIncrement(owner_cursor_->Page(), owner_info_.owner == target_);
     IncrementCursor();
     return result;
   }
@@ -1970,7 +1970,7 @@ class VmCowPages::LookupCursor {
 
   // If we held lock(), then since owner_ is from the same hierarchy as the target then we must also
   // hold its lock.
-  VmCowPages* owner() const TA_REQ(lock()) TA_ASSERT(owner()->lock()) { return owner_info_.owner_; }
+  VmCowPages* owner() const TA_REQ(lock()) TA_ASSERT(owner()->lock()) { return owner_info_.owner; }
 
   // Target always exists. This is provided in the constructor and will always be non-null.
   VmCowPages* const target_;
@@ -1984,32 +1984,33 @@ class VmCowPages::LookupCursor {
   // overflow.
   const uint64_t end_offset_;
 
-  // This struct exists to define a layout that is identical to |PageLookup| that is returned by
-  // FindPageContentLocked. Using this custom struct instead of PageLookup here allows for more
-  // meaningful names and comments.
-  struct OwnerInfo {
-    // Cursor in the page list of the current owner_ and is invalid if owner_ is nullptr. This is
-    // used to efficiently pull contiguous pages in an owner_ and the current() value of it is
-    // cached in cursor_.
-    VMPLCursor owner_pl_cursor_;
-
-    // owner_ represent the current owner of cursor_/pl_cursor_. owner_ can be non-null while
-    // cursor_ is null to indicate a lack of content, although in this case the owner_ can also be
-    // assumed to be the root. owner_ being null is used to indicate that the cursor is invalid and
-    // the owner for any content in the current slot needs to be looked up.
-    VmCowPages* owner_ = nullptr;
-
-    // The offset_ normalized to the current owner_. This is equal to offset_ when owner_ ==
-    // target_.
-    uint64_t owner_offset_ = 0;
-
-    // Tracks the offset in target_ at which the current pl_cursor_ becomes invalid. This range
-    // essentially means that no VMO between target_ and owner_ had any content, and so the cursor
-    // in owner is free to walk contiguous pages up to this point. This does not mean that there is
-    // no content in the parent_ of owner_, and so even if visible_end_ is not reached, if an empty
-    // slot is found the parent_ must then be checked. See IncrementCursor for more details.
-    uint64_t visible_end_ = 0;
-  } owner_info_;
+  // Captures information about the cursor owner. The different fields can be interpreted as
+  // follows.
+  //
+  // owner_info_.cursor:
+  // Cursor in the page list of the current owner_info_.owner and is invalid if owner_info_.owner is
+  // nullptr. This is used to efficiently pull contiguous pages in the owner and the current() value
+  // of it is cached in owner_cursor_.
+  //
+  // owner_info_.owner:
+  // Represents the current owner of owner_cursor_/owner_info_.cursor. Can be non-null while
+  // owner_info_.cursor is null to indicate a lack of content, although in this case the
+  // owner_info_.owner can also be assumed to be the root. owner_info_.owner being null is used to
+  // indicate that the cursor is invalid and the owner for any content in the current slot needs to
+  // be looked up.
+  //
+  // owner_info_.owner_offset:
+  // The offset_ normalized to the current owner_info_.owner. This is equal to offset_ when
+  // owner_info_.owner == target_.
+  //
+  // owner_info_.visible_end:
+  // Tracks the offset in target_ at which the current owner_info_.cursor becomes invalid. This
+  // range essentially means that no VMO between target_ and owner_info_.owner had any content, and
+  // so the cursor in owner is free to walk contiguous pages up to this point. This does not mean
+  // that there is no content in the parent_ of owner_info_.owner, and so even if
+  // owner_info_.visible_end is not reached, if an empty slot is found the parent_ must then be
+  // checked. See IncrementCursor for more details.
+  PageLookup owner_info_;
 
   // This is a cache of owner_pl_cursor_.current()
   VmPageOrMarkerRef owner_cursor_;
