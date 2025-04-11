@@ -24,10 +24,10 @@ pub(crate) struct SinkConfig {
 
 thread_local! {
     static PROCESS_ID: zx::Koid =
-        rt::process_self().get_koid().expect("couldn't read our own process koid");
+        rt::process_self().get_koid().unwrap_or_else(|_| zx::Koid::from_raw(zx::sys::zx_koid_t::MAX));
     static THREAD_ID: zx::Koid = rt::thread_self()
         .get_koid()
-        .expect("couldn't read our own thread id");
+        .unwrap_or_else(|_| zx::Koid::from_raw(zx::sys::zx_koid_t::MAX));
 }
 
 pub(crate) struct Sink {
