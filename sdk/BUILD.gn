@@ -1273,13 +1273,6 @@ sdk_molecule("core_licenses") {
 # defined in //build/bazel/bazel_sdk/BUILD.gn
 
 if (current_toolchain == default_toolchain) {
-  # The list of target cpu architectures supported by //sdk:bazel_in_tree_idk
-  if (bazel_fuchsia_sdk_all_cpus) {
-    _bazel_in_tree_idk_cpus = idk_target_cpus
-  } else {
-    _bazel_in_tree_idk_cpus = [ target_cpu ]
-  }
-
   # An IDK used to expose the SDK atoms to the in-tree Bazel workspace's
   # `@fuchsia_sdk` repository.
   #
@@ -1289,9 +1282,7 @@ if (current_toolchain == default_toolchain) {
   idk("bazel_in_tree_idk") {
     visibility = []
     visibility = [
-      ":bazel_in_tree_idk_tests_arm64",
-      ":bazel_in_tree_idk_tests_riscv64",
-      ":bazel_in_tree_idk_tests_x64",
+      ":bazel_in_tree_idk_tests_${target_cpu}",
       "//:ninja_subbuilds",
       "//build/bazel:fuchsia_in_tree_idk.hash",
       "//build/bazel:generate_main_workspace",
@@ -1314,12 +1305,9 @@ if (current_toolchain == default_toolchain) {
     idk_subbuilds_label = "//sdk:in_tree_collection_subbuilds"
     idk_subbuilds_prefix = "idk_subbuild.in_tree_collection_for_subbuilds"
 
-    target_cpus = _bazel_in_tree_idk_cpus
+    target_cpus = [ target_cpu ]
 
     api_levels = []  # `PLATFORM` artifacts will be used as `HEAD`
-    if (bazel_fuchsia_sdk_all_api_levels) {
-      api_levels = platform_version.idk_buildable_api_levels
-    }
 
     # TODO(https://fxbug.dev/306723826): Deal with the fact that the mac builders
     # are too slow to enable this setting, and therefore the mac IDK won't have
@@ -1335,7 +1323,7 @@ if (current_toolchain == default_toolchain) {
   # from the same IDK, is already checked by a different suite
   # of tests defined under //build/bazel/bazel_sdk.
   run_fuchsia_bazel_sdk_tests("bazel_in_tree_idk_tests") {
-    target_cpus = _bazel_in_tree_idk_cpus
+    target_cpus = [ target_cpu ]
 
     idk_exported_target = "//sdk:bazel_in_tree_idk"
     idk_exported_path = "$root_build_dir/sdk/exported/bazel_in_tree_idk"

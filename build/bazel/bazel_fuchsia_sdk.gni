@@ -7,28 +7,6 @@ import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/bazel_workspace.gni")
 import("//build/bazel/generate_prebuilt_dir_content_hash.gni")
 
-declare_args() {
-  # Set to true to populate the @fuchsia_sdk external repository with prebuilt
-  # binaries for all supported target CPU architectures. By default, only those
-  # for the current build configuration's `target_cpu` value will be generated
-  # to save about 3 minutes of build time when they are not needed.
-  bazel_fuchsia_sdk_all_cpus = false
-
-  # Set to true to populate the @fuchsia_sdk external repository with prebuilt
-  # binaries for all API levels, or a subset of them. Possible values are:
-  #
-  #   false: The default, which is to only build targets for which the IDK
-  #       contains artifacts built at "PLATFORM".
-  #
-  #   true: To build for all API levels listed in
-  #       platform_version.idk_buildable_api_levels, which defaults to
-  #       all Supported API levels plus the current in-development API level,
-  #       unless `override_idk_buildable_api_levels` is also set.
-  #       See //build/config/fuchsia/platform_versions.gni.
-  #
-  bazel_fuchsia_sdk_all_api_levels = false
-}
-
 # Generate a Fuchsia Bazel SDK directory at build time from the
 # content of a given IDK export directory. This does not require
 # the Bazel workspace to be setup.

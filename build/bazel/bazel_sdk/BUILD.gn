@@ -15,13 +15,6 @@ import("//build/sdk/config.gni")
 import("//build/sdk/idk.gni")
 import("//build/sdk/sdk_collection.gni")
 
-# The list of target cpu architectures supported by @fuchsia_sdk.
-if (bazel_fuchsia_sdk_all_cpus) {
-  _bazel_in_tree_idk_cpus = idk_target_cpus
-} else {
-  _bazel_in_tree_idk_cpus = [ target_cpu ]
-}
-
 # Generate a Bazel SDK directly from the content of ://sdk:bazel_in_tree_idk
 # and verify that it matches the content of @fuchsia_sdk. This is performed
 # using Bazel actions, to verify that there are no differences between
@@ -77,11 +70,9 @@ bazel_build_action("verify_fuchsia_sdk_repository") {
 }
 
 # Run the Bazel SDK test suite against the content of the @fuchsia_sdk
-# repository. This launches in a separate Bazel workspace, as many
-# times as the number of CPU architectures used to populate the
-# //sdk:bazel_in_tree_idk target.
+# repository (in-tree SDK).
 run_fuchsia_bazel_sdk_tests("bazel_sdk_tests") {
-  target_cpus = _bazel_in_tree_idk_cpus
+  target_cpus = [ target_cpu ]
 }
 
 # Run the Bazel SDK test suite against the content of the Bazel
@@ -94,7 +85,7 @@ run_fuchsia_bazel_sdk_tests("bazel_sdk_tests") {
 # NOTE: This is not incrementally correct at the moment!!
 #
 run_fuchsia_bazel_sdk_tests("final_fuchsia_in_tree_sdk.validation") {
-  target_cpus = _bazel_in_tree_idk_cpus
+  target_cpus = [ target_cpu ]
   fuchsia_sdk_path = "$target_gen_dir/../fuchsia_sdk"
   fuchsia_sdk_target = "//build/bazel:final_fuchsia_in_tree_sdk"
 }
