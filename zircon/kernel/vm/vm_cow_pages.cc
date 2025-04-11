@@ -2536,6 +2536,7 @@ void VmCowPages::LookupCursor::EstablishCursor() {
 
   target_->FindPageContentLocked(offset_, end_offset_ - offset_, &owner_info_);
   owner_cursor_ = owner_info_.cursor.current();
+  is_valid_ = true;
 }
 
 inline VmCowPages::LookupCursor::RequireResult VmCowPages::LookupCursor::PageAsResultNoIncrement(

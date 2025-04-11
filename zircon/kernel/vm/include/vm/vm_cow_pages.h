@@ -1887,11 +1887,7 @@ class VmCowPages::LookupCursor {
   void IncrementOffsetAndInvalidateCursor(uint64_t delta);
 
   // Returns whether the cursor is currently valid or needs to be re-calculated.
-  bool IsCursorValid() const {
-    // The owner being set is used to indicate whether the cursor is valid or not. Any operations
-    // that would invalidate the cursor will always clear owner_.
-    return owner_info_.owner;
-  }
+  bool IsCursorValid() const { return is_valid_; }
 
   // Calculates the current cursor, finding the correct owner, owner offset etc. There is always an
   // owner and this process can never fail.
@@ -1902,7 +1898,7 @@ class VmCowPages::LookupCursor {
 
   // Invalidates the owner, so that the next page will have to perform the lookup again, walking up
   // the hierarchy if needed.
-  void InvalidateCursor() { owner_info_.owner = nullptr; }
+  void InvalidateCursor() { is_valid_ = false; }
 
   // Helpers for querying the state of the cursor.
   bool CursorIsPage() const { return owner_cursor_ && owner_cursor_->IsPage(); }
@@ -2036,6 +2032,10 @@ class VmCowPages::LookupCursor {
 
   // Whether existing pages should be have their access time updated when they are returned.
   bool mark_accessed_ = true;
+
+  // Whether the cursor is valid. The owner_info_ can only be used if is_valid_ is true, otherwise
+  // it needs to be computed with EstablishCursor().
+  bool is_valid_ = false;
 
   // Optional allocation list that will be used for any page allocations.
   list_node_t* alloc_list_ = nullptr;
