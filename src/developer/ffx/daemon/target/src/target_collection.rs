@@ -422,12 +422,16 @@ impl TargetCollection {
     fn find_matching_target(&self, new_target: &Target) -> (Option<Rc<Target>>, bool) {
         // Look for a target by primary ID first
         let new_ids = new_target.ids();
+        let has_vsock_or_usb = new_target.has_vsock_or_usb_addr();
         let mut network_changed = false;
         let mut to_update =
             new_ids.iter().find_map(|id| self.targets.borrow().get(id).map(|t| t.clone()));
 
         // If we haven't yet found a target, try to find one by all IDs, nodename, serial, or address.
-        if to_update.is_none() {
+        if let Some(to_update) = &to_update {
+            tracing::debug!("Matched target by id: {to_update:?}");
+            network_changed = has_vsock_or_usb && !to_update.has_vsock_or_usb_addr();
+        } else {
             let new_ips = new_target
                 .addrs()
                 .iter()
@@ -487,12 +491,19 @@ impl TargetCollection {
                     );
                     to_update.replace(target.clone());
 
+                    let to_update_has_vsock_or_usb = target.has_vsock_or_usb_addr();
+
                     // The effect of returning true for network_changed
                     // is to trigger reconnecting the host_pipe to the target.
-                    // The main reason to do this is for user mode networking
-                    // with an emulator, where the port mapped to SSH changes,
-                    // but the host pipe is using the old port mapped to an old
-                    // instance.
+                    //
+                    // If we've gained USB or VSOCK networking, we always do
+                    // this as we'd always prefer to be using USB or VSOCK
+                    // networking.
+                    //
+                    // Otherwise, the main reason to do this is for user mode
+                    // networking with an emulator, where the port mapped to SSH
+                    // changes, but the host pipe is using the old port mapped
+                    // to an old instance.
                     //
                     // A side-effect of this physical targets that respond to
                     // mDNS on IPv4 and IPv6, the address will change quickly
@@ -501,7 +512,11 @@ impl TargetCollection {
                     //
                     // To avoid that, only return network changed if the port
                     // is specified as well as a change.
-                    network_changed = if let Some(target_ssh_port) = target.ssh_port() {
+                    network_changed = if has_vsock_or_usb != to_update_has_vsock_or_usb {
+                        has_vsock_or_usb
+                    } else if has_vsock_or_usb {
+                        false
+                    } else if let Some(target_ssh_port) = target.ssh_port() {
                         new_port.unwrap_or_default() != target_ssh_port
                     } else {
                         false
@@ -509,9 +524,6 @@ impl TargetCollection {
                     break;
                 }
             }
-        } else {
-            tracing::debug!("Matched target by id: {to_update:?}");
-            network_changed = false
         }
 
         (to_update, network_changed)

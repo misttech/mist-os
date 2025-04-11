@@ -648,6 +648,10 @@ impl Target {
         ids.insert(self.id);
     }
 
+    pub fn has_vsock_or_usb_addr(&self) -> bool {
+        self.addrs.borrow().iter().any(|x| !x.is_ip())
+    }
+
     pub(crate) fn replace_identity(&self, ident: Identity) {
         self.identity.replace(Some(Rc::new(ident.into())));
     }
