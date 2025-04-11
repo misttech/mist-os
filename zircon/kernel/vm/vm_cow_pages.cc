@@ -2609,7 +2609,7 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
     // The only page we can be forking here is the zero page.
     DEBUG_ASSERT(source == vm_get_zero_page());
     // The object directly owns the page.
-    DEBUG_ASSERT(owner_info_.owner == target_);
+    DEBUG_ASSERT(TargetIsOwner());
 
     target_->UpdateDirtyStateLocked(out_page, offset_, dirty_state,
                                     /*is_pending_add=*/true);
@@ -2625,7 +2625,7 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
   //    which are zeroes that we could be overwriting here, but the slot itself we have found could
   //    be empty and the interval may need splitting. For simplicity we do not attempt to check for
   //    and handle interval splitting, and just skip reusing our slot in this case.
-  const bool can_reuse_slot = (owner_info_.owner == target_ && owner_info_.cursor.current() &&
+  const bool can_reuse_slot = (TargetIsOwner() && owner_info_.cursor.current() &&
                                !owner_info_.owner->is_source_preserving_page_content());
   __UNINITIALIZED auto page_transaction =
       can_reuse_slot ? target_->BeginAddPageWithSlotLocked(offset_, owner_info_.cursor.current(),
@@ -2669,7 +2669,7 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
 
   // Need to increment the cursor, but we have also potentially modified the page lists in the
   // process of inserting the page.
-  if (owner_info_.owner == target_) {
+  if (TargetIsOwner()) {
     // In the case of owner_ == target_ we may have create a node and need to establish a cursor.
     // However, if we already had a node, i.e. the cursor was valid, then it would have had the page
     // inserted into it.
@@ -2722,7 +2722,7 @@ zx_status_t VmCowPages::LookupCursor::ReadRequest(uint max_request_pages,
 
   // Try and batch more pages up to |max_request_pages|.
   uint64_t request_size = static_cast<uint64_t>(max_request_pages) * PAGE_SIZE;
-  if (owner_info_.owner != target_) {
+  if (!TargetIsOwner()) {
     DEBUG_ASSERT(owner_info_.visible_end > offset_);
     // Limit the request by the number of pages that are actually visible from the target_ to
     // owner_
@@ -2767,7 +2767,7 @@ zx_status_t VmCowPages::LookupCursor::DirtyRequest(uint max_request_pages,
   // tracking for whether the cursor is valid, and it may have been made invalid just prior to
   // generating this dirty request, and we do not otherwise need the cursor here.
   // Instead we validate that we have no parent, and that we have a page source.
-  DEBUG_ASSERT(target_ == owner_info_.owner || !IsCursorValid());
+  DEBUG_ASSERT(TargetIsOwner() || !IsCursorValid());
   DEBUG_ASSERT(!target_->parent_);
   DEBUG_ASSERT(target_->page_source_);
   DEBUG_ASSERT(max_request_pages > 0);
@@ -2857,7 +2857,7 @@ uint VmCowPages::LookupCursor::IfExistPages(bool will_write, uint max_pages, pad
   // Trim max pages to the visible length of the current owner. This only has an effect when
   // target_ != owner_ as otherwise the visible_end_ is the same as end_offset_ and we already
   // validated that we are within that range.
-  if (owner_info_.owner != target_) {
+  if (!TargetIsOwner()) {
     max_pages =
         ktl::min(max_pages, static_cast<uint>((owner_info_.visible_end - offset_) / PAGE_SIZE));
   }
@@ -2899,7 +2899,7 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
 
   // If page exists in the target, i.e. the owner is the target, then we handle this case separately
   // as it's the only scenario where we might be dirtying an existing committed page.
-  if (owner_info_.owner == target_ && CursorIsPage()) {
+  if (TargetIsOwner() && CursorIsPage()) {
     // If we're writing to a root VMO backed by a user pager, i.e. a VMO whose page source preserves
     // page contents, we might need to mark pages Dirty so that they can be written back later. This
     // is the only path that can result in a write to such a page; if the page was not present, we
@@ -2944,7 +2944,7 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
   // into the target. As the target cannot have a page source do not need to worry about writes or
   // dirtying.
   if (CursorIsPage()) {
-    DEBUG_ASSERT(owner_info_.owner != target_);
+    DEBUG_ASSERT(!TargetIsOwner());
     vm_page_t* res_page = nullptr;
     // Although we are not returning the page, the act of forking counts as an access, and this is
     // an access regardless of whether the final returned page should be considered accessed, so

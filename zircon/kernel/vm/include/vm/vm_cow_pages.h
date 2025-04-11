@@ -1894,6 +1894,9 @@ class VmCowPages::LookupCursor {
   // owner and this process can never fail.
   void EstablishCursor() TA_REQ(lock());
 
+  // Returns true if target_ is the owner.
+  bool TargetIsOwner() const { return owner_info_.owner == target_; }
+
   // Helpers for querying the state of the cursor.
   bool CursorIsPage() const { return owner_cursor_ && owner_cursor_->IsPage(); }
   bool CursorIsMarker() const { return owner_cursor_ && owner_cursor_->IsMarker(); }
@@ -1921,7 +1924,7 @@ class VmCowPages::LookupCursor {
   // A usable page is either just any page, if not writing, or if writing, a page that is owned by
   // the target and doesn't need any dirty transitions. i.e., a page that is ready to use right now.
   bool CursorIsUsablePage(bool writing) {
-    return CursorIsPage() && (!writing || (owner_info_.owner == target_ && !TargetDirtyTracked()));
+    return CursorIsPage() && (!writing || (TargetIsOwner() && !TargetDirtyTracked()));
   }
 
   // Determines whether the zero content at the current cursor should be supplied as dirty or not.
@@ -1947,8 +1950,7 @@ class VmCowPages::LookupCursor {
     }
     // Inform PageAsResult whether the owner_ is the target_, but otherwise let it calculate the
     // actual writability of the page.
-    RequireResult result =
-        PageAsResultNoIncrement(owner_cursor_->Page(), owner_info_.owner == target_);
+    RequireResult result = PageAsResultNoIncrement(owner_cursor_->Page(), TargetIsOwner());
     IncrementCursor();
     return result;
   }
@@ -2001,7 +2003,7 @@ class VmCowPages::LookupCursor {
   //
   // owner_info_.owner_offset:
   // The offset_ normalized to the current owner_info_.owner. This is equal to offset_ when
-  // owner_info_.owner == target_.
+  // TargetIsOwner().
   //
   // owner_info_.visible_end:
   // Tracks the offset in target_ at which the current owner_info_.cursor becomes invalid. This
