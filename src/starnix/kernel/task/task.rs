@@ -9,16 +9,16 @@ use crate::security;
 use crate::signals::{KernelSignal, RunState, SignalInfo, SignalState};
 use crate::task::{
     AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, EventHandler, Kernel,
-    ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData, PtraceState, PtraceStatus,
-    SchedulerPolicy, SeccompFilterContainer, SeccompState, SeccompStateValue, ThreadGroup,
-    ThreadState, UtsNamespaceHandle, WaitCanceler, Waiter, ZombieProcess,
+    PidTable, ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData, PtraceState,
+    PtraceStatus, SchedulerPolicy, SeccompFilterContainer, SeccompState, SeccompStateValue,
+    ThreadGroup, ThreadState, UtsNamespaceHandle, WaitCanceler, Waiter, ZombieProcess,
 };
 use crate::vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsNodeHandle, FsString};
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::profile_duration;
 use macro_rules_attribute::apply;
 use starnix_logging::{log_warn, set_current_task_info, set_zx_name};
-use starnix_sync::{LockBefore, Locked, MmDumpable, Mutex, RwLock, TaskRelease};
+use starnix_sync::{LockBefore, Locked, MmDumpable, Mutex, RwLock, RwLockWriteGuard, TaskRelease};
 use starnix_types::ownership::{
     OwnedRef, Releasable, ReleasableByRef, ReleaseGuard, TempRef, WeakRef,
 };
@@ -696,7 +696,8 @@ impl TaskMutableState<Base = Task> {
         }
 
         if tracer.is_none() {
-            if let Ok(tg_stop_state) = self.base.thread_group.load_stopped().as_in_progress() {
+            // Handle the case where this is called while the thread group is being released.
+            if let Ok(tg_stop_state) = self.base.thread_group().load_stopped().as_in_progress() {
                 self.set_stopped(tg_stop_state, None, None, None);
             }
         }
@@ -747,19 +748,19 @@ impl TaskMutableState<Base = Task> {
 
     /// Returns the number of pending signals for this task, without considering the signal mask.
     pub fn pending_signal_count(&self) -> usize {
-        self.signals.num_queued() + self.base.thread_group.pending_signals.lock().num_queued()
+        self.signals.num_queued() + self.base.thread_group().pending_signals.lock().num_queued()
     }
 
     /// Returns `true` if `signal` is pending for this task, without considering the signal mask.
     pub fn has_signal_pending(&self, signal: Signal) -> bool {
         self.signals.has_queued(signal)
-            || self.base.thread_group.pending_signals.lock().has_queued(signal)
+            || self.base.thread_group().pending_signals.lock().has_queued(signal)
     }
 
     /// The set of pending signals for the task, including the signals pending for the thread
     /// group.
     pub fn pending_signals(&self) -> SigSet {
-        self.signals.pending() | self.base.thread_group.pending_signals.lock().pending()
+        self.signals.pending() | self.base.thread_group().pending_signals.lock().pending()
     }
 
     /// The set of pending signals for the task specifically, not including the signals pending
@@ -771,7 +772,7 @@ impl TaskMutableState<Base = Task> {
     /// Returns true if any currently pending signal is allowed by `mask`.
     pub fn is_any_signal_allowed_by_mask(&self, mask: SigSet) -> bool {
         self.signals.is_any_allowed_by_mask(mask)
-            || self.base.thread_group.pending_signals.lock().is_any_allowed_by_mask(mask)
+            || self.base.thread_group().pending_signals.lock().is_any_allowed_by_mask(mask)
     }
 
     /// Returns whether or not a signal is pending for this task, taking the current
@@ -779,7 +780,7 @@ impl TaskMutableState<Base = Task> {
     pub fn is_any_signal_pending(&self) -> bool {
         let mask = self.signal_mask();
         self.signals.is_any_pending()
-            || self.base.thread_group.pending_signals.lock().is_any_allowed_by_mask(mask)
+            || self.base.thread_group().pending_signals.lock().is_any_allowed_by_mask(mask)
     }
 
     /// Returns the next pending signal that passes `predicate`.
@@ -788,7 +789,7 @@ impl TaskMutableState<Base = Task> {
         F: Fn(&SignalInfo) -> bool,
     {
         if let Some(signal) =
-            self.base.thread_group.pending_signals.lock().take_next_where(&predicate)
+            self.base.thread_group().pending_signals.lock().take_next_where(&predicate)
         {
             Some(signal)
         } else {
@@ -834,7 +835,7 @@ impl TaskMutableState<Base = Task> {
     #[cfg(test)]
     pub fn queued_signal_count(&self, signal: Signal) -> usize {
         self.signals.queued_count(signal)
-            + self.base.thread_group.pending_signals.lock().queued_count(signal)
+            + self.base.thread_group().pending_signals.lock().queued_count(signal)
     }
 }
 
@@ -962,11 +963,17 @@ pub struct Task {
     /// of the `thread_group`.
     pub id: pid_t,
 
+    /// The process if of this task.
+    pub pid: pid_t,
+
+    /// The kernel to which this thread group belongs.
+    pub kernel: Arc<Kernel>,
+
     /// The thread group to which this task belongs.
     ///
     /// The group of tasks in a thread group roughly corresponds to the userspace notion of a
     /// process.
-    pub thread_group: OwnedRef<ThreadGroup>,
+    pub thread_group: Option<OwnedRef<ThreadGroup>>,
 
     /// A handle to the underlying Zircon thread object.
     ///
@@ -1040,7 +1047,13 @@ pub struct PageFaultExceptionReport {
 
 impl Task {
     pub fn kernel(&self) -> &Arc<Kernel> {
-        &self.thread_group.kernel
+        &self.kernel
+    }
+
+    pub fn thread_group(&self) -> &OwnedRef<ThreadGroup> {
+        self.thread_group
+            .as_ref()
+            .expect("thread_group should be always valid until the task is released")
     }
 
     pub fn has_same_address_space(&self, other: &Self) -> bool {
@@ -1058,7 +1071,7 @@ impl Task {
     /// When the task exits, if there is a notification that needs to propagate
     /// to a ptracer, make sure it will propagate.
     pub fn set_ptrace_zombie(&self, pids: &crate::task::PidTable) {
-        let pgid = self.thread_group.read().process_group.leader;
+        let pgid = self.thread_group().read().process_group.leader;
         let mut state = self.write();
         state.set_stopped(StopState::ForceAwake, None, None, None);
         if let Some(ref mut ptrace) = &mut state.ptrace {
@@ -1068,7 +1081,7 @@ impl Task {
             let weak_init = pids.get_task(tracer_pid);
             if let Some(tracer_task) = weak_init.upgrade() {
                 drop(state);
-                let mut tracer_state = tracer_task.thread_group.write();
+                let mut tracer_state = tracer_task.thread_group().write();
 
                 let exit_status = self.exit_status().unwrap_or_else(|| {
                     starnix_logging::log_error!("Exiting without an exit code.");
@@ -1095,8 +1108,7 @@ impl Task {
     }
 
     /// Disconnects this task from the tracer, if the tracer is still running.
-    pub fn ptrace_disconnect(&mut self) {
-        let pids = self.thread_group.kernel.pids.read();
+    pub fn ptrace_disconnect(&mut self, pids: &PidTable) {
         let mut state = self.write();
         let ptracer_pid = state.ptrace.as_ref().map(|ptrace| ptrace.get_pid());
         if let Some(ptracer_pid) = ptracer_pid {
@@ -1162,7 +1174,9 @@ impl Task {
         let pid = thread_group.leader;
         let task = Task {
             id,
-            thread_group,
+            pid: thread_group.leader,
+            kernel: Arc::clone(&thread_group.kernel),
+            thread_group: Some(thread_group),
             thread: RwLock::new(thread),
             files,
             mm,
@@ -1274,7 +1288,7 @@ impl Task {
             updater(&mut state.scheduler_policy);
             state.scheduler_policy
         };
-        self.thread_group.kernel.scheduler.set_thread_role(self, new_scheduler_policy)?;
+        self.thread_group().kernel.scheduler.set_thread_role(self, new_scheduler_policy)?;
         Ok(())
     }
 
@@ -1290,7 +1304,7 @@ impl Task {
     {
         // (1)  If the calling thread and the target thread are in the same
         //      thread group, access is always allowed.
-        if self.thread_group.leader == target.thread_group.leader {
+        if self.thread_group().leader == target.thread_group().leader {
             return Ok(());
         }
 
@@ -1405,7 +1419,7 @@ impl Task {
     }
 
     pub fn get_pid(&self) -> pid_t {
-        self.thread_group.leader
+        self.pid
     }
 
     pub fn get_tid(&self) -> pid_t {
@@ -1478,8 +1492,8 @@ impl Task {
         }
 
         if Signal::try_from(unchecked_signal) == Ok(SIGCONT) {
-            let target_session = target.thread_group.read().process_group.session.leader;
-            let self_session = self.thread_group.read().process_group.session.leader;
+            let target_session = target.thread_group().read().process_group.session.leader;
+            let self_session = self.thread_group().read().process_group.session.leader;
             if target_session == self_session {
                 return Ok(());
             }
@@ -1510,18 +1524,18 @@ impl Task {
         }
         // If this is the thread group leader, use this name for the process too.
         if self.is_leader() {
-            set_zx_name(&self.thread_group.process, name.as_bytes());
+            set_zx_name(&self.thread_group().process, name.as_bytes());
             let _ = zx::Thread::raise_user_exception(
                 zx::RaiseExceptionOptions::TARGET_JOB_DEBUGGER,
                 zx::sys::ZX_EXCP_USER_CODE_PROCESS_NAME_CHANGED,
                 0,
             );
-            if let Some(notifier) = &self.thread_group.read().notifier {
+            if let Some(notifier) = &self.thread_group().read().notifier {
                 let _ = notifier.send(MemoryAttributionLifecycleEvent::name_change(self.id));
             }
         }
 
-        set_current_task_info(&name, self.thread_group.leader, self.id);
+        set_current_task_info(&name, self.thread_group().leader, self.id);
 
         // Truncate to 16 bytes, including null byte.
         let bytes = name.to_bytes();
@@ -1568,24 +1582,29 @@ impl Task {
     }
 
     pub fn get_signal_action(&self, signal: Signal) -> sigaction_t {
-        self.thread_group.signal_actions.get(signal)
+        self.thread_group().signal_actions.get(signal)
     }
 }
 
 impl Releasable for Task {
-    type Context<'a: 'b, 'b> = (ThreadState, &'b mut Locked<'a, TaskRelease>);
+    type Context<'a: 'b, 'b> =
+        (ThreadState, &'b mut Locked<'a, TaskRelease>, RwLockWriteGuard<'b, PidTable>);
 
     fn release<'a: 'b, 'b>(mut self, context: Self::Context<'a, 'b>) {
-        let (thread_state, locked) = context;
+        let (thread_state, locked, mut pids) = context;
 
         // We remove from the thread group here because the WeakRef in the pid
         // table to this task must be valid until this task is removed from the
         // thread group, and the code below will invalidate it.
-        self.thread_group.remove(locked, &self);
+        self.thread_group().remove(locked, &mut pids, &self);
 
         *self.proc_pid_directory_cache.get_mut() = None;
+        self.ptrace_disconnect(&pids);
 
-        self.ptrace_disconnect();
+        // Release the ThreadGroup.
+        self.thread_group.take().release(&mut pids);
+
+        std::mem::drop(pids);
 
         // Release the fd table.
         self.files.release(());
@@ -1605,10 +1624,7 @@ impl Releasable for Task {
         // and from the resulting ReleaseGuard.
         let CurrentTask { mut task, .. } = current_task;
         let task = OwnedRef::take(&mut task).expect("task should not have been re-owned");
-        let task: Self = ReleaseGuard::take(task);
-
-        // Release the ThreadGroup.
-        task.thread_group.release(());
+        let _task: Self = ReleaseGuard::take(task);
     }
 }
 
@@ -1687,7 +1703,7 @@ impl fmt::Debug for Task {
         write!(
             f,
             "{}:{}[{}]",
-            self.thread_group.leader,
+            self.thread_group().leader,
             self.id,
             self.persistent_info.lock().command.to_string_lossy()
         )
@@ -1743,12 +1759,12 @@ mod test {
         );
         assert_eq!(current_task.get_pid(), thread.get_pid());
         assert_ne!(current_task.get_tid(), thread.get_tid());
-        assert_eq!(current_task.thread_group.leader, thread.thread_group.leader);
+        assert_eq!(current_task.thread_group().leader, thread.thread_group().leader);
 
         let child_task = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         assert_ne!(current_task.get_pid(), child_task.get_pid());
         assert_ne!(current_task.get_tid(), child_task.get_tid());
-        assert_eq!(current_task.get_pid(), child_task.thread_group.read().get_ppid());
+        assert_eq!(current_task.get_pid(), child_task.thread_group().read().get_ppid());
     }
 
     #[::fuchsia::test]
@@ -1764,18 +1780,18 @@ mod test {
     #[::fuchsia::test]
     async fn test_clone_rlimit() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let prev_fsize = current_task.thread_group.get_rlimit(Resource::FSIZE);
+        let prev_fsize = current_task.thread_group().get_rlimit(Resource::FSIZE);
         assert_ne!(prev_fsize, 10);
         current_task
-            .thread_group
+            .thread_group()
             .limits
             .lock()
             .set(Resource::FSIZE, rlimit { rlim_cur: 10, rlim_max: 100 });
-        let current_fsize = current_task.thread_group.get_rlimit(Resource::FSIZE);
+        let current_fsize = current_task.thread_group().get_rlimit(Resource::FSIZE);
         assert_eq!(current_fsize, 10);
 
         let child_task = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        let child_fsize = child_task.thread_group.get_rlimit(Resource::FSIZE);
+        let child_fsize = child_task.thread_group().get_rlimit(Resource::FSIZE);
         assert_eq!(child_fsize, 10)
     }
 }

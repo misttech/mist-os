@@ -211,7 +211,7 @@ pub fn sys_execveat(
     // See the Limits sections in https://man7.org/linux/man-pages/man2/execve.2.html
     const PAGE_LIMIT: usize = 32;
     let page_limit_size: usize = PAGE_LIMIT * *PAGE_SIZE as usize;
-    let rlimit = current_task.thread_group.get_rlimit(Resource::STACK);
+    let rlimit = current_task.thread_group().get_rlimit(Resource::STACK);
     let stack_limit = rlimit / 4;
     let argv_env_limit = cmp::max(page_limit_size, stack_limit as usize);
 
@@ -366,7 +366,7 @@ pub fn sys_getppid(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<pid_t, Errno> {
-    Ok(current_task.thread_group.read().get_ppid())
+    Ok(current_task.thread_group().read().get_ppid())
 }
 
 fn get_task_if_owner_or_has_capabilities(
@@ -400,7 +400,7 @@ pub fn sys_getsid(
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
     security::check_task_getsid(current_task, &target_task)?;
-    let sid = target_task.thread_group.read().process_group.session.leader;
+    let sid = target_task.thread_group().read().process_group.session.leader;
     Ok(sid)
 }
 
@@ -413,7 +413,7 @@ pub fn sys_getpgid(
     let task = Task::from_weak(&weak)?;
 
     security::check_getpgid_access(current_task, &task)?;
-    let pgid = task.thread_group.read().process_group.leader;
+    let pgid = task.thread_group().read().process_group.leader;
     Ok(pgid)
 }
 
@@ -427,7 +427,7 @@ pub fn sys_setpgid(
     let task = Task::from_weak(&weak)?;
 
     security::check_setpgid_access(current_task, &task)?;
-    current_task.thread_group.setpgid(locked, &task, pgid)?;
+    current_task.thread_group().setpgid(locked, &task, pgid)?;
     Ok(())
 }
 
@@ -751,7 +751,7 @@ pub fn sys_sched_setscheduler(
 
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
-    let rlimit = target_task.thread_group.get_rlimit(Resource::RTPRIO);
+    let rlimit = target_task.thread_group().get_rlimit(Resource::RTPRIO);
 
     security::check_setsched_access(current_task, &target_task)?;
     let param: sched_param = current_task.read_object(param.into())?;
@@ -900,7 +900,7 @@ pub fn sys_sched_setparam(
     let target_task = Task::from_weak(&weak)?;
     let current_policy = target_task.read().scheduler_policy;
 
-    let rlimit = target_task.thread_group.get_rlimit(Resource::RTPRIO);
+    let rlimit = target_task.thread_group().get_rlimit(Resource::RTPRIO);
 
     let policy =
         SchedulerPolicy::from_sched_params(current_policy.raw_policy(), new_params, rlimit)?;
@@ -1030,7 +1030,7 @@ pub fn sys_prctl(
                 }
                 PtraceAllowedPtracers::Some(arg2 as pid_t)
             };
-            current_task.thread_group.write().allowed_ptracers = allowed_ptracers;
+            current_task.thread_group().write().allowed_ptracers = allowed_ptracers;
             Ok(().into())
         }
         PR_GET_KEEPCAPS => {
@@ -1085,12 +1085,12 @@ pub fn sys_prctl(
             let addr = UserAddress::from(arg2);
             #[allow(clippy::bool_to_int_with_if)]
             let value: i32 =
-                if current_task.thread_group.read().is_child_subreaper { 1 } else { 0 };
+                if current_task.thread_group().read().is_child_subreaper { 1 } else { 0 };
             current_task.write_object(addr.into(), &value)?;
             Ok(().into())
         }
         PR_SET_CHILD_SUBREAPER => {
-            current_task.thread_group.write().is_child_subreaper = arg2 != 0;
+            current_task.thread_group().write().is_child_subreaper = arg2 != 0;
             Ok(().into())
         }
         PR_GET_SECUREBITS => {
@@ -1240,8 +1240,8 @@ pub fn sys_getrusage(
     const RUSAGE_THREAD: i32 = starnix_uapi::uapi::RUSAGE_THREAD as i32;
     track_stub!(TODO("https://fxbug.dev/297370242"), "real rusage");
     let time_stats = match who {
-        RUSAGE_CHILDREN => current_task.task.thread_group.read().children_time_stats,
-        RUSAGE_SELF => current_task.task.thread_group.time_stats(),
+        RUSAGE_CHILDREN => current_task.task.thread_group().read().children_time_stats,
+        RUSAGE_SELF => current_task.task.thread_group().time_stats(),
         RUSAGE_THREAD => current_task.task.time_stats(),
         _ => return error!(EINVAL),
     };
@@ -1615,7 +1615,7 @@ pub fn sys_setsid(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<pid_t, Errno> {
-    current_task.thread_group.setsid(locked)?;
+    current_task.thread_group().setsid(locked)?;
     Ok(current_task.get_pid())
 }
 
@@ -1664,7 +1664,7 @@ pub fn sys_setpriority(
         || current_task.creds().euid == target_task.creds().uid;
     let strengthening = target_task.read().scheduler_policy.raw_priority() < new_raw_priority;
     let allowed_so_far_as_rlimit_is_concerned = !strengthening
-        || new_raw_priority as u64 <= target_task.thread_group.get_rlimit(Resource::NICE);
+        || new_raw_priority as u64 <= target_task.thread_group().get_rlimit(Resource::NICE);
     if !(friendly && allowed_so_far_as_rlimit_is_concerned) {
         security::check_task_capable(current_task, CAP_SYS_NICE)?;
     }
@@ -1892,8 +1892,8 @@ pub fn sys_kcmp(
             Ok(encode_ordering(obfuscate_arc(&task1.fs()).cmp(&obfuscate_arc(&task2.fs()))))
         }
         KcmpResource::SIGHAND => Ok(encode_ordering(
-            obfuscate_arc(&task1.thread_group.signal_actions)
-                .cmp(&obfuscate_arc(&task2.thread_group.signal_actions)),
+            obfuscate_arc(&task1.thread_group().signal_actions)
+                .cmp(&obfuscate_arc(&task2.thread_group().signal_actions)),
         )),
         KcmpResource::VM => Ok(encode_ordering(
             obfuscate_arc(task1.mm().ok_or_else(|| errno!(EINVAL))?)
@@ -2309,7 +2309,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         current_task
-            .thread_group
+            .thread_group()
             .limits
             .lock()
             .set(Resource::RTPRIO, rlimit { rlim_cur: 255, rlim_max: 255 });

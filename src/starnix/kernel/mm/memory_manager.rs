@@ -1722,7 +1722,7 @@ impl MemoryManagerState {
             return error!(ENOMEM);
         }
 
-        let memlock_rlimit = current_task.thread_group.get_rlimit(Resource::MEMLOCK);
+        let memlock_rlimit = current_task.thread_group().get_rlimit(Resource::MEMLOCK);
         if self.total_locked_bytes() + num_new_locked_bytes > memlock_rlimit {
             if crate::security::check_task_capable(current_task, CAP_IPC_LOCK).is_err() {
                 let code = if memlock_rlimit > 0 { errno!(ENOMEM) } else { errno!(EPERM) };
@@ -3226,7 +3226,7 @@ impl MemoryManager {
     ) -> Result<UserAddress, Errno> {
         let rlimit_data = std::cmp::min(
             PROGRAM_BREAK_LIMIT,
-            current_task.thread_group.get_rlimit(Resource::DATA),
+            current_task.thread_group().get_rlimit(Resource::DATA),
         );
 
         let mut released_mappings = vec![];
