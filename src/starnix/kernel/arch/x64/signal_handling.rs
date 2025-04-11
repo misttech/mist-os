@@ -265,7 +265,7 @@ mod tests {
         let (_kernel, mut current_task, mut locked) = create_kernel_and_task_with_stack();
 
         // Register the signal action.
-        current_task.thread_group().signal_actions.set(
+        current_task.thread_group.signal_actions.set(
             SIGUSR1,
             sigaction_t {
                 sa_flags: (SA_RESTORER | SA_RESTART | SA_SIGINFO) as u64,
@@ -337,7 +337,7 @@ mod tests {
         let (_kernel, mut current_task, mut locked) = create_kernel_and_task_with_stack();
 
         // Register the signal actions.
-        current_task.thread_group().signal_actions.set(
+        current_task.thread_group.signal_actions.set(
             SIGUSR1,
             sigaction_t {
                 sa_flags: (SA_RESTORER | SA_RESTART | SA_SIGINFO) as u64,
@@ -346,7 +346,7 @@ mod tests {
                 ..sigaction_t::default()
             },
         );
-        current_task.thread_group().signal_actions.set(
+        current_task.thread_group.signal_actions.set(
             SIGUSR2,
             sigaction_t {
                 sa_flags: (SA_RESTORER | SA_RESTART | SA_SIGINFO) as u64,
@@ -471,7 +471,7 @@ mod tests {
         let (_kernel, mut current_task, mut locked) = create_kernel_and_task_with_stack();
 
         // Register the signal action.
-        current_task.thread_group().signal_actions.set(
+        current_task.thread_group.signal_actions.set(
             SIGUSR1,
             sigaction_t {
                 sa_flags: (SA_RESTORER | SA_SIGINFO) as u64,

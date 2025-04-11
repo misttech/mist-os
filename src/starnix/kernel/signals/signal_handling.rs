@@ -92,7 +92,7 @@ fn send_signal_prio(
 
     if is_real_time && prio != SignalPriority::First {
         if task_state.pending_signal_count()
-            >= task.thread_group().get_rlimit(Resource::SIGPENDING) as usize
+            >= task.thread_group.get_rlimit(Resource::SIGPENDING) as usize
         {
             return error!(EAGAIN);
         }
@@ -137,10 +137,10 @@ fn send_signal_prio(
     // a stopped process.
     if signal == Some(SIGKILL) {
         task.write().thaw();
-        task.thread_group().set_stopped(StopState::ForceWaking, siginfo, false);
+        task.thread_group.set_stopped(StopState::ForceWaking, siginfo, false);
         task.write().set_stopped(StopState::ForceWaking, None, None, None);
     } else if signal == Some(SIGCONT) || force_wake {
-        task.thread_group().set_stopped(StopState::Waking, siginfo, false);
+        task.thread_group.set_stopped(StopState::Waking, siginfo, false);
         task.write().set_stopped(StopState::Waking, None, None, None);
     }
 
@@ -212,7 +212,7 @@ pub fn dequeue_signal(locked: &mut Locked<'_, Unlocked>, current_task: &mut Curr
     let siginfo = if kernel_signal.is_some() { None } else { task_state.take_any_signal() };
     prepare_to_restart_syscall(
         thread_state,
-        siginfo.as_ref().map(|siginfo| task.thread_group().signal_actions.get(siginfo.signal)),
+        siginfo.as_ref().map(|siginfo| task.thread_group.signal_actions.get(siginfo.signal)),
     );
 
     if let Some(ref siginfo) = siginfo {
@@ -273,13 +273,13 @@ pub fn deliver_signal(
     extended_pstate: &ExtendedPstateState,
 ) -> Option<ExitStatus> {
     loop {
-        let sigaction = task.thread_group().signal_actions.get(siginfo.signal);
+        let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
         let action = action_for_signal(&siginfo, sigaction);
         log_trace!("handling signal {:?} with action {:?}", siginfo, action);
         match action {
             DeliveryAction::Ignore => {}
             DeliveryAction::CallHandler => {
-                let sigaction = task.thread_group().signal_actions.get(siginfo.signal);
+                let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
                 let signal = siginfo.signal;
                 match dispatch_signal_handler(
                     task,
@@ -298,7 +298,7 @@ pub fn deliver_signal(
                                 sa_flags: sigaction.sa_flags & !(SA_RESETHAND as u64),
                                 ..sigaction
                             };
-                            task.thread_group().signal_actions.set(signal, new_sigaction);
+                            task.thread_group.signal_actions.set(signal, new_sigaction);
                         }
                     }
                     Err(err) => {
@@ -310,7 +310,7 @@ pub fn deliver_signal(
                         //  ignored, we reset the signal disposition and unmask SIGSEGV.
                         //  2. Send a SIGSEGV to the program, with the (possibly) updated signal
                         //  disposition and mask.
-                        let sigaction = task.thread_group().signal_actions.get(siginfo.signal);
+                        let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
                         let action = action_for_signal(&siginfo, sigaction);
                         let masked_signals = task_state.signal_mask();
                         if signal == SIGSEGV
@@ -318,7 +318,7 @@ pub fn deliver_signal(
                             || action == DeliveryAction::Ignore
                         {
                             task_state.set_signal_mask(masked_signals & !SigSet::from(SIGSEGV));
-                            task.thread_group().signal_actions.set(SIGSEGV, sigaction_t::default());
+                            task.thread_group.signal_actions.set(SIGSEGV, sigaction_t::default());
                         }
 
                         // Try to deliver the SIGSEGV.
@@ -344,7 +344,7 @@ pub fn deliver_signal(
             }
             DeliveryAction::Stop => {
                 drop(task_state);
-                task.thread_group().set_stopped(StopState::GroupStopping, Some(siginfo), false);
+                task.thread_group.set_stopped(StopState::GroupStopping, Some(siginfo), false);
             }
             DeliveryAction::Continue => {
                 // Nothing to do. Effect already happened when the signal was raised.

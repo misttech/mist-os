@@ -17,6 +17,10 @@
 
                 // This test only runs on x86_64.
                 "signal06",
+
+                // https://fxbug.dev/409425986 - Flaking in recent builds.
+                "rt_sigtimedwait01",
+                "sigwaitinfo01",
             ],
         },
     ],

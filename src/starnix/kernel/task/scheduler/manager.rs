@@ -56,9 +56,9 @@ impl SchedulerManager {
     fn role_name_inner(&self, task: &Task, policy: SchedulerPolicy) -> Result<&str, Errno> {
         Ok(if policy.kind.is_realtime() {
             let process_name = task
-                .thread_group()
+                .thread_group
                 .read()
-                .get_task(task.thread_group().leader)
+                .get_task(task.thread_group.leader)
                 .ok_or_else(|| errno!(EINVAL))?
                 .command();
             let thread_name = task.command();

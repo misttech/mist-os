@@ -208,7 +208,7 @@ impl UnlockedForAsync {
 
 impl SystemTask {
     fn new(system_task: CurrentTask) -> Self {
-        let system_thread_group = OwnedRef::downgrade(&system_task.thread_group());
+        let system_thread_group = OwnedRef::downgrade(&system_task.thread_group);
         Self { system_task: system_task.into(), system_thread_group }
     }
 }

@@ -387,7 +387,7 @@ fn get_process_cpu_time(current_task: &CurrentTask, pid: pid_t) -> Result<i64, E
     let weak_task = current_task.get_task(pid);
     let task = weak_task.upgrade().ok_or_else(|| errno!(EINVAL))?;
     Ok(task
-        .thread_group()
+        .thread_group
         .process
         .get_runtime_info()
         .map_err(|status| from_status_like_fdio!(status))?
@@ -465,7 +465,7 @@ pub fn sys_timer_create(
     };
 
     let mut checked_signal_event: Option<SignalEvent> = None;
-    let thread_group = current_task.thread_group().read();
+    let thread_group = current_task.thread_group.read();
     if let Some(user_event) = user_event {
         let signal_event: SignalEvent = user_event.try_into()?;
         if !signal_event.is_valid(&thread_group) {
@@ -514,7 +514,7 @@ pub fn sys_timer_delete(
     current_task: &CurrentTask,
     id: TimerId,
 ) -> Result<(), Errno> {
-    let timers = &current_task.thread_group().read().timers;
+    let timers = &current_task.thread_group.read().timers;
     timers.delete(current_task, id)
 }
 
@@ -524,7 +524,7 @@ pub fn sys_timer_gettime(
     id: TimerId,
     curr_value: ITimerSpecPtr,
 ) -> Result<(), Errno> {
-    let timers = &current_task.thread_group().read().timers;
+    let timers = &current_task.thread_group.read().timers;
     current_task.write_multi_arch_object(curr_value, timers.get_time(id)?)?;
     Ok(())
 }
@@ -534,7 +534,7 @@ pub fn sys_timer_getoverrun(
     current_task: &CurrentTask,
     id: TimerId,
 ) -> Result<i32, Errno> {
-    let timers = &current_task.thread_group().read().timers;
+    let timers = &current_task.thread_group.read().timers;
     timers.get_overrun(id)
 }
 
@@ -557,7 +557,7 @@ pub fn sys_timer_settime(
         current_task.write_multi_arch_object(user_old_value, Default::default())?;
     }
 
-    let timers = &current_task.thread_group().read().timers;
+    let timers = &current_task.thread_group.read().timers;
     let old_value = timers.set_time(current_task, id, flags, new_value)?;
 
     if !user_old_value.is_null() {
@@ -572,7 +572,7 @@ pub fn sys_getitimer(
     which: u32,
     user_curr_value: ITimerValPtr,
 ) -> Result<(), Errno> {
-    let remaining = current_task.thread_group().get_itimer(which)?;
+    let remaining = current_task.thread_group.get_itimer(which)?;
     current_task.write_multi_arch_object(user_curr_value, remaining)?;
     Ok(())
 }
@@ -586,7 +586,7 @@ pub fn sys_setitimer(
 ) -> Result<(), Errno> {
     let new_value = current_task.read_multi_arch_object(user_new_value)?;
 
-    let old_value = current_task.thread_group().set_itimer(current_task, which, new_value)?;
+    let old_value = current_task.thread_group.set_itimer(current_task, which, new_value)?;
 
     if !user_old_value.is_null() {
         current_task.write_multi_arch_object(user_old_value, old_value)?;
@@ -601,7 +601,7 @@ pub fn sys_times(
     buf: UserRef<tms>,
 ) -> Result<i64, Errno> {
     if !buf.is_null() {
-        let thread_group = current_task.thread_group();
+        let thread_group = &current_task.thread_group;
         let process_time_stats = thread_group.time_stats();
         let children_time_stats = thread_group.read().children_time_stats;
         let tms_result = tms {
@@ -782,7 +782,7 @@ mod test {
         let interruption_target =
             zx::MonotonicInstant::get() + zx::MonotonicDuration::from_seconds(1);
 
-        let thread_group = OwnedRef::downgrade(current_task.thread_group());
+        let thread_group = OwnedRef::downgrade(&current_task.thread_group);
         let thread_join_handle = std::thread::Builder::new()
             .name("clock_nanosleep_interruptor".to_string())
             .spawn(move || {

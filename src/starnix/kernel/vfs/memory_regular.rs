@@ -286,7 +286,7 @@ impl MemoryRegularFile {
             }
 
             // Check against the FSIZE limt
-            let fsize_limit = current_task.thread_group().get_rlimit(Resource::FSIZE) as usize;
+            let fsize_limit = current_task.thread_group.get_rlimit(Resource::FSIZE) as usize;
             if write_end > fsize_limit {
                 if offset >= fsize_limit {
                     // Write starts beyond the FSIZE limt.

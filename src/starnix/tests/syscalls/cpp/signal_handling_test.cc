@@ -1220,28 +1220,4 @@ TEST(SignalHandling, SetContextInSignal) {
   });
 }
 
-TEST(SignalHandling, RaceBetweenTaskReleaseAndThreadRelease) {
-  for (int i = 0; i < 500; ++i) {
-    test_helper::ForkHelper helper;
-
-    helper.RunInForkedProcess([] {
-      sigset_t sigs, oldmask;
-      siginfo_t si;
-      SAFE_SYSCALL(sigemptyset(&sigs));
-      SAFE_SYSCALL(sigaddset(&sigs, SIGUSR1));
-      SAFE_SYSCALL(sigaddset(&sigs, SIGCHLD));
-      SAFE_SYSCALL(sigprocmask(SIG_SETMASK, &sigs, &oldmask));
-      SAFE_SYSCALL(sigdelset(&sigs, SIGCHLD));
-
-      pid_t pid = getpid();
-      test_helper::ForkHelper helper;
-      pid_t child = helper.RunInForkedProcess([pid] { kill(pid, SIGUSR1); });
-      SAFE_SYSCALL(sigtimedwait(&sigs, &si, NULL));
-      SAFE_SYSCALL(kill(child, SIGTERM));
-      helper.WaitForChildren();
-    });
-    ASSERT_TRUE(helper.WaitForChildren());
-  }
-}
-
 }  // namespace

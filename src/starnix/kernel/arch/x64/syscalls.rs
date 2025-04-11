@@ -49,7 +49,7 @@ pub fn sys_alarm(
 ) -> Result<u32, Errno> {
     let duration = zx::MonotonicDuration::from_seconds(duration.into());
     let new_value = timeval_from_duration(duration);
-    let old_value = current_task.thread_group().set_itimer(
+    let old_value = current_task.thread_group.set_itimer(
         current_task,
         ITIMER_REAL,
         itimerval { it_value: new_value, it_interval: Default::default() },
@@ -239,7 +239,7 @@ pub fn sys_getpgrp(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<pid_t, Errno> {
-    Ok(current_task.thread_group().read().process_group.leader)
+    Ok(current_task.thread_group.read().process_group.leader)
 }
 
 pub fn sys_inotify_init(

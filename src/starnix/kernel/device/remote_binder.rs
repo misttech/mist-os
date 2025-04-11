@@ -462,7 +462,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         Arc::new(Self {
             kernel: current_task.kernel().clone(),
             state: Mutex::new(RemoteBinderHandleState {
-                thread_group: OwnedRef::downgrade(&current_task.thread_group()),
+                thread_group: OwnedRef::downgrade(&current_task.thread_group),
                 koid_to_task: Default::default(),
                 unassigned_tasks: Default::default(),
                 unassigned_requests: Default::default(),

@@ -240,7 +240,7 @@ impl FdTable {
         file: FileHandle,
         flags: FdFlags,
     ) -> Result<(), Errno> {
-        let rlimit = task.thread_group().get_rlimit(Resource::NOFILE);
+        let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);
         let id = self.id();
         let inner = self.inner.lock();
         let mut state = inner.store.lock();
@@ -255,7 +255,7 @@ impl FdTable {
         flags: FdFlags,
     ) -> Result<FdNumber, Errno> {
         profile_duration!("AddFd");
-        let rlimit = task.thread_group().get_rlimit(Resource::NOFILE);
+        let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);
         let id = self.id();
         let inner = self.inner.lock();
         let mut state = inner.store.lock();
@@ -279,7 +279,7 @@ impl FdTable {
         #[allow(clippy::collection_is_never_read)]
         let _removed_entry;
         let result = {
-            let rlimit = task.thread_group().get_rlimit(Resource::NOFILE);
+            let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);
             let id = self.id();
             let inner = self.inner.lock();
             let mut state = inner.store.lock();

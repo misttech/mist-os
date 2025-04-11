@@ -168,7 +168,7 @@ pub fn pid_directory(
     dir.entry(
         current_task,
         "task",
-        TaskListDirectory { thread_group: OwnedRef::downgrade(&task.thread_group()) },
+        TaskListDirectory { thread_group: OwnedRef::downgrade(&task.thread_group) },
         mode!(IFDIR, 0o777),
     );
     let fs_node = TaskDirectory::new(current_task, fs, task, dir);
@@ -809,7 +809,7 @@ impl FileOps for CommFile {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         let task = Task::from_weak(&self.task)?;
-        if !OwnedRef::ptr_eq(&task.thread_group(), &current_task.thread_group()) {
+        if !OwnedRef::ptr_eq(&task.thread_group, &current_task.thread_group) {
             return error!(EINVAL);
         }
         // What happens if userspace writes to this file in multiple syscalls? We need more
@@ -866,7 +866,7 @@ impl LimitsFile {
 impl DynamicFileSource for LimitsFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let task = Task::from_weak(&self.0)?;
-        let limits = task.thread_group().limits.lock();
+        let limits = task.thread_group.limits.lock();
 
         let write_limit = |sink: &mut DynamicFileBuf, value| {
             if value == RLIM_INFINITY as u64 {
@@ -1067,7 +1067,7 @@ impl DynamicFileSource for StatFile {
         nice = 20 - task.read().scheduler_policy.raw_priority() as i64;
 
         {
-            let thread_group = task.thread_group().read();
+            let thread_group = task.thread_group.read();
             ppid = thread_group.get_ppid();
             pgrp = thread_group.process_group.leader;
             session = thread_group.process_group.session.leader;
@@ -1090,12 +1090,12 @@ impl DynamicFileSource for StatFile {
 
         let time_stats = match self.scope {
             StatsScope::Task => task.time_stats(),
-            StatsScope::ThreadGroup => task.thread_group().time_stats(),
+            StatsScope::ThreadGroup => task.thread_group.time_stats(),
         };
         utime = duration_to_scheduler_clock(time_stats.user_time);
         stime = duration_to_scheduler_clock(time_stats.system_time);
 
-        if let Ok(info) = task.thread_group().process.info() {
+        if let Ok(info) = task.thread_group.process.info() {
             starttime = duration_to_scheduler_clock(
                 zx::MonotonicInstant::from_nanos(info.start_time) - zx::MonotonicInstant::ZERO,
             ) as u64;
@@ -1106,7 +1106,7 @@ impl DynamicFileSource for StatFile {
             let page_size = *PAGE_SIZE as usize;
             vsize = mem_stats.vm_size;
             rss = mem_stats.vm_rss / page_size;
-            rsslim = task.thread_group().limits.lock().get(Resource::RSS).rlim_max;
+            rsslim = task.thread_group.limits.lock().get(Resource::RSS).rlim_max;
 
             {
                 let mm_state = mm.state.read();
@@ -1200,11 +1200,7 @@ impl DynamicFileSource for StatusFile {
             let task_state = task.read();
             writeln!(sink, "SigBlk:\t{:x}", task_state.signal_mask().0)?;
             writeln!(sink, "SigPnd:\t{:x}", task_state.task_specific_pending_signals().0)?;
-            writeln!(
-                sink,
-                "ShdPnd:\t{:x}",
-                task.thread_group().pending_signals.lock().pending().0
-            )?;
+            writeln!(sink, "ShdPnd:\t{:x}", task.thread_group.pending_signals.lock().pending().0)?;
         }
 
         let state_code =
@@ -1215,7 +1211,7 @@ impl DynamicFileSource for StatusFile {
         writeln!(sink, "Pid:\t{}", pid)?;
         let (ppid, threads, tracer_pid) = if let Some(task) = task {
             let tracer_pid = task.read().ptrace.as_ref().map_or(0, |p| p.get_pid());
-            let task_group = task.thread_group().read();
+            let task_group = task.thread_group.read();
             (task_group.get_ppid(), task_group.tasks_count(), tracer_pid)
         } else {
             track_stub!(TODO("https://fxbug.dev/297440106"), "/proc/pid/status zombies");
@@ -1351,8 +1347,7 @@ impl TimerslackNsFile {
 impl BytesFileOps for TimerslackNsFile {
     fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         let target_task = Task::from_weak(&self.0)?;
-        let same_task =
-            current_task.task.thread_group().leader == target_task.thread_group().leader;
+        let same_task = current_task.task.thread_group.leader == target_task.thread_group.leader;
         if !same_task {
             security::check_task_capable(current_task, CAP_SYS_NICE)?;
             security::check_setsched_access(current_task, &target_task)?;
@@ -1365,8 +1360,7 @@ impl BytesFileOps for TimerslackNsFile {
 
     fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         let target_task = Task::from_weak(&self.0)?;
-        let same_task =
-            current_task.task.thread_group().leader == target_task.thread_group().leader;
+        let same_task = current_task.task.thread_group.leader == target_task.thread_group.leader;
         if !same_task {
             security::check_task_capable(current_task, CAP_SYS_NICE)?;
             security::check_getsched_access(current_task, &target_task)?;

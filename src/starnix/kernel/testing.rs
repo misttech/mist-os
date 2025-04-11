@@ -216,7 +216,7 @@ fn create_test_init_task(
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
     // will trigger the tracing-mutex at the right call site.
     {
-        let _l1 = init_task.thread_group().read();
+        let _l1 = init_task.thread_group.read();
         let _l2 = init_task.read();
     }
     init_task
@@ -259,7 +259,7 @@ pub fn create_task(
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
     // will trigger the tracing-mutex at the right call site.
     {
-        let _l1 = task.thread_group().read();
+        let _l1 = task.thread_group.read();
         let _l2 = task.read();
     }
 

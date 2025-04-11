@@ -45,7 +45,7 @@ impl CrashReporter {
         trace_instant!(CATEGORY_STARNIX, c"RecordCoreDump", TraceScope::Process);
 
         let process_koid = current_task
-            .thread_group()
+            .thread_group
             .process
             .get_koid()
             .expect("handles for processes with crashing threads are still valid");
@@ -56,7 +56,7 @@ impl CrashReporter {
             .expect("coredumps occur in tasks with associated threads")
             .get_koid()
             .expect("handles for crashing threads are still valid");
-        let linux_pid = current_task.thread_group().leader as i64;
+        let linux_pid = current_task.thread_group.leader as i64;
         let argv = current_task
             .read_argv(MAX_ANNOTATION_VALUE_LENGTH as usize)
             .unwrap_or_else(|_| vec!["<unknown>".into()])
@@ -72,7 +72,7 @@ impl CrashReporter {
         };
 
         // TODO(https://fxbug.dev/356912301) use boot time
-        let uptime = zx::MonotonicInstant::get() - current_task.thread_group().start_time;
+        let uptime = zx::MonotonicInstant::get() - current_task.thread_group.start_time;
 
         let dump_info = CoreDumpInfo {
             process_koid,

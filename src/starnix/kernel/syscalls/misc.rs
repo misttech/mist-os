@@ -100,7 +100,7 @@ pub fn do_uname(
     }
 
     init_array(&mut result.sysname, b"Linux");
-    if current_task.thread_group().read().personality.contains(PersonalityFlags::UNAME26) {
+    if current_task.thread_group.read().personality.contains(PersonalityFlags::UNAME26) {
         init_array(&mut result.release, b"2.6.40-starnix");
     } else {
         init_array(&mut result.release, KERNEL_RELEASE.as_bytes());
@@ -478,7 +478,7 @@ pub fn sys_personality(
     current_task: &CurrentTask,
     persona: u32,
 ) -> Result<SyscallResult, Errno> {
-    let mut state = current_task.task.thread_group().write();
+    let mut state = current_task.task.thread_group.write();
     let previous_value = state.personality.bits();
     if persona != 0xffffffff {
         // Use `from_bits_retain()` since we want to keep unknown flags.

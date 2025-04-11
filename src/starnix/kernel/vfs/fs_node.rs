@@ -1861,7 +1861,7 @@ impl FsNode {
         if length > MAX_LFS_FILESIZE as u64 {
             return error!(EINVAL);
         }
-        if length > current_task.thread_group().get_rlimit(Resource::FSIZE) {
+        if length > current_task.thread_group.get_rlimit(Resource::FSIZE) {
             send_standard_signal(current_task, SignalInfo::default(SIGXFSZ));
             return error!(EFBIG);
         }
@@ -1913,7 +1913,7 @@ impl FsNode {
     {
         let allocate_size = checked_add_offset_and_length(offset as usize, length as usize)
             .map_err(|_| errno!(EFBIG))? as u64;
-        if allocate_size > current_task.thread_group().get_rlimit(Resource::FSIZE) {
+        if allocate_size > current_task.thread_group.get_rlimit(Resource::FSIZE) {
             send_standard_signal(current_task, SignalInfo::default(SIGXFSZ));
             return error!(EFBIG);
         }

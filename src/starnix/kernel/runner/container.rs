@@ -816,10 +816,7 @@ fn create_fs_context(
 
 pub fn set_rlimits(task: &Task, rlimits: &[String]) -> Result<(), Error> {
     let set_rlimit = |resource, value| {
-        task.thread_group()
-            .limits
-            .lock()
-            .set(resource, rlimit { rlim_cur: value, rlim_max: value });
+        task.thread_group.limits.lock().set(resource, rlimit { rlim_cur: value, rlim_max: value });
     };
 
     for rlimit in rlimits.iter() {

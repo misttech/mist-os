@@ -1969,7 +1969,7 @@ pub fn sys_pidfd_open(
 
     let blocking = (flags & PIDFD_NONBLOCK) == 0;
     let open_flags = if blocking { OpenFlags::empty() } else { OpenFlags::NONBLOCK };
-    let file = new_pidfd(current_task, task.thread_group(), open_flags);
+    let file = new_pidfd(current_task, &task.thread_group, open_flags);
     current_task.add_file(file, FdFlags::CLOEXEC)
 }
 
@@ -2244,11 +2244,7 @@ pub fn sys_pselect6(
     )?;
 
     if !timeout_addr.is_null()
-        && !current_task
-            .thread_group()
-            .read()
-            .personality
-            .contains(PersonalityFlags::STICKY_TIMEOUTS)
+        && !current_task.thread_group.read().personality.contains(PersonalityFlags::STICKY_TIMEOUTS)
     {
         let now = zx::MonotonicInstant::get();
         let remaining = std::cmp::max(deadline - now, zx::MonotonicDuration::from_seconds(0));
@@ -2288,11 +2284,7 @@ pub fn sys_select(
     )?;
 
     if !timeout_addr.is_null()
-        && !current_task
-            .thread_group()
-            .read()
-            .personality
-            .contains(PersonalityFlags::STICKY_TIMEOUTS)
+        && !current_task.thread_group.read().personality.contains(PersonalityFlags::STICKY_TIMEOUTS)
     {
         let now = zx::MonotonicInstant::get();
         let remaining = std::cmp::max(deadline - now, zx::MonotonicDuration::from_seconds(0));
@@ -2528,7 +2520,7 @@ pub fn poll(
     mask: Option<SigSet>,
     deadline: zx::MonotonicInstant,
 ) -> Result<usize, Errno> {
-    if num_fds < 0 || num_fds as u64 > current_task.thread_group().get_rlimit(Resource::NOFILE) {
+    if num_fds < 0 || num_fds as u64 > current_task.thread_group.get_rlimit(Resource::NOFILE) {
         return error!(EINVAL);
     }
 
