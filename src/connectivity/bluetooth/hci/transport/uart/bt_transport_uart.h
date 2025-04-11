@@ -66,12 +66,10 @@ class ScoConnectionServer : public fidl::Server<fuchsia_hardware_bluetooth::ScoC
   std::vector<uint8_t> write_buffer_;
 };
 
-class BtTransportUart
-    : public fdf::DriverBase,
-      public fidl::WireAsyncEventHandler<fuchsia_driver_framework::NodeController>,
-      public fidl::Server<fuchsia_hardware_bluetooth::HciTransport>,
-      public fdf::WireServer<fuchsia_hardware_serialimpl::Device>,
-      public fidl::Server<fuchsia_hardware_bluetooth::Snoop> {
+class BtTransportUart : public fdf::DriverBase,
+                        public fidl::Server<fuchsia_hardware_bluetooth::HciTransport>,
+                        public fdf::WireServer<fuchsia_hardware_serialimpl::Device>,
+                        public fidl::Server<fuchsia_hardware_bluetooth::Snoop> {
  public:
   // If |dispatcher| is non-null, it will be used instead of a new work thread.
   // tests.
@@ -81,9 +79,6 @@ class BtTransportUart
   zx::result<> Start() override;
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
   void Stop() override { fdf::DriverBase::Stop(); }
-
-  void handle_unknown_event(
-      fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override {}
 
   // fuchsia_hardware_bluetooth::HciTransport protocol overrides.
   void Send(SendRequest& request, SendCompleter::Sync& completer) override;
@@ -247,8 +242,7 @@ class BtTransportUart
   // In production, this is loop_.dispatcher(). In tests, this is the test dispatcher.
   async_dispatcher_t* dispatcher_ = nullptr;
 
-  fidl::WireClient<fuchsia_driver_framework::Node> node_;
-  fidl::WireClient<fuchsia_driver_framework::NodeController> node_controller_;
+  fidl::WireClient<fuchsia_driver_framework::NodeController> child_node_controller_;
 
   std::optional<fidl::ServerBinding<fuchsia_hardware_bluetooth::Snoop>> snoop_server_;
 

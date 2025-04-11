@@ -55,7 +55,6 @@ BtTransportUart::BtTransportUart(fuchsia_driver_framework::DriverStartArgs start
                                  fdf::UnownedSynchronizedDispatcher driver_dispatcher)
     : DriverBase("bt-transport-uart", std::move(start_args), std::move(driver_dispatcher)),
       dispatcher_(dispatcher()),
-      node_(fidl::WireClient(std::move(node()), dispatcher())),
       sco_connection_server_(fit::bind_member(this, &BtTransportUart::OnScoData),
                              fit::bind_member(this, &BtTransportUart::OnScoStop),
                              fit::bind_member(this, &BtTransportUart::OnAckReceive)) {
@@ -153,41 +152,23 @@ zx::result<> BtTransportUart::Start() {
   }
 
   // Add child node for the vendor driver to bind.
-  fidl::Arena args_arena;
-
   // Build offers
-  auto offers = compat_server_.CreateOffers2(args_arena);
-  offers.push_back(fdf::MakeOffer2<fhbt::HciService>(args_arena));
-  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_serialimpl::Service>(args_arena));
-  offers.push_back(mac_address_metadata_server_.MakeOffer(arena));
+  std::vector offers = compat_server_.CreateOffers2();
+  offers.push_back(fdf::MakeOffer2<fhbt::HciService>());
+  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_serialimpl::Service>());
+  offers.push_back(mac_address_metadata_server_.MakeOffer());
 
-  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(args_arena)
-                  .name("bt-transport-uart")
-                  .offers2(std::move(offers))
-                  .Build();
-
-  auto controller_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  if (controller_endpoints.is_error()) {
-    FDF_LOG(ERROR, "Create node controller end points failed: %s",
-            zx_status_get_string(controller_endpoints.error_value()));
-    return zx::error(controller_endpoints.error_value());
-  }
+  // Properties are automatically added for each offer, no need to specify any.
+  std::array<fuchsia_driver_framework::NodeProperty, 0> properties{};
 
   // Add bt-transport-uart child node.
-  auto result =
-      node_.sync()->AddChild(std::move(args), std::move(controller_endpoints->server), {});
-  if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to add bt-transport-uart node, FIDL error: %s", result.status_string());
-    return zx::error(result.status());
+  zx::result child = AddChild("bt-transport-uart", properties, offers);
+  if (child.is_error()) {
+    FDF_LOG(ERROR, "Failed to add bt-transport-uart node, error: %s", child.status_string());
+    return child.take_error();
   }
 
-  if (result->is_error()) {
-    FDF_LOG(ERROR, "Failed to add bt-transport-uart node: %u",
-            static_cast<uint32_t>(result->error_value()));
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-
-  node_controller_.Bind(std::move(controller_endpoints->client), dispatcher(), this);
+  child_node_controller_.Bind(std::move(child.value()), dispatcher());
 
   return zx::ok();
 }
@@ -289,7 +270,7 @@ void BtTransportUart::SendSnoop(fidl::VectorView<uint8_t>& packet,
 void BtTransportUart::HciBeginShutdown() {
   bool was_shutting_down = shutting_down_.exchange(true, std::memory_order_relaxed);
   if (!was_shutting_down) {
-    auto result = node_.UnbindMaybeGetEndpoint();
+    node().reset();
   }
 }
 
