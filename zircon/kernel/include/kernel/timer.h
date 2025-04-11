@@ -25,6 +25,8 @@
 // - Timers may be canceled or reprogrammed from within their callback.
 // - Setting and canceling timers is not thread safe and cannot be done concurrently.
 // - Timer::cancel() may spin waiting for a pending timer to complete on another cpu.
+// - Timers aren't permanently bound to a particular CPU and may fire on a CPU other
+//   than the one on which they were set.
 
 // Timers may be removed from an arbitrary TimerQueue, so their list
 // node requires the AllowRemoveFromContainer option.
