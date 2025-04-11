@@ -286,6 +286,33 @@ impl TargetCollection {
         self.targets.borrow().len() == 0
     }
 
+    /// Remove a known-invalid address from all targets. Only allowed for
+    /// VSOCK/USB addresses right now.
+    pub fn remove_address(&self, addr: TargetAddr) {
+        assert!(matches!(addr, TargetAddr::UsbCtx(_) | TargetAddr::VSockCtx(_)));
+
+        let mut drop_ids = Vec::new();
+
+        for (&id, target) in self.targets.borrow().iter() {
+            let addrs_empty = {
+                let mut addrs = target.addrs.borrow_mut();
+                addrs.retain(|x| x.addr != addr);
+                addrs.is_empty()
+            };
+
+            if addrs_empty {
+                drop_ids.push(id);
+            } else if target.is_connected() {
+                target.disconnect();
+                target.maybe_reconnect(None);
+            }
+        }
+
+        for id in drop_ids {
+            self.remove_target_from_list(id);
+        }
+    }
+
     pub fn remove_target_from_list(&self, tid: u64) {
         let target = self.targets.borrow_mut().remove(&tid);
         if let Some(target) = target {
@@ -1904,6 +1931,92 @@ mod tests {
             let target = targets.next().expect("Merging resulted in no targets.");
             assert!(targets.next().is_none());
             assert_eq!(target.nodename(), None);
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_target_remove_address() {
+        let ip1 = "f111::3".parse().unwrap();
+        let mut addr_set = BTreeSet::new();
+        addr_set.replace(TargetIpAddr::new(ip1, 0xbadf00d, 0));
+        let t1 = Target::new_with_addrs::<String>(None, addr_set);
+        let t2 = Target::new_named("this-is-a-crunchy-falafel");
+        let tc = TargetCollection::new_with_queue();
+        t2.addrs.borrow_mut().replace(TargetAddr::UsbCtx(3).into());
+        tc.merge_insert(t1);
+        tc.merge_insert(t2);
+
+        {
+            let targets = tc.targets.borrow();
+            let mut targets = targets.values();
+            let mut target1 = targets.next().expect("Merging resulted in no targets.");
+            let mut target2 = targets.next().expect("Merging resulted in only one target.");
+
+            if target1.nodename().is_none() {
+                std::mem::swap(&mut target1, &mut target2);
+            }
+            assert!(targets.next().is_none());
+            assert_eq!(target1.nodename_str(), "this-is-a-crunchy-falafel");
+            assert_eq!(target2.nodename(), None);
+        }
+
+        tc.remove_address(TargetAddr::UsbCtx(3));
+
+        {
+            let targets = tc.targets.borrow();
+            let mut targets = targets.values();
+            let target = targets.next().expect("Merging resulted in no targets.");
+            assert!(targets.next().is_none());
+            assert_eq!(target.nodename(), None);
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_target_remove_address_no_drop() {
+        let ip1 = "f111::3".parse().unwrap();
+        let ip2 = "f111::4".parse().unwrap();
+        let mut addr_set = BTreeSet::new();
+        addr_set.replace(TargetIpAddr::new(ip1, 0xbadf00d, 0));
+        let t1 = Target::new_with_addrs::<String>(None, addr_set);
+        let t2 = Target::new_named("this-is-a-crunchy-falafel");
+        let tc = TargetCollection::new_with_queue();
+        t2.addrs.borrow_mut().replace(TargetAddr::UsbCtx(3).into());
+        t2.addrs.borrow_mut().replace(TargetAddr::new(ip2, 0, 0).into());
+        tc.merge_insert(t1);
+        tc.merge_insert(t2);
+
+        {
+            let targets = tc.targets.borrow();
+            let mut targets = targets.values();
+            let mut target1 = targets.next().expect("Merging resulted in no targets.");
+            let mut target2 = targets.next().expect("Merging resulted in only one target.");
+
+            if target1.nodename().is_none() {
+                std::mem::swap(&mut target1, &mut target2);
+            }
+            assert!(targets.next().is_none());
+            assert_eq!(target1.nodename_str(), "this-is-a-crunchy-falafel");
+            assert_eq!(target2.nodename(), None);
+        }
+
+        tc.remove_address(TargetAddr::UsbCtx(3));
+
+        {
+            let targets = tc.targets.borrow();
+            let mut targets = targets.values();
+            let mut target1 = targets.next().expect("Merging resulted in no targets.");
+            let mut target2 = targets.next().expect("Merging resulted in only one target.");
+
+            if target1.nodename().is_none() {
+                std::mem::swap(&mut target1, &mut target2);
+            }
+            assert!(targets.next().is_none());
+            assert_eq!(target1.nodename_str(), "this-is-a-crunchy-falafel");
+            assert_eq!(target2.nodename(), None);
+            assert_eq!(target1.addrs.borrow().len(), 1);
+
+            let addr = target1.addrs.borrow().iter().next().unwrap().addr.clone();
+            assert_eq!(addr, TargetAddr::new(ip2, 0, 0));
         }
     }
 

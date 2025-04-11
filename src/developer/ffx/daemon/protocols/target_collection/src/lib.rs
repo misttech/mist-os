@@ -736,7 +736,9 @@ impl FidlProtocol for TargetCollectionProtocol {
                                 tracing::warn!(cid, ?error, "Could not connect to USB target");
                             }
                         }
-                        UsbVsockHostEvent::RemovedCid(_cid) => {}
+                        UsbVsockHostEvent::RemovedCid(cid) => {
+                            tc.remove_address(TargetAddr::UsbCtx(cid));
+                        }
                     }
                 }
 
