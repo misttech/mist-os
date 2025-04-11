@@ -297,21 +297,6 @@ class KernelDriver {
     return conf;
   }
 
-  // If this ZBI item matches a supported driver, instantiate that driver and
-  // return true.  If nothing matches, leave the existing driver (default null)
-  // in place and return false.  The expected procedure is to apply this to
-  // each ZBI item in order, so that the latest one wins (e.g. one appended by
-  // the boot loader will supersede one embedded in the original ZBI).
-  bool Match(const zbi_header_t& header, const void* payload) { return TryMatch(header, payload); }
-
-  // If |debug_port| (DBG2 Acpi Table) contains a configuration matching any existing driver,
-  // instantiate that driver and return true.
-  bool Match(const acpi_lite::AcpiDebugPortDescriptor& debug_port) { return TryMatch(debug_port); }
-
-  // This is like Match, but instead of matching a ZBI item, it matches a
-  // string value for the "kernel.serial" boot option.
-  bool Parse(std::string_view option) { return TryMatch(option); }
-
   // Write out a string that Parse() can read back to recreate the driver
   // state.  This doesn't preserve the driver state, only the configuration.
   void Unparse(FILE* out = stdout) const {
