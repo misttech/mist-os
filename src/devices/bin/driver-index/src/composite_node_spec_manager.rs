@@ -118,7 +118,7 @@ impl CompositeNodeSpecManager {
 
     pub fn add_composite_node_spec(
         &mut self,
-        spec: fdf::CompositeNodeSpec,
+        mut spec: fdf::CompositeNodeSpec,
         composite_drivers: Vec<&ResolvedDriver>,
     ) -> Result<(), i32> {
         // Get and validate the name.
@@ -132,7 +132,48 @@ impl CompositeNodeSpecManager {
             log::warn!("Regex failure. Unable to validate spec name");
         }
 
-        let parents = spec.parents.clone().ok_or_else(|| Status::INVALID_ARGS.into_raw())?;
+        let parents = match (spec.parents.take(), spec.parents2.take()) {
+            (Some(parents), None) => parents
+                .into_iter()
+                .map(|parent| {
+                    Ok(fdf::ParentSpec2 {
+                        bind_rules: parent
+                            .bind_rules
+                            .into_iter()
+                            .map(|rule| {
+                                if let fdf::NodePropertyKey::StringValue(key) = rule.key {
+                                    Ok(fdf::BindRule2 {
+                                        key,
+                                        condition: rule.condition,
+                                        values: rule.values,
+                                    })
+                                } else {
+                                    Err(Status::NOT_SUPPORTED.into_raw())
+                                }
+                            })
+                            .collect::<Result<_, _>>()?,
+                        properties: parent
+                            .properties
+                            .into_iter()
+                            .map(|prop| {
+                                if let fdf::NodePropertyKey::StringValue(key) = prop.key {
+                                    Ok(fdf::NodeProperty2 { key, value: prop.value })
+                                } else {
+                                    Err(Status::NOT_SUPPORTED.into_raw())
+                                }
+                            })
+                            .collect::<Result<_, _>>()?,
+                    })
+                })
+                .collect::<Result<_, i32>>()?,
+            (None, Some(parents2)) => parents2,
+            (Some(_), Some(_)) => {
+                return Err(Status::INVALID_ARGS.into_raw());
+            }
+            (None, None) => {
+                return Err(Status::INVALID_ARGS.into_raw());
+            }
+        };
 
         if self.spec_list.contains_key(&name) {
             return Err(Status::ALREADY_EXISTS.into_raw());
@@ -150,16 +191,6 @@ impl CompositeNodeSpecManager {
         let mut parent_refs: Vec<(BindRules, CompositeParentRef)> = vec![];
         for (idx, parent) in parents.iter().enumerate() {
             let bind_rules = convert_fidl_to_bind_rules(&parent.bind_rules)?;
-            for property in parent.properties.iter() {
-                if let fdf::NodePropertyKey::IntValue(key) = property.key {
-                    log::warn!(
-                        "Found unsupported integer-based key {} in composite node spec '{}'",
-                        key,
-                        name
-                    );
-                    return Err(Status::NOT_SUPPORTED.into_raw());
-                }
-            }
             parent_refs
                 .push((bind_rules, CompositeParentRef { name: name.clone(), index: idx as u32 }));
         }
@@ -181,6 +212,8 @@ impl CompositeNodeSpecManager {
                 name
             );
         }
+
+        spec.parents2 = Some(parents);
 
         self.spec_list.insert(
             name,
@@ -251,7 +284,7 @@ impl CompositeNodeSpecManager {
                 continue;
             }
 
-            let parents = composite_info.spec.as_ref().unwrap().parents.as_ref().unwrap();
+            let parents = composite_info.spec.as_ref().unwrap().parents2.as_ref().unwrap();
             let matched_composite_result = match_composite_properties(resolved_driver, parents);
             if let Ok(Some(matched_composite)) = matched_composite_result {
                 log::info!(
@@ -275,7 +308,7 @@ impl CompositeNodeSpecManager {
             .spec
             .as_ref()
             .ok_or_else(|| Status::INTERNAL.into_raw())?
-            .parents
+            .parents2
             .as_ref()
             .ok_or_else(|| Status::INTERNAL.into_raw())?;
         let new_match = find_composite_driver_match(parents, &composite_drivers);
@@ -311,7 +344,7 @@ impl CompositeNodeSpecManager {
                 .spec
                 .as_ref()
                 .ok_or_else(|| Status::INTERNAL.into_raw())?
-                .parents
+                .parents2
                 .as_ref()
                 .ok_or_else(|| Status::INTERNAL.into_raw())?;
             let new_match = find_composite_driver_match(parents, &composite_drivers);
@@ -350,10 +383,17 @@ pub fn strip_parents_from_spec(spec: &Option<fdf::CompositeNodeSpec>) -> fdf::Co
             .map(|_parent| fdf::ParentSpec { bind_rules: vec![], properties: vec![] })
             .collect::<Vec<_>>()
     });
+    let parents2_stripped = spec.as_ref().and_then(|spec| spec.parents2.as_ref()).map(|parents| {
+        parents
+            .iter()
+            .map(|_parent| fdf::ParentSpec2 { bind_rules: vec![], properties: vec![] })
+            .collect::<Vec<_>>()
+    });
 
     fdf::CompositeNodeSpec {
         name: spec.as_ref().and_then(|spec| spec.name.clone()),
         parents: parents_stripped,
+        parents2: parents2_stripped,
         ..Default::default()
     }
 }
@@ -377,40 +417,24 @@ mod tests {
     const TEST_ADDITIONAL_B_NAME: &str = "node_b";
     const TEST_OPTIONAL_NAME: &str = "optional_node";
 
-    fn make_deprecated_accept(key: u32, value: fdf::NodePropertyValue) -> fdf::BindRule {
-        fdf::BindRule {
-            key: fdf::NodePropertyKey::IntValue(key),
-            condition: fdf::Condition::Accept,
-            values: vec![value],
-        }
+    fn make_accept_list(key: &str, values: Vec<fdf::NodePropertyValue>) -> fdf::BindRule2 {
+        fdf::BindRule2 { key: key.to_string(), condition: fdf::Condition::Accept, values }
     }
 
-    fn make_accept_list(key: &str, values: Vec<fdf::NodePropertyValue>) -> fdf::BindRule {
-        fdf::BindRule {
-            key: fdf::NodePropertyKey::StringValue(key.to_string()),
-            condition: fdf::Condition::Accept,
-            values: values,
-        }
-    }
-
-    fn make_reject(key: &str, value: fdf::NodePropertyValue) -> fdf::BindRule {
-        fdf::BindRule {
-            key: fdf::NodePropertyKey::StringValue(key.to_string()),
+    fn make_reject(key: &str, value: fdf::NodePropertyValue) -> fdf::BindRule2 {
+        fdf::BindRule2 {
+            key: key.to_string(),
             condition: fdf::Condition::Reject,
             values: vec![value],
         }
     }
 
-    fn make_reject_list(key: &str, values: Vec<fdf::NodePropertyValue>) -> fdf::BindRule {
-        fdf::BindRule {
-            key: fdf::NodePropertyKey::StringValue(key.to_string()),
-            condition: fdf::Condition::Reject,
-            values: values,
-        }
+    fn make_reject_list(key: &str, values: Vec<fdf::NodePropertyValue>) -> fdf::BindRule2 {
+        fdf::BindRule2 { key: key.to_string(), condition: fdf::Condition::Reject, values }
     }
 
     // TODO(https://fxbug.dev/42071377): Update tests so that they use the test data functions more often.
-    fn create_test_parent_spec_1() -> fdf::ParentSpec {
+    fn create_test_parent_spec_1() -> fdf::ParentSpec2 {
         let bind_rules = vec![
             make_accept("testkey", fdf::NodePropertyValue::IntValue(200)),
             make_accept("testkey3", fdf::NodePropertyValue::BoolValue(true)),
@@ -420,7 +444,7 @@ mod tests {
         make_parent_spec(bind_rules, properties)
     }
 
-    fn create_test_parent_spec_2() -> fdf::ParentSpec {
+    fn create_test_parent_spec_2() -> fdf::ParentSpec2 {
         let bind_rules = vec![
             make_reject("killdeer", fdf::NodePropertyValue::StringValue("plover".to_string())),
             make_accept(
@@ -495,7 +519,7 @@ mod tests {
 
         let composite_spec = fdf::CompositeNodeSpec {
             name: Some("test_spec".to_string()),
-            parents: nodes.clone(),
+            parents2: nodes.clone(),
             ..Default::default()
         };
 
@@ -604,48 +628,6 @@ mod tests {
         assert_eq!(
             Some(fdi::MatchDriverResult::CompositeParents(vec![expected_parent])),
             composite_node_spec_manager.match_parent_specs(&device_properties)
-        );
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn test_deprecated_keys_fail() {
-        let invalid_bind_rules = vec![
-            make_accept("fuchsia.BIND_PROTOCOL", fdf::NodePropertyValue::IntValue(200)),
-            make_deprecated_accept(
-                0x0201, // "fuchsia.BIND_USB_PID"
-                fdf::NodePropertyValue::IntValue(10),
-            ),
-        ];
-        let composite_spec_invalid_bind_rules = make_composite_spec(
-            "invalid_bind_rules",
-            vec![make_parent_spec(
-                invalid_bind_rules,
-                vec![make_property("test_key", fdf::NodePropertyValue::IntValue(50))],
-            )],
-        );
-
-        let mut composite_node_spec_manager = CompositeNodeSpecManager::new();
-        assert_eq!(
-            Err(Status::NOT_SUPPORTED.into_raw()),
-            composite_node_spec_manager
-                .add_composite_node_spec(composite_spec_invalid_bind_rules, vec![])
-        );
-
-        let invalid_properties = vec![fdf::NodeProperty {
-            key: fdf::NodePropertyKey::IntValue(0x01),
-            value: fdf::NodePropertyValue::IntValue(10),
-        }];
-        let composite_spec_invalid_properties = make_composite_spec(
-            "invalid_properties",
-            vec![make_parent_spec(
-                vec![make_accept("fuchsia.BIND_PROTOCOL", fdf::NodePropertyValue::IntValue(200))],
-                invalid_properties,
-            )],
-        );
-        assert_eq!(
-            Err(Status::NOT_SUPPORTED.into_raw()),
-            composite_node_spec_manager
-                .add_composite_node_spec(composite_spec_invalid_properties, vec![])
         );
     }
 
@@ -1121,7 +1103,7 @@ mod tests {
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: None,
-                    parents: Some(vec![
+                    parents2: Some(vec![
                         make_parent_spec(bind_rules, properties_1),
                         make_parent_spec(vec![], properties_2),
                     ]),
@@ -1138,7 +1120,7 @@ mod tests {
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
-                    parents: None,
+                    parents2: None,
                     ..Default::default()
                 },
                 vec![]

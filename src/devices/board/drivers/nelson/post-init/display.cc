@@ -200,30 +200,30 @@ zx::result<> PostInit::InitDisplay() {
   display_dev.bti() = display_btis;
 
   // Composite binding rules for display driver.
-  std::vector<fuchsia_driver_framework::BindRule> gpio_bind_rules{
-      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
-                              bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
-                              bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_13),
+  std::vector<fuchsia_driver_framework::BindRule2> gpio_bind_rules{
+      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_gpio::SERVICE,
+                               bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_PIN,
+                               bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_13),
   };
 
-  std::vector<fuchsia_driver_framework::NodeProperty> gpio_properties{
-      fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
-                        bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_LCD_RESET),
+  std::vector<fuchsia_driver_framework::NodeProperty2> gpio_properties{
+      fdf::MakeProperty2(bind_fuchsia_hardware_gpio::SERVICE,
+                         bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty2(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_LCD_RESET),
   };
 
-  std::vector<fuchsia_driver_framework::BindRule> canvas_bind_rules{
-      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
-                              bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
+  std::vector<fuchsia_driver_framework::BindRule2> canvas_bind_rules{
+      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
+                               bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
   };
 
-  std::vector<fuchsia_driver_framework::NodeProperty> canvas_properties{
-      fdf::MakeProperty(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
-                        bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
+  std::vector<fuchsia_driver_framework::NodeProperty2> canvas_properties{
+      fdf::MakeProperty2(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
+                         bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
   };
 
-  std::vector<fuchsia_driver_framework::ParentSpec> parents = {
+  std::vector<fuchsia_driver_framework::ParentSpec2> parents = {
       {{
           .bind_rules = gpio_bind_rules,
           .properties = gpio_properties,
@@ -234,7 +234,7 @@ zx::result<> PostInit::InitDisplay() {
       }},
   };
 
-  fuchsia_driver_framework::CompositeNodeSpec spec{{.name = "display", .parents = parents}};
+  fuchsia_driver_framework::CompositeNodeSpec spec{{.name = "display", .parents2 = parents}};
 
   // TODO(payamm): Change from "dsi" to nullptr to separate DSI and Display into two different
   // driver hosts once support for it lands.

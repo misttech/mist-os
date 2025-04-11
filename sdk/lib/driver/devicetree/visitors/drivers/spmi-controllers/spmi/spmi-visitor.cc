@@ -223,25 +223,25 @@ zx::result<fuchsia_hardware_spmi::TargetInfo> SpmiVisitor::ParseTarget(
 
   if (node.GetNode()->children().empty()) {
     // This target has no sub-target children, so add a composite node spec for it.
-    fuchsia_driver_framework::ParentSpec target_spec{{
+    fuchsia_driver_framework::ParentSpec2 target_spec{{
         .bind_rules =
             {
-                fdf::MakeAcceptBindRule(bind_fuchsia_hardware_spmi::TARGETSERVICE,
-                                        bind_fuchsia_hardware_spmi::TARGETSERVICE_ZIRCONTRANSPORT),
-                fdf::MakeAcceptBindRule(bind_fuchsia_spmi::CONTROLLER_ID, controller_id),
-                fdf::MakeAcceptBindRule(bind_fuchsia_spmi::TARGET_ID, target_id),
+                fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_spmi::TARGETSERVICE,
+                                         bind_fuchsia_hardware_spmi::TARGETSERVICE_ZIRCONTRANSPORT),
+                fdf::MakeAcceptBindRule2(bind_fuchsia_spmi::CONTROLLER_ID, controller_id),
+                fdf::MakeAcceptBindRule2(bind_fuchsia_spmi::TARGET_ID, target_id),
             },
         .properties =
             {
-                fdf::MakeProperty(bind_fuchsia_hardware_spmi::TARGETSERVICE,
-                                  bind_fuchsia_hardware_spmi::TARGETSERVICE_ZIRCONTRANSPORT),
-                fdf::MakeProperty(bind_fuchsia_spmi::TARGET_ID, target_id),
+                fdf::MakeProperty2(bind_fuchsia_hardware_spmi::TARGETSERVICE,
+                                   bind_fuchsia_hardware_spmi::TARGETSERVICE_ZIRCONTRANSPORT),
+                fdf::MakeProperty2(bind_fuchsia_spmi::TARGET_ID, target_id),
             },
     }};
 
     if (!reg_names.empty()) {
       target_spec.properties().push_back(
-          fdf::MakeProperty(bind_fuchsia_spmi::TARGET_NAME, reg_names[0]));
+          fdf::MakeProperty2(bind_fuchsia_spmi::TARGET_NAME, reg_names[0]));
     }
 
     node.GetNode()->AddNodeSpec(target_spec);
@@ -297,7 +297,7 @@ zx::result<std::vector<fuchsia_hardware_spmi::SubTargetInfo>> SpmiVisitor::Parse
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  std::vector<fuchsia_driver_framework::ParentSpec>& parent_specs =
+  std::vector<fuchsia_driver_framework::ParentSpec2>& parent_specs =
       sub_targets_[node.id()].parent_specs;
 
   std::vector<fuchsia_hardware_spmi::SubTargetInfo> sub_targets;
@@ -318,37 +318,37 @@ zx::result<std::vector<fuchsia_hardware_spmi::SubTargetInfo>> SpmiVisitor::Parse
         .size = size,
     }};
 
-    fuchsia_driver_framework::ParentSpec sub_target_spec{{
+    fuchsia_driver_framework::ParentSpec2 sub_target_spec{{
         .bind_rules =
             {
-                fdf::MakeAcceptBindRule(
+                fdf::MakeAcceptBindRule2(
                     bind_fuchsia_hardware_spmi::SUBTARGETSERVICE,
                     bind_fuchsia_hardware_spmi::SUBTARGETSERVICE_ZIRCONTRANSPORT),
-                fdf::MakeAcceptBindRule(bind_fuchsia_spmi::CONTROLLER_ID, controller_id),
-                fdf::MakeAcceptBindRule(bind_fuchsia_spmi::TARGET_ID,
-                                        static_cast<uint32_t>(*parent.id())),
-                fdf::MakeAcceptBindRule(bind_fuchsia_spmi::SUB_TARGET_ADDRESS, address),
+                fdf::MakeAcceptBindRule2(bind_fuchsia_spmi::CONTROLLER_ID, controller_id),
+                fdf::MakeAcceptBindRule2(bind_fuchsia_spmi::TARGET_ID,
+                                         static_cast<uint32_t>(*parent.id())),
+                fdf::MakeAcceptBindRule2(bind_fuchsia_spmi::SUB_TARGET_ADDRESS, address),
             },
         .properties =
             {
-                fdf::MakeProperty(bind_fuchsia_hardware_spmi::SUBTARGETSERVICE,
-                                  bind_fuchsia_hardware_spmi::SUBTARGETSERVICE_ZIRCONTRANSPORT),
-                fdf::MakeProperty(bind_fuchsia_spmi::TARGET_ID,
-                                  static_cast<uint32_t>(*parent.id())),
-                fdf::MakeProperty(bind_fuchsia_spmi::SUB_TARGET_ADDRESS, address),
+                fdf::MakeProperty2(bind_fuchsia_hardware_spmi::SUBTARGETSERVICE,
+                                   bind_fuchsia_hardware_spmi::SUBTARGETSERVICE_ZIRCONTRANSPORT),
+                fdf::MakeProperty2(bind_fuchsia_spmi::TARGET_ID,
+                                   static_cast<uint32_t>(*parent.id())),
+                fdf::MakeProperty2(bind_fuchsia_spmi::SUB_TARGET_ADDRESS, address),
             },
     }};
 
     if (parent.name()) {
       sub_target_spec.properties().push_back(
-          fdf::MakeProperty(bind_fuchsia_spmi::TARGET_NAME, *parent.name()));
+          fdf::MakeProperty2(bind_fuchsia_spmi::TARGET_NAME, *parent.name()));
     }
 
     if (!reg_names.empty()) {
       const std::string_view sub_target_name = reg_names[i / 2];
       sub_target.name() = sub_target_name;
       sub_target_spec.properties().push_back(
-          fdf::MakeProperty(bind_fuchsia_spmi::SUB_TARGET_NAME, sub_target_name));
+          fdf::MakeProperty2(bind_fuchsia_spmi::SUB_TARGET_NAME, sub_target_name));
     }
 
     sub_targets.push_back(std::move(sub_target));
@@ -377,7 +377,7 @@ zx::result<> SpmiVisitor::FinalizeSubTarget(const SubTarget& sub_target,
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
-  for (const fuchsia_driver_framework::ParentSpec& parent_spec : sub_target.parent_specs) {
+  for (const fuchsia_driver_framework::ParentSpec2& parent_spec : sub_target.parent_specs) {
     node.AddNodeSpec(parent_spec);
   }
 
@@ -399,7 +399,7 @@ zx::result<> SpmiVisitor::FinalizeSubTargetReferences(
               node.name().c_str());
       return zx::error(ZX_ERR_BAD_STATE);
     }
-    for (const fuchsia_driver_framework::ParentSpec& parent_spec : sub_target.parent_specs) {
+    for (const fuchsia_driver_framework::ParentSpec2& parent_spec : sub_target.parent_specs) {
       node.AddNodeSpec(parent_spec);
     }
   }

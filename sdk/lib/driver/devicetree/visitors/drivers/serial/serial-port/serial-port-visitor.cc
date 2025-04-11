@@ -125,22 +125,22 @@ zx::result<> SerialPortVisitor::ParseReferenceChild(fdf_devicetree::Node& node,
 
 zx::result<> SerialPortVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t serial_class,
                                                  std::optional<std::string> uart_name) {
-  auto uart_node = fuchsia_driver_framework::ParentSpec{{
+  auto uart_node = fuchsia_driver_framework::ParentSpec2{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule(bind_fuchsia::SERIAL_CLASS, serial_class),
-              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_serialimpl::SERVICE,
-                                      bind_fuchsia_hardware_serialimpl::SERVICE_DRIVERTRANSPORT),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::SERIAL_CLASS, serial_class),
+              fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_serialimpl::SERVICE,
+                                       bind_fuchsia_hardware_serialimpl::SERVICE_DRIVERTRANSPORT),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia_hardware_serialimpl::SERVICE,
-                                bind_fuchsia_hardware_serialimpl::SERVICE_DRIVERTRANSPORT),
+              fdf::MakeProperty2(bind_fuchsia_hardware_serialimpl::SERVICE,
+                                 bind_fuchsia_hardware_serialimpl::SERVICE_DRIVERTRANSPORT),
           },
   }};
 
   if (uart_name) {
-    uart_node.properties().push_back(fdf::MakeProperty(bind_fuchsia_serial::NAME, *uart_name));
+    uart_node.properties().push_back(fdf::MakeProperty2(bind_fuchsia_serial::NAME, *uart_name));
   }
 
   child.AddNodeSpec(uart_node);

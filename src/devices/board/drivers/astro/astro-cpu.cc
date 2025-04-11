@@ -75,25 +75,25 @@ static const std::vector<fpbus::Metadata> cpu_metadata{
     }},
 };
 
-const std::vector<fdf::BindRule> kPowerRules = std::vector{
-    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_power::SERVICE,
-                            bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeAcceptBindRule(bind_fuchsia_power::POWER_DOMAIN,
-                            bind_fuchsia_amlogic_platform::POWER_DOMAIN_ARM_CORE_BIG),
+const std::vector<fdf::BindRule2> kPowerRules = std::vector{
+    fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_power::SERVICE,
+                             bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeAcceptBindRule2(bind_fuchsia_power::POWER_DOMAIN,
+                             bind_fuchsia_amlogic_platform::POWER_DOMAIN_ARM_CORE_BIG),
 };
 
-const std::vector<fdf::NodeProperty> kPowerProperties = std::vector{
-    fdf::MakeProperty(bind_fuchsia_hardware_power::SERVICE,
-                      bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeProperty(bind_fuchsia_power::POWER_DOMAIN,
-                      bind_fuchsia_amlogic_platform::POWER_DOMAIN_ARM_CORE_BIG),
+const std::vector<fdf::NodeProperty2> kPowerProperties = std::vector{
+    fdf::MakeProperty2(bind_fuchsia_hardware_power::SERVICE,
+                       bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeProperty2(bind_fuchsia_power::POWER_DOMAIN,
+                       bind_fuchsia_amlogic_platform::POWER_DOMAIN_ARM_CORE_BIG),
 };
 
-const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
-    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+const std::vector<fdf::BindRule2> kGpioInitRules = std::vector{
+    fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
-const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
-    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+const std::vector<fdf::NodeProperty2> kGpioInitProperties = std::vector{
+    fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
 // Contains all the clock parent nodes for the composite. Maps the clock id to the clock function.
@@ -128,29 +128,29 @@ zx_status_t Astro::CpuInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('CPU_');
 
-  std::vector<fdf::ParentSpec> parents;
+  std::vector<fdf::ParentSpec2> parents;
   parents.reserve(kClockFunctionMap.size() + 2);
-  parents.push_back(fdf::ParentSpec{{kPowerRules, kPowerProperties}});
-  parents.push_back(fdf::ParentSpec{{kGpioInitRules, kGpioInitProperties}});
+  parents.push_back(fdf::ParentSpec2{{kPowerRules, kPowerProperties}});
+  parents.push_back(fdf::ParentSpec2{{kGpioInitRules, kGpioInitProperties}});
 
   for (auto& [clock_id, function] : kClockFunctionMap) {
     auto rules = std::vector{
-        fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
-                                bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-        fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, clock_id),
+        fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_clock::SERVICE,
+                                 bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+        fdf::MakeAcceptBindRule2(bind_fuchsia::CLOCK_ID, clock_id),
     };
     auto properties = std::vector{
-        fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
-                          bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-        fdf::MakeProperty(bind_fuchsia_clock::FUNCTION, function),
+        fdf::MakeProperty2(bind_fuchsia_hardware_clock::SERVICE,
+                           bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+        fdf::MakeProperty2(bind_fuchsia_clock::FUNCTION, function),
     };
-    parents.push_back(fdf::ParentSpec{{rules, properties}});
+    parents.push_back(fdf::ParentSpec2{{rules, properties}});
   }
 
   auto composite_result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, cpu_dev),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = "aml_cpu", .parents = parents}}));
+                                   {.name = "aml_cpu", .parents2 = parents}}));
 
   if (!composite_result.ok()) {
     zxlogf(ERROR, "AddCompositeNodeSpec request failed: %s",

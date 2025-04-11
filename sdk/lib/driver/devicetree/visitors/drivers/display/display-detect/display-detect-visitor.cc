@@ -91,14 +91,14 @@ zx::result<> DisplayDetectVisitor::Visit(fdf_devicetree::Node& node,
 zx::result<> DisplayDetectVisitor::AddChildNodeSpec(fdf_devicetree::Node& child,
                                                     std::string_view output_name) {
   std::vector bind_rules = {
-      fdf::MakeAcceptBindRule(bind_fuchsia_display::OUTPUT,
-                              "fuchsia.display.OUTPUT." + std::string(output_name)),
+      fdf::MakeAcceptBindRule2(bind_fuchsia_display::OUTPUT,
+                               "fuchsia.display.OUTPUT." + std::string(output_name)),
 
   };
-  std::vector bind_properties = {fdf::MakeProperty(
+  std::vector bind_properties = {fdf::MakeProperty2(
       bind_fuchsia_display::OUTPUT, "fuchsia.display.OUTPUT." + std::string(output_name))};
 
-  auto display_detect_node = fuchsia_driver_framework::ParentSpec{{bind_rules, bind_properties}};
+  auto display_detect_node = fuchsia_driver_framework::ParentSpec2{{bind_rules, bind_properties}};
 
   child.AddNodeSpec(display_detect_node);
 

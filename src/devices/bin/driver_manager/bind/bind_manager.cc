@@ -130,15 +130,8 @@ void BindManager::BindInternal(BindRequest request,
   // Composite node's "default" node properties are its primary parent's node properties which
   // should not be used.
   if (node->type() == NodeType::kNormal) {
-    auto node_properties = node->GetNodeProperties();
-
-    if (node_properties.has_value()) {
-      std::vector<fuchsia_driver_framework::wire::NodeProperty> deprecated_properties;
-      deprecated_properties.reserve(node_properties->size());
-      for (auto& property : node_properties.value()) {
-        deprecated_properties.emplace_back(ToDeprecatedProperty(arena, property));
-      }
-      builder.properties(deprecated_properties);
+    if (std::optional props = node->GetNodeProperties(); props.has_value()) {
+      builder.properties(props.value());
     }
   }
   if (!driver_url_suffix.empty()) {

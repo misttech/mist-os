@@ -51,32 +51,32 @@ TEST(UsbVisitorTest, TestMetadataAndBindProperty) {
       node_tested_count++;
       auto mgr_request = usb_visitor_tester->env().SyncCall(
           &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, mgr_request_idx++);
-      ASSERT_TRUE(mgr_request.parents().has_value());
-      ASSERT_EQ(2lu, mgr_request.parents()->size());
+      ASSERT_TRUE(mgr_request.parents2().has_value());
+      ASSERT_EQ(2lu, mgr_request.parents2()->size());
 
       // 1st parent is pdev. Skip that.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_usb_phy::SERVICE,
-                                    bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
-            fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
-                                    bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
-            fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
-                                    bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
-            fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
-                                    bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_XHCI)}},
-          (*mgr_request.parents())[1].bind_rules(), false));
+          {{fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_usb_phy::SERVICE,
+                                     bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
+            fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_VID,
+                                     bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+            fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_PID,
+                                     bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+            fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_DID,
+                                     bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_XHCI)}},
+          (*mgr_request.parents2())[1].bind_rules(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
           {{
-              fdf::MakeProperty(bind_fuchsia_hardware_usb_phy::SERVICE,
-                                bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
-              fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
-                                bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
-              fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_PID,
-                                bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
-              fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
-                                bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_XHCI),
+              fdf::MakeProperty2(bind_fuchsia_hardware_usb_phy::SERVICE,
+                                 bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
+              fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_VID,
+                                 bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+              fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_PID,
+                                 bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+              fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_DID,
+                                 bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_XHCI),
           }},
-          (*mgr_request.parents())[1].properties(), false));
+          (*mgr_request.parents2())[1].properties(), false));
     }
   }
 

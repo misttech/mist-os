@@ -77,21 +77,21 @@ zx::result<> SpiBusVisitor::CreateController(const std::string& node_name) {
 
 void SpiBusVisitor::AddChildNodeSpec(fdf_devicetree::ChildNode& child, uint32_t bus_id,
                                      uint32_t chip_select, uint32_t child_chip_select_index) {
-  child.AddNodeSpec(fuchsia_driver_framework::ParentSpec{{
+  child.AddNodeSpec(fuchsia_driver_framework::ParentSpec2{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_spi::SERVICE,
-                                      bind_fuchsia_hardware_spi::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeAcceptBindRule(bind_fuchsia::SPI_BUS_ID, bus_id),
-              fdf::MakeAcceptBindRule(bind_fuchsia::SPI_CHIP_SELECT, chip_select),
+              fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_spi::SERVICE,
+                                       bind_fuchsia_hardware_spi::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::SPI_BUS_ID, bus_id),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::SPI_CHIP_SELECT, chip_select),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia_hardware_spi::SERVICE,
-                                bind_fuchsia_hardware_spi::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeProperty2(bind_fuchsia_hardware_spi::SERVICE,
+                                 bind_fuchsia_hardware_spi::SERVICE_ZIRCONTRANSPORT),
               // Add a chip select property, but zero-based for this child instead of dependent on
               // the number of children previously processed for this SPI controller.
-              fdf::MakeProperty(bind_fuchsia::SPI_CHIP_SELECT, child_chip_select_index),
+              fdf::MakeProperty2(bind_fuchsia::SPI_CHIP_SELECT, child_chip_select_index),
           },
   }});
 }

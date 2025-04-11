@@ -114,46 +114,46 @@ static const std::vector<fpbus::Metadata> wifi_metadata{
 // Composite binding rules for wifi driver.
 
 // Composite node specs for SDIO.
-const std::vector<fdf::BindRule> kPwmRules = std::vector{
-    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_pwm::BIND_INIT_STEP_PWM),
+const std::vector<fdf::BindRule2> kPwmRules = std::vector{
+    fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP, bind_fuchsia_pwm::BIND_INIT_STEP_PWM),
 };
 
-const std::vector<fdf::NodeProperty> kPwmProperties = std::vector{
-    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_pwm::BIND_INIT_STEP_PWM),
+const std::vector<fdf::NodeProperty2> kPwmProperties = std::vector{
+    fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_pwm::BIND_INIT_STEP_PWM),
 };
 
-const std::vector<fdf::BindRule> kGpioResetRules = std::vector{
-    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
-                            bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_SOC_WIFI_REG_ON)),
+const std::vector<fdf::BindRule2> kGpioResetRules = std::vector{
+    fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_gpio::SERVICE,
+                             bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_SOC_WIFI_REG_ON)),
 };
 
-const std::vector<fdf::NodeProperty> kGpioResetProperties = std::vector{
-    fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
-                      bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SDMMC_RESET),
+const std::vector<fdf::NodeProperty2> kGpioResetProperties = std::vector{
+    fdf::MakeProperty2(bind_fuchsia_hardware_gpio::SERVICE,
+                       bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeProperty2(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SDMMC_RESET),
 };
 
-const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
-    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+const std::vector<fdf::BindRule2> kGpioInitRules = std::vector{
+    fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
-const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
-    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+const std::vector<fdf::NodeProperty2> kGpioInitProperties = std::vector{
+    fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
 zx_status_t AddWifiComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
                              fidl::AnyArena& fidl_arena, fdf::Arena& arena) {
-  const std::vector<fdf::BindRule> kGpioWifiHostRules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
-                              bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
-                              static_cast<uint32_t>(S905D3_WIFI_SDIO_WAKE_HOST)),
+  const std::vector<fdf::BindRule2> kGpioWifiHostRules = std::vector{
+      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_gpio::SERVICE,
+                               bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_PIN,
+                               static_cast<uint32_t>(S905D3_WIFI_SDIO_WAKE_HOST)),
   };
 
-  const std::vector<fdf::NodeProperty> kGpioWifiHostProperties = std::vector{
-      fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
-                        bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+  const std::vector<fdf::NodeProperty2> kGpioWifiHostProperties = std::vector{
+      fdf::MakeProperty2(bind_fuchsia_hardware_gpio::SERVICE,
+                         bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
   };
 
   fpbus::Node wifi_dev;
@@ -165,28 +165,28 @@ zx_status_t AddWifiComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
   wifi_dev.boot_metadata() = wifi_boot_metadata;
 
   constexpr uint32_t kSdioFunctionCount = 2;
-  std::vector<fdf::ParentSpec> wifi_parents = {
-      fdf::ParentSpec{{kGpioWifiHostRules, kGpioWifiHostProperties}},
-      fdf::ParentSpec{{kGpioInitRules, kGpioInitProperties}},
+  std::vector<fdf::ParentSpec2> wifi_parents = {
+      fdf::ParentSpec2{{kGpioWifiHostRules, kGpioWifiHostProperties}},
+      fdf::ParentSpec2{{kGpioInitRules, kGpioInitProperties}},
   };
   wifi_parents.reserve(wifi_parents.size() + kSdioFunctionCount);
   for (uint32_t i = 1; i <= kSdioFunctionCount; i++) {
     auto sdio_bind_rules = {
-        fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_sdio::BIND_PROTOCOL_DEVICE),
-        fdf::MakeAcceptBindRule(bind_fuchsia::SDIO_VID,
-                                bind_fuchsia_broadcom_platform_sdio::BIND_SDIO_VID_BROADCOM),
-        fdf::MakeAcceptBindRule(bind_fuchsia::SDIO_PID,
-                                bind_fuchsia_broadcom_platform_sdio::BIND_SDIO_PID_BCM4345),
-        fdf::MakeAcceptBindRule(bind_fuchsia::SDIO_FUNCTION, i),
+        fdf::MakeAcceptBindRule2(bind_fuchsia::PROTOCOL, bind_fuchsia_sdio::BIND_PROTOCOL_DEVICE),
+        fdf::MakeAcceptBindRule2(bind_fuchsia::SDIO_VID,
+                                 bind_fuchsia_broadcom_platform_sdio::BIND_SDIO_VID_BROADCOM),
+        fdf::MakeAcceptBindRule2(bind_fuchsia::SDIO_PID,
+                                 bind_fuchsia_broadcom_platform_sdio::BIND_SDIO_PID_BCM4345),
+        fdf::MakeAcceptBindRule2(bind_fuchsia::SDIO_FUNCTION, i),
     };
 
     auto sdio_properties = {
-        fdf::MakeProperty(bind_fuchsia_hardware_sdio::SERVICE,
-                          bind_fuchsia_hardware_sdio::SERVICE_ZIRCONTRANSPORT),
-        fdf::MakeProperty(bind_fuchsia::SDIO_FUNCTION, i),
+        fdf::MakeProperty2(bind_fuchsia_hardware_sdio::SERVICE,
+                           bind_fuchsia_hardware_sdio::SERVICE_ZIRCONTRANSPORT),
+        fdf::MakeProperty2(bind_fuchsia::SDIO_FUNCTION, i),
     };
 
-    wifi_parents.push_back(fdf::ParentSpec{
+    wifi_parents.push_back(fdf::ParentSpec2{
         {sdio_bind_rules, sdio_properties},
     });
   }
@@ -194,7 +194,7 @@ zx_status_t AddWifiComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
   fdf::WireUnownedResult result = pbus.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, wifi_dev),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = "wifi", .parents = wifi_parents}}));
+                                   {.name = "wifi", .parents2 = wifi_parents}}));
   if (!result.ok()) {
     zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request to platform bus: %s",
            result.status_string());
@@ -258,10 +258,10 @@ zx_status_t Nelson::SdioInit() {
   gpio_init_steps_.push_back(sdio_pin(S905D3_WIFI_SDIO_CMD));
   gpio_init_steps_.push_back(GpioFunction(S905D3_WIFI_SDIO_WAKE_HOST, 0));
 
-  std::vector<fdf::ParentSpec> kSdioParents = {
-      fdf::ParentSpec{{kPwmRules, kPwmProperties}},
-      fdf::ParentSpec{{kGpioInitRules, kGpioInitProperties}},
-      fdf::ParentSpec{{kGpioResetRules, kGpioResetProperties}}};
+  std::vector<fdf::ParentSpec2> kSdioParents = {
+      fdf::ParentSpec2{{kPwmRules, kPwmProperties}},
+      fdf::ParentSpec2{{kGpioInitRules, kGpioInitProperties}},
+      fdf::ParentSpec2{{kGpioResetRules, kGpioResetProperties}}};
 
   fdf::Arena sdio_arena('SDIO');
   auto result =
@@ -269,7 +269,7 @@ zx_status_t Nelson::SdioInit() {
           ->AddCompositeNodeSpec(
               fidl::ToWire(fidl_arena, sd_emmc_dev),
               fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                           {.name = "aml_sdio", .parents = kSdioParents}}));
+                                           {.name = "aml_sdio", .parents2 = kSdioParents}}));
   if (!result.ok()) {
     zxlogf(ERROR, "AddCompositeNodeSpec Sdio(sd_emmc_dev) request failed: %s",
            result.FormatDescription().data());

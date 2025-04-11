@@ -29,7 +29,6 @@ std::vector<uint8_t> LoadTestBlob(const char* name) {
   vec.resize(bytes_read);
   return vec;
 }
-
 std::string DebugStringifyProperty(
     const fuchsia_driver_framework::NodePropertyKey& key,
     const std::vector<fuchsia_driver_framework::NodePropertyValue>& values) {
@@ -48,6 +47,37 @@ std::string DebugStringifyProperty(
       ret << "Unknown{" << static_cast<int>(key.Which()) << "}";
       break;
   }
+
+  for (auto& value : values) {
+    ret << " Value=";
+    switch (value.Which()) {
+      using Tag = fuchsia_driver_framework::NodePropertyValue::Tag;
+      case Tag::kBoolValue:
+        ret << "Bool{" << value.bool_value().value() << "}";
+        break;
+      case Tag::kEnumValue:
+        ret << "Enum{" << value.enum_value().value() << "}";
+        break;
+      case Tag::kIntValue:
+        ret << "Int{" << value.int_value().value() << "}";
+        break;
+      case Tag::kStringValue:
+        ret << "String{" << value.string_value().value() << "}";
+        break;
+      default:
+        ret << "Unknown{" << static_cast<int>(value.Which()) << "}";
+        break;
+    }
+  }
+
+  return ret.str();
+}
+
+std::string DebugStringifyProperty(
+    const std::string& key,
+    const std::vector<fuchsia_driver_framework::NodePropertyValue>& values) {
+  std::stringstream ret;
+  ret << "Key=" << key;
 
   for (auto& value : values) {
     ret << " Value=";
@@ -104,8 +134,66 @@ bool CheckHasProperties(
   return result;
 }
 
+bool CheckHasProperties(
+    std::vector<fuchsia_driver_framework::NodeProperty2> expected,
+    const std::vector<::fuchsia_driver_framework::NodeProperty2>& node_properties,
+    bool allow_additional_properties) {
+  bool result = true;
+  for (auto& property : node_properties) {
+    auto iter = std::find(expected.begin(), expected.end(), property);
+    if (iter == expected.end()) {
+      if (!allow_additional_properties) {
+        FX_LOGS(ERROR) << "Unexpected property: "
+                       << DebugStringifyProperty(property.key(), {property.value()});
+        result = false;
+      }
+    } else {
+      expected.erase(iter);
+    }
+  }
+
+  if (!expected.empty()) {
+    FX_LOGS(ERROR) << "All expected properties are not present.";
+    for (auto& property : expected) {
+      FX_LOGS(ERROR) << "Property expected: "
+                     << DebugStringifyProperty(property.key(), {property.value()});
+    }
+    result = false;
+  }
+
+  return result;
+}
+
 bool CheckHasBindRules(std::vector<fuchsia_driver_framework::BindRule> expected,
                        const std::vector<::fuchsia_driver_framework::BindRule>& node_rules,
+                       bool allow_additional_rules) {
+  bool result = true;
+  for (auto& rule : node_rules) {
+    auto iter = std::find(expected.begin(), expected.end(), rule);
+    if (iter == expected.end()) {
+      if (!allow_additional_rules) {
+        FX_LOGS(ERROR) << "Unexpected bind rule: "
+                       << DebugStringifyProperty(rule.key(), rule.values());
+        result = false;
+      }
+    } else {
+      expected.erase(iter);
+    }
+  }
+
+  if (!expected.empty()) {
+    FX_LOGS(ERROR) << "All expected bind rules are not present.";
+    for (auto& rule : expected) {
+      FX_LOGS(ERROR) << "Rule expected: " << DebugStringifyProperty(rule.key(), rule.values());
+    }
+    result = false;
+  }
+
+  return result;
+}
+
+bool CheckHasBindRules(std::vector<fuchsia_driver_framework::BindRule2> expected,
+                       const std::vector<::fuchsia_driver_framework::BindRule2>& node_rules,
                        bool allow_additional_rules) {
   bool result = true;
   for (auto& rule : node_rules) {

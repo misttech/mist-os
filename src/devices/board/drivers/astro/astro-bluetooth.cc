@@ -60,38 +60,38 @@ zx_status_t Astro::BluetoothInit() {
 
   fdf::Arena arena('BLUE');
 
-  fuchsia_driver_framework::wire::BindRule kPwmBindRules[] = {
+  fuchsia_driver_framework::wire::BindRule2 kPwmBindRules[] = {
       // TODO(https://fxbug.dev/42079489): Replace this with wire type function.
-      fidl::ToWire(arena, fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
-                                                  bind_fuchsia_pwm::BIND_INIT_STEP_PWM)),
+      fidl::ToWire(arena, fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP,
+                                                   bind_fuchsia_pwm::BIND_INIT_STEP_PWM)),
   };
 
-  fuchsia_driver_framework::wire::NodeProperty kPwmProperties[] = {
-      fdf::MakeProperty(arena, bind_fuchsia::INIT_STEP, bind_fuchsia_pwm::BIND_INIT_STEP_PWM),
+  fuchsia_driver_framework::wire::NodeProperty2 kPwmProperties[] = {
+      fdf::MakeProperty2(arena, bind_fuchsia::INIT_STEP, bind_fuchsia_pwm::BIND_INIT_STEP_PWM),
   };
 
-  fuchsia_driver_framework::wire::BindRule kGpioBindRules[] = {
-      fidl::ToWire(arena, fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
-                                                  bind_fuchsia_gpio::BIND_INIT_STEP_GPIO)),
+  fuchsia_driver_framework::wire::BindRule2 kGpioBindRules[] = {
+      fidl::ToWire(arena, fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP,
+                                                   bind_fuchsia_gpio::BIND_INIT_STEP_GPIO)),
   };
 
-  fuchsia_driver_framework::wire::NodeProperty kGpioProperties[] = {
-      fdf::MakeProperty(arena, bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  fuchsia_driver_framework::wire::NodeProperty2 kGpioProperties[] = {
+      fdf::MakeProperty2(arena, bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
   };
 
   auto parents = std::vector{
-      fuchsia_driver_framework::wire::ParentSpec{
-          .bind_rules = fidl::VectorView<fuchsia_driver_framework::wire::BindRule>::FromExternal(
+      fuchsia_driver_framework::wire::ParentSpec2{
+          .bind_rules = fidl::VectorView<fuchsia_driver_framework::wire::BindRule2>::FromExternal(
               kPwmBindRules, 1),
           .properties =
-              fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>::FromExternal(
+              fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty2>::FromExternal(
                   kPwmProperties, 1),
       },
-      fuchsia_driver_framework::wire::ParentSpec{
-          .bind_rules = fidl::VectorView<fuchsia_driver_framework::wire::BindRule>::FromExternal(
+      fuchsia_driver_framework::wire::ParentSpec2{
+          .bind_rules = fidl::VectorView<fuchsia_driver_framework::wire::BindRule2>::FromExternal(
               kGpioBindRules, 1),
           .properties =
-              fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>::FromExternal(
+              fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty2>::FromExternal(
                   kGpioProperties, 1),
       },
   };
@@ -99,7 +99,7 @@ zx_status_t Astro::BluetoothInit() {
   auto builder =
       fuchsia_driver_framework::wire::CompositeNodeSpec::Builder(arena)
           .name("bluetooth-composite-spec")
-          .parents(fidl::VectorView<fuchsia_driver_framework::wire::ParentSpec>(arena, parents));
+          .parents2(fidl::VectorView<fuchsia_driver_framework::wire::ParentSpec2>(arena, parents));
 
   fit::result encoded = fidl::Persist(bt_uart_serial_info);
   if (encoded.is_error()) {

@@ -27,7 +27,7 @@ class SpmiVisitor : public fdf_devicetree::Visitor {
 
  private:
   struct SubTarget {
-    std::vector<fuchsia_driver_framework::ParentSpec> parent_specs;
+    std::vector<fuchsia_driver_framework::ParentSpec2> parent_specs;
     bool has_reference_property = false;
   };
 

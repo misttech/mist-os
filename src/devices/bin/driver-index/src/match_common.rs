@@ -4,26 +4,25 @@
 
 use crate::resolved_driver::ResolvedDriver;
 use bind::compiler::Symbol;
-use bind::ddk_bind_constants::{BIND_AUTOBIND, BIND_PROTOCOL};
 use bind::interpreter::decode_bind_rules::DecodedCompositeBindRules;
 use bind::interpreter::match_bind::{DeviceProperties, PropertyKey};
 use fidl_fuchsia_driver_framework as fdf;
+use std::sync::LazyLock;
 use zx::sys::zx_status_t;
 use zx::Status;
 
-const BIND_PROTOCOL_KEY: PropertyKey = PropertyKey::NumberKey(BIND_PROTOCOL as u64);
-const BIND_AUTOBIND_KEY: PropertyKey = PropertyKey::NumberKey(BIND_AUTOBIND as u64);
+static BIND_PROTOCOL_KEY: LazyLock<PropertyKey> =
+    LazyLock::new(|| PropertyKey::StringKey(String::from("fuchsia.BIND_PROTOCOL")));
+static BIND_AUTOBIND_KEY: LazyLock<PropertyKey> =
+    LazyLock::new(|| PropertyKey::StringKey(String::from("fuchsia.BIND_AUTOBIND")));
 
 pub fn node_to_device_property(
-    node_properties: &Vec<fdf::NodeProperty>,
+    node_properties: &Vec<fdf::NodeProperty2>,
 ) -> Result<DeviceProperties, zx_status_t> {
     let mut device_properties = DeviceProperties::new();
 
     for property in node_properties {
-        let key = match &property.key {
-            fdf::NodePropertyKey::IntValue(i) => PropertyKey::NumberKey(i.clone().into()),
-            fdf::NodePropertyKey::StringValue(s) => PropertyKey::StringKey(s.clone()),
-        };
+        let key = PropertyKey::StringKey(property.key.clone());
 
         let value = match &property.value {
             fdf::NodePropertyValue::IntValue(i) => Symbol::NumberValue(i.clone().into()),
@@ -37,7 +36,7 @@ pub fn node_to_device_property(
 
         // TODO(https://fxbug.dev/42175777): Platform bus devices may contain two different BIND_PROTOCOL values.
         // The duplicate key needs to be fixed since this is incorrect and is working by luck.
-        if key != BIND_PROTOCOL_KEY {
+        if key != *BIND_PROTOCOL_KEY {
             if device_properties.contains_key(&key) && device_properties.get(&key) != Some(&value) {
                 log::error!(
                     "Node property key {:?} contains multiple values: {:?} and {:?}",
@@ -52,26 +51,17 @@ pub fn node_to_device_property(
         device_properties.insert(key, value);
     }
 
-    // Due to a bug, if device properties already contain a "fuchsia.BIND_PROTOCOL" string key
-    // and BIND_PROTOCOL = 28, we should remove the latter.
-    // TODO(https://fxbug.dev/42175777): Fix the duplicate BIND_PROTOCOL values and remove this hack.
-    if device_properties.contains_key(&PropertyKey::StringKey("fuchsia.BIND_PROTOCOL".to_string()))
-        && device_properties.get(&BIND_PROTOCOL_KEY) == Some(&Symbol::NumberValue(28))
-    {
-        device_properties.remove(&BIND_PROTOCOL_KEY);
-    }
-
     Ok(device_properties)
 }
 
 pub fn node_to_device_property_no_autobind(
-    node_properties: &Vec<fdf::NodeProperty>,
+    node_properties: &Vec<fdf::NodeProperty2>,
 ) -> Result<DeviceProperties, zx_status_t> {
     let mut properties = node_to_device_property(node_properties)?;
     if properties.contains_key(&BIND_AUTOBIND_KEY) {
         properties.remove(&BIND_AUTOBIND_KEY);
     }
-    properties.insert(BIND_AUTOBIND_KEY, Symbol::NumberValue(0));
+    properties.insert(BIND_AUTOBIND_KEY.clone(), Symbol::NumberValue(0));
     Ok(properties)
 }
 
@@ -95,18 +85,19 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_duplicate_properties() {
         let node_properties = vec![
-            fdf::NodeProperty {
-                key: fdf::NodePropertyKey::IntValue(10),
+            fdf::NodeProperty2 {
+                key: "foo".to_string(),
                 value: fdf::NodePropertyValue::IntValue(200),
             },
-            fdf::NodeProperty {
-                key: fdf::NodePropertyKey::IntValue(10),
+            fdf::NodeProperty2 {
+                key: "foo".to_string(),
                 value: fdf::NodePropertyValue::IntValue(200),
             },
         ];
 
         let mut expected_properties = DeviceProperties::new();
-        expected_properties.insert(PropertyKey::NumberKey(10), Symbol::NumberValue(200));
+        expected_properties
+            .insert(PropertyKey::StringKey("foo".to_string()), Symbol::NumberValue(200));
 
         let result = node_to_device_property(&node_properties).unwrap();
         assert_eq!(expected_properties, result);
@@ -115,12 +106,12 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_property_collision() {
         let node_properties = vec![
-            fdf::NodeProperty {
-                key: fdf::NodePropertyKey::IntValue(10),
+            fdf::NodeProperty2 {
+                key: "foo".to_string(),
                 value: fdf::NodePropertyValue::IntValue(200),
             },
-            fdf::NodeProperty {
-                key: fdf::NodePropertyKey::IntValue(10),
+            fdf::NodeProperty2 {
+                key: "foo".to_string(),
                 value: fdf::NodePropertyValue::IntValue(10),
             },
         ];
@@ -133,18 +124,18 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_multiple_bind_protocol() {
         let node_properties = vec![
-            fdf::NodeProperty {
-                key: fdf::NodePropertyKey::IntValue(BIND_PROTOCOL.into()),
+            fdf::NodeProperty2 {
+                key: "fuchsia.BIND_PROTOCOL".to_string(),
                 value: fdf::NodePropertyValue::IntValue(200),
             },
-            fdf::NodeProperty {
-                key: fdf::NodePropertyKey::IntValue(BIND_PROTOCOL.into()),
+            fdf::NodeProperty2 {
+                key: "fuchsia.BIND_PROTOCOL".to_string(),
                 value: fdf::NodePropertyValue::IntValue(10),
             },
         ];
 
         let mut expected_properties = DeviceProperties::new();
-        expected_properties.insert(BIND_PROTOCOL_KEY, Symbol::NumberValue(10));
+        expected_properties.insert(BIND_PROTOCOL_KEY.clone(), Symbol::NumberValue(10));
         assert_eq!(Ok(expected_properties), node_to_device_property(&node_properties));
     }
 
@@ -153,12 +144,12 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_multiple_bind_protocol_w_deprecated_str_key() {
         let node_properties = vec![
-            fdf::NodeProperty {
-                key: fdf::NodePropertyKey::IntValue(BIND_PROTOCOL.into()),
+            fdf::NodeProperty2 {
+                key: "fuchsia.BIND_PROTOCOL".to_string(),
                 value: fdf::NodePropertyValue::IntValue(28),
             },
-            fdf::NodeProperty {
-                key: fdf::NodePropertyKey::StringValue("fuchsia.BIND_PROTOCOL".to_string()),
+            fdf::NodeProperty2 {
+                key: "fuchsia.BIND_PROTOCOL".to_string(),
                 value: fdf::NodePropertyValue::IntValue(10),
             },
         ];
@@ -173,26 +164,26 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_no_autobind() {
-        let node_properties = vec![fdf::NodeProperty {
-            key: fdf::NodePropertyKey::IntValue(BIND_PROTOCOL.into()),
+        let node_properties = vec![fdf::NodeProperty2 {
+            key: "fuchsia.BIND_PROTOCOL".to_string(),
             value: fdf::NodePropertyValue::IntValue(200),
         }];
 
         let mut expected_properties = DeviceProperties::new();
-        expected_properties.insert(BIND_PROTOCOL_KEY, Symbol::NumberValue(200));
-        expected_properties.insert(BIND_AUTOBIND_KEY, Symbol::NumberValue(0));
+        expected_properties.insert(BIND_PROTOCOL_KEY.clone(), Symbol::NumberValue(200));
+        expected_properties.insert(BIND_AUTOBIND_KEY.clone(), Symbol::NumberValue(0));
         assert_eq!(Ok(expected_properties), node_to_device_property_no_autobind(&node_properties));
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_no_autobind_override() {
-        let node_properties = vec![fdf::NodeProperty {
-            key: fdf::NodePropertyKey::IntValue(BIND_AUTOBIND.into()),
+        let node_properties = vec![fdf::NodeProperty2 {
+            key: "fuchsia.BIND_AUTOBIND".to_string(),
             value: fdf::NodePropertyValue::IntValue(1),
         }];
 
         let mut expected_properties = DeviceProperties::new();
-        expected_properties.insert(BIND_AUTOBIND_KEY, Symbol::NumberValue(0));
+        expected_properties.insert(BIND_AUTOBIND_KEY.clone(), Symbol::NumberValue(0));
         assert_eq!(Ok(expected_properties), node_to_device_property_no_autobind(&node_properties));
     }
 }
