@@ -115,7 +115,7 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ShouldNeverAppearInAnyBinding5 {
     pub a: Option<bool>,
 }
@@ -980,7 +980,7 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ShouldNeverAppearInAnyBinding2 {
     pub a: Option<bool>,
 }
@@ -1752,7 +1752,7 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ShouldNeverAppearInAnyBinding8 {
     pub a: Option<bool>,
 }
@@ -5135,7 +5135,7 @@ impl ::core::fmt::Debug for WireOptionalOnlyLlcpp {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct OnlyPython {}
 
 impl OnlyPython {
@@ -5232,7 +5232,7 @@ impl ::core::fmt::Debug for WireOnlyPython {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct OnlyRust {}
 
 impl OnlyRust {

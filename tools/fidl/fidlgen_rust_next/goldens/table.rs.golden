@@ -2,7 +2,7 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct EmptyTable {}
 
 impl EmptyTable {
@@ -99,7 +99,7 @@ impl ::core::fmt::Debug for WireEmptyTable {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ExtensionTable {}
 
 impl ExtensionTable {
@@ -196,7 +196,7 @@ impl ::core::fmt::Debug for WireExtensionTable {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct NewerSimpleTable {
     pub x: Option<i64>,
 
@@ -384,7 +384,7 @@ impl ::core::fmt::Debug for WireNewerSimpleTable {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct OlderSimpleTable {
     pub x: Option<i64>,
 }
@@ -508,7 +508,7 @@ impl ::core::fmt::Debug for WireOlderSimpleTable {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ReverseOrdinalTable {
     pub z: Option<i64>,
 
@@ -696,7 +696,7 @@ impl ::core::fmt::Debug for WireReverseOrdinalTable {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct SimpleTable {
     pub x: Option<i64>,
 
@@ -851,7 +851,7 @@ impl ::core::fmt::Debug for WireSimpleTable {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct SixtyFourOrdinalTable {
     pub v1: Option<i64>,
 
@@ -3125,7 +3125,7 @@ impl ::core::fmt::Debug for WireSixtyFourOrdinalTable {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct TableWithAttributes {
     pub x: Option<i64>,
 }

@@ -572,7 +572,7 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ExampleTable {
     pub member: Option<u32>,
 }

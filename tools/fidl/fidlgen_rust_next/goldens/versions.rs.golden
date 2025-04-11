@@ -576,7 +576,7 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Table {
     pub x: Option<u32>,
 }

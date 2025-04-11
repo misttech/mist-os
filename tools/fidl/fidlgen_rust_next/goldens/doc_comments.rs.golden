@@ -1164,7 +1164,7 @@ where
 }
 
 #[doc = " table comment #1\n\n table comment #3\n"]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Table {
     pub field: Option<i32>,
 }

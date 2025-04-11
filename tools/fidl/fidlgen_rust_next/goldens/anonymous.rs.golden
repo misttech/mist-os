@@ -402,7 +402,7 @@ impl ::core::convert::From<Flags> for WireFlags {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct FunctionApplication {
     pub func: Option<String>,
 
@@ -1240,7 +1240,7 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct TableMember {
     pub table_data: Option<Vec<crate::TableData>>,
 }
