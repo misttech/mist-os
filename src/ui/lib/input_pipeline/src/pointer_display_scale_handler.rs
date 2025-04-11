@@ -52,8 +52,12 @@ impl UnhandledInputHandler for PointerDisplayScaleHandler {
                     }),
                 device_descriptor: device_descriptor @ input_device::InputDeviceDescriptor::Mouse(_),
                 event_time,
-                trace_id: _,
+                trace_id,
             } => {
+                let tracing_id = trace_id.unwrap_or_else(|| 0.into());
+                fuchsia_trace::duration!(c"input", c"pointer_display_scale_handler");
+                fuchsia_trace::flow_step!(c"input", c"event_in_input_pipeline", tracing_id);
+
                 self.inspect_status
                     .count_received_event(input_device::InputEvent::from(unhandled_input_event));
                 let scaled_mm = self.scale_motion(raw_mm);
@@ -74,7 +78,7 @@ impl UnhandledInputHandler for PointerDisplayScaleHandler {
                     device_descriptor,
                     event_time,
                     handled: input_device::Handled::No,
-                    trace_id: None,
+                    trace_id,
                 };
                 vec![input_event]
             }
@@ -91,8 +95,17 @@ impl UnhandledInputHandler for PointerDisplayScaleHandler {
                     }),
                 device_descriptor: device_descriptor @ input_device::InputDeviceDescriptor::Mouse(_),
                 event_time,
-                trace_id: _,
+                trace_id,
             } => {
+                fuchsia_trace::duration!(c"input", c"pointer_display_scale_handler");
+                if let Some(trace_id) = trace_id {
+                    fuchsia_trace::flow_step!(
+                        c"input",
+                        c"event_in_input_pipeline",
+                        trace_id.into()
+                    );
+                }
+
                 self.inspect_status
                     .count_received_event(input_device::InputEvent::from(unhandled_input_event));
                 let scaled_wheel_delta_v = self.scale_wheel_delta(wheel_delta_v);
@@ -112,7 +125,7 @@ impl UnhandledInputHandler for PointerDisplayScaleHandler {
                     device_descriptor,
                     event_time,
                     handled: input_device::Handled::No,
-                    trace_id: None,
+                    trace_id,
                 };
                 vec![input_event]
             }

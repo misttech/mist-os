@@ -239,6 +239,9 @@ async fn add_touchscreen_handler(
 ) -> InputPipelineAssembly {
     let setup_proxy = setup_pointer_injector_config_request_stream(scene_manager.clone());
     let size = scene_manager.lock().await.get_pointerinjection_display_size();
+    // touch injector handler is the last handler for touch event handling, it sends out touch
+    // events to scenic. Please double check tracing events, when changing the handlers assembly
+    // order.
     let touch_handler = TouchInjectorHandler::new_with_config_proxy(
         setup_proxy,
         size,
@@ -311,6 +314,9 @@ async fn register_keyboard_related_input_handlers(
     assembly = add_keymap_handler(assembly, input_handlers_node);
     assembly = add_key_meaning_modifier_handler(assembly, input_handlers_node);
     assembly = add_dead_keys_handler(assembly, icu_data_loader, input_handlers_node);
+
+    // ime_handler is the last handler for key event handling, it sends out key events to
+    // listeners. Please double check tracing events, when changing the handlers assembly order.
     assembly = add_ime(assembly, input_handlers_node, metrics_logger.clone()).await;
 
     // Forward focus to Text Manager.
@@ -363,6 +369,9 @@ async fn register_mouse_related_input_handlers(
         metrics_logger.clone(),
     );
 
+    // mouse injector handler is the last handler for mouse event handling, it sends out mouse
+    // events to scenic. Please double check tracing events, when changing the handlers assembly
+    // order.
     assembly = add_mouse_handler(
         scene_manager.clone(),
         assembly,
@@ -431,6 +440,10 @@ async fn build_input_pipeline_assembly(
             info!("Registering consumer controls-related input handlers.");
             // Add factory reset handler before media buttons handler.
             assembly = assembly.add_handler(factory_reset_handler);
+
+            // media_buttons_handler is the last handler for media button handling, it sends out
+            // button events to listeners. Please double check tracing events, when changing the
+            // handlers assembly order.
             assembly = assembly.add_handler(media_buttons_handler);
         }
 

@@ -434,7 +434,7 @@ pub fn create_mouse_event_with_handled(
         device_descriptor: device_descriptor.clone(),
         event_time,
         handled,
-        trace_id: None,
+        trace_id: Some(0.into()),
     }
 }
 
@@ -517,6 +517,7 @@ pub fn create_mouse_pointer_sample_event_with_wheel_physical_pixel(
     pointerinjector::Event {
         timestamp: Some(event_time.into_nanos()),
         data: Some(data),
+        trace_flow_id: Some(0),
         ..Default::default()
     }
 }
@@ -554,6 +555,27 @@ pub fn create_mouse_pointer_sample_event(
         is_precision_scroll,
         event_time,
     )
+}
+
+// mouse event with phase Add means the injector first seen this mouse.
+pub fn create_mouse_pointer_sample_event_phase_add(
+    buttons: Vec<mouse_binding::MouseButton>,
+    position: crate::utils::Position,
+    event_time: zx::MonotonicInstant,
+) -> pointerinjector::Event {
+    let mut e = create_mouse_pointer_sample_event(
+        pointerinjector::EventPhase::Add,
+        buttons,
+        position,
+        None, /*relative_motion*/
+        None, /*wheel_delta_v*/
+        None, /*wheel_delta_h*/
+        None, /*is_precision_scroll*/
+        event_time,
+    );
+
+    e.trace_flow_id = None;
+    e
 }
 
 /// Creates a [`fidl_input_report::InputReport`] with a touch report.
@@ -805,16 +827,12 @@ macro_rules! assert_input_report_sequence_generates_events {
         for mut expected_event in $expected_events {
             let input_event = event_receiver.next().await;
             match input_event {
-                Some(mut received_event) => {
-                    // The trace_id field is set to a nonce value by process_reports(), so a naive
-                    // comparison to an expected event will not match. Here, we set it to None to
-                    // allow comparing against an expected event, but we ensure trace_id is set
-                    // properly with another test.
-                    received_event.trace_id = None;
+                Some(received_event) => {
                     // Overwrite the expected_event's event_time, because an InputEvent's event_time
                     // is set at the time InputReports are processed into InputEvents.
                     expected_event.event_time = received_event.event_time;
                     expected_last_generated_timestamp = received_event.event_time.into_nanos().try_into().unwrap();
+                    expected_event.trace_id = received_event.trace_id;
                     pretty_assertions::assert_eq!(expected_event, received_event)
                 }
                 _ => assert!(false),

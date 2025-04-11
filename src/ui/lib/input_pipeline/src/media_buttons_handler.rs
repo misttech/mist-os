@@ -60,9 +60,6 @@ impl UnhandledInputHandler for MediaButtonsHandler {
             } => {
                 fuchsia_trace::duration!(c"input", c"media_buttons_handler");
                 if let Some(trace_id) = trace_id {
-                    // media_buttons_handler is the last handler for media button hanlding, it sends
-                    // out button events to listeners. Please double check tracing events, when
-                    // changing the handlers assembly order.
                     fuchsia_trace::flow_end!(c"input", c"event_in_input_pipeline", trace_id.into());
                 }
 
