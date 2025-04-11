@@ -559,20 +559,17 @@ async fn create_container(
 
                 let flags = fio::Flags::PERM_READ | fio::Flags::PROTOCOL_FILE;
 
-                if let Err(e) = pkg_dir_proxy.open(
-                    &file_path,
-                    flags,
-                    &fio::Options::default(),
-                    server_end.into_channel(),
-                ) {
-                    panic!(
-                        "failed to read SELinux exceptions config from \"{}\" (error: {})",
-                        file_path, e
-                    );
-                }
+                pkg_dir_proxy
+                    .open(&file_path, flags, &fio::Options::default(), server_end.into_channel())
+                    .expect("open SELinux exceptions config file");
 
-                let contents =
-                    fuchsia_fs::file::read(&file).await.expect("reading security exception file");
+                let contents = match fuchsia_fs::file::read(&file).await {
+                    Ok(contents) => contents,
+                    Err(e) => {
+                        panic!("read SELinux exceptions from \"{}\" (error: {})", file_path, e);
+                    }
+                };
+
                 String::from_utf8(contents).expect("parsing security exception file")
             }
             None => security::DEFAULT_EXCEPTIONS_CONFIG.into(),
