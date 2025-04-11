@@ -457,14 +457,24 @@ impl<T: RecordedVolume> ReplayState<T> {
                         });
                     });
 
-                    // Hold the items in cache until replay is stopped.
-                    let mut local_cache: BTreeMap<T::IdType, Arc<T::NodeType>> = BTreeMap::new();
+                    // Hold the items in cache until replay is stopped. Optional as None indicates
+                    // that the file could not be opened, and we want to cache that failure.
+                    let mut local_cache: BTreeMap<T::IdType, Option<Arc<T::NodeType>>> =
+                        BTreeMap::new();
+                    let volume_id = volume.id();
                     if let Err(e) =
                         Self::read_and_queue(handle, volume, &sender, &mut local_cache).await
                     {
                         error!("Failed to read back profile: {:?}", e);
                     }
                     sender.close();
+
+                    info!(
+                        "Replay for volume {} opened {} of {} objects.",
+                        volume_id,
+                        local_cache.iter().filter(|(_, e)| e.is_some()).count(),
+                        local_cache.len()
+                    );
                     // Keep the cache alive until dropped.
                     let () = std::future::pending().await;
                 }
@@ -492,7 +502,7 @@ impl<T: RecordedVolume> ReplayState<T> {
         handle: Box<dyn ReadObjectHandle>,
         volume: Arc<FxVolume>,
         sender: &async_channel::Sender<Request<T::NodeType>>,
-        local_cache: &mut BTreeMap<T::IdType, Arc<T::NodeType>>,
+        local_cache: &mut BTreeMap<T::IdType, Option<Arc<T::NodeType>>>,
     ) -> Result<(), Error> {
         let opener = T::new_opener(volume).await?;
         let mut io_buf = handle.allocate_buffer(IO_SIZE).await;
@@ -528,14 +538,20 @@ impl<T: RecordedVolume> ReplayState<T> {
                 }
 
                 let file = match local_cache.entry(msg.id()) {
-                    Entry::Occupied(entry) => entry.get().clone(),
+                    Entry::Occupied(entry) => match entry.get() {
+                        Some(file) => file.clone(),
+                        // Found a cached error.
+                        None => continue,
+                    },
                     Entry::Vacant(entry) => match opener.open(msg.id()).await {
                         Err(e) => {
-                            warn!("Failed to open object {} from profile: {:?}", msg.id(), e);
+                            debug!("Failed to open object {} from profile: {:?}", msg.id(), e);
+                            // Cache the error.
+                            entry.insert(None);
                             continue;
                         }
                         Ok(file) => {
-                            entry.insert(file.clone());
+                            entry.insert(Some(file.clone()));
                             file
                         }
                     },
@@ -942,7 +958,7 @@ mod tests {
 
         assert_eq!(get_test_profile_contents(volume).await.len(), BLOCK_SIZE * 2);
 
-        let mut local_cache: BTreeMap<Hash, Arc<FxBlob>> = BTreeMap::new();
+        let mut local_cache: BTreeMap<Hash, Option<Arc<FxBlob>>> = BTreeMap::new();
         let (sender, receiver) = async_channel::unbounded::<Request<FxBlob>>();
 
         let volume = fixture.volume().volume().clone();
@@ -995,7 +1011,7 @@ mod tests {
 
         assert_eq!(get_test_profile_contents(volume).await.len(), BLOCK_SIZE * 2);
 
-        let mut local_cache: BTreeMap<u64, Arc<FxFile>> = BTreeMap::new();
+        let mut local_cache: BTreeMap<u64, Option<Arc<FxFile>>> = BTreeMap::new();
         let (sender, receiver) = async_channel::unbounded::<Request<FxFile>>();
 
         let volume = fixture.volume().volume().clone();
@@ -1051,7 +1067,7 @@ mod tests {
             state.wait_for_recording_to_finish().await.unwrap();
             assert_eq!(get_test_profile_contents(volume).await.len(), IO_SIZE + BLOCK_SIZE);
 
-            let mut local_cache: BTreeMap<Hash, Arc<FxBlob>> = BTreeMap::new();
+            let mut local_cache: BTreeMap<Hash, Option<Arc<FxBlob>>> = BTreeMap::new();
             let (sender, receiver) = async_channel::unbounded::<Request<FxBlob>>();
 
             let volume = volume.clone();
