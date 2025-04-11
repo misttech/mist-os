@@ -21,4 +21,6 @@ pub struct SnapshotCommand {
     pub with_tags: bool,
     #[argh(option, description = "optional directory to dump each blocks' contents into")]
     pub output_contents_dir: Option<String>,
+    #[argh(switch, description = "symbolize the generated profile")]
+    pub symbolize: bool,
 }

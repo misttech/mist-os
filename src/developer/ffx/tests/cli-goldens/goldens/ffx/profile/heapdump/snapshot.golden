@@ -78,6 +78,14 @@
       "short": null,
       "description": "optional directory to dump each blocks' contents into",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--symbolize",
+      "short": null,
+      "description": "symbolize the generated profile",
+      "hidden": false
     }
   ],
   "notes": [],
