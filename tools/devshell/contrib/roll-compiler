@@ -100,6 +100,26 @@ def GetRustToolchainCommands(rust_toolchain_packages, tag):
     return rust_command
 
 
+def GetResolvedClangFromRust(tag, platforms):
+    tokens = tag.split(":", 2)
+    if len(tokens) != 2 or tokens[0] != "git_revisions":
+        sys.stderr.write(
+            f"{tag} not in expected format `git_revisions:<rust>,<llvm>`\n"
+        )
+        sys.exit(1)
+    revisions = tokens[1].split(",")
+    if len(revisions) != 2:
+        sys.stderr.write(
+            f"{tag} lists {len(revisions)} revisions, expected only 2"
+        )
+        sys.exit(1)
+    clang_tag = f"git_revision:{revisions[1]}"
+    # This will fail check_call if the tag is not found for each platform.
+    for platform in platforms:
+        ResolvePackage(f"fuchsia/third_party/clang/{platform}", clang_tag)
+    return clang_tag
+
+
 def main():
     possible_manifest_locations = [
         # Open-source checkout
@@ -160,12 +180,18 @@ before commands are run for any package.
     args = parser.parse_args()
 
     if not args.package:
-        args.package = ["clang"]
+        args.package = ["clang", "rust"]
 
-    if not args.platforms:
+    if default_platforms := not args.platforms:
         args.platforms = ["linux-arm64", "linux-amd64", "mac-amd64"]
         if args.package == ["clang"]:
             args.platforms.append("windows-amd64")
+
+    # If rolling rust and clang together, only resolve rust.
+    if clang_from_rust := "rust" in args.package and "clang" in args.package:
+        args.package = [
+            package for package in args.package if package != "clang"
+        ]
 
     # Rust separate host/target toolchain
     rust_toolchain_packages = GetSplitRustToolchainPaths(
@@ -214,9 +240,19 @@ before commands are run for any package.
     cmd = [JIRI, "edit"]
     for package in packages:
         cmd += ["-package", "%s/${platform}=%s" % (package, tag)]
-    if "clang" in args.package:
-        cmd += ["-package", "fuchsia/third_party/clang/linux-arm64=%s" % tag]
     cmd += GetRustToolchainCommands(rust_toolchain_packages, tag)
+
+    if clang_from_rust:
+        clang_platforms = args.platforms
+        if default_platforms:
+            clang_platforms.append("windows-amd64")
+        cmd.extend(
+            [
+                "-package",
+                "fuchsia/third_party/clang/${platform}="
+                + GetResolvedClangFromRust(tag, clang_platforms),
+            ]
+        )
 
     cmd.append(args.manifest)
 
