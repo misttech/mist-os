@@ -91,6 +91,8 @@ class Display {
 
   // The maximum vsync interval we would ever expect.
   static constexpr zx::duration kMaximumVsyncInterval = zx::msec(100);
+  // 240Hz should be fast enough for anybody.
+  static constexpr zx::duration kMinimumVsyncInterval = zx::usec(/*1000000/240=*/4167);
 
   const fuchsia_hardware_display_types::wire::DisplayId display_id_;
   const uint32_t width_in_px_;
