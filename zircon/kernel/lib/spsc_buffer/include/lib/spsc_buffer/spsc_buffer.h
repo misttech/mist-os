@@ -10,6 +10,7 @@
 
 #include <ktl/algorithm.h>
 #include <ktl/atomic.h>
+#include <ktl/bit.h>
 #include <ktl/byte.h>
 #include <ktl/move.h>
 #include <ktl/span.h>
@@ -21,6 +22,14 @@ concept CopyOutFunction = requires(F func, uint32_t offset, ktl::span<ktl::byte>
   { func(offset, src) } -> std::same_as<zx_status_t>;
 };
 
+// The AllocatorType concept sets up a concept that the SpscBuffer uses to allocate and free its
+// underlying storage.
+template <typename T>
+concept AllocatorType = requires(T, uint32_t size, ktl::byte* ptr) {
+  { T::Allocate(size) } -> std::same_as<ktl::byte*>;
+  { T::Free(ptr) } -> std::same_as<void>;
+};
+
 // SpscBuffer implements a transactional, single-producer, single-consumer ring buffer.
 //
 // The caller is responsible for ensuring that there is only one reader and one writer; no internal
@@ -30,10 +39,11 @@ concept CopyOutFunction = requires(F func, uint32_t offset, ktl::span<ktl::byte>
 // data. A span pointing to this buffer must be provided to the Init method before Read/Reserve can
 // be called. Note that this backing buffer must have a size that is a power of two for correct
 // functionality.
+template <AllocatorType Allocator>
 class SpscBuffer {
  public:
   SpscBuffer() = default;
-  ~SpscBuffer() = default;
+  ~SpscBuffer() { Allocator::Free(storage_.data()); }
 
   // An SpscBuffer should be initialized once and never moved or copied.
   SpscBuffer(const SpscBuffer&) = delete;
@@ -41,13 +51,29 @@ class SpscBuffer {
   SpscBuffer(SpscBuffer&&) = delete;
   SpscBuffer operator=(SpscBuffer&&) = delete;
 
-  // Initializes the buffer using the provided buffer as backing storage.
-  void Init(ktl::span<ktl::byte> buffer) {
+  // Initializes a buffer of the given size.
+  zx_status_t Init(uint32_t size) {
     // Assert that the provided buffer meets our requirements for the storage buffer.
     // See the comments around storage_ for more information about these requirements.
-    DEBUG_ASSERT(buffer.size() <= kMaxStorageSize);
-    DEBUG_ASSERT((buffer.size() & (buffer.size() - 1)) == 0);
-    storage_ = buffer;
+    if (size > kMaxStorageSize) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+    if (!ktl::has_single_bit(size)) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+
+    // SpscBuffers cannot be reinitialized once their backing storage has been allocated.
+    if (storage_.data() != nullptr) {
+      return ZX_ERR_BAD_STATE;
+    }
+
+    ktl::byte* ptr = Allocator::Allocate(size);
+    if (ptr == nullptr) {
+      return ZX_ERR_NO_MEMORY;
+    }
+
+    storage_ = ktl::span<ktl::byte>(ptr, size);
+    return ZX_OK;
   }
 
   // A simple convenience type used to hold the read and write pointers as separate values.
@@ -87,7 +113,7 @@ class SpscBuffer {
     }
 
     // Writes the given data into this reservation.
-    void Write(ktl::span<ktl::byte> data) {
+    void Write(ktl::span<const ktl::byte> data) {
       // Writing to an already committed reservation is not allowed.
       DEBUG_ASSERT(!committed_);
 
