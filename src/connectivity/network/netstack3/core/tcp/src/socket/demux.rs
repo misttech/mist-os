@@ -435,7 +435,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
         }
     };
 
-    match incoming.header.control {
+    match incoming.header().control {
         None => {}
         Some(control) => counters::increment_counter_with_optional_demux_id::<WireI, _, _, _, _>(
             core_ctx,
@@ -652,9 +652,12 @@ where
     //       connection incarnation, and
     //   (2) returns to TIME-WAIT state if the SYN turns out to be an old
     //       duplicate.
-    if *defunct && incoming.header.control == Some(Control::SYN) && incoming.header.ack.is_none() {
+    if *defunct
+        && incoming.header().control == Some(Control::SYN)
+        && incoming.header().ack.is_none()
+    {
         if let State::TimeWait(TimeWait { last_seq: _, closed_rcv, expiry: _ }) = state {
-            if !incoming.header.seq.before(closed_rcv.ack) {
+            if !incoming.header().seq.before(closed_rcv.ack) {
                 return ConnectionIncomingSegmentDisposition::ReuseCandidateForListener;
             }
         }
@@ -1141,7 +1144,7 @@ where
     I: IpExt,
     P: InnerPacketBuilder + Debug + Payload + 'a,
 {
-    let SegmentHeader { seq, ack, wnd, control, options, .. } = header;
+    let SegmentHeader { seq, ack, wnd, control, options, push } = header;
     let ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) } = conn_addr;
     let mut builder = TcpSegmentBuilder::new(
         local_ip.addr(),
@@ -1152,6 +1155,7 @@ where
         ack.map(Into::into),
         u16::from(*wnd),
     );
+    builder.psh(*push);
     match control {
         None => {}
         Some(Control::SYN) => builder.syn(true),
@@ -1198,7 +1202,7 @@ mod test {
         const SOURCE_PORT: NonZeroU16 = NonZeroU16::new(1111).unwrap();
         const DEST_PORT: NonZeroU16 = NonZeroU16::new(2222).unwrap();
 
-        let Segment { header, data } = segment;
+        let (header, data) = segment.into_parts();
         let serializer = super::tcp_serialize_segment::<I, _>(
             &header,
             data,

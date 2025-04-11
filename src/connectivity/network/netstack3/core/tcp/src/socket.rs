@@ -4851,7 +4851,7 @@ where
             &conn.socket_options,
         ) {
             Ok(seg) => {
-                let sent = u32::try_from(seg.data.len()).unwrap();
+                let sent = u32::try_from(seg.data().len()).unwrap();
                 send_tcp_segment(
                     core_ctx,
                     bindings_ctx,
@@ -5546,13 +5546,13 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
     BC: TcpBindingsTypes,
     D: WeakDeviceIdentifier,
 {
-    let control = segment.header.control;
     // NB: TCP does not use tx metadata to enforce send buffer. The TCP
     // application buffers only open send buffer space once the data is
     // acknowledged by the peer. That lives entirely in the TCP module and we
     // don't need to track segments sitting in device queues.
     let tx_metadata: BC::TxMetadata = Default::default();
-    let Segment { header, data } = segment;
+    let (header, data) = segment.into_parts();
+    let control = header.control;
     let result = match ip_sock {
         Some(ip_sock) => {
             let body = tcp_serialize_segment(&header, data, conn_addr);

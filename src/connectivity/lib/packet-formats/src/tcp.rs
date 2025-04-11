@@ -924,6 +924,11 @@ impl<A: IpAddress> TcpSegmentBuilder<A> {
         self.data_offset_reserved_flags.set_psh(psh);
     }
 
+    /// Returns the current value of the PSH flag.
+    pub fn psh_set(&self) -> bool {
+        self.data_offset_reserved_flags.psh()
+    }
+
     /// Sets the RST flag.
     pub fn rst(&mut self, rst: bool) {
         self.data_offset_reserved_flags.set_rst(rst);

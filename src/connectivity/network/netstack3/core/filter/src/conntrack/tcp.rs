@@ -483,7 +483,7 @@ fn do_established_update(
     dir: ConnectionDirection,
 ) -> EstablishedUpdateResult {
     let logical_len = segment.len(payload_len);
-    let SegmentHeader { seq, ack, wnd, control, options: _ } = segment;
+    let SegmentHeader { seq, ack, wnd, control, options: _, push: _ } = segment;
 
     let (sender, receiver) = swap_peers(original, reply, dir);
 
@@ -932,7 +932,7 @@ mod tests {
 
     use assert_matches::assert_matches;
     use netstack3_base::{
-        Control, HandshakeOptions, Options, SegmentHeader, SeqNum, UnscaledWindowSize, WindowScale,
+        Control, HandshakeOptions, SegmentHeader, SeqNum, UnscaledWindowSize, WindowScale,
         WindowSize,
     };
     use test_case::test_case;
@@ -974,10 +974,9 @@ mod tests {
 
         let segment = SegmentHeader {
             seq: ORIGINAL_ISS,
-            ack: None,
             wnd: UnscaledWindowSize::from(ORIGINAL_WND),
             control,
-            options: Options::default(),
+            ..Default::default()
         };
 
         let expected_state = state.clone().into();
@@ -990,7 +989,6 @@ mod tests {
     #[test_case(SegmentHeader {
         // Different from existing.
         seq: ORIGINAL_ISS + 1,
-        ack: None,
         wnd: UnscaledWindowSize::from(ORIGINAL_WND),
         control: Some(Control::SYN),
         options: HandshakeOptions {
@@ -998,11 +996,11 @@ mod tests {
             window_scale: WindowScale::new(ORIGINAL_WS),
             ..Default::default()
         }.into(),
+        ..Default::default()
     }; "different ISS")]
     #[test_case(SegmentHeader {
         // Same as existing.
         seq: ORIGINAL_ISS,
-        ack: None,
         wnd: UnscaledWindowSize::from(ORIGINAL_WND),
         control: Some(Control::SYN),
         options: HandshakeOptions {
@@ -1010,6 +1008,7 @@ mod tests {
             window_scale: WindowScale::new(ORIGINAL_WS + 1),
             ..Default::default()
         }.into(),
+        ..Default::default()
     }; "different window scale")]
     #[test_case(SegmentHeader {
         seq: ORIGINAL_ISS,
@@ -1021,6 +1020,7 @@ mod tests {
             window_scale: WindowScale::new(2),
             ..Default::default()
         }.into(),
+        ..Default::default()
     }; "ack not allowed")]
     fn syn_sent_original_syn_not_retransmit(segment: SegmentHeader) {
         let state = SynSent {
@@ -1048,7 +1048,6 @@ mod tests {
 
         let segment = SegmentHeader {
             seq: ORIGINAL_ISS,
-            ack: None,
             wnd: UnscaledWindowSize::from(ORIGINAL_WND + 10),
             control: Some(Control::SYN),
             options: HandshakeOptions {
@@ -1056,6 +1055,7 @@ mod tests {
                 ..Default::default()
             }
             .into(),
+            ..Default::default()
         };
 
         let result = assert_matches!(
@@ -1090,10 +1090,9 @@ mod tests {
 
         let segment = SegmentHeader {
             seq: ORIGINAL_ISS,
-            ack: None,
             wnd: UnscaledWindowSize::from(ORIGINAL_WND),
             control,
-            options: Options::default(),
+            ..Default::default()
         };
 
         let expected_state = state.clone().into();
@@ -1131,7 +1130,7 @@ mod tests {
             ack: Some(ack),
             wnd: UnscaledWindowSize::from(ORIGINAL_WND),
             control: Some(Control::RST),
-            options: Options::default(),
+            ..Default::default()
         };
 
         let (expected_state, valid) = match new_state {
@@ -1156,10 +1155,9 @@ mod tests {
 
         let segment = SegmentHeader {
             seq: ORIGINAL_ISS,
-            ack: None,
             wnd: UnscaledWindowSize::from(ORIGINAL_WND + 10),
             control: Some(Control::SYN),
-            options: Options::default(),
+            ..Default::default()
         };
 
         assert_eq!(
@@ -1183,7 +1181,7 @@ mod tests {
             ack: Some(ack),
             wnd: UnscaledWindowSize::from(REPLY_WND),
             control: Some(Control::SYN),
-            options: Options::default(),
+            ..Default::default()
         };
 
         let expected_state = state.clone().into();
@@ -1210,6 +1208,7 @@ mod tests {
             control: Some(Control::SYN),
             options: HandshakeOptions { window_scale: reply_window_scale, ..Default::default() }
                 .into(),
+            ..Default::default()
         };
 
         let new_state = assert_matches!(
@@ -1423,8 +1422,7 @@ mod tests {
                 seq: SeqNum::new(1400),
                 ack: Some(SeqNum::new(66_001)),
                 wnd: UnscaledWindowSize::from(10),
-                control: None,
-                options: Options::default(),
+                ..Default::default()
             },
             payload_len: 24,
             dir: ConnectionDirection::Original,
@@ -1460,7 +1458,7 @@ mod tests {
                 ack: Some(SeqNum::new(1024)),
                 wnd: UnscaledWindowSize::from(10),
                 control: Some(Control::FIN),
-                options: Options::default(),
+                ..Default::default()
             },
             payload_len: 0,
             dir: ConnectionDirection::Reply,
@@ -1493,7 +1491,7 @@ mod tests {
                 ack: Some(SeqNum::new(66_001)),
                 wnd: UnscaledWindowSize::from(10),
                 control: Some(Control::RST),
-                options: Options::default(),
+                ..Default::default()
             },
             payload_len: 24,
             dir: ConnectionDirection::Original,
@@ -1504,10 +1502,8 @@ mod tests {
         EstablishedUpdateTestArgs {
             segment: SegmentHeader {
                 seq: SeqNum::new(1400),
-                ack: None,
                 wnd: UnscaledWindowSize::from(10),
-                control: None,
-                options: Options::default(),
+                ..Default::default()
             },
             // These don't matter for the test
             payload_len: 24,
@@ -1520,10 +1516,8 @@ mod tests {
             segment: SegmentHeader {
                 // Too low. Doesn't meet equation II.
                 seq: SeqNum::new(0),
-                ack: None,
                 wnd: UnscaledWindowSize::from(10),
-                control: None,
-                options: Options::default(),
+                ..Default::default()
             },
             // These don't matter for the test
             payload_len: 24,
@@ -1538,7 +1532,7 @@ mod tests {
                 ack: Some(SeqNum::new(66_001)),
                 wnd: UnscaledWindowSize::from(10),
                 control: Some(Control::SYN),
-                options: Options::default(),
+                ..Default::default()
             },
             payload_len: 24,
             dir: ConnectionDirection::Original,
@@ -1599,8 +1593,7 @@ mod tests {
                 seq: SeqNum::new(1400),
                 ack: Some(SeqNum::new(66_001)),
                 wnd: UnscaledWindowSize::from(10),
-                control: None,
-                options: Options::default(),
+                ..Default::default()
             },
             payload_len: 24,
             dir: ConnectionDirection::Original,
@@ -1631,7 +1624,7 @@ mod tests {
                 ack: Some(SeqNum::new(1024)),
                 wnd: UnscaledWindowSize::from(10),
                 control: Some(Control::FIN),
-                options: Options::default(),
+                ..Default::default()
             },
             payload_len: 0,
             dir: ConnectionDirection::Reply,
@@ -1661,8 +1654,7 @@ mod tests {
                 seq: SeqNum::new(66_100),
                 ack: Some(SeqNum::new(1024)),
                 wnd: UnscaledWindowSize::from(10),
-                control: None,
-                options: Options::default(),
+                ..Default::default()
             },
             payload_len: 0,
             dir: ConnectionDirection::Reply,
@@ -1693,8 +1685,7 @@ mod tests {
                 seq: SeqNum::new(100_000),
                 ack: Some(SeqNum::new(1024)),
                 wnd: UnscaledWindowSize::from(10),
-                control: None,
-                options: Options::default(),
+                ..Default::default()
             },
             payload_len: 0,
             dir: ConnectionDirection::Reply,
@@ -1708,7 +1699,7 @@ mod tests {
                 ack: Some(SeqNum::new(66_001)),
                 wnd: UnscaledWindowSize::from(10),
                 control: Some(Control::RST),
-                options: Options::default(),
+                ..Default::default()
             },
             payload_len: 24,
             dir: ConnectionDirection::Original,
@@ -1749,8 +1740,7 @@ mod tests {
                 seq: SeqNum::new(1400),
                 ack: Some(SeqNum::new(66_001)),
                 wnd: UnscaledWindowSize::from(10),
-                control: None,
-                options: Options::default(),
+                ..Default::default()
             },
             payload_len: 24,
             dir: ConnectionDirection::Original,
@@ -1783,7 +1773,7 @@ mod tests {
                 ack: Some(SeqNum::new(1024)),
                 wnd: UnscaledWindowSize::from(10),
                 control: Some(Control::FIN),
-                options: Options::default(),
+                ..Default::default()
             },
             payload_len: 0,
             dir: ConnectionDirection::Reply,
@@ -1814,8 +1804,7 @@ mod tests {
                 // Fails equation III.
                 ack: Some(SeqNum::new(100_000)),
                 wnd: UnscaledWindowSize::from(10),
-                control: None,
-                options: Options::default(),
+                ..Default::default()
             },
             payload_len: 24,
             dir: ConnectionDirection::Original,
@@ -1829,7 +1818,7 @@ mod tests {
                 ack: Some(SeqNum::new(66_001)),
                 wnd: UnscaledWindowSize::from(10),
                 control: Some(Control::RST),
-                options: Options::default(),
+                ..Default::default()
             },
             payload_len: 24,
             dir: ConnectionDirection::Original,
@@ -1870,8 +1859,7 @@ mod tests {
                 seq: SeqNum::new(1400),
                 ack: Some(SeqNum::new(66_001)),
                 wnd: UnscaledWindowSize::from(10),
-                control: None,
-                options: Options::default(),
+                ..Default::default()
             },
             payload_len: 24,
             dir: ConnectionDirection::Original,
@@ -1902,8 +1890,7 @@ mod tests {
                 // Fails equation III.
                 ack: Some(SeqNum::new(100_000)),
                 wnd: UnscaledWindowSize::from(10),
-                control: None,
-                options: Options::default(),
+                ..Default::default()
             },
             payload_len: 24,
             dir: ConnectionDirection::Original,
@@ -1917,7 +1904,7 @@ mod tests {
                 ack: Some(SeqNum::new(66_001)),
                 wnd: UnscaledWindowSize::from(10),
                 control: Some(Control::RST),
-                options: Options::default(),
+                ..Default::default()
             },
             payload_len: 0,
             dir: ConnectionDirection::Original,
@@ -1977,8 +1964,7 @@ mod tests {
             seq: SeqNum::new(66_100),
             ack: Some(SeqNum::new(1024)),
             wnd: UnscaledWindowSize::from(10),
-            control: None,
-            options: Options::default(),
+            ..Default::default()
         };
 
         assert_matches!(

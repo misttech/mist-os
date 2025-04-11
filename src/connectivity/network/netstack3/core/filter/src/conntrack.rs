@@ -1165,9 +1165,7 @@ mod tests {
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use netstack3_base::testutil::FakeTimerCtxExt;
-    use netstack3_base::{
-        Control, IntoCoreTimerCtx, Options, SegmentHeader, SeqNum, UnscaledWindowSize,
-    };
+    use netstack3_base::{Control, IntoCoreTimerCtx, SegmentHeader, SeqNum, UnscaledWindowSize};
     use packet_formats::ip::IpProto;
     use test_case::test_case;
 
@@ -2184,10 +2182,9 @@ mod tests {
                 dst_port: I::DST_PORT,
                 segment: SegmentHeader {
                     seq: SeqNum::new(1024),
-                    ack: None,
                     wnd: UnscaledWindowSize::from(16u16),
                     control: Some(Control::SYN),
-                    options: Options::default(),
+                    ..Default::default()
                 },
                 payload_len: 0,
             },
@@ -2204,7 +2201,7 @@ mod tests {
                     ack: Some(SeqNum::new(1025)),
                     wnd: UnscaledWindowSize::from(16u16),
                     control: Some(Control::RST),
-                    options: Options::default(),
+                    ..Default::default()
                 },
                 payload_len: 0,
             },

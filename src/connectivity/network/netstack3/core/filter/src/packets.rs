@@ -1779,10 +1779,8 @@ pub mod testutil {
             fn arbitrary_value() -> Self {
                 SegmentHeader {
                     seq: SeqNum::new(55555),
-                    ack: None,
-                    control: None,
                     wnd: UnscaledWindowSize::from(1234),
-                    options: Options::default(),
+                    ..Default::default()
                 }
             }
         }
@@ -2043,9 +2041,8 @@ mod tests {
                 segment: SegmentHeader {
                     seq: SeqNum::new(SEQ_NUM),
                     ack: ACK_NUM.map(SeqNum::new),
-                    control: None,
                     wnd: UnscaledWindowSize::from(WINDOW_SIZE),
-                    options: Options::default(),
+                    ..Default::default()
                 },
                 payload_len: 3,
             },
