@@ -253,6 +253,41 @@ async fn diagnostics_persistence_integration() {
         file_name: persisted_data_path_2,
         after: None,
     });
+
+    // Restart twice to purge the cache.
+    let realm = realm.restart().await;
+    let realm = realm.restart().await;
+
+    // Tags with persist_across_boot should write to /cache/current
+    // immediately, not waiting for an update to trigger.
+    const TAG_PERSISTED: &str = "test-component-metric-across-boot";
+    let tag_persisted_path = format!("/tmp/cache/current/test-service/{TAG_PERSISTED}");
+
+    realm.set_inspect(Some(8i64)).await;
+    assert_eq!(
+        File::open(&tag_persisted_path).map(|_| ()).map_err(|e| e.kind()),
+        Err(std::io::ErrorKind::NotFound)
+    );
+    assert_eq!(realm.request_persistence(TAG_PERSISTED).await, PersistResult::Queued);
+    expect_file_change(FileChange {
+        old: FileState::None,
+        new: FileState::Int(8),
+        file_name: &tag_persisted_path,
+        after: None,
+    });
+
+    let realm = realm.restart().await;
+    expect_file_change(FileChange {
+        old: FileState::None,
+        new: FileState::Int(8),
+        file_name: &tag_persisted_path,
+        after: None,
+    });
+    verify_diagnostics_persistence_publication(Published::Waiting).await;
+    realm.set_update_completed().await;
+    verify_diagnostics_persistence_publication(Published::Int(TAG_PERSISTED, 8)).await;
+
+    realm.instance.destroy().await.expect("Failed to destroy realm");
 }
 
 /// The Inspect source may not publish Inspect (via take_and_serve_directory_handle()) until

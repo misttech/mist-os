@@ -5,7 +5,7 @@
 use diagnostics_data::ExtendedMoniker;
 use glob::glob;
 use log::{info, warn};
-use persistence_config::{ServiceName, Tag};
+use persistence_config::{Config, ServiceName, Tag};
 use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
 use serde_json::Value;
@@ -90,7 +90,7 @@ impl Serialize for ErrorHelper<'_> {
 
 // Throw away stuff from two boots ago. Move stuff in the "current"
 // directory to the "previous" directory.
-pub fn shuffle_at_boot() {
+pub fn shuffle_at_boot(config: &Config) {
     // These may fail if /cache was wiped. This is WAI and should not signal an error.
     fs::remove_dir_all(PREVIOUS_PATH)
         .map_err(|e| info!("Could not delete {}: {:?}", PREVIOUS_PATH, e))
@@ -98,6 +98,33 @@ pub fn shuffle_at_boot() {
     fs::rename(CURRENT_PATH, PREVIOUS_PATH)
         .map_err(|e| info!("Could not move {} to {}: {:?}", CURRENT_PATH, PREVIOUS_PATH, e))
         .ok();
+
+    // Copy tags that should persist across multiple reboots.
+    for (service, tag) in config.iter().flat_map(|(service, tags)| {
+        tags.iter().filter(|(_, c)| c.persist_across_boot).map(move |(tag, _)| (service, tag))
+    }) {
+        match fs::read(format!("{PREVIOUS_PATH}/{service}/{tag}")) {
+            Ok(data) => {
+                match fs::create_dir(format!("{CURRENT_PATH}/{service}")) {
+                    Ok(()) => {}
+                    Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+                    Err(e) => {
+                        warn!("Error creating directory {CURRENT_PATH}/{service}: {e:?}");
+                        continue;
+                    }
+                }
+                if let Err(e) = fs::write(format!("{CURRENT_PATH}/{service}/{tag}"), data) {
+                    warn!("Error writing persisted data for {service}/{tag}: {e:?}");
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                // No data was made available in the last boot.
+            }
+            Err(e) => {
+                warn!("Error reading persisted data for {service}/{tag}: {e:?}")
+            }
+        }
+    }
 }
 
 // Write a VMO's contents to the appropriate file.

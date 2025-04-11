@@ -32,4 +32,15 @@
             'INSPECT:realm*/single_counter:root/samples:integer_1',
         ],
     },
+    {
+        tag: 'test-component-metric-across-boot',
+        service_name: 'test-service',
+        max_bytes: 10000,
+        min_seconds_between_fetch: 1,
+        selectors: [
+            'INSPECT:realm*/single_counter:root/samples:optional',
+            'INSPECT:realm*/single_counter:root/samples:integer_1',
+        ],
+        persist_across_boot: true,
+    },
 ]

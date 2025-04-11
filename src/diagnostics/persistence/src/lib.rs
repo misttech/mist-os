@@ -58,7 +58,7 @@ pub async fn main(_args: CommandLine) -> Result<(), Error> {
         inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
 
     info!("Rotating directories");
-    file_handler::shuffle_at_boot();
+    file_handler::shuffle_at_boot(&config);
 
     let mut fs = ServiceFs::new();
 
