@@ -40,13 +40,13 @@ def _debug_symbols_collection_test_impl(ctx):
     )
 
     converted_build_ids = {}
-    for key, build_id_dirs in target_under_test[FuchsiaDebugSymbolInfo].build_id_dirs.items():
+    for key, build_id_dirs in target_under_test[FuchsiaDebugSymbolInfo].build_id_dirs_mapping.items():
         if type(key) == "File":
-            source_dir = key.short_path
+            source_search_root = key.short_path
         else:
-            source_dir = key
+            source_search_root = key
 
-        converted_build_ids[source_dir] = [f.short_path for f in build_id_dirs.to_list()]
+        converted_build_ids[source_search_root] = [f.short_path for f in build_id_dirs.to_list()]
 
     expected = json.decode(ctx.attr.expected_build_id_dirs)
     asserts.equals(
@@ -97,7 +97,7 @@ def _test_debug_symbols_collection():
 
     fuchsia_debug_symbols(
         name = "single_dep_debug_symbols",
-        build_dir = ":single_dep_root",
+        source_search_root = ":single_dep_root",
         build_id_dirs = [":single_dep_build_dir"],
     )
 
@@ -137,13 +137,13 @@ def _test_debug_symbols_collection():
 
     fuchsia_debug_symbols(
         name = "multi_deps_debug_symbols_1",
-        build_dir = ":multi_dep_root",
+        source_search_root = ":multi_dep_root",
         build_id_dirs = [":multi_dep_build_dir_1"],
     )
 
     fuchsia_debug_symbols(
         name = "multi_deps_debug_symbols_2",
-        build_dir = ":multi_dep_root",
+        source_search_root = ":multi_dep_root",
         build_id_dirs = [":multi_dep_build_dir_2"],
     )
 
@@ -173,19 +173,19 @@ def _test_debug_symbols_collection():
 
     fuchsia_debug_symbols(
         name = "all_attrs_debug_symbols_1",
-        build_dir = ":all_attrs_root_1",
+        source_search_root = ":all_attrs_root_1",
         build_id_dirs = [":all_attrs_build_dir_1"],
     )
 
     fuchsia_debug_symbols(
         name = "all_attrs_debug_symbols_2",
-        build_dir = ":all_attrs_root_2",
+        source_search_root = ":all_attrs_root_2",
         build_id_dirs = [":all_attrs_build_dir_2"],
     )
 
     fuchsia_debug_symbols(
         name = "all_attrs_debug_symbols_3",
-        build_dir = ":all_attrs_root_3",
+        source_search_root = ":all_attrs_root_3",
         build_id_dirs = [":all_attrs_build_dir_3", ":all_attrs_build_dir_1"],
     )
 

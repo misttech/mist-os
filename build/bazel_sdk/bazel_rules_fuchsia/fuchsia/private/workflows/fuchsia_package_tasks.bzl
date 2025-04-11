@@ -104,7 +104,7 @@ def _fuchsia_package_default_task_impl(ctx, make_workflow):
         # https://fxbug.dev/42070079.
         OutputGroupInfo(
             far_file = depset([ctx.attr.package[FuchsiaPackageInfo].far_file]),
-            build_id_dirs = depset(transitive = ctx.attr.package[FuchsiaDebugSymbolInfo].build_id_dirs.values()),
+            build_id_dirs = depset(transitive = ctx.attr.package[FuchsiaDebugSymbolInfo].build_id_dirs_mapping.values()),
         ),
     ]
 

@@ -5,16 +5,18 @@
 """Registers debug symbols with ffx as a task workflow."""
 
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
-load("//fuchsia/private:fuchsia_debug_symbols.bzl", "collect_debug_symbols")
+load("//fuchsia/private:fuchsia_debug_symbols.bzl", "merge_debug_symbol_infos")
 load(":fuchsia_shell_task.bzl", "shell_task_rule")
 load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_task_register_debug_symbols_impl(ctx, make_shell_task):
     sdk = get_fuchsia_sdk_toolchain(ctx)
+
+    # The symbol-index.json file uses the "build_dir" key for source search roots.
     build_id_dirs, build_dirs = zip(*[
-        (build_id_dir, build_dir)
-        for build_dir, build_id_dirs in collect_debug_symbols(ctx.attr.deps).build_id_dirs.items()
-        for build_id_dir in build_id_dirs.to_list()
+        (build_id_dir, source_search_root)
+        for source_search_root, build_id_dirs_depset in merge_debug_symbol_infos(ctx.attr.deps).build_id_dirs_mapping.items()
+        for build_id_dir in build_id_dirs_depset.to_list()
     ]) or ([], [])
 
     return make_shell_task(

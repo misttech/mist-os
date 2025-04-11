@@ -698,7 +698,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
         recovery_scrutiny_config = ctx.attr.recovery_scrutiny_config[FuchsiaScrutinyConfigInfo]
         deps += _scrutiny_validation(ctx, fuchsia_toolchain, pb_out_dir, recovery_scrutiny_config, platform_scrutiny_config, True)
 
-    fuchsia_debug_symbols_infos = transform_collected_debug_symbols_infos(
+    fuchsia_debug_symbol_info = transform_collected_debug_symbols_infos(
         ctx.attr.main,
         ctx.attr.recovery,
     )
@@ -718,9 +718,9 @@ def _build_fuchsia_product_bundle_impl(ctx):
         FuchsiaSizeCheckerInfo(
             size_report = size_report,
         ),
-        fuchsia_debug_symbols_infos,
+        fuchsia_debug_symbol_info,
         OutputGroupInfo(
-            build_id_dirs = depset(transitive = fuchsia_debug_symbols_infos.build_id_dirs.values()),
+            build_id_dirs = depset(transitive = fuchsia_debug_symbol_info.build_id_dirs_mapping.values()),
         ),
     ]
 

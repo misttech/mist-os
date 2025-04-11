@@ -259,7 +259,7 @@ cc_library(
 
 fuchsia_debug_symbols(
     name = "debug_symbols",
-    build_dir = "//:BUILD.bazel",
+    source_search_root = "//:BUILD.bazel",
     build_id_dirs = ["//:lib/debug/.build-id"],
 )
 
