@@ -176,6 +176,12 @@ def build_and_run_tests(
     kernel_path = fuchsia_dir / "local/vmlinuz"
     if not kernel_path.is_file():
         print(f"No kernel found at {kernel_path}", file=sys.stderr)
+        print(
+            f"Try copying your current kernel with:\n"
+            f"cp $(ls /boot/vmlinuz* | head -n1) {kernel_path}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     print("Re-building tests...")
     subprocess.run(
