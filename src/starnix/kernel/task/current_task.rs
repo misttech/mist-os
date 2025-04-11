@@ -95,7 +95,9 @@ impl Releasable for TaskBuilder {
     type Context<'a: 'b, 'b> = &'b mut Locked<'a, TaskRelease>;
 
     fn release<'a: 'b, 'b>(self, locked: Self::Context<'a, 'b>) {
-        let context = (self.thread_state, locked);
+        let kernel = Arc::clone(self.kernel());
+        let pids = kernel.pids.write();
+        let context = (self.thread_state, locked, pids);
         self.task.release(context);
     }
 }
@@ -210,7 +212,9 @@ impl Releasable for CurrentTask {
         self.notify_robust_list();
         let _ignored = self.clear_child_tid_if_needed();
 
-        let context = (self.thread_state, locked);
+        let kernel = Arc::clone(self.kernel());
+        let pids = kernel.pids.write();
+        let context = (self.thread_state, locked, pids);
         self.task.release(context);
     }
 }
@@ -304,7 +308,7 @@ impl CurrentTask {
     /// If waking, promotes from waking to awake.  If not waking, make waiter async
     /// wait until woken.  Returns true if woken.
     pub fn wake_or_wait_until_unstopped_async(&self, waiter: &Waiter) -> bool {
-        let group_state = self.thread_group.read();
+        let group_state = self.thread_group().read();
         let mut task_state = self.write();
 
         // Wake up if
@@ -314,7 +318,7 @@ impl CurrentTask {
         //   b) and ptrace isn't stopping us from waking up, but
         //   c) always wake up if we got a SIGKILL.
         let task_stop_state = self.load_stopped();
-        let group_stop_state = self.thread_group.load_stopped();
+        let group_stop_state = self.thread_group().load_stopped();
         if ((task_stop_state == StopState::GroupStopped && group_stop_state.is_waking_or_awake())
             || task_stop_state.is_waking_or_awake())
             && (!task_state.is_ptrace_listening() || task_stop_state.is_force())
@@ -333,13 +337,13 @@ impl CurrentTask {
                 // invocation, but set_stopped does sufficient checking while
                 // holding the lock to make sure that such a change won't result
                 // in corrupted state.
-                self.thread_group.set_stopped(new_state, None, false);
+                self.thread_group().set_stopped(new_state, None, false);
                 return true;
             }
         }
 
         // We will wait.
-        if self.thread_group.load_stopped().is_stopped() || task_stop_state.is_stopped() {
+        if self.thread_group().load_stopped().is_stopped() || task_stop_state.is_stopped() {
             // If we've stopped or PTRACE_LISTEN has been sent, wait for a
             // signal or instructions from the tracer.
             group_state
@@ -910,7 +914,7 @@ impl CurrentTask {
             Default::default()
         };
 
-        if self.thread_group.read().tasks_count() > 1 {
+        if self.thread_group().read().tasks_count() > 1 {
             track_stub!(TODO("https://fxbug.dev/297434895"), "exec on multithread process");
             return error!(EINVAL);
         }
@@ -1018,7 +1022,7 @@ impl CurrentTask {
         let regs: zx_thread_state_general_regs_t = start_info.into();
         self.thread_state.registers = regs.into();
         self.thread_state.extended_pstate.reset();
-        self.thread_group.signal_actions.reset_for_exec();
+        self.thread_group().signal_actions.reset_for_exec();
 
         // TODO(http://b/320436714): when adding SELinux support for the file subsystem, implement
         // hook to clean up state after exec.
@@ -1040,7 +1044,7 @@ impl CurrentTask {
 
         // TODO: POSIX timers are not preserved.
 
-        self.thread_group.write().did_exec = true;
+        self.thread_group().write().did_exec = true;
 
         // Get the basename of the path, which will be used as the name displayed with
         // `prctl(PR_GET_NAME)` and `/proc/self/stat`
@@ -1063,7 +1067,7 @@ impl CurrentTask {
     ) -> Result<SyscallResult, Errno> {
         let new_filter = Arc::new(SeccompFilter::from_cbpf(
             &code,
-            self.thread_group.next_seccomp_filter_id.add(1),
+            self.thread_group().next_seccomp_filter_id.add(1),
             flags & SECCOMP_FILTER_FLAG_LOG != 0,
         )?);
 
@@ -1075,7 +1079,7 @@ impl CurrentTask {
 
         // We take the process lock here because we can't change any of the threads
         // while doing a tsync.  So, you hold the process lock while making any changes.
-        let state = self.thread_group.write();
+        let state = self.thread_group().write();
 
         if flags & SECCOMP_FILTER_FLAG_TSYNC != 0 {
             // TSYNC synchronizes all filters for all threads in the current process to
@@ -1332,15 +1336,15 @@ impl CurrentTask {
             security_context,
         )?;
         {
-            let mut init_writer = init_task.thread_group.write();
-            let mut new_process_writer = task.thread_group.write();
-            new_process_writer.parent = Some(ThreadGroupParent::from(&init_task.thread_group));
-            init_writer.children.insert(task.id, OwnedRef::downgrade(&task.thread_group));
+            let mut init_writer = init_task.thread_group().write();
+            let mut new_process_writer = task.thread_group().write();
+            new_process_writer.parent = Some(ThreadGroupParent::from(init_task.thread_group()));
+            init_writer.children.insert(task.id, OwnedRef::downgrade(task.thread_group()));
         }
         // A child process created via fork(2) inherits its parent's
         // resource limits.  Resource limits are preserved across execve(2).
-        let limits = init_task.thread_group.limits.lock().clone();
-        *task.thread_group.limits.lock() = limits;
+        let limits = init_task.thread_group().limits.lock().clone();
+        *task.thread_group().limits.lock() = limits;
         Ok(task)
     }
 
@@ -1543,17 +1547,17 @@ impl CurrentTask {
         };
         release_on_error!(builder, locked, {
             let temp_task = TempRef::from(&builder.task);
-            builder.thread_group.add(&temp_task)?;
+            builder.thread_group().add(&temp_task)?;
             for (resource, limit) in rlimits {
                 builder
-                    .thread_group
+                    .thread_group()
                     .limits
                     .lock()
                     .set(*resource, rlimit { rlim_cur: *limit, rlim_max: *limit });
             }
 
             pids.add_task(&temp_task);
-            pids.add_thread_group(&builder.thread_group);
+            pids.add_thread_group(builder.thread_group());
             Ok(())
         });
         Ok(builder)
@@ -1588,7 +1592,7 @@ impl CurrentTask {
         let current_task: CurrentTask = TaskBuilder::new(Task::new(
             pid,
             initial_name,
-            OwnedRef::share(&system_task.thread_group),
+            OwnedRef::share(system_task.thread_group()),
             None,
             FdTable::default(),
             system_task.mm().cloned(),
@@ -1612,7 +1616,7 @@ impl CurrentTask {
         .into();
         release_on_error!(current_task, locked, {
             let temp_task = current_task.temp_task();
-            current_task.thread_group.add(&temp_task)?;
+            current_task.thread_group().add(&temp_task)?;
             pids.add_task(&temp_task);
             Ok(())
         });
@@ -1769,7 +1773,7 @@ impl CurrentTask {
 
             // Make sure to drop these locks ASAP to avoid inversion
             let mut thread_group_state = {
-                let thread_group_state = self.thread_group.write();
+                let thread_group_state = self.thread_group().write();
                 if clone_parent {
                     // With the CLONE_PARENT flag, the parent of the new task is our parent
                     // instead of ourselves.
@@ -1805,7 +1809,7 @@ impl CurrentTask {
             if clone_thread {
                 TaskInfo {
                     thread: None,
-                    thread_group: OwnedRef::share(&self.thread_group),
+                    thread_group: OwnedRef::share(self.thread_group()),
                     memory_manager: self.mm().cloned(),
                 }
             } else {
@@ -1814,9 +1818,9 @@ impl CurrentTask {
                 // priority than locks on the task in the thread group.
                 std::mem::drop(state);
                 let signal_actions = if clone_sighand {
-                    self.thread_group.signal_actions.clone()
+                    self.thread_group().signal_actions.clone()
                 } else {
-                    self.thread_group.signal_actions.fork()
+                    self.thread_group().signal_actions.fork()
                 };
                 let process_group = thread_group_state.process_group.clone();
 
@@ -1886,7 +1890,7 @@ impl CurrentTask {
             // takes place we have a self deadlock.
             pids.add_task(&child_task);
             if !clone_thread {
-                pids.add_thread_group(&child.thread_group);
+                pids.add_thread_group(child.thread_group());
             }
             std::mem::drop(pids);
 
@@ -1898,15 +1902,15 @@ impl CurrentTask {
                 // Take the lock on the thread group and its child in the correct order to ensure any wrong ordering
                 // will trigger the tracing-mutex at the right call site.
                 if !clone_thread {
-                    let _l1 = self.thread_group.read();
-                    let _l2 = child.thread_group.read();
+                    let _l1 = self.thread_group().read();
+                    let _l2 = child.thread_group().read();
                 }
             }
 
             if clone_thread {
-                self.thread_group.add(&child_task)?;
+                self.thread_group().add(&child_task)?;
             } else {
-                child.thread_group.add(&child_task)?;
+                child.thread_group().add(&child_task)?;
 
                 // These manipulations of the signal handling state appear to be related to
                 // CLONE_SIGHAND and CLONE_VM rather than CLONE_THREAD. However, we do not support
@@ -1956,7 +1960,7 @@ impl CurrentTask {
         // will trigger the tracing-mutex at the right call site.
         #[cfg(any(test, debug_assertions))]
         {
-            let _l1 = child.thread_group.read();
+            let _l1 = child.thread_group().read();
             let _l2 = child.read();
         }
 
@@ -1973,7 +1977,7 @@ impl CurrentTask {
         }
 
         if !stopped.is_in_progress() {
-            let parent = self.thread_group.read().parent.clone();
+            let parent = self.thread_group().read().parent.clone();
             if let Some(parent) = parent {
                 parent
                     .upgrade()
@@ -2001,10 +2005,10 @@ impl CurrentTask {
 
         // Stopping because the thread group is stopping.
         // Try to flip to GroupStopped - will fail if we shouldn't.
-        if self.thread_group.set_stopped(StopState::GroupStopped, None, true)
+        if self.thread_group().set_stopped(StopState::GroupStopped, None, true)
             == StopState::GroupStopped
         {
-            let signal = self.thread_group.read().last_signal.clone();
+            let signal = self.thread_group().read().last_signal.clone();
             // stopping because the thread group has stopped
             let event = Some(PtraceEventData::new_from_event(PtraceEvent::Stop, 0));
             self.write().set_stopped(StopState::GroupStopped, signal, Some(self), event);
@@ -2036,7 +2040,7 @@ impl CurrentTask {
             // If we've exited, unstop the threads and return without notifying
             // waiters.
             if self.is_exitted() {
-                self.thread_group.set_stopped(StopState::ForceAwake, None, false);
+                self.thread_group().set_stopped(StopState::ForceAwake, None, false);
                 self.write().set_stopped(StopState::ForceAwake, None, Some(self), None);
                 return;
             }
@@ -2124,7 +2128,7 @@ impl CurrentTask {
             PtraceOptions::TRACEEXIT,
             exit_status.signal_info_status() as u64,
         );
-        self.thread_group.exit(locked, exit_status, None);
+        self.thread_group().exit(locked, exit_status, None);
     }
 
     /// The flags indicates only the flags as in clone3(), and does not use the low 8 bits for the

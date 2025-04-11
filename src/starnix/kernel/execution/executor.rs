@@ -12,8 +12,8 @@ use crate::signals::{
 use crate::syscalls::table::dispatch_syscall;
 use crate::task::{
     ptrace_attach_from_state, ptrace_syscall_enter, ptrace_syscall_exit, CurrentTask,
-    ExceptionResult, ExitStatus, Kernel, ProcessGroup, PtraceCoreState, SeccompStateValue,
-    StopState, TaskBuilder, TaskFlags, ThreadGroup, ThreadGroupWriteGuard,
+    ExceptionResult, ExitStatus, Kernel, PidTable, ProcessGroup, PtraceCoreState,
+    SeccompStateValue, StopState, TaskBuilder, TaskFlags, ThreadGroup, ThreadGroupWriteGuard,
 };
 use crate::vfs::DelayedReleaser;
 use anyhow::{format_err, Error};
@@ -200,7 +200,7 @@ fn run_task(
 
     set_current_task_info(
         &current_task.task.command(),
-        current_task.task.thread_group.leader,
+        current_task.task.thread_group().leader,
         current_task.id,
     );
 
@@ -494,7 +494,7 @@ where
 {
     // Set the process handle to the new task's process, so the new thread is spawned in that
     // process.
-    let process_handle = task_builder.task.thread_group.process.raw_handle();
+    let process_handle = task_builder.task.thread_group().process.raw_handle();
     let old_process_handle = unsafe { thrd_set_zx_process(process_handle) };
 
     let weak_task = WeakRef::from(&task_builder.task);
@@ -711,7 +711,7 @@ fn create_shared(
 ///                   expected to resume.
 pub fn notify_debugger_of_module_list(current_task: &mut CurrentTask) -> Result<(), Errno> {
     let break_on_load = current_task
-        .thread_group
+        .thread_group()
         .process
         .get_break_on_load()
         .map_err(|err| from_status_like_fdio!(err))?;
@@ -727,7 +727,7 @@ pub fn notify_debugger_of_module_list(current_task: &mut CurrentTask) -> Result<
 
     if breakpoint_addr != break_on_load {
         current_task
-            .thread_group
+            .thread_group()
             .process
             .set_break_on_load(&breakpoint_addr)
             .map_err(|err| from_status_like_fdio!(err))?;
@@ -776,10 +776,10 @@ pub struct TaskInfo {
 }
 
 impl Releasable for TaskInfo {
-    type Context<'a: 'b, 'b> = ();
+    type Context<'a: 'b, 'b> = &'b mut PidTable;
 
-    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
-        self.thread_group.release(context);
+    fn release<'a: 'b, 'b>(self, pids: Self::Context<'a, 'b>) {
+        self.thread_group.release(pids);
     }
 }
 
@@ -933,7 +933,7 @@ mod tests {
         task.block_while_stopped(&mut locked);
 
         // Stop the task.
-        task.thread_group.set_stopped(
+        task.thread_group().set_stopped(
             StopState::GroupStopping,
             Some(SignalInfo::default(SIGSTOP)),
             false,
@@ -949,7 +949,7 @@ mod tests {
                 }
 
                 // Continue the task.
-                task.thread_group.set_stopped(
+                task.thread_group().set_stopped(
                     StopState::Waking,
                     Some(SignalInfo::default(SIGCONT)),
                     false,
@@ -975,7 +975,7 @@ mod tests {
         task.block_while_stopped(&mut locked);
 
         // Stop the task.
-        task.thread_group.set_stopped(
+        task.thread_group().set_stopped(
             StopState::GroupStopping,
             Some(SignalInfo::default(SIGSTOP)),
             false,
@@ -992,7 +992,7 @@ mod tests {
                 }
 
                 // exit the task.
-                task.thread_group.exit(&mut locked, ExitStatus::Exit(1), None);
+                task.thread_group().exit(&mut locked, ExitStatus::Exit(1), None);
             }
         });
 
