@@ -60,8 +60,8 @@ void InitAcpi(LegacyBoot& boot_info) {
 
   if (auto debug_port = acpi_lite::GetDebugPort(*acpi_parser); debug_port.is_ok()) {
     if (ktl::optional config = uart::all::Config<>::Match(*debug_port)) {
-      boot_info.uart = uart::all::MakeDriver(*config);
-      SetUartConsole(boot_info.uart);
+      boot_info.uart_config = *config;
+      SetUartConsole(uart::all::MakeDriver(boot_info.uart_config));
     }
   }
 }

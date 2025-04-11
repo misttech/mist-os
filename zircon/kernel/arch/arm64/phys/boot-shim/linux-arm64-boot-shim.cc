@@ -59,12 +59,16 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   MainSymbolize symbolize(kShimName);
 
   // Memory has been initialized, we can finish up parsing the rest of the items from the boot shim.
-  boot_shim::DevicetreeBootShim<
-      boot_shim::UartItem<>, boot_shim::PoolMemConfigItem, boot_shim::NvramItem,
-      boot_shim::DevicetreeSerialNumberItem, boot_shim::ArmDevicetreePsciItem,
-      boot_shim::ArmDevicetreeGicItem, boot_shim::DevicetreeDtbItem,
-      boot_shim::GenericWatchdogItem<WatchdogMmioHelper>, boot_shim::ArmDevicetreeCpuTopologyItem,
-      boot_shim::ArmDevicetreeTimerItem>
+  boot_shim::DevicetreeBootShim<boot_shim::UartItem<>,                               //
+                                boot_shim::PoolMemConfigItem,                        //
+                                boot_shim::NvramItem,                                //
+                                boot_shim::DevicetreeSerialNumberItem,               //
+                                boot_shim::ArmDevicetreePsciItem,                    //
+                                boot_shim::ArmDevicetreeGicItem,                     //
+                                boot_shim::DevicetreeDtbItem,                        //
+                                boot_shim::GenericWatchdogItem<WatchdogMmioHelper>,  //
+                                boot_shim::ArmDevicetreeCpuTopologyItem,             //
+                                boot_shim::ArmDevicetreeTimerItem>
       shim(kShimName, gDevicetreeBoot.fdt);
   shim.set_mmio_observer([&](boot_shim::DevicetreeMmioRange mmio_range) {
     auto& pool = Allocation::GetPool();

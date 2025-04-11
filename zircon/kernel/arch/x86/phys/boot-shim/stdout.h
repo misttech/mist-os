@@ -11,8 +11,8 @@
 
 #include <ktl/string_view.h>
 
-// If |cmdline| provides 'kernel.serial=' override |uart| is replaced by the provided configuration.
-// Otherwise, |uart| is left unchanged.
-void UartFromCmdLine(ktl::string_view cmdline, uart::all::Driver& uart);
+// If `cmdline` provides 'kernel.serial=' override `uart_config` is replaced by the provided
+// configuration. Otherwise, `uart_config` is left unchanged.
+void UartFromCmdLine(ktl::string_view cmdline, uart::all::Config<>& uart_config);
 
 #endif  // ZIRCON_KERNEL_ARCH_X86_PHYS_BOOT_SHIM_STDOUT_H_

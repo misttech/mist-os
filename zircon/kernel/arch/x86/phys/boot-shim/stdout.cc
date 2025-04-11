@@ -18,9 +18,9 @@
 
 // Pure Multiboot loaders like QEMU provide no means of information about the
 // serial port, just the command line.  So parse it just for kernel.serial.
-void UartFromCmdLine(ktl::string_view cmdline, uart::all::Driver& uart) {
+void UartFromCmdLine(ktl::string_view cmdline, uart::all::Config<>& uart_config) {
   BootOptions boot_opts;
-  boot_opts.serial = uart::all::GetConfig(uart);
+  boot_opts.serial = uart_config;
 
   // `console=` command-line option will override settings provided by ACPI or ZBI items,
   // and this option will be overriden by `kernel.serial=` option.
@@ -31,5 +31,5 @@ void UartFromCmdLine(ktl::string_view cmdline, uart::all::Driver& uart) {
   }
 
   SetBootOptionsWithoutEntropy(boot_opts, {}, cmdline);
-  uart = uart::all::MakeDriver(boot_opts.serial);
+  uart_config = boot_opts.serial;
 }

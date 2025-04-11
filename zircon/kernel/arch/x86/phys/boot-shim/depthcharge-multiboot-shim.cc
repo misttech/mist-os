@@ -144,19 +144,19 @@ bool LoadDepthchargeZbi(LegacyBootShim& shim, BootZbi& boot) {
          AppendDepthChargeItems(shim, boot.DataZbi(), kernel_item);
 }
 
-ktl::optional<uart::all::Driver> GetUartFromLegacyUart(LegacyBootShim::InputZbi::iterator it) {
+ktl::optional<uart::all::Config<>> GetUartFromLegacyUart(LegacyBootShim::InputZbi::iterator it) {
   auto& [header, payload] = *it;
   if (header->type == kLegacyBootdataDebugUart && payload.size() >= sizeof(LegacyBootdataUart)) {
     LegacyBootdataUart uart;
     memcpy(&uart, payload.data(), sizeof(uart));
     switch (uart.type) {
       case LegacyBootdataUart::Type::kPio:
-        return uart::ns8250::PioDriver(zbi_dcfg_simple_pio_t{
+        return uart::Config<uart::ns8250::PioDriver>(zbi_dcfg_simple_pio_t{
             .base = static_cast<uint16_t>(uart.base),
         });
 
       case LegacyBootdataUart::Type::kMmio:
-        return uart::ns8250::Mmio32Driver(zbi_dcfg_simple_t{.mmio_phys = uart.base});
+        return uart::Config<uart::ns8250::Mmio32Driver>(zbi_dcfg_simple_t{.mmio_phys = uart.base});
     }
   }
   return std::nullopt;
@@ -176,7 +176,7 @@ bool LegacyBootShim::BootQuirksLoad(BootZbi& boot) {
   return !IsProperZbi() && LoadDepthchargeZbi(*this, boot);
 }
 
-void UartFromZbi(LegacyBootShim::InputZbi zbi, uart::all::Driver& uart) {
+void UartFromZbi(LegacyBootShim::InputZbi zbi, uart::all::Config<>& uart_config) {
   auto check_and_print_error = [&zbi]() {
     if (auto maybe_error = zbi.take_error(); maybe_error.is_error()) {
       zbitl::PrintViewError(maybe_error.error_value());
@@ -199,7 +199,7 @@ void UartFromZbi(LegacyBootShim::InputZbi zbi, uart::all::Driver& uart) {
     return;
   }
 
-  uart = GetUartFromRange(ktl::next(kernel_it), last).value_or(uart);
+  uart_config = GetUartFromRange(ktl::next(kernel_it), last).value_or(uart_config);
   if (check_and_print_error()) {
     return;
   }
@@ -215,14 +215,14 @@ void UartFromZbi(LegacyBootShim::InputZbi zbi, uart::all::Driver& uart) {
 
     // If we have a valid uart at this point
     if (bootloader_uart) {
-      uart = *bootloader_uart;
+      uart_config = *bootloader_uart;
       return;
     }
 
     // Look for legacy uart items, if non current version items where found.
     for (auto it = zbi.begin(); it != kernel_it && it != zbi.end(); ++it) {
       if (auto maybe_legacy_uart_dcfg = GetUartFromLegacyUart(it)) {
-        uart = *maybe_legacy_uart_dcfg;
+        uart_config = *maybe_legacy_uart_dcfg;
       }
     }
     check_and_print_error();

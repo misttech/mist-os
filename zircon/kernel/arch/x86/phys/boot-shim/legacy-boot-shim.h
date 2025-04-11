@@ -54,7 +54,7 @@ class LegacyBootShim : public LegacyBootShimBase {
     } else {
       fprintf(log, "%s:   SMBIOS not found\n", name);
     }
-    Get<boot_shim::UartItem<>>().Init(info.uart);
+    Get<boot_shim::UartItem<>>().Init(info.uart_config);
   }
 
   void InitMemConfig(const memalloc::Pool& pool) { Get<boot_shim::PoolMemConfigItem>().Init(pool); }
@@ -80,9 +80,9 @@ class LegacyBootShim : public LegacyBootShimBase {
 };
 
 // If |zbi| contains a uart driver, |uart| is overwritten with such configuration.
-void UartFromZbi(LegacyBootShim::InputZbi zbi, uart::all::Driver& uart);
+void UartFromZbi(LegacyBootShim::InputZbi zbi, uart::all::Config<>& uart_config);
 
-std::optional<uart::all::Driver> GetUartFromRange(LegacyBootShim::InputZbi::iterator start,
-                                                  LegacyBootShim::InputZbi::iterator end);
+std::optional<uart::all::Config<>> GetUartFromRange(LegacyBootShim::InputZbi::iterator start,
+                                                    LegacyBootShim::InputZbi::iterator end);
 
 #endif  // ZIRCON_KERNEL_ARCH_X86_PHYS_BOOT_SHIM_LEGACY_BOOT_SHIM_H_

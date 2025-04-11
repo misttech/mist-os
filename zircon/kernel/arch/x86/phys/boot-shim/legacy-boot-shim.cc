@@ -40,9 +40,9 @@ void PhysMain(void* ptr, arch::EarlyTicks boot_ticks) {
   InitMemory(ptr, &aspace);
 
   const ktl::span ramdisk = ktl::as_bytes(gLegacyBoot.ramdisk);
-  UartFromZbi(LegacyBootShim::InputZbi(ramdisk), gLegacyBoot.uart);
-  UartFromCmdLine(gLegacyBoot.cmdline, gLegacyBoot.uart);
-  LegacyBootSetUartConsole(gLegacyBoot.uart);
+  UartFromZbi(LegacyBootShim::InputZbi(ramdisk), gLegacyBoot.uart_config);
+  UartFromCmdLine(gLegacyBoot.cmdline, gLegacyBoot.uart_config);
+  LegacyBootSetUartConsole(uart::all::MakeDriver(gLegacyBoot.uart_config));
 
   LegacyBootShim shim(symbolize.name(), gLegacyBoot);
   shim.set_build_id(symbolize.build_id());
@@ -88,25 +88,25 @@ bool LegacyBootShim::IsProperZbi() const {
 // first item is the kernel item, and items are appended.  The symbols is weak,
 // such that bug compatible shims can override this.  Examples of such bugs are
 // bootloaders prepending items to the ZBI (preceding the original kernel).
-[[gnu::weak]] void UartFromZbi(LegacyBootShim::InputZbi zbi, uart::all::Driver& uart) {
+[[gnu::weak]] void UartFromZbi(LegacyBootShim::InputZbi zbi, uart::all::Config<>& uart_config) {
   if (ktl::optional new_uart = GetUartFromRange(zbi.begin(), zbi.end())) {
-    uart = *new_uart;
+    uart_config = *new_uart;
   }
   zbi.ignore_error();
 }
 
-ktl::optional<uart::all::Driver> GetUartFromRange(  //
+ktl::optional<uart::all::Config<>> GetUartFromRange(  //
     LegacyBootShim::InputZbi::iterator start, LegacyBootShim::InputZbi::iterator end) {
-  ktl::optional<uart::all::Driver> uart;
+  ktl::optional<uart::all::Config<>> uart_config;
+
   while (start != end && start != start.view().end()) {
     auto& [header, payload] = *start;
     if (header->type == ZBI_TYPE_KERNEL_DRIVER) {
       if (ktl::optional config = uart::all::Config<>::Match(*header, payload.data())) {
-        uart = uart::all::MakeDriver(*config);
+        uart_config = *config;
       }
     }
     start++;
   }
-
-  return uart;
+  return uart_config;
 }
