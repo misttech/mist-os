@@ -2550,7 +2550,7 @@ inline VmCowPages::LookupCursor::RequireResult VmCowPages::LookupCursor::PageAsR
 
 void VmCowPages::LookupCursor::IncrementOffsetAndInvalidateCursor(uint64_t delta) {
   offset_ += delta;
-  owner_info_.owner = nullptr;
+  InvalidateCursor();
 }
 
 bool VmCowPages::LookupCursor::CursorIsContentZero() const {

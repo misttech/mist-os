@@ -1731,7 +1731,10 @@ class VmCowPages final : public VmHierarchyBase,
 // usage of this object.
 class VmCowPages::LookupCursor {
  public:
-  ~LookupCursor() { DEBUG_ASSERT(!alloc_list_); }
+  ~LookupCursor() {
+    InvalidateCursor();
+    DEBUG_ASSERT(!alloc_list_);
+  }
 
   // Convenience struct holding the return result of the Require* methods.
   struct RequireResult {
@@ -1853,8 +1856,8 @@ class VmCowPages::LookupCursor {
       // again to find the next owner that applies to this slot.
       // In the case where we have reached the end of the range, i.e. offset_ is also equal to
       // end_offset_, there is nothing we need to do, but to ensure that an error is generated if
-      // the user incorrectly attempts to get another page we also set the owner to the nullptr.
-      owner_info_.owner = nullptr;
+      // the user incorrectly attempts to get another page we also invalidate the owner.
+      InvalidateCursor();
     } else {
       // Increment the owner offset and step the page list cursor to the next slot.
       owner_info_.owner_offset += PAGE_SIZE;
@@ -1872,9 +1875,9 @@ class VmCowPages::LookupCursor {
       // page. In this case we would ideally walk up to the parent, if there is one, and check for
       // content, or if no parent keep returning empty slots. Unfortunately once the cursor returns
       // a nullptr we cannot know where the next content might be. To make things simpler we just
-      // invalidate owner_ if we hit this case and re-walk from the bottom again.
+      // invalidate owner if we hit this case and re-walk from the bottom again.
       if (!owner_cursor_ || (owner_cursor_->IsEmpty() && owner()->parent_)) {
-        owner_info_.owner = nullptr;
+        InvalidateCursor();
       }
     }
   }
@@ -1896,6 +1899,10 @@ class VmCowPages::LookupCursor {
 
   // Returns true if target_ is the owner.
   bool TargetIsOwner() const { return owner_info_.owner == target_; }
+
+  // Invalidates the owner, so that the next page will have to perform the lookup again, walking up
+  // the hierarchy if needed.
+  void InvalidateCursor() { owner_info_.owner = nullptr; }
 
   // Helpers for querying the state of the cursor.
   bool CursorIsPage() const { return owner_cursor_ && owner_cursor_->IsPage(); }
