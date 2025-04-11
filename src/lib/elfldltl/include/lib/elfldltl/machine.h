@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <type_traits>
 
 #include "constants.h"
 #include "layout.h"
@@ -246,18 +247,23 @@ struct RelocationTraits<ElfMachine::kRiscv> {
   static constexpr std::optional<uint32_t> kTlsDesc = 12;  // R_RISCV_TLSDESC
 };
 
-// This is specialized to give the machine-specific details on dynamic
-// linking for TLS.  This is only what relocation needs to handle, not
-// the whole thread-pointer ABI for the machine.  The ElfMachine::kNone
-// specialization is an exemplar documenting the template API.
-template <class Elf = Elf<>, ElfMachine Machine = ElfMachine::kNative>
-struct TlsTraits;
+// This is specialized to give the machine-specific details on dynamic linking
+// for TLS.  This is only what relocation needs to handle, not the whole
+// thread-pointer ABI for the machine.  Each specialization must meet the
+// concept TlsTraitsApi<Elf> defined below.
+template <class Elf, ElfMachine Machine>
+struct TlsTraitsImpl;
 
-template <class Elf>
-struct TlsTraits<Elf, ElfMachine::kNone> {
-  using GotAddr = typename Elf::Addr;
+// This defines the API for each TlsTraitsImpl<Elf, Machine> class, given Elf.
+//
+// _Note:_ An expression like `std::integral_constant<T, Traits::K>{}`
+// indicates the requirement for a public member `static constexpr T K = ...;`.
+template <class Traits, class Elf = Elf<>>
+concept TlsTraitsApi = requires {
+  // This is the type of GOT entries in this ABI, usually Elf::Addr.
+  typename Traits::GotAddr;
 
-  // Each module in the initial exec set that has a PT_TLS segment gets
+  // Each module in the initial-exec set that has a PT_TLS segment gets
   // assigned an offset from the thread pointer where its PT_TLS block will
   // appear in each thread's static TLS area.  If the main executable has a
   // PT_TLS segment, then it will have module ID 1 and its Local Exec
@@ -276,56 +282,80 @@ struct TlsTraits<Elf, ElfMachine::kNone> {
   // PT_TLS and no Local Exec accesses will be made.  The runtime always lays
   // out the thread pointer memory with this space reserved for private uses,
   // and puts the first PT_TLS segment after it.
-  static constexpr typename Elf::size_type kTlsLocalExecOffset = 0;
+  { std::integral_constant<typename Elf::size_type, Traits::kTlsLocalExecOffset>{} };
 
-  // If true, TLS offsets from the thread pointer are negative.  The
-  // calculations for thread pointer alignment are the same whether
-  // offsets are positive or negative: that the first PT_TLS segment
-  // (the executable's if it has one) has the offset closest to zero
-  // that is aligned to p_align and >= p_memsz.
-  static constexpr bool kTlsNegative = false;
+  // If true, TLS offsets from the thread pointer are negative.  Calculations
+  // for thread pointer alignment are the same whether offsets are positive or
+  // negative: that the first PT_TLS segment (the executable's if it has one)
+  // has the offset closest to zero that is aligned to p_align and >= p_memsz.
+  { std::bool_constant<Traits::kTlsNegative>{} };
 
   // This bias is subtracted from the offset for a kTlsRelative relocation.
   // It's then added back in again by the `__tls_get_addr` code.  In Local
   // Dynamic cases, there is no kTlsRelative relocation emitted and instead the
   // offset word is filled at link time with this bias subtracted.
-  static constexpr typename Elf::size_type kTlsRelativeBias = 0;
+  { std::integral_constant<typename Elf::size_type, Traits::kTlsRelativeBias>{} };
+};
+
+// This is a convenient way to verify a TlsTraitsApi implementation.
+template <class Elf, TlsTraitsApi<Elf> Traits>
+using AsTlsTraitsApi = Traits;
+
+// All uses go through this so any TlsTraitsImpl specialization actually used
+// will be verified against the concept requirements.
+template <class Elf = Elf<>, ElfMachine Machine = ElfMachine::kNative>
+using TlsTraits = AsTlsTraitsApi<Elf, TlsTraitsImpl<Elf, Machine>>;
+
+// This is an exemplar and recommended starting point for newly-specified TLS
+// psABIs.  Specializations for real machines can use this as a base class.
+template <class Elf>
+struct TlsTraitsImpl<Elf, ElfMachine::kNone> {
+  using GotAddr = typename Elf::Addr;
+  using size_type = typename Elf::size_type;
+
+  static constexpr size_type kTlsLocalExecOffset = 0;
+  static constexpr bool kTlsNegative = false;
+  static constexpr size_type kTlsRelativeBias = 0;
 };
 
 // AArch64 puts TLS above TP after a two-word reserved area.
 template <class Elf>
-struct TlsTraits<Elf, ElfMachine::kAarch64> {
-  using GotAddr = typename Elf::Addr;
-  using size_type = typename Elf::size_type;
+struct TlsTraitsImpl<Elf, ElfMachine::kAarch64> : public TlsTraits<Elf, ElfMachine::kNone> {
+  using typename TlsTraits<Elf, ElfMachine::kNone>::size_type;
 
   static constexpr size_type kTlsLocalExecOffset = 2 * sizeof(size_type);
-  static constexpr bool kTlsNegative = false;
-  static constexpr typename Elf::size_type kTlsRelativeBias = 0;
 };
 
 // ARM (AArch32) is just the same.
 template <class Elf>
-struct TlsTraits<Elf, ElfMachine::kArm> : public TlsTraits<Elf, ElfMachine::kAarch64> {};
+struct TlsTraitsImpl<Elf, ElfMachine::kArm> : public TlsTraits<Elf, ElfMachine::kAarch64> {};
 
 // RISC-V puts TLS above TP with no offset, as shown in the exemplar.
 template <class Elf>
-struct TlsTraits<Elf, ElfMachine::kRiscv> : public TlsTraits<Elf, ElfMachine::kNone> {
-  static constexpr typename Elf::size_type kTlsRelativeBias = 0x800;
+struct TlsTraitsImpl<Elf, ElfMachine::kRiscv> : public TlsTraits<Elf, ElfMachine::kNone> {
+  using typename TlsTraits<Elf, ElfMachine::kNone>::size_type;
+
+  static constexpr size_type kTlsRelativeBias = 0x800;
 };
 
-// X86 puts TLS below TP.
+// x86 puts TLS below TP.
 template <class Elf>
-struct TlsTraits<Elf, ElfMachine::kX86_64> {
-  using GotAddr = Elf64<ElfData::k2Lsb>::Addr;
-  static constexpr typename Elf::size_type kTlsLocalExecOffset = 0;
+struct TlsTraitsImpl<Elf, ElfMachine::k386> : public TlsTraits<Elf, ElfMachine::kNone> {
   static constexpr bool kTlsNegative = true;
-  static constexpr typename Elf::size_type kTlsRelativeBias = 0;
 };
 
+// x86-64 uses 64-bit GOT entries even for ILP32.
 template <class Elf>
-struct TlsTraits<Elf, ElfMachine::k386> : public TlsTraits<Elf, ElfMachine::kX86_64> {};
+struct TlsTraitsImpl<Elf, ElfMachine::kX86_64> : public TlsTraits<Elf, ElfMachine::k386> {
+  using GotAddr = Elf64<Elf::kData>::Addr;
+};
 
 // This should list all the fully-defined specializations except for kNone.
+// Note that some generic tests may instantiate a combination of Elf layout
+// class and ElfMachine that never actually go together (such as big-endian x86
+// or 64-bit i386); this is generally harmless, but does require that whenever
+// defining new specializations above, they either be partial specializations
+// across layouts or an exhaustive set of full specializations for each layout.
 template <template <ElfMachine...> class Template>
 using AllSupportedMachines = Template<  //
     ElfMachine::kAarch64, ElfMachine::kArm, ElfMachine::kX86_64, ElfMachine::k386,

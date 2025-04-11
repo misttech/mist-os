@@ -4,6 +4,7 @@
 
 #include <lib/elfldltl/machine.h>
 
+#include <tuple>
 #include <type_traits>
 
 #include <gtest/gtest.h>
@@ -45,6 +46,23 @@ struct CheckMachines {
   }
 };
 
+template <elfldltl::ElfMachine Machine>
+struct CheckTlsFormats {
+  template <class... Elf>
+  struct Check {
+    // Just instantiating this to define the member as default-constructed will
+    // check each implementation against the TlsTraitsApi concept.
+    std::tuple<elfldltl::TlsTraits<Elf, Machine>...> check;
+  };
+};
+
+template <elfldltl::ElfMachine... Machines>
+struct CheckMachinesTls {
+  std::tuple<elfldltl::AllFormats<CheckTlsFormats<Machines>::template Check>...> check;
+};
+
 TEST(ElfldltlAbiTests, Machines) { elfldltl::AllSupportedMachines<CheckMachines>(); }
+
+TEST(ElfldltlAbiTests, MachinesTls) { elfldltl::AllSupportedMachines<CheckMachinesTls>(); }
 
 }  // namespace
