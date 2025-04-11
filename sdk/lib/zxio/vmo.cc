@@ -25,10 +25,7 @@ class Vmo : public HasIo {
   zx::stream stream_;
 
  protected:
-  zx_status_t Close(const bool should_wait) {
-    this->~Vmo();
-    return ZX_OK;
-  }
+  void Destroy() { this->~Vmo(); }
 
   zx_status_t Release(zx_handle_t* out_handle) {
     *out_handle = vmo_.release();
@@ -246,7 +243,7 @@ class Vmo : public HasIo {
 constexpr zxio_ops_t Vmo::kOps = []() {
   using Adaptor = Adaptor<Vmo>;
   zxio_ops_t ops = zxio_default_ops;
-  ops.close = Adaptor::From<&Vmo::Close>;
+  ops.destroy = Adaptor::From<&Vmo::Destroy>;
   ops.release = Adaptor::From<&Vmo::Release>;
   ops.clone = Adaptor::From<&Vmo::Clone>;
   ops.attr_get = Adaptor::From<&Vmo::AttrGet>;

@@ -22,7 +22,8 @@ class Transferable : public HasIo {
  private:
   static const zxio_ops_t kOps;
 
-  zx_status_t Close(bool should_wait);
+  void Destroy();
+  zx_status_t Close();
   zx_status_t Clone(zx_handle_t* out_handle);
   zx_status_t Release(zx_handle_t* out_handle);
   zx_status_t AttrGet(zxio_node_attributes_t* inout_attr);
@@ -37,7 +38,8 @@ class Transferable : public HasIo {
 constexpr zxio_ops_t Transferable::kOps = []() {
   using Adaptor = Adaptor<Transferable>;
   zxio_ops_t ops = zxio_default_ops;
-  ops.close = Adaptor::From<&Transferable::Close>;
+  ops.destroy = Adaptor::From<&Transferable::Destroy>;
+  ops.close2 = Adaptor::From<&Transferable::Close>;
   ops.clone = Adaptor::From<&Transferable::Clone>;
   ops.release = Adaptor::From<&Transferable::Release>;
   ops.attr_get = Adaptor::From<&Transferable::AttrGet>;
@@ -48,10 +50,10 @@ constexpr zxio_ops_t Transferable::kOps = []() {
   return ops;
 }();
 
-zx_status_t Transferable::Close(bool should_wait) {
-  auto cleanup = fit::defer([this] { this->~Transferable(); });
+void Transferable::Destroy() { this->~Transferable(); }
 
-  if (channel_.is_valid() && should_wait) {
+zx_status_t Transferable::Close() {
+  if (channel_.is_valid()) {
     auto client = fidl::UnownedClientEnd<funknown::Closeable>(channel_.get());
 
     const fidl::WireResult result = fidl::WireCall(client)->Close();

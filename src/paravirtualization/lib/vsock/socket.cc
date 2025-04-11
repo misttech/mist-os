@@ -210,7 +210,7 @@ zx_status_t Socket::Accept(struct sockaddr* addr, socklen_t* addrlen, zxio_stora
       return ZX_OK;
     }
 
-    struct sockaddr_vm addr_vm {};
+    struct sockaddr_vm addr_vm{};
     addr_vm.svm_family = AF_VSOCK;
     // TODO(https://fxbug.dev/361410840): Double check which port and cid we are supposed to return
     // here. These are correct for the connected socket, but possibly not for addr that we return?
@@ -305,10 +305,7 @@ static Socket& to_socket(zxio_t* io) { return reinterpret_cast<ZxioSocket*>(io)-
 
 static constexpr zxio_ops_t kListenSocketOps = []() {
   zxio_ops_t ops = zxio_default_ops;
-  ops.close = [](zxio_t* io, const bool should_wait) {
-    reinterpret_cast<ZxioSocket*>(io)->~ZxioSocket();
-    return ZX_OK;
-  };
+  ops.destroy = [](zxio_t* io) { reinterpret_cast<ZxioSocket*>(io)->~ZxioSocket(); };
   ops.bind = [](zxio_t* io, const struct sockaddr* addr, socklen_t addrlen, int16_t* out_code) {
     return to_socket(io).Bind(addr, addrlen, out_code);
   };

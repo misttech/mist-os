@@ -80,16 +80,49 @@ const zxio_ops_t* zxio_get_ops(zxio_t* io) {
   return zio->ops;
 }
 
-zx_status_t zxio_close(zxio_t* io, const bool should_wait) {
+void zxio_destroy(zxio_t* io) {
   if (!zxio_is_valid(io)) {
-    return ZX_ERR_BAD_HANDLE;
+    // TODO(https://fxbug.dev/409665751): Panic if this happens.
+    return;
   }
   static_assert(std::is_trivially_destructible<zxio_internal_t>::value,
                 "zxio_internal_t must have trivial destructor");
   zxio_internal_t* zio = to_internal(io);
-  zx_status_t status = zio->ops->close(io, should_wait);
-  // Poison the object. Double destruction is undefined behavior.
-  zio->ops = nullptr;
+
+  // TODO(https://fxbug.dev/409665751): Call close if set until we have migrated OOT users.
+  if (zio->ops->close) {
+    zio->ops->close(io, false);
+  } else {
+    zio->ops->destroy(io);
+  }
+
+  // Poison the object. Double destruction is undefined behavior. To do this, zxio_init is called to
+  // start the lifetime of a new poisoned object.
+  zxio_init(io, nullptr);
+}
+
+zx_status_t zxio_close(zxio_t* io, bool should_wait) {
+  if (!zxio_is_valid(io)) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+  zxio_internal_t* zio = to_internal(io);
+  zx_status_t status = ZX_OK;
+  if (zio->ops->close) {
+    // TODO(https://fxbug.dev/409665751): Call close if set until we have migrated OOT users.
+    status = zio->ops->close(io, should_wait);
+  } else {
+    if (should_wait) {
+      status = zio->ops->close2(io);
+      if (status == ZX_ERR_NOT_SUPPORTED) {
+        // For now, swallow ZX_ERR_NOT_SUPPORTED as that's the default implementation.
+        status = ZX_OK;
+      }
+    }
+    zio->ops->destroy(io);
+  }
+  // Poison the object. Double destruction is undefined behavior. To do this, zxio_init is called to
+  // start the lifetime of a new poisoned object.
+  zxio_init(io, nullptr);
   return status;
 }
 

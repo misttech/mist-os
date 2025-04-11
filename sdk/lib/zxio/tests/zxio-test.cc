@@ -9,10 +9,10 @@
 #include <zxtest/zxtest.h>
 
 TEST(OpsTest, Close) {
-  zxio_ops_t ops;
-  memset(&ops, 0, sizeof(ops));
-  ops.close = [](zxio_t*, bool) { return ZX_OK; };
-
+  zxio_ops_t ops = {
+      .destroy = [](zxio_t*) {},
+      .close2 = [](zxio_t*) { return ZX_OK; },
+  };
   zxio_t io = {};
   ASSERT_EQ(nullptr, zxio_get_ops(&io));
 
@@ -23,10 +23,10 @@ TEST(OpsTest, Close) {
 }
 
 TEST(OpsTest, CloseWillInvalidateTheObject) {
-  zxio_ops_t ops;
-  memset(&ops, 0, sizeof(ops));
-  ops.close = [](zxio_t*, bool) { return ZX_OK; };
-
+  zxio_ops_t ops = {
+      .destroy = [](zxio_t*) {},
+      .close2 = [](zxio_t*) { return ZX_OK; },
+  };
   zxio_t io = {};
   zxio_init(&io, &ops);
   ASSERT_OK(zxio_close(&io, /*should_wait=*/true));

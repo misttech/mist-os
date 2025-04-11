@@ -59,15 +59,15 @@ zxio library will internally synchronize any local state changes.
 A zxio object must be fully created with one of the `zxio_create..()` functions
 before it can be used.
 
-A zxio object is destroyed with the `zxio_close()` call. The caller is responsible
+A zxio object is destroyed with the `zxio_destroy()` call. The caller is responsible
 for ensuring that the zxio object is not in use on any thread before calling
-`zxio_close()`. The `zxio_close()` operations always destroys the object and frees
+`zxio_destroy()`. The `zxio_destroy()` operations always destroys the object and frees
 any resources associated with the object even in error cases. The close
 operation cannot be retried.
 
 The storage underlying the zxio object should not be modified except by the zxio
 library or custom object implementations and must remain valid until after
-`zxio_close()` returns.
+`zxio_destroy()` returns.
 
 ### Intrusive and compound operations
 
@@ -78,7 +78,7 @@ object and have additional considerations.
 destructive on the object. The caller is responsible for ensuring that the zxio
 object is not in use on any thread before calling `zxio_release()`. After
 calling `zxio_release()`, the only operation that is safe to perform on the zxio
-object is `zxio_close()`. `zxio_close()` must be called before the storage
+object is `zxio_destroy()`. `zxio_destroy()` must be called before the storage
 underlying the object is deallocated.
 
 - `zxio_borrow()` returns a handle to the zxio object's primary object if it

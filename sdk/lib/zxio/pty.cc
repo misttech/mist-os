@@ -29,9 +29,10 @@ class Pty : public HasIo {
   Pty(fidl::ClientEnd<fuchsia_hardware_pty::Device> client_end, zx::eventpair event)
       : HasIo(kOps), client_(std::move(client_end)), event_(std::move(event)) {}
 
-  zx_status_t Close(const bool should_wait) {
-    auto destroy = fit::defer([this] { this->~Pty(); });
-    if (client_.is_valid() && should_wait) {
+  void Destroy() { this->~Pty(); }
+
+  zx_status_t Close() {
+    if (client_.is_valid()) {
       const fidl::WireResult result = client_->Close();
       if (!result.ok()) {
         return result.status();
@@ -190,7 +191,8 @@ class Pty : public HasIo {
 constexpr zxio_ops_t Pty::kOps = ([]() {
   using Adaptor = Adaptor<Pty>;
   zxio_ops_t ops = zxio_default_ops;
-  ops.close = Adaptor::From<&Pty::Close>;
+  ops.destroy = Adaptor::From<&Pty::Destroy>;
+  ops.close2 = Adaptor::From<&Pty::Close>;
   ops.release = Adaptor::From<&Pty::Release>;
   ops.borrow = Adaptor::From<&Pty::Borrow>;
   ops.clone = Adaptor::From<&Pty::Clone>;

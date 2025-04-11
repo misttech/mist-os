@@ -1490,7 +1490,7 @@ impl Zxio {
 impl Drop for Zxio {
     fn drop(&mut self) {
         unsafe {
-            zxio::zxio_close(self.as_ptr(), /* should_wait= */ false);
+            zxio::zxio_destroy(self.as_ptr());
         };
     }
 }

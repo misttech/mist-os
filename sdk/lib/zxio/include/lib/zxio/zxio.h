@@ -31,8 +31,8 @@ __BEGIN_CDECLS
 // Threading model
 
 // Most operations on zxio objects can be called concurrently from any thread.
-// However, the caller needs to synchronize |zxio_close| with other operations.
-// Specifically, no operations may be called concurrently with |zxio_close| on
+// However, the caller needs to synchronize |zxio_destroy| with other operations.
+// Specifically, no operations may be called concurrently with |zxio_destroy| on
 // the same zxio object.
 
 // Node
@@ -40,11 +40,11 @@ __BEGIN_CDECLS
 // Creates a new zxio_t object wrapping |handle| into the provided storage.
 //
 // On success, this function returns ZX_OK and initializes a zxio_t instance in
-// |storage->io|. The caller is responsible for calling zxio_close() on this
+// |storage->io|. The caller is responsible for calling zxio_destroy() on this
 // object when done with it.
 //
 // If |handle| is valid but is not a type that zxio recognizes the zxio_t
-// instance will support at least zxio_close() and zxio_release() to close and
+// instance will support at least zxio_destroy() and zxio_release() to destroy and
 // retrieve the contained value.
 //
 // May block to communicate with the server about the state of the object.
@@ -117,6 +117,15 @@ ZXIO_EXPORT zx_status_t zxio_create_with_info(zx_handle_t handle,
 //     |zx_handle_t| vmo containing the file contents
 //     |zx_handle_t| stream referring to the file contents and offset
 zx_status_t zxio_create_with_type(zxio_storage_t* storage, zxio_object_type_t type, ...);
+
+// Destroys |io|.
+//
+// For remote objects, this will typically not involve a round-trip with the remote object, which
+// means connections will be closed asynchronously. Use `zxio_close` to synchronously close remote
+// objects.
+//
+// Always consumes |io|.
+ZXIO_EXPORT void zxio_destroy(zxio_t* io);
 
 // Attempt to close |io|.
 //

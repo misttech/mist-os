@@ -2447,13 +2447,16 @@ static SynchronousDatagramSocket::Storage& zxio_synchronous_datagram_socket(zxio
 static constexpr zxio_ops_t zxio_synchronous_datagram_socket_ops = []() {
   zxio_ops_t ops = zxio_default_socket_ops;
   ops.attr_get = AttrGet<ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET>;
-  ops.close = [](zxio_t* io, const bool should_wait) {
+  ops.destroy = [](zxio_t* io) {
+    SynchronousDatagramSocket::Storage& zs = zxio_synchronous_datagram_socket(io);
+    zs.~Storage();
+  };
+  ops.close2 = [](zxio_t* io) {
     SynchronousDatagramSocket::Storage& zs = zxio_synchronous_datagram_socket(io);
     zx_status_t status = ZX_OK;
-    if (zs.client.is_valid() && should_wait) {
+    if (zs.client.is_valid()) {
       status = base_socket(zs.client).CloseSocket();
     }
-    zs.~Storage();
     return status;
   };
   ops.release = [](zxio_t* io, zx_handle_t* out_handle) {
@@ -2988,13 +2991,16 @@ struct datagram_socket
 static constexpr zxio_ops_t zxio_datagram_socket_ops = []() {
   zxio_ops_t ops = zxio_default_socket_ops;
   ops.attr_get = AttrGet<ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET>;
-  ops.close = [](zxio_t* io, const bool should_wait) {
+  ops.destroy = [](zxio_t* io) {
+    zxio_datagram_socket_t& zs = zxio_datagram_socket(io);
+    zs.~zxio_datagram_socket();
+  };
+  ops.close2 = [](zxio_t* io) {
     zxio_datagram_socket_t& zs = zxio_datagram_socket(io);
     zx_status_t status = ZX_OK;
-    if (zs.client.is_valid() && should_wait) {
+    if (zs.client.is_valid()) {
       status = base_socket(zs.client).CloseSocket();
     }
-    zs.~zxio_datagram_socket();
     return status;
   };
   ops.release = [](zxio_t* io, zx_handle_t* out_handle) {
@@ -3380,13 +3386,16 @@ struct stream_socket : public socket_with_zx_socket<fidl::WireSyncClient<fsocket
 static constexpr zxio_ops_t zxio_stream_socket_ops = []() {
   zxio_ops_t ops = zxio_default_socket_ops;
   ops.attr_get = AttrGet<ZXIO_OBJECT_TYPE_STREAM_SOCKET>;
-  ops.close = [](zxio_t* io, const bool should_wait) {
+  ops.destroy = [](zxio_t* io) {
+    zxio_stream_socket_t& zs = zxio_stream_socket(io);
+    zs.~zxio_stream_socket_t();
+  };
+  ops.close2 = [](zxio_t* io) {
     zxio_stream_socket_t& zs = zxio_stream_socket(io);
     zx_status_t status = ZX_OK;
-    if (zs.client.is_valid() && should_wait) {
+    if (zs.client.is_valid()) {
       status = base_socket(zs.client).CloseSocket();
     }
-    zs.~zxio_stream_socket_t();
     return status;
   };
   ops.release = [](zxio_t* io, zx_handle_t* out_handle) {
@@ -3603,13 +3612,16 @@ static RawSocket::Storage& zxio_raw_socket(zxio_t* io) {
 static constexpr zxio_ops_t zxio_raw_socket_ops = []() {
   zxio_ops_t ops = zxio_default_socket_ops;
   ops.attr_get = AttrGet<ZXIO_OBJECT_TYPE_RAW_SOCKET>;
-  ops.close = [](zxio_t* io, const bool should_wait) {
+  ops.destroy = [](zxio_t* io) {
+    RawSocket::Storage& zs = zxio_raw_socket(io);
+    zs.~Storage();
+  };
+  ops.close2 = [](zxio_t* io) {
     RawSocket::Storage& zs = zxio_raw_socket(io);
     zx_status_t status = ZX_OK;
-    if (zs.client.is_valid() && should_wait) {
+    if (zs.client.is_valid()) {
       status = base_socket(zs.client).CloseSocket();
     }
-    zs.~Storage();
     return status;
   };
   ops.release = [](zxio_t* io, zx_handle_t* out_handle) {
@@ -3809,13 +3821,16 @@ static PacketSocket::Storage& zxio_packet_socket(zxio_t* io) {
 static constexpr zxio_ops_t zxio_packet_socket_ops = []() {
   zxio_ops_t ops = zxio_default_socket_ops;
   ops.attr_get = AttrGet<ZXIO_OBJECT_TYPE_PACKET_SOCKET>;
-  ops.close = [](zxio_t* io, const bool should_wait) {
+  ops.destroy = [](zxio_t* io) {
+    PacketSocket::Storage& zs = zxio_packet_socket(io);
+    zs.~Storage();
+  };
+  ops.close2 = [](zxio_t* io) {
     PacketSocket::Storage& zs = zxio_packet_socket(io);
     zx_status_t status = ZX_OK;
-    if (zs.client.is_valid() && should_wait) {
+    if (zs.client.is_valid()) {
       status = base_socket(zs.client).CloseSocket();
     }
-    zs.~Storage();
     return status;
   };
   ops.release = [](zxio_t* io, zx_handle_t* out_handle) {

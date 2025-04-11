@@ -22,16 +22,17 @@ __BEGIN_CDECLS
 // table to actually perform the operation. Use |zxio_init| to initialize a
 // zxio_t with a custom operations table.
 typedef struct zxio_ops {
-  // Releases all resources held by |io|.
-  // After |close| returns, any further ops must not be called relative to |io|.
-  //
-  // The parameter |should_wait| indicates whether the function should wait for a response from
-  // remote connections. If set to |false|, the function will not wait for the operation to be
-  // acknowledged.
+  // Releases all resources held by |io|. No further ops may be called after invoking |destroy|.
+  void (*destroy)(zxio_t* io);
+
+  // TODO(https://fxbug.dev/409665751): DEPRECATED. Use close2.
   zx_status_t (*close)(zxio_t* io, bool should_wait);
 
+  // See `zxio_close`.
+  zx_status_t (*close2)(zxio_t* io);
+
   // After |release| returns, any further ops most not be called relative to |io|,
-  // except |close|.
+  // except |destroy|.
   zx_status_t (*release)(zxio_t* io, zx_handle_t* out_handle);
 
   zx_status_t (*borrow)(zxio_t* io, zx_handle_t* out_handle);

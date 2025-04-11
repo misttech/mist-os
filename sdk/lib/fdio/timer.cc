@@ -48,10 +48,9 @@ bool timespec_to_duration(const struct timespec* spec, zx::duration* out_duratio
   return true;
 }
 
-zx_status_t fdio_timer_close(zxio_t* io, const bool should_wait) {
+void fdio_timer_destroy(zxio_t* io) {
   auto* timer = reinterpret_cast<fdio_timer_t*>(io);
   timer->~fdio_timer_t();
-  return ZX_OK;
 }
 
 zx_status_t fdio_timer_readv(zxio_t* io, const zx_iovec_t* vector, size_t vector_count,
@@ -116,7 +115,7 @@ void fdio_timer_wait_end(zxio_t* io, zx_signals_t zx_signals, zxio_signals_t* ou
 
 constexpr zxio_ops_t fdio_timer_ops = []() {
   zxio_ops_t ops = zxio_default_ops;
-  ops.close = fdio_timer_close;
+  ops.destroy = fdio_timer_destroy;
   ops.readv = fdio_timer_readv;
   ops.wait_begin = fdio_timer_wait_begin;
   ops.wait_end = fdio_timer_wait_end;
