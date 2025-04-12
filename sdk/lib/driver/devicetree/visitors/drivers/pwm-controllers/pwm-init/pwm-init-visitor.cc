@@ -16,12 +16,12 @@ namespace pwm_init_visitor_dt {
 
 zx::result<> PwmInitVisitor::AddChildNodeSpec(fdf_devicetree::Node& child) {
   std::vector bind_rules = {
-      fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP, bind_fuchsia_pwm::BIND_INIT_STEP_PWM)};
+      fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_pwm::BIND_INIT_STEP_PWM)};
 
   std::vector bind_properties = {
-      fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_pwm::BIND_INIT_STEP_PWM)};
+      fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_pwm::BIND_INIT_STEP_PWM)};
 
-  auto pwm_init_node = fuchsia_driver_framework::ParentSpec2{{bind_rules, bind_properties}};
+  auto pwm_init_node = fuchsia_driver_framework::ParentSpec{{bind_rules, bind_properties}};
 
   child.AddNodeSpec(pwm_init_node);
   FDF_LOG(DEBUG, "Added pwm init node spec of to '%s'.", child.name().c_str());

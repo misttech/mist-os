@@ -889,8 +889,8 @@ mod tests {
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
             // Check the value from the 'test-bind' binary. This should match my-driver.cm
-            let property = fdf::NodeProperty2 {
-                key: "fuchsia.BIND_PROTOCOL".to_string(),
+            let property = fdf::NodeProperty {
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(1),
             };
             let args =
@@ -918,8 +918,8 @@ mod tests {
             }
 
             // Check the value from the 'test-bind2' binary. This should match my-driver2.cm
-            let property = fdf::NodeProperty2 {
-                key: "fuchsia.BIND_PROTOCOL".to_string(),
+            let property = fdf::NodeProperty {
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
             let args =
@@ -947,8 +947,8 @@ mod tests {
             }
 
             // Check an unknown value. This should return the NOT_FOUND error.
-            let property = fdf::NodeProperty2 {
-                key: "fuchsia.BIND_PROTOCOL".to_string(),
+            let property = fdf::NodeProperty {
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(3),
             };
             let args =
@@ -1161,8 +1161,8 @@ mod tests {
 
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
-            let property = fdf::NodeProperty2 {
-                key: "fuchsia.BIND_PROTOCOL".to_string(),
+            let property = fdf::NodeProperty {
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
             let args =
@@ -1230,8 +1230,8 @@ mod tests {
 
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
-            let property = fdf::NodeProperty2 {
-                key: "fuchsia.BIND_PROTOCOL".to_string(),
+            let property = fdf::NodeProperty {
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
             let args = fdi::MatchDriverArgs {
@@ -1339,8 +1339,8 @@ mod tests {
         let development_task =
             run_driver_development_server(index.clone(), development_stream).fuse();
         let test_task = async move {
-            let property = fdf::NodeProperty2 {
-                key: "fuchsia.BIND_PROTOCOL".to_string(),
+            let property = fdf::NodeProperty {
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
             let args = fdi::MatchDriverArgs {
@@ -1479,8 +1479,8 @@ mod tests {
 
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
-            let property = fdf::NodeProperty2 {
-                key: "fuchsia.BIND_PROTOCOL".to_string(),
+            let property = fdf::NodeProperty {
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
             let args =
@@ -1578,8 +1578,8 @@ mod tests {
 
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
-            let property = fdf::NodeProperty2 {
-                key: "fuchsia.BIND_PROTOCOL".to_string(),
+            let property = fdf::NodeProperty {
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
             let args =
@@ -1831,8 +1831,8 @@ mod tests {
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
 
         execute_driver_index_test(index, stream, async move {
-            let property = fdf::NodeProperty2 {
-                key: "fuchsia.BIND_PROTOCOL".to_string(),
+            let property = fdf::NodeProperty {
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
             let args =
@@ -1865,8 +1865,8 @@ mod tests {
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>();
 
         execute_driver_index_test(index, stream, async move {
-            let property = fdf::NodeProperty2 {
-                key: "fuchsia.BIND_PROTOCOL".to_string(),
+            let property = fdf::NodeProperty {
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
             let args =
@@ -1904,8 +1904,8 @@ mod tests {
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
             // Check the value from the 'test-bind' binary. This should match my-driver.cm
-            let property = fdf::NodeProperty2 {
-                key: "fuchsia.BIND_PROTOCOL".to_string(),
+            let property = fdf::NodeProperty {
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(1),
             };
             let args =
@@ -1927,8 +1927,8 @@ mod tests {
             }
 
             // Check the value from the 'test-bind2' binary. This should match my-driver2.cm
-            let property = fdf::NodeProperty2 {
-                key: "fuchsia.BIND_PROTOCOL".to_string(),
+            let property = fdf::NodeProperty {
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
             let args =
@@ -1950,8 +1950,8 @@ mod tests {
             }
 
             // Check an unknown value. This should return the NOT_FOUND error.
-            let property = fdf::NodeProperty2 {
-                key: "fuchsia.BIND_PROTOCOL".to_string(),
+            let property = fdf::NodeProperty {
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(3),
             };
             let args =
@@ -2223,8 +2223,8 @@ mod tests {
                     .unwrap()
             );
 
-            let node_1_props_nonmatch = vec![fdf::NodeProperty2 {
-                key: "trembler".to_string(),
+            let node_1_props_nonmatch = vec![fdf::NodeProperty {
+                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
                 value: fdf::NodePropertyValue::StringValue("catbird".to_string()),
             }];
 
@@ -2242,8 +2242,8 @@ mod tests {
                     .unwrap()
             );
 
-            let node_2_props_nonmatch = vec![fdf::NodeProperty2 {
-                key: "testkey_1".to_string(),
+            let node_2_props_nonmatch = vec![fdf::NodeProperty {
+                key: fdf::NodePropertyKey::StringValue("testkey_1".to_string()),
                 value: fdf::NodePropertyValue::IntValue(10),
             }];
 
@@ -2385,8 +2385,8 @@ mod tests {
                     .unwrap()
             );
 
-            let node_1_props_nonmatch = vec![fdf::NodeProperty2 {
-                key: "trembler".to_string(),
+            let node_1_props_nonmatch = vec![fdf::NodeProperty {
+                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
                 value: fdf::NodePropertyValue::StringValue("catbird".to_string()),
             }];
 
@@ -2404,8 +2404,8 @@ mod tests {
                     .unwrap()
             );
 
-            let node_2_props_nonmatch = vec![fdf::NodeProperty2 {
-                key: "testkey_1".to_string(),
+            let node_2_props_nonmatch = vec![fdf::NodeProperty {
+                key: fdf::NodePropertyKey::StringValue("testkey_1".to_string()),
                 value: fdf::NodePropertyValue::IntValue(10),
             }];
 
@@ -2521,8 +2521,8 @@ mod tests {
             let optional_1_bind_rules =
                 vec![make_accept("testkey_1", fdf::NodePropertyValue::IntValue(10))];
 
-            let optional_1_props_match = vec![fdf::NodeProperty2 {
-                key: "thrasher".to_string(),
+            let optional_1_props_match = vec![fdf::NodeProperty {
+                key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
                 value: fdf::NodePropertyValue::StringValue("trembler".to_string()),
             }];
 
@@ -2996,8 +2996,8 @@ mod tests {
             let optional_1_bind_rules =
                 vec![make_accept("testkey_2", fdf::NodePropertyValue::IntValue(10))];
 
-            let optional_1_props_match = vec![fdf::NodeProperty2 {
-                key: "thrasher".to_string(),
+            let optional_1_props_match = vec![fdf::NodeProperty {
+                key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
                 value: fdf::NodePropertyValue::StringValue("trembler".to_string()),
             }];
 
@@ -3021,8 +3021,8 @@ mod tests {
                     .unwrap()
             );
 
-            let device_properties_match = vec![fdf::NodeProperty2 {
-                key: "testkey_2".to_string(),
+            let device_properties_match = vec![fdf::NodeProperty {
+                key: fdf::NodePropertyKey::StringValue("testkey_2".to_string()),
                 value: fdf::NodePropertyValue::IntValue(10),
             }];
             let match_args = fdi::MatchDriverArgs {
@@ -3215,16 +3215,16 @@ mod tests {
 
         let test_task = async move {
             let bind_rules = vec![
-                fdf::BindRule2 {
-                    key: "testkey20".to_string(),
+                fdf::BindRule {
+                    key: fdf::NodePropertyKey::StringValue("testkey20".to_string()),
                     condition: fdf::Condition::Accept,
                     values: vec![
                         fdf::NodePropertyValue::IntValue(200),
                         fdf::NodePropertyValue::IntValue(150),
                     ],
                 },
-                fdf::BindRule2 {
-                    key: "testkey20".to_string(),
+                fdf::BindRule {
+                    key: fdf::NodePropertyKey::StringValue("testkey20".to_string()),
                     condition: fdf::Condition::Accept,
                     values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
                 },
@@ -3283,8 +3283,8 @@ mod tests {
             fasync::Timer::new(std::time::Duration::from_millis(100)).await;
 
             // These properties match the bind rules for the "test-bind-componenet.cm".
-            let property = fdf::NodeProperty2 {
-                key: "fuchsia.BIND_PROTOCOL".to_string(),
+            let property = fdf::NodeProperty {
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(1),
             };
             let args =

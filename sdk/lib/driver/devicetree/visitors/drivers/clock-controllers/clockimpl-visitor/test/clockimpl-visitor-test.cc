@@ -138,33 +138,33 @@ TEST(ClockImplVisitorTest, TestClocksProperty) {
 
       auto mgr_request = clock_tester->env().SyncCall(
           &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, mgr_request_idx++);
-      ASSERT_TRUE(mgr_request.parents2().has_value());
-      ASSERT_EQ(3lu, mgr_request.parents2()->size());
+      ASSERT_TRUE(mgr_request.parents().has_value());
+      ASSERT_EQ(3lu, mgr_request.parents()->size());
 
       // 1st parent is pdev. Skipping that.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty2(bind_fuchsia_hardware_clock::SERVICE,
-                               bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-            fdf::MakeProperty2(bind_fuchsia_clock::FUNCTION,
-                               "fuchsia.clock.FUNCTION." + std::string(CLK1_NAME))}},
-          (*mgr_request.parents2())[1].properties(), false));
+          {{fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                              bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+            fdf::MakeProperty(bind_fuchsia_clock::FUNCTION,
+                              "fuchsia.clock.FUNCTION." + std::string(CLK1_NAME))}},
+          (*mgr_request.parents())[1].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_clock::SERVICE,
-                                     bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-            fdf::MakeAcceptBindRule2(bind_fuchsia::CLOCK_ID, static_cast<uint32_t>(CLK_ID1))}},
-          (*mgr_request.parents2())[1].bind_rules(), false));
+          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                                    bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+            fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, static_cast<uint32_t>(CLK_ID1))}},
+          (*mgr_request.parents())[1].bind_rules(), false));
 
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty2(bind_fuchsia_hardware_clock::SERVICE,
-                               bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-            fdf::MakeProperty2(bind_fuchsia_clock::FUNCTION,
-                               "fuchsia.clock.FUNCTION." + std::string(CLK2_NAME))}},
-          (*mgr_request.parents2())[2].properties(), false));
+          {{fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                              bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+            fdf::MakeProperty(bind_fuchsia_clock::FUNCTION,
+                              "fuchsia.clock.FUNCTION." + std::string(CLK2_NAME))}},
+          (*mgr_request.parents())[2].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_clock::SERVICE,
-                                     bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-            fdf::MakeAcceptBindRule2(bind_fuchsia::CLOCK_ID, static_cast<uint32_t>(CLK_ID2))}},
-          (*mgr_request.parents2())[2].bind_rules(), false));
+          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                                    bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+            fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, static_cast<uint32_t>(CLK_ID2))}},
+          (*mgr_request.parents())[2].bind_rules(), false));
 
       node_tested_count++;
     }
@@ -175,34 +175,34 @@ TEST(ClockImplVisitorTest, TestClocksProperty) {
 
       auto mgr_request = clock_tester->env().SyncCall(
           &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, mgr_request_idx++);
-      ASSERT_TRUE(mgr_request.parents2().has_value());
-      ASSERT_EQ(4lu, mgr_request.parents2()->size());
+      ASSERT_TRUE(mgr_request.parents().has_value());
+      ASSERT_EQ(4lu, mgr_request.parents()->size());
 
       // 1st parent is pdev. Skipping that.
 
       // 2nd is the clock impl parent.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty2(bind_fuchsia_hardware_clock::SERVICE,
-                               bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT)}},
-          (*mgr_request.parents2())[1].properties(), false));
+          {{fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                              bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT)}},
+          (*mgr_request.parents())[1].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_clock::SERVICE,
-                                     bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-            fdf::MakeAcceptBindRule2(bind_fuchsia::CLOCK_ID, static_cast<uint32_t>(CLK_ID6))}},
-          (*mgr_request.parents2())[1].bind_rules(), false));
+          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                                    bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+            fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, static_cast<uint32_t>(CLK_ID6))}},
+          (*mgr_request.parents())[1].bind_rules(), false));
 
-      // The rest are init step clock parents2.
+      // The rest are init step clock parents.
       for (size_t i = 2; i < 4; i++) {
         EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
             {{
-                fdf::MakeProperty2(bind_fuchsia::INIT_STEP,
-                                   bind_fuchsia_clock::BIND_INIT_STEP_CLOCK),
+                fdf::MakeProperty(bind_fuchsia::INIT_STEP,
+                                  bind_fuchsia_clock::BIND_INIT_STEP_CLOCK),
             }},
-            (*mgr_request.parents2())[i].properties(), false));
+            (*mgr_request.parents())[i].properties(), false));
         EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-            {{fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP,
-                                       bind_fuchsia_clock::BIND_INIT_STEP_CLOCK)}},
-            (*mgr_request.parents2())[i].bind_rules(), false));
+            {{fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
+                                      bind_fuchsia_clock::BIND_INIT_STEP_CLOCK)}},
+            (*mgr_request.parents())[i].bind_rules(), false));
       }
       node_tested_count++;
     }

@@ -96,27 +96,27 @@ zx_status_t Sherlock::MaliInit() {
     fidl::Arena<> fidl_arena;
     fdf::Arena arena('MALI');
 
-    auto aml_gpu_register_reset_node = fuchsia_driver_framework::ParentSpec2{{
+    auto aml_gpu_register_reset_node = fuchsia_driver_framework::ParentSpec{{
         .bind_rules =
             {
-                fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_registers::SERVICE,
-                                         bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
-                fdf::MakeAcceptBindRule2(bind_fuchsia_register::NAME,
-                                         bind_fuchsia_amlogic_platform::NAME_REGISTER_MALI_RESET),
+                fdf::MakeAcceptBindRule(bind_fuchsia_hardware_registers::SERVICE,
+                                        bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
+                fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME,
+                                        bind_fuchsia_amlogic_platform::NAME_REGISTER_MALI_RESET),
             },
         .properties =
             {
-                fdf::MakeProperty2(bind_fuchsia_hardware_registers::SERVICE,
-                                   bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
-                fdf::MakeProperty2(bind_fuchsia_register::NAME,
-                                   bind_fuchsia_amlogic_platform::NAME_REGISTER_MALI_RESET),
+                fdf::MakeProperty(bind_fuchsia_hardware_registers::SERVICE,
+                                  bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
+                fdf::MakeProperty(bind_fuchsia_register::NAME,
+                                  bind_fuchsia_amlogic_platform::NAME_REGISTER_MALI_RESET),
             },
     }};
 
-    auto parents = std::vector<fuchsia_driver_framework::ParentSpec2>{aml_gpu_register_reset_node};
+    auto parents = std::vector<fuchsia_driver_framework::ParentSpec>{aml_gpu_register_reset_node};
 
     auto composite_node_spec = fuchsia_driver_framework::CompositeNodeSpec(
-        {.name = "aml-gpu-composite", .parents2 = parents});
+        {.name = "aml-gpu-composite", .parents = parents});
 
     auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
         fidl::ToWire(fidl_arena, aml_gpu_dev), fidl::ToWire(fidl_arena, composite_node_spec));
@@ -146,18 +146,18 @@ zx_status_t Sherlock::MaliInit() {
     fdf::Arena arena('MALI');
 
     auto aml_gpu_bind_rules = std::vector{
-        fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_gpu_mali::SERVICE,
-                                 bind_fuchsia_hardware_gpu_mali::SERVICE_DRIVERTRANSPORT)};
+        fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpu_mali::SERVICE,
+                                bind_fuchsia_hardware_gpu_mali::SERVICE_DRIVERTRANSPORT)};
 
     auto aml_gpu_properties =
-        std::vector{fdf::MakeProperty2(bind_fuchsia_hardware_gpu_mali::SERVICE,
-                                       bind_fuchsia_hardware_gpu_mali::SERVICE_DRIVERTRANSPORT)};
+        std::vector{fdf::MakeProperty(bind_fuchsia_hardware_gpu_mali::SERVICE,
+                                      bind_fuchsia_hardware_gpu_mali::SERVICE_DRIVERTRANSPORT)};
 
     auto parents =
-        std::vector{fuchsia_driver_framework::ParentSpec2(aml_gpu_bind_rules, aml_gpu_properties)};
+        std::vector{fuchsia_driver_framework::ParentSpec(aml_gpu_bind_rules, aml_gpu_properties)};
 
-    auto composite_node_spec = fuchsia_driver_framework::CompositeNodeSpec(
-        {.name = "mali-composite", .parents2 = parents});
+    auto composite_node_spec =
+        fuchsia_driver_framework::CompositeNodeSpec({.name = "mali-composite", .parents = parents});
 
     auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
         fidl::ToWire(fidl_arena, mali_dev), fidl::ToWire(fidl_arena, composite_node_spec));

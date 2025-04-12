@@ -94,26 +94,26 @@ zx::result<> MailboxVisitor::Visit(fdf_devicetree::Node& node,
 
     controller_info_[channel->first.id()].push_back({{.channel = channel->second}});
 
-    fuchsia_driver_framework::ParentSpec2 parent_spec{{
+    fuchsia_driver_framework::ParentSpec parent_spec{{
         .bind_rules =
             {
-                fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_mailbox::SERVICE,
-                                         bind_fuchsia_hardware_mailbox::SERVICE_ZIRCONTRANSPORT),
-                fdf::MakeAcceptBindRule2(bind_fuchsia_mailbox::CONTROLLER_ID, channel->first.id()),
-                fdf::MakeAcceptBindRule2(bind_fuchsia_mailbox::CHANNEL, channel->second),
+                fdf::MakeAcceptBindRule(bind_fuchsia_hardware_mailbox::SERVICE,
+                                        bind_fuchsia_hardware_mailbox::SERVICE_ZIRCONTRANSPORT),
+                fdf::MakeAcceptBindRule(bind_fuchsia_mailbox::CONTROLLER_ID, channel->first.id()),
+                fdf::MakeAcceptBindRule(bind_fuchsia_mailbox::CHANNEL, channel->second),
             },
         .properties =
             {
-                fdf::MakeProperty2(bind_fuchsia_hardware_mailbox::SERVICE,
-                                   bind_fuchsia_hardware_mailbox::SERVICE_ZIRCONTRANSPORT),
-                fdf::MakeProperty2(bind_fuchsia_mailbox::CONTROLLER_ID, local_controller_id),
-                fdf::MakeProperty2(bind_fuchsia_mailbox::CHANNEL, channel->second),
+                fdf::MakeProperty(bind_fuchsia_hardware_mailbox::SERVICE,
+                                  bind_fuchsia_hardware_mailbox::SERVICE_ZIRCONTRANSPORT),
+                fdf::MakeProperty(bind_fuchsia_mailbox::CONTROLLER_ID, local_controller_id),
+                fdf::MakeProperty(bind_fuchsia_mailbox::CHANNEL, channel->second),
             },
     }};
 
     if (channel_name_it != channel_names.cend()) {
       parent_spec.properties().push_back(
-          fdf::MakeProperty2(bind_fuchsia_mailbox::CHANNEL_NAME, *channel_name_it));
+          fdf::MakeProperty(bind_fuchsia_mailbox::CHANNEL_NAME, *channel_name_it));
       *channel_name_it++;
     }
 

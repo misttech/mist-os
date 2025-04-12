@@ -17,14 +17,14 @@ namespace amlogic_canvas_dt {
 
 zx::result<> AmlogicCanvasVisitor::AddChildNodeSpec(fdf_devicetree::Node& child) {
   std::vector bind_rules = {
-      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
-                               bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT)};
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
+                              bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT)};
 
   std::vector bind_properties = {
-      fdf::MakeProperty2(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
-                         bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT)};
+      fdf::MakeProperty(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
+                        bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT)};
 
-  auto amlogic_canvas_node = fuchsia_driver_framework::ParentSpec2{{bind_rules, bind_properties}};
+  auto amlogic_canvas_node = fuchsia_driver_framework::ParentSpec{{bind_rules, bind_properties}};
 
   child.AddNodeSpec(amlogic_canvas_node);
   FDF_LOG(DEBUG, "Added amlogic canvas node spec of to '%s'.", child.name().c_str());

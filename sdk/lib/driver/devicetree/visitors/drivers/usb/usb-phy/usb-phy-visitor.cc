@@ -84,48 +84,48 @@ zx::result<> UsbPhyVisitor::Visit(fdf_devicetree::Node& node,
 zx::result<> UsbPhyVisitor::AddChildNodeSpec(fdf_devicetree::Node& child,
                                              std::string_view phy_name) {
   std::vector bind_rules = {
-      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_usb_phy::SERVICE,
-                               bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
-      fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_VID,
-                               bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
-      fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_PID,
-                               bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_usb_phy::SERVICE,
+                              bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
+                              bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
+                              bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
 
   };
   std::vector bind_properties = {
-      fdf::MakeProperty2(bind_fuchsia_hardware_usb_phy::SERVICE,
-                         bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
-      fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_VID,
-                         bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
-      fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_PID,
-                         bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeProperty(bind_fuchsia_hardware_usb_phy::SERVICE,
+                        bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_PID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
 
   };
 
   if (phy_name == "xhci-phy") {
-    bind_rules.emplace_back(fdf::MakeAcceptBindRule2(
+    bind_rules.emplace_back(fdf::MakeAcceptBindRule(
         bind_fuchsia::PLATFORM_DEV_DID, bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_XHCI));
-    bind_properties.emplace_back(fdf::MakeProperty2(
+    bind_properties.emplace_back(fdf::MakeProperty(
         bind_fuchsia::PLATFORM_DEV_DID, bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_XHCI));
   } else if (phy_name == "dwc2-phy") {
-    bind_rules.emplace_back(fdf::MakeAcceptBindRule2(
+    bind_rules.emplace_back(fdf::MakeAcceptBindRule(
         bind_fuchsia::PLATFORM_DEV_DID, bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_USB_DWC2));
-    bind_properties.emplace_back(fdf::MakeProperty2(
+    bind_properties.emplace_back(fdf::MakeProperty(
         bind_fuchsia::PLATFORM_DEV_DID, bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_USB_DWC2));
   } else if (phy_name == "dwc3-phy") {
     bind_rules.emplace_back(
-        fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_DID,
-                                 bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_DID_DWC3));
+        fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
+                                bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_DID_DWC3));
     bind_properties.emplace_back(
-        fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_DID,
-                           bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_DID_DWC3));
+        fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                          bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_DID_DWC3));
   } else {
     FDF_LOG(ERROR, "Node '%s' has invalid phy-name '%s'.", child.name().c_str(),
             std::string(phy_name).c_str());
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  auto phy_node = fuchsia_driver_framework::ParentSpec2{{bind_rules, bind_properties}};
+  auto phy_node = fuchsia_driver_framework::ParentSpec{{bind_rules, bind_properties}};
 
   child.AddNodeSpec(phy_node);
 

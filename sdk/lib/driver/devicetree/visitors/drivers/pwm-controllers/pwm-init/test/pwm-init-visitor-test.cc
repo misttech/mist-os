@@ -47,17 +47,17 @@ TEST(PwmInitVisitorTest, TestMetadataAndBindProperty) {
       auto mgr_request = pwm_init_visitor_tester->env().SyncCall(
           &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, 0);
 
-      ASSERT_EQ(2lu, mgr_request.parents2()->size());
+      ASSERT_EQ(2lu, mgr_request.parents()->size());
 
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP,
-                                     bind_fuchsia_pwm::BIND_INIT_STEP_PWM)}},
-          (*mgr_request.parents2())[1].bind_rules(), false));
+          {{fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
+                                    bind_fuchsia_pwm::BIND_INIT_STEP_PWM)}},
+          (*mgr_request.parents())[1].bind_rules(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
           {{
-              fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_pwm::BIND_INIT_STEP_PWM),
+              fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_pwm::BIND_INIT_STEP_PWM),
           }},
-          (*mgr_request.parents2())[1].properties(), false));
+          (*mgr_request.parents())[1].properties(), false));
     }
   }
 

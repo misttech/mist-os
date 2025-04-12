@@ -59,50 +59,48 @@ zx_status_t Sherlock::LightInit() {
   tcs3400_light_node.metadata() = kTcs3400Metadata;
 
   const auto kI2cBindRules = std::vector{
-      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_i2c::SERVICE,
-                               bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_BUS_ID,
-                               bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_A0_0),
-      fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_ADDRESS,
-                               bind_fuchsia_i2c::BIND_I2C_ADDRESS_AMBIENTLIGHT),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
+                              bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_A0_0),
+      fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
+                              bind_fuchsia_i2c::BIND_I2C_ADDRESS_AMBIENTLIGHT),
   };
   const auto kI2cProperties = std::vector{
-      fdf::MakeProperty2(bind_fuchsia_hardware_i2c::SERVICE,
-                         bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeProperty2(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_A0_0),
-      fdf::MakeProperty2(bind_fuchsia::I2C_ADDRESS,
-                         bind_fuchsia_i2c::BIND_I2C_ADDRESS_AMBIENTLIGHT),
+      fdf::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
+                        bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_A0_0),
+      fdf::MakeProperty(bind_fuchsia::I2C_ADDRESS, bind_fuchsia_i2c::BIND_I2C_ADDRESS_AMBIENTLIGHT),
   };
 
   const auto kGpioLightInterruptRules = std::vector{
-      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_gpio::SERVICE,
-                               bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_PIN,
-                               bind_fuchsia_amlogic_platform_t931::GPIOAO_PIN_ID_PIN_5),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
+                              bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              bind_fuchsia_amlogic_platform_t931::GPIOAO_PIN_ID_PIN_5),
   };
   const auto kGpioLightInterruptProperties = std::vector{
-      fdf::MakeProperty2(bind_fuchsia_hardware_gpio::SERVICE,
-                         bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeProperty2(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_LIGHT_INTERRUPT),
+      fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
+                        bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_LIGHT_INTERRUPT),
   };
 
   const auto kGpioInitBindRules = std::vector{
-      fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+      fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
   };
   const auto kGpioInitProperties = std::vector{
-      fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+      fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
   };
 
   auto kTcs3400LightParents = std::vector{
-      fuchsia_driver_framework::ParentSpec2{{
+      fuchsia_driver_framework::ParentSpec{{
           .bind_rules = kI2cBindRules,
           .properties = kI2cProperties,
       }},
-      fuchsia_driver_framework::ParentSpec2{{
+      fuchsia_driver_framework::ParentSpec{{
           .bind_rules = kGpioLightInterruptRules,
           .properties = kGpioLightInterruptProperties,
       }},
-      fuchsia_driver_framework::ParentSpec2{{
+      fuchsia_driver_framework::ParentSpec{{
           .bind_rules = kGpioInitBindRules,
           .properties = kGpioInitProperties,
       }},
@@ -112,7 +110,7 @@ zx_status_t Sherlock::LightInit() {
   fdf::Arena tcs3400_light_arena('TCS3');
 
   auto tcs3400_light_spec = fuchsia_driver_framework::CompositeNodeSpec{
-      {.name = "tcs3400_light", .parents2 = kTcs3400LightParents}};
+      {.name = "tcs3400_light", .parents = kTcs3400LightParents}};
   fdf::WireUnownedResult tsc3400_light_result =
       pbus_.buffer(tcs3400_light_arena)
           ->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tcs3400_light_node),
@@ -167,77 +165,77 @@ zx_status_t Sherlock::LightInit() {
   gpio_init_steps_.push_back(GpioOutput(GPIO_GREEN_LED, true));
 
   auto amber_led_gpio_bind_rules = std::vector{
-      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_gpio::SERVICE,
-                               bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_PIN,
-                               bind_fuchsia_amlogic_platform_t931::GPIOAO_PIN_ID_PIN_11),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
+                              bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              bind_fuchsia_amlogic_platform_t931::GPIOAO_PIN_ID_PIN_11),
   };
 
   auto amber_led_gpio_properties = std::vector{
-      fdf::MakeProperty2(bind_fuchsia_hardware_gpio::SERVICE,
-                         bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeProperty2(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_GPIO_AMBER_LED),
+      fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
+                        bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_GPIO_AMBER_LED),
   };
 
   auto amber_led_pwm_bind_rules = std::vector{
-      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_pwm::SERVICE,
-                               bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeAcceptBindRule2(bind_fuchsia::PWM_ID,
-                               bind_fuchsia_amlogic_platform_t931::BIND_PWM_ID_PWM_AO_A),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_pwm::SERVICE,
+                              bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID,
+                              bind_fuchsia_amlogic_platform_t931::BIND_PWM_ID_PWM_AO_A),
   };
 
   auto amber_led_pwm_properties = std::vector{
-      fdf::MakeProperty2(bind_fuchsia_hardware_pwm::SERVICE,
-                         bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeProperty2(bind_fuchsia_pwm::PWM_ID_FUNCTION,
-                         bind_fuchsia_pwm::PWM_ID_FUNCTION_AMBER_LED),
+      fdf::MakeProperty(bind_fuchsia_hardware_pwm::SERVICE,
+                        bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia_pwm::PWM_ID_FUNCTION,
+                        bind_fuchsia_pwm::PWM_ID_FUNCTION_AMBER_LED),
   };
 
   auto green_led_gpio_bind_rules = std::vector{
-      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_gpio::SERVICE,
-                               bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_PIN,
-                               bind_fuchsia_amlogic_platform_t931::GPIOH_PIN_ID_PIN_5),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
+                              bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              bind_fuchsia_amlogic_platform_t931::GPIOH_PIN_ID_PIN_5),
   };
 
   auto green_led_gpio_properties = std::vector{
-      fdf::MakeProperty2(bind_fuchsia_hardware_gpio::SERVICE,
-                         bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeProperty2(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_GPIO_GREEN_LED),
+      fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
+                        bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_GPIO_GREEN_LED),
   };
 
   auto green_led_pwm_bind_rules = std::vector{
-      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_pwm::SERVICE,
-                               bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeAcceptBindRule2(bind_fuchsia::PWM_ID,
-                               bind_fuchsia_amlogic_platform_t931::BIND_PWM_ID_PWM_F),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_pwm::SERVICE,
+                              bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID,
+                              bind_fuchsia_amlogic_platform_t931::BIND_PWM_ID_PWM_F),
   };
 
   auto green_led_pwm_properties = std::vector{
-      fdf::MakeProperty2(bind_fuchsia_hardware_pwm::SERVICE,
-                         bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeProperty2(bind_fuchsia_pwm::PWM_ID_FUNCTION,
-                         bind_fuchsia_pwm::PWM_ID_FUNCTION_GREEN_LED),
+      fdf::MakeProperty(bind_fuchsia_hardware_pwm::SERVICE,
+                        bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia_pwm::PWM_ID_FUNCTION,
+                        bind_fuchsia_pwm::PWM_ID_FUNCTION_GREEN_LED),
   };
 
   auto parents = std::vector{
-      fuchsia_driver_framework::ParentSpec2{{
+      fuchsia_driver_framework::ParentSpec{{
           .bind_rules = amber_led_gpio_bind_rules,
           .properties = amber_led_gpio_properties,
       }},
-      fuchsia_driver_framework::ParentSpec2{{
+      fuchsia_driver_framework::ParentSpec{{
           .bind_rules = amber_led_pwm_bind_rules,
           .properties = amber_led_pwm_properties,
       }},
-      fuchsia_driver_framework::ParentSpec2{{
+      fuchsia_driver_framework::ParentSpec{{
           .bind_rules = green_led_gpio_bind_rules,
           .properties = green_led_gpio_properties,
       }},
-      fuchsia_driver_framework::ParentSpec2{{
+      fuchsia_driver_framework::ParentSpec{{
           .bind_rules = green_led_pwm_bind_rules,
           .properties = green_led_pwm_properties,
       }},
-      fuchsia_driver_framework::ParentSpec2{{
+      fuchsia_driver_framework::ParentSpec{{
           .bind_rules = kGpioInitBindRules,
           .properties = kGpioInitProperties,
       }},
@@ -245,7 +243,7 @@ zx_status_t Sherlock::LightInit() {
 
   fdf::Arena arena('LIGH');
   auto aml_light_spec =
-      fuchsia_driver_framework::CompositeNodeSpec{{.name = "aml_light", .parents2 = parents}};
+      fuchsia_driver_framework::CompositeNodeSpec{{.name = "aml_light", .parents = parents}};
 
   fdf::WireUnownedResult result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, light_node), fidl::ToWire(fidl_arena, aml_light_spec));

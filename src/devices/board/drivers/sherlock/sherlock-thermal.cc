@@ -314,52 +314,52 @@ zx_status_t Sherlock::ThermalInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('SHER');
   {
-    std::vector<fdf::ParentSpec2> parents;
+    std::vector<fdf::ParentSpec> parents;
     parents.reserve(kClockFunctionMap.size() + kPwmIdMap.size() + 1);
-    parents.push_back(fuchsia_driver_framework::ParentSpec2{{
+    parents.push_back(fuchsia_driver_framework::ParentSpec{{
         .bind_rules =
             {
-                fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP,
-                                         bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+                fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
+                                        bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
             },
         .properties =
             {
-                fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+                fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
             },
     }});
 
     for (auto& [pwm_id, function] : kPwmIdMap) {
       auto rules = std::vector{
-          fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_pwm::SERVICE,
-                                   bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-          fdf::MakeAcceptBindRule2(bind_fuchsia::PWM_ID, pwm_id),
+          fdf::MakeAcceptBindRule(bind_fuchsia_hardware_pwm::SERVICE,
+                                  bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+          fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID, pwm_id),
       };
       auto properties = std::vector{
-          fdf::MakeProperty2(bind_fuchsia_hardware_pwm::SERVICE,
-                             bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-          fdf::MakeProperty2(bind_fuchsia_pwm::PWM_ID_FUNCTION, function),
+          fdf::MakeProperty(bind_fuchsia_hardware_pwm::SERVICE,
+                            bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+          fdf::MakeProperty(bind_fuchsia_pwm::PWM_ID_FUNCTION, function),
       };
-      parents.push_back(fdf::ParentSpec2{{rules, properties}});
+      parents.push_back(fdf::ParentSpec{{rules, properties}});
     }
 
     for (auto& [clock_id, function] : kClockFunctionMap) {
       auto rules = std::vector{
-          fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_clock::SERVICE,
-                                   bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-          fdf::MakeAcceptBindRule2(bind_fuchsia::CLOCK_ID, clock_id),
+          fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                                  bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+          fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, clock_id),
       };
       auto properties = std::vector{
-          fdf::MakeProperty2(bind_fuchsia_hardware_clock::SERVICE,
-                             bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-          fdf::MakeProperty2(bind_fuchsia_clock::FUNCTION, function),
+          fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                            bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+          fdf::MakeProperty(bind_fuchsia_clock::FUNCTION, function),
       };
-      parents.push_back(fdf::ParentSpec2{{rules, properties}});
+      parents.push_back(fdf::ParentSpec{{rules, properties}});
     }
 
     auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
         fidl::ToWire(fidl_arena, thermal_dev_pll),
         fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                     {.name = "aml_thermal_pll", .parents2 = parents}}));
+                                     {.name = "aml_thermal_pll", .parents = parents}}));
     if (!result.ok()) {
       zxlogf(ERROR, "AddCompositeNodeSpec SherlockThermal(thermal_dev_pll) request failed: %s",
              result.FormatDescription().data());

@@ -145,24 +145,24 @@ zx::result<> PwmVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
 
 zx::result<> PwmVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t id,
                                           std::optional<std::string_view> pwm_name) {
-  auto pwm_node = fuchsia_driver_framework::ParentSpec2{{
+  auto pwm_node = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_pwm::SERVICE,
-                                       bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeAcceptBindRule2(bind_fuchsia::PWM_ID, id),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_pwm::SERVICE,
+                                      bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID, id),
           },
       .properties =
           {
-              fdf::MakeProperty2(bind_fuchsia_hardware_pwm::SERVICE,
-                                 bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeProperty(bind_fuchsia_hardware_pwm::SERVICE,
+                                bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
           },
   }};
 
   if (pwm_name) {
     pwm_node.properties().push_back(
-        fdf::MakeProperty2(bind_fuchsia_pwm::PWM_ID_FUNCTION,
-                           "fuchsia.pwm.PWM_ID_FUNCTION." + std::string(*pwm_name)));
+        fdf::MakeProperty(bind_fuchsia_pwm::PWM_ID_FUNCTION,
+                          "fuchsia.pwm.PWM_ID_FUNCTION." + std::string(*pwm_name)));
   }
 
   child.AddNodeSpec(pwm_node);

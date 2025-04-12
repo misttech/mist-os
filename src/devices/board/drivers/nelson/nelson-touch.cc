@@ -28,51 +28,51 @@ namespace fpbus = fuchsia_hardware_platform_bus;
 
 namespace {
 const std::vector kI2cRules = {
-    fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_i2c::SERVICE,
-                             bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
-    fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_ADDRESS,
-                             bind_fuchsia_goodix_platform::BIND_I2C_ADDRESS_TOUCH),
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
+                            bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
+    fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
+                            bind_fuchsia_goodix_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 
 const std::vector kI2cProperties = {
-    fdf::MakeProperty2(bind_fuchsia_hardware_i2c::SERVICE,
-                       bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeProperty2(bind_fuchsia::I2C_ADDRESS,
-                       bind_fuchsia_goodix_platform::BIND_I2C_ADDRESS_TOUCH),
+    fdf::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
+                      bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeProperty(bind_fuchsia::I2C_ADDRESS,
+                      bind_fuchsia_goodix_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 
 const std::vector kInterruptRules = {
-    fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_gpio::SERVICE,
-                             bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_PIN,
-                             bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_4),
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
+                            bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                            bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_4),
 };
 
 const std::vector kInterruptProperties = {
-    fdf::MakeProperty2(bind_fuchsia_hardware_gpio::SERVICE,
-                       bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeProperty2(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_INTERRUPT)};
+    fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
+                      bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_INTERRUPT)};
 
 const std::vector kResetRules = {
-    fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_gpio::SERVICE,
-                             bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_PIN,
-                             bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_9),
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
+                            bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                            bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_9),
 };
 
 const std::vector kResetProperties = {
-    fdf::MakeProperty2(bind_fuchsia_hardware_gpio::SERVICE,
-                       bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeProperty2(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_RESET),
+    fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
+                      bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_RESET),
 };
 
 const std::vector kGpioInitRules = {
-    fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
 const std::vector kGpioInitProperties = {
-    fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 }  // namespace
 
@@ -93,26 +93,26 @@ zx_status_t Nelson::TouchInit() {
   touch_dev.boot_metadata() = touch_boot_metadata;
 
   auto parents = std::vector{
-      fuchsia_driver_framework::ParentSpec2{{
+      fuchsia_driver_framework::ParentSpec{{
           .bind_rules = kI2cRules,
           .properties = kI2cProperties,
       }},
-      fuchsia_driver_framework::ParentSpec2{{
+      fuchsia_driver_framework::ParentSpec{{
           .bind_rules = kInterruptRules,
           .properties = kInterruptProperties,
       }},
-      fuchsia_driver_framework::ParentSpec2{{
+      fuchsia_driver_framework::ParentSpec{{
           .bind_rules = kResetRules,
           .properties = kResetProperties,
       }},
-      fuchsia_driver_framework::ParentSpec2{{
+      fuchsia_driver_framework::ParentSpec{{
           .bind_rules = kGpioInitRules,
           .properties = kGpioInitProperties,
       }},
   };
 
   auto composite_node_spec =
-      fuchsia_driver_framework::CompositeNodeSpec{{.name = "gt6853_touch", .parents2 = parents}};
+      fuchsia_driver_framework::CompositeNodeSpec{{.name = "gt6853_touch", .parents = parents}};
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('TOUC');

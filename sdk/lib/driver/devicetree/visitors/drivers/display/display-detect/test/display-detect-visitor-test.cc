@@ -41,16 +41,16 @@ TEST(DisplayDetectVisitorTest, TestMetadataAndBindProperty) {
   auto hdmi_composite_spec = display_detect_visitor_tester->GetCompositeNodeSpecs("hdmi-display");
   EXPECT_EQ(hdmi_composite_spec.size(), 1u);
 
-  ASSERT_TRUE(hdmi_composite_spec[0].parents2().has_value());
-  ASSERT_EQ(2lu, hdmi_composite_spec[0].parents2()->size());
+  ASSERT_TRUE(hdmi_composite_spec[0].parents().has_value());
+  ASSERT_EQ(2lu, hdmi_composite_spec[0].parents()->size());
 
   // 1st parent is pdev. Skip that.
   EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-      {{fdf::MakeAcceptBindRule2(bind_fuchsia_display::OUTPUT, bind_fuchsia_display::OUTPUT_HDMI)}},
-      (*hdmi_composite_spec[0].parents2())[1].bind_rules(), false));
+      {{fdf::MakeAcceptBindRule(bind_fuchsia_display::OUTPUT, bind_fuchsia_display::OUTPUT_HDMI)}},
+      (*hdmi_composite_spec[0].parents())[1].bind_rules(), false));
   EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-      {{fdf::MakeProperty2(bind_fuchsia_display::OUTPUT, bind_fuchsia_display::OUTPUT_HDMI)}},
-      (*hdmi_composite_spec[0].parents2())[1].properties(), false));
+      {{fdf::MakeProperty(bind_fuchsia_display::OUTPUT, bind_fuchsia_display::OUTPUT_HDMI)}},
+      (*hdmi_composite_spec[0].parents())[1].properties(), false));
 }
 
 }  // namespace display_detect_visitor_dt

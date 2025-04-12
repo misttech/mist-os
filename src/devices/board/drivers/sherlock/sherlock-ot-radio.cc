@@ -47,32 +47,32 @@ static const std::vector<fpbus::Metadata> kNrf52840RadioMetadata{
     }},
 };
 
-const std::vector<fdf::BindRule2> kSpiRules = std::vector{
-    fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_spi::SERVICE,
-                             bind_fuchsia_hardware_spi::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_VID,
-                             bind_fuchsia_nordic_platform::BIND_PLATFORM_DEV_VID_NORDIC),
-    fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_PID,
-                             bind_fuchsia_nordic_platform::BIND_PLATFORM_DEV_PID_NRF52840),
-    fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_DID,
-                             bind_fuchsia_nordic_platform::BIND_PLATFORM_DEV_DID_THREAD),
+const std::vector<fdf::BindRule> kSpiRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_spi::SERVICE,
+                            bind_fuchsia_hardware_spi::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
+                            bind_fuchsia_nordic_platform::BIND_PLATFORM_DEV_VID_NORDIC),
+    fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
+                            bind_fuchsia_nordic_platform::BIND_PLATFORM_DEV_PID_NRF52840),
+    fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
+                            bind_fuchsia_nordic_platform::BIND_PLATFORM_DEV_DID_THREAD),
 
 };
 
-const std::vector<fdf::NodeProperty2> kSpiProperties = std::vector{
-    fdf::MakeProperty2(bind_fuchsia_hardware_spi::SERVICE,
-                       bind_fuchsia_hardware_spi::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_VID,
-                       bind_fuchsia_nordic_platform::BIND_PLATFORM_DEV_VID_NORDIC),
-    fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_DID,
-                       bind_fuchsia_nordic_platform::BIND_PLATFORM_DEV_DID_THREAD),
+const std::vector<fdf::NodeProperty> kSpiProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia_hardware_spi::SERVICE,
+                      bind_fuchsia_hardware_spi::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                      bind_fuchsia_nordic_platform::BIND_PLATFORM_DEV_VID_NORDIC),
+    fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                      bind_fuchsia_nordic_platform::BIND_PLATFORM_DEV_DID_THREAD),
 };
 
-const std::vector<fdf::BindRule2> kGpioInitRules = std::vector{
-    fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
-const std::vector<fdf::NodeProperty2> kGpioInitProperties = std::vector{
-    fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
 const std::map<uint32_t, std::string> kGpioPinFunctionMap = {
@@ -91,24 +91,24 @@ zx_status_t Sherlock::OtRadioInit() {
   dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_OT_RADIO;
   dev.metadata() = kNrf52840RadioMetadata;
 
-  std::vector<fdf::ParentSpec2> parents = {
-      fdf::ParentSpec2{{kSpiRules, kSpiProperties}},
-      fdf::ParentSpec2{{kGpioInitRules, kGpioInitProperties}},
+  std::vector<fdf::ParentSpec> parents = {
+      fdf::ParentSpec{{kSpiRules, kSpiProperties}},
+      fdf::ParentSpec{{kGpioInitRules, kGpioInitProperties}},
   };
   parents.reserve(parents.size() + kGpioPinFunctionMap.size());
 
   for (auto& [gpio_pin, function] : kGpioPinFunctionMap) {
     auto rules = std::vector{
-        fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_gpio::SERVICE,
-                                 bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-        fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_PIN, gpio_pin),
+        fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
+                                bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+        fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, gpio_pin),
     };
     auto properties = std::vector{
-        fdf::MakeProperty2(bind_fuchsia_hardware_gpio::SERVICE,
-                           bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-        fdf::MakeProperty2(bind_fuchsia_gpio::FUNCTION, function),
+        fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
+                          bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+        fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, function),
     };
-    parents.push_back(fdf::ParentSpec2{{rules, properties}});
+    parents.push_back(fdf::ParentSpec{{rules, properties}});
   }
 
   fidl::Arena<> fidl_arena;
@@ -116,7 +116,7 @@ zx_status_t Sherlock::OtRadioInit() {
   fdf::WireUnownedResult result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, dev),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = "nrf52840_radio", .parents2 = parents}}));
+                                   {.name = "nrf52840_radio", .parents = parents}}));
 
   if (!result.ok()) {
     zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request to platform bus: %s",

@@ -186,25 +186,25 @@ static const fpbus::Node usb_phy_dev = []() {
 
 zx_status_t AddUsbPhyComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
                                fidl::AnyArena& fidl_arena, fdf::Arena& arena) {
-  const std::vector<fdf::BindRule2> kResetRegisterRules = std::vector{
-      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_registers::SERVICE,
-                               bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeAcceptBindRule2(bind_fuchsia_register::NAME,
-                               bind_fuchsia_amlogic_platform::NAME_REGISTER_USB_PHY_V2_RESET),
+  const std::vector<fdf::BindRule> kResetRegisterRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_registers::SERVICE,
+                              bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME,
+                              bind_fuchsia_amlogic_platform::NAME_REGISTER_USB_PHY_V2_RESET),
   };
 
-  const std::vector<fdf::NodeProperty2> kResetRegisterProperties = std::vector{
-      fdf::MakeProperty2(bind_fuchsia_hardware_registers::SERVICE,
-                         bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeProperty2(bind_fuchsia_register::NAME,
-                         bind_fuchsia_amlogic_platform::NAME_REGISTER_USB_PHY_V2_RESET),
+  const std::vector<fdf::NodeProperty> kResetRegisterProperties = std::vector{
+      fdf::MakeProperty(bind_fuchsia_hardware_registers::SERVICE,
+                        bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia_register::NAME,
+                        bind_fuchsia_amlogic_platform::NAME_REGISTER_USB_PHY_V2_RESET),
   };
 
-  std::vector<fdf::ParentSpec2> parents{{kResetRegisterRules, kResetRegisterProperties}};
+  std::vector<fdf::ParentSpec> parents{{kResetRegisterRules, kResetRegisterProperties}};
   auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, usb_phy_dev),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = "aml_usb_phy", .parents2 = parents}}));
+                                   {.name = "aml_usb_phy", .parents = parents}}));
   if (!result.ok()) {
     zxlogf(ERROR, "AddCompositeNodeSpec Usb(usb_phy_dev) request failed: %s",
            result.FormatDescription().data());
@@ -235,33 +235,33 @@ zx_status_t AddDwc2Composite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
     return dev;
   }();
 
-  const std::vector<fdf::BindRule2> kDwc2PhyRules = std::vector{
-      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_usb_phy::SERVICE,
-                               bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
-      fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_VID,
-                               bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
-      fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_PID,
-                               bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
-      fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_DID,
-                               bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_USB_DWC2),
+  const std::vector<fdf::BindRule> kDwc2PhyRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_usb_phy::SERVICE,
+                              bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
+                              bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
+                              bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
+                              bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_USB_DWC2),
   };
 
-  const std::vector<fdf::NodeProperty2> kDwc2PhyProperties = std::vector{
-      fdf::MakeProperty2(bind_fuchsia_hardware_usb_phy::SERVICE,
-                         bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
-      fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_VID,
-                         bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
-      fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_PID,
-                         bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
-      fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_DID,
-                         bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_USB_DWC2),
+  const std::vector<fdf::NodeProperty> kDwc2PhyProperties = std::vector{
+      fdf::MakeProperty(bind_fuchsia_hardware_usb_phy::SERVICE,
+                        bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_PID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_USB_DWC2),
   };
 
-  const std::vector<fdf::ParentSpec2> kDwc2Parents{{kDwc2PhyRules, kDwc2PhyProperties}};
+  const std::vector<fdf::ParentSpec> kDwc2Parents{{kDwc2PhyRules, kDwc2PhyProperties}};
   auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, dwc2_dev),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = "dwc2_phy", .parents2 = kDwc2Parents}}));
+                                   {.name = "dwc2_phy", .parents = kDwc2Parents}}));
   if (!result.ok()) {
     zxlogf(ERROR, "AddCompositeNodeSpec Usb(dwc2_phy) request failed: %s",
            result.FormatDescription().data());
@@ -277,34 +277,34 @@ zx_status_t AddDwc2Composite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
 
 zx_status_t AddXhciComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
                              fidl::AnyArena& fidl_arena, fdf::Arena& arena) {
-  const std::vector<fuchsia_driver_framework::BindRule2> kXhciCompositeRules = {
-      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_usb_phy::SERVICE,
-                               bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
-      fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_VID,
-                               bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
-      fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_PID,
-                               bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
-      fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_DID,
-                               bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_XHCI),
+  const std::vector<fuchsia_driver_framework::BindRule> kXhciCompositeRules = {
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_usb_phy::SERVICE,
+                              bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
+                              bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
+                              bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
+                              bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_XHCI),
   };
-  const std::vector<fuchsia_driver_framework::NodeProperty2> kXhciCompositeProperties = {
-      fdf::MakeProperty2(bind_fuchsia_hardware_usb_phy::SERVICE,
-                         bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
-      fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_VID,
-                         bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
-      fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_PID,
-                         bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
-      fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_DID,
-                         bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_XHCI),
+  const std::vector<fuchsia_driver_framework::NodeProperty> kXhciCompositeProperties = {
+      fdf::MakeProperty(bind_fuchsia_hardware_usb_phy::SERVICE,
+                        bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_PID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_XHCI),
   };
 
-  const std::vector<fuchsia_driver_framework::ParentSpec2> kXhciParents = {
-      fuchsia_driver_framework::ParentSpec2{
+  const std::vector<fuchsia_driver_framework::ParentSpec> kXhciParents = {
+      fuchsia_driver_framework::ParentSpec{
           {.bind_rules = kXhciCompositeRules, .properties = kXhciCompositeProperties}}};
   auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, xhci_dev),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = "xhci-phy", .parents2 = kXhciParents}}));
+                                   {.name = "xhci-phy", .parents = kXhciParents}}));
   if (!result.ok()) {
     zxlogf(ERROR, "AddCompositeNodeSpec Usb(xhci-phy) request failed: %s",
            result.FormatDescription().data());

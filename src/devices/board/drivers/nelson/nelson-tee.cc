@@ -73,13 +73,13 @@ static tee_thread_config_t tee_thread_cfg[] = {
          {0xe043cde0, 0x61d0, 0x11e5, {0x9c, 0x26, 0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}}  // widevine
      }}};
 
-const std::vector<fdf::BindRule2> kRpmbRules = std::vector{fdf::MakeAcceptBindRule2(
+const std::vector<fdf::BindRule> kRpmbRules = std::vector{fdf::MakeAcceptBindRule(
     bind_fuchsia_hardware_rpmb::SERVICE, bind_fuchsia_hardware_rpmb::SERVICE_ZIRCONTRANSPORT)};
 
-const std::vector<fdf::NodeProperty2> kRpmbProperties = std::vector{fdf::MakeProperty2(
+const std::vector<fdf::NodeProperty> kRpmbProperties = std::vector{fdf::MakeProperty(
     bind_fuchsia_hardware_rpmb::SERVICE, bind_fuchsia_hardware_rpmb::SERVICE_ZIRCONTRANSPORT)};
 
-const std::vector<fdf::ParentSpec2> kTeeCompositeParents = {{kRpmbRules, kRpmbProperties}};
+const std::vector<fdf::ParentSpec> kTeeCompositeParents = {{kRpmbRules, kRpmbProperties}};
 
 zx_status_t Nelson::TeeInit() {
   std::vector<fpbus::Metadata> metadata;
@@ -118,7 +118,7 @@ zx_status_t Nelson::TeeInit() {
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, dev),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = "tee", .parents2 = kTeeCompositeParents}}));
+                                   {.name = "tee", .parents = kTeeCompositeParents}}));
   if (!result.ok()) {
     zxlogf(ERROR, "AddCompositeNodeSpec Tee(dev) request failed: %s",
            result.FormatDescription().data());

@@ -92,24 +92,24 @@ zx_status_t AddMlbComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
   mlb_dev.metadata() = kMlbMetadata;
 
   const auto kI2cRules = std::vector{
-      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_i2c::SERVICE,
-                               bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_3),
-      fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_ADDRESS,
-                               bind_fuchsia_ti_platform::BIND_I2C_ADDRESS_INA231_MLB),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
+                              bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_3),
+      fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
+                              bind_fuchsia_ti_platform::BIND_I2C_ADDRESS_INA231_MLB),
   };
   const auto kI2cProperties = std::vector{
-      fdf::MakeProperty2(bind_fuchsia_hardware_i2c::SERVICE,
-                         bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeProperty2(bind_fuchsia::I2C_ADDRESS,
-                         bind_fuchsia_ti_platform::BIND_I2C_ADDRESS_INA231_MLB),
+      fdf::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
+                        bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia::I2C_ADDRESS,
+                        bind_fuchsia_ti_platform::BIND_I2C_ADDRESS_INA231_MLB),
   };
 
-  const std::vector<fdf::ParentSpec2> kParents{{kI2cRules, kI2cProperties}};
+  const std::vector<fdf::ParentSpec> kParents{{kI2cRules, kI2cProperties}};
   auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, mlb_dev),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = "ti_ina231_mlb", .parents2 = kParents}}));
+                                   {.name = "ti_ina231_mlb", .parents = kParents}}));
   if (!result.ok()) {
     zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request failed to platform bus: %s",
            result.FormatDescription().data());
@@ -133,24 +133,24 @@ zx_status_t AddSpeakerComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
   speakers_dev.metadata() = kSpeakersMetadata;
 
   const auto kI2cRules = std::vector{
-      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_i2c::SERVICE,
-                               bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_3),
-      fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_ADDRESS,
-                               bind_fuchsia_ti_platform::BIND_I2C_ADDRESS_INA231_SPEAKERS),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
+                              bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_3),
+      fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
+                              bind_fuchsia_ti_platform::BIND_I2C_ADDRESS_INA231_SPEAKERS),
   };
   const auto kI2cProperties = std::vector{
-      fdf::MakeProperty2(bind_fuchsia_hardware_i2c::SERVICE,
-                         bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeProperty2(bind_fuchsia::I2C_ADDRESS,
-                         bind_fuchsia_ti_platform::BIND_I2C_ADDRESS_INA231_SPEAKERS),
+      fdf::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
+                        bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia::I2C_ADDRESS,
+                        bind_fuchsia_ti_platform::BIND_I2C_ADDRESS_INA231_SPEAKERS),
   };
 
-  const std::vector<fdf::ParentSpec2> kParents{{kI2cRules, kI2cProperties}};
+  const std::vector<fdf::ParentSpec> kParents{{kI2cRules, kI2cProperties}};
   auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, speakers_dev),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = "ti_ina231_speakers", .parents2 = kParents}}));
+                                   {.name = "ti_ina231_speakers", .parents = kParents}}));
   if (!result.ok()) {
     zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request failed to platform bus: %s",
            result.FormatDescription().data());

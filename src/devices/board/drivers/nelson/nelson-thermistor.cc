@@ -105,40 +105,39 @@ zx_status_t Nelson::ThermistorInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('THER');
 
-  const std::vector<fuchsia_driver_framework::BindRule2> kThreadThermistorCompositeRules = {
-      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_adc::SERVICE,
-                               bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeAcceptBindRule2(bind_fuchsia_adc::CHANNEL, NELSON_THERMISTOR_THREAD),
+  const std::vector<fuchsia_driver_framework::BindRule> kThreadThermistorCompositeRules = {
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_adc::SERVICE,
+                              bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia_adc::CHANNEL, NELSON_THERMISTOR_THREAD),
   };
-  const std::vector<fuchsia_driver_framework::NodeProperty2> kThreadThermistorCompositeProperties =
-      {
-          fdf::MakeProperty2(bind_fuchsia_hardware_adc::SERVICE,
-                             bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
-          fdf::MakeProperty2(bind_fuchsia_adc::FUNCTION, bind_fuchsia_adc::FUNCTION_THERMISTOR),
-          fdf::MakeProperty2(bind_fuchsia_adc::CHANNEL, NELSON_THERMISTOR_THREAD),
-      };
-  const std::vector<fuchsia_driver_framework::BindRule2> kAudioThermistorCompositeRules = {
-      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_adc::SERVICE,
-                               bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeAcceptBindRule2(bind_fuchsia_adc::CHANNEL, NELSON_THERMISTOR_AUDIO),
+  const std::vector<fuchsia_driver_framework::NodeProperty> kThreadThermistorCompositeProperties = {
+      fdf::MakeProperty(bind_fuchsia_hardware_adc::SERVICE,
+                        bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia_adc::FUNCTION, bind_fuchsia_adc::FUNCTION_THERMISTOR),
+      fdf::MakeProperty(bind_fuchsia_adc::CHANNEL, NELSON_THERMISTOR_THREAD),
   };
-  const std::vector<fuchsia_driver_framework::NodeProperty2> kAudioThermistorCompositeProperties = {
-      fdf::MakeProperty2(bind_fuchsia_hardware_adc::SERVICE,
-                         bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeProperty2(bind_fuchsia_adc::FUNCTION, bind_fuchsia_adc::FUNCTION_THERMISTOR),
-      fdf::MakeProperty2(bind_fuchsia_adc::CHANNEL, NELSON_THERMISTOR_AUDIO),
+  const std::vector<fuchsia_driver_framework::BindRule> kAudioThermistorCompositeRules = {
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_adc::SERVICE,
+                              bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia_adc::CHANNEL, NELSON_THERMISTOR_AUDIO),
+  };
+  const std::vector<fuchsia_driver_framework::NodeProperty> kAudioThermistorCompositeProperties = {
+      fdf::MakeProperty(bind_fuchsia_hardware_adc::SERVICE,
+                        bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia_adc::FUNCTION, bind_fuchsia_adc::FUNCTION_THERMISTOR),
+      fdf::MakeProperty(bind_fuchsia_adc::CHANNEL, NELSON_THERMISTOR_AUDIO),
   };
 
-  const std::vector<fuchsia_driver_framework::ParentSpec2> kThermistorParents = {
-      fuchsia_driver_framework::ParentSpec2{{.bind_rules = kThreadThermistorCompositeRules,
-                                             .properties = kThreadThermistorCompositeProperties}},
-      fuchsia_driver_framework::ParentSpec2{{.bind_rules = kAudioThermistorCompositeRules,
-                                             .properties = kAudioThermistorCompositeProperties}},
+  const std::vector<fuchsia_driver_framework::ParentSpec> kThermistorParents = {
+      fuchsia_driver_framework::ParentSpec{{.bind_rules = kThreadThermistorCompositeRules,
+                                            .properties = kThreadThermistorCompositeProperties}},
+      fuchsia_driver_framework::ParentSpec{{.bind_rules = kAudioThermistorCompositeRules,
+                                            .properties = kAudioThermistorCompositeProperties}},
   };
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, thermistor),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = "thermistor", .parents2 = kThermistorParents}}));
+                                   {.name = "thermistor", .parents = kThermistorParents}}));
   if (!result.ok()) {
     zxlogf(ERROR, "%s: NodeAdd Thermistor(thermistor) request failed: %s", __func__,
            result.FormatDescription().data());

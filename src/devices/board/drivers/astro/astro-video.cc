@@ -103,70 +103,69 @@ zx_status_t Astro::VideoInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('VIDE');
 
-  auto video_canvas = fuchsia_driver_framework::ParentSpec2{{
+  auto video_canvas = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule2(
-                  bind_fuchsia_hardware_amlogiccanvas::SERVICE,
-                  bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
+                                      bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
           },
       .properties =
           {
-              fdf::MakeProperty2(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
-                                 bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeProperty(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
+                                bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
           },
   }};
 
-  auto video_clock_dos_vdec = fuchsia_driver_framework::ParentSpec2{{
+  auto video_clock_dos_vdec = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_clock::SERVICE,
-                                       bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeAcceptBindRule2(
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                                      bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeAcceptBindRule(
                   bind_fuchsia::CLOCK_ID,
                   bind_fuchsia_amlogic_platform_meson::G12A_CLK_ID_CLK_DOS_GCLK_VDEC),
           },
       .properties =
           {
-              fdf::MakeProperty2(bind_fuchsia_hardware_clock::SERVICE,
-                                 bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeProperty2(bind_fuchsia_clock::FUNCTION,
-                                 bind_fuchsia_clock::FUNCTION_DOS_GCLK_VDEC),
+              fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                                bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeProperty(bind_fuchsia_clock::FUNCTION,
+                                bind_fuchsia_clock::FUNCTION_DOS_GCLK_VDEC),
           },
   }};
 
-  auto video_clock_dos = fuchsia_driver_framework::ParentSpec2{{
+  auto video_clock_dos = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_clock::SERVICE,
-                                       bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeAcceptBindRule2(bind_fuchsia::CLOCK_ID,
-                                       bind_fuchsia_amlogic_platform_meson::G12A_CLK_ID_CLK_DOS),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                                      bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID,
+                                      bind_fuchsia_amlogic_platform_meson::G12A_CLK_ID_CLK_DOS),
           },
       .properties =
           {
-              fdf::MakeProperty2(bind_fuchsia_hardware_clock::SERVICE,
-                                 bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeProperty2(bind_fuchsia_clock::FUNCTION, bind_fuchsia_clock::FUNCTION_DOS),
+              fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                                bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeProperty(bind_fuchsia_clock::FUNCTION, bind_fuchsia_clock::FUNCTION_DOS),
           },
   }};
 
-  auto video_tee = fuchsia_driver_framework::ParentSpec2{{
+  auto video_tee = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_tee::SERVICE,
-                                       bind_fuchsia_hardware_tee::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_tee::SERVICE,
+                                      bind_fuchsia_hardware_tee::SERVICE_ZIRCONTRANSPORT),
           },
       .properties =
           {
-              fdf::MakeProperty2(bind_fuchsia_hardware_tee::SERVICE,
-                                 bind_fuchsia_hardware_tee::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeProperty(bind_fuchsia_hardware_tee::SERVICE,
+                                bind_fuchsia_hardware_tee::SERVICE_ZIRCONTRANSPORT),
           },
   }};
 
   auto video_spec = fuchsia_driver_framework::CompositeNodeSpec{{
       .name = "aml_video",
-      .parents2 = {{video_canvas, video_clock_dos_vdec, video_clock_dos, video_tee}},
+      .parents = {{video_canvas, video_clock_dos_vdec, video_clock_dos, video_tee}},
   }};
 
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, video_dev),

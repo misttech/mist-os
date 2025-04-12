@@ -118,33 +118,33 @@ TEST(AdcVisitorTester, TestAdcsProperty) {
 
       auto mgr_request = adc_tester->env().SyncCall(
           &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, mgr_request_idx++);
-      ASSERT_TRUE(mgr_request.parents2().has_value());
-      ASSERT_EQ(3lu, mgr_request.parents2()->size());
+      ASSERT_TRUE(mgr_request.parents().has_value());
+      ASSERT_EQ(3lu, mgr_request.parents()->size());
 
       // 1st parent is pdev. Skipping that.
       // 2nd parent is ADC CHAN1.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty2(bind_fuchsia_hardware_adc::SERVICE,
-                               bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
-            fdf::MakeProperty2(bind_fuchsia_adc::CHANNEL, static_cast<uint32_t>(ADC_CHAN1))}},
-          (*mgr_request.parents2())[1].properties(), false));
+          {{fdf::MakeProperty(bind_fuchsia_hardware_adc::SERVICE,
+                              bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+            fdf::MakeProperty(bind_fuchsia_adc::CHANNEL, static_cast<uint32_t>(ADC_CHAN1))}},
+          (*mgr_request.parents())[1].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_adc::SERVICE,
-                                     bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
-            fdf::MakeAcceptBindRule2(bind_fuchsia_adc::CHANNEL, static_cast<uint32_t>(ADC_CHAN1))}},
-          (*mgr_request.parents2())[1].bind_rules(), false));
+          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_adc::SERVICE,
+                                    bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+            fdf::MakeAcceptBindRule(bind_fuchsia_adc::CHANNEL, static_cast<uint32_t>(ADC_CHAN1))}},
+          (*mgr_request.parents())[1].bind_rules(), false));
 
       // 3rd parent is ADC CHAN2.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty2(bind_fuchsia_hardware_adc::SERVICE,
-                               bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
-            fdf::MakeProperty2(bind_fuchsia_adc::CHANNEL, static_cast<uint32_t>(ADC_CHAN2))}},
-          (*mgr_request.parents2())[2].properties(), false));
+          {{fdf::MakeProperty(bind_fuchsia_hardware_adc::SERVICE,
+                              bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+            fdf::MakeProperty(bind_fuchsia_adc::CHANNEL, static_cast<uint32_t>(ADC_CHAN2))}},
+          (*mgr_request.parents())[2].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_adc::SERVICE,
-                                     bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
-            fdf::MakeAcceptBindRule2(bind_fuchsia_adc::CHANNEL, static_cast<uint32_t>(ADC_CHAN2))}},
-          (*mgr_request.parents2())[2].bind_rules(), false));
+          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_adc::SERVICE,
+                                    bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+            fdf::MakeAcceptBindRule(bind_fuchsia_adc::CHANNEL, static_cast<uint32_t>(ADC_CHAN2))}},
+          (*mgr_request.parents())[2].bind_rules(), false));
     }
 
     if (node.name()->find("video") != std::string::npos) {
@@ -155,21 +155,21 @@ TEST(AdcVisitorTester, TestAdcsProperty) {
 
       auto mgr_request = adc_tester->env().SyncCall(
           &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, mgr_request_idx++);
-      ASSERT_TRUE(mgr_request.parents2().has_value());
-      ASSERT_EQ(2lu, mgr_request.parents2()->size());
+      ASSERT_TRUE(mgr_request.parents().has_value());
+      ASSERT_EQ(2lu, mgr_request.parents()->size());
 
       // 1st parent is pdev. Skipping that.
       // 2nd parent is ADC CHAN3.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty2(bind_fuchsia_hardware_adc::SERVICE,
-                               bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
-            fdf::MakeProperty2(bind_fuchsia_adc::CHANNEL, static_cast<uint32_t>(ADC_CHAN3))}},
-          (*mgr_request.parents2())[1].properties(), false));
+          {{fdf::MakeProperty(bind_fuchsia_hardware_adc::SERVICE,
+                              bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+            fdf::MakeProperty(bind_fuchsia_adc::CHANNEL, static_cast<uint32_t>(ADC_CHAN3))}},
+          (*mgr_request.parents())[1].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_adc::SERVICE,
-                                     bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
-            fdf::MakeAcceptBindRule2(bind_fuchsia_adc::CHANNEL, static_cast<uint32_t>(ADC_CHAN3))}},
-          (*mgr_request.parents2())[1].bind_rules(), false));
+          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_adc::SERVICE,
+                                    bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+            fdf::MakeAcceptBindRule(bind_fuchsia_adc::CHANNEL, static_cast<uint32_t>(ADC_CHAN3))}},
+          (*mgr_request.parents())[1].bind_rules(), false));
     }
   }
 

@@ -63,18 +63,18 @@ zx::result<> PowerDomainVisitor::Visit(fdf_devicetree::Node& node,
 }
 
 zx::result<> PowerDomainVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t domain_id) {
-  auto power_node = fuchsia_driver_framework::ParentSpec2{{
+  auto power_node = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_power::SERVICE,
-                                       bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeAcceptBindRule2(bind_fuchsia_power::POWER_DOMAIN, domain_id),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_power::SERVICE,
+                                      bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeAcceptBindRule(bind_fuchsia_power::POWER_DOMAIN, domain_id),
           },
       .properties =
           {
-              fdf::MakeProperty2(bind_fuchsia_hardware_power::SERVICE,
-                                 bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeProperty2(bind_fuchsia_power::POWER_DOMAIN, domain_id),
+              fdf::MakeProperty(bind_fuchsia_hardware_power::SERVICE,
+                                bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeProperty(bind_fuchsia_power::POWER_DOMAIN, domain_id),
           },
   }};
   FDF_LOG(INFO, "Added power domain (id: %d) parent to node '%s'", domain_id, child.name().c_str());

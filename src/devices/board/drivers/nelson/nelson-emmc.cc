@@ -67,24 +67,24 @@ static const std::vector<fpbus::BootMetadata> emmc_boot_metadata{
     }},
 };
 
-const std::vector<fdf::BindRule2> kGpioResetRules = std::vector{
-    fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_gpio::SERVICE,
-                             bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(SOC_EMMC_RST_L)),
+const std::vector<fdf::BindRule> kGpioResetRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
+                            bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(SOC_EMMC_RST_L)),
 };
 
-const std::vector<fdf::NodeProperty2> kGpioResetProperties = std::vector{
-    fdf::MakeProperty2(bind_fuchsia_hardware_gpio::SERVICE,
-                       bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeProperty2(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SDMMC_RESET),
+const std::vector<fdf::NodeProperty> kGpioResetProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
+                      bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SDMMC_RESET),
 };
 
-const std::vector<fdf::BindRule2> kGpioInitRules = std::vector{
-    fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
-const std::vector<fdf::NodeProperty2> kGpioInitProperties = std::vector{
-    fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
 }  // namespace
@@ -145,15 +145,15 @@ zx_status_t Nelson::EmmcInit() {
     return dev;
   }();
 
-  std::vector<fdf::ParentSpec2> kEmmcParents = {
-      fdf::ParentSpec2{{kGpioResetRules, kGpioResetProperties}},
-      fdf::ParentSpec2{{kGpioInitRules, kGpioInitProperties}}};
+  std::vector<fdf::ParentSpec> kEmmcParents = {
+      fdf::ParentSpec{{kGpioResetRules, kGpioResetProperties}},
+      fdf::ParentSpec{{kGpioInitRules, kGpioInitProperties}}};
 
   fdf::Arena arena('EMMC');
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, emmc_dev),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = "nelson_emmc", .parents2 = kEmmcParents}}));
+                                   {.name = "nelson_emmc", .parents = kEmmcParents}}));
   if (!result.ok()) {
     zxlogf(ERROR, "AddCompositeNodeSpec Emmc(emmc_dev) request failed: %s",
            result.FormatDescription().data());

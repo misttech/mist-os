@@ -95,43 +95,43 @@ TEST(PwmVisitorTest, TestMetadataAndBindProperty) {
       node_tested_count++;
       auto mgr_request = pwm_visitor_tester->env().SyncCall(
           &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, mgr_request_idx++);
-      ASSERT_TRUE(mgr_request.parents2().has_value());
-      ASSERT_EQ(3lu, mgr_request.parents2()->size());
+      ASSERT_TRUE(mgr_request.parents().has_value());
+      ASSERT_EQ(3lu, mgr_request.parents()->size());
 
       // 1st parent is pdev. Skip that.
       // Bind rules for PIN1
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
           {{
-              fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_pwm::SERVICE,
-                                       bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeAcceptBindRule2(bind_fuchsia::PWM_ID, static_cast<uint32_t>(PIN1)),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_pwm::SERVICE,
+                                      bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID, static_cast<uint32_t>(PIN1)),
           }},
-          (*mgr_request.parents2())[1].bind_rules(), false));
+          (*mgr_request.parents())[1].bind_rules(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
           {{
-              fdf::MakeProperty2(bind_fuchsia_hardware_pwm::SERVICE,
-                                 bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeProperty2(bind_fuchsia_pwm::PWM_ID_FUNCTION,
-                                 "fuchsia.pwm.PWM_ID_FUNCTION." + std::string(PIN1_NAME)),
+              fdf::MakeProperty(bind_fuchsia_hardware_pwm::SERVICE,
+                                bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeProperty(bind_fuchsia_pwm::PWM_ID_FUNCTION,
+                                "fuchsia.pwm.PWM_ID_FUNCTION." + std::string(PIN1_NAME)),
           }},
-          (*mgr_request.parents2())[1].properties(), false));
+          (*mgr_request.parents())[1].properties(), false));
 
       // Bind rules for PIN2
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
           {{
-              fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_pwm::SERVICE,
-                                       bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeAcceptBindRule2(bind_fuchsia::PWM_ID, static_cast<uint32_t>(PIN2)),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_pwm::SERVICE,
+                                      bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID, static_cast<uint32_t>(PIN2)),
           }},
-          (*mgr_request.parents2())[2].bind_rules(), false));
+          (*mgr_request.parents())[2].bind_rules(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
           {{
-              fdf::MakeProperty2(bind_fuchsia_hardware_pwm::SERVICE,
-                                 bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeProperty2(bind_fuchsia_pwm::PWM_ID_FUNCTION,
-                                 "fuchsia.pwm.PWM_ID_FUNCTION." + std::string(PIN2_NAME)),
+              fdf::MakeProperty(bind_fuchsia_hardware_pwm::SERVICE,
+                                bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeProperty(bind_fuchsia_pwm::PWM_ID_FUNCTION,
+                                "fuchsia.pwm.PWM_ID_FUNCTION." + std::string(PIN2_NAME)),
           }},
-          (*mgr_request.parents2())[2].properties(), false));
+          (*mgr_request.parents())[2].properties(), false));
     }
   }
 

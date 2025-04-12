@@ -71,18 +71,18 @@ AdcVisitor::AdcController& AdcVisitor::GetController(uint32_t node_id) {
 }
 
 zx::result<> AdcVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t chan_id) {
-  auto adc_node = fuchsia_driver_framework::ParentSpec2{{
+  auto adc_node = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_adc::SERVICE,
-                                       bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeAcceptBindRule2(bind_fuchsia_adc::CHANNEL, chan_id),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_adc::SERVICE,
+                                      bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeAcceptBindRule(bind_fuchsia_adc::CHANNEL, chan_id),
           },
       .properties =
           {
-              fdf::MakeProperty2(bind_fuchsia_hardware_adc::SERVICE,
-                                 bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeProperty2(bind_fuchsia_adc::CHANNEL, chan_id),
+              fdf::MakeProperty(bind_fuchsia_hardware_adc::SERVICE,
+                                bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeProperty(bind_fuchsia_adc::CHANNEL, chan_id),
           },
   }};
   child.AddNodeSpec(adc_node);

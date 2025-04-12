@@ -80,20 +80,20 @@ TEST(RegulatorVisitorTest, TestMetadataAndBindProperty) {
 
       auto mgr_request = regulator_visitor_tester->env().SyncCall(
           &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, mgr_request_idx++);
-      ASSERT_TRUE(mgr_request.parents2().has_value());
-      ASSERT_EQ(2lu, mgr_request.parents2()->size());
+      ASSERT_TRUE(mgr_request.parents().has_value());
+      ASSERT_EQ(2lu, mgr_request.parents()->size());
 
       // Check for regulator parent node specs. Skip the 1st one as it is either pdev/board device.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty2(bind_fuchsia_hardware_vreg::SERVICE,
-                               bind_fuchsia_hardware_vreg::SERVICE_ZIRCONTRANSPORT),
-            fdf::MakeProperty2(bind_fuchsia_regulator::NAME, REGULATOR_NAME)}},
-          (*mgr_request.parents2())[1].properties(), false));
+          {{fdf::MakeProperty(bind_fuchsia_hardware_vreg::SERVICE,
+                              bind_fuchsia_hardware_vreg::SERVICE_ZIRCONTRANSPORT),
+            fdf::MakeProperty(bind_fuchsia_regulator::NAME, REGULATOR_NAME)}},
+          (*mgr_request.parents())[1].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_vreg::SERVICE,
-                                     bind_fuchsia_hardware_vreg::SERVICE_ZIRCONTRANSPORT),
-            fdf::MakeAcceptBindRule2(bind_fuchsia_regulator::NAME, REGULATOR_NAME)}},
-          (*mgr_request.parents2())[1].bind_rules(), false));
+          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_vreg::SERVICE,
+                                    bind_fuchsia_hardware_vreg::SERVICE_ZIRCONTRANSPORT),
+            fdf::MakeAcceptBindRule(bind_fuchsia_regulator::NAME, REGULATOR_NAME)}},
+          (*mgr_request.parents())[1].bind_rules(), false));
     }
   }
 

@@ -146,30 +146,30 @@ zx::result<> PostInit::InitDisplay() {
     return dev;
   }();
 
-  std::vector<fuchsia_driver_framework::BindRule2> gpio_bind_rules{
-      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_gpio::SERVICE,
-                               bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_PIN,
-                               bind_fuchsia_amlogic_platform_t931::GPIOH_PIN_ID_PIN_6),
+  std::vector<fuchsia_driver_framework::BindRule> gpio_bind_rules{
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
+                              bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              bind_fuchsia_amlogic_platform_t931::GPIOH_PIN_ID_PIN_6),
   };
 
-  std::vector<fuchsia_driver_framework::NodeProperty2> gpio_properties{
-      fdf::MakeProperty2(bind_fuchsia_hardware_gpio::SERVICE,
-                         bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeProperty2(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_LCD_RESET),
+  std::vector<fuchsia_driver_framework::NodeProperty> gpio_properties{
+      fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
+                        bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_LCD_RESET),
   };
 
-  std::vector<fuchsia_driver_framework::BindRule2> canvas_bind_rules{
-      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
-                               bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
+  std::vector<fuchsia_driver_framework::BindRule> canvas_bind_rules{
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
+                              bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
   };
 
-  std::vector<fuchsia_driver_framework::NodeProperty2> canvas_properties{
-      fdf::MakeProperty2(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
-                         bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
+  std::vector<fuchsia_driver_framework::NodeProperty> canvas_properties{
+      fdf::MakeProperty(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
+                        bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
   };
 
-  std::vector<fuchsia_driver_framework::ParentSpec2> parents = {
+  std::vector<fuchsia_driver_framework::ParentSpec> parents = {
       {{
           .bind_rules = gpio_bind_rules,
           .properties = gpio_properties,
@@ -180,7 +180,7 @@ zx::result<> PostInit::InitDisplay() {
       }},
   };
 
-  auto spec = fuchsia_driver_framework::CompositeNodeSpec{{.name = "display", .parents2 = parents}};
+  auto spec = fuchsia_driver_framework::CompositeNodeSpec{{.name = "display", .parents = parents}};
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('DISP');

@@ -77,26 +77,26 @@ TEST(SerialPortVisitorTest, TestMetadataAndBindProperty) {
 
       auto mgr_request = serial_port_visitor_tester->env().SyncCall(
           &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, mgr_request_idx++);
-      ASSERT_TRUE(mgr_request.parents2().has_value());
-      ASSERT_EQ(2lu, mgr_request.parents2()->size());
+      ASSERT_TRUE(mgr_request.parents().has_value());
+      ASSERT_EQ(2lu, mgr_request.parents()->size());
 
       // 1st parent is pdev. Skipping that.
       // 2nd parent is bt-uart.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
           {{
-              fdf::MakeProperty2(bind_fuchsia_serial::NAME, TEST_NAME),
-              fdf::MakeProperty2(bind_fuchsia_hardware_serialimpl::SERVICE,
-                                 bind_fuchsia_hardware_serialimpl::SERVICE_DRIVERTRANSPORT),
+              fdf::MakeProperty(bind_fuchsia_serial::NAME, TEST_NAME),
+              fdf::MakeProperty(bind_fuchsia_hardware_serialimpl::SERVICE,
+                                bind_fuchsia_hardware_serialimpl::SERVICE_DRIVERTRANSPORT),
           }},
-          (*mgr_request.parents2())[1].properties(), false));
+          (*mgr_request.parents())[1].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
           {{
-              fdf::MakeAcceptBindRule2(bind_fuchsia::SERIAL_CLASS,
-                                       static_cast<uint32_t>(TEST_CLASS)),
-              fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_serialimpl::SERVICE,
-                                       bind_fuchsia_hardware_serialimpl::SERVICE_DRIVERTRANSPORT),
+              fdf::MakeAcceptBindRule(bind_fuchsia::SERIAL_CLASS,
+                                      static_cast<uint32_t>(TEST_CLASS)),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_serialimpl::SERVICE,
+                                      bind_fuchsia_hardware_serialimpl::SERVICE_DRIVERTRANSPORT),
           }},
-          (*mgr_request.parents2())[1].bind_rules(), false));
+          (*mgr_request.parents())[1].bind_rules(), false));
     }
   }
 

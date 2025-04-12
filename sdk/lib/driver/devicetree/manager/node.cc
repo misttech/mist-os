@@ -64,7 +64,7 @@ Node::Node(Node *parent, const std::string_view name, devicetree::Properties pro
   }
 }
 
-void Node::AddBindProperty(fuchsia_driver_framework::NodeProperty2 prop) {
+void Node::AddBindProperty(fuchsia_driver_framework::NodeProperty prop) {
   node_properties_.emplace_back(std::move(prop));
 }
 
@@ -108,34 +108,7 @@ void Node::AddBootMetadata(fuchsia_hardware_platform_bus::BootMetadata boot_meta
   add_platform_device_ = true;
 }
 
-void Node::AddNodeSpec(const fuchsia_driver_framework::ParentSpec &spec) {
-  std::vector<fuchsia_driver_framework::BindRule2> bind_rules;
-  std::transform(
-      spec.bind_rules().begin(), spec.bind_rules().end(), std::back_inserter(bind_rules),
-      [](const fuchsia_driver_framework::BindRule &bind_rule) {
-        ZX_ASSERT(bind_rule.key().Which() ==
-                  fuchsia_driver_framework::NodePropertyKey::Tag::kStringValue);
-        return fuchsia_driver_framework::BindRule2{{.key = bind_rule.key().string_value().value(),
-                                                    .condition = bind_rule.condition(),
-                                                    .values = bind_rule.values()}};
-      });
-
-  std::vector<fuchsia_driver_framework::NodeProperty2> properties;
-  std::transform(spec.properties().begin(), spec.properties().end(), std::back_inserter(properties),
-                 [](const fuchsia_driver_framework::NodeProperty &property) {
-                   ZX_ASSERT(property.key().Which() ==
-                             fuchsia_driver_framework::NodePropertyKey::Tag::kStringValue);
-                   return fuchsia_driver_framework::NodeProperty2{
-                       {.key = property.key().string_value().value(), .value = property.value()}};
-                 });
-  parents_.emplace_back(fuchsia_driver_framework::ParentSpec2{{
-      .bind_rules = std::move(bind_rules),
-      .properties = std::move(properties),
-  }});
-  composite_ = true;
-}
-
-void Node::AddNodeSpec(const fuchsia_driver_framework::ParentSpec2 &spec) {
+void Node::AddNodeSpec(fuchsia_driver_framework::ParentSpec spec) {
   parents_.emplace_back(spec);
   composite_ = true;
 }
@@ -223,7 +196,7 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
     fuchsia_driver_framework::NodeAddArgs node_add_args;
     node_add_args.name() = fdf_name();
 
-    node_add_args.properties2() = node_properties_;
+    node_add_args.properties() = node_properties_;
 
     auto [client_end, server_end] =
         fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
@@ -240,39 +213,39 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
   if (composite_) {
     if (add_platform_device_) {
       // Construct the platform bus node.
-      fdf::ParentSpec2 platform_node;
+      fdf::ParentSpec platform_node;
       platform_node.properties() = node_properties_;
-      auto additional_node_properties = std::vector<fdf::NodeProperty2>{
-          fdf::MakeProperty2(bind_fuchsia::PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
-          fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_VID,
-                             bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC),
-          fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_DID,
-                             bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_DEVICETREE),
-          fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, id_),
+      auto additional_node_properties = std::vector<fdf::NodeProperty>{
+          fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
+          fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                            bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC),
+          fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                            bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_DEVICETREE),
+          fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, id_),
       };
       platform_node.properties().insert(platform_node.properties().end(),
                                         additional_node_properties.begin(),
                                         additional_node_properties.end());
 
-      platform_node.bind_rules() = std::vector<fdf::BindRule2>{
-          fdf::MakeAcceptBindRule2(bind_fuchsia::PROTOCOL,
-                                   bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
-          fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_VID,
-                                   bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC),
-          fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_DID,
-                                   bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_DEVICETREE),
-          fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, id_),
+      platform_node.bind_rules() = std::vector<fdf::BindRule>{
+          fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                                  bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
+          fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
+                                  bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC),
+          fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
+                                  bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_DEVICETREE),
+          fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, id_),
       };
       parents_.insert(parents_.begin(), std::move(platform_node));
     } else if (add_non_platform_device) {
       // Construct the non platform bus node.
-      fdf::ParentSpec2 non_pbus_node;
+      fdf::ParentSpec non_pbus_node;
       non_pbus_node.properties() = node_properties_;
 
       for (auto &node_property : node_properties_) {
-        fdf::BindRule2 bind_rule = {node_property.key(),
-                                    fuchsia_driver_framework::Condition::kAccept,
-                                    {node_property.value()}};
+        fdf::BindRule bind_rule = {node_property.key(),
+                                   fuchsia_driver_framework::Condition::kAccept,
+                                   {node_property.value()}};
         non_pbus_node.bind_rules().emplace_back(std::move(bind_rule));
       }
       parents_.insert(parents_.begin(), std::move(non_pbus_node));
@@ -281,10 +254,9 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
     FDF_LOG(DEBUG, "Adding composite node spec to '%s' with %zu parents.", fdf_name().data(),
             parents_.size());
 
-    fdf::CompositeNodeSpec group{{
-        .name = fdf_name() + "_group",
-        .parents2 = std::move(parents_),
-    }};
+    fdf::CompositeNodeSpec group;
+    group.name() = fdf_name() + "_group";
+    group.parents() = std::move(parents_);
 
     auto devicegroup_result = mgr->AddSpec({std::move(group)});
     if (devicegroup_result.is_error()) {

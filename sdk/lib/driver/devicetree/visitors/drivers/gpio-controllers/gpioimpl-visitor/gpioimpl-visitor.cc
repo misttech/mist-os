@@ -150,19 +150,19 @@ zx::result<> GpioImplVisitor::Visit(fdf_devicetree::Node& node,
 zx::result<> GpioImplVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t pin,
                                                uint32_t controller_id,
                                                const std::string& gpio_name) {
-  auto gpio_node = fuchsia_driver_framework::ParentSpec2{{
+  auto gpio_node = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_gpio::SERVICE,
-                                       bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_CONTROLLER, controller_id),
-              fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_PIN, pin),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
+                                      bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, controller_id),
+              fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, pin),
           },
       .properties =
           {
-              fdf::MakeProperty2(bind_fuchsia_hardware_gpio::SERVICE,
-                                 bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeProperty2(bind_fuchsia_gpio::FUNCTION, "fuchsia.gpio.FUNCTION." + gpio_name),
+              fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
+                                bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, "fuchsia.gpio.FUNCTION." + gpio_name),
           },
   }};
   child.AddNodeSpec(gpio_node);
@@ -171,17 +171,17 @@ zx::result<> GpioImplVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint
 
 zx::result<> GpioImplVisitor::AddInitNodeSpec(fdf_devicetree::Node& child, uint32_t controller_id,
                                               uint32_t controller_index) {
-  auto gpio_init_node = fuchsia_driver_framework::ParentSpec2{{
+  auto gpio_init_node = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP,
-                                       bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
-              fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_CONTROLLER, controller_id),
+              fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
+                                      bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+              fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, controller_id),
           },
       .properties =
           {
-              fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
-              fdf::MakeProperty2(bind_fuchsia::GPIO_CONTROLLER, controller_index),
+              fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+              fdf::MakeProperty(bind_fuchsia::GPIO_CONTROLLER, controller_index),
           },
   }};
   child.AddNodeSpec(gpio_init_node);

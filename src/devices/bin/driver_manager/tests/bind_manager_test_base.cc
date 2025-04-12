@@ -20,7 +20,8 @@ void TestDriverIndex::MatchDriver(MatchDriverRequestView request,
                                   MatchDriverCompleter::Sync& completer) {
   std::optional<uint32_t> id;
   for (auto& property : request->args.properties()) {
-    if (property.key.get() == bind_fuchsia::PLATFORM_DEV_INSTANCE_ID) {
+    if (property.key.is_string_value() &&
+        property.key.string_value().get() == bind_fuchsia::PLATFORM_DEV_INSTANCE_ID) {
       id = property.value.int_value();
     }
   }

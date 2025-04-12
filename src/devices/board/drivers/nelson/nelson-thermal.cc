@@ -240,25 +240,25 @@ static const std::vector<fpbus::Metadata> thermal_metadata{
     }},
 };
 
-const std::vector<fdf::BindRule2> kPwmRules = std::vector{
-    fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_pwm::SERVICE,
-                             bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeAcceptBindRule2(bind_fuchsia::PWM_ID, static_cast<uint32_t>(S905D3_PWM_AO_D)),
+const std::vector<fdf::BindRule> kPwmRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_pwm::SERVICE,
+                            bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID, static_cast<uint32_t>(S905D3_PWM_AO_D)),
 };
 
-const std::vector<fdf::NodeProperty2> kPwmProperties = std::vector{
-    fdf::MakeProperty2(bind_fuchsia_hardware_pwm::SERVICE,
-                       bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeProperty2(bind_fuchsia_pwm::PWM_ID_FUNCTION,
-                       bind_fuchsia_pwm::PWM_ID_FUNCTION_CORE_POWER_BIG_CLUSTER),
+const std::vector<fdf::NodeProperty> kPwmProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia_hardware_pwm::SERVICE,
+                      bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeProperty(bind_fuchsia_pwm::PWM_ID_FUNCTION,
+                      bind_fuchsia_pwm::PWM_ID_FUNCTION_CORE_POWER_BIG_CLUSTER),
 };
 
-const std::vector<fdf::BindRule2> kGpioInitRules = std::vector{
-    fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
-const std::vector<fdf::NodeProperty2> kGpioInitProperties = std::vector{
-    fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
 // Contains all the clock parent nodes for the composite. Maps the clock id to the clock function.
@@ -290,27 +290,27 @@ zx_status_t Nelson::ThermalInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('THER');
 
-  std::vector<fdf::ParentSpec2> parents = {fdf::ParentSpec2{{kPwmRules, kPwmProperties}},
-                                           fdf::ParentSpec2{{kGpioInitRules, kGpioInitProperties}}};
+  std::vector<fdf::ParentSpec> parents = {fdf::ParentSpec{{kPwmRules, kPwmProperties}},
+                                          fdf::ParentSpec{{kGpioInitRules, kGpioInitProperties}}};
   parents.reserve(parents.size() + kClockFunctionMap.size());
   for (auto& [clock_id, function] : kClockFunctionMap) {
     auto rules = std::vector{
-        fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_clock::SERVICE,
-                                 bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-        fdf::MakeAcceptBindRule2(bind_fuchsia::CLOCK_ID, clock_id),
+        fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                                bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+        fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, clock_id),
     };
     auto properties = std::vector{
-        fdf::MakeProperty2(bind_fuchsia_hardware_clock::SERVICE,
-                           bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-        fdf::MakeProperty2(bind_fuchsia_clock::FUNCTION, function),
+        fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                          bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+        fdf::MakeProperty(bind_fuchsia_clock::FUNCTION, function),
     };
-    parents.push_back(fdf::ParentSpec2{{rules, properties}});
+    parents.push_back(fdf::ParentSpec{{rules, properties}});
   }
 
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, thermal_dev),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = "aml_thermal_pll", .parents2 = parents}}));
+                                   {.name = "aml_thermal_pll", .parents = parents}}));
   if (!result.ok()) {
     zxlogf(ERROR, "AddCompositeNodeSpec Thermal(thermal_dev) request failed: %s",
            result.FormatDescription().data());

@@ -46,9 +46,9 @@ type Irq = table {
     /// Bit flag for setting the interrupt mode.
     2: mode ZirconInterruptMode;
 
-    /// Properties for this interrupt's fragment.
+    /// Properties for this interrupt's fragment. Only used in DFv2.
     3: properties
-            vector<fuchsia.driver.framework.NodeProperty2>:fuchsia.driver.framework.MAX_PROPERTY_COUNT;
+            vector<fuchsia.driver.framework.NodeProperty>:fuchsia.driver.framework.MAX_PROPERTY_COUNT;
     /// Name that can be used to retrieve the irq using
     /// [`fuchsia.hardware.platform.device/GetInterruptByName`].
     /// It is valid for this to be empty, however the resource will only be able
@@ -144,7 +144,7 @@ type Node = table {
 
     /// Other node properties beyond BIND_PLATFORM_DEV_VID, BIND_PLATFORM_DEV_PID, and BIND_PLATFORM_DEV_DID.
     12: properties
-            vector<fuchsia.driver.framework.NodeProperty2>:fuchsia.driver.framework.MAX_PROPERTY_COUNT;
+            vector<fuchsia.driver.framework.NodeProperty>:fuchsia.driver.framework.MAX_PROPERTY_COUNT;
     13: power_config
             vector<fuchsia.hardware.power.PowerElementConfiguration>:MAX_INFO_STRING_LENGTH;
 };

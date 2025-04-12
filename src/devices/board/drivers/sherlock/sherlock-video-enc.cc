@@ -61,35 +61,35 @@ static const std::vector<fpbus::Irq> sherlock_video_enc_irqs{
     }},
 };
 
-const std::vector<fdf::BindRule2> kCanvasRules = std::vector{
-    fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
-                             bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT)};
+const std::vector<fdf::BindRule> kCanvasRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
+                            bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT)};
 
-const std::vector<fdf::NodeProperty2> kCanvasProperties = std::vector{
-    fdf::MakeProperty2(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
-                       bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
-};
-
-const std::vector<fdf::BindRule2> kClkDosHCodecRules = std::vector{
-    fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_clock::SERVICE,
-                             bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeAcceptBindRule2(bind_fuchsia::CLOCK_ID, g12b_clk::G12B_CLK_DOS_GCLK_HCODEC),
-};
-const std::vector<fdf::NodeProperty2> kClkDosHCodecProperties = std::vector{
-    fdf::MakeProperty2(bind_fuchsia_hardware_clock::SERVICE,
-                       bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeProperty2(bind_fuchsia_clock::FUNCTION, bind_fuchsia_clock::FUNCTION_DOS_GCLK_HCODEC),
+const std::vector<fdf::NodeProperty> kCanvasProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
+                      bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
 };
 
-const std::vector<fdf::BindRule2> kClkDosRules = std::vector{
-    fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_clock::SERVICE,
-                             bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeAcceptBindRule2(bind_fuchsia::CLOCK_ID, g12b_clk::G12B_CLK_DOS),
+const std::vector<fdf::BindRule> kClkDosHCodecRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                            bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, g12b_clk::G12B_CLK_DOS_GCLK_HCODEC),
 };
-const std::vector<fdf::NodeProperty2> kClkDosProperties = std::vector{
-    fdf::MakeProperty2(bind_fuchsia_hardware_clock::SERVICE,
-                       bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeProperty2(bind_fuchsia_clock::FUNCTION, bind_fuchsia_clock::FUNCTION_DOS),
+const std::vector<fdf::NodeProperty> kClkDosHCodecProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                      bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeProperty(bind_fuchsia_clock::FUNCTION, bind_fuchsia_clock::FUNCTION_DOS_GCLK_HCODEC),
+};
+
+const std::vector<fdf::BindRule> kClkDosRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                            bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, g12b_clk::G12B_CLK_DOS),
+};
+const std::vector<fdf::NodeProperty> kClkDosProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                      bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeProperty(bind_fuchsia_clock::FUNCTION, bind_fuchsia_clock::FUNCTION_DOS),
 };
 
 static const fpbus::Node video_enc_dev = []() {
@@ -124,15 +124,15 @@ zx_status_t Sherlock::VideoEncInit() {
 
   fidl::Arena<> fidl_arena;
 
-  std::vector<fdf::ParentSpec2> kVideoEncParents = {
-      fdf::ParentSpec2{{kCanvasRules, kCanvasProperties}},
-      fdf::ParentSpec2{{kClkDosHCodecRules, kClkDosHCodecProperties}},
-      fdf::ParentSpec2{{kClkDosRules, kClkDosProperties}}};
+  std::vector<fdf::ParentSpec> kVideoEncParents = {
+      fdf::ParentSpec{{kCanvasRules, kCanvasProperties}},
+      fdf::ParentSpec{{kClkDosHCodecRules, kClkDosHCodecProperties}},
+      fdf::ParentSpec{{kClkDosRules, kClkDosProperties}}};
   fdf::Arena arena('VIDE');
   auto composite_result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, video_enc_dev),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = "aml-video-enc", .parents2 = kVideoEncParents}}));
+                                   {.name = "aml-video-enc", .parents = kVideoEncParents}}));
   if (!composite_result.ok()) {
     zxlogf(ERROR, "AddCompositeNodeSpec VideoEnc(video_enc_dev) request failed: %s",
            composite_result.FormatDescription().data());

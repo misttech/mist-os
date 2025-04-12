@@ -121,23 +121,22 @@ zx::result<> RegistersVisitor::Visit(fdf_devicetree::Node& node,
 zx::result<> RegistersVisitor::AddChildNodeSpec(fdf_devicetree::Node& child,
                                                 std::optional<std::string> register_name) {
   std::vector bind_rules = {
-      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_registers::SERVICE,
-                               bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_registers::SERVICE,
+                              bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
   };
   std::vector bind_properties = {
-      fdf::MakeProperty2(bind_fuchsia_hardware_registers::SERVICE,
-                         bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia_hardware_registers::SERVICE,
+                        bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
   };
 
   if (register_name) {
-    bind_rules.emplace_back(fdf::MakeAcceptBindRule2(bind_fuchsia_register::NAME, *register_name));
-    bind_properties.emplace_back(fdf::MakeProperty2(bind_fuchsia_register::NAME, *register_name));
+    bind_rules.emplace_back(fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME, *register_name));
+    bind_properties.emplace_back(fdf::MakeProperty(bind_fuchsia_register::NAME, *register_name));
   } else {
-    bind_rules.emplace_back(
-        fdf::MakeAcceptBindRule2(bind_fuchsia_register::NAME, child.fdf_name()));
+    bind_rules.emplace_back(fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME, child.fdf_name()));
   }
 
-  auto register_node = fuchsia_driver_framework::ParentSpec2{{bind_rules, bind_properties}};
+  auto register_node = fuchsia_driver_framework::ParentSpec{{bind_rules, bind_properties}};
 
   child.AddNodeSpec(register_node);
   return zx::ok();

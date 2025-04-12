@@ -150,20 +150,20 @@ zx::result<> RegulatorVisitor::AddChildNodeSpec(fdf_devicetree::Node& child,
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
-  auto regulator_node = fuchsia_driver_framework::ParentSpec2{{
+  auto regulator_node = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_vreg::SERVICE,
-                                       bind_fuchsia_hardware_vreg::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeAcceptBindRule2(bind_fuchsia_regulator::NAME,
-                                       regulator_name->second.AsString().value()),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_vreg::SERVICE,
+                                      bind_fuchsia_hardware_vreg::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeAcceptBindRule(bind_fuchsia_regulator::NAME,
+                                      regulator_name->second.AsString().value()),
           },
       .properties =
           {
-              fdf::MakeProperty2(bind_fuchsia_hardware_vreg::SERVICE,
-                                 bind_fuchsia_hardware_vreg::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeProperty2(bind_fuchsia_regulator::NAME,
-                                 regulator_name->second.AsString().value()),
+              fdf::MakeProperty(bind_fuchsia_hardware_vreg::SERVICE,
+                                bind_fuchsia_hardware_vreg::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeProperty(bind_fuchsia_regulator::NAME,
+                                regulator_name->second.AsString().value()),
           },
   }};
 

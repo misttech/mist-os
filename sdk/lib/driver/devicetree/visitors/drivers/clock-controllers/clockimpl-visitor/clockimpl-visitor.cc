@@ -159,22 +159,22 @@ zx::result<> ClockImplVisitor::Visit(fdf_devicetree::Node& node,
 
 zx::result<> ClockImplVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t id,
                                                 std::optional<std::string_view> clock_name) {
-  auto clock_node = fuchsia_driver_framework::ParentSpec2{{
+  auto clock_node = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_clock::SERVICE,
-                                       bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeAcceptBindRule2(bind_fuchsia::CLOCK_ID, id),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                                      bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, id),
           },
       .properties =
           {
-              fdf::MakeProperty2(bind_fuchsia_hardware_clock::SERVICE,
-                                 bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                                bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
           },
   }};
 
   if (clock_name) {
-    clock_node.properties().push_back(fdf::MakeProperty2(
+    clock_node.properties().push_back(fdf::MakeProperty(
         bind_fuchsia_clock::FUNCTION, "fuchsia.clock.FUNCTION." + std::string(*clock_name)));
   }
 
@@ -183,12 +183,12 @@ zx::result<> ClockImplVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uin
 }
 
 zx::result<> ClockImplVisitor::AddInitChildNodeSpec(fdf_devicetree::Node& child) {
-  auto clock_init_node = fuchsia_driver_framework::ParentSpec2{{
-      .bind_rules = {fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP,
-                                              bind_fuchsia_clock::BIND_INIT_STEP_CLOCK)},
+  auto clock_init_node = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules = {fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
+                                             bind_fuchsia_clock::BIND_INIT_STEP_CLOCK)},
       .properties =
           {
-              fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_clock::BIND_INIT_STEP_CLOCK),
+              fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_clock::BIND_INIT_STEP_CLOCK),
           },
   }};
   child.AddNodeSpec(clock_init_node);
