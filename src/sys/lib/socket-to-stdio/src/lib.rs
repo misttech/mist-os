@@ -65,11 +65,25 @@ pub async fn connect_socket_to_stdio(
     stdout: Stdout<'_>,
 ) -> anyhow::Result<()> {
     #[allow(clippy::large_futures)]
+    connect_socket_to_stdio_impl(
+        fuchsia_async::Socket::from_socket(socket),
+        || std::io::stdin().lock(),
+        stdout,
+    )?
+    .await
+}
+
+/// Same as `connect_socket_to_stdio` but operates on an FDomain socket.
+pub async fn connect_fdomain_socket_to_stdio(
+    socket: fdomain_client::Socket,
+    stdout: Stdout<'_>,
+) -> anyhow::Result<()> {
+    #[allow(clippy::large_futures)]
     connect_socket_to_stdio_impl(socket, || std::io::stdin().lock(), stdout)?.await
 }
 
 fn connect_socket_to_stdio_impl<R>(
-    socket: fidl::Socket,
+    socket: impl futures::AsyncRead + futures::AsyncWrite,
     stdin: impl FnOnce() -> R + Send + 'static,
     mut stdout: impl std::io::Write,
 ) -> anyhow::Result<impl futures::Future<Output = anyhow::Result<()>>>
@@ -93,7 +107,7 @@ where
         })
         .context("spawning stdin thread")?;
 
-    let (mut socket_in, mut socket_out) = fuchsia_async::Socket::from_socket(socket).split();
+    let (mut socket_in, mut socket_out) = socket.split();
 
     let stdin_to_socket = async move {
         while let Some(stdin) = stdin_recv.next().await {
@@ -143,6 +157,7 @@ mod tests {
     #[fuchsia::test]
     async fn stdin_to_socket() {
         let (socket, socket_remote) = fidl::Socket::create_stream();
+        let socket_remote = fuchsia_async::Socket::from_socket(socket_remote);
 
         let connect_fut =
             connect_socket_to_stdio_impl(socket_remote, || &b"test input"[..], vec![]).unwrap();
@@ -168,6 +183,7 @@ mod tests {
         let mut stdout = vec![];
         let (unblocker, block_until) = std::sync::mpsc::channel();
 
+        let socket_remote = fuchsia_async::Socket::from_socket(socket_remote);
         #[allow(clippy::large_futures)]
         let () = connect_socket_to_stdio_impl(
             socket_remote,
