@@ -2,14 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "inspect/use.shard.cml",
-
-        // TODO(b/345827642): Remove inline declarations
-        // of RealmBuilder shards once Chromium uses dictionaries.
-        // Use sys/component/realm_builder.shard.cml instead.
-        "syslog/use.shard.cml",
-    ],
     program: {
         runner: "elf",
         binary: "bin/test-ui-stack",
@@ -54,43 +46,21 @@
                 "test.accessibility.Magnifier",
             ],
         },
-        { dictionary: "diagnostics" },
     ],
     use: [
         {
             protocol: "fuchsia.component.Realm",
             from: "framework",
         },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "parent/diagnostics",
+        },
     ],
     offer: [
-        // NOTE: These routes are not redundant. They are needed for Chromium
-        // which can't yet use dictionaries.
-        {
-            protocol: "fuchsia.inspect.InspectSink",
-            from: "parent",
-            to: "all",
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "all",
-        },
-        {
-            dictionary: "diagnostics",
-            from: "self",
-            to: "all",
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "self/diagnostics",
-        },
-        {
-            protocol: "fuchsia.inspect.InspectSink",
-            from: "parent",
-            to: "self/diagnostics",
-        },
-
         // [START collection_offers]
         {
             protocol: [
@@ -99,6 +69,14 @@
             ],
             from: "parent",
             to: [ "#realm_builder" ],
+        },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: [
+                "#realm_builder",
+                "#realm_builder_server",
+            ],
         },
         {
             event_stream: [
