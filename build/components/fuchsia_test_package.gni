@@ -294,6 +294,7 @@ template("fuchsia_test_package") {
 
       test_spec(test_target) {
         forward_variables_from(test_specs, "*")
+        forward_variables_from(invoker, [ "package_deps" ])
         if (!defined(build_rule)) {
           build_rule = "fuchsia_test_package"
         }

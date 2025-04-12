@@ -457,6 +457,7 @@ template("python_mobly_test") {
     forward_variables_from(invoker,
                            [
                              "isolated",
+                             "package_deps",
                              "product_bundle",
                              "timeout_secs",
                              "visibility",

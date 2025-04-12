@@ -27,7 +27,7 @@ rustc_test("connect") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-package_deps = [
+package_deps_for_tests = [
   "//src/connectivity/network/netstack3:component-debug",
   "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
   "//src/lib/testing/expectation:expectation_comparer",
@@ -35,7 +35,8 @@ package_deps = [
 
 # RISC-V on Fuchsia does not support Golang.
 if (target_cpu != "riscv64") {
-  package_deps += [ "//src/connectivity/network/netstack:component-debug" ]
+  package_deps_for_tests +=
+      [ "//src/connectivity/network/netstack:component-debug" ]
 }
 
 fuchsia_test_component_with_expectations("netstack-connect-test-component") {
@@ -55,12 +56,12 @@ fuchsia_test_component_with_expectations(
 
 fuchsia_test_package("netstack-connect-tests") {
   test_components = [ ":netstack-connect-test-component" ]
-  deps = package_deps
+  deps = package_deps_for_tests
 }
 
 fuchsia_test_package("netstack-connect-tests-with-error-logs") {
   test_components = [ ":netstack-connect-test-with-error-logs-component" ]
-  deps = package_deps
+  deps = package_deps_for_tests
   test_specs = {
     log_settings = {
       max_severity = "ERROR"

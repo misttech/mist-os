@@ -78,31 +78,6 @@ template("host_test") {
     }
   }
 
-  # Some e2e tests depend on target tests which they run on the target
-  # so get the paths to the package_manifests of those target
-  # test dependencies to attach to the test_spec of the host test
-  # so we know what blobs it depends on.
-  pkg_manifest_deps_file = ""
-  if ((defined(invoker.deps) && invoker.deps != []) ||
-      (defined(invoker.data_deps) && invoker.data_deps != []) ||
-      (defined(invoker.public_deps) && invoker.public_deps != [])) {
-    pkg_manifest_deps_file = "$target_gen_dir/${target_name}.pkg_manifests.json"
-    pkg_manifest_deps_target_name = "${target_name}_pkg_manifest_deps"
-
-    generated_file(pkg_manifest_deps_target_name) {
-      testonly = true
-      forward_variables_from(invoker,
-                             [
-                               "data_deps",
-                               "deps",
-                               "public_deps",
-                             ])
-      outputs = [ pkg_manifest_deps_file ]
-      data_keys = [ "package_manifests" ]
-      output_conversion = "json"
-    }
-  }
-
   test_spec(target_name) {
     if (defined(invoker.target)) {
       target = invoker.target
@@ -118,6 +93,7 @@ template("host_test") {
                              "visibility",
                              "isolated",
                              "timeout_secs",
+                             "package_deps",
                              "product_bundle",
                            ])
 
@@ -132,10 +108,6 @@ template("host_test") {
                                "deps",
                                "public_deps",
                              ])
-    }
-    if (pkg_manifest_deps_file != "") {
-      package_manifest_deps = pkg_manifest_deps_file
-      deps += [ ":$pkg_manifest_deps_target_name" ]
     }
   }
 }
