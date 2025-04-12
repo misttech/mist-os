@@ -10,15 +10,18 @@ use crate::lifecycle::{
     start_instance, start_instance_with_args, ActionError, CreateError, DestroyError, StartError,
 };
 use anyhow::{bail, format_err, Result};
-use fidl::HandleBased;
+#[allow(unused)]
+use flex_client::ProxyHasDomain;
+use flex_client::{HandleBased, Socket};
 use fuchsia_url::AbsoluteComponentUrl;
 use futures::future::BoxFuture;
-use futures::AsyncReadExt;
+#[allow(unused)]
+use futures::{AsyncReadExt, AsyncWriteExt};
 use moniker::Moniker;
 use std::io::Read;
 use {
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys,
+    flex_fuchsia_component as fcomponent, flex_fuchsia_component_decl as fdecl,
+    flex_fuchsia_process as fprocess, flex_fuchsia_sys2 as fsys,
 };
 
 // This value is fairly arbitrary. The value matches `MAX_BUF` from `fuchsia.io`, but that
@@ -26,7 +29,8 @@ use {
 // transfers.
 const TRANSFER_CHUNK_SIZE: usize = 8192;
 
-async fn copy<W: std::io::Write>(source: fidl::Socket, mut sink: W) -> Result<()> {
+async fn copy<W: std::io::Write>(source: Socket, mut sink: W) -> Result<()> {
+    #[cfg(not(feature = "fdomain"))]
     let mut source = fuchsia_async::Socket::from_socket(source);
     let mut buf = [0u8; TRANSFER_CHUNK_SIZE];
     loop {
@@ -48,16 +52,33 @@ fn handle_id_for_fd(fd: u32) -> u32 {
 }
 
 struct Stdio {
-    local_in: fidl::Socket,
-    local_out: fidl::Socket,
-    local_err: fidl::Socket,
+    local_in: Socket,
+    local_out: Socket,
+    local_err: Socket,
 }
 
 impl Stdio {
+    #[cfg(not(feature = "fdomain"))]
     fn new() -> (Self, Vec<fprocess::HandleInfo>) {
         let (local_in, remote_in) = fidl::Socket::create_stream();
         let (local_out, remote_out) = fidl::Socket::create_stream();
         let (local_err, remote_err) = fidl::Socket::create_stream();
+
+        (
+            Self { local_in, local_out, local_err },
+            vec![
+                fprocess::HandleInfo { handle: remote_in.into_handle(), id: handle_id_for_fd(0) },
+                fprocess::HandleInfo { handle: remote_out.into_handle(), id: handle_id_for_fd(1) },
+                fprocess::HandleInfo { handle: remote_err.into_handle(), id: handle_id_for_fd(2) },
+            ],
+        )
+    }
+
+    #[cfg(feature = "fdomain")]
+    fn new(client: &std::sync::Arc<flex_client::Client>) -> (Self, Vec<fprocess::HandleInfo>) {
+        let (local_in, remote_in) = client.create_stream_socket();
+        let (local_out, remote_out) = client.create_stream_socket();
+        let (local_err, remote_err) = client.create_stream_socket();
 
         (
             Self { local_in, local_out, local_err },
@@ -74,19 +95,20 @@ impl Stdio {
         let local_out = self.local_out;
         let local_err = self.local_err;
 
+        #[cfg(not(feature = "fdomain"))]
+        let mut local_in = fuchsia_async::Socket::from_socket(local_in);
+
         std::thread::spawn(move || {
             let mut term_in = std::io::stdin().lock();
             let mut buf = [0u8; TRANSFER_CHUNK_SIZE];
+            let mut executor = fuchsia_async::LocalExecutor::new();
             loop {
                 let bytes_read = term_in.read(&mut buf)?;
                 if bytes_read == 0 {
                     return Ok::<(), anyhow::Error>(());
                 }
-                let mut buf = &buf[..bytes_read];
-                while !buf.is_empty() {
-                    let bytes = local_in.write(buf)?;
-                    buf = &buf[bytes..];
-                }
+
+                executor.run_singlethreaded(local_in.write_all(&buf[..bytes_read]))?;
             }
         });
 
@@ -154,7 +176,10 @@ pub async fn run_cmd<W: std::io::Write>(
     // First try to use StartWithArgs
 
     let (mut maybe_stdio, numbered_handles) = if connect_stdio {
+        #[cfg(not(feature = "fdomain"))]
         let (stdio, numbered_handles) = Stdio::new();
+        #[cfg(feature = "fdomain")]
+        let (stdio, numbered_handles) = Stdio::new(&lifecycle_controller.domain());
         (Some(stdio), Some(numbered_handles))
     } else {
         (None, Some(vec![]))
@@ -203,7 +228,10 @@ pub async fn run_cmd<W: std::io::Write>(
             // creating an instance when we have to use the legacy `StartInstance`. Delete and
             // recreate the component, providing the handles to the create call.
 
+            #[cfg(not(feature = "fdomain"))]
             let (stdio, numbered_handles) = Stdio::new();
+            #[cfg(feature = "fdomain")]
+            let (stdio, numbered_handles) = Stdio::new(&lifecycle_controller.domain());
             maybe_stdio = Some(stdio);
             let create_args = fcomponent::CreateChildArgs {
                 numbered_handles: Some(numbered_handles),
@@ -247,7 +275,7 @@ pub async fn run_cmd<W: std::io::Write>(
 mod test {
     use super::*;
     use fidl::endpoints::create_proxy_and_stream;
-    use fidl_fuchsia_sys2 as fsys;
+    use flex_fuchsia_sys2 as fsys;
     use futures::{FutureExt, TryStreamExt};
 
     fn setup_fake_lifecycle_controller_ok(

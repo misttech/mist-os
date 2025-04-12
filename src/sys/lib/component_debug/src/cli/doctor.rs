@@ -5,8 +5,9 @@
 use crate::doctor::{create_tables, validate_routes, RouteReport};
 use crate::query::get_cml_moniker_from_query;
 use anyhow::Result;
-use fidl_fuchsia_sys2 as fsys;
 use moniker::Moniker;
+
+use flex_fuchsia_sys2 as fsys;
 
 pub async fn doctor_cmd_print<W: std::io::Write>(
     query: String,

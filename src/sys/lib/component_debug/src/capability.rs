@@ -9,7 +9,7 @@ use cm_rust::{
     CapabilityDecl, ComponentDecl, ExposeDecl, ExposeDeclCommon, OfferDecl, OfferDeclCommon,
     SourceName, UseDecl, UseDeclCommon,
 };
-use fidl_fuchsia_sys2 as fsys;
+use flex_fuchsia_sys2 as fsys;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use moniker::Moniker;

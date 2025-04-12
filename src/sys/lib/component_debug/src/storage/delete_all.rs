@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Result};
-use fidl_fuchsia_sys2::StorageAdminProxy;
+use flex_fuchsia_sys2::StorageAdminProxy;
 
 /// Delete the contents of all the storage of this component.
 ///
@@ -27,7 +27,7 @@ pub async fn delete_all(storage_admin: StorageAdminProxy, moniker: String) -> Re
 mod test {
     use super::*;
     use fidl::endpoints::{create_proxy_and_stream, Proxy};
-    use fidl_fuchsia_sys2 as fsys;
+    use flex_fuchsia_sys2 as fsys;
     use futures::TryStreamExt;
 
     #[fuchsia_async::run_singlethreaded(test)]

@@ -5,7 +5,7 @@
 use crate::query::get_cml_moniker_from_query;
 use crate::route::{self, RouteReport};
 use anyhow::{format_err, Result};
-use fidl_fuchsia_sys2 as fsys;
+use flex_fuchsia_sys2 as fsys;
 
 pub async fn route_cmd_print<W: std::io::Write>(
     target_moniker: String,

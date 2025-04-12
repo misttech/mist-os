@@ -4,11 +4,12 @@
 
 use crate::realm::{get_all_instances, Instance};
 use anyhow::Result;
-use fidl_fuchsia_sys2 as fsys;
 use std::collections::HashSet;
 use std::fmt::Write;
 use std::str::FromStr;
 use url::Url;
+
+use flex_fuchsia_sys2 as fsys;
 
 /// The starting part of our Graphviz graph output. This should be printed before any contents.
 static GRAPHVIZ_START: &str = r##"digraph {

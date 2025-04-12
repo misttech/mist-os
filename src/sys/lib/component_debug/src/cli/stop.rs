@@ -6,7 +6,7 @@ use crate::cli::format::format_action_error;
 use crate::lifecycle::stop_instance;
 use crate::query::get_cml_moniker_from_query;
 use anyhow::Result;
-use fidl_fuchsia_sys2 as fsys;
+use flex_fuchsia_sys2 as fsys;
 
 pub async fn stop_cmd<W: std::io::Write>(
     query: String,

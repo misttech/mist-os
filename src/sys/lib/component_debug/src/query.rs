@@ -4,8 +4,9 @@
 
 use crate::realm::{get_all_instances, Instance};
 use anyhow::{bail, Result};
-use fidl_fuchsia_sys2 as fsys;
 use moniker::Moniker;
+
+use flex_fuchsia_sys2 as fsys;
 
 /// Retrieves a list of CML instances that match a given string query.
 ///

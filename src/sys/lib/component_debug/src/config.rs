@@ -6,7 +6,7 @@ use crate::realm::{get_resolved_declaration, resolve_declaration};
 use cm_rust::NativeIntoFidl;
 use config_value_file::field::config_value_from_json_value;
 use moniker::Moniker;
-use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
+use {flex_fuchsia_component_decl as fdecl, flex_fuchsia_sys2 as fsys};
 
 pub async fn resolve_raw_config_overrides(
     realm_query: &fsys::RealmQueryProxy,

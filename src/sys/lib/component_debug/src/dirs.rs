@@ -5,10 +5,11 @@
 //! Convenience functions for accessing directories of a component instance
 //! and opening protocols that exist in them.
 
-use fidl::endpoints::{create_proxy, ProtocolMarker};
+use flex_client::fidl::ProtocolMarker;
+use flex_client::{Channel, ProxyHasDomain};
 use moniker::Moniker;
 use thiserror::Error;
-use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
+use {flex_fuchsia_io as fio, flex_fuchsia_sys2 as fsys};
 
 /// Errors that can be returned from opening a component instance directory.
 #[derive(Debug, Error)]
@@ -103,7 +104,7 @@ pub async fn connect_to_instance_protocol_at_path<P: ProtocolMarker>(
     path: &str,
     realm: &fsys::RealmQueryProxy,
 ) -> Result<P::Proxy, OpenError> {
-    let (proxy, server_end) = create_proxy::<P>();
+    let (proxy, server_end) = realm.domain().create_proxy::<P>();
     let server_end = server_end.into_channel();
     open_in_instance_dir(
         &moniker,
@@ -134,7 +135,7 @@ pub async fn open_instance_subdir_readable(
     path: &str,
     realm: &fsys::RealmQueryProxy,
 ) -> Result<fio::DirectoryProxy, OpenError> {
-    let (root_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
+    let (root_dir, server_end) = realm.domain().create_proxy::<fio::DirectoryMarker>();
     let server_end = server_end.into_channel();
     open_in_instance_dir(
         moniker,
@@ -158,7 +159,7 @@ pub async fn open_in_instance_dir(
     flags: fio::OpenFlags,
     mode: fio::ModeType,
     path: &str,
-    object: fidl::Channel,
+    object: Channel,
     realm: &fsys::RealmQueryProxy,
 ) -> Result<(), OpenError> {
     let moniker_str = moniker.to_string();
@@ -186,7 +187,7 @@ pub async fn open_in_instance_dir(
 mod tests {
     use fidl_test_util::spawn_stream_handler;
     use moniker::Moniker;
-    use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
+    use {flex_fuchsia_io as fio, flex_fuchsia_sys2 as fsys};
 
     use super::{
         connect_to_instance_protocol_at_path, open_instance_dir_root_readable,

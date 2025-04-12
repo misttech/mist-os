@@ -7,14 +7,18 @@
 
 use anyhow::{anyhow, format_err, Error, Result};
 use async_trait::async_trait;
-use fidl::endpoints::create_proxy;
-use fidl_fuchsia_io as fio;
-use fuchsia_fs::directory::{open_directory_async, open_file_async, readdir, DirEntry};
-use fuchsia_fs::file::{close, read, read_to_string, write};
 use futures::lock::Mutex;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 use zx_status::Status;
+
+#[cfg(feature = "fdomain")]
+use fuchsia_fs_fdomain as fuchsia_fs;
+
+use flex_client::ProxyHasDomain;
+use flex_fuchsia_io as fio;
+use fuchsia_fs::directory::{open_directory_async, open_file_async, readdir, DirEntry};
+use fuchsia_fs::file::{close, read, read_to_string, write};
 
 pub enum DirentKind {
     File,
@@ -201,7 +205,8 @@ impl RemoteDirectory {
     }
 
     pub fn clone_proxy(&self) -> Result<fio::DirectoryProxy> {
-        let (cloned_proxy, clone_server) = create_proxy::<fio::DirectoryMarker>();
+        let (cloned_proxy, clone_server) =
+            self.proxy.domain().create_proxy::<fio::DirectoryMarker>();
         self.proxy.clone(clone_server.into_channel().into())?;
         Ok(cloned_proxy)
     }

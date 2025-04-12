@@ -7,7 +7,7 @@ use crate::lifecycle::create_instance_in_collection;
 use anyhow::{format_err, Result};
 use fuchsia_url::AbsoluteComponentUrl;
 use moniker::Moniker;
-use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
+use {flex_fuchsia_component_decl as fdecl, flex_fuchsia_sys2 as fsys};
 
 pub async fn create_cmd<W: std::io::Write>(
     url: AbsoluteComponentUrl,

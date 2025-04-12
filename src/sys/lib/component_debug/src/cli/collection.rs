@@ -5,7 +5,7 @@
 use crate::realm::{get_all_instances, get_resolved_declaration, Durability};
 use anyhow::{bail, Result};
 use cm_rust::{OfferDeclCommon, OfferTarget};
-use fidl_fuchsia_sys2 as fsys;
+use flex_fuchsia_sys2 as fsys;
 use moniker::Moniker;
 use prettytable::format::consts::FORMAT_CLEAN;
 use prettytable::{cell, row, Table};
