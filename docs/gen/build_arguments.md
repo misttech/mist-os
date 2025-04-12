@@ -88,7 +88,7 @@ these device types will be used for tests.
 
 **Current value (from the default):** `[]`
 
-From //build/testing/test_spec.gni:12
+From //build/testing/test_spec.gni:13
 
 ### always_zedboot
 
@@ -247,36 +247,6 @@ remote inputs, and more.
 **Current value (from the default):** `true`
 
 From //build/bazel/logging.gni:9
-
-### bazel_fuchsia_sdk_all_api_levels
-
-Set to true to populate the @fuchsia_sdk external repository with prebuilt
-binaries for all API levels, or a subset of them. Possible values are:
-
-  false: The default, which is to only build targets for which the IDK
-      contains artifacts built at "PLATFORM".
-
-  true: To build for all API levels listed in
-      platform_version.idk_buildable_api_levels, which defaults to
-      all Supported API levels plus the current in-development API level,
-      unless `override_idk_buildable_api_levels` is also set.
-      See //build/config/fuchsia/platform_versions.gni.
-
-
-**Current value (from the default):** `false`
-
-From //build/bazel/bazel_fuchsia_sdk.gni:29
-
-### bazel_fuchsia_sdk_all_cpus
-
-Set to true to populate the @fuchsia_sdk external repository with prebuilt
-binaries for all supported target CPU architectures. By default, only those
-for the current build configuration's `target_cpu` value will be generated
-to save about 3 minutes of build time when they are not needed.
-
-**Current value (from the default):** `false`
-
-From //build/bazel/bazel_fuchsia_sdk.gni:15
 
 ### bazel_product_bundle_board
 
@@ -4654,14 +4624,11 @@ This is useful for reducing the overall build time of any build that
 includes the IDK/SDK in exchange for reduced coverage of API level support.
 For example, `fx build //sdk:final_fuchsia_idk`.
 
-Note: The in-tree Bazel SDK ignores this variable and the variable it
-overrides unless `bazel_fuchsia_sdk_all_api_levels` is true.
-
 To override the set of target CPUs, see `override_idk_target_cpus`.
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:44
+From //build/config/fuchsia/platform_version.gni:41
 
 ### override_idk_target_cpus
 
@@ -4674,15 +4641,12 @@ This is useful for reducing the overall build time of any build that
 includes the IDK/SDK in exchange for reduced coverage of target CPU
 architecture support. For example, `fx build //sdk:final_fuchsia_idk`.
 
-Note: The in-tree Bazel SDK ignores this variable and the variable it
-overrides unless `bazel_fuchsia_sdk_all_cpus` is true.
-
 To override the set of API levels, see
 `override_idk_buildable_api_levels`.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:63
+From //build/sdk/config.gni:60
 
 ### override_target_api_level
 
