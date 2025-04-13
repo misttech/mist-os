@@ -917,8 +917,6 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
   // We only expect write to be set if this a pin. All non-pin commits are reads.
   DEBUG_ASSERT(!write || pin);
 
-  Guard<VmoLockType> guard{lock()};
-
   // Child slices of VMOs are currently not resizable, nor can they be made
   // from resizable parents.  If this ever changes, the logic surrounding what
   // to do if a VMO gets resized during a Commit or Pin operation will need to
@@ -943,30 +941,23 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
     len = end_page - offset;
   }
 
-  // If a pin is requested the entire range must exist and be valid.
-  if (pin) {
+  // Although the length, for the non-pin ranges, is allowed to end up outside the VMO range during
+  // the operation, at least initially it must be within range.
+  {
+    Guard<VmoLockType> guard{lock()};
+    if (unlikely(!InRange(offset, len, size_locked()))) {
+      return ZX_ERR_OUT_OF_RANGE;
+    }
+  }
+
+  if (len == 0) {
     // If pinning we explicitly forbid zero length pins as we cannot guarantee consistent semantics.
     // For example pinning a zero length range outside the range of the VMO is an error, and so
     // pinning a zero length range inside the vmo and then resizing the VMO smaller than the pin
     // region should also be an error. To enforce this without having to have new metadata to track
     // zero length pin regions is to just forbid them. Note that the user entry points for pinning
     // already forbid zero length ranges.
-    if (unlikely(len == 0)) {
-      return ZX_ERR_INVALID_ARGS;
-    }
-    // verify that the range is within the object
-    if (unlikely(!InRange(offset, len, size_locked()))) {
-      return ZX_ERR_OUT_OF_RANGE;
-    }
-  } else {
-    // verify that the range is within the object
-    if (!InRange(offset, len, size_locked())) {
-      return ZX_ERR_OUT_OF_RANGE;
-    }
-    // was in range, just zero length
-    if (len == 0) {
-      return ZX_OK;
-    }
+    return pin ? ZX_ERR_INVALID_ARGS : ZX_OK;
   }
 
   // Tracks the end of the pinned range to unpin in case of failure. The |offset| might lag behind
@@ -976,222 +967,145 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
   // Should any errors occur we need to unpin everything. If we were asked to write, we need to mark
   // the VMO modified if any pages were committed.
   auto deferred_cleanup =
-      fit::defer([this, original_offset = offset, &offset, &len, &pinned_end_offset, pin, write]() {
-        AssertHeld(lock_ref());
+      fit::defer([this, pinned_start_offset = offset, &pinned_end_offset, &len, &write]() {
         // If we were not able to pin the entire range, i.e. len is not 0, we need to unpin
         // everything. Regardless of any resizes or other things that may have happened any pinned
         // pages *must* still be within a valid range, and so we know Unpin should succeed. The edge
         // case is if we had failed to pin *any* pages and so our original offset may be outside the
         // current range of the vmo. Additionally, as pinning a zero length range is invalid, so is
         // unpinning, and so we must avoid.
-        if (pin && len > 0 && pinned_end_offset > original_offset) {
-          auto cow_range = GetCowRange(original_offset, pinned_end_offset - original_offset);
-          cow_pages_locked()->UnpinLocked(*cow_range);
-        } else if (write && offset > original_offset) {
-          // Mark modified as we successfully committed pages for writing *and* we did not end up
-          // undoing a partial pin (the if-block above).
-          mark_modified_locked();
+        if (pinned_end_offset > pinned_start_offset) {
+          if (len > 0) {
+            auto cow_range =
+                GetCowRange(pinned_start_offset, pinned_end_offset - pinned_start_offset);
+            Guard<VmoLockType> guard{AssertOrderedLock, lock(), cow_pages_->lock_order(),
+                                     VmLockAcquireMode::First};
+            cow_pages_locked()->UnpinLocked(*cow_range);
+          } else if (write) {
+            Guard<VmoLockType> guard{AssertOrderedLock, lock(), cow_pages_->lock_order(),
+                                     VmLockAcquireMode::First};
+            mark_modified_locked();
+          }
         }
       });
 
   __UNINITIALIZED MultiPageRequest page_request;
-  // Convenience lambda to advance offset by processed_len, indicating that all pages in the range
-  // [offset, offset + processed_len) have been processed, then potentially wait on the page_request
-  // (if wait_on_page_request is set to true), and revalidate range checks after waiting.
-  auto advance_processed_range = [&](uint64_t processed_len,
-                                     bool wait_on_page_request) -> zx_status_t {
-    offset += processed_len;
-    len -= processed_len;
-
-    if (wait_on_page_request) {
-      // If the length is now zero we should not be waiting on a page request. This is both
-      // nonsensical, as we have already done all we needed, but also an error since if the wait
-      // were to fail we would error the commit, but not undo any potential pinning.
-      DEBUG_ASSERT(len > 0);
-      DEBUG_ASSERT(can_block_on_page_requests());
-      zx_status_t wait_status = ZX_OK;
-      AssertHeld(lock_ref());
-      guard.CallUnlocked(
-          [&page_request, &wait_status]() mutable { wait_status = page_request.Wait(); });
-      if (wait_status != ZX_OK) {
-        if (wait_status == ZX_ERR_TIMED_OUT) {
-          DumpLocked(0, false);
-        }
-        return wait_status;
-      }
-
-      // Re-run the range checks, since size_ could have changed while we were blocked. This
-      // is not a failure, since the arguments were valid when the syscall was made. It's as
-      // if the commit was successful but then the pages were thrown away. Unless we are pinning,
-      // in which case pages being thrown away is explicitly an error.
-      if (pin) {
-        // verify that the range is within the object
-        if (unlikely(!InRange(offset, len, size_locked()))) {
-          return ZX_ERR_OUT_OF_RANGE;
-        }
-      } else {
-        uint64_t new_len = len;
-        if (!TrimRange(offset, len, size_locked(), &new_len)) {
-          // No remaining range to process. Set len to 0 so that the top level loop can exit.
-          len = 0;
-          return ZX_OK;
-        }
-        len = new_len;
-      }
-    }
-    return ZX_OK;
-  };
 
   // As we may need to wait on arbitrary page requests we just keep running this as long as there is
   // a non-zero range to process.
+  uint64_t to_dirty_len = 0;
   while (len > 0) {
+    zx_status_t status = ZX_OK;
+    ;
     uint64_t committed_len = 0;
-    zx_status_t commit_status = cow_pages_locked()->CommitRangeLocked(
-        *GetCowRange(offset, len), &committed_len, &page_request);
-    DEBUG_ASSERT(committed_len <= len);
-
-    // Now we can exit if we received any error states.
-    if (commit_status != ZX_OK && commit_status != ZX_ERR_SHOULD_WAIT) {
-      return commit_status;
-    }
-
-    // If we're required to pin, try to pin the committed range before waiting on the page_request,
-    // which has been populated to request pages beyond the committed range.
-    // Even though the page_request has already been initialized, we choose to first completely
-    // process the committed range, which could end up canceling the already initialized page
-    // request. This allows us to keep making forward progress as we will potentially pin a few
-    // pages before trying to fault in further pages, thereby preventing the already committed (and
-    // pinned) pages from being evicted while we wait with the lock dropped.
-    if (pin && committed_len > 0) {
-      uint64_t non_loaned_len = 0;
-      zx_status_t replace_status = ZX_OK;
-      if (cow_pages_locked()->can_borrow_locked()) {
-        // We need to replace any loaned pages in the committed range with non-loaned pages first,
-        // since pinning expects all pages to be non-loaned. Replacing loaned pages requires a page
-        // request too. At any time we'll only be able to wait on a single page request, and after
-        // the wait the conditions that resulted in the previous request might have changed, so we
-        // can just cancel and reuse the existing page_request.
-        // TODO: consider not canceling this and the other request below. The issue with not
-        // canceling is that without early wake support, i.e. being able to reinitialize an existing
-        // initialized request, I think this code will not work without canceling.
-        page_request.CancelRequests();
-        replace_status = cow_pages_locked()->ReplacePagesWithNonLoanedLocked(
-            *GetCowRange(offset, committed_len), page_request.GetAnonymous(), &non_loaned_len);
-        DEBUG_ASSERT(non_loaned_len <= committed_len);
-        if (replace_status == ZX_OK) {
-          DEBUG_ASSERT(non_loaned_len == committed_len);
-        } else if (replace_status != ZX_ERR_SHOULD_WAIT) {
-          return replace_status;
-        }
-      } else {
-        // Borrowing not available so we know there are no loaned pages.
-        non_loaned_len = committed_len;
-        // As we have not canceled the page_request in this branch, duplicate the commit_status into
-        // the replace_status so that later code knows whether there is still a page_request to wait
-        // on or not.
-        replace_status = commit_status;
+    if (to_dirty_len > 0) {
+      Guard<VmoLockType> guard{AssertOrderedLock, lock(), cow_pages_->lock_order(),
+                               VmLockAcquireMode::First};
+      // The to_dirty_len *must* be within range, even though we just grabbed the lock and a resize
+      // could have happened, since the dirtied range is pinned. As such, any resize could not have
+      // removed the in progress dirty range.
+      DEBUG_ASSERT(InRange(offset, to_dirty_len, size_locked()));
+      uint64_t dirty_len = 0;
+      status = cow_pages_locked()->PrepareForWriteLocked(
+          *GetCowRange(offset, to_dirty_len), page_request.GetLazyDirtyRequest(), &dirty_len);
+      DEBUG_ASSERT(dirty_len <= to_dirty_len);
+      if (status == ZX_ERR_SHOULD_WAIT) {
+        page_request.MadeDirtyRequest();
       }
-
-      // We can safely pin the non-loaned range before waiting on the page request.
-      if (non_loaned_len > 0) {
-        // Verify that we are starting the pin after the previously pinned range, as we do not want
-        // to repeatedly pin the same pages.
-        ASSERT(pinned_end_offset == offset);
-        zx_status_t pin_status =
-            cow_pages_locked()->PinRangeLocked(*GetCowRange(offset, non_loaned_len));
-        if (pin_status != ZX_OK) {
-          return pin_status;
-        }
-      }
-      // At this point we have successfully committed and pinned non_loaned_len.
-      uint64_t pinned_len = non_loaned_len;
-      pinned_end_offset = offset + pinned_len;
-
-      // If this is a write and the VMO supports dirty tracking, we also need to mark the pinned
-      // pages Dirty.
-      // We pin the pages first before marking them dirty in order to guarantee forward progress.
-      // Pinning the pages will prevent them from getting decommitted while we are waiting on the
-      // dirty page request without the lock held.
-      if (write && pinned_len > 0 && is_dirty_tracked()) {
-        // Prepare the committed range for writing. We need a page request for this too, so cancel
-        // any existing one and reuse it.
-        page_request.CancelRequests();
-
-        // We want to dirty the entire pinned range.
-        uint64_t to_dirty_len = pinned_len;
-        while (to_dirty_len > 0) {
-          uint64_t dirty_len = 0;
-          zx_status_t write_status = cow_pages_locked()->PrepareForWriteLocked(
-              *GetCowRange(offset, to_dirty_len), page_request.GetLazyDirtyRequest(), &dirty_len);
-          DEBUG_ASSERT(dirty_len <= to_dirty_len);
-          if (write_status != ZX_OK && write_status != ZX_ERR_SHOULD_WAIT) {
-            return write_status;
-          }
-          if (write_status == ZX_ERR_SHOULD_WAIT) {
-            page_request.MadeDirtyRequest();
-          }
-          // Account for the pages that were dirtied during this attempt.
-          to_dirty_len -= dirty_len;
-
-          // At this point we have successfully committed, pinned, and dirtied dirty_len. This is
-          // where we need to restart the next call to PrepareForWriteLocked. Advance the offset to
-          // reflect that, and then wait on the page request beyond dirty_len (if any).
-          zx_status_t wait_status = advance_processed_range(
-              dirty_len, /*wait_on_page_request=*/write_status == ZX_ERR_SHOULD_WAIT);
-          if (wait_status != ZX_OK) {
-            return wait_status;
-          }
-          // Retry dirtying pages beyond dirty_len. Note that it is fine to resume the inner loop
-          // here and directly call PrepareForWriteLocked after advancing the offset because the
-          // pages were pinned previously, and so they could not have gotten decommitted while we
-          // waited on the page request.
-          if (write_status == ZX_ERR_SHOULD_WAIT) {
-            // Resume the loop that repeatedly calls PrepareForWriteLocked until all the pinned
-            // pages have been marked dirty.
-            continue;
-          }
-        }
-      } else {
-        // We did not need to perform any dirty tracking. So we can advance the offset over the
-        // pinned length. Now that we've dealt with all the pages in the non-loaned range, wait on
-        // the page request for offsets beyond (if any).
-        zx_status_t wait_status = advance_processed_range(
-            pinned_len, /*wait_on_page_request=*/replace_status == ZX_ERR_SHOULD_WAIT);
-        if (wait_status != ZX_OK) {
-          return wait_status;
-        }
-      }
-      // If we dropped the lock while waiting, things might have changed, so can reattempt
-      // committing beyond the length we had successfully pinned before waiting. Alternatively if we
-      // canceled that page request in favor of potentially making a dirty request we still have
-      // unfinished work and need to go around the loop again.
-      if (replace_status == ZX_ERR_SHOULD_WAIT) {
-        continue;
-      }
+      // Account for the pages that were dirtied during this attempt.
+      to_dirty_len -= dirty_len;
+      committed_len = dirty_len;
     } else {
-      // We were either not required to pin, or committed_len was 0. We need to update how much was
-      // committed, and then wait on the page request (if any).
-      zx_status_t wait_status = advance_processed_range(
-          committed_len, /*wait_on_page_request=*/commit_status == ZX_ERR_SHOULD_WAIT);
-      if (wait_status != ZX_OK) {
-        return wait_status;
+      Guard<VmoLockType> guard{AssertOrderedLock, lock(), cow_pages_->lock_order(),
+                               VmLockAcquireMode::First};
+      uint64_t new_len = len;
+      if (!TrimRange(offset, len, size_locked(), &new_len)) {
+        return pin ? ZX_ERR_OUT_OF_RANGE : ZX_OK;
       }
-      // After we're done waiting on the page request, we loop around with the same |offset| and
-      // |len|, so that we can reprocess the range populated by the page request, with another
-      // call to VmCowPages::CommitRangeLocked(). This is required to make any COW copies of pages
-      // that were just supplied.
-      // - The first call to VmCowPages::CommitRangeLocked() returns early from
-      // LookupCursor::RequireOwnedPage with ZX_ERR_SHOULD_WAIT after queueing a page request
-      // for the absent page.
-      // - The second call to VmCowPages::CommitRangeLocked() calls LookupCursor::RequireOwnedPage
-      // which copies out the now present page (if required).
-      if (commit_status == ZX_ERR_SHOULD_WAIT) {
-        continue;
+      if (new_len != len) {
+        if (pin) {
+          return ZX_ERR_OUT_OF_RANGE;
+        }
+        len = new_len;
+        if (len == 0) {
+          break;
+        }
+      }
+
+      status = cow_pages_locked()->CommitRangeLocked(*GetCowRange(offset, len), &committed_len,
+                                                     &page_request);
+      DEBUG_ASSERT(committed_len <= len);
+
+      // If we're required to pin, try to pin the committed range before waiting on the
+      // page_request, which has been populated to request pages beyond the committed range. Even
+      // though the page_request has already been initialized, we choose to first completely process
+      // the committed range, which could end up canceling the already initialized page request.
+      // This allows us to keep making forward progress as we will potentially pin a few pages
+      // before trying to fault in further pages, thereby preventing the already committed (and
+      // pinned) pages from being evicted while we wait with the lock dropped.
+      if (pin && committed_len > 0) {
+        uint64_t non_loaned_len = 0;
+        if (cow_pages_locked()->can_borrow_locked()) {
+          // We need to replace any loaned pages in the committed range with non-loaned pages first,
+          // since pinning expects all pages to be non-loaned. Replacing loaned pages requires a
+          // page request too. At any time we'll only be able to wait on a single page request, and
+          // after the wait the conditions that resulted in the previous request might have changed,
+          // so we can just cancel and reuse the existing page_request.
+          // TODO: consider not canceling this and the other request below. The issue with not
+          // canceling is that without early wake support, i.e. being able to reinitialize an
+          // existing initialized request, I think this code will not work without canceling.
+          page_request.CancelRequests();
+          status = cow_pages_locked()->ReplacePagesWithNonLoanedLocked(
+              *GetCowRange(offset, committed_len), page_request.GetAnonymous(), &non_loaned_len);
+          DEBUG_ASSERT(non_loaned_len <= committed_len);
+        } else {
+          // Borrowing not available so we know there are no loaned pages.
+          non_loaned_len = committed_len;
+        }
+
+        // We can safely pin the non-loaned range before waiting on the page request.
+        if (non_loaned_len > 0) {
+          // Verify that we are starting the pin after the previously pinned range, as we do not
+          // want to repeatedly pin the same pages.
+          ASSERT(pinned_end_offset == offset);
+          zx_status_t pin_status =
+              cow_pages_locked()->PinRangeLocked(*GetCowRange(offset, non_loaned_len));
+          if (pin_status != ZX_OK) {
+            return pin_status;
+          }
+        }
+        // At this point we have successfully committed and pinned non_loaned_len.
+        uint64_t pinned_len = non_loaned_len;
+        pinned_end_offset = offset + pinned_len;
+
+        // If this is a write and the VMO supports dirty tracking, we also need to mark the pinned
+        // pages Dirty.
+        // We pin the pages first before marking them dirty in order to guarantee forward progress.
+        // Pinning the pages will prevent them from getting decommitted while we are waiting on the
+        // dirty page request without the lock held.
+        if (write && pinned_len > 0 && is_dirty_tracked()) {
+          // Prepare the committed range for writing. We need a page request for this too, so cancel
+          // any existing one and reuse it.
+          page_request.CancelRequests();
+
+          // We want to dirty the entire pinned range.
+          to_dirty_len = pinned_len;
+          continue;
+        }
+        committed_len = pinned_len;
       }
     }
-
-    // If commit was successful we should have no more to process.
-    DEBUG_ASSERT(commit_status != ZX_OK || len == 0);
+    if (status == ZX_ERR_SHOULD_WAIT) {
+      status = page_request.Wait();
+    }
+    if (status != ZX_OK) {
+      if (status == ZX_ERR_TIMED_OUT) {
+        Dump(0, false);
+      }
+      return status;
+    }
+    offset += committed_len;
+    len -= committed_len;
   }
   return ZX_OK;
 }
