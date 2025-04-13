@@ -1016,6 +1016,7 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
       to_dirty_len -= dirty_len;
       committed_len = dirty_len;
     } else {
+      __UNINITIALIZED VmCowPages::DeferredOps deferred(cow_pages_.get());
       Guard<VmoLockType> guard{AssertOrderedLock, lock(), cow_pages_->lock_order(),
                                VmLockAcquireMode::First};
       uint64_t new_len = len;
@@ -1032,8 +1033,8 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
         }
       }
 
-      status = cow_pages_locked()->CommitRangeLocked(*GetCowRange(offset, len), &committed_len,
-                                                     &page_request);
+      status = cow_pages_locked()->CommitRangeLocked(*GetCowRange(offset, len), deferred,
+                                                     &committed_len, &page_request);
       DEBUG_ASSERT(committed_len <= len);
 
       // If we're required to pin, try to pin the committed range before waiting on the
@@ -1056,7 +1057,8 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
           // existing initialized request, I think this code will not work without canceling.
           page_request.CancelRequests();
           status = cow_pages_locked()->ReplacePagesWithNonLoanedLocked(
-              *GetCowRange(offset, committed_len), page_request.GetAnonymous(), &non_loaned_len);
+              *GetCowRange(offset, committed_len), deferred, page_request.GetAnonymous(),
+              &non_loaned_len);
           DEBUG_ASSERT(non_loaned_len <= committed_len);
         } else {
           // Borrowing not available so we know there are no loaned pages.

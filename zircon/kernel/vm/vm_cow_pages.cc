@@ -3058,8 +3058,8 @@ zx::result<VmCowPages::LookupCursor> VmCowPages::GetLookupCursorLocked(VmCowRang
   return zx::ok(LookupCursor(this, range));
 }
 
-zx_status_t VmCowPages::CommitRangeLocked(VmCowRange range, uint64_t* committed_len,
-                                          MultiPageRequest* page_request) {
+zx_status_t VmCowPages::CommitRangeLocked(VmCowRange range, DeferredOps& deferred,
+                                          uint64_t* committed_len, MultiPageRequest* page_request) {
   canary_.Assert();
   LTRACEF("offset %#" PRIx64 ", len %#" PRIx64 "\n", range.offset, range.len);
 
@@ -3119,7 +3119,6 @@ zx_status_t VmCowPages::CommitRangeLocked(VmCowRange range, uint64_t* committed_
   zx_status_t status = ZX_OK;
   uint64_t offset = start_offset;
   while (offset < end) {
-    __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
     __UNINITIALIZED zx::result<VmCowPages::LookupCursor::RequireResult> result =
         cursor->RequireOwnedPage(false, static_cast<uint>((end - offset) / PAGE_SIZE), deferred,
                                  page_request);
@@ -6222,7 +6221,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offs
   return ReclaimCounts{};
 }
 
-zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(VmCowRange range,
+zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(VmCowRange range, DeferredOps& deferred,
                                                         AnonymousPageRequest* page_request,
                                                         uint64_t* non_loaned_len) {
   canary_.Assert();
@@ -6234,8 +6233,8 @@ zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(VmCowRange range,
   *non_loaned_len = 0;
   bool found_page_or_gap = false;
   zx_status_t status = page_list_.ForEveryPageAndGapInRange(
-      [page_request, non_loaned_len, &found_page_or_gap, this](const VmPageOrMarker* p,
-                                                               uint64_t off) {
+      [page_request, non_loaned_len, &found_page_or_gap, &deferred, this](const VmPageOrMarker* p,
+                                                                          uint64_t off) {
         found_page_or_gap = true;
         // We only expect committed pages in the specified range.
         if (p->IsMarker() || p->IsReference() || p->IsInterval()) {
@@ -6248,7 +6247,6 @@ zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(VmCowRange range,
           // A loaned page could only have been clean.
           DEBUG_ASSERT(!is_page_dirty_tracked(page) || is_page_clean(page));
           DEBUG_ASSERT(page_request);
-          __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
           zx_status_t status =
               ReplacePageLocked(page, off, /*with_loaned=*/false, &page, deferred, page_request);
           if (status == ZX_ERR_SHOULD_WAIT) {

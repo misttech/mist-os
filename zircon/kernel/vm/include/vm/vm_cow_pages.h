@@ -579,7 +579,7 @@ class VmCowPages final : public VmHierarchyBase,
   //                        not need to retried.
   //  * => Any other error, the number of pages committed is undefined.
   // The |offset| and |len| are assumed to be page aligned and within the range of |size_|.
-  zx_status_t CommitRangeLocked(VmCowRange range, uint64_t* committed_len,
+  zx_status_t CommitRangeLocked(VmCowRange range, DeferredOps& deferred, uint64_t* committed_len,
                                 MultiPageRequest* page_request) TA_REQ(lock());
 
   // Increases the pin count of the range of pages given by |offset| and |len|. The full range must
@@ -652,7 +652,8 @@ class VmCowPages final : public VmHierarchyBase,
   // allocation, returns ZX_ERR_SHOULD_WAIT, and the caller should wait on the |page_request|.
   // |non_loaned_len| is set to the length (starting at |offset|) that contains only non-loaned
   // pages. |offset| and |len| must be page-aligned.
-  zx_status_t ReplacePagesWithNonLoanedLocked(VmCowRange range, AnonymousPageRequest* page_request,
+  zx_status_t ReplacePagesWithNonLoanedLocked(VmCowRange range, DeferredOps& deferred,
+                                              AnonymousPageRequest* page_request,
                                               uint64_t* non_loaned_len) TA_REQ(lock());
 
   // If page is still at offset, replace it with a loaned page.
