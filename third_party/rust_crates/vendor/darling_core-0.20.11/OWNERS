@@ -2,5 +2,5 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /third_party/rust_crates/vendor/darling_core-0.12.4/OWNERS
-include /third_party/rust_crates/vendor/darling_core-0.20.11/OWNERS
+include /third_party/rust_crates/vendor/darling-0.20.11/OWNERS
+include /third_party/rust_crates/vendor/darling_macro-0.20.11/OWNERS
