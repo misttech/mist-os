@@ -53,19 +53,7 @@ bitflags! {
     }
 }
 
-impl Bits {
-    #[deprecated = "Strict bits should not use `has_unknown_bits`"]
-    #[inline(always)]
-    pub fn has_unknown_bits(&self) -> bool {
-        false
-    }
-
-    #[deprecated = "Strict bits should not use `get_unknown_bits`"]
-    #[inline(always)]
-    pub fn get_unknown_bits(&self) -> u32 {
-        0
-    }
-}
+impl Bits {}
 
 bitflags! {
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -76,19 +64,7 @@ bitflags! {
     }
 }
 
-impl BitsType {
-    #[deprecated = "Strict bits should not use `has_unknown_bits`"]
-    #[inline(always)]
-    pub fn has_unknown_bits(&self) -> bool {
-        false
-    }
-
-    #[deprecated = "Strict bits should not use `get_unknown_bits`"]
-    #[inline(always)]
-    pub fn get_unknown_bits(&self) -> u32 {
-        0
-    }
-}
+impl BitsType {}
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(u32)]
@@ -108,12 +84,6 @@ impl Enum {
     #[inline]
     pub const fn into_primitive(self) -> u32 {
         self as u32
-    }
-
-    #[deprecated = "Strict enums should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
     }
 }
 
@@ -137,12 +107,6 @@ impl EnumType {
     #[inline]
     pub const fn into_primitive(self) -> i32 {
         self as i32
-    }
-
-    #[deprecated = "Strict enums should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
     }
 }
 

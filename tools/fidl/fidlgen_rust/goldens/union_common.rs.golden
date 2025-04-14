@@ -236,12 +236,6 @@ impl ExplicitPizzaOrPasta {
             Self::Pasta(_) => 4,
         }
     }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
 }
 
 impl fidl::Persistable for ExplicitPizzaOrPasta {}
@@ -259,12 +253,6 @@ impl ExplicitStrictFoo {
             Self::I(_) => 2,
             Self::S(_) => 3,
         }
-    }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
     }
 }
 
@@ -284,12 +272,6 @@ impl ExplicitUnion {
             Self::StringNeedsConstructor(_) => 3,
         }
     }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
 }
 
 impl fidl::Persistable for ExplicitUnion {}
@@ -305,12 +287,6 @@ impl FieldCollision {
         match *self {
             Self::FieldCollisionTag(_) => 1,
         }
-    }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
     }
 }
 
@@ -614,12 +590,6 @@ impl PizzaOrPasta {
             Self::Pasta(_) => 2,
         }
     }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
 }
 
 impl fidl::Persistable for PizzaOrPasta {}
@@ -638,12 +608,6 @@ impl ReverseOrdinalUnion {
             Self::Second(_) => 2,
         }
     }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
 }
 
 impl fidl::Persistable for ReverseOrdinalUnion {}
@@ -659,12 +623,6 @@ impl StrictBoundedUnion {
         match *self {
             Self::V(_) => 1,
         }
-    }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
     }
 }
 
@@ -684,12 +642,6 @@ impl StrictFoo {
             Self::I(_) => 2,
         }
     }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
 }
 
 impl fidl::Persistable for StrictFoo {}
@@ -707,12 +659,6 @@ impl StrictPizzaOrPasta {
             Self::Pizza(_) => 1,
             Self::Pasta(_) => 2,
         }
-    }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
     }
 }
 
@@ -734,12 +680,6 @@ impl StrictSimpleUnion {
             Self::S(_) => 3,
         }
     }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
 }
 
 impl fidl::Persistable for StrictSimpleUnion {}
@@ -760,12 +700,6 @@ impl StrictUnion {
             Self::VectorStringAlsoNeedsConstructor(_) => 3,
         }
     }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
 }
 
 impl fidl::Persistable for StrictUnion {}
@@ -785,12 +719,6 @@ impl Union {
             Self::StringNeedsConstructor(_) => 2,
             Self::VectorStringAlsoNeedsConstructor(_) => 3,
         }
-    }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
     }
 }
 

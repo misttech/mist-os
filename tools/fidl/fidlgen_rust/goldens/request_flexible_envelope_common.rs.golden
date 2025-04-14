@@ -107,12 +107,6 @@ impl StrictFoo {
             Self::I(_) => 2,
         }
     }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
 }
 
 impl fidl::Persistable for StrictFoo {}

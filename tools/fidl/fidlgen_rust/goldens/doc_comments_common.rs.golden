@@ -66,19 +66,7 @@ bitflags! {
     }
 }
 
-impl MyStrictBits {
-    #[deprecated = "Strict bits should not use `has_unknown_bits`"]
-    #[inline(always)]
-    pub fn has_unknown_bits(&self) -> bool {
-        false
-    }
-
-    #[deprecated = "Strict bits should not use `get_unknown_bits`"]
-    #[inline(always)]
-    pub fn get_unknown_bits(&self) -> u32 {
-        0
-    }
-}
+impl MyStrictBits {}
 
 /// flexible enum comment #1.
 ///
@@ -176,12 +164,6 @@ impl MyStrictEnum {
     #[inline]
     pub const fn into_primitive(self) -> u32 {
         self as u32
-    }
-
-    #[deprecated = "Strict enums should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
     }
 }
 
@@ -287,12 +269,6 @@ impl StrictUnion {
         match *self {
             Self::Field(_) => 1,
         }
-    }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
     }
 }
 

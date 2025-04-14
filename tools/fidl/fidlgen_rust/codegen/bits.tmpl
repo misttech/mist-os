@@ -21,19 +21,7 @@ bitflags! {
 }
 
 impl {{ .Name }} {
-    {{- if .IsStrict }}
-    #[deprecated = "Strict bits should not use `has_unknown_bits`"]
-    #[inline(always)]
-    pub fn has_unknown_bits(&self) -> bool {
-        false
-    }
-
-    #[deprecated = "Strict bits should not use `get_unknown_bits`"]
-    #[inline(always)]
-    pub fn get_unknown_bits(&self) -> {{ .UnderlyingType }} {
-        0
-    }
-    {{- else }}
+    {{- if not .IsStrict }}
     #[inline(always)]
     pub fn from_bits_allow_unknown(bits: {{ .UnderlyingType }}) -> Self {
         Self::from_bits_retain(bits)

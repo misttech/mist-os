@@ -56,12 +56,6 @@ impl UnionLargeArray {
             Self::A(_) => 1,
         }
     }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
 }
 
 impl fidl::Persistable for UnionLargeArray {}
@@ -77,12 +71,6 @@ impl UnionSmallArray {
         match *self {
             Self::A(_) => 1,
         }
-    }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
     }
 }
 

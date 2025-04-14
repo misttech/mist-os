@@ -67,12 +67,6 @@ impl UnionSize12Alignment4 {
             Self::Variant(_) => 1,
         }
     }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
 }
 
 impl fidl::Persistable for UnionSize12Alignment4 {}
@@ -88,12 +82,6 @@ impl UnionSize24Alignment8 {
         match *self {
             Self::Variant(_) => 1,
         }
-    }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
     }
 }
 
@@ -111,12 +99,6 @@ impl UnionSize36Alignment4 {
             Self::Variant(_) => 1,
         }
     }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
 }
 
 impl fidl::Persistable for UnionSize36Alignment4 {}
@@ -132,12 +114,6 @@ impl UnionSize8Alignment4 {
         match *self {
             Self::Variant(_) => 1,
         }
-    }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
     }
 }
 

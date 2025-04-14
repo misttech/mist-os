@@ -31,12 +31,6 @@ impl ErrorEnum {
     pub const fn into_primitive(self) -> u32 {
         self as u32
     }
-
-    #[deprecated = "Strict enums should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]

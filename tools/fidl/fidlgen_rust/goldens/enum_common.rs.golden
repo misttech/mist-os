@@ -204,12 +204,6 @@ impl MyStrictEnum {
     pub const fn into_primitive(self) -> u32 {
         self as u32
     }
-
-    #[deprecated = "Strict enums should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
 }
 
 mod internal {

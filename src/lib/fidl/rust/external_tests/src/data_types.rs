@@ -19,15 +19,6 @@ fn strict_bits() {
     assert_eq!(StrictButtons::from_bits_truncate(0b1010), StrictButtons::PAUSE);
     assert_eq!(StrictButtons::from_bits_truncate(u32::MAX), StrictButtons::all());
     assert_eq!(StrictButtons::STOP.bits(), 0b100);
-
-    // You can use the flexible methods on strict types, but it produces a
-    // deprecation warning.
-    #[allow(deprecated)]
-    let has_unknown_bits = StrictButtons::PLAY.has_unknown_bits();
-    assert_eq!(has_unknown_bits, false);
-    #[allow(deprecated)]
-    let get_unknown_bits = StrictButtons::PLAY.get_unknown_bits();
-    assert_eq!(get_unknown_bits, 0);
 }
 
 #[test]
@@ -70,12 +61,6 @@ fn strict_enum() {
     assert_eq!(StrictAnimal::from_primitive(0), Some(StrictAnimal::Dog));
     assert_eq!(StrictAnimal::from_primitive(3), None);
     assert_eq!(StrictAnimal::Cat.into_primitive(), 1);
-
-    // You can use the flexible methods on strict types, but it produces a
-    // deprecation warning.
-    #[allow(deprecated)]
-    let is_unknown = StrictAnimal::Cat.is_unknown();
-    assert_eq!(is_unknown, false);
 }
 
 #[test]
@@ -113,12 +98,6 @@ fn flexible_empty_enum() {
 fn strict_value_union() {
     assert_eq!(StrictValueThing::Number(42).ordinal(), 1);
     assert_eq!(StrictValueThing::Name("hello".to_owned()).ordinal(), 2);
-
-    // You can use the flexible methods on strict types, but it produces a
-    // deprecation warning.
-    #[allow(deprecated)]
-    let is_unknown = StrictValueThing::Number(42).is_unknown();
-    assert_eq!(is_unknown, false);
 }
 
 #[test]
@@ -149,12 +128,6 @@ fn flexible_value_union() {
 fn strict_resource_union() {
     assert_eq!(StrictResourceThing::Number(42).ordinal(), 1);
     assert_eq!(StrictResourceThing::Name("hello".to_owned()).ordinal(), 2);
-
-    // You can use the flexible methods on strict types, but it produces a
-    // deprecation warning.
-    #[allow(deprecated)]
-    let is_unknown = StrictResourceThing::Number(42).is_unknown();
-    assert_eq!(is_unknown, false);
 }
 
 #[test]

@@ -85,12 +85,6 @@ impl ComposedProtocolOnAnonComposedRequest {
             Self::B(_) => 1,
         }
     }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
 }
 
 impl fidl::Persistable for ComposedProtocolOnAnonComposedRequest {}
@@ -107,12 +101,6 @@ impl ComposedProtocolTwoWayAnonComposedRequest {
             Self::B(_) => 1,
         }
     }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
 }
 
 impl fidl::Persistable for ComposedProtocolTwoWayAnonComposedRequest {}
@@ -128,12 +116,6 @@ impl ComposedProtocolTwoWayAnonComposedWithErrorResponse {
         match *self {
             Self::B(_) => 1,
         }
-    }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
     }
 }
 
@@ -306,12 +288,6 @@ impl UnionPayload {
         match *self {
             Self::B(_) => 1,
         }
-    }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
     }
 }
 
