@@ -14,6 +14,8 @@
 #include <sys/timerfd.h>
 #include <unistd.h>
 
+#include <format>
+
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 #include <linux/capability.h>
@@ -31,7 +33,14 @@ namespace {
 using testing::AnyOf;
 using testing::ContainsRegex;
 using testing::Eq;
-using testing::MatchesRegex;
+
+/// Check if the procfs status file shows the correct fsuid number.
+void AssertFsuidInProcfsStatus(uid_t fsuid) {
+  std::string status_string;
+  ASSERT_TRUE(files::ReadFileToString("/proc/self/status", &status_string));
+  ASSERT_THAT(status_string,
+              testing::ContainsRegex(std::format("Uid:\t[0-9]+\t[0-9]+\t[0-9]+\t{}\n", fsuid)));
+}
 
 class ProcUptimeTest : public ProcTestBase {
  protected:
@@ -310,6 +319,7 @@ TEST_F(ProcTaskDirTest, PidDirSetFsuidDoesntChangeOwnership) {
     ASSERT_EQ(static_cast<const int>(pre_stat.st_uid), setfsuid(newuid)) << "Unexpected fsuid";
     // This is how you check to see if a call to setfsuid worked correctly.
     ASSERT_EQ(static_cast<const int>(newuid), setfsuid(-1)) << "setfsuid not supported";
+    AssertFsuidInProcfsStatus(newuid);
 
     // Make sure that the current owner has *not* changed to the fsuid
     SAFE_SYSCALL(dirfd = open(proc_path.c_str(), O_RDONLY));
@@ -319,6 +329,7 @@ TEST_F(ProcTaskDirTest, PidDirSetFsuidDoesntChangeOwnership) {
     EXPECT_NE(fsuid_stat.st_uid, newuid) << "fsuid seen to change incorrectly";
     // Revert the fsuid
     ASSERT_EQ(static_cast<const int>(newuid), setfsuid(pre_stat.st_uid));
+    AssertFsuidInProcfsStatus(pre_stat.st_uid);
   });
 }
 

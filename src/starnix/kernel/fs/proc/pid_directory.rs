@@ -1183,11 +1183,11 @@ impl DynamicFileSource for StatusFile {
                     creds.uid,
                     creds.euid,
                     creds.saved_uid,
-                    creds.euid,
+                    creds.fsuid,
                     creds.gid,
                     creds.egid,
                     creds.saved_gid,
-                    creds.egid,
+                    creds.fsgid,
                     creds.groups.iter().map(|n| n.to_string()).join(" ")
                 ),
             )
@@ -1225,7 +1225,6 @@ impl DynamicFileSource for StatusFile {
         writeln!(sink, "TracerPid:\t{}", tracer_pid)?;
 
         writeln!(sink, "{}", creds_string)?;
-        track_stub!(TODO("https://fxbug.dev/322873739"), "/proc/pid/status fsuid");
 
         if let Some(task) = task {
             if let Some(mm) = task.mm() {
