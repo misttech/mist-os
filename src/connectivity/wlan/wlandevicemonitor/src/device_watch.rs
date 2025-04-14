@@ -76,6 +76,7 @@ pub fn watch_phy_devices(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fidl::endpoints::Proxy as _;
     use fidl_fuchsia_wlan_device::{ConnectorRequest, ConnectorRequestStream};
     use fuchsia_async as fasync;
     use futures::poll;
@@ -85,9 +86,7 @@ mod tests {
     use std::pin::pin;
     use std::sync::Arc;
     use vfs::directory::entry_container::Directory;
-    use vfs::execution_scope::ExecutionScope;
-    use vfs::path::Path;
-    use vfs::{pseudo_directory, ObjectRequest};
+    use vfs::pseudo_directory;
     use wlan_common::test_utils::ExpectWithin;
 
     #[fasync::run_singlethreaded(test)]
@@ -151,19 +150,9 @@ mod tests {
     }
 
     fn serve_and_bind_vfs(vfs_dir: Arc<dyn Directory>, path: &'static str) {
-        let (client, server) = fidl::endpoints::create_endpoints();
-        let flags = fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY;
-        vfs_dir
-            .open3(
-                ExecutionScope::new(),
-                Path::dot(),
-                flags,
-                &mut ObjectRequest::new(flags, &Default::default(), server.into_channel()),
-            )
-            .expect("failed to serve root directory");
-
+        let client = vfs::directory::serve_read_only(vfs_dir);
         let ns = fdio::Namespace::installed().expect("failed to get installed namespace");
-        ns.bind(path, client).expect("Failed to bind dev in namespace");
+        ns.bind(path, client.into_client_end().unwrap()).expect("Failed to bind dev in namespace");
     }
 
     fn serve_device_connector() -> Arc<vfs::service::Service> {
