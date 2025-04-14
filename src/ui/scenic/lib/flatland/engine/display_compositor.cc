@@ -855,6 +855,12 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::RenderFrame");
   std::scoped_lock lock(lock_);
 
+  if (last_frame_number_) {
+    FX_CHECK(frame_number > *last_frame_number_);
+  }
+  last_frame_number_ = frame_number;
+  TRACE_FLOW_BEGIN("gfx", "render_frame_to_vsync", frame_number);
+
   // Determine whether we need to fall back to GPU composition. Avoid calling CheckConfig() if we
   // don't need to, because this requires a round-trip to the display coordinator.
   // Note: TryDirectToDisplay() failing indicates hardware failure to do display composition.
@@ -949,6 +955,7 @@ void DisplayCompositor::OnVsync(zx::time timestamp,
   auto it = pending_apply_configs_.begin();
   auto end = std::next(vsync_frame_it);
   while (it != end) {
+    TRACE_FLOW_END("gfx", "render_frame_to_vsync", it->frame_number);
     release_fence_manager_.OnVsync(it->frame_number, timestamp);
     it = pending_apply_configs_.erase(it);
   }

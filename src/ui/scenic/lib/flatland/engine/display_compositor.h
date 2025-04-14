@@ -332,6 +332,10 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // display device.
   std::deque<ApplyConfigInfo> pending_apply_configs_;
 
+  // The last frame number called in RenderFrame(), this number is use assert the frame number is
+  // strictly increasing.
+  std::optional<uint64_t> last_frame_number_;
+
   // Stores the ConfigStamp information of the latest frame shown on the display. If no frame
   // has been presented, its value will be nullopt.
   std::optional<fuchsia_hardware_display::wire::ConfigStamp> last_presented_config_stamp_ =

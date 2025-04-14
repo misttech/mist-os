@@ -13,7 +13,7 @@ from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
 _LOGGER: logging.Logger = logging.getLogger("FPSMetricsProcessor")
 _EVENT_CATEGORY: str = "gfx"
 _SCENIC_RENDER_EVENT_NAME: str = "RenderFrame"
-_DISPLAY_VSYNC_EVENT_NAME: str = "Display::Controller::OnDisplayVsync"
+_DISPLAY_VSYNC_EVENT_NAME: str = "Flatland::DisplayCompositor::OnVsync"
 
 
 class FpsMetricsProcessor(trace_metrics.MetricsProcessor):

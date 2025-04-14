@@ -14,7 +14,7 @@ _LOGGER: logging.Logger = logging.getLogger("ScenicMetricsProcessor")
 _EVENT_CATEGORY: str = "gfx"
 _SCENIC_START_EVENT_NAME: str = "ApplyScheduledSessionUpdates"
 _SCENIC_RENDER_EVENT_NAME: str = "RenderFrame"
-_DISPLAY_VSYNC_READY_EVENT_NAME: str = "Display::Controller::OnDisplayVsync"
+_DISPLAY_VSYNC_READY_EVENT_NAME: str = "Flatland::DisplayCompositor::OnVsync"
 
 
 class _ScenicTracingEvent:

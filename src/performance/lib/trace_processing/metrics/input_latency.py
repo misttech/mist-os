@@ -15,7 +15,7 @@ _AGGREGATE_METRICS_ONLY: str = "aggregateMetricsOnly"
 _CATEGORY_INPUT: str = "input"
 _INPUT_EVENT_NAME: str = "input-device-process-reports"
 _CATEGORY_GFX: str = "gfx"
-_DISPLAY_VSYNC_EVENT_NAME: str = "Display::Controller::OnDisplayVsync"
+_DISPLAY_VSYNC_EVENT_NAME: str = "Flatland::DisplayCompositor::OnVsync"
 
 
 def metrics_processor(
