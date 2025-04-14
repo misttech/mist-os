@@ -12,7 +12,6 @@ use rand::distributions::{Distribution, WeightedIndex};
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
-use std::iter::StepBy;
 use std::ops::Range;
 use storage_benchmarks::{
     Benchmark, CacheClearableFilesystem as _, OperationDuration, OperationTimer,
@@ -20,164 +19,185 @@ use storage_benchmarks::{
 
 const RNG_SEED: u64 = 0xda782a0c3ce1819a;
 
-macro_rules! open_and_get_vmo_benchmark {
-    ($benchmark:ident, $resource_path:expr, $cold:expr, $trace_name:literal $(,)?) => {
-        #[derive(Clone)]
-        pub struct $benchmark {
-            resource_path: String,
-            cold: bool,
-        }
-
-        impl $benchmark {
-            pub fn new() -> Self {
-                Self { resource_path: $resource_path.to_string(), cold: $cold }
-            }
-
-            async fn run_test(&self, pkgdir: &fio::DirectoryProxy) -> OperationDuration {
-                let timer = OperationTimer::start();
-                let file = {
-                    storage_trace::duration!(c"benchmark", c"open-file");
-                    fuchsia_fs::directory::open_file(
-                        pkgdir,
-                        &self.resource_path,
-                        fio::PERM_READABLE,
-                    )
-                    .await
-                    .expect("failed to open blob")
-                };
-                storage_trace::duration!(c"benchmark", c"get-vmo");
-                let _ = file.get_backing_memory(fio::VmoFlags::READ).await.unwrap().unwrap();
-
-                timer.stop()
-            }
-        }
-
-        #[async_trait]
-        impl Benchmark<PkgDirInstance> for $benchmark {
-            async fn run(&self, fs: &mut PkgDirInstance) -> Vec<OperationDuration> {
-                storage_trace::duration!(c"benchmark", $trace_name);
-                let package = PackageBuilder::new("pkg")
-                    .add_resource_at(&self.resource_path, "data".as_bytes())
-                    .build()
-                    .await
-                    .unwrap();
-                let (meta, map) = package.contents();
-
-                {
-                    storage_trace::duration!(c"benchmark", c"write-package");
-                    fs.write_blob(&DeliveryBlob::new(meta.contents, CompressionMode::Always)).await;
-                    for (_, content) in map.clone() {
-                        fs.write_blob(&DeliveryBlob::new(content, CompressionMode::Always)).await;
-                    }
-                }
-
-                fs.clear_cache().await;
-                let pkgdir_client_end =
-                    fs.pkgdir_proxy().open_package_directory(&meta.merkle).await.unwrap().unwrap();
-                let mut pkgdir = pkgdir_client_end.into_proxy();
-
-                const SAMPLES: usize = 10;
-                let mut durations = Vec::with_capacity(SAMPLES);
-                for _ in 0..SAMPLES {
-                    durations.push(self.run_test(&pkgdir).await);
-                    if self.cold {
-                        fs.clear_cache().await;
-                        let pkgdir_client_end = fs
-                            .pkgdir_proxy()
-                            .open_package_directory(&meta.merkle)
-                            .await
-                            .unwrap()
-                            .unwrap();
-                        pkgdir = pkgdir_client_end.into_proxy();
-                    }
-                }
-                durations
-            }
-
-            fn name(&self) -> String {
-                stringify!($benchmark).to_string()
-            }
-        }
-    };
+#[derive(Clone)]
+pub struct OpenAndGetVmoBenchmark {
+    name: &'static std::ffi::CStr,
+    resource_path: String,
+    cold: bool,
 }
 
-open_and_get_vmo_benchmark!(
-    OpenAndGetVmoMetaFileCold,
-    "meta/bar",
-    true,
-    c"OpenAndGetVmoMetaFileCold",
-);
-open_and_get_vmo_benchmark!(
-    OpenAndGetVmoMetaFileWarm,
-    "meta/bar",
-    false,
-    c"OpenAndGetVmoMetaFileWarm",
-);
-open_and_get_vmo_benchmark!(
-    OpenAndGetVmoContentBlobCold,
-    "data/foo",
-    true,
-    c"OpenAndGetVmoContentBlobCold",
-);
-open_and_get_vmo_benchmark!(
-    OpenAndGetVmoContentBlobWarm,
-    "data/foo",
-    false,
-    c"OpenAndGetVmoContentBlobWarm",
-);
+impl OpenAndGetVmoBenchmark {
+    pub fn new_content_blob_cold() -> Self {
+        Self {
+            name: c"OpenAndGetVmoContentBlobCold",
+            resource_path: "data/foo".to_owned(),
+            cold: true,
+        }
+    }
 
-macro_rules! page_in_benchmark {
-    ($benchmark:ident, $data_gen_fn:ident, $page_iter_gen_fn:ident, $trace_name:literal $(,)?) => {
-        #[derive(Clone)]
-        pub struct $benchmark {
-            blob_size: usize,
+    pub fn new_meta_file_cold() -> Self {
+        Self {
+            name: c"OpenAndGetVmoMetaFileCold",
+            resource_path: "meta/bar".to_owned(),
+            cold: true,
+        }
+    }
+
+    pub fn new_meta_file_warm() -> Self {
+        Self {
+            name: c"OpenAndGetVmoMetaFileWarm",
+            resource_path: "meta/bar".to_owned(),
+            cold: false,
+        }
+    }
+
+    pub fn new_content_blob_warm() -> Self {
+        Self {
+            name: c"OpenAndGetVmoContentBlobWarm",
+            resource_path: "data/foo".to_owned(),
+            cold: false,
+        }
+    }
+
+    async fn run_test(&self, pkgdir: &fio::DirectoryProxy) -> OperationDuration {
+        let timer = OperationTimer::start();
+        let file = {
+            storage_trace::duration!(c"benchmark", c"open-file");
+            fuchsia_fs::directory::open_file(pkgdir, &self.resource_path, fio::PERM_READABLE)
+                .await
+                .expect("failed to open blob")
+        };
+        storage_trace::duration!(c"benchmark", c"get-vmo");
+        let _ = file.get_backing_memory(fio::VmoFlags::READ).await.unwrap().unwrap();
+
+        timer.stop()
+    }
+}
+
+#[async_trait]
+impl Benchmark<PkgDirInstance> for OpenAndGetVmoBenchmark {
+    async fn run(&self, fs: &mut PkgDirInstance) -> Vec<OperationDuration> {
+        storage_trace::duration!(c"benchmark", self.name);
+        let package = PackageBuilder::new("pkg")
+            .add_resource_at(&self.resource_path, "data".as_bytes())
+            .build()
+            .await
+            .unwrap();
+        let (meta, map) = package.contents();
+
+        {
+            storage_trace::duration!(c"benchmark", c"write-package");
+            fs.write_blob(&DeliveryBlob::new(meta.contents, CompressionMode::Always)).await;
+            for (_, content) in map.clone() {
+                fs.write_blob(&DeliveryBlob::new(content, CompressionMode::Always)).await;
+            }
         }
 
-        impl $benchmark {
-            pub fn new(blob_size: usize) -> Self {
-                Self { blob_size }
+        fs.clear_cache().await;
+        let pkgdir_client_end = fs
+            .pkgdir_proxy()
+            .open_package_directory(&meta.merkle)
+            .await
+            .unwrap()
+            .expect("Opening pkg dir");
+        let mut pkgdir = pkgdir_client_end.into_proxy();
+
+        const SAMPLES: usize = 10;
+        let mut durations = Vec::with_capacity(SAMPLES);
+        for _ in 0..SAMPLES {
+            durations.push(self.run_test(&pkgdir).await);
+            if self.cold {
+                fs.clear_cache().await;
+                let pkgdir_client_end = fs
+                    .pkgdir_proxy()
+                    .open_package_directory(&meta.merkle)
+                    .await
+                    .unwrap()
+                    .expect("Opening pkg dir");
+                pkgdir = pkgdir_client_end.into_proxy();
             }
         }
+        durations
+    }
 
-        #[async_trait]
-        impl<T:BlobFilesystem> Benchmark<T> for $benchmark {
-            async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
-                storage_trace::duration!(
-                    c"benchmark",
-                    $trace_name,
-                    "blob_size" => self.blob_size
-                );
-                let mut rng = XorShiftRng::seed_from_u64(RNG_SEED);
-                let blob = $data_gen_fn(self.blob_size, &mut rng);
-                let page_iter = $page_iter_gen_fn(self.blob_size, &mut rng);
-                page_in_blob_benchmark(fs, blob, page_iter).await
-            }
+    fn name(&self) -> String {
+        String::from_utf8_lossy(self.name.to_bytes()).to_string()
+    }
+}
 
-            fn name(&self) -> String {
-                stringify!($benchmark).to_string()
-            }
+#[derive(Clone)]
+enum DataGeneration {
+    Compressible,
+    Incompressible,
+}
+
+#[derive(Clone)]
+enum PageIteration {
+    Random,
+    Sequential,
+}
+
+#[derive(Clone)]
+pub struct PageInBlobBenchmark {
+    name: &'static std::ffi::CStr,
+    page_iter: PageIteration,
+    data_gen: DataGeneration,
+    blob_size: usize,
+}
+
+impl PageInBlobBenchmark {
+    pub fn new_sequential_uncompressed(blob_size: usize) -> Self {
+        Self {
+            name: c"PageInBlobSequentialUncompressed",
+            page_iter: PageIteration::Sequential,
+            data_gen: DataGeneration::Incompressible,
+            blob_size,
+        }
+    }
+
+    pub fn new_sequential_compressed(blob_size: usize) -> Self {
+        Self {
+            name: c"PageInBlobSequentialCompressed",
+            page_iter: PageIteration::Sequential,
+            data_gen: DataGeneration::Compressible,
+            blob_size,
+        }
+    }
+
+    pub fn new_random_compressed(blob_size: usize) -> Self {
+        Self {
+            name: c"PageInBlobRandomCompressed",
+            page_iter: PageIteration::Random,
+            data_gen: DataGeneration::Compressible,
+            blob_size,
         }
     }
 }
 
-page_in_benchmark!(
-    PageInBlobSequentialUncompressed,
-    create_incompressible_data,
-    sequential_page_iter,
-    c"PageInBlobSequentialUncompressed",
-);
-page_in_benchmark!(
-    PageInBlobSequentialCompressed,
-    create_compressible_data,
-    sequential_page_iter,
-    c"PageInBlobSequentialCompressed",
-);
-page_in_benchmark!(
-    PageInBlobRandomCompressed,
-    create_compressible_data,
-    random_page_iter,
-    c"PageInBlobRandomCompressed",
-);
+#[async_trait]
+impl<T: BlobFilesystem> Benchmark<T> for PageInBlobBenchmark {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
+        storage_trace::duration!(
+            c"benchmark",
+            self.name,
+            "blob_size" => self.blob_size
+        );
+        let mut rng = XorShiftRng::seed_from_u64(RNG_SEED);
+        let blob = match &self.data_gen {
+            DataGeneration::Incompressible => create_incompressible_data(self.blob_size, &mut rng),
+            DataGeneration::Compressible => create_compressible_data(self.blob_size, &mut rng),
+        };
+        let page_iter = match &self.page_iter {
+            PageIteration::Sequential => sequential_page_iter(self.blob_size),
+            PageIteration::Random => random_page_iter(self.blob_size, &mut rng),
+        };
+        page_in_blob_benchmark(fs, blob, page_iter).await
+    }
+
+    fn name(&self) -> String {
+        String::from_utf8_lossy(self.name.to_bytes()).to_string()
+    }
+}
 
 #[derive(Clone)]
 pub struct WriteBlob {
@@ -328,14 +348,14 @@ fn create_compressible_data(size: usize, rng: &mut XorShiftRng) -> DeliveryBlob 
 }
 
 /// Returns an iterator to the index of the first byte of every page in sequential order.
-fn sequential_page_iter(blob_size: usize, _rng: &mut XorShiftRng) -> impl Iterator<Item = usize> {
+fn sequential_page_iter(blob_size: usize) -> Vec<usize> {
     let page_size = zx::system_get_page_size() as usize;
-    (0..blob_size).step_by(page_size)
+    (0..blob_size).step_by(page_size).collect::<Vec<usize>>()
 }
 
 /// Returns an iterator to the index of the first byte of every page. The order of the pages tries
 /// to mimic how pages are accessed if the blob was an executable.
-fn random_page_iter(blob_size: usize, rng: &mut XorShiftRng) -> impl Iterator<Item = usize> {
+fn random_page_iter(blob_size: usize, rng: &mut XorShiftRng) -> Vec<usize> {
     // Executables tend to both randomly jump between pages and go on long runs of sequentially
     // accessing pages.
     const RUN_LENGTHS: [usize; 6] = [1, 3, 15, 40, 60, 80];
@@ -350,7 +370,7 @@ fn random_page_iter(blob_size: usize, rng: &mut XorShiftRng) -> impl Iterator<It
 
     // Split the pages up into runs.
     let mut taken_pages = 0;
-    let mut page_runs: Vec<StepBy<Range<usize>>> = Vec::new();
+    let mut page_runs = Vec::new();
     while taken_pages < pages_to_read {
         let index = distribution.sample(rng);
         let run_length = std::cmp::min(RUN_LENGTHS[index], pages_to_read - taken_pages);
@@ -361,13 +381,13 @@ fn random_page_iter(blob_size: usize, rng: &mut XorShiftRng) -> impl Iterator<It
     }
 
     page_runs.shuffle(rng);
-    page_runs.into_iter().flatten()
+    page_runs.into_iter().flatten().collect()
 }
 
 async fn page_in_blob_benchmark(
     fs: &mut impl BlobFilesystem,
     blob: DeliveryBlob,
-    page_iter: impl Iterator<Item = usize>,
+    page_iter: Vec<usize>,
 ) -> Vec<OperationDuration> {
     {
         storage_trace::duration!(c"benchmark", c"write-blob");
@@ -419,7 +439,7 @@ mod tests {
     #[fuchsia::test]
     async fn page_in_blob_sequential_compressed_blobfs_test() {
         check_benchmark(
-            PageInBlobSequentialCompressed::new(PAGE_COUNT * page_size()),
+            PageInBlobBenchmark::new_sequential_compressed(PAGE_COUNT * page_size()),
             Blobfs,
             PAGE_COUNT,
         )
@@ -429,7 +449,7 @@ mod tests {
     #[fuchsia::test]
     async fn page_in_blob_sequential_compressed_fxblob_test() {
         check_benchmark(
-            PageInBlobSequentialCompressed::new(PAGE_COUNT * page_size()),
+            PageInBlobBenchmark::new_sequential_compressed(PAGE_COUNT * page_size()),
             Fxblob,
             PAGE_COUNT,
         )
@@ -439,7 +459,7 @@ mod tests {
     #[fuchsia::test]
     async fn page_in_blob_sequential_uncompressed_test() {
         check_benchmark(
-            PageInBlobSequentialUncompressed::new(PAGE_COUNT * page_size()),
+            PageInBlobBenchmark::new_sequential_uncompressed(PAGE_COUNT * page_size()),
             Fxblob,
             PAGE_COUNT,
         )
@@ -449,7 +469,7 @@ mod tests {
     #[fuchsia::test]
     async fn page_in_blob_random_compressed_test() {
         check_benchmark(
-            PageInBlobRandomCompressed::new(PAGE_COUNT * page_size()),
+            PageInBlobBenchmark::new_random_compressed(PAGE_COUNT * page_size()),
             Fxblob,
             PAGE_COUNT / 5 * 3,
         )
@@ -478,48 +498,74 @@ mod tests {
 
     #[fuchsia::test]
     async fn open_and_get_vmo_blobfs_test() {
-        check_benchmark(OpenAndGetVmoContentBlobCold::new(), PkgDirTest::new_blobfs(), 10).await;
-        check_benchmark(OpenAndGetVmoContentBlobWarm::new(), PkgDirTest::new_blobfs(), 10).await;
-        check_benchmark(OpenAndGetVmoMetaFileCold::new(), PkgDirTest::new_blobfs(), 10).await;
-        check_benchmark(OpenAndGetVmoMetaFileWarm::new(), PkgDirTest::new_blobfs(), 10).await;
+        check_benchmark(
+            OpenAndGetVmoBenchmark::new_content_blob_cold(),
+            PkgDirTest::new_blobfs(),
+            10,
+        )
+        .await;
+        check_benchmark(
+            OpenAndGetVmoBenchmark::new_content_blob_warm(),
+            PkgDirTest::new_blobfs(),
+            10,
+        )
+        .await;
+        check_benchmark(OpenAndGetVmoBenchmark::new_meta_file_cold(), PkgDirTest::new_blobfs(), 10)
+            .await;
+        check_benchmark(OpenAndGetVmoBenchmark::new_meta_file_warm(), PkgDirTest::new_blobfs(), 10)
+            .await;
     }
 
     #[fuchsia::test]
     async fn open_and_get_vmo_fxblob_test() {
-        check_benchmark(OpenAndGetVmoContentBlobCold::new(), PkgDirTest::new_fxblob(), 10).await;
-        check_benchmark(OpenAndGetVmoContentBlobWarm::new(), PkgDirTest::new_fxblob(), 10).await;
-        check_benchmark(OpenAndGetVmoMetaFileCold::new(), PkgDirTest::new_fxblob(), 10).await;
-        check_benchmark(OpenAndGetVmoMetaFileWarm::new(), PkgDirTest::new_fxblob(), 10).await;
+        check_benchmark(
+            OpenAndGetVmoBenchmark::new_content_blob_cold(),
+            PkgDirTest::new_fxblob(),
+            10,
+        )
+        .await;
+        check_benchmark(
+            OpenAndGetVmoBenchmark::new_content_blob_warm(),
+            PkgDirTest::new_fxblob(),
+            10,
+        )
+        .await;
+        check_benchmark(OpenAndGetVmoBenchmark::new_meta_file_cold(), PkgDirTest::new_fxblob(), 10)
+            .await;
+        check_benchmark(OpenAndGetVmoBenchmark::new_meta_file_warm(), PkgDirTest::new_fxblob(), 10)
+            .await;
     }
 
     #[fuchsia::test]
     fn sequential_page_iter_test() {
-        let mut rng = XorShiftRng::seed_from_u64(RNG_SEED);
-        assert_eq!(sequential_page_iter(0, &mut rng).max(), None);
-        assert_eq!(sequential_page_iter(1, &mut rng).max(), Some(0));
-        assert_eq!(sequential_page_iter(page_size() - 1, &mut rng).max(), Some(0));
-        assert_eq!(sequential_page_iter(page_size(), &mut rng).max(), Some(0));
-        assert_eq!(sequential_page_iter(page_size() + 1, &mut rng).max(), Some(page_size()));
+        assert_eq!(sequential_page_iter(0).into_iter().max(), None);
+        assert_eq!(sequential_page_iter(1).into_iter().max(), Some(0));
+        assert_eq!(sequential_page_iter(page_size() - 1).into_iter().max(), Some(0));
+        assert_eq!(sequential_page_iter(page_size()).into_iter().max(), Some(0));
+        assert_eq!(sequential_page_iter(page_size() + 1).into_iter().max(), Some(page_size()));
 
-        let offsets: Vec<usize> = sequential_page_iter(page_size() * 4, &mut rng).collect();
+        let offsets = sequential_page_iter(page_size() * 4);
         assert_eq!(&offsets, &[0, page_size(), page_size() * 2, page_size() * 3]);
     }
 
     #[fuchsia::test]
     fn random_page_iter_test() {
         let mut rng = XorShiftRng::seed_from_u64(RNG_SEED);
-        assert_eq!(random_page_iter(0, &mut rng).max(), None);
-        assert_eq!(random_page_iter(1, &mut rng).max(), Some(0));
-        assert_eq!(random_page_iter(page_size() - 1, &mut rng).max(), Some(0));
-        assert_eq!(random_page_iter(page_size(), &mut rng).max(), Some(0));
-        assert_eq!(random_page_iter(page_size() + 1, &mut rng).max(), Some(page_size()));
-        assert_eq!(random_page_iter(page_size() * 4, &mut rng).count(), 4);
-        assert_eq!(random_page_iter(page_size() * 5, &mut rng).count(), 3);
-        assert_eq!(random_page_iter(page_size() * 9, &mut rng).count(), 3);
-        assert_eq!(random_page_iter(page_size() * 10, &mut rng).count(), 6);
+        assert_eq!(random_page_iter(0, &mut rng).into_iter().max(), None);
+        assert_eq!(random_page_iter(1, &mut rng).into_iter().max(), Some(0));
+        assert_eq!(random_page_iter(page_size() - 1, &mut rng).into_iter().max(), Some(0));
+        assert_eq!(random_page_iter(page_size(), &mut rng).into_iter().max(), Some(0));
+        assert_eq!(
+            random_page_iter(page_size() + 1, &mut rng).into_iter().max(),
+            Some(page_size())
+        );
+        assert_eq!(random_page_iter(page_size() * 4, &mut rng).len(), 4);
+        assert_eq!(random_page_iter(page_size() * 5, &mut rng).len(), 3);
+        assert_eq!(random_page_iter(page_size() * 9, &mut rng).len(), 3);
+        assert_eq!(random_page_iter(page_size() * 10, &mut rng).len(), 6);
 
         let blob_size = page_size() * 500;
-        let mut offsets: Vec<usize> = random_page_iter(blob_size, &mut rng).collect();
+        let mut offsets = random_page_iter(blob_size, &mut rng);
 
         // Make sure that the offsets aren't sorted.
         let mut is_sorted = true;
