@@ -7,6 +7,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.lowpan.thread/Capabilities.epskc",
+        "ordinal": "3",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.lowpan.thread/Capabilities.nat64",
         "ordinal": "1",
         "type": "bool"
@@ -243,6 +249,12 @@
         "kind": "table/member",
         "name": "fuchsia.lowpan.thread/FeatureConfig.dns_upstream_query_enabled",
         "ordinal": "7",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.lowpan.thread/FeatureConfig.epskc_enabled",
+        "ordinal": "9",
         "type": "bool"
     },
     {
