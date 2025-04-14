@@ -4,8 +4,9 @@
 
 #include "rndis_function.h"
 
+#include <fidl/fuchsia.boot.metadata/cpp/fidl.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
-#include <lib/ddk/metadata.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/sync/completion.h>
 
@@ -169,24 +170,23 @@ class RndisFunctionTestEnvironment : public fdf_testing::Environment {
   void Init(const std::array<uint8_t, ETH_MAC_SIZE>& mac_address) {
     compat::DeviceServer::BanjoConfig config{.default_proto_id = ZX_PROTOCOL_USB_FUNCTION};
     config.callbacks[ZX_PROTOCOL_USB_FUNCTION] = function_.GetBanjoCallback();
-    default_device_server_.Initialize("default", std::nullopt, std::move(config));
+    device_server_.Initialize("default", std::nullopt, std::move(config));
 
-    pdev_device_server_.Initialize("pdev", std::nullopt, std::move(config));
-    ASSERT_OK(default_device_server_.AddMetadata(DEVICE_METADATA_MAC_ADDRESS, mac_address.data(),
-                                                 mac_address.size()));
+    fuchsia_boot_metadata::MacAddressMetadata mac_address_metadata{{.mac_address{{mac_address}}}};
+    ASSERT_OK(mac_address_metadata_server_.SetMetadata(mac_address_metadata));
   }
 
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    zx_status_t status = default_device_server_.Serve(
-        fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs);
+    auto* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+
+    zx_status_t status = device_server_.Serve(dispatcher, &to_driver_vfs);
     if (status != ZX_OK) {
       return zx::error(status);
     }
 
-    status = pdev_device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                       &to_driver_vfs);
-    if (status != ZX_OK) {
-      return zx::error(status);
+    if (zx::result result = mac_address_metadata_server_.Serve(to_driver_vfs, dispatcher);
+        result.is_error()) {
+      return result.take_error();
     }
 
     return zx::ok();
@@ -195,9 +195,10 @@ class RndisFunctionTestEnvironment : public fdf_testing::Environment {
   FakeFunction& function() { return function_; }
 
  private:
-  compat::DeviceServer default_device_server_;
-  compat::DeviceServer pdev_device_server_;
+  compat::DeviceServer device_server_;
   FakeFunction function_;
+  fdf_metadata::MetadataServer<fuchsia_boot_metadata::MacAddressMetadata>
+      mac_address_metadata_server_;
 };
 
 class FixtureConfig final {
