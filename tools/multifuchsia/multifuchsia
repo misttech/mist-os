@@ -281,11 +281,11 @@ function cmd_rebase() {
     git -C "$checkout.new" fetch --recurse-submodules=no "$(realpath $checkout)" "$new_hash"
     git -C "$checkout.new" checkout "$new_hash"
   fi
-  echo "restoring submodules to match snapshot" >&2
+  echo "restoring submodules (if any) to match snapshot" >&2
   local gitmodules_dir
   gitmodules_dir="$(git -C "$checkout" rev-parse --absolute-git-dir)/modules"
   rm -rf "$gitmodules_dir"
-  mv "$checkout.new/.git/modules" "$gitmodules_dir"
+  mv "$checkout.new/.git/modules" "$gitmodules_dir" || echo "checkout has no submodules" >&2
   rm -rf "$checkout.new/.git"
   cp -a --reflink=auto "$checkout/.git" "$checkout.new/.git"
   if ! cmp --quiet "$checkout/out/default/args.gn" "$checkout.new/out/default/args.gn"; then
