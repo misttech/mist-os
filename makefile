@@ -140,13 +140,14 @@ starnix_lite_kernel: gen info
 .PHONY: starnix_lite_kernel
 
 iso:
-	$(NOECHO)$(NINJA) -C $(OUTPUT) kernel.phys32/linux-x86-boot-shim.bin
-	$(NOECHO)$(NINJA) -C $(OUTPUT) kernel.phys32/linux-x86-32-boot-shim.bin
 	$(NOECHO)$(NINJA) -C $(OUTPUT) kernel.phys32/multiboot-shim.bin
 	$(NOECHO)$(NINJA) -C $(OUTPUT) kernel_x64/kernel.zbi
 	$(MISTOSROOT)/zircon/scripts/make-zircon-x64-grub
 .PHONY: iso
 
+img: iso
+	$(NOECHO)$(MISTOSROOT)/prebuilt/third_party/qemu/$(HOST_OS)-$(HOST_ARCH)/bin/qemu-img convert -O raw out/default/mistos.iso out/default/mistos.img
+.PHONY: img
 
 %: ## Make any ninja target
 	$(NOECHO)$(NINJA) -C $(OUTPUT) $@

@@ -21,23 +21,13 @@ if ! which xorriso ${GRUB_PREFIX}grub-mkrescue &> /dev/null; then
 fi
 
 mkdir -p "$PROJECT_DIR/iso/boot/grub"
-cp "$PROJECT_DIR/kernel.phys32/linux-x86-32-boot-shim.bin" "$PROJECT_DIR/iso/boot/"
-cp "$PROJECT_DIR/kernel.phys32/linux-x86-boot-shim.bin" "$PROJECT_DIR/iso/boot/"
 cp "$PROJECT_DIR/kernel.phys32/multiboot-shim.bin" "$PROJECT_DIR/iso/boot/"
 cp "$PROJECT_DIR/kernel_x64/kernel.zbi" "$PROJECT_DIR/iso/boot/"
 cat > "$PROJECT_DIR/iso/boot/grub/grub.cfg" << \EOF
-set timeout=1
+set timeout=0
 menuentry "mist-os" {
-  multiboot /boot/multiboot-shim.bin kernel.serial=legacy kernel.shell=true
+  multiboot /boot/multiboot-shim.bin kernel.serial=legacy kernel.bypass-debuglog=true kernel.halt-on-panic=true kernel.shell=true
   module /boot/kernel.zbi
-}
-menuentry "mist-os-linux32" {
-  linux /boot/linux-x86-32-boot-shim.bin kernel.serial=legacy kernel.shell=true
-  initrd /boot/kernel.zbi
-}
-menuentry "mist-os-linux64" {
-  linux /boot/linux-x86-boot-shim.bin kernel.serial=legacy kernel.shell=true
-  initrd /boot/kernel.zbi
 }
 EOF
 ${GRUB_PREFIX}grub-mkrescue -o "$PROJECT_DIR/mistos.iso" "$PROJECT_DIR/iso"
