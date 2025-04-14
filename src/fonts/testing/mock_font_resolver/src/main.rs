@@ -9,10 +9,9 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_url::AbsolutePackageUrl;
 use futures::{StreamExt, TryStreamExt};
 use log::*;
-use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::read_only;
-use vfs::{pseudo_directory, ToObjectRequest as _};
+use vfs::pseudo_directory;
 use zx::Status;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -71,9 +70,6 @@ async fn resolve(
         }
     };
 
-    fio::PERM_READABLE.to_object_request(directory_request.into_channel()).handle(|request| {
-        root.open(ExecutionScope::new(), vfs::Path::dot(), fio::PERM_READABLE, request)
-    });
-
+    vfs::directory::serve_on(root, fio::PERM_READABLE, ExecutionScope::new(), directory_request);
     Ok(())
 }

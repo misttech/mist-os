@@ -206,7 +206,6 @@ mod tests {
     use fuchsia_pkg_testing::blobfs::Fake as FakeBlobfs;
     use fuchsia_pkg_testing::PackageBuilder;
     use futures::prelude::*;
-    use vfs::directory::entry_container::Directory as _;
 
     struct TestEnv {
         _blobfs_fake: FakeBlobfs,
@@ -245,11 +244,7 @@ mod tests {
         let root_dir = RootDir::new(blobfs_client, metafar_blob.merkle).await.unwrap();
         let sub_dir = MetaSubdir::new(root_dir, "meta/dir/".to_string());
         for flags in [fio::PERM_WRITABLE, fio::PERM_EXECUTABLE] {
-            let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-            let request = flags.to_object_request(server);
-            request.handle(|request: &mut vfs::ObjectRequest| {
-                sub_dir.clone().open(ExecutionScope::new(), vfs::Path::dot(), flags, request)
-            });
+            let proxy = vfs::directory::serve(sub_dir.clone(), flags);
             assert_matches!(
                 proxy.take_event_stream().try_next().await,
                 Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })

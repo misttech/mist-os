@@ -7,13 +7,10 @@ use fidl::endpoints::ServerEnd;
 use log::*;
 use std::collections::HashMap;
 use std::sync::Arc;
-use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::immutable::simple as simpledir;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::VmoFile;
-use vfs::path::Path as VfsPath;
-use vfs::ObjectRequest;
 use zx::{self as zx, HandleBased};
 use {fidl_fuchsia_component_test as ftest, fidl_fuchsia_io as fio};
 
@@ -61,13 +58,12 @@ pub async fn read_only_directory_helper(
     top_directory.clone().set_not_found_handler(Box::new(move |path| {
         warn!("nonexistent path {:?} accessed in read only directory {:?}", path, directory_name);
     }));
-    let flags = fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY;
-    top_directory.open(
+    vfs::directory::serve_on(
+        top_directory,
+        fio::PERM_READABLE,
         execution_scope_dropper.execution_scope.clone(),
-        VfsPath::dot(),
-        flags.clone(),
-        &mut ObjectRequest::new(flags, &Default::default(), outgoing_dir.into_channel().into()),
-    )?;
+        outgoing_dir,
+    );
     execution_scope_dropper.execution_scope.wait().await;
     Ok(())
 }

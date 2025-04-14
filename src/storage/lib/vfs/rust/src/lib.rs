@@ -74,6 +74,7 @@ pub mod pseudo_directory;
 pub use vfs_macros::pseudo_directory;
 
 pub use common::CreationMode;
+pub use execution_scope::ExecutionScope;
 pub use object_request::{ObjectRequest, ObjectRequestRef, ToObjectRequest};
 pub use path::Path;
 pub use protocols::ProtocolsExt;
@@ -85,7 +86,6 @@ pub use protocols::ProtocolsExt;
 extern crate self as vfs;
 
 use directory::entry_container::Directory;
-use execution_scope::ExecutionScope;
 use fidl_fuchsia_io as fio;
 use std::sync::Arc;
 

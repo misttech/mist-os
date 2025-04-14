@@ -10,7 +10,7 @@
 use crate::base_packages::{BasePackages, CachePackages};
 use crate::index::PackageIndex;
 use anyhow::{anyhow, format_err, Context as _, Error};
-use fidl::endpoints::DiscoverableProtocolMarker as _;
+use fidl::endpoints::{DiscoverableProtocolMarker as _, ServerEnd};
 use fidl_contrib::protocol_connector::ConnectedProtocol;
 use fidl_contrib::ProtocolConnector;
 use fidl_fuchsia_metrics::{
@@ -25,10 +25,8 @@ use log::{error, info};
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
-use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable as _;
 use vfs::remote::remote_dir;
-use vfs::ObjectRequest;
 use {
     cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_inspect as finspect,
@@ -392,17 +390,15 @@ async fn main_inner() -> Result<(), Error> {
 
     let _inspect_server_task =
         inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
-
-    let flags = fio::PERM_READABLE | fio::PERM_WRITABLE | fio::PERM_EXECUTABLE;
-    ObjectRequest::new(
-        flags,
-        &fio::Options::default(),
+    let handle =
         fuchsia_runtime::take_startup_handle(fuchsia_runtime::HandleType::DirectoryRequest.into())
-            .context("taking startup handle")?
-            .into(),
-    )
-    .handle(|request| out_dir.open(scope.clone(), vfs::path::Path::dot(), flags, request));
-
+            .context("taking startup handle")?;
+    vfs::directory::serve_on(
+        out_dir,
+        fio::PERM_READABLE | fio::PERM_WRITABLE | fio::PERM_EXECUTABLE,
+        scope.clone(),
+        ServerEnd::new(handle.into()),
+    );
     let () = scope.wait().await;
     cobalt_fut.await;
 

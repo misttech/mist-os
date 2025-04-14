@@ -946,10 +946,8 @@ mod tests {
     use fidl::prelude::*;
     use fidl_test_processbuilder::{UtilMarker, UtilProxy};
     use lazy_static::lazy_static;
-    use vfs::directory::entry_container::Directory;
-    use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
-    use vfs::{pseudo_directory, ToObjectRequest as _};
+    use vfs::pseudo_directory;
     use zerocopy::Ref;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -1391,28 +1389,20 @@ mod tests {
         zx::cprng_draw(&mut randbuf);
         let test_content2 = format!("test content 2 {}", u64::from_le_bytes(randbuf));
 
-        let (dir1_server, dir1_client) = zx::Channel::create();
-        let dir_scope = ExecutionScope::new();
         let dir1 = pseudo_directory! {
             "test_file1" => read_only(test_content1.clone()),
         };
-        const FLAGS: fio::Flags = fio::PERM_READABLE;
-        FLAGS
-            .to_object_request(dir1_server)
-            .handle(|request| dir1.open(dir_scope.clone(), vfs::Path::dot(), FLAGS, request));
+        let dir1_client = vfs::directory::serve_read_only(dir1).into_client_end().unwrap();
 
-        let (dir2_server, dir2_client) = zx::Channel::create();
         let dir2 = pseudo_directory! {
             "test_file2" => read_only(test_content2.clone()),
         };
-        FLAGS
-            .to_object_request(dir2_server)
-            .handle(|request| dir2.open(dir_scope.clone(), vfs::Path::dot(), FLAGS, request));
+        let dir2_client = vfs::directory::serve_read_only(dir2).into_client_end().unwrap();
 
         let (mut builder, proxy) = setup_test_util_builder(true)?;
         builder.add_namespace_entries(vec![
-            NamespaceEntry { path: CString::new("/dir1")?, directory: ClientEnd::new(dir1_client) },
-            NamespaceEntry { path: CString::new("/dir2")?, directory: ClientEnd::new(dir2_client) },
+            NamespaceEntry { path: CString::new("/dir1")?, directory: dir1_client },
+            NamespaceEntry { path: CString::new("/dir2")?, directory: dir2_client },
         ])?;
         let process = builder.build().await?.start()?;
         check_process_running(&process)?;

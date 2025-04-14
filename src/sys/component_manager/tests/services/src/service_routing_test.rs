@@ -20,11 +20,10 @@ use moniker::ChildName;
 use std::collections::HashSet;
 use std::sync::Arc;
 use test_case::test_case;
-use vfs::directory::entry::DirectoryEntry;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::simple::Simple;
 use vfs::execution_scope::ExecutionScope;
-use vfs::{pseudo_directory, ToObjectRequest};
+use vfs::pseudo_directory;
 use {
     fidl_fidl_test_components as ftest, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_examples as fecho,
@@ -826,14 +825,12 @@ async fn component_adds_service_entries_late() {
                     let outdir = Simple::new();
                     backing_directory_sender.unbounded_send(outdir.clone()).unwrap();
                     let scope = ExecutionScope::new();
-                    fio::PERM_READABLE.to_object_request(h.outgoing_dir).handle(|object_request| {
-                        Ok(outdir.open_entry(vfs::directory::entry::OpenRequest::new(
-                            scope.clone(),
-                            fio::PERM_READABLE,
-                            vfs::path::Path::dot(),
-                            object_request,
-                        )))
-                    });
+                    vfs::directory::serve_on(
+                        outdir,
+                        fio::PERM_READABLE,
+                        scope.clone(),
+                        h.outgoing_dir,
+                    );
                     scope.wait().await;
                     Ok(())
                 }

@@ -29,7 +29,7 @@ fn to_render2_error(err: fidl::Error) -> Error {
 async fn main_internal<S, P, T, Fut, Fut2>(
     wipe_storage_fn: S,
     ota_progress_proxy: &P,
-    out_dir: ServerEnd<fio::NodeMarker>,
+    out_dir: ServerEnd<fio::DirectoryMarker>,
     do_ota_fn: T,
 ) -> Result<(), Error>
 where
@@ -44,9 +44,7 @@ where
     let blobfs_proxy = wipe_storage_fn().await.context("failed to wipe storage")?;
 
     let scope = vfs::execution_scope::ExecutionScope::new();
-    SERVE_FLAGS.to_object_request(out_dir.into_channel()).handle(|request| {
-        outgoing_dir_vfs.clone().open(scope.clone(), vfs::Path::dot(), SERVE_FLAGS, request)
-    });
+    vfs::directory::serve_on(outgoing_dir_vfs.clone(), SERVE_FLAGS, scope.clone(), out_dir);
     fasync::Task::local(async move { scope.wait().await }).detach();
 
     ota_progress_proxy
@@ -148,19 +146,12 @@ mod tests {
 
     async fn fake_wipe_storage() -> Result<fio::DirectoryProxy, Error> {
         let (client, server) = create_endpoints::<fio::DirectoryMarker>();
-
         let scope = vfs::execution_scope::ExecutionScope::new();
-
         let dir = vfs::pseudo_directory! {
             "testfile" => read_only("test1")
         };
-
-        SERVE_FLAGS.to_object_request(server.into_channel()).handle(|request| {
-            dir.clone().open(scope.clone(), vfs::Path::dot(), SERVE_FLAGS, request)
-        });
-
+        vfs::directory::serve_on(dir, SERVE_FLAGS, scope.clone(), server);
         fasync::Task::local(async move { scope.wait().await }).detach();
-
         Ok(client.into_proxy())
     }
 
@@ -188,12 +179,9 @@ mod tests {
         })
         .detach();
 
-        main_internal(
-            fake_wipe_storage,
-            &progress_proxy,
-            dir_server.into_channel().into(),
-            |_storage, _outgoing_dir| futures::future::ready(Ok(())),
-        )
+        main_internal(fake_wipe_storage, &progress_proxy, dir_server, |_storage, _outgoing_dir| {
+            futures::future::ready(Ok(()))
+        })
         .await
         .unwrap();
     }
@@ -221,12 +209,9 @@ mod tests {
         })
         .detach();
 
-        main_internal(
-            fake_wipe_storage,
-            &progress_proxy,
-            dir_server.into_channel().into(),
-            |_storage, _outgoing_dir| futures::future::ready(Err(format_err!("ota failed"))),
-        )
+        main_internal(fake_wipe_storage, &progress_proxy, dir_server, |_storage, _outgoing_dir| {
+            futures::future::ready(Err(format_err!("ota failed")))
+        })
         .await
         .unwrap_err();
     }

@@ -5,12 +5,10 @@
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use std::sync::Arc;
-use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::immutable::simple as pfs;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::read_only;
-use vfs::object_request::ToObjectRequest as _;
 use vfs::tree_builder::TreeBuilder;
 
 // Simple directory type which is used to implement `ComponentStartInfo.runtime_directory`.
@@ -59,13 +57,11 @@ impl RuntimeDirectory {
 pub struct RuntimeDirBuilder {
     args: Vec<String>,
     job_id: Option<u64>,
-    server_end: ServerEnd<fio::NodeMarker>,
+    server_end: ServerEnd<fio::DirectoryMarker>,
 }
 
 impl RuntimeDirBuilder {
     pub fn new(server_end: ServerEnd<fio::DirectoryMarker>) -> Self {
-        // Transform the server end to speak Node protocol only
-        let server_end = ServerEnd::<fio::NodeMarker>::new(server_end.into_channel());
         Self { args: vec![], job_id: None, server_end }
     }
 
@@ -109,15 +105,13 @@ impl RuntimeDirBuilder {
         }
 
         let runtime_directory = runtime_tree_builder.build();
-
-        const SERVE_FLAGS: fio::Flags = fio::PERM_READABLE.union(fio::PERM_WRITABLE);
-
         // Serve the runtime directory
-        let object_request = SERVE_FLAGS.to_object_request(self.server_end.into_channel());
-        let dir = runtime_directory.clone();
-        object_request.handle(|request| {
-            dir.open(ExecutionScope::new(), vfs::Path::dot(), SERVE_FLAGS, request)
-        });
+        vfs::directory::serve_on(
+            runtime_directory.clone(),
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
+            ExecutionScope::new(),
+            self.server_end,
+        );
         RuntimeDirectory(runtime_directory)
     }
 }

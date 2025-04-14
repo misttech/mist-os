@@ -538,7 +538,6 @@ mod tests {
     use futures::TryStreamExt as _;
     use pretty_assertions::assert_eq;
     use std::io::Cursor;
-    use vfs::directory::entry_container::Directory as _;
 
     struct TestEnv {
         _blobfs_fake: FakeBlobfs,
@@ -767,11 +766,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn root_dir_cannot_be_served_as_mutable() {
         let (_env, root_dir) = TestEnv::with_subpackages(None).await;
-        let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let request = fio::PERM_WRITABLE.to_object_request(server);
-        request.handle(|request: &mut vfs::ObjectRequest| {
-            root_dir.open(ExecutionScope::new(), vfs::Path::dot(), fio::PERM_WRITABLE, request)
-        });
+        let proxy = vfs::directory::serve(root_dir, fio::PERM_WRITABLE);
         assert_matches!(
             proxy.take_event_stream().try_next().await,
             Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })

@@ -7,9 +7,7 @@ use futures::stream::TryStreamExt as _;
 use log::info;
 use mock_metrics::MockMetricEventLoggerFactory;
 use std::sync::Arc;
-use vfs::directory::entry_container::Directory as _;
 use vfs::directory::helper::DirectlyMutable as _;
-use vfs::ToObjectRequest as _;
 use {fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics};
 
 static PKGFS_BOOT_ARG_KEY: &'static str = "zircon.system.pkgfs.cmd";
@@ -79,13 +77,11 @@ async fn main() {
     }
 
     let scope = vfs::execution_scope::ExecutionScope::new();
-    let dir_server: ServerEnd<fio::DirectoryProxy> =
+    let dir_server: ServerEnd<fio::DirectoryMarker> =
         fuchsia_runtime::take_startup_handle(fuchsia_runtime::HandleType::DirectoryRequest.into())
             .unwrap()
             .into();
-    OUT_DIR_FLAGS
-        .to_object_request(dir_server)
-        .handle(|request| out_dir.open(scope.clone(), vfs::Path::dot(), OUT_DIR_FLAGS, request));
+    vfs::directory::serve_on(out_dir, OUT_DIR_FLAGS, scope.clone(), dir_server);
     let () = scope.wait().await;
 }
 

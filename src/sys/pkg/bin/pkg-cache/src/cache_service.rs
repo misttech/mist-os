@@ -27,7 +27,6 @@ use log::{error, warn};
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
-use vfs::directory::entry_container::Directory;
 use zx::Status;
 use {cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fuchsia_trace as ftrace};
 
@@ -354,8 +353,7 @@ async fn get_impl(
     };
 
     let flags = executability_status(executability_restrictions, base_packages, pkg).into();
-    let request = vfs::ObjectRequest::new(flags, &Default::default(), dir.into_channel());
-    request.handle(|request| root_dir.open(scope, vfs::path::Path::dot(), flags, request));
+    vfs::directory::serve_on(root_dir, flags, scope, dir);
 
     cobalt_sender.open_success();
     Ok(())
@@ -819,9 +817,7 @@ async fn get_subpackage(
         fpkg::GetSubpackageError::Internal
     })?;
     let flags = executability_status(executability_restrictions, base_packages, *hash).into();
-    let request = vfs::ObjectRequest::new(flags, &Default::default(), dir.into_channel());
-    request.handle(|request| root.open(scope, vfs::path::Path::dot(), flags, request));
-
+    vfs::directory::serve_on(root, flags, scope, dir);
     Ok(())
 }
 

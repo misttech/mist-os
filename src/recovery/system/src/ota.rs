@@ -14,10 +14,8 @@ use serde_json::{json, Value};
 use std::fs::File;
 use std::str::FromStr;
 use std::sync::Arc;
-use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::immutable::simple::Simple;
-use vfs::ToObjectRequest as _;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 const PATH_TO_CONFIGS_DIR: &'static str = "/config/data/ota-configs";
@@ -258,9 +256,7 @@ pub async fn run_devhost_ota(
     let outgoing_dir_vfs = vfs::pseudo_directory! {};
 
     let scope = vfs::execution_scope::ExecutionScope::new();
-    SERVE_FLAGS.to_object_request(out_dir.into_channel()).handle(|request| {
-        outgoing_dir_vfs.clone().open(scope.clone(), vfs::Path::dot(), SERVE_FLAGS, request)
-    });
+    vfs::directory::serve_on(outgoing_dir_vfs.clone(), SERVE_FLAGS, scope.clone(), out_dir);
     fasync::Task::local(async move { scope.wait().await }).detach();
 
     let ota_env = OtaEnvBuilder::new(outgoing_dir_vfs)
@@ -538,9 +534,12 @@ mod tests {
             let outgoing_dir_vfs = vfs::pseudo_directory! {};
 
             let scope = vfs::execution_scope::ExecutionScope::new();
-            SERVE_FLAGS.to_object_request(outgoing_dir).handle(|request| {
-                outgoing_dir_vfs.clone().open(scope.clone(), vfs::Path::dot(), SERVE_FLAGS, request)
-            });
+            vfs::directory::serve_on(
+                outgoing_dir_vfs.clone(),
+                SERVE_FLAGS,
+                scope.clone(),
+                outgoing_dir.into(),
+            );
             fasync::Task::local(async move { scope.wait().await }).detach();
 
             let blobfs_proxy = self.storage.blobfs_root()?;

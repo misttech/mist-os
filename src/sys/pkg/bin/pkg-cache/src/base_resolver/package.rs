@@ -12,7 +12,6 @@ use futures::stream::TryStreamExt as _;
 use log::error;
 use std::collections::HashMap;
 use std::sync::Arc;
-use vfs::directory::entry_container::Directory;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg};
 
 const FLAGS: fio::Flags = fio::PERM_READABLE.union(fio::PERM_EXECUTABLE);
@@ -222,9 +221,7 @@ pub(crate) async fn resolve_package(
         .get_or_insert(hash, None)
         .await
         .map_err(ResolverError::ServePackageDirectory)?;
-
-    let request = vfs::ObjectRequest::new(FLAGS, &Default::default(), dir.into_channel());
-    request.handle(|request| root.open(scope, vfs::path::Path::dot(), FLAGS, request));
+    vfs::directory::serve_on(root, FLAGS, scope, dir);
     Ok(hash)
 }
 
@@ -268,8 +265,7 @@ async fn resolve_subpackage(
         .get_or_insert(subpackage, None)
         .await
         .map_err(ResolverError::ServePackageDirectory)?;
-    let request = vfs::ObjectRequest::new(FLAGS, &Default::default(), dir.into_channel());
-    request.handle(|request| root.open(scope, vfs::path::Path::dot(), FLAGS, request));
+    vfs::directory::serve_on(root, FLAGS, scope, dir);
     Ok(authenticator.create(&subpackage))
 }
 

@@ -26,9 +26,7 @@ use mock_paver::{MockPaverService, MockPaverServiceBuilder};
 use mock_reboot::MockRebootService;
 use std::collections::HashMap;
 use std::sync::Arc;
-use vfs::directory::entry_container::Directory as _;
 use vfs::directory::helper::DirectlyMutable as _;
-use vfs::ToObjectRequest as _;
 use zx::{self as zx, Status};
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_component_resolution as fcomponent_resolution,
@@ -725,15 +723,13 @@ where
                         .lock()
                         .take()
                         .expect("mock component should only be launched once");
-                    let scope = vfs::execution_scope::ExecutionScope::new();
-                    OUT_DIR_FLAGS.to_object_request(handles.outgoing_dir).handle(|request| {
-                        local_child_out_dir.open(
-                            scope.clone(),
-                            vfs::Path::dot(),
-                            OUT_DIR_FLAGS,
-                            request,
-                        )
-                    });
+                    let scope = vfs::ExecutionScope::new();
+                    vfs::directory::serve_on(
+                        local_child_out_dir,
+                        OUT_DIR_FLAGS,
+                        scope.clone(),
+                        handles.outgoing_dir,
+                    );
                     async move {
                         scope.wait().await;
                         Ok(())

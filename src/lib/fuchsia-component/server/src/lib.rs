@@ -22,16 +22,13 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use thiserror::Error;
 use vfs::directory::entry::DirectoryEntry;
-use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::immutable::Simple as PseudoDir;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::VmoFile;
 use vfs::name::Name;
-use vfs::path::Path;
 use vfs::remote::remote_dir;
 use vfs::service::endpoint;
-use vfs::ObjectRequest;
 use zx::MonotonicDuration;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -483,19 +480,12 @@ impl<ServiceObjTy: ServiceObjTrait> ServiceFs<ServiceObjTy> {
     }
 
     fn serve_connection_impl(&self, chan: fidl::endpoints::ServerEnd<fio::DirectoryMarker>) {
-        self.dir
-            .clone()
-            .open(
-                self.scope.clone(),
-                Path::dot(),
-                Self::base_connection_flags(),
-                &mut ObjectRequest::new(
-                    Self::base_connection_flags(),
-                    &Default::default(),
-                    chan.into_channel(),
-                ),
-            )
-            .expect("failed to serve root ServiceFs connection");
+        vfs::directory::serve_on(
+            self.dir.clone(),
+            Self::base_connection_flags(),
+            self.scope.clone(),
+            chan,
+        );
     }
 
     /// Creates a protocol connector that can access the capabilities exposed by this ServiceFs.

@@ -41,9 +41,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
-use vfs::directory::entry_container::Directory as _;
 use vfs::directory::helper::DirectlyMutable as _;
-use vfs::ObjectRequest;
 use zx::{self as zx, AsHandleRef as _, HandleBased as _};
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio,
@@ -555,20 +553,12 @@ where
                         .take()
                         .expect("mock component should only be launched once");
                     let scope = vfs::execution_scope::ExecutionScope::new();
-                    let flags = fio::PERM_READABLE | fio::PERM_WRITABLE | fio::PERM_EXECUTABLE;
-                    ObjectRequest::new(
-                        flags,
-                        &fio::Options::default(),
-                        handles.outgoing_dir.into_channel(),
-                    )
-                    .handle(|request| {
-                        local_child_out_dir.open(
-                            scope.clone(),
-                            vfs::path::Path::dot(),
-                            flags,
-                            request,
-                        )
-                    });
+                    vfs::directory::serve_on(
+                        local_child_out_dir,
+                        fio::PERM_READABLE | fio::PERM_WRITABLE | fio::PERM_EXECUTABLE,
+                        scope.clone(),
+                        handles.outgoing_dir,
+                    );
                     async move {
                         scope.wait().await;
                         Ok(())

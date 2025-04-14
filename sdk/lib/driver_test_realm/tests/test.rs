@@ -9,9 +9,7 @@ use fuchsia_component_test::{
 };
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
 use futures::{FutureExt as _, StreamExt as _};
-use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
-use vfs::ToObjectRequest;
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_driver_development as fdd,
     fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio,
@@ -51,10 +49,7 @@ async fn serve_boot_items(handles: LocalComponentHandles) -> Result<(), Error> {
     };
 
     let scope = ExecutionScope::new();
-    fio::PERM_READABLE.to_object_request(handles.outgoing_dir.into_channel()).handle(|request| {
-        export.open(scope.clone(), vfs::Path::dot(), fio::PERM_READABLE, request)
-    });
-
+    vfs::directory::serve_on(export, fio::PERM_READABLE, scope.clone(), handles.outgoing_dir);
     scope.wait().await;
 
     Ok(())

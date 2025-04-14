@@ -24,7 +24,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use thiserror::Error;
 use vfs::directory::entry::{EntryInfo, OpenRequest};
-use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable as _;
 use vfs::directory::immutable::simple::Simple as SimpleImmutableDir;
 use vfs::remote::RemoteLike;
@@ -734,17 +733,12 @@ impl ManagedRealm {
                         })?;
                 }
                 ManagedRealmRequest::GetDevfs { devfs: server_end, control_handle: _ } => {
-                    let flags = fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY;
                     // On errors `server_end` will be closed with an epitaph.
-                    let _ = devfs.clone().open(
-                        vfs::execution_scope::ExecutionScope::new(),
-                        vfs::path::Path::dot(),
-                        flags,
-                        &mut vfs::ObjectRequest::new(
-                            flags,
-                            &Default::default(),
-                            server_end.into_channel(),
-                        ),
+                    vfs::directory::serve_on(
+                        devfs.clone(),
+                        fio::PERM_READABLE,
+                        vfs::ExecutionScope::new(),
+                        server_end,
                     );
                 }
                 ManagedRealmRequest::AddDevice { path, device, responder } => {

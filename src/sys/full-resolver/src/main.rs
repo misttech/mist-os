@@ -253,11 +253,9 @@ mod tests {
     use futures::lock::Mutex;
     use futures::SinkExt as _;
     use std::sync::Arc;
-    use vfs::directory::entry_container::Directory;
     use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
-    use vfs::path::Path;
-    use vfs::{pseudo_directory, ToObjectRequest as _};
+    use vfs::pseudo_directory;
     use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     async fn mock_pkg_resolver(
@@ -401,14 +399,12 @@ mod tests {
             match server.try_next().await.unwrap().expect("client makes one request") {
                 fpkg::PackageResolverRequest::Resolve { package_url, dir, responder } => {
                     assert_eq!(package_url, "fuchsia-pkg://fuchsia.example/test");
-                    fio::PERM_READABLE.to_object_request(dir).handle(|request| {
-                        fs.clone().open(
-                            ExecutionScope::new(),
-                            Path::dot(),
-                            fio::PERM_READABLE,
-                            request,
-                        )
-                    });
+                    vfs::directory::serve_on(
+                        fs.clone(),
+                        fio::PERM_READABLE,
+                        ExecutionScope::new(),
+                        dir,
+                    );
                     responder
                         .send(Ok(&fpkg::ResolutionContext { bytes: b"context-contents".to_vec() }))
                         .unwrap();
@@ -458,14 +454,12 @@ mod tests {
                         context,
                         fpkg::ResolutionContext { bytes: b"incoming-context".to_vec() }
                     );
-                    fio::PERM_READABLE.to_object_request(dir).handle(|request| {
-                        fs.clone().open(
-                            ExecutionScope::new(),
-                            Path::dot(),
-                            fio::PERM_READABLE,
-                            request,
-                        )
-                    });
+                    vfs::directory::serve_on(
+                        fs.clone(),
+                        fio::PERM_READABLE,
+                        ExecutionScope::new(),
+                        dir,
+                    );
                     responder
                         .send(Ok(&fpkg::ResolutionContext { bytes: b"outgoing-context".to_vec() }))
                         .unwrap();

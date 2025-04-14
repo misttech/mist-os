@@ -26,9 +26,7 @@ use mock_omaha_server::OmahaResponse;
 use mock_paver::{hooks as mphooks, PaverEvent};
 use pretty_assertions::assert_eq;
 use std::collections::BTreeSet;
-use vfs::directory::entry_container::Directory;
 use vfs::file::vmo::read_only;
-use vfs::ToObjectRequest as _;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 const OUT_DIR_FLAGS: fio::Flags =
@@ -117,15 +115,13 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
                         .lock()
                         .take()
                         .expect("mock component should only be launched once");
-                    let scope = vfs::execution_scope::ExecutionScope::new();
-                    OUT_DIR_FLAGS.to_object_request(handles.outgoing_dir).handle(|request| {
-                        directories_out_dir.open(
-                            scope.clone(),
-                            vfs::Path::dot(),
-                            OUT_DIR_FLAGS,
-                            request,
-                        )
-                    });
+                    let scope = vfs::ExecutionScope::new();
+                    vfs::directory::serve_on(
+                        directories_out_dir,
+                        OUT_DIR_FLAGS,
+                        scope.clone(),
+                        handles.outgoing_dir,
+                    );
                     async move {
                         scope.wait().await;
                         Ok(())
@@ -239,10 +235,13 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
                     let out_dir = vfs::pseudo_directory! {
                         "blob" => blobfs_vfs,
                     };
-                    let scope = vfs::execution_scope::ExecutionScope::new();
-                    OUT_DIR_FLAGS.to_object_request(handles.outgoing_dir).handle(|request| {
-                        out_dir.open(scope.clone(), vfs::Path::dot(), OUT_DIR_FLAGS, request)
-                    });
+                    let scope = vfs::ExecutionScope::new();
+                    vfs::directory::serve_on(
+                        out_dir,
+                        OUT_DIR_FLAGS,
+                        scope.clone(),
+                        handles.outgoing_dir,
+                    );
                     async move {
                         scope.wait().await;
                         Ok(())

@@ -10,14 +10,12 @@ use futures::TryStreamExt;
 use std::collections::HashMap;
 use std::sync::Arc;
 use vfs::directory::entry::DirectoryEntry;
-use vfs::directory::entry_container::Directory;
 use vfs::directory::immutable::simple as pfs;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::read_only;
 use vfs::remote::remote_dir;
 use vfs::service::host;
 use vfs::tree_builder::TreeBuilder;
-use vfs::ToObjectRequest as _;
 
 /// Used to construct and then host an outgoing directory.
 #[derive(Clone)]
@@ -72,16 +70,15 @@ impl OutDir {
     pub fn host_fn(&self) -> HostFn {
         // Build the output directory.
         let dir = self.build_out_dir().expect("could not build out directory");
-
         // Construct a function. Each time it is invoked, we connect a new Zircon channel
         // `server_end` to the directory.
-        const FLAGS: fio::Flags = fio::PERM_READABLE.union(fio::PERM_WRITABLE);
         Box::new(move |server_end: ServerEnd<fio::DirectoryMarker>| {
-            let dir = dir.clone();
-            let object_request = FLAGS.to_object_request(server_end.into_channel());
-            object_request.handle(|request| {
-                dir.open(ExecutionScope::new(), vfs::Path::dot(), FLAGS, request)
-            });
+            vfs::directory::serve_on(
+                dir.clone(),
+                fio::PERM_READABLE | fio::PERM_WRITABLE,
+                ExecutionScope::new(),
+                server_end,
+            );
         })
     }
 

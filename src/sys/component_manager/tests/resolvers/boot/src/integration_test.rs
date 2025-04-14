@@ -15,8 +15,6 @@
 use fidl::endpoints::{create_proxy, ProtocolMarker};
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
 use futures::prelude::*;
-use vfs::directory::entry_container::Directory as _;
-use vfs::ToObjectRequest as _;
 use {fidl_fidl_test_components as ftest, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
 
 #[fuchsia::test]
@@ -37,11 +35,7 @@ async fn boot_resolver_can_be_routed_from_component_manager() {
                         fuchsia_fs::directory::open_in_namespace("/pkg", FLAGS).unwrap()
                     ),
                 };
-                let object_request =
-                    FLAGS.to_object_request(mock_handles.outgoing_dir.into_channel());
-                let scope_clone = scope.clone();
-                object_request
-                    .handle(|request| dir.open(scope_clone, vfs::Path::dot(), FLAGS, request));
+                vfs::directory::serve_on(dir, FLAGS, scope.clone(), mock_handles.outgoing_dir);
                 async move { Ok(scope.wait().await) }.boxed()
             },
             ChildOptions::new(),
