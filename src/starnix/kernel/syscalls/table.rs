@@ -176,9 +176,11 @@ pub fn dispatch_syscall(
         };
         pub use crate::task::syscalls::{
             sys_arch32_execve, sys_arch32_geteuid32, sys_arch32_getgid32, sys_arch32_getppid,
-            sys_arch32_getresgid32, sys_arch32_getresuid32, sys_arch32_ptrace,
-            sys_arch32_sched_getaffinity, sys_arch32_sched_setaffinity, sys_arch32_seccomp,
-            sys_arch32_setfsuid, sys_arch32_setfsuid32, sys_arch32_setgroups32, sys_arch32_setpgid,
+            sys_arch32_getpriority, sys_arch32_getresgid32, sys_arch32_getresuid32,
+            sys_arch32_ptrace, sys_arch32_sched_get_priority_max,
+            sys_arch32_sched_get_priority_min, sys_arch32_sched_getaffinity,
+            sys_arch32_sched_setaffinity, sys_arch32_seccomp, sys_arch32_setfsuid,
+            sys_arch32_setfsuid32, sys_arch32_setgroups32, sys_arch32_setpgid,
             sys_arch32_setpriority, sys_arch32_setresgid32, sys_arch32_setresuid32,
             sys_arch32_setrlimit, sys_arch32_setsid, sys_arch32_syslog, sys_arch32_ugetrlimit,
             sys_capget as sys_arch32_capget, sys_capset as sys_arch32_capset,
@@ -191,10 +193,10 @@ pub fn dispatch_syscall(
             sys_setuid as sys_arch32_setuid32,
         };
         pub use crate::vfs::socket::syscalls::{
-            sys_arch32_accept, sys_arch32_bind, sys_arch32_getsockname, sys_arch32_getsockopt,
-            sys_arch32_listen, sys_arch32_recv, sys_arch32_recvfrom, sys_arch32_recvmmsg,
-            sys_arch32_recvmsg, sys_arch32_send, sys_arch32_sendmsg, sys_arch32_sendto,
-            sys_arch32_setsockopt, sys_arch32_shutdown, sys_arch32_socketpair,
+            sys_arch32_accept, sys_arch32_accept4, sys_arch32_bind, sys_arch32_getsockname,
+            sys_arch32_getsockopt, sys_arch32_listen, sys_arch32_recv, sys_arch32_recvfrom,
+            sys_arch32_recvmmsg, sys_arch32_recvmsg, sys_arch32_send, sys_arch32_sendmsg,
+            sys_arch32_sendto, sys_arch32_setsockopt, sys_arch32_shutdown, sys_arch32_socketpair,
             sys_connect as sys_arch32_connect, sys_socket as sys_arch32_socket,
         };
         pub use crate::vfs::syscalls::{
@@ -256,6 +258,7 @@ pub fn dispatch_syscall(
             ARM_set_tls[1],
             _llseek[5],
             _newselect[5],
+            accept4[4],
             accept[3],
             access[2],
             bind[3],
@@ -308,6 +311,7 @@ pub fn dispatch_syscall(
             getgid32[0],
             getpid[0],
             getppid[0],
+            getpriority[2],
             getrandom[3],
             getresgid32[3],
             getresuid32[3],
@@ -383,6 +387,8 @@ pub fn dispatch_syscall(
             rt_sigsuspend[2],
             rt_sigtimedwait[4],
             rt_tgsigqueueinfo[4],
+            sched_get_priority_max[1],
+            sched_get_priority_min[1],
             sched_getaffinity[3],
             sched_getscheduler[1],
             sched_setaffinity[3],
