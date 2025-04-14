@@ -18,6 +18,7 @@
 #include <ktl/move.h>
 #include <object/handle.h>
 #include <object/io_buffer_dispatcher.h>
+#include <object/io_buffer_shared_region_dispatcher.h>
 #include <object/process_dispatcher.h>
 
 // zx_status_t zx_iob_create
@@ -83,9 +84,52 @@ zx_status_t sys_iob_allocate_id(zx_handle_t handle, zx_iob_allocate_id_options_t
   }
 
   zx::result<uint32_t> result =
-      iob->AllocateId(region_index, blob_ptr.reinterpret<const std::byte>(), blob_size);
+      iob->AllocateId(region_index, blob_ptr.reinterpret<const ktl::byte>(), blob_size);
   if (result.is_error()) {
     return result.status_value();
   }
   return id.copy_to_user(result.value());
+}
+
+// zx_status_t zx_iob_writev
+zx_status_t sys_iob_writev(zx_handle_t handle, zx_iob_write_options_t options,
+                           uint32_t region_index, user_in_ptr<const zx_iovec_t> vector,
+                           size_t vector_count) {
+  // No options are supported at this time.
+  if (options != 0) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  auto* up = ProcessDispatcher::GetCurrent();
+
+  fbl::RefPtr<IoBufferDispatcher> iob;
+  zx_status_t status =
+      up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_WRITE, &iob);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  return iob->Write(region_index, make_user_in_iovec(vector, vector_count)).status_value();
+}
+
+// zx_status_t zx_iob_create_shared_region
+zx_status_t sys_iob_create_shared_region(uint64_t options, uint64_t size, zx_handle_t* out) {
+  if (options != 0 || !IS_PAGE_ALIGNED(size) || size == 0) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  auto up = ProcessDispatcher::GetCurrent();
+  zx_status_t res = up->EnforceBasicPolicy(ZX_POL_NEW_IOB);
+  if (res != ZX_OK) {
+    return res;
+  }
+
+  KernelHandle<IoBufferSharedRegionDispatcher> handle;
+  zx_rights_t rights;
+  if (zx_status_t result = IoBufferSharedRegionDispatcher::Create(size, &handle, &rights);
+      result != ZX_OK) {
+    return result;
+  }
+
+  return up->MakeAndAddHandle(ktl::move(handle), rights, out);
 }

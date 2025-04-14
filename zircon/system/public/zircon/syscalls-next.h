@@ -10,6 +10,7 @@
 #include <zircon/syscalls/debug.h>
 #include <zircon/syscalls/exception.h>
 #include <zircon/syscalls/iob.h>
+#include <zircon/types.h>
 
 // ====== Pager writeback support ====== //
 
@@ -219,9 +220,30 @@ typedef struct {
 // --------------------------------
 //
 #define ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR ((zx_iob_discipline_type_t)(1u))
+#define ZX_IOB_DISCIPLINE_TYPE_MEDIATED_WRITE_RING_BUFFER ((zx_iob_discipline_type_t)(2u))
 
 // Allocation options for `zx_iob_allocate_id()`.
 typedef uint32_t zx_iob_allocate_id_options_t;
+
+// New shared region type.
+#define ZX_IOB_REGION_TYPE_SHARED ((zx_iob_region_type_t)(1u))
+
+typedef struct zx_iob_region_shared {
+  uint32_t options;
+  zx_handle_t shared_region;
+  uint64_t padding[3];
+} zx_iob_region_shared_t;
+
+static_assert(sizeof(zx_iob_region_shared_t) == 8 * 4);
+
+// Ring buffer discipline.
+typedef struct zx_iob_discipline_mediated_write_ring_buffer {
+  uint64_t tag;
+  uint64_t reserved[7];
+} zx_iob_discipline_mediated_write_ring_buffer_t;
+
+// Signals for IO Buffer shared regions.
+#define ZX_IOB_SHARED_REGION_UPDATED __ZX_OBJECT_SIGNALED
 
 // ====== End of upcoming IOB support ====== //
 

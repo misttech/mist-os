@@ -37,6 +37,7 @@ pub type zx_iob_access_t = u32;
 pub type zx_iob_allocate_id_options_t = u32;
 pub type zx_iob_discipline_type_t = u64;
 pub type zx_iob_region_type_t = u32;
+pub type zx_iob_write_options_t = u64;
 pub type zx_off_t = u64;
 pub type zx_paddr_t = usize;
 pub type zx_rights_t = u32;

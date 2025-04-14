@@ -29,6 +29,7 @@ zx_library("object") {
     "interrupt_dispatcher.cc",
     "interrupt_event_dispatcher.cc",
     "io_buffer_dispatcher.cc",
+    "io_buffer_shared_region_dispatcher.cc",
     "iommu_dispatcher.cc",
     "job_dispatcher.cc",
     "job_policy.cc",

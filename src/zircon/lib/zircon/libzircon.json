@@ -60,6 +60,8 @@
     "zx_interrupt_wait",
     "zx_iob_allocate_id",
     "zx_iob_create",
+    "zx_iob_create_shared_region",
+    "zx_iob_writev",
     "zx_iommu_create",
     "zx_ioports_release",
     "zx_ioports_request",

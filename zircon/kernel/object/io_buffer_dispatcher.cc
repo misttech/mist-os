@@ -28,6 +28,7 @@
 #include <object/dispatcher.h>
 #include <object/handle.h>
 #include <object/io_buffer_dispatcher.h>
+#include <object/process_dispatcher.h>
 #include <object/vm_object_dispatcher.h>
 #include <vm/pinned_vm_object.h>
 #include <vm/pmm.h>
@@ -54,11 +55,59 @@ zx::result<fbl::Array<IoBufferDispatcher::IobRegionVariant>> IoBufferDispatcher:
 
   for (unsigned i = 0; i < region_configs.size(); i++) {
     zx_iob_region_t region_config = region_configs[i];
-    if (region_config.type != ZX_IOB_REGION_TYPE_PRIVATE) {
-      return zx::error(ZX_ERR_INVALID_ARGS);
-    }
-    if (region_config.access == 0) {
-      return zx::error(ZX_ERR_INVALID_ARGS);
+    fbl::RefPtr<VmObjectPaged> vmo;
+    zx_koid_t koid = KernelObjectId::Generate();
+    fbl::RefPtr<IoBufferSharedRegionDispatcher> shared_region;
+
+    switch (region_config.type) {
+      case ZX_IOB_REGION_TYPE_PRIVATE: {
+        zx::result<VmObjectDispatcher::CreateStats> parse_result =
+            VmObjectDispatcher::parse_create_syscall_flags(region_config.private_region.options,
+                                                           region_config.size);
+        if (parse_result.is_error()) {
+          return zx::error(parse_result.error_value());
+        }
+        VmObjectDispatcher::CreateStats stats = parse_result.value();
+
+        if (zx_status_t status =
+                VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, stats.flags, stats.size, &vmo);
+            status != ZX_OK) {
+          return zx::error(status);
+        }
+
+        // parse_create_syscall_flags will round up the size to the nearest page, or set the size to
+        // the maximum possible VMO size if ZX_VMO_UNBOUNDED is used. We need to know the actual
+        // size of the vmo to later return if asked.
+        region_config.size = stats.size;
+        vmo->set_user_id(koid);
+        break;
+      }
+
+      case ZX_IOB_REGION_TYPE_SHARED: {
+        // TODO(https://fxbug.dev/319500512): Remove the cast when we move it out of vdso next.
+        const auto& shared_options =
+            *reinterpret_cast<const zx_iob_region_shared_t*>(region_config.max_extension);
+
+        if (shared_options.options != 0 || region_config.size != 0) {
+          return zx::error(ZX_ERR_INVALID_ARGS);
+        }
+        auto up = ProcessDispatcher::GetCurrent();
+        zx_status_t status =
+            up->handle_table().GetDispatcher(*up, shared_options.shared_region, &shared_region);
+        if (status != ZX_OK) {
+          return zx::error(status);
+        }
+        vmo = shared_region->vmo();
+
+        if (vmo->size() < PAGE_SIZE * 2) {
+          return zx::error(ZX_ERR_INVALID_ARGS);
+        }
+
+        break;
+      }
+
+      default:
+        return zx::error(ZX_ERR_INVALID_ARGS);
     }
 
     // A note on resource management:
@@ -79,28 +128,6 @@ zx::result<fbl::Array<IoBufferDispatcher::IobRegionVariant>> IoBufferDispatcher:
 
     // We effectively duplicate the logic from sys_vmo_create here, but instead of creating a
     // kernel handle and dispatcher, we keep ownership of it and assign it to a region.
-
-    zx::result<VmObjectDispatcher::CreateStats> parse_result =
-        VmObjectDispatcher::parse_create_syscall_flags(region_config.private_region.options,
-                                                       region_config.size);
-    if (parse_result.is_error()) {
-      return zx::error(parse_result.error_value());
-    }
-    VmObjectDispatcher::CreateStats stats = parse_result.value();
-
-    fbl::RefPtr<VmObjectPaged> vmo;
-    if (zx_status_t status =
-            VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, stats.flags, stats.size, &vmo);
-        status != ZX_OK) {
-      return zx::error(status);
-    }
-
-    // parse_create_syscall_flags will round up the size to the nearest page, or set the size to the
-    // maximum possible VMO size if ZX_VMO_UNBOUNDED is used. We need to know the actual size of the
-    // vmo to later return if asked.
-    region_config.size = stats.size;
-    zx_koid_t koid = KernelObjectId::Generate();
-    vmo->set_user_id(koid);
 
     // In order to track mappings and unmappings separately for each endpoint, we give each
     // endpoint a child reference instead of the created vmo.
@@ -129,7 +156,7 @@ zx::result<fbl::Array<IoBufferDispatcher::IobRegionVariant>> IoBufferDispatcher:
 
     if (zx::result result =
             CreateIobRegionVariant(ktl::move(ep0_reference), ktl::move(ep1_reference),
-                                   ktl::move(vmo), region_config, koid);
+                                   ktl::move(vmo), region_config, koid, shared_region);
         result.is_error()) {
       return result.take_error();
     } else {
@@ -366,12 +393,12 @@ zx::result<uint32_t> IoBufferDispatcher::AllocateId(size_t region_index,
                                                     user_in_ptr<const ktl::byte> blob_ptr,
                                                     size_t blob_size) {
   if (region_index >= RegionCount()) {
-    return zx::error{ZX_ERR_OUT_OF_RANGE};
+    return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
   if (auto* region = shared_state_->GetRegion<IobRegionIdAllocator>(region_index)) {
     return region->AllocateId(GetEndpointId(), blob_ptr, blob_size);
   }
-  return zx::error{ZX_ERR_WRONG_TYPE};
+  return zx::error(ZX_ERR_WRONG_TYPE);
 }
 
 // static
@@ -380,7 +407,8 @@ zx::result<IoBufferDispatcher::IobRegionVariant> IoBufferDispatcher::CreateIobRe
     fbl::RefPtr<VmObject> ep1_vmo,     //
     fbl::RefPtr<VmObject> kernel_vmo,  //
     const zx_iob_region_t& region,     //
-    zx_koid_t koid) {
+    zx_koid_t koid,                    //
+    fbl::RefPtr<IoBufferSharedRegionDispatcher> shared_region) {
   constexpr zx_iob_access_t kEp0MedR = ZX_IOB_ACCESS_EP0_CAN_MEDIATED_READ;
   constexpr zx_iob_access_t kEp0MedW = ZX_IOB_ACCESS_EP0_CAN_MEDIATED_WRITE;
   constexpr zx_iob_access_t kEp0MapW = ZX_IOB_ACCESS_EP0_CAN_MAP_WRITE;
@@ -395,65 +423,71 @@ zx::result<IoBufferDispatcher::IobRegionVariant> IoBufferDispatcher::CreateIobRe
 
   // The region memory must be directly accessible by userspace or the kernel.
   if (!map_writable && !mediated) {
-    return zx::error{ZX_ERR_INVALID_ARGS};
-  }
-
-  fbl::RefPtr<VmMapping> mapping;
-  zx_vaddr_t base = 0;
-  if (mediated) {
-    const char* mapping_name;
-    switch (region.discipline.type) {
-      case ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR:
-        // If an ID allocator endpoint requests mediated access, that access must at
-        // least admit mediated writes. Equivalently, no ID allocator endpoint can
-        // be read-only in terms of mediated access.
-        if (mediated0 == kEp0MedR || mediated1 == kEp1MedR) {
-          return zx::error{ZX_ERR_INVALID_ARGS};
-        }
-        mapping_name = "IOBuffer region (ID allocator)";
-        break;
-      case ZX_IOB_DISCIPLINE_TYPE_NONE:
-        // NONE type discipline does not support mediated access.
-        [[fallthrough]];
-      default:
-        // Unknown discipline.
-        return zx::error{ZX_ERR_INVALID_ARGS};
-    }
-
-    // Create a mapping of this VMO in the kernel aspace. It is convenient to
-    // create the mapping object first before any discipline-specific pinning
-    // and mapping is actually performed, allowing that to be done in
-    // subclasses, so we pass `VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING`.
-    fbl::RefPtr<VmAddressRegion> kernel_vmar =
-        VmAspace::kernel_aspace()->RootVmar()->as_vm_address_region();
-    zx::result<VmAddressRegion::MapResult> result = kernel_vmar->CreateVmMapping(
-        0, region.size, 0, VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING, ktl::move(kernel_vmo), 0,
-        ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, mapping_name);
-    if (result.is_error()) {
-      return result.take_error();
-    }
-    mapping = ktl::move(result.value().mapping);
-    base = result.value().base;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   IobRegionVariant variant;
   switch (region.discipline.type) {
     case ZX_IOB_DISCIPLINE_TYPE_NONE:
-      variant = IobRegionNone{
-          ktl::move(ep0_vmo), ktl::move(ep1_vmo), ktl::move(mapping), base, region, koid};
+      // For now, disallow shared regions. This can be relaxed as and when need arises.
+      if (shared_region) {
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+      if (mediated) {
+        // NONE type discipline does not support mediated access.
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+      variant = IobRegionNone{ktl::move(ep0_vmo), ktl::move(ep1_vmo), nullptr, 0, region, koid};
       break;
     case ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR: {
-      IobRegionIdAllocator allocator{
-          ktl::move(ep0_vmo), ktl::move(ep1_vmo), ktl::move(mapping), base, region, koid};
+      // For now, disallow shared regions. This can be relaxed as and when need arises.
+      if (shared_region) {
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+      // If an ID allocator endpoint requests mediated access, that access must at
+      // least admit mediated writes. Equivalently, no ID allocator endpoint can
+      // be read-only in terms of mediated access.
+      if (mediated0 == kEp0MedR || mediated1 == kEp1MedR) {
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+
+      // Create a mapping of this VMO in the kernel aspace. It is convenient to
+      // create the mapping object first before any discipline-specific pinning
+      // and mapping is actually performed, allowing that to be done in
+      // subclasses, so we pass `VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING`.
+      fbl::RefPtr<VmAddressRegion> kernel_vmar =
+          VmAspace::kernel_aspace()->RootVmar()->as_vm_address_region();
+
+      zx::result mapping = kernel_vmar->CreateVmMapping(
+          0, region.size, 0, VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING, ktl::move(kernel_vmo), 0,
+          ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, "IOBuffer region (ID allocator)");
+      if (mapping.is_error()) {
+        return mapping.take_error();
+      }
+
+      IobRegionIdAllocator allocator(ktl::move(ep0_vmo), ktl::move(ep1_vmo),
+                                     ktl::move(mapping->mapping), mapping->base, region, koid);
       if (zx::result result = allocator.Init(); result.is_error()) {
         return result.take_error();
       }
       variant = ktl::move(allocator);
       break;
     }
+    case ZX_IOB_DISCIPLINE_TYPE_MEDIATED_WRITE_RING_BUFFER:
+      // For now, insist upon a shared region. This can be relaxed as and when need arises.
+      if (!shared_region) {
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+      variant = IobRegionMediatedWriteRingBuffer(
+          ktl::move(ep0_vmo), ktl::move(ep1_vmo), region, koid, shared_region,
+          // TODO(https://fxbug.dev/319500512): Remove the cast when we move it out of vdso next.
+          reinterpret_cast<const zx_iob_discipline_mediated_write_ring_buffer_t*>(
+              region.discipline.reserved)
+              ->tag);
+      break;
     default:
       // Unknown discipline.
-      return zx::error{ZX_ERR_INVALID_ARGS};
+      return zx::error(ZX_ERR_INVALID_ARGS);
   }
   return zx::ok(ktl::move(variant));
 }
@@ -468,11 +502,11 @@ zx::result<> IoBufferDispatcher::IobRegionIdAllocator::Init() {
   zx_status_t status =
       PinnedVmObject::Create(mapping()->vmo(), 0, region().size, /*write=*/true, &pin_);
   if (status != ZX_OK) {
-    return zx::error{status};
+    return zx::error(status);
   }
   status = mapping()->MapRange(0, region().size, /*commit=*/true);
   if (status != ZX_OK) {
-    return zx::error{status};
+    return zx::error(status);
   }
 
   iob::BlobIdAllocator allocator(mediated_bytes());
@@ -487,7 +521,7 @@ zx::result<uint32_t> IoBufferDispatcher::IobRegionIdAllocator::AllocateId(
 
   zx_rights_t mediated_rights = GetMediatedRights(id);
   if ((mediated_rights & ZX_RIGHT_WRITE) == 0) {
-    return zx::error{ZX_ERR_ACCESS_DENIED};
+    return zx::error(ZX_ERR_ACCESS_DENIED);
   }
 
   iob::BlobIdAllocator allocator(mediated_bytes());
@@ -498,15 +532,40 @@ zx::result<uint32_t> IoBufferDispatcher::IobRegionIdAllocator::AllocateId(
       },
       blob_ptr, blob_size);
   if (copy_status != ZX_OK) {
-    return zx::error{copy_status};
+    return zx::error(copy_status);
   }
   if (result.is_error()) {
     switch (result.error_value()) {
       case iob::BlobIdAllocator::AllocateError::kOutOfMemory:
-        return zx::error{ZX_ERR_NO_MEMORY};
+        return zx::error(ZX_ERR_NO_MEMORY);
       default:
-        return zx::error{ZX_ERR_IO_DATA_INTEGRITY};
+        return zx::error(ZX_ERR_IO_DATA_INTEGRITY);
     }
   }
   return zx::ok(result.value());
+}
+
+zx::result<> IoBufferDispatcher::Write(size_t region_index, user_in_iovec_t message) {
+  canary_.Assert();
+  if (region_index >= RegionCount()) {
+    return zx::error(ZX_ERR_OUT_OF_RANGE);
+  }
+  if (auto* region = shared_state_->GetRegion<IobRegionMediatedWriteRingBuffer>(region_index);
+      !region) {
+    return zx::error(ZX_ERR_WRONG_TYPE);
+  } else {
+    return region->Write(GetEndpointId(), message);
+  }
+}
+
+zx::result<> IoBufferDispatcher::IobRegionMediatedWriteRingBuffer::Write(const IobEndpointId id,
+                                                                         user_in_iovec_t message) {
+  AssertDiscipline(ZX_IOB_DISCIPLINE_TYPE_MEDIATED_WRITE_RING_BUFFER);
+
+  zx_rights_t mediated_rights = GetMediatedRights(id);
+  if ((mediated_rights & ZX_RIGHT_WRITE) == 0) {
+    return zx::error(ZX_ERR_ACCESS_DENIED);
+  }
+
+  return shared_region_->Write(tag_, message);
 }

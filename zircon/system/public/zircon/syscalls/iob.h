@@ -80,6 +80,9 @@ typedef struct zx_iob_region {
   };
 } zx_iob_region_t;
 
+// Options for `zx_iob_write()`.
+typedef uint64_t zx_iob_write_options_t;
+
 __END_CDECLS
 
 #endif  // ZIRCON_SYSCALLS_IOB_H_
