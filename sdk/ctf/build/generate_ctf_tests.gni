@@ -1121,7 +1121,7 @@ template("generate_ctf_test") {
     # fidl_coverage will be forwarded in each "generate_foo" target defined above.
     # It can be un-forwarded to disable it for a specific test, or set to false
     # here to disable it for all tests.
-    fidl_coverage = true
+    fidl_coverage = api_level == "_in_development"
 
     # If you change these properties, change the docs at the top of this file.
     test_info = {
