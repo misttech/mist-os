@@ -224,6 +224,7 @@ group_with_no_dir_target_deps("smart_display_nelson_stable_tests") {
     "honeydew/honeydew/affordances/connectivity/netstack/tests/functional_tests:netstack_test($host_toolchain)",
     "honeydew/honeydew/affordances/location/tests/functional_tests:location_test($host_toolchain)",
     "honeydew/honeydew/affordances/session/tests/functional_tests:test_session",
+    "honeydew/honeydew/affordances/tracing/tests/functional_tests:tracing_test($host_toolchain)",
     "honeydew/honeydew/affordances/ui/screenshot/tests/functional_tests:test_screenshot",
     "honeydew/honeydew/auxiliary_devices/power_switch/tests/functional_tests:power_switch_dmc_test($host_toolchain)",
     "honeydew/honeydew/fuchsia_device/tests/functional_tests:nelson_test($host_toolchain)",
@@ -236,7 +237,7 @@ group_with_no_dir_target_deps("smart_display_nelson_stable_tests") {
 
 group_with_no_dir_target_deps("smart_display_nelson_unstable_tests") {
   testonly = true
-  public_deps = [ "honeydew/honeydew/affordances/tracing/tests/functional_tests:tracing_test($host_toolchain)" ]
+  public_deps = []
 }
 
 group("smart_display_nelson_staging_tests") {
