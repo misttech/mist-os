@@ -48,7 +48,7 @@
     expose: [
         {
             protocol: [ "fuchsia.memory.attribution.plugin.MemoryMonitor" ],
-            from: "#memory_monitor",
+            from: "#memory_monitor2",
             to: "parent",
         },
     ],
