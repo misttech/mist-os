@@ -591,7 +591,11 @@ class VmCowPages final : public VmHierarchyBase,
   zx_status_t PinRangeLocked(VmCowRange range) TA_REQ(lock());
 
   // See VmObject::Unpin
-  void UnpinLocked(VmCowRange range) TA_REQ(lock());
+  // An optional |DeferredOps| can be provided for the purposes of performing extra debugging
+  // checks, but otherwise has no functional requirement. The debug checks are optional as call
+  // sites may not be able to satisfy the locking requirements to construct a DeferredOps, and may
+  // know (due to be undoing a pin they themselves had started), that no checks need to be done.
+  void UnpinLocked(VmCowRange range, DeferredOps* deferred) TA_REQ(lock());
 
   // See VmObject::DebugIsRangePinned
   bool DebugIsRangePinnedLocked(VmCowRange range) TA_REQ(lock());

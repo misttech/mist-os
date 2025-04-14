@@ -341,7 +341,7 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
   if (!ac.check()) {
     if (options & kAlwaysPinned) {
       Guard<VmoLockType> guard{cow_pages->lock()};
-      cow_pages->UnpinLocked(VmCowRange(0, size));
+      cow_pages->UnpinLocked(VmCowRange(0, size), nullptr);
     }
     return ZX_ERR_NO_MEMORY;
   }
@@ -980,7 +980,7 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
                 GetCowRange(pinned_start_offset, pinned_end_offset - pinned_start_offset);
             Guard<VmoLockType> guard{AssertOrderedLock, lock(), cow_pages_->lock_order(),
                                      VmLockAcquireMode::First};
-            cow_pages_locked()->UnpinLocked(*cow_range);
+            cow_pages_locked()->UnpinLocked(*cow_range, nullptr);
           } else if (write) {
             Guard<VmoLockType> guard{AssertOrderedLock, lock(), cow_pages_->lock_order(),
                                      VmLockAcquireMode::First};

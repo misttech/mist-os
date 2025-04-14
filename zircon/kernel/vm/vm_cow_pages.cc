@@ -3156,7 +3156,7 @@ zx_status_t VmCowPages::PinRangeLocked(VmCowRange range) {
   auto pin_cleanup = fit::defer([this, offset = range.offset, &next_offset]() {
     if (next_offset > offset) {
       AssertHeld(*lock());
-      UnpinLocked(VmCowRange(offset, next_offset - offset));
+      UnpinLocked(VmCowRange(offset, next_offset - offset), nullptr);
     }
   });
 
@@ -4231,7 +4231,7 @@ void VmCowPages::ChangeHighPriorityCountLocked(int64_t delta) {
   }
 }
 
-void VmCowPages::UnpinLocked(VmCowRange range) {
+void VmCowPages::UnpinLocked(VmCowRange range, DeferredOps* deferred) {
   canary_.Assert();
 
   // verify that the range is within the object
@@ -4267,11 +4267,10 @@ void VmCowPages::UnpinLocked(VmCowRange range) {
             completely_unpin_len += PAGE_SIZE;
           } else {
             // Complete any existing range and then start again at this offset.
-            if (completely_unpin_len > 0) {
-              __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
+            if (completely_unpin_len > 0 && deferred) {
               const VmCowRange range_update =
                   VmCowRange(completely_unpin_start, completely_unpin_len);
-              RangeChangeUpdateLocked(range_update, RangeChangeOp::DebugUnpin, &deferred);
+              RangeChangeUpdateLocked(range_update, RangeChangeOp::DebugUnpin, deferred);
             }
             completely_unpin_start = off;
             completely_unpin_len = PAGE_SIZE;
@@ -4293,10 +4292,9 @@ void VmCowPages::UnpinLocked(VmCowRange range) {
 
 #if (DEBUG_ASSERT_IMPLEMENTED)
   // Check any leftover range.
-  if (completely_unpin_len > 0) {
-    __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
+  if (completely_unpin_len > 0 && deferred) {
     const VmCowRange range_update = VmCowRange(completely_unpin_start, completely_unpin_len);
-    RangeChangeUpdateLocked(range_update, RangeChangeOp::DebugUnpin, &deferred);
+    RangeChangeUpdateLocked(range_update, RangeChangeOp::DebugUnpin, deferred);
   }
 #endif
 

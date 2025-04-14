@@ -191,10 +191,11 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   }
 
   void Unpin(uint64_t offset, uint64_t len) override {
+    __UNINITIALIZED VmCowPages::DeferredOps deferred(cow_pages_.get());
     Guard<VmoLockType> guard{lock()};
     auto cow_range = GetCowRange(offset, len);
     ASSERT(cow_range);
-    cow_pages_locked()->UnpinLocked(*cow_range);
+    cow_pages_locked()->UnpinLocked(*cow_range, &deferred);
   }
 
   // See VmObject::DebugIsRangePinned
