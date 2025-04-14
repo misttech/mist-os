@@ -39,6 +39,9 @@ todo_deny https://fxbug.dev/385121365 kernel adbd fd
 // https://fxbug.dev/407739795 - "adbd" reciprocates, using FDs created by the kernel.
 todo_deny https://fxbug.dev/407739795 adbd kernel fd
 
+// https://fxbug.dev/408136119 - Missing policy configuration breaks one of the system daemons.
+todo_deny https://fxbug.dev/408136119 init device chr_file
+
 // https://fxbug.dev/408336449 - Dumpstate encounters "share" and some "getattr"
 // "use" and "read" failures.
 todo_deny https://fxbug.dev/408336449 dumpstate device dir
@@ -65,3 +68,6 @@ todo_deny https://fxbug.dev/408251799 nfc system_data_file dir
 // https://fxbug.dev/398246622 - Test apks interacting poorly with fuse.
 todo_deny https://fxbug.dev/390739936 platform_app fuse file
 todo_deny https://fxbug.dev/390739936 platform_app fuse dir
+
+// https://fxbug.dev/408136119 - Missing valid policy.
+todo_permissive https://fxbug.dev/408136119 mcu_mgmtd
