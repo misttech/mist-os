@@ -7,7 +7,7 @@ pub mod compat {
         {% let name = filters::ident(base_name.camel())? %}
         {% let wire_name = format!("Wire{}", base_name.camel()) %}
 
-        {% let restriction = context.rust_bindings_restriction(ident) %}
+        {% let restriction = context.bindings_compat_restriction(ident) %}
         {% if !matches!(restriction, BindingsRestriction::Never) %}
             {% match context.schema.declarations[ident] %}
                 {% when DeclType::Bits %}

@@ -58,20 +58,24 @@ impl Context {
         CompatTemplate { context: self }
     }
 
-    fn rust_bindings_restriction(&self, ident: &CompId) -> BindingsRestriction {
-        self.rust_bindings_restriction_inner(ident, None)
+    fn bindings_compat_restriction(&self, ident: &CompId) -> BindingsRestriction {
+        self.bindings_restriction_inner(&["rust", "rust_next"], ident, None)
     }
 
-    fn rust_bindings_restriction_inner(
+    fn bindings_denylist_restriction(&self, ident: &CompId) -> BindingsRestriction {
+        self.bindings_restriction_inner(&["rust_next"], ident, None)
+    }
+
+    fn bindings_restriction_inner(
         &self,
+        bindings_names: &[&str],
         ident: &CompId,
         next: Option<&str>,
     ) -> BindingsRestriction {
-        fn denylist_contains_rust(attributes: &Attributes) -> bool {
-            attributes
-                .attributes
-                .get("bindings_denylist")
-                .is_some_and(|attr| attr.args["value"].value.value.split(", ").any(|x| x == "rust"))
+        fn denylist_contains_any(attributes: &Attributes, names: &[&str]) -> bool {
+            attributes.attributes.get("bindings_denylist").is_some_and(|attr| {
+                attr.args["value"].value.value.split(", ").any(|x| names.iter().any(|y| *x == **y))
+            })
         }
 
         let (attributes, naming_context) = match self.schema.declarations[ident] {
@@ -100,10 +104,13 @@ impl Context {
 
                 let is_method_denylisted = next.is_some_and(|next| {
                     protocol.methods.iter().any(|m| {
-                        m.name.non_canonical() == next && denylist_contains_rust(&m.attributes)
+                        m.name.non_canonical() == next
+                            && denylist_contains_any(&m.attributes, bindings_names)
                     })
                 });
-                if denylist_contains_rust(&protocol.attributes) || is_method_denylisted {
+                if denylist_contains_any(&protocol.attributes, bindings_names)
+                    || is_method_denylisted
+                {
                     return BindingsRestriction::Never;
                 }
 
@@ -116,15 +123,16 @@ impl Context {
             _ => return BindingsRestriction::Always,
         };
 
-        if denylist_contains_rust(attributes) {
+        if denylist_contains_any(attributes, bindings_names) {
             BindingsRestriction::Never
         } else {
-            self.rust_bindings_naming_context_restriction(naming_context)
+            self.bindings_naming_context_restriction(bindings_names, naming_context)
         }
     }
 
-    fn rust_bindings_naming_context_restriction(
+    fn bindings_naming_context_restriction(
         &self,
+        bindings_names: &[&str],
         naming_context: &[String],
     ) -> BindingsRestriction {
         let mut aggregate = format!("{}/", self.schema.name);
@@ -134,7 +142,11 @@ impl Context {
             aggregate = format!("{aggregate}{name}");
             let comp_ident = CompIdent::new(aggregate.clone());
             if self.schema.declarations.contains_key(&comp_ident) {
-                result = result.max(self.rust_bindings_restriction_inner(&comp_ident, Some(next)));
+                result = result.max(self.bindings_restriction_inner(
+                    bindings_names,
+                    &comp_ident,
+                    Some(next),
+                ));
             }
         }
         result
