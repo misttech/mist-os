@@ -142,6 +142,8 @@ TouchSourceBase::TouchSourceBase(
 
 void TouchSourceBase::UpdateStream(StreamId stream_id, const InternalTouchEvent& event,
                                    bool is_end_of_stream, view_tree::BoundingBox view_bounds) {
+  TRACE_DURATION("input", "TouchSourceBase::UpdateStream");
+
   const bool is_new_stream = ongoing_streams_.count(stream_id) == 0;
   FX_CHECK(is_new_stream == (event.phase == Phase::kAdd)) << "Stream must only start with ADD.";
   FX_CHECK(is_end_of_stream == (event.phase == Phase::kRemove || event.phase == Phase::kCancel));
@@ -211,6 +213,8 @@ void TouchSourceBase::UpdateStream(StreamId stream_id, const InternalTouchEvent&
 }
 
 void TouchSourceBase::EndContest(StreamId stream_id, bool awarded_win) {
+  TRACE_DURATION("input", "TouchSourceBase::EndContest");
+
   inspector_.OnContestDecided(view_ref_koid_, awarded_win);
 
   auto it = ongoing_streams_.find(stream_id);
@@ -382,6 +386,7 @@ void TouchSourceBase::SendPendingIfWaiting() {
   std::vector<AugmentedTouchEvent> events;
   for (size_t i = 0; !pending_events_.empty() && i < fuchsia::ui::pointer::TOUCH_MAX_EVENT; ++i) {
     auto [stream_id, event] = std::move(pending_events_.front());
+    TRACE_FLOW_END("input", "input_event_in_scenic", event.touch_event.trace_flow_id());
     TRACE_FLOW_BEGIN("input", "dispatch_event_to_client", event.touch_event.trace_flow_id());
 
     pending_events_.pop();

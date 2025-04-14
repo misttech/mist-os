@@ -11,16 +11,14 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["fidl.clientsuite"]
+_ir_path = get_fidl_ir_map()["fidl.clientsuite"]
 add_ir_path(_ir_path)
 
 
 @dataclass
 class Empty:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-
     __fidl_kind__ = "struct"
     __fidl_type__ = "Empty"
     __fidl_raw_type__ = "fidl.clientsuite/Empty"
@@ -38,6 +36,8 @@ class Empty:
             self, "fidl.clientsuite", "fidl.clientsuite/Empty"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{})
@@ -45,9 +45,7 @@ class Empty:
 
 @dataclass
 class NonEmptyPayload:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    some_field: int | None
+    some_field: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "NonEmptyPayload"
@@ -66,20 +64,19 @@ class NonEmptyPayload:
             self, "fidl.clientsuite", "fidl.clientsuite/NonEmptyPayload"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "some_field": None,
+                "some_field": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class OpenTargetFlexibleTwoWayErrResponse:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-
     __fidl_kind__ = "struct"
     __fidl_type__ = "OpenTargetFlexibleTwoWayErrResponse"
     __fidl_raw_type__ = "fidl.clientsuite/OpenTarget_FlexibleTwoWayErr_Response"
@@ -99,6 +96,8 @@ class OpenTargetFlexibleTwoWayErrResponse:
             "fidl.clientsuite/OpenTarget_FlexibleTwoWayErr_Response",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{})
@@ -106,9 +105,6 @@ class OpenTargetFlexibleTwoWayErrResponse:
 
 @dataclass
 class OpenTargetFlexibleTwoWayResponse:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-
     __fidl_kind__ = "struct"
     __fidl_type__ = "OpenTargetFlexibleTwoWayResponse"
     __fidl_raw_type__ = "fidl.clientsuite/OpenTarget_FlexibleTwoWay_Response"
@@ -128,6 +124,8 @@ class OpenTargetFlexibleTwoWayResponse:
             "fidl.clientsuite/OpenTarget_FlexibleTwoWay_Response",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{})
@@ -135,9 +133,6 @@ class OpenTargetFlexibleTwoWayResponse:
 
 @dataclass
 class OpenTargetStrictTwoWayErrResponse:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-
     __fidl_kind__ = "struct"
     __fidl_type__ = "OpenTargetStrictTwoWayErrResponse"
     __fidl_raw_type__ = "fidl.clientsuite/OpenTarget_StrictTwoWayErr_Response"
@@ -157,6 +152,8 @@ class OpenTargetStrictTwoWayErrResponse:
             "fidl.clientsuite/OpenTarget_StrictTwoWayErr_Response",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{})
@@ -164,9 +161,7 @@ class OpenTargetStrictTwoWayErrResponse:
 
 @dataclass
 class RunnerCallFlexibleOneWayRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
+    target: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallFlexibleOneWayRequest"
@@ -187,20 +182,20 @@ class RunnerCallFlexibleOneWayRequest:
             "fidl.clientsuite/RunnerCallFlexibleOneWayRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallFlexibleTwoWayErrRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
+    target: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallFlexibleTwoWayErrRequest"
@@ -221,20 +216,20 @@ class RunnerCallFlexibleTwoWayErrRequest:
             "fidl.clientsuite/RunnerCallFlexibleTwoWayErrRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallFlexibleTwoWayFieldsErrRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
+    target: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallFlexibleTwoWayFieldsErrRequest"
@@ -257,20 +252,20 @@ class RunnerCallFlexibleTwoWayFieldsErrRequest:
             "fidl.clientsuite/RunnerCallFlexibleTwoWayFieldsErrRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallFlexibleTwoWayFieldsRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
+    target: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallFlexibleTwoWayFieldsRequest"
@@ -291,20 +286,20 @@ class RunnerCallFlexibleTwoWayFieldsRequest:
             "fidl.clientsuite/RunnerCallFlexibleTwoWayFieldsRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallFlexibleTwoWayRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
+    target: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallFlexibleTwoWayRequest"
@@ -325,20 +320,20 @@ class RunnerCallFlexibleTwoWayRequest:
             "fidl.clientsuite/RunnerCallFlexibleTwoWayRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallOneWayNoRequestRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
+    target: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallOneWayNoRequestRequest"
@@ -359,21 +354,21 @@ class RunnerCallOneWayNoRequestRequest:
             "fidl.clientsuite/RunnerCallOneWayNoRequestRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallOneWayStructRequestRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
-    request: NonEmptyPayload | None
+    target: int
+    request: NonEmptyPayload
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallOneWayStructRequestRequest"
@@ -394,22 +389,22 @@ class RunnerCallOneWayStructRequestRequest:
             "fidl.clientsuite/RunnerCallOneWayStructRequestRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
-                "request": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "request": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallOneWayTableRequestRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
-    request: TablePayload | None
+    target: int
+    request: TablePayload
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallOneWayTableRequestRequest"
@@ -430,22 +425,22 @@ class RunnerCallOneWayTableRequestRequest:
             "fidl.clientsuite/RunnerCallOneWayTableRequestRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
-                "request": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "request": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallOneWayUnionRequestRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
-    request: UnionPayload | None
+    target: int
+    request: UnionPayload
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallOneWayUnionRequestRequest"
@@ -466,21 +461,21 @@ class RunnerCallOneWayUnionRequestRequest:
             "fidl.clientsuite/RunnerCallOneWayUnionRequestRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
-                "request": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "request": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallStrictOneWayRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
+    target: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallStrictOneWayRequest"
@@ -501,20 +496,20 @@ class RunnerCallStrictOneWayRequest:
             "fidl.clientsuite/RunnerCallStrictOneWayRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallStrictTwoWayErrRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
+    target: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallStrictTwoWayErrRequest"
@@ -535,20 +530,20 @@ class RunnerCallStrictTwoWayErrRequest:
             "fidl.clientsuite/RunnerCallStrictTwoWayErrRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallStrictTwoWayFieldsErrRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
+    target: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallStrictTwoWayFieldsErrRequest"
@@ -571,20 +566,20 @@ class RunnerCallStrictTwoWayFieldsErrRequest:
             "fidl.clientsuite/RunnerCallStrictTwoWayFieldsErrRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallStrictTwoWayFieldsRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
+    target: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallStrictTwoWayFieldsRequest"
@@ -605,20 +600,20 @@ class RunnerCallStrictTwoWayFieldsRequest:
             "fidl.clientsuite/RunnerCallStrictTwoWayFieldsRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallStrictTwoWayRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
+    target: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallStrictTwoWayRequest"
@@ -639,20 +634,20 @@ class RunnerCallStrictTwoWayRequest:
             "fidl.clientsuite/RunnerCallStrictTwoWayRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallTwoWayNoPayloadRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
+    target: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallTwoWayNoPayloadRequest"
@@ -673,20 +668,20 @@ class RunnerCallTwoWayNoPayloadRequest:
             "fidl.clientsuite/RunnerCallTwoWayNoPayloadRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallTwoWayStructPayloadErrRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
+    target: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallTwoWayStructPayloadErrRequest"
@@ -709,20 +704,20 @@ class RunnerCallTwoWayStructPayloadErrRequest:
             "fidl.clientsuite/RunnerCallTwoWayStructPayloadErrRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallTwoWayStructPayloadRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
+    target: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallTwoWayStructPayloadRequest"
@@ -743,21 +738,21 @@ class RunnerCallTwoWayStructPayloadRequest:
             "fidl.clientsuite/RunnerCallTwoWayStructPayloadRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallTwoWayStructRequestRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
-    request: NonEmptyPayload | None
+    target: int
+    request: NonEmptyPayload
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallTwoWayStructRequestRequest"
@@ -778,21 +773,21 @@ class RunnerCallTwoWayStructRequestRequest:
             "fidl.clientsuite/RunnerCallTwoWayStructRequestRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
-                "request": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "request": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallTwoWayTablePayloadRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
+    target: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallTwoWayTablePayloadRequest"
@@ -813,21 +808,21 @@ class RunnerCallTwoWayTablePayloadRequest:
             "fidl.clientsuite/RunnerCallTwoWayTablePayloadRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallTwoWayTableRequestRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
-    request: TablePayload | None
+    target: int
+    request: TablePayload
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallTwoWayTableRequestRequest"
@@ -848,21 +843,21 @@ class RunnerCallTwoWayTableRequestRequest:
             "fidl.clientsuite/RunnerCallTwoWayTableRequestRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
-                "request": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "request": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallTwoWayUnionPayloadRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
+    target: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallTwoWayUnionPayloadRequest"
@@ -883,21 +878,21 @@ class RunnerCallTwoWayUnionPayloadRequest:
             "fidl.clientsuite/RunnerCallTwoWayUnionPayloadRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerCallTwoWayUnionRequestRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
-    request: UnionPayload | None
+    target: int
+    request: UnionPayload
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallTwoWayUnionRequestRequest"
@@ -918,21 +913,21 @@ class RunnerCallTwoWayUnionRequestRequest:
             "fidl.clientsuite/RunnerCallTwoWayUnionRequestRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
-                "request": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "request": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerGetVersionResponse:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    version: int | None
+    version: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerGetVersionResponse"
@@ -953,20 +948,20 @@ class RunnerGetVersionResponse:
             "fidl.clientsuite/RunnerGetVersionResponse",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "version": None,
+                "version": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerIsTestEnabledRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    test: int | None
+    test: int | Test
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerIsTestEnabledRequest"
@@ -987,20 +982,20 @@ class RunnerIsTestEnabledRequest:
             "fidl.clientsuite/RunnerIsTestEnabledRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "test": None,
+                "test": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerIsTestEnabledResponse:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    is_enabled: bool | None
+    is_enabled: bool
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerIsTestEnabledResponse"
@@ -1021,21 +1016,21 @@ class RunnerIsTestEnabledResponse:
             "fidl.clientsuite/RunnerIsTestEnabledResponse",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "is_enabled": None,
+                "is_enabled": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerReceiveAjarEventsRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
-    reporter: int | None
+    target: int
+    reporter: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerReceiveAjarEventsRequest"
@@ -1056,22 +1051,22 @@ class RunnerReceiveAjarEventsRequest:
             "fidl.clientsuite/RunnerReceiveAjarEventsRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
-                "reporter": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "reporter": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerReceiveClosedEventsRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
-    reporter: int | None
+    target: int
+    reporter: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerReceiveClosedEventsRequest"
@@ -1092,22 +1087,22 @@ class RunnerReceiveClosedEventsRequest:
             "fidl.clientsuite/RunnerReceiveClosedEventsRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
-                "reporter": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "reporter": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class RunnerReceiveOpenEventsRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    target: int | None
-    reporter: int | None
+    target: int
+    reporter: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerReceiveOpenEventsRequest"
@@ -1128,21 +1123,21 @@ class RunnerReceiveOpenEventsRequest:
             "fidl.clientsuite/RunnerReceiveOpenEventsRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,
-                "reporter": None,
+                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "reporter": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class UnknownEvent:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    ordinal: int | None
+    ordinal: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "UnknownEvent"
@@ -1161,22 +1156,24 @@ class UnknownEvent:
             self, "fidl.clientsuite", "fidl.clientsuite/UnknownEvent"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "ordinal": None,
+                "ordinal": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class BindingsProperties:
-    io_style: int | None
+    io_style: int | IoStyle | None
 
     def __init__(
         self,
-        io_style: int | None = None,
+        io_style: int | IoStyle | None = None,
     ) -> None:
         self.io_style = io_style
 
@@ -1235,7 +1232,7 @@ class TablePayload:
 
 
 class AjarTargetEventReport:
-    _fidl_error: typing.Optional[int]
+    _fidl_error: typing.Optional[int | FidlErrorKind]
     _unknown_event: typing.Optional[UnknownEvent]
 
     __fidl_kind__ = "union"
@@ -1265,7 +1262,7 @@ class AjarTargetEventReport:
 
     def __init__(
         self,
-        fidl_error: typing.Optional[int] = None,
+        fidl_error: typing.Optional[int | FidlErrorKind] = None,
         unknown_event: typing.Optional[UnknownEvent] = None,
         _empty: typing.Optional[tuple[()]] = None,
     ):
@@ -1290,7 +1287,7 @@ class AjarTargetEventReport:
             )
 
     @property
-    def fidl_error(self) -> int | None:
+    def fidl_error(self) -> int | FidlErrorKind | None:
         return getattr(self, "_fidl_error", None)
 
     @property
@@ -1316,7 +1313,7 @@ class AjarTargetEventReport:
 
 
 class ClosedTargetEventReport:
-    _fidl_error: typing.Optional[int]
+    _fidl_error: typing.Optional[int | FidlErrorKind]
     _on_event_no_payload: typing.Optional[Empty]
     _on_event_struct_payload: typing.Optional[NonEmptyPayload]
     _on_event_table_payload: typing.Optional[TablePayload]
@@ -1363,7 +1360,7 @@ class ClosedTargetEventReport:
 
     def __init__(
         self,
-        fidl_error: typing.Optional[int] = None,
+        fidl_error: typing.Optional[int | FidlErrorKind] = None,
         on_event_no_payload: typing.Optional[Empty] = None,
         on_event_struct_payload: typing.Optional[NonEmptyPayload] = None,
         on_event_table_payload: typing.Optional[TablePayload] = None,
@@ -1403,7 +1400,7 @@ class ClosedTargetEventReport:
             )
 
     @property
-    def fidl_error(self) -> int | None:
+    def fidl_error(self) -> int | FidlErrorKind | None:
         return getattr(self, "_fidl_error", None)
 
     @property
@@ -1527,14 +1524,14 @@ class ClosedTargetTwoWayStructPayloadErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -1552,7 +1549,7 @@ class ClosedTargetTwoWayStructPayloadErrResult:
 
 class EmptyResultClassification:
     _success: typing.Optional[Empty]
-    _fidl_error: typing.Optional[int]
+    _fidl_error: typing.Optional[int | FidlErrorKind]
 
     __fidl_kind__ = "union"
     __fidl_type__ = "EmptyResultClassification"
@@ -1582,7 +1579,7 @@ class EmptyResultClassification:
     def __init__(
         self,
         success: typing.Optional[Empty] = None,
-        fidl_error: typing.Optional[int] = None,
+        fidl_error: typing.Optional[int | FidlErrorKind] = None,
         _empty: typing.Optional[tuple[()]] = None,
     ):
         object.__init__(self)
@@ -1610,7 +1607,7 @@ class EmptyResultClassification:
         return getattr(self, "_success", None)
 
     @property
-    def fidl_error(self) -> int | None:
+    def fidl_error(self) -> int | FidlErrorKind | None:
         return getattr(self, "_fidl_error", None)
 
     # TODO(https://fxbug.dev/394421154): We should probably remove this method when we
@@ -1636,7 +1633,7 @@ class EmptyResultClassification:
 class EmptyResultWithErrorClassification:
     _success: typing.Optional[Empty]
     _application_error: typing.Optional[int]
-    _fidl_error: typing.Optional[int]
+    _fidl_error: typing.Optional[int | FidlErrorKind]
 
     __fidl_kind__ = "union"
     __fidl_type__ = "EmptyResultWithErrorClassification"
@@ -1671,7 +1668,7 @@ class EmptyResultWithErrorClassification:
         self,
         success: typing.Optional[Empty] = None,
         application_error: typing.Optional[int] = None,
-        fidl_error: typing.Optional[int] = None,
+        fidl_error: typing.Optional[int | FidlErrorKind] = None,
         _empty: typing.Optional[tuple[()]] = None,
     ):
         object.__init__(self)
@@ -1707,7 +1704,7 @@ class EmptyResultWithErrorClassification:
         return getattr(self, "_application_error", None)
 
     @property
-    def fidl_error(self) -> int | None:
+    def fidl_error(self) -> int | FidlErrorKind | None:
         return getattr(self, "_fidl_error", None)
 
     # TODO(https://fxbug.dev/394421154): We should probably remove this method when we
@@ -1732,7 +1729,7 @@ class EmptyResultWithErrorClassification:
 
 class NonEmptyResultClassification:
     _success: typing.Optional[NonEmptyPayload]
-    _fidl_error: typing.Optional[int]
+    _fidl_error: typing.Optional[int | FidlErrorKind]
 
     __fidl_kind__ = "union"
     __fidl_type__ = "NonEmptyResultClassification"
@@ -1762,7 +1759,7 @@ class NonEmptyResultClassification:
     def __init__(
         self,
         success: typing.Optional[NonEmptyPayload] = None,
-        fidl_error: typing.Optional[int] = None,
+        fidl_error: typing.Optional[int | FidlErrorKind] = None,
         _empty: typing.Optional[tuple[()]] = None,
     ):
         object.__init__(self)
@@ -1790,7 +1787,7 @@ class NonEmptyResultClassification:
         return getattr(self, "_success", None)
 
     @property
-    def fidl_error(self) -> int | None:
+    def fidl_error(self) -> int | FidlErrorKind | None:
         return getattr(self, "_fidl_error", None)
 
     # TODO(https://fxbug.dev/394421154): We should probably remove this method when we
@@ -1816,7 +1813,7 @@ class NonEmptyResultClassification:
 class NonEmptyResultWithErrorClassification:
     _success: typing.Optional[NonEmptyPayload]
     _application_error: typing.Optional[int]
-    _fidl_error: typing.Optional[int]
+    _fidl_error: typing.Optional[int | FidlErrorKind]
 
     __fidl_kind__ = "union"
     __fidl_type__ = "NonEmptyResultWithErrorClassification"
@@ -1851,7 +1848,7 @@ class NonEmptyResultWithErrorClassification:
         self,
         success: typing.Optional[NonEmptyPayload] = None,
         application_error: typing.Optional[int] = None,
-        fidl_error: typing.Optional[int] = None,
+        fidl_error: typing.Optional[int | FidlErrorKind] = None,
         _empty: typing.Optional[tuple[()]] = None,
     ):
         object.__init__(self)
@@ -1887,7 +1884,7 @@ class NonEmptyResultWithErrorClassification:
         return getattr(self, "_application_error", None)
 
     @property
-    def fidl_error(self) -> int | None:
+    def fidl_error(self) -> int | FidlErrorKind | None:
         return getattr(self, "_fidl_error", None)
 
     # TODO(https://fxbug.dev/394421154): We should probably remove this method when we
@@ -1911,7 +1908,7 @@ class NonEmptyResultWithErrorClassification:
 
 
 class OpenTargetEventReport:
-    _fidl_error: typing.Optional[int]
+    _fidl_error: typing.Optional[int | FidlErrorKind]
     _unknown_event: typing.Optional[UnknownEvent]
     _strict_event: typing.Optional[Empty]
     _flexible_event: typing.Optional[Empty]
@@ -1951,7 +1948,7 @@ class OpenTargetEventReport:
 
     def __init__(
         self,
-        fidl_error: typing.Optional[int] = None,
+        fidl_error: typing.Optional[int | FidlErrorKind] = None,
         unknown_event: typing.Optional[UnknownEvent] = None,
         strict_event: typing.Optional[Empty] = None,
         flexible_event: typing.Optional[Empty] = None,
@@ -1986,7 +1983,7 @@ class OpenTargetEventReport:
             )
 
     @property
-    def fidl_error(self) -> int | None:
+    def fidl_error(self) -> int | FidlErrorKind | None:
         return getattr(self, "_fidl_error", None)
 
     @property
@@ -2118,14 +2115,14 @@ class OpenTargetFlexibleTwoWayErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -2241,14 +2238,14 @@ class OpenTargetFlexibleTwoWayFieldsErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -2351,14 +2348,14 @@ class OpenTargetFlexibleTwoWayFieldsResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -2459,14 +2456,14 @@ class OpenTargetFlexibleTwoWayResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -2566,14 +2563,14 @@ class OpenTargetStrictTwoWayErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -2675,14 +2672,14 @@ class OpenTargetStrictTwoWayFieldsErrResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -2700,7 +2697,7 @@ class OpenTargetStrictTwoWayFieldsErrResult:
 
 class TableResultClassification:
     _success: typing.Optional[TablePayload]
-    _fidl_error: typing.Optional[int]
+    _fidl_error: typing.Optional[int | FidlErrorKind]
 
     __fidl_kind__ = "union"
     __fidl_type__ = "TableResultClassification"
@@ -2730,7 +2727,7 @@ class TableResultClassification:
     def __init__(
         self,
         success: typing.Optional[TablePayload] = None,
-        fidl_error: typing.Optional[int] = None,
+        fidl_error: typing.Optional[int | FidlErrorKind] = None,
         _empty: typing.Optional[tuple[()]] = None,
     ):
         object.__init__(self)
@@ -2758,7 +2755,7 @@ class TableResultClassification:
         return getattr(self, "_success", None)
 
     @property
-    def fidl_error(self) -> int | None:
+    def fidl_error(self) -> int | FidlErrorKind | None:
         return getattr(self, "_fidl_error", None)
 
     # TODO(https://fxbug.dev/394421154): We should probably remove this method when we
@@ -2850,7 +2847,7 @@ class UnionPayload:
 
 class UnionResultClassification:
     _success: typing.Optional[UnionPayload]
-    _fidl_error: typing.Optional[int]
+    _fidl_error: typing.Optional[int | FidlErrorKind]
 
     __fidl_kind__ = "union"
     __fidl_type__ = "UnionResultClassification"
@@ -2880,7 +2877,7 @@ class UnionResultClassification:
     def __init__(
         self,
         success: typing.Optional[UnionPayload] = None,
-        fidl_error: typing.Optional[int] = None,
+        fidl_error: typing.Optional[int | FidlErrorKind] = None,
         _empty: typing.Optional[tuple[()]] = None,
     ):
         object.__init__(self)
@@ -2908,7 +2905,7 @@ class UnionResultClassification:
         return getattr(self, "_success", None)
 
     @property
-    def fidl_error(self) -> int | None:
+    def fidl_error(self) -> int | FidlErrorKind | None:
         return getattr(self, "_fidl_error", None)
 
     # TODO(https://fxbug.dev/394421154): We should probably remove this method when we
@@ -3046,12 +3043,20 @@ Test = enum.IntEnum(
 CLIENT_SUITE_VERSION: int = 1
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class AjarTargetServer(fidl._server.ServerBase, ABC):
+class AjarTargetServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "fidl.clientsuite"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -3060,12 +3065,14 @@ class AjarTargetServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-class AjarTargetClient(fidl._client.FidlClient):
+class AjarTargetClient(FidlClient):
     __fidl_kind__ = "client"
     library = "fidl.clientsuite"
 
@@ -3073,12 +3080,14 @@ class AjarTargetClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-class AjarTargetEventHandler(fidl._client.EventHandlerBase, ABC):
+class AjarTargetEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "fidl.clientsuite"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -3087,22 +3096,32 @@ class AjarTargetEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-AjarTargetMarker = fidl._library.ProtocolMarker(
+AjarTargetMarker = FidlProtocolMarker(
     "(nondiscoverable) fidl.clientsuite/AjarTarget"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class AjarTargetEventReporterServer(fidl._server.ServerBase, ABC):
+class AjarTargetEventReporterServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "fidl.clientsuite"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -3120,6 +3139,8 @@ class AjarTargetEventReporterServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -3137,7 +3158,7 @@ class AjarTargetEventReporterServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class AjarTargetEventReporterClient(fidl._client.FidlClient):
+class AjarTargetEventReporterClient(FidlClient):
     __fidl_kind__ = "client"
     library = "fidl.clientsuite"
 
@@ -3145,6 +3166,8 @@ class AjarTargetEventReporterClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -3152,7 +3175,7 @@ class AjarTargetEventReporterClient(fidl._client.FidlClient):
     def report_event(
         self,
         *,
-        fidl_error: int | None = None,
+        fidl_error: int | FidlErrorKind | None = None,
         unknown_event: UnknownEvent | None = None,
     ) -> None:
         msg = AjarTargetEventReport(
@@ -3168,7 +3191,7 @@ class AjarTargetEventReporterClient(fidl._client.FidlClient):
         )
 
 
-class AjarTargetEventReporterEventHandler(fidl._client.EventHandlerBase, ABC):
+class AjarTargetEventReporterEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "fidl.clientsuite"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -3177,22 +3200,32 @@ class AjarTargetEventReporterEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-AjarTargetEventReporterMarker = fidl._library.ProtocolMarker(
+AjarTargetEventReporterMarker = FidlProtocolMarker(
     "(nondiscoverable) fidl.clientsuite/AjarTargetEventReporter"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class ClosedTargetServer(fidl._server.ServerBase, ABC):
+class ClosedTargetServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "fidl.clientsuite"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -3298,6 +3331,8 @@ class ClosedTargetServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -3504,7 +3539,7 @@ class ClosedTargetServer(fidl._server.ServerBase, ABC):
         self._send_event(7621842152112557728, "fidl.clientsuite", msg)
 
 
-class ClosedTargetClient(fidl._client.FidlClient):
+class ClosedTargetClient(FidlClient):
     __fidl_kind__ = "client"
     library = "fidl.clientsuite"
 
@@ -3512,6 +3547,8 @@ class ClosedTargetClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -3535,9 +3572,7 @@ class ClosedTargetClient(fidl._client.FidlClient):
             4197391242806919613,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "fidl.clientsuite/NonEmptyPayload"
-            ),
+            normalize_identifier("fidl.clientsuite/NonEmptyPayload"),
         )
 
     def two_way_table_payload(
@@ -3548,9 +3583,7 @@ class ClosedTargetClient(fidl._client.FidlClient):
             6034278263774013116,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "fidl.clientsuite/TablePayload"
-            ),
+            normalize_identifier("fidl.clientsuite/TablePayload"),
         )
 
     def two_way_union_payload(
@@ -3561,9 +3594,7 @@ class ClosedTargetClient(fidl._client.FidlClient):
             2303581613023334284,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "fidl.clientsuite/UnionPayload"
-            ),
+            normalize_identifier("fidl.clientsuite/UnionPayload"),
         )
 
     def two_way_struct_payload_err(
@@ -3576,7 +3607,7 @@ class ClosedTargetClient(fidl._client.FidlClient):
             7112457167486827531,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "fidl.clientsuite/ClosedTarget_TwoWayStructPayloadErr_Result"
             ),
         )
@@ -3687,7 +3718,7 @@ class ClosedTargetClient(fidl._client.FidlClient):
         )
 
 
-class ClosedTargetEventHandler(fidl._client.EventHandlerBase, ABC):
+class ClosedTargetEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "fidl.clientsuite"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -3729,6 +3760,8 @@ class ClosedTargetEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -3761,17 +3794,25 @@ class ClosedTargetEventHandler(fidl._client.EventHandlerBase, ABC):
         ...
 
 
-ClosedTargetMarker = fidl._library.ProtocolMarker(
+ClosedTargetMarker = FidlProtocolMarker(
     "(nondiscoverable) fidl.clientsuite/ClosedTarget"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class ClosedTargetEventReporterServer(fidl._server.ServerBase, ABC):
+class ClosedTargetEventReporterServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "fidl.clientsuite"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -3789,6 +3830,8 @@ class ClosedTargetEventReporterServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -3806,7 +3849,7 @@ class ClosedTargetEventReporterServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class ClosedTargetEventReporterClient(fidl._client.FidlClient):
+class ClosedTargetEventReporterClient(FidlClient):
     __fidl_kind__ = "client"
     library = "fidl.clientsuite"
 
@@ -3814,6 +3857,8 @@ class ClosedTargetEventReporterClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -3821,7 +3866,7 @@ class ClosedTargetEventReporterClient(fidl._client.FidlClient):
     def report_event(
         self,
         *,
-        fidl_error: int | None = None,
+        fidl_error: int | FidlErrorKind | None = None,
         on_event_no_payload: Empty | None = None,
         on_event_struct_payload: NonEmptyPayload | None = None,
         on_event_table_payload: TablePayload | None = None,
@@ -3843,7 +3888,7 @@ class ClosedTargetEventReporterClient(fidl._client.FidlClient):
         )
 
 
-class ClosedTargetEventReporterEventHandler(fidl._client.EventHandlerBase, ABC):
+class ClosedTargetEventReporterEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "fidl.clientsuite"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -3852,22 +3897,32 @@ class ClosedTargetEventReporterEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-ClosedTargetEventReporterMarker = fidl._library.ProtocolMarker(
+ClosedTargetEventReporterMarker = FidlProtocolMarker(
     "(nondiscoverable) fidl.clientsuite/ClosedTargetEventReporter"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class OpenTargetServer(fidl._server.ServerBase, ABC):
+class OpenTargetServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "fidl.clientsuite"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -3957,6 +4012,8 @@ class OpenTargetServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -4122,7 +4179,7 @@ class OpenTargetServer(fidl._server.ServerBase, ABC):
         self._send_event(5824395118547404952, "fidl.clientsuite", msg)
 
 
-class OpenTargetClient(fidl._client.FidlClient):
+class OpenTargetClient(FidlClient):
     __fidl_kind__ = "client"
     library = "fidl.clientsuite"
 
@@ -4130,6 +4187,8 @@ class OpenTargetClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -4177,9 +4236,7 @@ class OpenTargetClient(fidl._client.FidlClient):
             8775166568163566307,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "fidl.clientsuite/NonEmptyPayload"
-            ),
+            normalize_identifier("fidl.clientsuite/NonEmptyPayload"),
         )
 
     def strict_two_way_err(
@@ -4192,7 +4249,7 @@ class OpenTargetClient(fidl._client.FidlClient):
             6063427118545698440,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "fidl.clientsuite/OpenTarget_StrictTwoWayErr_Result"
             ),
         )
@@ -4207,7 +4264,7 @@ class OpenTargetClient(fidl._client.FidlClient):
             9059738677182539537,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "fidl.clientsuite/OpenTarget_StrictTwoWayFieldsErr_Result"
             ),
         )
@@ -4222,7 +4279,7 @@ class OpenTargetClient(fidl._client.FidlClient):
             7373850992214410631,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "fidl.clientsuite/OpenTarget_FlexibleTwoWay_Result"
             ),
         )
@@ -4237,7 +4294,7 @@ class OpenTargetClient(fidl._client.FidlClient):
             4087393006943873764,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "fidl.clientsuite/OpenTarget_FlexibleTwoWayFields_Result"
             ),
         )
@@ -4252,7 +4309,7 @@ class OpenTargetClient(fidl._client.FidlClient):
             7932048879253591162,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "fidl.clientsuite/OpenTarget_FlexibleTwoWayErr_Result"
             ),
         )
@@ -4267,13 +4324,13 @@ class OpenTargetClient(fidl._client.FidlClient):
             1029425766479692362,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "fidl.clientsuite/OpenTarget_FlexibleTwoWayFieldsErr_Result"
             ),
         )
 
 
-class OpenTargetEventHandler(fidl._client.EventHandlerBase, ABC):
+class OpenTargetEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "fidl.clientsuite"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -4299,6 +4356,8 @@ class OpenTargetEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -4316,17 +4375,25 @@ class OpenTargetEventHandler(fidl._client.EventHandlerBase, ABC):
         ...
 
 
-OpenTargetMarker = fidl._library.ProtocolMarker(
+OpenTargetMarker = FidlProtocolMarker(
     "(nondiscoverable) fidl.clientsuite/OpenTarget"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class OpenTargetEventReporterServer(fidl._server.ServerBase, ABC):
+class OpenTargetEventReporterServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "fidl.clientsuite"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -4344,6 +4411,8 @@ class OpenTargetEventReporterServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -4361,7 +4430,7 @@ class OpenTargetEventReporterServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class OpenTargetEventReporterClient(fidl._client.FidlClient):
+class OpenTargetEventReporterClient(FidlClient):
     __fidl_kind__ = "client"
     library = "fidl.clientsuite"
 
@@ -4369,6 +4438,8 @@ class OpenTargetEventReporterClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -4376,7 +4447,7 @@ class OpenTargetEventReporterClient(fidl._client.FidlClient):
     def report_event(
         self,
         *,
-        fidl_error: int | None = None,
+        fidl_error: int | FidlErrorKind | None = None,
         unknown_event: UnknownEvent | None = None,
         strict_event: Empty | None = None,
         flexible_event: Empty | None = None,
@@ -4396,7 +4467,7 @@ class OpenTargetEventReporterClient(fidl._client.FidlClient):
         )
 
 
-class OpenTargetEventReporterEventHandler(fidl._client.EventHandlerBase, ABC):
+class OpenTargetEventReporterEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "fidl.clientsuite"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -4405,22 +4476,32 @@ class OpenTargetEventReporterEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-OpenTargetEventReporterMarker = fidl._library.ProtocolMarker(
+OpenTargetEventReporterMarker = FidlProtocolMarker(
     "(nondiscoverable) fidl.clientsuite/OpenTargetEventReporter"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class RunnerServer(fidl._server.ServerBase, ABC):
+class RunnerServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "fidl.clientsuite"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -4662,6 +4743,8 @@ class RunnerServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -5120,7 +5203,7 @@ class RunnerServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class RunnerClient(fidl._client.FidlClient):
+class RunnerClient(FidlClient):
     __fidl_kind__ = "client"
     library = "fidl.clientsuite"
 
@@ -5128,6 +5211,8 @@ class RunnerClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -5140,15 +5225,13 @@ class RunnerClient(fidl._client.FidlClient):
             6151094865554034132,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "fidl.clientsuite/RunnerGetVersionResponse"
-            ),
+            normalize_identifier("fidl.clientsuite/RunnerGetVersionResponse"),
         )
 
     def is_test_enabled(
         self,
         *,
-        test: int,
+        test: int | Test,
     ) -> typing.Coroutine[typing.Any, typing.Any, RunnerIsTestEnabledResponse]:
         msg = RunnerIsTestEnabledRequest(
             test,
@@ -5157,7 +5240,7 @@ class RunnerClient(fidl._client.FidlClient):
             8456568861872716880,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "fidl.clientsuite/RunnerIsTestEnabledResponse"
             ),
         )
@@ -5181,9 +5264,7 @@ class RunnerClient(fidl._client.FidlClient):
             8553849771382515254,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "fidl.clientsuite/BindingsProperties"
-            ),
+            normalize_identifier("fidl.clientsuite/BindingsProperties"),
         )
 
     def call_two_way_no_payload(
@@ -5198,9 +5279,7 @@ class RunnerClient(fidl._client.FidlClient):
             6029318298044407969,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "fidl.clientsuite/EmptyResultClassification"
-            ),
+            normalize_identifier("fidl.clientsuite/EmptyResultClassification"),
         )
 
     def call_two_way_struct_payload(
@@ -5215,7 +5294,7 @@ class RunnerClient(fidl._client.FidlClient):
             2659811426878208326,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "fidl.clientsuite/NonEmptyResultClassification"
             ),
         )
@@ -5232,9 +5311,7 @@ class RunnerClient(fidl._client.FidlClient):
             517424185216448362,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "fidl.clientsuite/TableResultClassification"
-            ),
+            normalize_identifier("fidl.clientsuite/TableResultClassification"),
         )
 
     def call_two_way_union_payload(
@@ -5249,9 +5326,7 @@ class RunnerClient(fidl._client.FidlClient):
             9064011510580525152,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "fidl.clientsuite/UnionResultClassification"
-            ),
+            normalize_identifier("fidl.clientsuite/UnionResultClassification"),
         )
 
     def call_two_way_struct_payload_err(
@@ -5268,7 +5343,7 @@ class RunnerClient(fidl._client.FidlClient):
             3100628808697771749,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "fidl.clientsuite/NonEmptyResultWithErrorClassification"
             ),
         )
@@ -5287,9 +5362,7 @@ class RunnerClient(fidl._client.FidlClient):
             8935324979276061509,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "fidl.clientsuite/EmptyResultClassification"
-            ),
+            normalize_identifier("fidl.clientsuite/EmptyResultClassification"),
         )
 
     def call_two_way_table_request(
@@ -5306,9 +5379,7 @@ class RunnerClient(fidl._client.FidlClient):
             7212342332333000126,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "fidl.clientsuite/EmptyResultClassification"
-            ),
+            normalize_identifier("fidl.clientsuite/EmptyResultClassification"),
         )
 
     def call_two_way_union_request(
@@ -5325,9 +5396,7 @@ class RunnerClient(fidl._client.FidlClient):
             5469041625659498910,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "fidl.clientsuite/EmptyResultClassification"
-            ),
+            normalize_identifier("fidl.clientsuite/EmptyResultClassification"),
         )
 
     def call_one_way_no_request(
@@ -5342,9 +5411,7 @@ class RunnerClient(fidl._client.FidlClient):
             2645564239868906505,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "fidl.clientsuite/EmptyResultClassification"
-            ),
+            normalize_identifier("fidl.clientsuite/EmptyResultClassification"),
         )
 
     def call_one_way_struct_request(
@@ -5361,9 +5428,7 @@ class RunnerClient(fidl._client.FidlClient):
             3830919545774453792,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "fidl.clientsuite/EmptyResultClassification"
-            ),
+            normalize_identifier("fidl.clientsuite/EmptyResultClassification"),
         )
 
     def call_one_way_table_request(
@@ -5380,9 +5445,7 @@ class RunnerClient(fidl._client.FidlClient):
             8304956294418347759,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "fidl.clientsuite/EmptyResultClassification"
-            ),
+            normalize_identifier("fidl.clientsuite/EmptyResultClassification"),
         )
 
     def call_one_way_union_request(
@@ -5399,9 +5462,7 @@ class RunnerClient(fidl._client.FidlClient):
             702155129378639542,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "fidl.clientsuite/EmptyResultClassification"
-            ),
+            normalize_identifier("fidl.clientsuite/EmptyResultClassification"),
         )
 
     def call_strict_one_way(
@@ -5416,9 +5477,7 @@ class RunnerClient(fidl._client.FidlClient):
             5682710877569041515,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "fidl.clientsuite/EmptyResultClassification"
-            ),
+            normalize_identifier("fidl.clientsuite/EmptyResultClassification"),
         )
 
     def call_flexible_one_way(
@@ -5433,9 +5492,7 @@ class RunnerClient(fidl._client.FidlClient):
             8238193170653898775,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "fidl.clientsuite/EmptyResultClassification"
-            ),
+            normalize_identifier("fidl.clientsuite/EmptyResultClassification"),
         )
 
     def call_strict_two_way(
@@ -5450,9 +5507,7 @@ class RunnerClient(fidl._client.FidlClient):
             2281631162221649191,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "fidl.clientsuite/EmptyResultClassification"
-            ),
+            normalize_identifier("fidl.clientsuite/EmptyResultClassification"),
         )
 
     def call_strict_two_way_fields(
@@ -5467,7 +5522,7 @@ class RunnerClient(fidl._client.FidlClient):
             8027963207886237987,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "fidl.clientsuite/NonEmptyResultClassification"
             ),
         )
@@ -5486,7 +5541,7 @@ class RunnerClient(fidl._client.FidlClient):
             5897108006990753562,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "fidl.clientsuite/EmptyResultWithErrorClassification"
             ),
         )
@@ -5505,7 +5560,7 @@ class RunnerClient(fidl._client.FidlClient):
             8044305163731028997,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "fidl.clientsuite/NonEmptyResultWithErrorClassification"
             ),
         )
@@ -5522,9 +5577,7 @@ class RunnerClient(fidl._client.FidlClient):
             293287060805479753,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "fidl.clientsuite/EmptyResultClassification"
-            ),
+            normalize_identifier("fidl.clientsuite/EmptyResultClassification"),
         )
 
     def call_flexible_two_way_fields(
@@ -5539,7 +5592,7 @@ class RunnerClient(fidl._client.FidlClient):
             3677636279746006765,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "fidl.clientsuite/NonEmptyResultClassification"
             ),
         )
@@ -5558,7 +5611,7 @@ class RunnerClient(fidl._client.FidlClient):
             6763272537909111383,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "fidl.clientsuite/EmptyResultWithErrorClassification"
             ),
         )
@@ -5577,7 +5630,7 @@ class RunnerClient(fidl._client.FidlClient):
             8854931429453661326,
             "fidl.clientsuite",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "fidl.clientsuite/NonEmptyResultWithErrorClassification"
             ),
         )
@@ -5634,7 +5687,7 @@ class RunnerClient(fidl._client.FidlClient):
         )
 
 
-class RunnerEventHandler(fidl._client.EventHandlerBase, ABC):
+class RunnerEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "fidl.clientsuite"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -5643,9 +5696,11 @@ class RunnerEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-RunnerMarker = fidl._library.ProtocolMarker("fidl.clientsuite.Runner")
+RunnerMarker = FidlProtocolMarker("fidl.clientsuite.Runner")

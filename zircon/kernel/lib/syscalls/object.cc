@@ -1512,8 +1512,9 @@ zx_status_t sys_object_set_property(zx_handle_t handle_value, uint32_t property,
   auto up = ProcessDispatcher::GetCurrent();
   fbl::RefPtr<Dispatcher> dispatcher;
 
+  zx_rights_t rights;
   const zx_status_t get_dispatcher_status = up->handle_table().GetDispatcherWithRights(
-      *up, handle_value, ZX_RIGHT_SET_PROPERTY, &dispatcher);
+      *up, handle_value, ZX_RIGHT_SET_PROPERTY, &dispatcher, &rights);
   if (get_dispatcher_status != ZX_OK)
     return get_dispatcher_status;
 
@@ -1677,6 +1678,9 @@ zx_status_t sys_object_set_property(zx_handle_t handle_value, uint32_t property,
       return ZX_OK;
     }
     case ZX_PROP_VMO_CONTENT_SIZE: {
+      if ((rights & ZX_RIGHT_WRITE) == 0) {
+        return ZX_ERR_ACCESS_DENIED;
+      }
       if (size < sizeof(uint64_t)) {
         return ZX_ERR_BUFFER_TOO_SMALL;
       }

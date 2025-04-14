@@ -1811,6 +1811,7 @@ uint16_t Controller::DataBufferBlockCount() const {
 void Controller::DisplayEngineApplyConfiguration(const display_config_t* banjo_display_config,
                                                  const config_stamp_t* banjo_config_stamp) {
   fbl::AutoLock lock(&display_lock_);
+  ZX_DEBUG_ASSERT(banjo_display_config != nullptr);
   ZX_DEBUG_ASSERT(display_devices_.size() <= kMaximumConnectedDisplayCount);
   display::DisplayId fake_vsync_display_ids[kMaximumConnectedDisplayCount];
   size_t fake_vsync_size = 0;
@@ -1838,7 +1839,23 @@ void Controller::DisplayEngineApplyConfiguration(const display_config_t* banjo_d
     // The hardware only gives vsyncs if at least one plane is enabled, so
     // fake one if we need to, to inform the client that we're done with the
     // images.
-    if (!banjo_display_config || banjo_display_config->layer_count == 0) {
+    bool needs_fake_vsync = false;
+
+    // TODO(https://fxbug.dev/42079186): Remove this condition once we enforce
+    // config layer count to be non-zero.
+    if (banjo_display_config->layer_count == 0) {
+      needs_fake_vsync = true;
+    }
+
+    // No display plane is enabled on the pipe if there's only a color layer
+    // in a display config, thus we need to issue a fake Vsync event.
+    if (banjo_display_config->layer_count == 1) {
+      const auto& layer = banjo_display_config->layer_list[0];
+      if (layer.image_source.width == 0 && layer.image_source.height == 0) {
+        needs_fake_vsync = true;
+      }
+    }
+    if (needs_fake_vsync) {
       fake_vsync_display_ids[fake_vsync_size++] = display->id();
     }
   }

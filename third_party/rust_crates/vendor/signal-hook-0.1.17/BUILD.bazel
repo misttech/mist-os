@@ -79,7 +79,7 @@ rust_library(
     }),
     version = "0.1.17",
     deps = [
-        "//third_party/rust_crates/vendor/libc-0.2.169:libc",
+        "//third_party/rust_crates/vendor/libc-0.2.171:libc",
         "//third_party/rust_crates/vendor/mio-0.7.14:mio",
         "//third_party/rust_crates/vendor/signal-hook-registry-1.4.1:signal_hook_registry",
     ],

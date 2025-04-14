@@ -128,6 +128,7 @@ template("python_perf_test") {
                                "isolated",
                                "local_config_source",
                                "main_source",
+                               "package_deps",
                                "params_source",
                                "params",
                                "product_bundle",
@@ -147,11 +148,6 @@ template("python_perf_test") {
       }
       if (invoker.expected_metric_names_filepaths != []) {
         deps += [ ":${_runtime_deps_target}" ]
-      }
-      if (defined(invoker.target_deps)) {
-        foreach(target_dep, invoker.target_deps) {
-          deps += [ "${target_dep}($target_toolchain)" ]
-        }
       }
 
       # Enabling on internal builders is primarily controlled by GN groups and not by the
@@ -309,6 +305,9 @@ template("fuchsia_component_perf_test") {
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
       "//third_party/mobly",
     ]
+
+    # TODO(https://fxbug.dev/407117303): Add this to package_deps after
+    # fixing some tests that don't pass in the exact package target.
     target_deps = [ invoker.package ]
   }
 }

@@ -17,11 +17,13 @@ rustc_library("processing") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:regex",
+    "//third_party/rust_crates:serde",
   ]
 
   test_deps = [ "//third_party/rust_crates:pretty_assertions" ]
 
   sources = [
+    "src/digest.rs",
     "src/kernel_statistics.rs",
     "src/lib.rs",
     "src/summary.rs",

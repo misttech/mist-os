@@ -1,0 +1,48 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.net.policy.socketproxy;
+
+using fuchsia.net;
+
+/// A DNS server configuration.
+///
+/// All table fields are currently required.
+type DnsServerList = table {
+    /// The server addresses.
+    1: addresses vector<fuchsia.net.SocketAddress>:MAX;
+
+    /// The corresponding `network_id` for the DNS server addresses.
+    2: source_network_id uint32;
+};
+
+/// Provides a hanging get interface to watch for DNS servers configuration.
+/// Only one connection to this service is considered valid at any one time.
+@discoverable
+closed protocol DnsServerWatcher {
+    /// Returns a list of DNS servers registered with the socketproxy.
+    ///
+    /// First call always returns a snapshot of the current list of servers or blocks if an empty
+    /// list would be returned. Subsequent calls will block until the list of servers changes.
+    ///
+    /// The list of servers changes over time by configuration or network topology changes,
+    /// expiration, etc. Callers must repeatedly call `WatchServers` and replace any previously
+    /// returned `servers` with new ones to avoid using stale or expired entries.
+    ///
+    /// It is invalid to call this method while a previous call is pending. Doing so will cause the
+    /// server end of the protocol to be closed.
+    ///
+    /// - response `servers` The list of servers to use for DNS resolution, in priority order.
+    strict WatchServers() -> (struct {
+        servers vector<DnsServerList>:MAX;
+    });
+
+    /// No-op method that allows checking for presence.
+    ///
+    /// TODO(https://fxbug.dev/296283299): It's not currently possible for a
+    /// client with an optionally-provided protocol to check whether there's
+    /// someone on the other end without making a FIDL call . This method
+    /// provides a workaround by giving a client a method that it can call to
+    /// check for liveness.
+    strict CheckPresence() -> ();
+};

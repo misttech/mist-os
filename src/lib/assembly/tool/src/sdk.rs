@@ -7,7 +7,6 @@ use crate::{Tool, ToolCommand, ToolCommandLog, ToolProvider};
 use anyhow::{anyhow, Context, Result};
 use ffx_config::global_env_context;
 use ffx_config::sdk::Sdk;
-use futures::executor::block_on;
 use std::path::PathBuf;
 use std::process::Command;
 use utf8_path::PathToStringExt;
@@ -32,7 +31,7 @@ impl SdkToolProvider {
 
 impl ToolProvider for SdkToolProvider {
     fn get_tool(&self, name: &str) -> Result<Box<dyn Tool>> {
-        let path = block_on(ffx_config::get_host_tool(&self.sdk, name.as_ref()))
+        let path = ffx_config::get_host_tool(&self.sdk, name.as_ref())
             .context(format!("Getting host tool from the SDK: {}", name))?;
         self.get_tool_with_path(path)
     }

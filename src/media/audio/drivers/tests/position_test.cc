@@ -183,6 +183,7 @@ void PositionTest::ValidatePositionInfo() {
 // Verify position notifications at fast rate (64/sec: 32 notifs/ring in a 0.5-second buffer).
 DEFINE_POSITION_TEST_CLASS(PositionNotifyFast, {
   constexpr auto kNotifsPerRingBuffer = 32u;
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
@@ -203,6 +204,7 @@ DEFINE_POSITION_TEST_CLASS(PositionNotifyFast, {
 // Verify position notifications at slow rate (1/sec: 2 notifs/ring in a 2-second buffer).
 DEFINE_POSITION_TEST_CLASS(PositionNotifySlow, {
   constexpr auto kNotifsPerRingBuffer = 2u;
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
@@ -226,6 +228,7 @@ DEFINE_POSITION_TEST_CLASS(PositionNotifySlow, {
 // Verify that NO position notifications arrive after Stop is called.
 DEFINE_POSITION_TEST_CLASS(NoPositionNotifyAfterStop, {
   constexpr auto kNotifsPerRingBuffer = 32u;
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
@@ -245,6 +248,7 @@ DEFINE_POSITION_TEST_CLASS(NoPositionNotifyAfterStop, {
 
 // Verify no position notifications arrive if notifications_per_ring is 0.
 DEFINE_POSITION_TEST_CLASS(PositionNotifyNone, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
@@ -270,22 +274,16 @@ DEFINE_POSITION_TEST_CLASS(PositionNotifyNone, {
       nullptr, DevNameForEntry(DEVICE).c_str(), __FILE__, __LINE__,                               \
       [&]() -> PositionTest* { return new CLASS_NAME(DEVICE); })
 
-void RegisterPositionTestsForDevice(const DeviceEntry& device_entry,
-                                    bool expect_audio_svcs_not_connected,
-                                    bool enable_position_tests) {
+void RegisterPositionTestsForDevice(const DeviceEntry& device_entry) {
+  // Codec drivers have no RingBuffers, and thus require no position tests.
   if (device_entry.isCodec()) {
     return;
   }
-  // If audio_core is connected to the audio driver, admin tests will fail.
-  // We test a hermetic instance of the A2DP driver, so audio_core is never connected.
-  if (device_entry.isA2DP() || expect_audio_svcs_not_connected) {
-    if (enable_position_tests) {
-      REGISTER_POSITION_TEST(PositionNotifySlow, device_entry);
-      REGISTER_POSITION_TEST(PositionNotifyFast, device_entry);
-      REGISTER_POSITION_TEST(NoPositionNotifyAfterStop, device_entry);
-      REGISTER_POSITION_TEST(PositionNotifyNone, device_entry);
-    }
-  }
+
+  REGISTER_POSITION_TEST(PositionNotifySlow, device_entry);
+  REGISTER_POSITION_TEST(PositionNotifyFast, device_entry);
+  REGISTER_POSITION_TEST(NoPositionNotifyAfterStop, device_entry);
+  REGISTER_POSITION_TEST(PositionNotifyNone, device_entry);
 }
 
 }  // namespace media::audio::drivers::test

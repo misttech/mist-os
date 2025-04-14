@@ -41,7 +41,6 @@ class Session {
 
   explicit Session(const internal::Session* session) : session_(session) {}
 
-  // NOTE: Do not add more members; there are casts in the implementation.
   const internal::Session* session_;
 };
 
@@ -134,6 +133,8 @@ class BlockServer {
 
 // Splits the request at `block_offset` returning the head and leaving the tail in `request`.
 Request SplitRequest(Request& request, uint32_t block_offset, uint32_t block_size);
+
+zx_status_t CheckIoRange(const Request& request, uint64_t total_block_count);
 
 }  // namespace block_server
 

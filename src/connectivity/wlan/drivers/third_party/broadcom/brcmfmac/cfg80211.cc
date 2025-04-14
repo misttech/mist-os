@@ -5123,8 +5123,18 @@ void brcmf_if_query_telemetry_support(net_device* ndev,
   inspect_counter_configs.push_back(CounterConfigs::SDIO_RX_PACKETS_READ.toFidl(arena));
   inspect_counter_configs.push_back(CounterConfigs::SDIO_TX_PACKETS_WRITE.toFidl(arena));
 
+  std::vector<fuchsia_wlan_stats::wire::InspectGaugeConfig> inspect_gauge_configs;
+  inspect_gauge_configs.push_back(GaugeConfigs::SDIO_TX_SEQ.toFidl(arena));
+  inspect_gauge_configs.push_back(GaugeConfigs::SDIO_TX_MAX.toFidl(arena));
+  inspect_gauge_configs.push_back(GaugeConfigs::SDIO_TX_QUEUE_LEN.toFidl(arena));
+  inspect_gauge_configs.push_back(GaugeConfigs::SDIO_TX_QUEUE_0_LEN.toFidl(arena));
+  inspect_gauge_configs.push_back(GaugeConfigs::SDIO_TX_QUEUE_1_LEN.toFidl(arena));
+  inspect_gauge_configs.push_back(GaugeConfigs::SDIO_TX_QUEUE_2_LEN.toFidl(arena));
+  inspect_gauge_configs.push_back(GaugeConfigs::SDIO_TX_QUEUE_3_LEN.toFidl(arena));
+
   *resp = fuchsia_wlan_stats::wire::TelemetrySupport::Builder(arena)
               .inspect_counter_configs(fidl::VectorView(arena, inspect_counter_configs))
+              .inspect_gauge_configs(fidl::VectorView(arena, inspect_gauge_configs))
               .Build();
 }
 
@@ -5329,6 +5339,10 @@ zx_status_t brcmf_if_get_iface_stats(net_device* ndev,
   std::vector<fuchsia_wlan_stats::wire::UnnamedCounter> sdio_counters =
       brcmf_bus_get_counters(cfg->pub->bus_if);
   stats_builder.driver_specific_counters(sdio_counters);
+
+  std::vector<fuchsia_wlan_stats::wire::UnnamedGauge> sdio_gauges =
+      brcmf_bus_get_gauges(cfg->pub->bus_if);
+  stats_builder.driver_specific_gauges(sdio_gauges);
 
   if (!brcmf_test_bit(brcmf_vif_status_bit_t::CONNECTED, &ifp->vif->sme_state)) {
     *out_stats = stats_builder.Build();

@@ -207,8 +207,19 @@ pub(super) fn fidl_rule_from_rule_message<I: Ip>(
             Some(is_loopback) => Some(is_loopback),
         },
     };
-    let bound_device =
-        oifname.map(|name| fnet_routes_ext::rules::InterfaceMatcher::DeviceName(name.to_owned()));
+    let bound_device = oifname
+        .map(|name| fnet_routes_ext::rules::InterfaceMatcher::DeviceName(name.to_owned()))
+        .or_else(||
+            // If the action is `Unreachable`, we want to allow traffic with SO_BINDTODEVICE to
+            // sidestep the unreachable rule and look into the main table. In most cases, Linux
+            // would simply ignore the unreachable rule if the socket is bound to a device. The
+            // motivating use case is when an application does SO_BINDTODEVICE and wants to use the
+            // subnet route that only exists in the main table.
+            //
+            // See https://fxbug.dev/404262204 for more details.
+            (action == Action::Unreachable)
+                .then_some(fnet_routes_ext::rules::InterfaceMatcher::Unbound));
+
     let mark_1 = fwmark
         .map(|fwmark| fnet_routes_ext::rules::MarkMatcher::Marked {
             // If no mask is specified, default to checking the entire mark.
@@ -301,7 +312,9 @@ mod test {
     use test_case::test_case;
 
     use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
-    use fidl_fuchsia_net_routes_ext::rules::{MarkMatcher, RuleIndex, RuleMatcher};
+    use fidl_fuchsia_net_routes_ext::rules::{
+        InterfaceMatcher, MarkMatcher, RuleIndex, RuleMatcher,
+    };
 
     use crate::route_tables::NetlinkRouteTableIndex;
 
@@ -383,7 +396,7 @@ mod test {
                 matcher: RuleMatcher {
                     from: None,
                     locally_generated: None,
-                    bound_device: None,
+                    bound_device: Some(InterfaceMatcher::Unbound),
                     mark_1: Some(MarkMatcher::Marked { mask: 0, between: 0..=0 }),
                     mark_2: None
                 },
@@ -528,21 +541,25 @@ mod test {
     }
 
     #[ip_test(I)]
-    #[test_case(Some("device-name") => Some("device-name".to_owned()))]
-    #[test_case(None => None)]
-    fn bound_device<I: Ip>(oifname: Option<&str>) -> Option<String> {
-        let bound_device = test_convert_rule_args::<I>(RuleArgs {
+    #[test_case(Some("device-name"), RuleAction::Unreachable
+        => Some(InterfaceMatcher::DeviceName("device-name".to_owned())))]
+    #[test_case(Some("device-name"), RuleAction::ToTable
+        => Some(InterfaceMatcher::DeviceName("device-name".to_owned())))]
+    #[test_case(None, RuleAction::Unreachable => Some(InterfaceMatcher::Unbound))]
+    #[test_case(None, RuleAction::ToTable => None)]
+    fn bound_device<I: Ip>(oifname: Option<&str>, action: RuleAction) -> Option<InterfaceMatcher> {
+        test_convert_rule_args::<I>(RuleArgs {
             rule_attributes: oifname
                 .map(|name| RuleAttribute::Oifname(name.to_owned()))
                 .into_iter()
                 .collect::<Vec<_>>(),
+            action,
+            table_in_header: rt_class_t_RT_TABLE_MAIN as u8,
             ..basic_rule_args::<I>()
         })
         .expect("conversion should succeed")
         .matcher
-        .bound_device;
-
-        bound_device.map(|fnet_routes_ext::rules::InterfaceMatcher::DeviceName(name)| name)
+        .bound_device
     }
 
     #[ip_test(I)]

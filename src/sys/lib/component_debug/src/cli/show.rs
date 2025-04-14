@@ -10,7 +10,7 @@ use crate::realm::{
 use ansi_term::Colour;
 use anyhow::Result;
 use cm_rust::ExposeDeclCommon;
-use fidl_fuchsia_sys2 as fsys;
+use flex_fuchsia_sys2 as fsys;
 use moniker::Moniker;
 use prettytable::format::FormatBuilder;
 use prettytable::{cell, row, Table};

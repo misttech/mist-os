@@ -30,6 +30,7 @@ rustc_library("lib") {
     "//src/lib/diagnostics/log/encoding/rust",
     "//src/lib/flyweights",
     "//src/sys/lib/moniker",
+    "//third_party/rust_crates:bumpalo",
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:libc",
     "//third_party/rust_crates:thiserror",
@@ -48,6 +49,7 @@ rustc_library("lib") {
   sources = [
     "src/constants.rs",
     "src/error.rs",
+    "src/ffi.rs",
     "src/lib.rs",
     "src/test.rs",
   ]

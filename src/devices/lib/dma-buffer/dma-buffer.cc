@@ -64,10 +64,17 @@ class PagedBufferImpl : public PagedBuffer {
 
 class BufferFactoryImpl : public BufferFactory {
   zx_status_t CreateContiguous(const zx::bti& bti, size_t size, uint32_t alignment_log2,
+                               bool enable_cache,
                                std::unique_ptr<ContiguousBuffer>* out) const override {
     zx::vmo vmo;
     zx_status_t status;
     status = zx::vmo::create_contiguous(bti, size, alignment_log2, &vmo);
+    if (status != ZX_OK) {
+      return status;
+    }
+    if (!enable_cache) {
+      status = vmo.set_cache_policy(ZX_CACHE_POLICY_UNCACHED_DEVICE);
+    }
     if (status != ZX_OK) {
       return status;
     }

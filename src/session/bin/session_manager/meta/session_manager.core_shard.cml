@@ -427,7 +427,6 @@
         },
         {
             protocol: [
-                "fuchsia.logger.Log",
                 "fuchsia.space.Manager",
                 "fuchsia.sys2.RealmExplorer.root",
                 "fuchsia.sys2.RealmQuery.root",

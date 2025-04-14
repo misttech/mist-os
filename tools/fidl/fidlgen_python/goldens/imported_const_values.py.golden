@@ -11,16 +11,16 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.importedconstvalues"]
+_ir_path = get_fidl_ir_map()["test.importedconstvalues"]
 add_ir_path(_ir_path)
+
+import fidl_test_dependent
 
 
 @dataclass
 class MyStruct:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-
     __fidl_kind__ = "struct"
     __fidl_type__ = "MyStruct"
     __fidl_raw_type__ = "test.importedconstvalues/MyStruct"
@@ -40,13 +40,15 @@ class MyStruct:
             "test.importedconstvalues/MyStruct",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{})
 
 
 # Generated constants
-BITS_MEMBER: int = 1
+BITS_MEMBER: int | fidl_test_dependent.MyBits = 1
 BITS_MEMBER_PRIMITIVE: int = 1
-ENUM_MEMBER: int = 1
+ENUM_MEMBER: int | fidl_test_dependent.MyEnum = 1
 ENUM_MEMBER_PRIMITIVE: int = 1

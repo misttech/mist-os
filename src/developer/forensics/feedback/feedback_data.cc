@@ -12,6 +12,8 @@
 #include <zircon/types.h>
 
 #include <memory>
+#include <optional>
+#include <utility>
 
 namespace forensics::feedback {
 
@@ -19,7 +21,8 @@ FeedbackData::FeedbackData(async_dispatcher_t* dispatcher,
                            std::shared_ptr<sys::ServiceDirectory> services,
                            timekeeper::Clock* clock, inspect::Node* inspect_root,
                            cobalt::Logger* cobalt, RedactorBase* redactor,
-                           feedback::AnnotationManager* annotation_manager, Options options)
+                           feedback::AnnotationManager* annotation_manager,
+                           std::optional<std::string> dlog, Options options)
     : dispatcher_(dispatcher),
       services_(services),
       clock_(clock),
@@ -27,7 +30,8 @@ FeedbackData::FeedbackData(async_dispatcher_t* dispatcher,
       inspect_node_manager_(inspect_root),
       inspect_data_budget_(options.limit_inspect_data, &inspect_node_manager_, cobalt_),
       attachment_providers_(dispatcher, services, options.delete_previous_boot_logs_time, clock,
-                            redactor, &inspect_data_budget_, options.config.attachment_allowlist),
+                            redactor, &inspect_data_budget_, options.config.attachment_allowlist,
+                            std::move(dlog)),
       data_provider_(dispatcher_, services_, clock_, redactor, options.is_first_instance,
                      options.config.annotation_allowlist, options.config.attachment_allowlist,
                      cobalt_, annotation_manager, attachment_providers_.GetAttachmentManager(),

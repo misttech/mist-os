@@ -35,7 +35,7 @@ uint64_t GetDefaultGuestMemory() {
 }
 
 uint8_t GetDefaultNumCpus() {
-  return static_cast<uint8_t>(std::min(zx_system_get_num_cpus(), UINT8_MAX));
+  return static_cast<uint8_t>(std::min<uint32_t>(zx_system_get_num_cpus(), UINT8_MAX));
 }
 
 }  // namespace

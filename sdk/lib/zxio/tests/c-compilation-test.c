@@ -16,13 +16,13 @@
 
 // Tests that the zxio headers can be used from C.
 
-zx_status_t test_close(zxio_t* io, const bool should_wait) { return ZX_OK; }
+void test_destroy(zxio_t* io) {}
 
 TEST(Zxio, UseFromC) {
   zxio_storage_t object;
   zxio_ops_t ops = {};
   memset(&ops, 0, sizeof(ops));
-  ops.close = test_close;
+  ops.destroy = test_destroy;
   zxio_init(&object.io, &ops);
-  ASSERT_OK(zxio_close(&object.io, /*should_wait=*/true));
+  zxio_destroy(&object.io);
 }

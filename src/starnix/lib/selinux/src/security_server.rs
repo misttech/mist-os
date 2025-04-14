@@ -16,8 +16,8 @@ use crate::policy::{
 use crate::sid_table::SidTable;
 use crate::sync::Mutex;
 use crate::{
-    AbstractObjectClass, ClassPermission, FileSystemLabel, FileSystemLabelingScheme,
-    FileSystemMountOptions, FsNodeClass, InitialSid, NullessByteStr, ObjectClass, Permission,
+    ClassPermission, FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions,
+    FsNodeClass, InitialSid, KernelClass, KernelPermission, NullessByteStr, ObjectClass,
     SeLinuxStatus, SeLinuxStatusPublisher, SecurityId,
 };
 
@@ -380,18 +380,15 @@ impl SecurityServer {
             FileSystemLabel { sid: fs_sid, scheme: FileSystemLabelingScheme::GenFsCon, mount_sids }
         } else {
             // The name of the filesystem type was not recognized.
-            //
-            // TODO: https://fxbug.dev/363215797 - verify that these defaults are correct.
-            let unrecognized_filesystem_type_sid = SecurityId::initial(InitialSid::File);
-            let unrecognized_filesystem_type_fs_use_type = FsUseType::Xattr;
-
             FileSystemLabel {
-                sid: mount_sids.fs_context.unwrap_or(unrecognized_filesystem_type_sid),
+                sid: mount_sids
+                    .fs_context
+                    .unwrap_or_else(|| SecurityId::initial(InitialSid::Unlabeled)),
                 scheme: FileSystemLabelingScheme::FsUse {
-                    fs_use_type: unrecognized_filesystem_type_fs_use_type,
+                    fs_use_type: FsUseType::Xattr,
                     computed_def_sid: mount_sids
                         .def_context
-                        .unwrap_or(unrecognized_filesystem_type_sid),
+                        .unwrap_or_else(|| SecurityId::initial(InitialSid::File)),
                 },
                 mount_sids,
             }
@@ -483,7 +480,7 @@ impl SecurityServer {
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: ObjectClass,
+        target_class: KernelClass,
     ) -> Result<SecurityId, anyhow::Error> {
         let mut locked_state = self.state.lock();
         let active_policy = locked_state.expect_active_policy_mut();
@@ -509,7 +506,7 @@ impl Query for SecurityServer {
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
     ) -> AccessDecision {
         let locked_state = self.state.lock();
 
@@ -523,7 +520,7 @@ impl Query for SecurityServer {
         let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
 
         match target_class {
-            AbstractObjectClass::System(target_class) => {
+            ObjectClass::System(target_class) => {
                 let mut decision = active_policy.parsed.compute_access_decision(
                     &source_context,
                     &target_context,
@@ -536,11 +533,9 @@ impl Query for SecurityServer {
                 );
                 decision
             }
-            AbstractObjectClass::Custom(target_class) => active_policy
+            ObjectClass::Custom(target_class) => active_policy
                 .parsed
                 .compute_access_decision_custom(&source_context, &target_context, &target_class),
-            // No meaningful policy can be determined without target class.
-            _ => AccessDecision::allow(AccessVector::NONE),
         }
     }
 
@@ -601,7 +596,7 @@ impl Query for SecurityServer {
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
         ioctl_prefix: u8,
     ) -> IoctlAccessDecision {
         let locked_state = self.state.lock();
@@ -616,7 +611,7 @@ impl Query for SecurityServer {
         let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
 
         match target_class {
-            AbstractObjectClass::System(target_class) => {
+            ObjectClass::System(target_class) => {
                 active_policy.parsed.compute_ioctl_access_decision(
                     &source_context,
                     &target_context,
@@ -624,7 +619,7 @@ impl Query for SecurityServer {
                     ioctl_prefix,
                 )
             }
-            AbstractObjectClass::Custom(target_class) => {
+            ObjectClass::Custom(target_class) => {
                 active_policy.parsed.compute_ioctl_access_decision_custom(
                     &source_context,
                     &target_context,
@@ -632,14 +627,14 @@ impl Query for SecurityServer {
                     ioctl_prefix,
                 )
             }
-            // No meaningful policy can be determined without target class.
-            _ => IoctlAccessDecision::DENY_ALL,
         }
     }
 }
 
 impl AccessVectorComputer for SecurityServer {
-    fn access_vector_from_permissions<P: ClassPermission + Into<Permission> + Clone + 'static>(
+    fn access_vector_from_permissions<
+        P: ClassPermission + Into<KernelPermission> + Clone + 'static,
+    >(
         &self,
         permissions: &[P],
     ) -> Option<AccessVector> {
@@ -701,7 +696,7 @@ mod tests {
         let sid1 = SecurityId::initial(InitialSid::Kernel);
         let sid2 = SecurityId::initial(InitialSid::Unlabeled);
         assert_eq!(
-            security_server.compute_access_decision(sid1, sid2, ObjectClass::Process.into()).allow,
+            security_server.compute_access_decision(sid1, sid2, KernelClass::Process.into()).allow,
             AccessVector::ALL
         );
     }
@@ -1440,10 +1435,12 @@ mod tests {
             todo_deny b/002 test_exception_other_t test_exception_target_t chr_file
             todo_deny b/003 test_exception_source_t test_exception_other_t anon_inode
             todo_deny b/004 test_exception_permissive_t test_exception_target_t file
+            todo_permissive b/005 test_exception_todo_permissive_t
 
             // These statements should not be resolved.
             todo_deny b/101 test_undefined_source_t test_exception_target_t file
             todo_deny b/102 test_exception_source_t test_undefined_target_t file
+            todo_permissive b/103 test_undefined_source_t
         ";
         let security_server = SecurityServer::new_with_exceptions(EXCEPTIONS_CONFIG.into());
         security_server.set_enforcing(true);
@@ -1469,6 +1466,11 @@ mod tests {
         let unmatched_sid = security_server
             .security_context_to_sid(
                 "test_exception_u:object_r:test_exception_unmatched_t:s0".into(),
+            )
+            .unwrap();
+        let todo_permissive_sid = security_server
+            .security_context_to_sid(
+                "test_exception_u:object_r:test_exception_todo_permissive_t:s0".into(),
             )
             .unwrap();
 
@@ -1532,6 +1534,45 @@ mod tests {
         assert_eq!(
             permission_check.has_permission(permissive_sid, target_sid, FilePermission::Entrypoint),
             PermissionCheckResult { permit: true, audit: true, todo_bug: None }
+        );
+
+        // Todo-permissive SID is not granted any permissions, so all permissions should be granted,
+        // to all target domains and classes, and all grants should be associated with the bug.
+        assert_eq!(
+            permission_check.has_permission(
+                todo_permissive_sid,
+                target_sid,
+                FilePermission::Entrypoint
+            ),
+            PermissionCheckResult {
+                permit: true,
+                audit: true,
+                todo_bug: Some(NonZeroU64::new(5).unwrap())
+            }
+        );
+        assert_eq!(
+            permission_check.has_permission(
+                todo_permissive_sid,
+                todo_permissive_sid,
+                FilePermission::Entrypoint
+            ),
+            PermissionCheckResult {
+                permit: true,
+                audit: true,
+                todo_bug: Some(NonZeroU64::new(5).unwrap())
+            }
+        );
+        assert_eq!(
+            permission_check.has_permission(
+                todo_permissive_sid,
+                target_sid,
+                FilePermission::Entrypoint
+            ),
+            PermissionCheckResult {
+                permit: true,
+                audit: true,
+                todo_bug: Some(NonZeroU64::new(5).unwrap())
+            }
         );
     }
 

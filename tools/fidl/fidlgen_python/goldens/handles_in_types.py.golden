@@ -11,16 +11,14 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.handlesintypes"]
+_ir_path = get_fidl_ir_map()["test.handlesintypes"]
 add_ir_path(_ir_path)
 
 
 @dataclass
 class EmptyResourceStruct:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-
     __fidl_kind__ = "struct"
     __fidl_type__ = "EmptyResourceStruct"
     __fidl_raw_type__ = "test.handlesintypes/EmptyResourceStruct"
@@ -40,6 +38,8 @@ class EmptyResourceStruct:
             "test.handlesintypes/EmptyResourceStruct",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{})
@@ -47,14 +47,12 @@ class EmptyResourceStruct:
 
 @dataclass
 class HandlesInTypes:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    normal_handle: int | None
-    handle_in_vec: typing.Sequence[int] | None
-    handle_in_array: typing.Sequence[int] | None
-    handle_in_mixed_vec_array: typing.Sequence[typing.Sequence[int]] | None
-    table_with_handle: TableWithHandle | None
-    union_with_handle: UnionWithHandle | None
+    normal_handle: int
+    handle_in_vec: typing.Sequence[int]
+    handle_in_array: typing.Sequence[int]
+    handle_in_mixed_vec_array: typing.Sequence[typing.Sequence[int]]
+    table_with_handle: TableWithHandle
+    union_with_handle: UnionWithHandle
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "HandlesInTypes"
@@ -73,16 +71,18 @@ class HandlesInTypes:
             self, "test.handlesintypes", "test.handlesintypes/HandlesInTypes"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "normal_handle": None,
-                "handle_in_vec": None,
-                "handle_in_array": None,
-                "handle_in_mixed_vec_array": None,
-                "table_with_handle": None,
-                "union_with_handle": None,
+                "normal_handle": None,  # type: ignore[arg-type,unused-ignore]
+                "handle_in_vec": None,  # type: ignore[arg-type,unused-ignore]
+                "handle_in_array": None,  # type: ignore[arg-type,unused-ignore]
+                "handle_in_mixed_vec_array": None,  # type: ignore[arg-type,unused-ignore]
+                "table_with_handle": None,  # type: ignore[arg-type,unused-ignore]
+                "union_with_handle": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 

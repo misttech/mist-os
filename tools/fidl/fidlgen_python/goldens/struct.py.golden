@@ -11,17 +11,16 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.struct"]
+_ir_path = get_fidl_ir_map()["test.struct"]
 add_ir_path(_ir_path)
 
 
 @dataclass
 class BasicStruct:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    x: int | None
-    y: str | None
+    x: int
+    y: str
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "BasicStruct"
@@ -40,22 +39,22 @@ class BasicStruct:
             self, "test.struct", "test.struct/BasicStruct"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "x": None,
-                "y": None,
+                "x": None,  # type: ignore[arg-type,unused-ignore]
+                "y": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class Simple:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    f1: int | None
-    f2: bool | None
+    f1: int
+    f2: bool
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Simple"
@@ -72,11 +71,13 @@ class Simple:
     def encode(self) -> tuple[bytes, list[tuple[int, int, int, int, int]]]:
         return encode_fidl_object(self, "test.struct", "test.struct/Simple")
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "f1": None,
-                "f2": None,
+                "f1": None,  # type: ignore[arg-type,unused-ignore]
+                "f2": None,  # type: ignore[arg-type,unused-ignore]
             }
         )

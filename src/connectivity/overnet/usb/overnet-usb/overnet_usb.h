@@ -330,8 +330,10 @@ class OvernetUsb : public fdf::DriverBase,
               .b_alternate_setting = 0,
               .b_num_endpoints = 2,
               .b_interface_class = USB_CLASS_VENDOR,
-              .b_interface_sub_class = bind_fuchsia_google_platform_usb::BIND_USB_SUBCLASS_OVERNET,
-              .b_interface_protocol = bind_fuchsia_google_platform_usb::BIND_USB_PROTOCOL_OVERNET,
+              .b_interface_sub_class =
+                  bind_fuchsia_google_platform_usb::BIND_USB_SUBCLASS_VSOCK_BRIDGE,
+              .b_interface_protocol =
+                  bind_fuchsia_google_platform_usb::BIND_USB_PROTOCOL_VSOCK_BRIDGE,
               .i_interface = 0,
           },
       .out_ep =

@@ -792,36 +792,6 @@ zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint6
   LockedParentWalker walker(parent);
 
   while (start_in_self < end_in_self) {
-    // Early out if the current node is empty.
-    // TODO(https://fxbug.dev/338300943): This early out shouldn't be necessary as long as the
-    // VmPageList iterator functions like `ForEveryPageInRange` early out instead. Microbenchmarks
-    // slightly regressed when we attempted this though. Investigate adding the `IsEmpty` early-out
-    // to the VMPageList methods and removing this block.
-    if (walker.current(self).page_list_.IsEmpty()) {
-      if (walker.current(self).is_parent_hidden_locked() &&
-          start_in_cur < walker.current(self).parent_limit_) {
-        // Some of this range within the parent node is still owned by `self`, so walk up and
-        // process the range from within the parent instead.
-        start_in_cur = start_in_cur + walker.current(self).parent_offset_;
-        end_in_cur = ktl::min(end_in_cur, walker.current(self).parent_limit_) +
-                     walker.current(self).parent_offset_;
-        walker.WalkUp(self);
-      } else {
-        // The range within the current node is owned by `self`, but the same range is not owned by
-        // `self` within the parent node. Either:
-        //  1. The parent is a visible node and owns all its pages, so `self` cannot own them.
-        //  2. This range within the parent is not visible to `self` due to the `parent_limit_`, and
-        //     thus it cannot be owned by `self` either.
-        // Mark the range as processed and restart another walk up from `self`.
-        start_in_self += end_in_cur - start_in_cur;
-        start_in_cur = start_in_self;
-        end_in_cur = end_in_self;
-        walker.reset();
-      }
-
-      continue;
-    }
-
     // We attempt to always inline these lambdas, as its a huge performance benefit and has minimal
     // impact on code size.
     bool stopped_early = false;
@@ -1982,9 +1952,14 @@ zx_status_t VmCowPages::AddNewPagesLocked(uint64_t start_offset, list_node_t* pa
     if (status != ZX_OK) {
       // Put the page back on the list so that someone owns it and it'll get free'd.
       list_add_head(pages, &p->queue_node);
-      // Decommit any pages we already placed.
+      // Remove any pages we already placed.
       if (offset > start_offset) {
-        DecommitRangeLocked(VmCowRange(start_offset, offset - start_offset));
+        __UNINITIALIZED ScopedPageFreedList freed_list;
+        __UNINITIALIZED BatchPQRemove page_remover(freed_list);
+
+        page_list_.RemovePages(page_remover.RemovePagesCallback(), start_offset, offset);
+        page_remover.Flush();
+        freed_list.FreePages(this);
       }
 
       // Free all the pages back as we had ownership of them.
@@ -2007,7 +1982,7 @@ zx_status_t VmCowPages::AddNewPagesLocked(uint64_t start_offset, list_node_t* pa
 
 zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_list,
                                            VmCowPages* page_owner, vm_page_t* page,
-                                           uint64_t owner_offset,
+                                           uint64_t owner_offset, DeferredOps& deferred,
                                            AnonymousPageRequest* page_request,
                                            vm_page_t** out_page) {
   DEBUG_ASSERT(page != vm_get_zero_page());
@@ -2070,7 +2045,6 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
   // If the new page is different from the original page, then we must remove the original page
   // from any mappings that reference this node or its descendants.
   const bool do_range_update = (*out_page != page);
-  __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
   [[maybe_unused]] VmPageOrMarker prev_content = CompleteAddPageLocked(
       *page_transaction, VmPageOrMarker::Page(*out_page), do_range_update ? &deferred : nullptr);
   // We should not have been trying to fork at this offset if something already existed.
@@ -2186,32 +2160,32 @@ void VmCowPages::ReleaseOwnedPagesLocked(uint64_t start, const LockedPtr& parent
   page_remover.Flush();
 }
 
-template <typename T>
-void VmCowPages::FindPageContentLocked(uint64_t offset, uint64_t max_owner_length, T* out) {
-  VmCowPages* cur = this;
-  AssertHeld(cur->lock_ref());
+void VmCowPages::FindPageContentLocked(uint64_t offset, uint64_t max_owner_length,
+                                       PageLookup* out) {
   const uint64_t this_offset = offset;
 
   // Search up the clone chain for any committed pages. cur_offset is the offset
   // into cur we care about. The loop terminates either when that offset contains
   // a committed page or when that offset can't reach into the parent.
-  while (offset < cur->parent_limit_) {
-    VmCowPages* parent = cur->parent_.get();
+  LockedPtr cur;
+  while (offset < cur.locked_or(this).parent_limit_) {
+    VmCowPages* parent = cur.locked_or(this).parent_.get();
     DEBUG_ASSERT(parent);
 
-    __UNINITIALIZED VMPLCursor cursor = cur->page_list_.LookupNearestMutableCursor(offset);
+    __UNINITIALIZED VMPLCursor cursor =
+        cur.locked_or(this).page_list_.LookupNearestMutableCursor(offset);
     VmPageOrMarkerRef p = cursor.current();
-    if (p && !p->IsEmpty() && cursor.offset(cur->page_list_.GetSkew()) == offset) {
-      *out = {cursor, cur, offset, max_owner_length + this_offset};
+    if (p && !p->IsEmpty() && cursor.offset(cur.locked_or(this).page_list_.GetSkew()) == offset) {
+      *out = {cursor, &cur.locked_or(this), offset, max_owner_length + this_offset};
       return;
     }
 
     // Need to walk up, see if we need to trim the owner length.
     if (max_owner_length > PAGE_SIZE) {
       // First trim to the parent limit.
-      max_owner_length = ktl::min(max_owner_length, cur->parent_limit_ - offset);
+      max_owner_length = ktl::min(max_owner_length, cur.locked_or(this).parent_limit_ - offset);
       if (max_owner_length > PAGE_SIZE && p) {
-        cur->page_list_.ForEveryPageInCursorRange(
+        cur.locked_or(this).page_list_.ForEveryPageInCursorRange(
             [&offset, &max_owner_length](const VmPageOrMarker* slot, uint64_t slot_offset) {
               DEBUG_ASSERT(!slot->IsEmpty() && slot_offset >= offset);
               const uint64_t new_owner_length = slot_offset - offset;
@@ -2223,10 +2197,11 @@ void VmCowPages::FindPageContentLocked(uint64_t offset, uint64_t max_owner_lengt
       }
     }
 
-    offset += cur->parent_offset_;
-    cur = parent;
+    offset += cur.locked_or(this).parent_offset_;
+    cur = LockedPtr(parent, VmLockAcquireMode::Reentrant);
   }
-  *out = {cur->page_list_.LookupMutableCursor(offset), cur, offset, max_owner_length + this_offset};
+  *out = {cur.locked_or(this).page_list_.LookupMutableCursor(offset), &cur.locked_or(this), offset,
+          max_owner_length + this_offset};
 }
 
 void VmCowPages::FindInitialPageContentLocked(uint64_t offset, PageLookup* out) {
@@ -2559,11 +2534,9 @@ void VmCowPages::LookupCursor::EstablishCursor() {
   // Ensure still in the valid range.
   DEBUG_ASSERT(offset_ < end_offset_);
 
-  // TODO: Once is_layout_compatible is available enable this assertion and remove the templating
-  // from FindPageContentLocked.
-  // static_assert(is_layout_compatible_v<OwnerInfo, PageLookup>);
   target_->FindPageContentLocked(offset_, end_offset_ - offset_, &owner_info_);
-  owner_cursor_ = owner_info_.owner_pl_cursor_.current();
+  owner_cursor_ = owner_info_.cursor.current();
+  is_valid_ = true;
 }
 
 inline VmCowPages::LookupCursor::RequireResult VmCowPages::LookupCursor::PageAsResultNoIncrement(
@@ -2578,7 +2551,7 @@ inline VmCowPages::LookupCursor::RequireResult VmCowPages::LookupCursor::PageAsR
 
 void VmCowPages::LookupCursor::IncrementOffsetAndInvalidateCursor(uint64_t delta) {
   offset_ += delta;
-  owner_info_.owner_ = nullptr;
+  InvalidateCursor();
 }
 
 bool VmCowPages::LookupCursor::CursorIsContentZero() const {
@@ -2587,7 +2560,7 @@ bool VmCowPages::LookupCursor::CursorIsContentZero() const {
     return true;
   }
 
-  if (owner_info_.owner_->page_source_) {
+  if (owner_info_.owner->page_source_) {
     // With a page source emptiness implies needing to request content, however we can have zero
     // intervals which do start as zero content.
     return CursorIsInIntervalZero();
@@ -2619,6 +2592,7 @@ bool VmCowPages::LookupCursor::TargetZeroContentSupplyDirty(bool writing) const 
 
 zx::result<VmCowPages::LookupCursor::RequireResult>
 VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, DirtyState dirty_state,
+                                                         VmCowPages::DeferredOps& deferred,
                                                          AnonymousPageRequest* page_request) {
   vm_page_t* out_page = nullptr;
   zx_status_t status =
@@ -2636,7 +2610,7 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
     // The only page we can be forking here is the zero page.
     DEBUG_ASSERT(source == vm_get_zero_page());
     // The object directly owns the page.
-    DEBUG_ASSERT(owner_info_.owner_ == target_);
+    DEBUG_ASSERT(TargetIsOwner());
 
     target_->UpdateDirtyStateLocked(out_page, offset_, dirty_state,
                                     /*is_pending_add=*/true);
@@ -2652,25 +2626,20 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
   //    which are zeroes that we could be overwriting here, but the slot itself we have found could
   //    be empty and the interval may need splitting. For simplicity we do not attempt to check for
   //    and handle interval splitting, and just skip reusing our slot in this case.
-  const bool can_reuse_slot =
-      (owner_info_.owner_ == target_ && owner_info_.owner_pl_cursor_.current() &&
-       !owner_info_.owner_->is_source_preserving_page_content());
+  const bool can_reuse_slot = (TargetIsOwner() && owner_info_.cursor.current() &&
+                               !owner_info_.owner->is_source_preserving_page_content());
   __UNINITIALIZED auto page_transaction =
-      can_reuse_slot
-          ? target_->BeginAddPageWithSlotLocked(offset_, owner_info_.owner_pl_cursor_.current(),
-                                                CanOverwriteContent::Zero)
-          : target_->BeginAddPageLocked(offset_, CanOverwriteContent::Zero);
+      can_reuse_slot ? target_->BeginAddPageWithSlotLocked(offset_, owner_info_.cursor.current(),
+                                                           CanOverwriteContent::Zero)
+                     : target_->BeginAddPageLocked(offset_, CanOverwriteContent::Zero);
   if (page_transaction.is_error()) {
     target_->FreePage(out_page);
     return page_transaction.take_error();
   }
 
-  {
-    __UNINITIALIZED DeferredOps deferred(target_, DeferredOps::LockedTag{});
-    [[maybe_unused]] VmPageOrMarker old = target_->CompleteAddPageLocked(
-        *page_transaction, VmPageOrMarker::Page(out_page), &deferred);
-    DEBUG_ASSERT(!old.IsPageOrRef());
-  }
+  [[maybe_unused]] VmPageOrMarker old =
+      target_->CompleteAddPageLocked(*page_transaction, VmPageOrMarker::Page(out_page), &deferred);
+  DEBUG_ASSERT(!old.IsPageOrRef());
 
   // If asked to explicitly mark zero forks, and this is actually fork of the zero page, move to the
   // correct queue. Discardable pages are not considered zero forks as they are always in the
@@ -2701,11 +2670,11 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
 
   // Need to increment the cursor, but we have also potentially modified the page lists in the
   // process of inserting the page.
-  if (owner_info_.owner_ == target_) {
+  if (TargetIsOwner()) {
     // In the case of owner_ == target_ we may have create a node and need to establish a cursor.
     // However, if we already had a node, i.e. the cursor was valid, then it would have had the page
     // inserted into it.
-    if (!owner_info_.owner_pl_cursor_.current()) {
+    if (!owner_info_.cursor.current()) {
       IncrementOffsetAndInvalidateCursor(PAGE_SIZE);
     } else {
       // Cursor should have been updated to the new page
@@ -2727,14 +2696,14 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
 zx_status_t VmCowPages::LookupCursor::CursorReferenceToPage(AnonymousPageRequest* page_request) {
   DEBUG_ASSERT(CursorIsReference());
 
-  return owner()->ReplaceReferenceWithPageLocked(owner_cursor_, owner_info_.owner_offset_,
+  return owner()->ReplaceReferenceWithPageLocked(owner_cursor_, owner_info_.owner_offset,
                                                  page_request);
 }
 
 zx_status_t VmCowPages::LookupCursor::ReadRequest(uint max_request_pages,
                                                   PageRequest* page_request) {
   // The owner must have a page_source_ to be doing a read request.
-  DEBUG_ASSERT(owner_info_.owner_->page_source_);
+  DEBUG_ASSERT(owner_info_.owner->page_source_);
   // The cursor should be explicitly empty as read requests are only for complete content absence.
   DEBUG_ASSERT(CursorIsEmpty());
   DEBUG_ASSERT(!CursorIsInIntervalZero());
@@ -2754,11 +2723,11 @@ zx_status_t VmCowPages::LookupCursor::ReadRequest(uint max_request_pages,
 
   // Try and batch more pages up to |max_request_pages|.
   uint64_t request_size = static_cast<uint64_t>(max_request_pages) * PAGE_SIZE;
-  if (owner_info_.owner_ != target_) {
-    DEBUG_ASSERT(owner_info_.visible_end_ > offset_);
+  if (!TargetIsOwner()) {
+    DEBUG_ASSERT(owner_info_.visible_end > offset_);
     // Limit the request by the number of pages that are actually visible from the target_ to
     // owner_
-    request_size = ktl::min(request_size, owner_info_.visible_end_ - offset_);
+    request_size = ktl::min(request_size, owner_info_.visible_end - offset_);
   }
   // Limit |request_size| to the first page visible in the page owner to avoid requesting pages
   // that are already present. If there is one page present in an otherwise long run of absent pages
@@ -2769,23 +2738,23 @@ zx_status_t VmCowPages::LookupCursor::ReadRequest(uint max_request_pages,
         [&](const VmPageOrMarker* p, uint64_t offset) {
           // Content should have been empty initially, so should not find anything at the start
           // offset.
-          DEBUG_ASSERT(offset > owner_info_.owner_offset_);
+          DEBUG_ASSERT(offset > owner_info_.owner_offset);
           // If this is an interval sentinel, it can only be a start or slot, since we know we
           // started in a true gap outside of an interval.
           DEBUG_ASSERT(!p->IsInterval() || p->IsIntervalSlot() || p->IsIntervalStart());
-          const uint64_t new_size = offset - owner_info_.owner_offset_;
+          const uint64_t new_size = offset - owner_info_.owner_offset;
           // Due to the limited range of the operation, the only way this callback ever fires is if
           // the range is actually getting trimmed.
           DEBUG_ASSERT(new_size < request_size);
           request_size = new_size;
           return ZX_ERR_STOP;
         },
-        owner_info_.owner_offset_, owner_info_.owner_offset_ + request_size);
+        owner_info_.owner_offset, owner_info_.owner_offset + request_size);
   }
   DEBUG_ASSERT(request_size >= PAGE_SIZE);
 
-  zx_status_t status = owner_info_.owner_->page_source_->GetPages(
-      owner_info_.owner_offset_, request_size, page_request, vmo_debug_info);
+  zx_status_t status = owner_info_.owner->page_source_->GetPages(
+      owner_info_.owner_offset, request_size, page_request, vmo_debug_info);
   // Pager page sources will never synchronously return a page.
   DEBUG_ASSERT(status != ZX_OK);
   return status;
@@ -2799,7 +2768,7 @@ zx_status_t VmCowPages::LookupCursor::DirtyRequest(uint max_request_pages,
   // tracking for whether the cursor is valid, and it may have been made invalid just prior to
   // generating this dirty request, and we do not otherwise need the cursor here.
   // Instead we validate that we have no parent, and that we have a page source.
-  DEBUG_ASSERT(target_ == owner_info_.owner_ || !IsCursorValid());
+  DEBUG_ASSERT(TargetIsOwner() || !IsCursorValid());
   DEBUG_ASSERT(!target_->parent_);
   DEBUG_ASSERT(target_->page_source_);
   DEBUG_ASSERT(max_request_pages > 0);
@@ -2844,7 +2813,7 @@ uint64_t VmCowPages::LookupCursor::SkipMissingPages() {
     return 0;
   }
 
-  uint64_t possibly_empty = owner_info_.visible_end_ - offset_;
+  uint64_t possibly_empty = owner_info_.visible_end - offset_;
   // Limit possibly_empty by the first page visible in the owner which, since our cursor is empty,
   // would also be the root vmo.
   if (possibly_empty > PAGE_SIZE) {
@@ -2852,18 +2821,18 @@ uint64_t VmCowPages::LookupCursor::SkipMissingPages() {
         [&](const VmPageOrMarker* p, uint64_t offset) {
           // Content should have been empty initially, so should not find anything at the start
           // offset.
-          DEBUG_ASSERT(offset > owner_info_.owner_offset_);
+          DEBUG_ASSERT(offset > owner_info_.owner_offset);
           // If this is an interval sentinel, it can only be a start or slot, since we know we
           // started in a true gap outside of an interval.
           DEBUG_ASSERT(!p->IsInterval() || p->IsIntervalSlot() || p->IsIntervalStart());
-          const uint64_t new_size = offset - owner_info_.owner_offset_;
+          const uint64_t new_size = offset - owner_info_.owner_offset;
           // Due to the limited range of the operation, the only way this callback ever fires is if
           // the range is actually getting trimmed.
           DEBUG_ASSERT(new_size < possibly_empty);
           possibly_empty = new_size;
           return ZX_ERR_STOP;
         },
-        owner_info_.owner_offset_, owner_info_.owner_offset_ + possibly_empty);
+        owner_info_.owner_offset, owner_info_.owner_offset + possibly_empty);
   }
   // The cursor was empty, so we should have ended up with at least one page.
   DEBUG_ASSERT(possibly_empty >= PAGE_SIZE);
@@ -2889,15 +2858,15 @@ uint VmCowPages::LookupCursor::IfExistPages(bool will_write, uint max_pages, pad
   // Trim max pages to the visible length of the current owner. This only has an effect when
   // target_ != owner_ as otherwise the visible_end_ is the same as end_offset_ and we already
   // validated that we are within that range.
-  if (owner_info_.owner_ != target_) {
+  if (!TargetIsOwner()) {
     max_pages =
-        ktl::min(max_pages, static_cast<uint>((owner_info_.visible_end_ - offset_) / PAGE_SIZE));
+        ktl::min(max_pages, static_cast<uint>((owner_info_.visible_end - offset_) / PAGE_SIZE));
   }
   DEBUG_ASSERT(max_pages > 0);
 
   // Take up to the max_pages as long as they exist contiguously.
   uint pages = 0;
-  owner_info_.owner_pl_cursor_.ForEveryContiguous([&](VmPageOrMarkerRef page) {
+  owner_info_.cursor.ForEveryContiguous([&](VmPageOrMarkerRef page) {
     if (page->IsPage()) {
       paddrs[pages] = page->Page()->paddr();
       pages++;
@@ -2913,7 +2882,8 @@ uint VmCowPages::LookupCursor::IfExistPages(bool will_write, uint max_pages, pad
 }
 
 zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::RequireOwnedPage(
-    bool will_write, uint max_request_pages, MultiPageRequest* page_request) {
+    bool will_write, uint max_request_pages, DeferredOps& deferred,
+    MultiPageRequest* page_request) {
   DEBUG_ASSERT(page_request);
 
   // Make sure the cursor is valid.
@@ -2930,7 +2900,7 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
 
   // If page exists in the target, i.e. the owner is the target, then we handle this case separately
   // as it's the only scenario where we might be dirtying an existing committed page.
-  if (owner_info_.owner_ == target_ && CursorIsPage()) {
+  if (TargetIsOwner() && CursorIsPage()) {
     // If we're writing to a root VMO backed by a user pager, i.e. a VMO whose page source preserves
     // page contents, we might need to mark pages Dirty so that they can be written back later. This
     // is the only path that can result in a write to such a page; if the page was not present, we
@@ -2946,7 +2916,7 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
         DEBUG_ASSERT(is_page_clean(owner_cursor_->Page()));
         zx_status_t status =
             target_->ReplacePageLocked(owner_cursor_->Page(), offset_, /*with_loaned=*/false,
-                                       &res_page, page_request->GetAnonymous());
+                                       &res_page, deferred, page_request->GetAnonymous());
         if (status != ZX_OK) {
           return zx::error(status);
         }
@@ -2975,7 +2945,7 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
   // into the target. As the target cannot have a page source do not need to worry about writes or
   // dirtying.
   if (CursorIsPage()) {
-    DEBUG_ASSERT(owner_info_.owner_ != target_);
+    DEBUG_ASSERT(!TargetIsOwner());
     vm_page_t* res_page = nullptr;
     // Although we are not returning the page, the act of forking counts as an access, and this is
     // an access regardless of whether the final returned page should be considered accessed, so
@@ -2983,11 +2953,11 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
     pmm_page_queues()->MarkAccessed(owner_cursor_->Page());
     if (!owner()->is_hidden()) {
       // Directly copying the page from the owner into the target.
-      return TargetAllocateCopyPageAsResult(owner_cursor_->Page(), DirtyState::Untracked,
+      return TargetAllocateCopyPageAsResult(owner_cursor_->Page(), DirtyState::Untracked, deferred,
                                             page_request->GetAnonymous());
     }
     zx_status_t result = target_->CloneCowPageLocked(
-        offset_, alloc_list_, owner(), owner_cursor_->Page(), owner_info_.owner_offset_,
+        offset_, alloc_list_, owner(), owner_cursor_->Page(), owner_info_.owner_offset, deferred,
         page_request->GetAnonymous(), &res_page);
     if (result != ZX_OK) {
       return zx::error(result);
@@ -3025,7 +2995,7 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
     // Allocate the page and mark it dirty or clean as previously determined.
     return TargetAllocateCopyPageAsResult(vm_get_zero_page(),
                                           target_page_dirty ? DirtyState::Dirty : DirtyState::Clean,
-                                          page_request->GetAnonymous());
+                                          deferred, page_request->GetAnonymous());
   }
   DEBUG_ASSERT(CursorIsEmpty());
 
@@ -3035,7 +3005,7 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
 }
 
 zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::RequireReadPage(
-    uint max_request_pages, MultiPageRequest* page_request) {
+    uint max_request_pages, DeferredOps& deferred, MultiPageRequest* page_request) {
   DEBUG_ASSERT(page_request);
 
   // Make sure the cursor is valid.
@@ -3088,8 +3058,8 @@ zx::result<VmCowPages::LookupCursor> VmCowPages::GetLookupCursorLocked(VmCowRang
   return zx::ok(LookupCursor(this, range));
 }
 
-zx_status_t VmCowPages::CommitRangeLocked(VmCowRange range, uint64_t* committed_len,
-                                          MultiPageRequest* page_request) {
+zx_status_t VmCowPages::CommitRangeLocked(VmCowRange range, DeferredOps& deferred,
+                                          uint64_t* committed_len, MultiPageRequest* page_request) {
   canary_.Assert();
   LTRACEF("offset %#" PRIx64 ", len %#" PRIx64 "\n", range.offset, range.len);
 
@@ -3150,7 +3120,7 @@ zx_status_t VmCowPages::CommitRangeLocked(VmCowRange range, uint64_t* committed_
   uint64_t offset = start_offset;
   while (offset < end) {
     __UNINITIALIZED zx::result<VmCowPages::LookupCursor::RequireResult> result =
-        cursor->RequireOwnedPage(false, static_cast<uint>((end - offset) / PAGE_SIZE),
+        cursor->RequireOwnedPage(false, static_cast<uint>((end - offset) / PAGE_SIZE), deferred,
                                  page_request);
 
     if (result.is_error()) {
@@ -3186,7 +3156,7 @@ zx_status_t VmCowPages::PinRangeLocked(VmCowRange range) {
   auto pin_cleanup = fit::defer([this, offset = range.offset, &next_offset]() {
     if (next_offset > offset) {
       AssertHeld(*lock());
-      UnpinLocked(VmCowRange(offset, next_offset - offset));
+      UnpinLocked(VmCowRange(offset, next_offset - offset), nullptr);
     }
   });
 
@@ -3234,9 +3204,11 @@ zx_status_t VmCowPages::PinRangeLocked(VmCowRange range) {
   return status;
 }
 
-zx_status_t VmCowPages::DecommitRangeLocked(VmCowRange range) {
+zx_status_t VmCowPages::DecommitRange(VmCowRange range) {
   canary_.Assert();
 
+  __UNINITIALIZED DeferredOps deferred(this);
+  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
   // Validate the size and perform our zero-length hot-path check before we recurse
   // up to our top-level ancestor.  Size bounding needs to take place relative
   // to the child the operation was originally targeted against.
@@ -3262,10 +3234,11 @@ zx_status_t VmCowPages::DecommitRangeLocked(VmCowRange range) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  return UnmapAndFreePagesLocked(range.offset, range.len).status_value();
+  return UnmapAndFreePagesLocked(range.offset, range.len, deferred).status_value();
 }
 
-zx::result<uint64_t> VmCowPages::UnmapAndFreePagesLocked(uint64_t offset, uint64_t len) {
+zx::result<uint64_t> VmCowPages::UnmapAndFreePagesLocked(uint64_t offset, uint64_t len,
+                                                         DeferredOps& deferred) {
   canary_.Assert();
 
   if (AnyPagesPinnedLocked(offset, len)) {
@@ -3274,28 +3247,23 @@ zx::result<uint64_t> VmCowPages::UnmapAndFreePagesLocked(uint64_t offset, uint64
 
   LTRACEF("start offset %#" PRIx64 ", end %#" PRIx64 "\n", offset, offset + len);
 
-  // We've already trimmed the range in DecommitRangeLocked().
+  // We've already trimmed the range in DecommitRange().
   DEBUG_ASSERT(InRange(offset, len, size_));
 
   // Verify page alignment.
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(len) || (offset + len == size_));
 
-  // DecommitRangeLocked() will call this function only on a VMO with no parent.
+  // DecommitRange() will call this function only on a VMO with no parent.
   DEBUG_ASSERT(!parent_);
 
   // unmap all of the pages in this range on all the mapping regions
-  {
-    __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
-    RangeChangeUpdateLocked(VmCowRange(offset, len), RangeChangeOp::Unmap, &deferred);
-  }
+  RangeChangeUpdateLocked(VmCowRange(offset, len), RangeChangeOp::Unmap, &deferred);
 
-  __UNINITIALIZED ScopedPageFreedList freed_list;
-  __UNINITIALIZED BatchPQRemove page_remover(freed_list);
+  __UNINITIALIZED BatchPQRemove page_remover(deferred.FreedList(this));
 
   page_list_.RemovePages(page_remover.RemovePagesCallback(), offset, offset + len);
   page_remover.Flush();
-  freed_list.FreePages(this);
 
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
@@ -3332,7 +3300,7 @@ bool VmCowPages::PageWouldReadZeroLocked(uint64_t page_offset) {
 
 zx_status_t VmCowPages::ZeroPagesPreservingContentLocked(uint64_t page_start_base,
                                                          uint64_t page_end_base, bool dirty_track,
-                                                         list_node_t* freed_list,
+                                                         DeferredOps& deferred,
                                                          MultiPageRequest* page_request,
                                                          uint64_t* processed_len_out) {
   // Validate inputs.
@@ -3399,7 +3367,7 @@ zx_status_t VmCowPages::ZeroPagesPreservingContentLocked(uint64_t page_start_bas
               LookupCursor cursor(this, VmCowRange(off, PAGE_SIZE));
               AssertHeld(cursor.lock_ref());
               zx::result<LookupCursor::RequireResult> result =
-                  cursor.RequireOwnedPage(true, 1, page_request);
+                  cursor.RequireOwnedPage(true, 1, deferred, page_request);
               if (result.is_error()) {
                 return result.error_value();
               }
@@ -3500,7 +3468,7 @@ zx_status_t VmCowPages::ZeroPagesPreservingContentLocked(uint64_t page_start_bas
         DEBUG_ASSERT(state.start == state.end);
         vm_page_t* page = page_list_.ReplacePageWithZeroInterval(state.start, required_state);
         DEBUG_ASSERT(page->object.pin_count == 0);
-        RemovePageToListLocked(page, freed_list);
+        RemovePageLocked(page, deferred);
       } else if (state.overwrite_interval) {
         uint64_t old_start = state.start;
         uint64_t old_end = state.end;
@@ -3546,7 +3514,7 @@ zx_status_t VmCowPages::ZeroPagesPreservingContentLocked(uint64_t page_start_bas
   return ZX_OK;
 }
 
-zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
+zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track, DeferredOps& deferred,
                                         MultiPageRequest* page_request, uint64_t* zeroed_len_out) {
   canary_.Assert();
 
@@ -3557,57 +3525,18 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
   // This function tries to zero pages as optimally as possible for most cases, so we attempt
   // increasingly expensive actions only if certain preconditions do not allow us to perform the
   // cheaper action. Broadly speaking, the sequence of actions that are attempted are as follows.
-  //  1) Try to decommit the entire range at once if the VMO allows it.
-  //  2) Otherwise, try to decommit each page if the VMO allows it and doing so doesn't expose
-  //  content in the parent (if any) that shouldn't be visible.
-  //  3) Otherwise, if this is a child VMO and there is no committed page yet, allocate a zero page.
-  //  4) Otherwise, look up the page, faulting it in if necessary, and zero the page. If the page
+  //  1) Try to decommit each page if the VMO allows it and doing so doesn't expose  content in the
+  //  parent (if any) that shouldn't be visible.
+  //  2) Otherwise, if this is a child VMO and there is no committed page yet, allocate a zero page.
+  //  3) Otherwise, look up the page, faulting it in if necessary, and zero the page. If the page
   //  source needs to supply or dirty track the page, a page request is initialized and we return
   //  early with ZX_ERR_SHOULD_WAIT. The caller is expected to wait on the page request, and then
   //  retry. On the retry, we should be able to look up the page successfully and zero it.
 
-  // First try and do the more efficient decommit. We prefer/ decommit as it performs work in the
-  // order of the number of committed pages, instead of work in the order of size of the range. An
-  // error from DecommitRangeLocked indicates that the VMO is not of a form that decommit can safely
-  // be performed without exposing data that we shouldn't between children and parents, but no
-  // actual state will have been changed. Should decommit succeed we are done, otherwise we will
-  // have to handle each offset individually.
-  //
-  // Zeroing doesn't decommit pages of contiguous VMOs.
-  if (can_decommit_zero_pages()) {
-    zx_status_t status = DecommitRangeLocked(range);
-    if (status == ZX_OK) {
-      *zeroed_len_out = range.len;
-      return ZX_OK;
-    }
-  }
-
   // Unmap any page that is touched by this range in any of our, or our childrens, mapping
   // regions. We do this on the assumption we are going to be able to free pages either completely
   // or by turning them into markers and it's more efficient to unmap once in bulk here.
-  {
-    __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
-    RangeChangeUpdateLocked(range, RangeChangeOp::Unmap, &deferred);
-  }
-
-  list_node_t freed_list;
-  list_initialize(&freed_list);
-
-  // See also free_any_pages below, which intentionally frees incrementally.
-  auto auto_free = fit::defer([this, &freed_list]() {
-    if (!list_is_empty(&freed_list)) {
-      FreePages(&freed_list);
-    }
-  });
-
-  // Ideally we just collect up pages and hand them over to the pmm all at the end, but if we need
-  // to allocate any pages then we would like to ensure that we do not cause total memory to peak
-  // higher due to squirreling these pages away.
-  auto free_any_pages = [this, &freed_list] {
-    if (!list_is_empty(&freed_list)) {
-      FreePages(&freed_list);
-    }
-  };
+  RangeChangeUpdateLocked(range, RangeChangeOp::Unmap, &deferred);
 
   // Give us easier names for our range.
   const uint64_t start = range.offset;
@@ -3620,7 +3549,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
   // If the page source preserves content, we can perform efficient zeroing by inserting dirty zero
   // intervals. Handle this case separately.
   if (is_source_preserving_page_content()) {
-    return ZeroPagesPreservingContentLocked(start, end, dirty_track, &freed_list, page_request,
+    return ZeroPagesPreservingContentLocked(start, end, dirty_track, deferred, page_request,
                                             zeroed_len_out);
   }
   // dirty_track has no meaning for VMOs without page sources that preserve content, so ignore it
@@ -3719,9 +3648,6 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
     // committed pages). A committed page in this case exists if the parent has any content.
     // Otherwise, we'll need to zero an actual page.
     if (!can_decommit_slot(slot, offset) || !parent_has_content(offset)) {
-      // We might allocate a new page below. Free any pages we've accumulated first.
-      free_any_pages();
-
       // If we're here because of !parent_has_content() and slot doesn't have a page, we can simply
       // allocate a zero page to replace the empty slot. Otherwise, we'll have to look up the page
       // and zero it.
@@ -3767,7 +3693,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
         return cursor.error_value();
       }
       AssertHeld(cursor->lock_ref());
-      auto result = cursor->RequirePage(true, 1, page_request);
+      auto result = cursor->RequirePage(true, 1, deferred, page_request);
       if (result.is_error()) {
         return result.error_value();
       }
@@ -3784,7 +3710,6 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
     const InitialPageContent& content = get_initial_page_content(offset);
     AssertHeld(content.page_owner->lock_ref());
     if (!slot && content.page_owner->is_hidden()) {
-      free_any_pages();
       // TODO(https://fxbug.dev/42138396): This could be more optimal since unlike a regular cow
       // clone, we are not going to actually need to read the target page we are cloning, and hence
       // it does not actually need to get converted.
@@ -3796,8 +3721,8 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
         }
       }
       zx_status_t result = CloneCowPageAsZeroLocked(
-          offset, &freed_list, content.page_owner, content.page_or_marker->Page(),
-          content.owner_offset, page_request->GetAnonymous());
+          offset, deferred.FreedList(this).List(), content.page_owner,
+          content.page_or_marker->Page(), content.owner_offset, page_request->GetAnonymous());
       if (result != ZX_OK) {
         return result;
       }
@@ -3816,13 +3741,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
     // Free the old page.
     if (released_page.IsPage()) {
       vm_page_t* page = released_page.ReleasePage();
-      DEBUG_ASSERT(page->object.pin_count == 0);
-      // Already handled pager backed VMOs previously, and loaned pages cannot appear in anonymous
-      // VMOs.
-      DEBUG_ASSERT(!page->is_loaned());
-      pmm_page_queues()->Remove(page);
-      DEBUG_ASSERT(!list_in_list(&page->queue_node));
-      list_add_tail(&freed_list, &page->queue_node);
+      RemovePageLocked(page, deferred);
     } else if (released_page.IsReference()) {
       FreeReference(released_page.ReleaseReference());
     }
@@ -3855,12 +3774,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
                                          !is_root_source_user_pager_backed()))) {
           if (slot->IsPage()) {
             vm_page_t* page = slot->ReleasePage();
-            // Already handled pager backed VMOs previously, and loaned pages cannot appear in
-            // anonymous VMOs.
-            DEBUG_ASSERT(!page->is_loaned());
-            pmm_page_queues()->Remove(page);
-            DEBUG_ASSERT(!list_in_list(&page->queue_node));
-            list_add_tail(&freed_list, &page->queue_node);
+            RemovePageLocked(page, deferred);
           } else if (slot->IsReference()) {
             FreeReference(slot->ReleaseReference());
           } else {
@@ -4031,16 +3945,21 @@ void VmCowPages::SetNotPinnedLocked(vm_page_t* page, uint64_t offset) {
   }
 }
 
-void VmCowPages::PromoteRangeForReclamationLocked(VmCowRange range) {
+zx_status_t VmCowPages::PromoteRangeForReclamation(VmCowRange range) {
   canary_.Assert();
 
   // Hints only apply to pager backed VMOs.
   if (!can_root_source_evict()) {
-    return;
+    return ZX_OK;
   }
   // Zero lengths have no work to do.
   if (range.is_empty()) {
-    return;
+    return ZX_OK;
+  }
+
+  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+  if (!range.IsBoundedBy(size_)) {
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   uint64_t start_offset = ROUNDDOWN(range.offset, PAGE_SIZE);
@@ -4049,7 +3968,7 @@ void VmCowPages::PromoteRangeForReclamationLocked(VmCowRange range) {
   __UNINITIALIZED zx::result<VmCowPages::LookupCursor> cursor =
       GetLookupCursorLocked(VmCowRange(start_offset, end_offset - start_offset));
   if (cursor.is_error()) {
-    return;
+    return cursor.status_value();
   }
   // Do not consider pages accessed as the goal is reclaim them, not consider them used.
   cursor->DisableMarkAccessed();
@@ -4075,41 +3994,73 @@ void VmCowPages::PromoteRangeForReclamationLocked(VmCowRange range) {
     // ignore it and move on to the next page. Hints are best effort anyway.
     start_offset += PAGE_SIZE;
   }
+  return ZX_OK;
 }
 
-zx_status_t VmCowPages::ProtectRangeFromReclamationLocked(VmCowRange range, bool set_always_need,
-                                                          bool ignore_errors,
-                                                          Guard<VmoLockType>* guard) {
+zx_status_t VmCowPages::ProtectRangeFromReclamation(VmCowRange range, bool set_always_need,
+                                                    bool ignore_errors) {
   canary_.Assert();
 
   // Hints only apply to pager backed VMOs.
   if (!can_root_source_evict()) {
     return ZX_OK;
   }
-  // Zero lengths have no work to do.
-  if (range.is_empty()) {
-    return ZX_OK;
+
+  // Validate that the range is completely in range at the start of the operation. Although we
+  // tolerate the VMO shrinking during the operation, the range must be valid at the point we
+  // started.
+  {
+    Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+    if (!range.IsBoundedBy(size_)) {
+      return ZX_ERR_OUT_OF_RANGE;
+    }
+    // Zero lengths have no work to do.
+    if (range.is_empty()) {
+      return ZX_OK;
+    }
   }
 
-  uint64_t cur_offset = ROUNDDOWN(range.offset, PAGE_SIZE);
-  uint64_t end_offset = ROUNDUP(range.end(), PAGE_SIZE);
+  range = range.ExpandTillPageAligned();
 
   __UNINITIALIZED MultiPageRequest page_request;
-  while (cur_offset < end_offset) {
-    __UNINITIALIZED zx::result<VmCowPages::LookupCursor> cursor =
-        GetLookupCursorLocked(VmCowRange(cur_offset, end_offset - cur_offset));
-    if (cursor.is_error()) {
-      return cursor.status_value();
-    }
-    AssertHeld(cursor->lock_ref());
-    for (; cur_offset < end_offset; cur_offset += PAGE_SIZE) {
-      const uint64_t remaining = end_offset - cur_offset;
-      // Lookup the page, this will fault in the page from the parent if necessary, but will not
-      // allocate pages directly in this if it is a child.
-      auto result =
-          cursor->RequirePage(false, static_cast<uint>(remaining / PAGE_SIZE), &page_request);
-      zx_status_t status = result.status_value();
-      if (status == ZX_OK) {
+  while (!range.is_empty()) {
+    // Any loaned page replacement needs to happen outside the main lock acquisition so if we loaned
+    // page is found we use these variables to record its information and process it after dropping
+    // the lock.
+    fbl::RefPtr<VmCowPages> loaned_page_owner;
+    uint64_t loaned_page_offset = 0;
+    vm_page_t* loaned_page = nullptr;
+    zx_status_t status;
+    {
+      __UNINITIALIZED DeferredOps deferred(this);
+      Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+      // The size might have changed since we dropped the lock. Adjust the range if required.
+      if (range.offset >= size_) {
+        // No more pages to hint.
+        return ZX_OK;
+      }
+      // Shrink the range if required. Proceed with hinting on the remaining pages in the range;
+      // we've already hinted on the preceding pages, so just go on ahead instead of returning an
+      // error. The range was valid at the time we started hinting.
+      if (!range.IsBoundedBy(size_)) {
+        range = range.WithLength(size_ - range.offset);
+      }
+
+      __UNINITIALIZED zx::result<VmCowPages::LookupCursor> cursor =
+          GetLookupCursorLocked(VmCowRange(range.offset, range.len));
+      if (cursor.is_error()) {
+        return cursor.status_value();
+      }
+      AssertHeld(cursor->lock_ref());
+      for (; !range.is_empty(); range = range.TrimedFromStart(PAGE_SIZE)) {
+        // Lookup the page, this will fault in the page from the parent if necessary, but will not
+        // allocate pages directly in this if it is a child.
+        auto result = cursor->RequirePage(false, static_cast<uint>(range.len / PAGE_SIZE), deferred,
+                                          &page_request);
+        status = result.status_value();
+        if (status != ZX_OK) {
+          break;
+        }
         // If we reached here, we successfully found a page at the current offset.
         vm_page_t* page = result->page;
 
@@ -4134,46 +4085,44 @@ zx_status_t VmCowPages::ProtectRangeFromReclamationLocked(VmCowRange range, bool
         if (page->is_loaned()) {
           DEBUG_ASSERT(is_page_clean(page));
           AssertHeld(owner->lock_ref());
-          status =
-              owner->ReplacePageLocked(page, page->object.get_page_offset(),
-                                       /*with_loaned=*/false, &page, page_request.GetAnonymous());
-          // Let the status fall through below to have success, waiting and errors handled.
+          loaned_page_owner = fbl::MakeRefPtrUpgradeFromRaw<VmCowPages>(owner, owner->lock());
+          loaned_page = page;
+          loaned_page_offset = page->object.get_page_offset();
+          break;
+        }
+        if (status != ZX_OK) {
+          break;
         }
 
-        if (status == ZX_OK) {
-          DEBUG_ASSERT(!page->is_loaned());
-          if (set_always_need) {
-            page->object.always_need = 1;
-            vm_vmo_always_need.Add(1);
-            // Nothing more to do beyond marking the page always_need true. The lookup must have
-            // already marked the page accessed, moving it to the head of the first page queue.
-          }
-          continue;
+        DEBUG_ASSERT(!page->is_loaned());
+        if (set_always_need) {
+          page->object.always_need = 1;
+          vm_vmo_always_need.Add(1);
+          // Nothing more to do beyond marking the page always_need true. The lookup must have
+          // already marked the page accessed, moving it to the head of the first page queue.
         }
       }
-      // There was either an error in the original require page, or in processing what was looked
-      // up. Either way when go back around in the loop we are going to need a new cursor.
-
+    }
+    // Check if we exited to swap a loaned page.
+    if (loaned_page) {
+      vm_page_t* after;
+      status = loaned_page_owner->ReplacePage(loaned_page, loaned_page_offset, false, &after,
+                                              page_request.GetAnonymous());
+      if (status != ZX_ERR_SHOULD_WAIT) {
+        // Between finding the loaned page and attempting to replace it the lock was dropped and so
+        // ReplacePage could spuriously fail, hence ignore any other failure and go around the loop
+        // and retry.
+        status = ZX_OK;
+      }
+    }
+    if (status != ZX_OK) {
       if (status == ZX_ERR_SHOULD_WAIT) {
-        guard->CallUnlocked([&status, &page_request]() { status = page_request.Wait(); });
-
-        // The size might have changed since we dropped the lock. Adjust the range if required.
-        if (cur_offset >= size_locked()) {
-          // No more pages to hint.
-          return ZX_OK;
-        }
-        // Shrink the range if required. Proceed with hinting on the remaining pages in the range;
-        // we've already hinted on the preceding pages, so just go on ahead instead of returning an
-        // error. The range was valid at the time we started hinting.
-        if (end_offset > size_locked()) {
-          end_offset = size_locked();
-        }
+        status = page_request.Wait();
 
         // If the wait succeeded, cur_offset will now have a backing page, so we need to try the
-        // same offset again with a new cursor. In case of failure, simply continue on to the next
-        // page, as hints are best effort only.
+        // same offset again with a new cursor.
         if (status == ZX_OK) {
-          break;
+          continue;
         }
       }
 
@@ -4183,22 +4132,24 @@ zx_status_t VmCowPages::ProtectRangeFromReclamationLocked(VmCowRange range, bool
         return status;
       }
 
-      // Break out of the inner loop to get a new cursor for the next offset.
-      cur_offset += PAGE_SIZE;
-      break;
+      // Ignore the error, move to the next offset.
+      range = range.TrimedFromStart(PAGE_SIZE);
     }
   }
   return ZX_OK;
 }
 
-zx_status_t VmCowPages::DecompressInRangeLocked(VmCowRange range, Guard<VmoLockType>* guard) {
+zx_status_t VmCowPages::DecompressInRange(VmCowRange range) {
   canary_.Assert();
 
+  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+  if (!range.IsBoundedBy(size_)) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
   if (range.is_empty()) {
     return ZX_OK;
   }
 
-  DEBUG_ASSERT(range.IsBoundedBy(size_));
   uint64_t cur_offset = ROUNDDOWN(range.offset, PAGE_SIZE);
   uint64_t end_offset = ROUNDUP(range.end(), PAGE_SIZE);
 
@@ -4225,7 +4176,7 @@ zx_status_t VmCowPages::DecompressInRangeLocked(VmCowRange range, Guard<VmoLockT
       return ZX_OK;
     }
     if (status == ZX_ERR_SHOULD_WAIT) {
-      guard->CallUnlocked([&page_request, &status]() { status = page_request.Wait(); });
+      guard.CallUnlocked([&page_request, &status]() { status = page_request.Wait(); });
     }
   } while (status == ZX_OK);
   return status;
@@ -4280,7 +4231,7 @@ void VmCowPages::ChangeHighPriorityCountLocked(int64_t delta) {
   }
 }
 
-void VmCowPages::UnpinLocked(VmCowRange range) {
+void VmCowPages::UnpinLocked(VmCowRange range, DeferredOps* deferred) {
   canary_.Assert();
 
   // verify that the range is within the object
@@ -4316,11 +4267,10 @@ void VmCowPages::UnpinLocked(VmCowRange range) {
             completely_unpin_len += PAGE_SIZE;
           } else {
             // Complete any existing range and then start again at this offset.
-            if (completely_unpin_len > 0) {
-              __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
+            if (completely_unpin_len > 0 && deferred) {
               const VmCowRange range_update =
                   VmCowRange(completely_unpin_start, completely_unpin_len);
-              RangeChangeUpdateLocked(range_update, RangeChangeOp::DebugUnpin, &deferred);
+              RangeChangeUpdateLocked(range_update, RangeChangeOp::DebugUnpin, deferred);
             }
             completely_unpin_start = off;
             completely_unpin_len = PAGE_SIZE;
@@ -4342,10 +4292,9 @@ void VmCowPages::UnpinLocked(VmCowRange range) {
 
 #if (DEBUG_ASSERT_IMPLEMENTED)
   // Check any leftover range.
-  if (completely_unpin_len > 0) {
-    __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
+  if (completely_unpin_len > 0 && deferred) {
     const VmCowRange range_update = VmCowRange(completely_unpin_start, completely_unpin_len);
-    RangeChangeUpdateLocked(range_update, RangeChangeOp::DebugUnpin, &deferred);
+    RangeChangeUpdateLocked(range_update, RangeChangeOp::DebugUnpin, deferred);
   }
 #endif
 
@@ -4685,7 +4634,7 @@ zx_status_t VmCowPages::LookupReadableLocked(VmCowRange range, LookupReadableFun
     // traversal above partway into an interval, we will be able to continue the traversal over the
     // rest of the interval after this call - since we're the root, we will be the owner and the
     // owner length won't be clipped.
-    __UNINITIALIZED PageLookup content;
+    PageLookup content;
     FindPageContentLocked(current_page_offset, end_page_offset - current_page_offset, &content);
 
     // This should always get filled out.
@@ -4767,7 +4716,7 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(VmCowRange range, VmPageSplice
     {
       // Once we have a zero page ready to go, require an owned page at the current position.
       auto result = cursor->RequireOwnedPage(true, static_cast<uint>((end - position) / PAGE_SIZE),
-                                             page_request);
+                                             deferred, page_request);
       if (result.is_error()) {
         status = result.error_value();
         break;
@@ -4957,7 +4906,7 @@ zx_status_t VmCowPages::SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pa
     AssertHeld(cursor->lock_ref());
     while (position < end) {
       auto result = cursor->RequireOwnedPage(true, static_cast<uint>((end - position) / PAGE_SIZE),
-                                             page_request);
+                                             deferred, page_request);
       if (result.is_error()) {
         return result.error_value();
       }
@@ -6270,41 +6219,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offs
   return ReclaimCounts{};
 }
 
-void VmCowPages::SwapPageInListLocked(uint64_t offset, vm_page_t* old_page, vm_page_t* new_page) {
-  DEBUG_ASSERT(!old_page->object.pin_count);
-  DEBUG_ASSERT(new_page->state() == vm_page_state::OBJECT);
-
-  // unmap before removing old page
-  {
-    __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
-    RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap, &deferred);
-  }
-
-  // The caller is required to have provided us a page that exists, so this can never fail.
-  VmPageOrMarkerRef p = page_list_.LookupMutable(offset);
-  DEBUG_ASSERT(p);
-  DEBUG_ASSERT(p->IsPage());
-
-  CopyPageMetadataForReplacementLocked(new_page, old_page);
-
-  // Add replacement page in place of old page.
-  __UNINITIALIZED auto result = BeginAddPageWithSlotLocked(offset, p, CanOverwriteContent::NonZero);
-  // Absent bugs, BeginAddPageWithSlotLocked() can only return ZX_ERR_NO_MEMORY, but that failure
-  // can only occur if page_list_ had to allocate.  Here, page_list_ hasn't yet had a chance to
-  // clean up any internal structures, so BeginAddPageWithSlotLocked() didn't need to allocate, so
-  // we know that BeginAddPageWithSlotLocked() will succeed.
-  DEBUG_ASSERT(result.is_ok());
-  VmPageOrMarker released_page =
-      CompleteAddPageLocked(*result, VmPageOrMarker::Page(new_page), nullptr);
-  // The page released was the old page.
-  DEBUG_ASSERT(released_page.IsPage() && released_page.Page() == old_page);
-  // Need to take the page out of |released_page| to avoid a [[nodiscard]] error. Since we just
-  // checked that this matches the target page, which is now owned by the caller, this is not
-  // leaking.
-  [[maybe_unused]] vm_page_t* released = released_page.ReleasePage();
-}
-
-zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(VmCowRange range,
+zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(VmCowRange range, DeferredOps& deferred,
                                                         AnonymousPageRequest* page_request,
                                                         uint64_t* non_loaned_len) {
   canary_.Assert();
@@ -6316,8 +6231,8 @@ zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(VmCowRange range,
   *non_loaned_len = 0;
   bool found_page_or_gap = false;
   zx_status_t status = page_list_.ForEveryPageAndGapInRange(
-      [page_request, non_loaned_len, &found_page_or_gap, this](const VmPageOrMarker* p,
-                                                               uint64_t off) {
+      [page_request, non_loaned_len, &found_page_or_gap, &deferred, this](const VmPageOrMarker* p,
+                                                                          uint64_t off) {
         found_page_or_gap = true;
         // We only expect committed pages in the specified range.
         if (p->IsMarker() || p->IsReference() || p->IsInterval()) {
@@ -6331,7 +6246,7 @@ zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(VmCowRange range,
           DEBUG_ASSERT(!is_page_dirty_tracked(page) || is_page_clean(page));
           DEBUG_ASSERT(page_request);
           zx_status_t status =
-              ReplacePageLocked(page, off, /*with_loaned=*/false, &page, page_request);
+              ReplacePageLocked(page, off, /*with_loaned=*/false, &page, deferred, page_request);
           if (status == ZX_ERR_SHOULD_WAIT) {
             return status;
           }
@@ -6366,17 +6281,25 @@ zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(VmCowRange range,
 zx_status_t VmCowPages::ReplacePageWithLoaned(vm_page_t* before_page, uint64_t offset) {
   canary_.Assert();
 
+  __UNINITIALIZED DeferredOps deferred(this);
   Guard<VmoLockType> guard{lock()};
-  return ReplacePageLocked(before_page, offset, true, nullptr, nullptr);
+  return ReplacePageLocked(before_page, offset, true, nullptr, deferred, nullptr);
+}
+
+zx_status_t VmCowPages::ReplacePage(vm_page_t* before_page, uint64_t offset, bool with_loaned,
+                                    vm_page_t** after_page, AnonymousPageRequest* page_request) {
+  __UNINITIALIZED DeferredOps deferred(this);
+  Guard<VmoLockType> guard{lock()};
+  return ReplacePageLocked(before_page, offset, with_loaned, after_page, deferred, page_request);
 }
 
 zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offset, bool with_loaned,
-                                          vm_page_t** after_page,
+                                          vm_page_t** after_page, DeferredOps& deferred,
                                           AnonymousPageRequest* page_request) {
   // If not replacing with loaned it is required that a page_request be provided.
   DEBUG_ASSERT(with_loaned || page_request);
 
-  const VmPageOrMarker* p = page_list_.Lookup(offset);
+  VmPageOrMarkerRef p = page_list_.LookupMutable(offset);
   if (!p) {
     return ZX_ERR_NOT_FOUND;
   }
@@ -6397,6 +6320,27 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
     return ZX_ERR_BAD_STATE;
   }
 
+  // unmap before removing old page
+  RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap, &deferred);
+
+  VmPageOrMarker released_page;
+  auto replace_page_in_list = [&](vm_page_t* new_page) {
+    AssertHeld(lock_ref());
+    DEBUG_ASSERT(new_page->state() == vm_page_state::OBJECT);
+
+    CopyPageMetadataForReplacementLocked(new_page, old_page);
+
+    // Add replacement page in place of old page.
+    __UNINITIALIZED auto result =
+        BeginAddPageWithSlotLocked(offset, p, CanOverwriteContent::NonZero);
+    // Absent bugs, BeginAddPageWithSlotLocked() can only return ZX_ERR_NO_MEMORY, but that failure
+    // can only occur if page_list_ had to allocate.  Here, page_list_ hasn't yet had a chance to
+    // clean up any internal structures, so BeginAddPageWithSlotLocked() didn't need to allocate, so
+    // we know that BeginAddPageWithSlotLocked() will succeed.
+    DEBUG_ASSERT(result.is_ok());
+    released_page = CompleteAddPageLocked(*result, VmPageOrMarker::Page(new_page), nullptr);
+  };
+
   vm_page_t* new_page = nullptr;
   zx_status_t status = ZX_OK;
   if (with_loaned) {
@@ -6406,10 +6350,8 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
     if (is_page_dirty_tracked(old_page) && !is_page_clean(old_page)) {
       return ZX_ERR_BAD_STATE;
     }
-    auto result = AllocLoanedPage([this, offset, old_page](vm_page_t* page) {
-      AssertHeld(lock_ref());
-      SwapPageInListLocked(offset, old_page, page);
-    });
+    auto result =
+        AllocLoanedPage([&replace_page_in_list](vm_page_t* page) { replace_page_in_list(page); });
     status = result.status_value();
     if (result.is_ok()) {
       new_page = *result;
@@ -6417,15 +6359,23 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
   } else {
     status = AllocPage(&new_page, page_request);
     if (status == ZX_OK) {
-      SwapPageInListLocked(offset, old_page, new_page);
+      replace_page_in_list(new_page);
     }
   }
+
   if (status != ZX_OK) {
     return status;
   }
   CopyPageContentsForReplacementLocked(new_page, old_page);
 
-  RemoveAndFreePageLocked(old_page);
+  // Need to take the page out of |released_page| to avoid a [[nodiscard]] error. Since we just
+  // checked that this matches the target page, which is now owned by the caller, this is not
+  // leaking.
+  [[maybe_unused]] vm_page_t* released = released_page.ReleasePage();
+  // The page released was the old page.
+  DEBUG_ASSERT(released == old_page);
+
+  RemovePageLocked(old_page, deferred);
   if (after_page) {
     *after_page = new_page;
   }
@@ -6941,12 +6891,13 @@ VmCowPages::DiscardablePageCounts VmCowPages::DebugGetDiscardablePageCounts() co
 uint64_t VmCowPages::DiscardPages() {
   canary_.Assert();
 
+  __UNINITIALIZED DeferredOps deferred(this);
   Guard<VmoLockType> guard{lock()};
   // Discard any errors and overlap a 0 return value for errors.
-  return DiscardPagesLocked().value_or(0);
+  return DiscardPagesLocked(deferred).value_or(0);
 }
 
-zx::result<uint64_t> VmCowPages::DiscardPagesLocked() {
+zx::result<uint64_t> VmCowPages::DiscardPagesLocked(DeferredOps& deferred) {
   // Not a discardable VMO.
   if (!discardable_tracker_) {
     return zx::error(ZX_ERR_BAD_STATE);
@@ -6958,7 +6909,7 @@ zx::result<uint64_t> VmCowPages::DiscardPagesLocked() {
   }
 
   // Remove all pages.
-  zx::result<uint64_t> result = UnmapAndFreePagesLocked(0, size_);
+  zx::result<uint64_t> result = UnmapAndFreePagesLocked(0, size_, deferred);
 
   if (result.is_ok()) {
     reclamation_event_count_++;
@@ -6972,6 +6923,7 @@ zx::result<uint64_t> VmCowPages::DiscardPagesLocked() {
 zx::result<uint64_t> VmCowPages::ReclaimDiscardable(vm_page_t* page, uint64_t offset) {
   DEBUG_ASSERT(discardable_tracker_);
 
+  __UNINITIALIZED DeferredOps deferred(this);
   Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
 
   const VmPageOrMarker* page_or_marker = page_list_.Lookup(offset);
@@ -6992,7 +6944,7 @@ zx::result<uint64_t> VmCowPages::ReclaimDiscardable(vm_page_t* page, uint64_t of
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  return DiscardPagesLocked();
+  return DiscardPagesLocked(deferred);
 }
 
 void VmCowPages::CopyPageContentsForReplacementLocked(vm_page_t* dst_page, vm_page_t* src_page) {

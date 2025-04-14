@@ -65,7 +65,7 @@ zx_status_t FtlTestObserver::WaitForBlockDevice() {
 
   zx_status_t status =
       device_watcher::RecursiveWaitForFile(devfs_root().get(),
-                                           "sys/platform/00:00:2e/nand-ctl/ram-nand-0/ftl/block")
+                                           "sys/platform/ram-nand/nand-ctl/ram-nand-0/ftl/block")
           .status_value();
   if (status != ZX_OK) {
     printf("Unable to open device, %d\n", status);

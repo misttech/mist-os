@@ -8,7 +8,7 @@
 use super::{
     check_permission, fs_node_effective_sid_and_class, fs_node_ensure_class,
     fs_node_set_label_with_task, has_fs_node_permissions, permissions_from_flags, scoped_fs_create,
-    set_cached_sid, todo_has_fs_node_permissions, FileSystemLabelState, FsNodeLabel,
+    set_cached_sid, todo_has_fs_node_permissions, Auditable, FileSystemLabelState, FsNodeLabel,
     FsNodeSecurityXattr, FsNodeSidAndClass, PermissionFlags, ScopedFsCreate,
 };
 
@@ -23,7 +23,7 @@ use bstr::BStr;
 use selinux::policy::FsUseType;
 use selinux::{
     CommonFilePermission, CommonFsNodePermission, DirPermission, FileClass, FileSystemLabel,
-    FileSystemLabelingScheme, FileSystemPermission, FsNodeClass, InitialSid, ObjectClass,
+    FileSystemLabelingScheme, FileSystemPermission, FsNodeClass, InitialSid, KernelClass,
     SecurityId, SecurityServer,
 };
 use starnix_logging::{log_debug, log_warn, track_stub};
@@ -239,7 +239,7 @@ pub(in crate::security) fn fs_node_init_with_dentry(
             };
 
             let class_id = security_server
-                .class_id_by_name(ObjectClass::from(fs_node_class).name())
+                .class_id_by_name(KernelClass::from(fs_node_class).name())
                 .map_err(|_| errno!(EINVAL))?;
 
             security_server
@@ -477,7 +477,8 @@ fn may_create(
     let parent_sid = fs_node_effective_sid_and_class(parent).sid;
     let fs = parent.fs();
 
-    let audit_context = [current_task.into(), parent.into(), fs.as_ref().into()];
+    let audit_context =
+        [current_task.into(), parent.into(), fs.as_ref().into(), Auditable::Name(name)];
     check_permission(
         &permission_check,
         current_sid,
@@ -594,12 +595,13 @@ fn may_unlink_or_rmdir(
     current_task: &CurrentTask,
     parent: &FsNode,
     fs_node: &FsNode,
+    name: &FsStr,
     operation: UnlinkKind,
 ) -> Result<(), Errno> {
     assert!(!Anon::is_private(parent));
     assert!(!Anon::is_private(fs_node));
 
-    let audit_context = current_task.into();
+    let audit_context = [current_task.into(), Auditable::Name(name)];
 
     let permission_check = security_server.as_permission_check();
     let current_sid = current_task.security_state.lock().current_sid;
@@ -610,14 +612,14 @@ fn may_unlink_or_rmdir(
         current_sid,
         parent_sid,
         DirPermission::Search,
-        audit_context,
+        (&audit_context).into(),
     )?;
     check_permission(
         &permission_check,
         current_sid,
         parent_sid,
         DirPermission::RemoveName,
-        audit_context,
+        (&audit_context).into(),
     )?;
 
     let FsNodeSidAndClass { sid: file_sid, class: file_class } =
@@ -632,14 +634,14 @@ fn may_unlink_or_rmdir(
             current_sid,
             file_sid,
             CommonFilePermission::Unlink.for_class(file_class),
-            audit_context,
+            (&audit_context).into(),
         ),
         UnlinkKind::Directory => check_permission(
             &permission_check,
             current_sid,
             file_sid,
             DirPermission::RemoveDir,
-            audit_context,
+            (&audit_context).into(),
         ),
     }
 }
@@ -709,10 +711,18 @@ pub(in crate::security) fn check_fs_node_unlink_access(
     current_task: &CurrentTask,
     parent: &FsNode,
     child: &FsNode,
+    name: &FsStr,
 ) -> Result<(), Errno> {
     assert!(!child.is_dir());
 
-    may_unlink_or_rmdir(security_server, current_task, parent, child, UnlinkKind::NonDirectory)
+    may_unlink_or_rmdir(
+        security_server,
+        current_task,
+        parent,
+        child,
+        name,
+        UnlinkKind::NonDirectory,
+    )
 }
 
 /// Validate that `current_task` has the permission to remove a directory.
@@ -721,10 +731,11 @@ pub(in crate::security) fn check_fs_node_rmdir_access(
     current_task: &CurrentTask,
     parent: &FsNode,
     child: &FsNode,
+    name: &FsStr,
 ) -> Result<(), Errno> {
     assert!(child.is_dir());
 
-    may_unlink_or_rmdir(security_server, current_task, parent, child, UnlinkKind::Directory)
+    may_unlink_or_rmdir(security_server, current_task, parent, child, name, UnlinkKind::Directory)
 }
 
 /// Validates that `current_task` has the permissions to move `moving_node`.
@@ -735,6 +746,8 @@ pub(in crate::security) fn check_fs_node_rename_access(
     moving_node: &FsNode,
     new_parent: &FsNode,
     replaced_node: Option<&FsNode>,
+    old_basename: &FsStr,
+    new_basename: &FsStr,
 ) -> Result<(), Errno> {
     assert!(!Anon::is_private(old_parent));
     assert!(!Anon::is_private(moving_node));
@@ -751,12 +764,14 @@ pub(in crate::security) fn check_fs_node_rename_access(
         DirPermission::Search,
         current_task.into(),
     )?;
+
+    let audit_context_old_name = [current_task.into(), Auditable::Name(old_basename)];
     check_permission(
         &permission_check,
         current_sid,
         old_parent_sid,
         DirPermission::RemoveName,
-        current_task.into(),
+        (&audit_context_old_name).into(),
     )?;
 
     let FsNodeSidAndClass { sid: file_sid, class: file_class } =
@@ -770,16 +785,17 @@ pub(in crate::security) fn check_fs_node_rename_access(
         current_sid,
         file_sid,
         CommonFilePermission::Rename.for_class(file_class),
-        current_task.into(),
+        (&audit_context_old_name).into(),
     )?;
 
+    let audit_context_new_name = [current_task.into(), Auditable::Name(new_basename)];
     let new_parent_sid = fs_node_effective_sid_and_class(new_parent).sid;
     check_permission(
         &permission_check,
         current_sid,
         new_parent_sid,
         DirPermission::AddName,
-        current_task.into(),
+        (&audit_context_new_name).into(),
     )?;
 
     // If a file already exists with the new name, then verify that the existing file can be
@@ -791,6 +807,7 @@ pub(in crate::security) fn check_fs_node_rename_access(
             current_task,
             new_parent,
             replaced_node,
+            new_basename,
             if replaced_node_class == FileClass::Dir.into() {
                 UnlinkKind::Directory
             } else {

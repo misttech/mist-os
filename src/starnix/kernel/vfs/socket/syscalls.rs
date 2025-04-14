@@ -89,8 +89,15 @@ pub fn sys_socket(
     // Should we use parse_socket_protocol here?
     let protocol = SocketProtocol::from_raw(protocol);
     let open_flags = socket_flags_to_open_flags(flags);
-    let socket_file =
-        new_socket_file(locked, current_task, domain, socket_type, open_flags, protocol)?;
+    let socket_file = new_socket_file(
+        locked,
+        current_task,
+        domain,
+        socket_type,
+        open_flags,
+        protocol,
+        /*kernel_private=*/ false,
+    )?;
 
     let fd_flags = socket_flags_to_fd_flags(flags);
     let fd = current_task.add_file(socket_file, fd_flags)?;
@@ -321,7 +328,13 @@ pub fn sys_accept4(
     }
 
     let open_flags = socket_flags_to_open_flags(flags);
-    let accepted_socket_file = Socket::new_file(locked, current_task, accepted_socket, open_flags);
+    let accepted_socket_file = Socket::new_file(
+        locked,
+        current_task,
+        accepted_socket,
+        open_flags,
+        /* kernel_private= */ false,
+    );
     let fd_flags = if flags & SOCK_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
     let accepted_fd = current_task.add_file(accepted_socket_file, fd_flags)?;
     Ok(accepted_fd)

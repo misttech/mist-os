@@ -444,7 +444,6 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fasync::TestExecutor;
-    use fidl::endpoints::ControlHandle;
     use fidl::epitaph::ChannelEpitaphExt;
     use fidl_test_storage::{TestStruct, WrongStruct};
     use futures::TryStreamExt;
@@ -582,31 +581,6 @@ mod tests {
         async fn run(self: Arc<Self>, mut requests: fio::DirectoryRequestStream) {
             while let Ok(Some(request)) = requests.try_next().await {
                 match request {
-                    fio::DirectoryRequest::DeprecatedOpen {
-                        flags,
-                        mode,
-                        path,
-                        object,
-                        control_handle: _,
-                    } => {
-                        match (self.inner.lock().unwrap().open_interceptor)(
-                            &path,
-                            flags.intersects(fio::OpenFlags::CREATE),
-                        ) {
-                            Some(status) => {
-                                let (_, control_handle) = object.into_stream_and_control_handle();
-                                control_handle
-                                    .send_on_open_(status.into_raw(), None)
-                                    .expect("failed to send OnOpen event");
-                                control_handle.shutdown_with_epitaph(status);
-                            }
-                            None => {
-                                self.real_dir
-                                    .deprecated_open(flags, mode, &path, object)
-                                    .expect("failed to forward Open request");
-                            }
-                        }
-                    }
                     fio::DirectoryRequest::Open {
                         path,
                         flags,

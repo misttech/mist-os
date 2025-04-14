@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use super::buffer::MapBuffer;
+use super::lock::RwMapLock;
 use super::vmar::AllocatedVmar;
 use super::{MapError, MapImpl, MapKey};
 use ebpf::MapSchema;
-use fuchsia_sync::Mutex;
 use linux_uapi::{
     BPF_RB_FORCE_WAKEUP, BPF_RB_NO_WAKEUP, BPF_RINGBUF_BUSY_BIT, BPF_RINGBUF_DISCARD_BIT,
     BPF_RINGBUF_HDR_SZ,
@@ -23,37 +23,52 @@ use zx::AsHandleRef;
 // incoming data.
 pub const RINGBUF_SIGNAL: zx::Signals = zx::Signals::USER_0;
 
+const RINGBUF_LOCK_SIGNAL: zx::Signals = zx::Signals::USER_1;
+
 #[derive(Debug)]
 struct RingBufferState {
+    /// Address of the mapped ring buffer VMO.
+    base_addr: usize,
+
     /// The mask corresponding to the size of the ring buffer. This is used to map back the
     /// position in the ringbuffer (that are always growing) to their actual position in the memory
     /// object.
     mask: u32,
-
-    /// The never decreasing position of the read head of the ring buffer. This is updated
-    /// exclusively from userspace.
-    consumer_position: &'static AtomicU32,
-
-    /// The never decreasing position of the writing head of the ring buffer. This is updated
-    /// exclusively from the kernel.
-    producer_position: &'static AtomicU32,
-
-    /// Pointer to the start of the data of the ring buffer.
-    data: usize,
 }
 
 impl RingBufferState {
-    /// The pointer into `data` that corresponds to `position`.
+    /// Pointer to the start of the data of the ring buffer.
+    fn data_addr(&self) -> usize {
+        self.base_addr + 3 * *MapBuffer::PAGE_SIZE
+    }
+
+    /// The never decreasing position of the read head of the ring buffer. This is updated
+    /// exclusively from userspace.
+    fn consumer_position(&self) -> &AtomicU32 {
+        // SAFETY: `RingBuffer::state()` wraps `self` in a lock, which
+        // guarantees that the lock is acquired here.
+        unsafe { &*((self.base_addr + *MapBuffer::PAGE_SIZE) as *const AtomicU32) }
+    }
+
+    /// The never decreasing position of the writing head of the ring buffer. This is updated
+    /// exclusively from the kernel.
+    fn producer_position(&self) -> &AtomicU32 {
+        // SAFETY: `RingBuffer::state()` wraps `self` in a lock, which
+        // guarantees that the lock is acquired here.
+        unsafe { &*((self.base_addr + *MapBuffer::PAGE_SIZE * 2) as *const AtomicU32) }
+    }
+
+    /// Address of the specified `position` within the buffer.
     fn data_position(&self, position: u32) -> usize {
-        self.data + ((position & self.mask) as usize)
+        self.data_addr() + ((position & self.mask) as usize)
     }
 
     fn is_consumer_position(&self, addr: usize) -> bool {
-        let Some(position) = addr.checked_sub(self.data) else {
+        let Some(position) = addr.checked_sub(self.data_addr()) else {
             return false;
         };
         let position = position as u32;
-        let consumer_position = self.consumer_position.load(Ordering::Acquire) & self.mask;
+        let consumer_position = self.consumer_position().load(Ordering::Acquire) & self.mask;
         position == consumer_position
     }
 
@@ -74,13 +89,14 @@ pub struct RingBuffer {
     /// signals from the VMO (see RINGBUF_SIGNAL).
     vmo: Arc<zx::Vmo>,
 
-    /// Mutable state protected with a lock.
-    state: Mutex<RingBufferState>,
-
     /// The specific memory address space used to map the ring buffer. This is the last field in
     /// the struct so that all the data that conceptually points to it is destroyed before the
     /// memory is unmapped.
-    _vmar: AllocatedVmar,
+    vmar: AllocatedVmar,
+
+    /// The mask corresponding to the size of the ring buffer. It's used to map the positions
+    /// in the ringbuffer (that are always growing) to their actual position in the memory object.
+    mask: u32,
 }
 
 impl RingBuffer {
@@ -93,13 +109,15 @@ impl RingBuffer {
     ///
     /// where:
     /// - T is 1 page containing at its 0 index a pointer to the `RingBuffer` itself.
-    /// - L is 1 page reserved for a lock. Currently unused. Hidden from user-space.
+    /// - L is 1 page that stores a 32-bit lock state at offset 0. Hidden from user-space.
     /// - C is 1 page containing at its 0 index a atomic u32 for the consumer position.
     ///   Accessible in user-space for write.
     /// - P is 1 page containing at its 0 index a atomic u32 for the producer position.
     ///   Accessible in user-space for read-only access.
     /// - D is size bytes and is the content of the ring buffer.
     ///   Accessible in user-space for read-only access.
+    ///
+    /// All sections described above are stored in the shared VMO except for T.
     ///
     /// The returns value is a `Pin<Box>`, because the structure is self referencing and is
     /// required never to move in memory.
@@ -136,7 +154,7 @@ impl RingBuffer {
         // The returned value and all pointer to the allocated memory will be part of `Self` and
         // all pointers will be dropped before the vmar. This ensures the deallocated memory will
         // not be used after it has been freed.
-        let (vmar, base) = unsafe {
+        let vmar = unsafe {
             AllocatedVmar::allocate(
                 &kernel_root_vmar,
                 0,
@@ -160,7 +178,20 @@ impl RingBuffer {
         )
         .map_err(|_| MapError::Internal)?;
 
-        let vmo = zx::Vmo::create(vmo_size as u64).map_err(|_| MapError::Internal)?;
+        let vmo = match vmo {
+            Some(vmo) => {
+                let actual_vmo_size = vmo.get_size().map_err(|_| MapError::InvalidVmo)? as usize;
+                if vmo_size != actual_vmo_size {
+                    return Err(MapError::InvalidVmo);
+                }
+                vmo
+            }
+            None => zx::Vmo::create(vmo_size as u64).map_err(|e| match e {
+                zx::Status::NO_MEMORY | zx::Status::OUT_OF_RANGE => MapError::NoMemory,
+                _ => MapError::Internal,
+            })?,
+        };
+
         vmo.set_name(&zx::Name::new_lossy("starnix:bpf")).unwrap();
         vmar.map(
             technical_vmo_size,
@@ -185,20 +216,34 @@ impl RingBuffer {
         //
         // This is safe as long as the vmar mapping stays alive. This will be ensured by the
         // `RingBuffer` itself.
-        let storage_position = unsafe { &mut *((base) as *mut *const Self) };
-        let consumer_position = unsafe { &*((base + 2 * page_size) as *const AtomicU32) };
-        let producer_position = unsafe { &*((base + 3 * page_size) as *const AtomicU32) };
-        let data = base + technical_vmo_size + control_pages_size;
-        let storage = Box::pin(Self {
-            vmo: Arc::new(vmo),
-            state: Mutex::new(RingBufferState { mask, consumer_position, producer_position, data }),
-            _vmar: vmar,
-        });
+        let storage_position = unsafe { &mut *(vmar.base() as *mut *const Self) };
+        let storage = Box::pin(Self { vmo: Arc::new(vmo), vmar, mask });
         // Store the pointer to the storage to the start of the technical vmo. This is required to
         // access the storage from the bpf methods that only get a pointer to the reserved memory.
         // This is safe as the returned referenced is Pinned.
         *storage_position = storage.deref();
         Ok(storage)
+    }
+
+    fn state<'a>(&'a self) -> RwMapLock<'a, RingBufferState> {
+        let page_size = *MapBuffer::PAGE_SIZE;
+
+        // Creates a `RwMapLock` that wraps `RingBufferState`.
+        //
+        // SAFETY: Lifetime of the lock is tied to the lifetime of `self`,
+        // which guarantees that the mapping is not destroyed for the lifetime
+        // of the result. The lock guarantees that the access to the
+        // `RingBufferState` is synchronized with other threads sharing the ring
+        // buffer.
+        unsafe {
+            let lock_cell = &*((self.vmar.base() + page_size) as *const AtomicU32);
+            RwMapLock::new(
+                lock_cell,
+                self.vmo.as_handle_ref(),
+                RINGBUF_LOCK_SIGNAL,
+                RingBufferState { base_addr: self.vmar.base() + page_size, mask: self.mask },
+            )
+        }
     }
 
     /// Commits the section of the ringbuffer represented by the `header`. This only consist in
@@ -217,7 +262,7 @@ impl RingBuffer {
 
         // Send a signal either if it is forced, or it is the default and the committed entry is
         // the next one the client will consume.
-        let state = self.state.lock();
+        let state = self.state().read();
         if flags == RingBufferWakeupPolicy::ForceWakeup
             || (flags == RingBufferWakeupPolicy::DefaultWakeup
                 && state.is_consumer_position(header as *const RingBufferRecordHeader as usize))
@@ -300,9 +345,9 @@ impl MapImpl for RingBuffer {
     }
 
     fn can_read(&self) -> Option<bool> {
-        let mut state = self.state.lock();
-        let consumer_position = state.consumer_position.load(Ordering::Acquire);
-        let producer_position = state.producer_position.load(Ordering::Acquire);
+        let mut state = self.state().write();
+        let consumer_position = state.consumer_position().load(Ordering::Acquire);
+        let producer_position = state.producer_position().load(Ordering::Acquire);
 
         // Read the header at the consumer position, and check that the entry is not busy.
         let can_read = consumer_position < producer_position
@@ -321,10 +366,10 @@ impl MapImpl for RingBuffer {
             return Err(MapError::InvalidParam);
         }
 
-        let mut state = self.state.lock();
-        let consumer_position = state.consumer_position.load(Ordering::Acquire);
-        let producer_position = state.producer_position.load(Ordering::Acquire);
-        let max_size = state.mask + 1;
+        let mut state = self.state().write();
+        let consumer_position = state.consumer_position().load(Ordering::Acquire);
+        let producer_position = state.producer_position().load(Ordering::Acquire);
+        let max_size = self.mask + 1;
 
         // Available size on the ringbuffer.
         let consumed_size =
@@ -343,13 +388,13 @@ impl MapImpl for RingBuffer {
         }
         let data_position = state.data_position(producer_position + BPF_RINGBUF_HDR_SZ);
         let data_length = size | BPF_RINGBUF_BUSY_BIT;
-        let page_count = ((data_position - state.data) / *MapBuffer::PAGE_SIZE + 3)
+        let page_count = ((data_position - state.data_addr()) / *MapBuffer::PAGE_SIZE + 3)
             .try_into()
             .map_err(|_| MapError::SizeLimit)?;
         let header = state.header_mut(producer_position);
         *header.length.get_mut() = data_length;
         header.page_count = page_count;
-        state.producer_position.store(producer_position + total_size, Ordering::Release);
+        state.producer_position().store(producer_position + total_size, Ordering::Release);
         Ok(data_position)
     }
 }

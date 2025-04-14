@@ -16,9 +16,11 @@ use fidl_fuchsia_ui_pointer::{
     {self as fuipointer},
 };
 use futures::StreamExt as _;
-use starnix_core::power::create_proxy_for_wake_events_counter;
+use starnix_core::power::{create_proxy_for_wake_events_counter, mark_proxy_message_handled};
 use starnix_core::task::Kernel;
-use starnix_logging::log_warn;
+use starnix_logging::{
+    log_warn, trace_duration, trace_duration_begin, trace_duration_end, trace_flow_end,
+};
 use starnix_sync::Mutex;
 use starnix_types::time::timeval_from_time;
 use starnix_uapi::uapi;
@@ -212,10 +214,24 @@ impl InputEventsRelay {
 
                 // .. until the counter that we passed to the runner has been decremented. This prevents
                 // the container from suspending between calls to `watch`.
-                message_counter.as_ref().map(|c| c.add(-1));
+                message_counter.as_ref().map(mark_proxy_message_handled);
 
                 match watch_future.await {
                     Ok(touch_events) => {
+                        trace_duration!(c"input", c"starnix_process_touch_event");
+                        for e in &touch_events {
+                            match e.trace_flow_id {
+                                Some(trace_flow_id)=>{
+                                    trace_flow_end!(
+                                        c"input",
+                                        c"dispatch_event_to_client",
+                                        trace_flow_id.into());
+                                }
+                                None => {
+                                    log_warn!("touch event has not tracing id");
+                                }
+                            }
+                        }
                         // TODO(https://fxbug.dev/365571169): record received event count by device,
                         // and use `num_received_events` in another inspect node.
                         let num_received_events: u64 = touch_events.len().try_into().unwrap();
@@ -231,6 +247,8 @@ impl InputEventsRelay {
                         num_ignored_events += ignored_events;
 
                         for (device_id, events) in events_by_device {
+                            trace_duration_begin!(c"input", c"starnix_process_per_device_touch_event");
+
                             let mut devs = slf.devices.lock();
 
                             let dev = devs.get_mut(&device_id).unwrap_or(&mut default_touch_device);
@@ -248,6 +266,7 @@ impl InputEventsRelay {
                                 num_unexpected_events += batch.count_unexpected_fidl_events;
                                 last_event_time_ns = batch.last_event_time_ns;
                             } else {
+                                trace_duration_end!(c"input", c"starnix_process_per_device_touch_event");
                                 log_warn!("Non touch device received touch events: device_id = {}, device_type = {}", device_id, dev.device_type);
                                 continue;
                             }
@@ -265,6 +284,7 @@ impl InputEventsRelay {
                                 log_warn!("unable to record inspect for device_id: {}, device_type: {}", device_id, dev.device_type);
                             }
 
+                            trace_duration_end!(c"input", c"starnix_process_per_device_touch_event");
                             dev.open_files.lock().retain(|f| {
                                 let Some(file) = f.upgrade() else {
                                     log_warn!("Dropping input file for touch that failed to upgrade");
@@ -339,6 +359,8 @@ impl InputEventsRelay {
                 while let Some(Ok(request)) = event_stream.next().await {
                     match request {
                         KeyboardListenerRequest::OnKeyEvent { event, responder } => {
+                            trace_duration!(c"input", c"starnix_process_keyboard_event");
+
                             let new_events = parse_fidl_keyboard_event_to_linux_input_event(&event);
 
                             let mut devs = slf.devices.lock();
@@ -443,10 +465,12 @@ impl InputEventsRelay {
             let next_event_future = local_listener_stream.next();
 
             // The previous hanging get has been handled, so decrement the unhandled message counter.
-            message_counter.as_ref().map(|c| c.add(-1));
+            message_counter.as_ref().map(mark_proxy_message_handled);
 
             match next_event_future.await {
                 Some(Ok(fuipolicy::MediaButtonsListenerRequest::OnEvent { event, responder })) => {
+                    trace_duration!(c"input", c"starnix_process_button_event");
+
                     let batch =
                         parse_fidl_button_event(&event, power_was_pressed, function_was_pressed);
 
@@ -594,7 +618,7 @@ impl InputEventsRelay {
 
             // .. until the message counter has been decremented. This prevents
             // the container from suspending between calls to `watch`.
-            message_counter.as_ref().map(|c| c.add(-1));
+            message_counter.as_ref().map(mark_proxy_message_handled);
 
             match event_future.await {
                 Ok(mouse_events) => {

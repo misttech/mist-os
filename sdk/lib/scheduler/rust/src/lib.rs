@@ -6,7 +6,7 @@ use anyhow::{Context, Error};
 use fidl_fuchsia_scheduler::{
     RoleManagerMarker, RoleManagerSetRoleRequest, RoleManagerSynchronousProxy, RoleName, RoleTarget,
 };
-use fuchsia_component::client::connect_to_protocol_sync;
+use fuchsia_component_client::connect_to_protocol_sync;
 use fuchsia_sync::RwLock;
 use std::sync::Arc;
 use zx::{HandleBased, MonotonicInstant, Rights, Status, Thread, Vmar};

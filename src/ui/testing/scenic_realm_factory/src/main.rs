@@ -126,6 +126,7 @@ async fn assemble_realm(
                 .capability(Capability::configuration(
                     "fuchsia.scenic.FrameSchedulerMinPredictedFrameDurationInUs",
                 ))
+                .capability(Capability::configuration("fuchsia.scenic.FramePredictionMarginInUs"))
                 .capability(Capability::configuration("fuchsia.scenic.ICanHazDisplayId"))
                 .capability(Capability::configuration("fuchsia.scenic.ICanHazDisplayMode"))
                 .capability(Capability::configuration(

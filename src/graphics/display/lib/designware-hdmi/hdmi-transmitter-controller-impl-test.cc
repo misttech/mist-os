@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller-impl.h"
 
-#include <lib/driver/mock-mmio/cpp/mock-mmio-range.h>
+#include <lib/driver/mock-mmio/cpp/globally-ordered-region.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 
 #include <fbl/array.h>
@@ -179,7 +179,7 @@ class HdmiTransmitterControllerImplTest : public testing::Test {
   void TearDown() override { mmio_range_.CheckAllAccessesReplayed(); }
 
   void ExpectScdcWrite(uint8_t address, uint8_t value) {
-    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
         {.address = kI2cmTargetOffset, .value = 0x54, .write = true},
         {.address = kI2cmAddressOffset, .value = address, .write = true},
         {.address = kI2cmDataoOffset, .value = value, .write = true},
@@ -188,7 +188,7 @@ class HdmiTransmitterControllerImplTest : public testing::Test {
   }
 
   void ExpectScdcRead(uint8_t address, uint8_t value) {
-    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
         {.address = kI2cmTargetOffset, .value = 0x54, .write = true},
         {.address = kI2cmAddressOffset, .value = address, .write = true},
         {.address = kI2cmOperationOffset, .value = 0b00'0001, .write = true},
@@ -200,13 +200,14 @@ class HdmiTransmitterControllerImplTest : public testing::Test {
   fdf_testing::ScopedGlobalLogger logger_;
 
   constexpr static int kMmioRangeSize = 0x8000;
-  mock_mmio::MockMmioRange mmio_range_{kMmioRangeSize, mock_mmio::MockMmioRange::Size::k8};
+  mock_mmio::GloballyOrderedRegion mmio_range_{kMmioRangeSize,
+                                               mock_mmio::GloballyOrderedRegion::Size::k8};
 
   std::unique_ptr<HdmiTransmitterControllerImpl> hdmitx_controller_;
 };
 
 TEST_F(HdmiTransmitterControllerImplTest, InitHwTest) {
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kMcLockonclockOffset, .value = 0b1111'1111, .write = true},
       {.address = kMcClkdisOffset, .value = 0b0000'0000, .write = true},
 
@@ -259,7 +260,7 @@ TEST_F(HdmiTransmitterControllerImplTest, ConfigHdmitxTest) {
       .is4K = false,
   };
 
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kTxInvid0Offset, .value = 0x03, .write = true},
 
       {.address = kTxInstuffingOffset, .value = 0b000, .write = true},
@@ -364,7 +365,7 @@ TEST_F(HdmiTransmitterControllerImplTest, ConfigHdmitxTest) {
 }
 
 TEST_F(HdmiTransmitterControllerImplTest, SetupInterruptsTest) {
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kIhMuteFcStat0Offset, .value = 0b1111'1111, .write = true},
       {.address = kIhMuteFcStat1Offset, .value = 0b1111'1111, .write = true},
       {.address = kIhMuteFcStat2Offset, .value = 0b0'0011, .write = true},
@@ -383,7 +384,7 @@ TEST_F(HdmiTransmitterControllerImplTest, SetupInterruptsTest) {
 }
 
 TEST_F(HdmiTransmitterControllerImplTest, ResetTest) {
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kMcSwrstzreqOffset, .value = 0b0000'0000, .write = true},
       {.address = kMcSwrstzreqOffset, .value = 0b0111'1101, .write = true},
       {.address = kFcVsyncinwidthOffset, .value = 0x41},
@@ -418,7 +419,7 @@ TEST_F(HdmiTransmitterControllerImplTest, SetupScdcTest) {
 }
 
 TEST_F(HdmiTransmitterControllerImplTest, ResetFcTest) {
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kFcInvidconfOffset, .value = 0b1111'1111},
       {.address = kFcInvidconfOffset, .value = 0b1111'0111, .write = true},
       {.address = kFcInvidconfOffset, .value = 0b0000'0000},
@@ -430,14 +431,14 @@ TEST_F(HdmiTransmitterControllerImplTest, ResetFcTest) {
 
 TEST_F(HdmiTransmitterControllerImplTest, SetFcScramblerCtrlTest) {
   // is4k = true
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kFcScamblerCtrlOffset, .value = 0b0000'0000},
       {.address = kFcScamblerCtrlOffset, .value = 0b0000'0001, .write = true},
   }));
   hdmitx_controller_->SetFcScramblerCtrl(true);
 
   // is4k = false
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kFcScamblerCtrlOffset, .value = 0b0000'0000, .write = true},
   }));
 
@@ -448,14 +449,14 @@ TEST_F(HdmiTransmitterControllerImplTest, ReadExtendedEdidForOneBlockEdid) {
   // The EDID of HP ZR30W has one block.
   static_assert(edid::kHpZr30wEdid.size() == 128);
 
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kI2cmTargetOffset, .value = 0x50, .write = true},
       {.address = kI2cmSegAddrOffset, .value = 0x30, .write = true},
       {.address = kI2cmSegPtrOffset, .value = 0x00, .write = true},
   }));
 
   for (size_t i = 0; i < 128; i += 8) {
-    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
         {.address = kI2cmAddressOffset, .value = i, .write = true},
         {.address = kI2cmOperationOffset, .value = 0b00'1000, .write = true},
 
@@ -487,14 +488,14 @@ TEST_F(HdmiTransmitterControllerImplTest, ReadExtendedEdidForTwoBlockEdid) {
   static_assert(edid::kDellP2719hEdid.size() == 256);
 
   // Read the first EDID block.
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kI2cmTargetOffset, .value = 0x50, .write = true},
       {.address = kI2cmSegAddrOffset, .value = 0x30, .write = true},
       {.address = kI2cmSegPtrOffset, .value = 0x00, .write = true},
   }));
 
   for (size_t i = 0; i < 128; i += 8) {
-    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
         {.address = kI2cmAddressOffset, .value = i, .write = true},
         {.address = kI2cmOperationOffset, .value = 0b00'1000, .write = true},
 
@@ -514,14 +515,14 @@ TEST_F(HdmiTransmitterControllerImplTest, ReadExtendedEdidForTwoBlockEdid) {
   };
 
   // Read the second EDID block.
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kI2cmTargetOffset, .value = 0x50, .write = true},
       {.address = kI2cmSegAddrOffset, .value = 0x30, .write = true},
       {.address = kI2cmSegPtrOffset, .value = 0x00, .write = true},
   }));
 
   for (size_t i = 128; i < 256; i += 8) {
-    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
         {.address = kI2cmAddressOffset, .value = i, .write = true},
         {.address = kI2cmOperationOffset, .value = 0b00'1000, .write = true},
 
@@ -553,14 +554,14 @@ TEST_F(HdmiTransmitterControllerImplTest, ReadExtendedEdidForMultiSegmentExtende
   static_assert(edid::kSamsungCrg9Edid.size() == 512);
 
   // Read the first EDID block.
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kI2cmTargetOffset, .value = 0x50, .write = true},
       {.address = kI2cmSegAddrOffset, .value = 0x30, .write = true},
       {.address = kI2cmSegPtrOffset, .value = 0x00, .write = true},
   }));
 
   for (size_t i = 0; i < 128; i += 8) {
-    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
         {.address = kI2cmAddressOffset, .value = i, .write = true},
         {.address = kI2cmOperationOffset, .value = 0b00'1000, .write = true},
 
@@ -580,14 +581,14 @@ TEST_F(HdmiTransmitterControllerImplTest, ReadExtendedEdidForMultiSegmentExtende
   }
 
   // Read the second EDID block.
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kI2cmTargetOffset, .value = 0x50, .write = true},
       {.address = kI2cmSegAddrOffset, .value = 0x30, .write = true},
       {.address = kI2cmSegPtrOffset, .value = 0x00, .write = true},
   }));
 
   for (size_t i = 128; i < 256; i += 8) {
-    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
         {.address = kI2cmAddressOffset, .value = i, .write = true},
         {.address = kI2cmOperationOffset, .value = 0b00'1000, .write = true},
 
@@ -607,14 +608,14 @@ TEST_F(HdmiTransmitterControllerImplTest, ReadExtendedEdidForMultiSegmentExtende
   }
 
   // Read the third EDID block.
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kI2cmTargetOffset, .value = 0x50, .write = true},
       {.address = kI2cmSegAddrOffset, .value = 0x30, .write = true},
       {.address = kI2cmSegPtrOffset, .value = 0x01, .write = true},
   }));
 
   for (size_t i = 256; i < 384; i += 8) {
-    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
         {.address = kI2cmAddressOffset, .value = i - 256, .write = true},
         {.address = kI2cmOperationOffset, .value = 0b00'1000, .write = true},
 
@@ -634,14 +635,14 @@ TEST_F(HdmiTransmitterControllerImplTest, ReadExtendedEdidForMultiSegmentExtende
   }
 
   // Read the fourth EDID block.
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kI2cmTargetOffset, .value = 0x50, .write = true},
       {.address = kI2cmSegAddrOffset, .value = 0x30, .write = true},
       {.address = kI2cmSegPtrOffset, .value = 0x01, .write = true},
   }));
 
   for (size_t i = 384; i < 512; i += 8) {
-    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
         {.address = kI2cmAddressOffset, .value = i - 256, .write = true},
         {.address = kI2cmOperationOffset, .value = 0b00'1000, .write = true},
 

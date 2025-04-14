@@ -7,7 +7,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use assembly_blob_size::BlobSizeCalculator;
 use assembly_images_config::BlobfsLayout;
 use assembly_manifest::{AssemblyManifest, Image};
-use assembly_partitions_config::PartitionsConfig;
+use assembly_partitions_config::{PartitionsConfig, RecoveryStyle};
 use assembly_tool::ToolProvider;
 use assembly_update_packages_manifest::UpdatePackagesManifest;
 use camino::{Utf8Path, Utf8PathBuf};
@@ -334,19 +334,42 @@ impl UpdatePackageBuilder {
                 .zbi_vbmeta_dtbo()
                 .ok_or_else(|| anyhow!("recovery slot missing a zbi image"))?;
 
-            builder.package.add_file_as_blob(&zbi.destination, &zbi.source)?;
+            match self.partitions.recovery_style()? {
+                RecoveryStyle::AB => {
+                    firmware_images.push(FirmwareImage {
+                        source: zbi.source,
+                        destination: "recovery_zbi".into(),
+                        firmware_type: "recovery_zbi".into(),
+                    });
+                    if let Some(vbmeta) = vbmeta {
+                        firmware_images.push(FirmwareImage {
+                            source: vbmeta.source,
+                            destination: "recovery_vbmeta".into(),
+                            firmware_type: "recovery_vbmeta".into(),
+                        });
+                    }
+                    let (_url, manifest) = builder.build()?;
+                    package_manifests.push(manifest);
+                }
+                RecoveryStyle::R => {
+                    builder.package.add_file_as_blob(&zbi.destination, &zbi.source)?;
 
-            if let Some(vbmeta) = &vbmeta {
-                builder.package.add_file_as_blob(&vbmeta.destination, &vbmeta.source)?;
+                    if let Some(vbmeta) = &vbmeta {
+                        builder.package.add_file_as_blob(&vbmeta.destination, &vbmeta.source)?;
+                    }
+
+                    let (url, manifest) = builder.build()?;
+                    package_manifests.push(manifest);
+
+                    assembly_manifest.recovery_package(
+                        zbi.metadata(url.clone())?,
+                        vbmeta.map(|vbmeta| vbmeta.metadata(url)).transpose()?,
+                    );
+                }
+                RecoveryStyle::NoRecovery => {
+                    bail!("Has recovery images but no recovery partitions");
+                }
             }
-
-            let (url, manifest) = builder.build()?;
-            package_manifests.push(manifest);
-
-            assembly_manifest.recovery_package(
-                zbi.metadata(url.clone())?,
-                vbmeta.map(|vbmeta| vbmeta.metadata(url)).transpose()?,
-            );
         } else {
             let (_, manifest) = builder.build()?;
             package_manifests.push(manifest);
@@ -613,6 +636,8 @@ mod tests {
             partitions: vec![
                 Partition::ZBI { name: "zircon_a".into(), slot: PartitionSlot::A, size: None },
                 Partition::Dtbo { name: "dtbo_a".into(), slot: PartitionSlot::A, size: None },
+                Partition::ZBI { name: "zircon_r".into(), slot: PartitionSlot::R, size: None },
+                Partition::ZBI { name: "vbmeta_r".into(), slot: PartitionSlot::R, size: None },
             ],
             hardware_revision: "hw".into(),
         };
@@ -793,6 +818,95 @@ mod tests {
         let i: ::update_package::VersionedImagePackagesManifest =
             serde_json::from_reader(reader).unwrap();
         assert_eq!(ImagePackagesManifest::builder().build(), i);
+
+        // Ensure the expected package fars/manifests were generated.
+        assert!(outdir.join("update.far").exists());
+        assert!(outdir.join("update_package_manifest.json").exists());
+        assert!(outdir.join("update_images_fuchsia.far").exists());
+        assert!(outdir.join("update_images_recovery.far").exists());
+        assert!(outdir.join("update_images_firmware.far").exists());
+        assert!(outdir.join("update_images_fuchsia_package_manifest.json").exists());
+        assert!(outdir.join("update_images_recovery_package_manifest.json").exists());
+        assert!(outdir.join("update_images_firmware_package_manifest.json").exists());
+    }
+
+    #[test]
+    fn build_ab_recovery() {
+        let tmp = tempdir().unwrap();
+        let outdir = Utf8Path::from_path(tmp.path()).unwrap();
+
+        let partitions_config = PartitionsConfig {
+            partitions: vec![
+                Partition::RecoveryZBI {
+                    name: "recovery_zbi_a".into(),
+                    slot: PartitionSlot::A,
+                    size: None,
+                },
+                Partition::RecoveryVBMeta {
+                    name: "recovery_vbmeta_a".into(),
+                    slot: PartitionSlot::A,
+                    size: None,
+                },
+            ],
+            ..PartitionsConfig::default()
+        };
+        let epoch = EpochFile::Version1 { epoch: 0 };
+        let mut fake_version = NamedTempFile::new().unwrap();
+        writeln!(fake_version, "1.2.3.4").unwrap();
+        let mut builder = UpdatePackageBuilder::new(
+            partitions_config,
+            "board",
+            fake_version.path().to_path_buf(),
+            epoch.clone(),
+            &outdir,
+        );
+
+        // Add a Recovery ZBI/VBMeta to the update.
+        let fake_recovery_zbi_tmp = NamedTempFile::new().unwrap();
+        let fake_recovery_zbi = Utf8Path::from_path(fake_recovery_zbi_tmp.path()).unwrap();
+
+        let fake_recovery_vbmeta_tmp = NamedTempFile::new().unwrap();
+        let fake_recovery_vbmeta = Utf8Path::from_path(fake_recovery_vbmeta_tmp.path()).unwrap();
+
+        builder.add_slot_images(Slot::Recovery(AssemblyManifest {
+            images: vec![
+                Image::ZBI { path: fake_recovery_zbi.to_path_buf(), signed: true },
+                Image::VBMeta(fake_recovery_vbmeta.to_path_buf()),
+            ],
+            board_name: "my_board".into(),
+        }));
+
+        let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
+        builder.build(tool_provider).unwrap();
+
+        let file = File::open(outdir.join("images.json")).unwrap();
+        let reader = BufReader::new(file);
+        let i: VersionedImagePackagesManifest = serde_json::from_reader(reader).unwrap();
+        match i {
+            VersionedImagePackagesManifest::Version1(v) => {
+                assert_eq!(v.assets.len(), 0);
+
+                assert_eq!(v.firmware.len(), 2);
+                let firmware = &v.firmware[0];
+                assert_eq!(firmware.type_, "recovery_vbmeta".to_string());
+                assert_eq!(firmware.size, 0);
+                let firmware = &v.firmware[1];
+                assert_eq!(firmware.type_, "recovery_zbi".to_string());
+                assert_eq!(firmware.size, 0);
+            }
+        }
+
+        let far_path = outdir.join("update_images_firmware.far");
+        let mut far_reader = Utf8Reader::new(File::open(&far_path).unwrap()).unwrap();
+        let package = far_reader.read_file("meta/package").unwrap();
+        assert_eq!(package, br#"{"name":"update_images_firmware","version":"0"}"#);
+        let contents = far_reader.read_file("meta/contents").unwrap();
+        let contents = std::str::from_utf8(&contents).unwrap();
+        let contents = MetaContents::deserialize(std::io::Cursor::new(contents)).unwrap();
+        let mut contents: Vec<String> = contents.into_contents().into_keys().collect();
+        contents.sort();
+        let expected_contents = vec!["recovery_vbmeta".to_string(), "recovery_zbi".to_string()];
+        assert_eq!(expected_contents, contents);
 
         // Ensure the expected package fars/manifests were generated.
         assert!(outdir.join("update.far").exists());

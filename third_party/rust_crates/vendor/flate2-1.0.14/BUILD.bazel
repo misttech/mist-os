@@ -78,7 +78,7 @@ rust_library(
     deps = [
         "//third_party/rust_crates/vendor/cfg-if-0.1.10:cfg_if",
         "//third_party/rust_crates/vendor/crc32fast-1.2.0:crc32fast",
-        "//third_party/rust_crates/vendor/libc-0.2.169:libc",
+        "//third_party/rust_crates/vendor/libc-0.2.171:libc",
         "//third_party/rust_crates/vendor/miniz_oxide-0.3.6:miniz_oxide",
     ],
 )

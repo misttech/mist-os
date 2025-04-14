@@ -9,18 +9,23 @@
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/zircon-internal/thread_annotations.h>
 #include <zircon/types.h>
 
 #include <cinttypes>
 
+#include <fbl/auto_lock.h>
+
 #include "sdmmc-types.h"
+#include "src/storage/lib/block_server/block_server.h"
 
 namespace sdmmc {
 
 class SdmmcBlockDevice;
 
 class PartitionDevice : public ddk::BlockImplProtocol<PartitionDevice>,
-                        public ddk::BlockPartitionProtocol<PartitionDevice> {
+                        public ddk::BlockPartitionProtocol<PartitionDevice>,
+                        public block_server::Interface {
  public:
   PartitionDevice(SdmmcBlockDevice* sdmmc_parent, const block_info_t& block_info,
                   EmmcPartition partition);
@@ -34,22 +39,40 @@ class PartitionDevice : public ddk::BlockImplProtocol<PartitionDevice>,
   zx_status_t BlockPartitionGetName(char* out_name, size_t capacity);
   zx_status_t BlockPartitionGetMetadata(partition_metadata_t* out_metadata);
 
-  // Visible for testing.
   EmmcPartition partition() const { return partition_; }
+  block_info_t block_info() const { return block_info_; }
+
+  // Visible for testing.
   const block_impl_protocol_ops_t& block_impl_protocol_ops() const {
     return block_impl_protocol_ops_;
   }
 
-  fdf::Logger& logger();
+  fdf::Logger& logger() const;
+
+  void StopBlockServer();
+
+  // block_server::Interface
+  void StartThread(block_server::Thread) override;
+  void OnNewSession(block_server::Session) override;
+  void OnRequests(const block_server::Session&, cpp20::span<block_server::Request>) override;
+  void Log(std::string_view msg) const override {
+    FDF_LOGL(INFO, logger(), "%.*s", static_cast<int>(msg.size()), msg.data());
+  }
 
  private:
   SdmmcBlockDevice* const sdmmc_parent_;
   const block_info_t block_info_;
   const EmmcPartition partition_;
 
-  std::string partition_name_;
+  const char* partition_name_ = nullptr;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
 
+  fbl::Mutex lock_;
+  std::optional<block_server::BlockServer> block_server_ TA_GUARDED(lock_);
+
+  // Legacy DFv1-based protocols.
+  // TODO(https://fxbug.dev/394968352): Remove once all clients use Volume service provided by
+  // block_server_.
   compat::BanjoServer block_impl_server_{ZX_PROTOCOL_BLOCK_IMPL, this, &block_impl_protocol_ops_};
   std::optional<compat::BanjoServer> block_partition_server_;
   compat::SyncInitializedDeviceServer compat_server_;

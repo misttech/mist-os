@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use blob_writer::BlobWriter;
 use delivery_blob::{CompressionMode, Type1Blob};
 use fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobReaderMarker, BlobWriterProxy, CreateBlobError};
-use fuchsia_component::client::connect_to_protocol_at_dir_svc;
+use fuchsia_component_client::connect_to_protocol_at_dir_svc;
 use fuchsia_merkle::Hash;
 
 use fxfs::object_store::directory::Directory;
@@ -67,7 +67,7 @@ impl BlobFixture for TestFixture {
         let root_object_id = self.volume().volume().store().root_directory_object_id();
         let root_dir =
             Directory::open(self.volume().volume(), root_object_id).await.expect("open failed");
-        let (object_id, _) =
+        let (object_id, _, _) =
             root_dir.lookup(name).await.expect("lookup failed").expect("file doesn't exist yet");
 
         ObjectStore::open_object(self.volume().volume(), object_id, HandleOptions::default(), None)

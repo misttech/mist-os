@@ -5,7 +5,10 @@
 # https://opensource.org/licenses/MIT
 
 source_set("tests") {
-  sources = [ "ktrace-internal-tests.cc" ]
+  sources = [
+    "ktrace-internal-tests.cc",
+    "ktrace-tests.cc",
+  ]
   deps = [
     "//zircon/kernel/lib/ktrace",
     "//zircon/kernel/lib/unittest",

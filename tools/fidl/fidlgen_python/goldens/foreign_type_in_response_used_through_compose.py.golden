@@ -11,22 +11,29 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()[
-    "test.foreigntypeinresponseusedthroughcompose"
-]
+_ir_path = get_fidl_ir_map()["test.foreigntypeinresponseusedthroughcompose"]
 add_ir_path(_ir_path)
 
 import fidl_test_bottom
 import fidl_test_middle
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class TopServer(fidl._server.ServerBase, ABC):
+class TopServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.foreigntypeinresponseusedthroughcompose"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -44,6 +51,8 @@ class TopServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -62,7 +71,7 @@ class TopServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class TopClient(fidl._client.FidlClient):
+class TopClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.foreigntypeinresponseusedthroughcompose"
 
@@ -70,6 +79,8 @@ class TopClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -84,13 +95,11 @@ class TopClient(fidl._client.FidlClient):
             4619180266423108403,
             "test.foreigntypeinresponseusedthroughcompose",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.middle/MiddleGetFooResponse"
-            ),
+            normalize_identifier("test.middle/MiddleGetFooResponse"),
         )
 
 
-class TopEventHandler(fidl._client.EventHandlerBase, ABC):
+class TopEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.foreigntypeinresponseusedthroughcompose"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -99,11 +108,13 @@ class TopEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-TopMarker = fidl._library.ProtocolMarker(
+TopMarker = FidlProtocolMarker(
     "(nondiscoverable) test.foreigntypeinresponseusedthroughcompose/Top"
 )

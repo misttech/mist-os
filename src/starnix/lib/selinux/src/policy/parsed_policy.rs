@@ -152,7 +152,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     /// Computes the access vector that associates type `source_type_name` and `target_type_name`
     /// via an explicit `allow [...];` statement in the binary policy. Computes `AccessVector::NONE`
     /// if no such statement exists. This is the "custom" form of this API because
-    /// `target_class_name` is associated with a [`crate::AbstractObjectClass::Custom`]
+    /// `target_class_name` is associated with a [`crate::ObjectClass::Custom`]
     /// value.
     pub(super) fn compute_explicitly_allowed_custom(
         &self,
@@ -280,7 +280,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
 
     /// A permission is denied if it matches at least one unsatisfied
     /// constraint. This is the "custom" version because `target_class_name` is
-    /// associated with a [`crate::AbstractObjectClass::Custom`] value.
+    /// associated with a [`crate::ObjectClass::Custom`] value.
     fn compute_denied_by_constraints_custom(
         &self,
         source_context: &SecurityContext,
@@ -375,7 +375,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     /// Computes the ioctl extended permissions that should be allowed, audited when allowed, and
     /// audited when denied, for a given source context, target context, target class, and ioctl
     /// prefix byte. This is the "custom" version because `target_class_name` is associated with a
-    /// [`crate::AbstractObjectClass::Custom`] value.
+    /// [`crate::ObjectClass::Custom`] value.
     pub(super) fn compute_ioctl_access_decision_custom(
         &self,
         source_context: &SecurityContext,

@@ -25,10 +25,9 @@ struct fdio_waitable_t {
 static_assert(sizeof(fdio_waitable_t) <= sizeof(zxio_storage_t),
               "fdio_waitable_t must fit inside zxio_storage_t.");
 
-static zx_status_t fdio_waitable_close(zxio_t* io, const bool should_wait) {
+static void fdio_waitable_destroy(zxio_t* io) {
   auto waitable = reinterpret_cast<fdio_waitable_t*>(io);
   waitable->~fdio_waitable_t();
-  return ZX_OK;
 }
 
 static void fdio_waitable_wait_begin(zxio_t* io, zxio_signals_t zxio_signals,
@@ -64,7 +63,7 @@ static void fdio_waitable_wait_end(zxio_t* io, zx_signals_t zx_signals,
 
 static constexpr zxio_ops_t fdio_waitable_ops = []() {
   zxio_ops_t ops = zxio_default_ops;
-  ops.close = fdio_waitable_close;
+  ops.destroy = fdio_waitable_destroy;
   ops.wait_begin = fdio_waitable_wait_begin;
   ops.wait_end = fdio_waitable_wait_end;
   return ops;

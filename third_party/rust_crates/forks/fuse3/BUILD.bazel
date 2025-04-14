@@ -84,7 +84,7 @@ rust_library(
         "//third_party/rust_crates/vendor/bytes-1.10.0:bytes",
         "//third_party/rust_crates/vendor/futures-channel-0.3.30:futures_channel",
         "//third_party/rust_crates/vendor/futures-util-0.3.30:futures_util",
-        "//third_party/rust_crates/vendor/libc-0.2.169:libc",
+        "//third_party/rust_crates/vendor/libc-0.2.171:libc",
         "//third_party/rust_crates/vendor/serde-1.0.204:serde",
         "//third_party/rust_crates/vendor/slab-0.4.9:slab",
         "//third_party/rust_crates/vendor/tokio-1.38.1:tokio",

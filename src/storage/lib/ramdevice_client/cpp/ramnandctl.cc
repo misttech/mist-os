@@ -28,7 +28,7 @@ namespace ramdevice_client_test {
 __EXPORT
 zx_status_t RamNandCtl::Create(fbl::unique_fd devfs_root, std::unique_ptr<RamNandCtl>* out) {
   zx::result channel =
-      device_watcher::RecursiveWaitForFile(devfs_root.get(), "sys/platform/00:00:2e/nand-ctl");
+      device_watcher::RecursiveWaitForFile(devfs_root.get(), "sys/platform/ram-nand/nand-ctl");
   if (channel.is_error()) {
     fprintf(stderr, "ram_nand_ctl device failed enumerated: %s\n", channel.status_string());
     return channel.status_value();
@@ -54,7 +54,7 @@ zx_status_t RamNandCtl::CreateRamNand(fuchsia_hardware_nand::wire::RamNandInfo c
   }
 
   fbl::String path = fbl::String::Concat({
-      "sys/platform/00:00:2e/nand-ctl/",
+      "sys/platform/ram-nand/nand-ctl/",
       response.name.get(),
   });
   fprintf(stderr, "Trying to open (%s)\n", path.c_str());

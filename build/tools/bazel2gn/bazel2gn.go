@@ -50,9 +50,10 @@ var attrsToOmitByRules = map[string]map[string]bool{
 // and GN. specialIdentifiers maps from their Bazel representations to GN
 // representations.
 var specialIdentifiers = map[string]string{
-	"True":  "true",
-	"False": "false",
-	"srcs":  "sources",
+	"True":           "true",
+	"False":          "false",
+	"srcs":           "sources",
+	"crate_features": "features",
 }
 
 // specialTokens maps from special tokens in Bazel to their GN equivalents.
@@ -295,16 +296,41 @@ func attrAssignmentToGN(expr *syntax.BinaryExpr) ([]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("expecting an identifier on the left hand side of attribute assignment, got %T", expr.X)
 	}
-	attrName := lhs.Name
+	attrName, ok := specialIdentifiers[lhs.Name]
+	if !ok {
+		attrName = lhs.Name
+	}
 
 	var transformers []transformer
 	switch attrName {
 	case "visibility":
 		transformers = append(transformers, bazelVisibilityToGN)
-	case "deps":
+	case "deps", "test_deps":
 		transformers = append(transformers, bazelDepToGN)
 	}
 
+	// This is a simple `attr = select(...)`, convert in-place.
+	if isSelectCall(expr.Y) {
+		return selectToGN(attrName, "=", expr.Y.(*syntax.CallExpr), transformers)
+	}
+
+	// It is not a simple `select` call on the RHS, and `select`s are found in
+	// subtree, so assume this is list concatenation with `select`s in them.
+	//
+	// NOTE: Currently `select`s are only supported in list concatenation when
+	// they are used in binary expressions. Other usages will fail this call.
+	if hasSelectCall(expr.Y) {
+		lc, err := listConcatWithSelectToGN(attrName, expr.Y, transformers)
+		if err != nil {
+			return nil, err
+		}
+		// Start with an empty list so it's easy to += new elements from later
+		// conversions.
+		return append([]string{fmt.Sprintf("%s = []", attrName)}, lc...), nil
+	}
+
+	// No selects found, convert this assignment as a normal binary expression to
+	// reuse logic there.
 	return binaryExprToGN(expr, transformers)
 }
 

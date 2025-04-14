@@ -4,7 +4,10 @@
 
 //! Common counter abstractions.
 
+use core::fmt::Debug;
 use core::sync::atomic::{AtomicU64, Ordering};
+
+use crate::test_only::TestOnlyPartialEq;
 
 /// An atomic counter for packet statistics, e.g. IPv4 packets received.
 #[derive(Debug, Default)]
@@ -58,5 +61,50 @@ pub trait ResourceCounterContext<R, T>: CounterContext<T> {
     fn increment_both<F: Fn(&T) -> &Counter>(&self, resource: &R, cb: F) {
         cb(self.per_resource_counters(resource)).increment();
         cb(self.counters()).increment();
+    }
+}
+
+mod sealed {
+    use super::*;
+
+    /// Used to implement the "sealed trait" pattern.
+    pub trait Sealed {}
+
+    impl Sealed for u64 {}
+    impl Sealed for Counter {}
+}
+
+/// A marker trait to indicate types that may be used as a counter.
+pub trait CounterRepr: sealed::Sealed + Default + Debug + TestOnlyPartialEq {
+    /// Get the held counter value.
+    fn get(&self) -> u64;
+    /// Construct a new counter from the value.
+    fn new(value: u64) -> Self;
+
+    /// Convert one `CounterRepr` into another `CounterRepr`.
+    fn into_repr<C: CounterRepr>(&self) -> C {
+        C::new(self.get())
+    }
+}
+
+impl CounterRepr for Counter {
+    fn get(&self) -> u64 {
+        self.get()
+    }
+
+    fn new(value: u64) -> Self {
+        Counter(AtomicU64::new(value))
+    }
+}
+
+// Only allow `u64` as a counter in tests.
+#[cfg(any(test, feature = "testutils"))]
+impl CounterRepr for u64 {
+    fn get(&self) -> u64 {
+        *self
+    }
+
+    fn new(value: u64) -> Self {
+        value
     }
 }

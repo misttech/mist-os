@@ -1483,7 +1483,7 @@ async fn event_streams_test() -> Result<(), Error> {
                 }
                 .boxed()
             },
-            ChildOptions::new().eager(),
+            ChildOptions::new(),
         )
         .await?;
     let listener = builder
@@ -1496,6 +1496,8 @@ async fn event_streams_test() -> Result<(), Error> {
                     let proxy = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
                         EventStreamMarker,
                     >(&events_dir, "event_stream")?;
+                    proxy.wait_for_ready().await.unwrap();
+                    let _ = handles.connect_to_service::<fex_services::BankAccountMarker>();
                     proxy.get_next().await.unwrap();
                     tx.unbounded_send(())?;
                     Ok(())
@@ -1510,7 +1512,7 @@ async fn event_streams_test() -> Result<(), Error> {
             Route::new()
                 .capability(Capability::service::<fex_services::BankAccountMarker>())
                 .from(&root)
-                .to(Ref::parent()),
+                .to(&listener),
         )
         .await?;
     // Add event streams from parent

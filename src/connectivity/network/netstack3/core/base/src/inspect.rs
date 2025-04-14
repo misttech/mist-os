@@ -14,13 +14,13 @@ pub use diagnostics_traits::{Inspectable, InspectableValue, Inspector, Inspector
 use net_types::ip::IpAddress;
 use net_types::{AddrAndPortFormatter, ZonedAddr};
 
-use crate::counters::Counter;
+use crate::counters::CounterRepr;
 
 /// Extension trait for [`Inspector`] adding support for netstack3-specific
 /// types.
 pub trait InspectorExt: Inspector {
     /// Records a counter.
-    fn record_counter(&mut self, name: &str, value: &Counter) {
+    fn record_counter<C: CounterRepr>(&mut self, name: &str, value: &C) {
         self.record_uint(name, value.get())
     }
 

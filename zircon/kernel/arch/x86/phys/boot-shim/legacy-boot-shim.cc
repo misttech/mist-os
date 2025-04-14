@@ -12,6 +12,7 @@
 #include <lib/memalloc/pool.h>
 #include <lib/stdcompat/span.h>
 #include <lib/uart/all.h>
+#include <lib/fit/defer.h>
 #include <lib/zbi-format/zbi.h>
 #include <stdlib.h>
 
@@ -40,9 +41,9 @@ void PhysMain(void* ptr, arch::EarlyTicks boot_ticks) {
   InitMemory(ptr, &aspace);
 
   const ktl::span ramdisk = ktl::as_bytes(gLegacyBoot.ramdisk);
-  UartFromZbi(LegacyBootShim::InputZbi(ramdisk), gLegacyBoot.uart);
-  UartFromCmdLine(gLegacyBoot.cmdline, gLegacyBoot.uart);
-  LegacyBootSetUartConsole(gLegacyBoot.uart);
+  gLegacyBoot.uart_config = UartFromZbi(LegacyBootShim::InputZbi(ramdisk), gLegacyBoot.uart_config);
+  UartFromCmdLine(gLegacyBoot.cmdline, gLegacyBoot.uart_config);
+  LegacyBootSetUartConsole(gLegacyBoot.uart_config);
 
   LegacyBootShim shim(symbolize.name(), gLegacyBoot);
   shim.set_build_id(symbolize.build_id());
@@ -88,26 +89,29 @@ bool LegacyBootShim::IsProperZbi() const {
 // first item is the kernel item, and items are appended.  The symbols is weak,
 // such that bug compatible shims can override this.  Examples of such bugs are
 // bootloaders prepending items to the ZBI (preceding the original kernel).
-[[gnu::weak]] void UartFromZbi(LegacyBootShim::InputZbi zbi, uart::all::Driver& uart) {
-  if (ktl::optional new_uart = GetUartFromRange(zbi.begin(), zbi.end())) {
-    uart = *new_uart;
+[[gnu::weak]] uart::all::Config<> UartFromZbi(LegacyBootShim::InputZbi zbi, const uart::all::Config<>& uart_config) {
+  auto cleanup = fit::defer([&zbi](){
+    zbi.ignore_error();
+  });
+
+  if (ktl::optional new_uart_config = GetUartFromRange(zbi.begin(), zbi.end())) {
+    return *new_uart_config;
   }
-  zbi.ignore_error();
+  return uart_config;
 }
 
-ktl::optional<uart::all::Driver> GetUartFromRange(  //
+ktl::optional<uart::all::Config<>> GetUartFromRange(  //
     LegacyBootShim::InputZbi::iterator start, LegacyBootShim::InputZbi::iterator end) {
-  ktl::optional<uart::all::Driver> uart;
-  UartDriver driver;
+  ktl::optional<uart::all::Config<>> uart_config;
+
   while (start != end && start != start.view().end()) {
     auto& [header, payload] = *start;
     if (header->type == ZBI_TYPE_KERNEL_DRIVER) {
-      if (driver.Match(*header, payload.data())) {
-        uart = ktl::move(driver).TakeUart();
+      if (ktl::optional config = uart::all::Config<>::Match(*header, payload.data())) {
+        uart_config = *config;
       }
     }
     start++;
   }
-
-  return uart;
+  return uart_config;
 }

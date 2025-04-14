@@ -467,8 +467,6 @@ template("clang_toolchain") {
     # Compute default dynamic library extension
     if (invoker.toolchain_os == "mac") {
       _dylib_extension = ".dylib"
-    } else if (invoker.toolchain_cpu == "wasm32") {
-      _dylib_extension = ".wasm"
     } else if (invoker.toolchain_os == "win") {
       _dylib_extension = ".dll"
     } else if (invoker.toolchain_os == "fuchsia" ||
@@ -509,10 +507,9 @@ template("clang_toolchain") {
     # based on the final target type:
     #
     # - {{UNSTRIPPED_OUTFILE}}: path of the unstripped output file. Should be
-    #   'unstripped_outfile', except for tool("rust_bin") when toolchain_os is
-    #   "wasm32", where it should be "${unstripped_outfile}.wasm" instead.
-    #   The reason for this is that setting default_output_extension doesn't
-    #   work for binaries as it does for libraries.
+    #   'unstripped_outfile'. The reason for this is that setting
+    #   default_output_extension doesn't work for binaries as it does for
+    #   libraries.
     #
     # - {{UNSTRIPPED_DIR}}: name of directory holding unstripped binaries.
     #   'lib.unstripped' for shared libraries and modules, and 'exe.unstripped'
@@ -655,9 +652,6 @@ template("clang_toolchain") {
       }
     }
 
-    # Quiet GN for wasm32 toolchain
-    not_needed(_link_common, [ "command_suffix" ])
-
     if (enable_rust) {
       # The _rust_link_common scope is used to capture common computations that
       # are needed by the "rust_bin", "rust_dylib" and "rust_cdylib" tool()
@@ -697,20 +691,6 @@ template("clang_toolchain") {
             invoker.toolchain_os == "mistos") {
           # On Fuchsia, lld is directly used to perform linking
           link_map_args = "-C link-args=--Map=\"{{UNSTRIPPED_OUTFILE}}.map\""
-        } else if (invoker.toolchain_cpu == "wasm32") {
-          # TODO(https://fxbug.dev/42133775): Remove need for ld location.
-          # On WASM builds, rust-ldd has trouble finding libLLVM.
-          # This workaround allows the build to proceed.
-          shared_lib_dir = rebase_path("$rustc_prefix/lib", root_build_dir)
-          if (host_os == "mac") {
-            ld_location_env = " DYLD_FALLBACK_LIBRARY_PATH=\"$shared_lib_dir\""
-          } else if (host_os == "linux") {
-            ld_location_env = " LD_LIBRARY_PATH=\"$shared_lib_dir\""
-          } else {
-            assert(false, "Unsupported host os: $host_os")
-          }
-
-          # Disable link map args, which also seems to have a problem with WASM.
         } else if (invoker.toolchain_os == "mac") {
           # NOTE: MacOs does not support '--Map' in linker flags
         } else {
@@ -817,9 +797,6 @@ template("clang_toolchain") {
 
         forward_variables_from(_rust_link_common, "*", [ "outputs" ])
 
-        if (invoker.toolchain_cpu == "wasm32") {
-          unstripped_outfile += ".wasm"
-        }
         _unstripped_dir = "exe.unstripped"
         _outputs = _rust_link_common.outputs
 

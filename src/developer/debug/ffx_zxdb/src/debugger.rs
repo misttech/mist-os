@@ -38,7 +38,7 @@ impl Debugger {
             eprintln!("ensure_symbol_index_registered failed, error was: {:#?}", e);
         }
 
-        let path = ffx_config::get_host_tool(&sdk, "zxdb").await?;
+        let path = ffx_config::get_host_tool(&sdk, "zxdb")?;
 
         let mut command = CommandBuilder::new(path.clone());
         command.connect(&socket);

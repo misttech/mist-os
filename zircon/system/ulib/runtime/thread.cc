@@ -3,11 +3,12 @@
 // found in the LICENSE file.
 
 #include <lib/elfldltl/machine.h>
-#include <lib/stdcompat/atomic.h>
 #include <lib/zircon-internal/unique-backtrace.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <zircon/syscalls.h>
+
+#include <atomic>
 
 #include <runtime/thread.h>
 
@@ -30,7 +31,7 @@ enum {
 };
 
 union zxr_internal_thread_t {
-  cpp20::atomic_ref<int> atomic_state() { return cpp20::atomic_ref(state); }
+  std::atomic_ref<int> atomic_state() { return std::atomic_ref(state); }
 
   zxr_thread_t external;
   struct {

@@ -6,7 +6,7 @@
 import logging
 import typing
 
-import fidl.fuchsia_hardware_power_statecontrol as power_statecontrol
+import fidl_fuchsia_hardware_power_statecontrol as power_statecontrol
 from fuchsia_controller_py import ZxStatus
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 from mobly import base_test, test_runner

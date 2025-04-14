@@ -170,7 +170,7 @@ $ driver dump
                   [00_1f_3_] pid=4766
          [ram-disk] pid=4766 fuchsia-boot:///#meta/ramdisk.cm
             [ramctl] pid=4766
-         [00_00_2e] pid=4766
+         [ram-nand] pid=4766
          [virtual-audio] pid=4766 fuchsia-pkg://fuchsia.com/virtual_audio#meta/virtual_audio_driver.cm
             [virtual_audio] pid=4766
          [bt-hci-emulator] pid=4766

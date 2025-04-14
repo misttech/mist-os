@@ -9,6 +9,8 @@
 #include <lib/magma/util/utils.h>
 #include <lib/zx/time.h>
 
+#include <chrono>
+
 #include "zircon_platform_port.h"
 
 namespace magma {
@@ -33,7 +35,7 @@ bool ZirconVmoSemaphore::duplicate_handle(zx::handle* handle_out) const {
 magma::Status ZirconVmoSemaphore::WaitNoReset(uint64_t timeout_ms) {
   TRACE_DURATION("magma:sync", "semaphore wait", "id", koid_);
   zx_status_t status = vmo_.wait_one(
-      zx_signal(), zx::deadline_after(zx::duration(magma::ms_to_signed_ns(timeout_ms))), nullptr);
+      GetZxSignal(), zx::deadline_after(zx::duration(magma::ms_to_signed_ns(timeout_ms))), nullptr);
   switch (status) {
     case ZX_OK:
       return MAGMA_STATUS_OK;
@@ -60,7 +62,7 @@ bool ZirconVmoSemaphore::WaitAsync(PlatformPort* port, uint64_t key) {
 
   auto zircon_port = static_cast<ZirconPlatformPort*>(port);
 
-  zx_status_t status = vmo_.wait_async(zircon_port->zx_port(), key, zx_signal(), 0);
+  zx_status_t status = vmo_.wait_async(zircon_port->zx_port(), key, GetZxSignal(), 0);
   if (status != ZX_OK)
     return DRETF(false, "wait_async failed: %d", status);
 
@@ -85,7 +87,7 @@ void ZirconVmoSemaphore::Signal() {
     WriteTimestamp(timestamp_ns);
   }
 
-  zx_status_t status = vmo_.signal(0u, zx_signal());
+  zx_status_t status = vmo_.signal(0u, GetZxSignal());
   DASSERT(status == ZX_OK);
 }
 
@@ -99,7 +101,7 @@ void ZirconVmoSemaphore::Reset() {
 
   WriteTimestamp(0);
 
-  zx_status_t status = vmo_.signal(zx_signal(), 0);
+  zx_status_t status = vmo_.signal(GetZxSignal(), 0);
   DASSERT(status == ZX_OK);
 }
 

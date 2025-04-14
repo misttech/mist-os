@@ -136,11 +136,51 @@ impl SeqNum {
         self - other < 0
     }
 
+    /// A predicate for whether a sequence number is equal to or before the
+    /// other.
+    ///
+    /// Please refer to [`SeqNum`] for the defined order.
+    pub fn before_or_eq(self, other: SeqNum) -> bool {
+        self - other <= 0
+    }
+
     /// A predicate for whether a sequence number is after the other.
     ///
     /// Please refer to [`SeqNum`] for the defined order.
     pub fn after(self, other: SeqNum) -> bool {
         self - other > 0
+    }
+
+    /// A predicate for whether a sequence number is equal to or after the
+    /// other.
+    ///
+    /// Please refer to [`SeqNum`] for the defined order.
+    pub fn after_or_eq(self, other: SeqNum) -> bool {
+        self - other >= 0
+    }
+
+    /// Returns the earliest sequence number between `self` and `other`.
+    ///
+    /// This is equivalent to [`Ord::min`], but keeps within the temporal
+    /// instead of numeric semantics.
+    pub fn earliest(self, other: SeqNum) -> SeqNum {
+        if self.before(other) {
+            self
+        } else {
+            other
+        }
+    }
+
+    /// Returns the latest sequence number between `self` and `other`.
+    ///
+    /// This is equivalent to [`Ord::max`], but keeps within the temporal
+    /// instead of numeric semantics.
+    pub fn latest(self, other: SeqNum) -> SeqNum {
+        if self.after(other) {
+            self
+        } else {
+            other
+        }
     }
 }
 
@@ -160,6 +200,8 @@ impl WindowSize {
     pub const MAX: WindowSize = WindowSize(1 << 30 - 1);
     /// The smallest possible window size.
     pub const ZERO: WindowSize = WindowSize(0);
+    /// A window size of 1, the smallest nonzero window size.
+    pub const ONE: WindowSize = WindowSize(1);
 
     /// The Netstack3 default window size.
     // TODO(https://github.com/rust-lang/rust/issues/67441): put this constant
@@ -210,6 +252,12 @@ impl WindowSize {
         let effective_bits = u8::try_from(32 - u32::leading_zeros(size)).unwrap();
         let scale = WindowScale(effective_bits.saturating_sub(16));
         scale
+    }
+
+    /// Returns this `WindowSize` with a halved value
+    pub fn halved(self) -> WindowSize {
+        let WindowSize(size) = self;
+        WindowSize(size >> 1)
     }
 }
 

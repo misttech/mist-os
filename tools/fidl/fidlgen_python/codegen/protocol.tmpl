@@ -5,11 +5,15 @@
 */}}
 
 {{ define "ProtocolDeclaration" -}}
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError, FrameworkError, MethodInfo, FidlProtocolMarker, normalize_identifier
+)
+
 from abc import abstractmethod, ABC
 
-class {{ .PythonServerName }}(fidl._server.ServerBase, ABC):
+class {{ .PythonServerName }}(ServerBase, ABC):
     {{- if .DocComments }}
     """
     {{- range .DocComments }}
@@ -38,6 +42,7 @@ class {{ .PythonServerName }}(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
         return fidl._construct.construct_response_object(response_ident, response_obj)
 
 {{ range .PythonMethods }}
@@ -97,7 +102,7 @@ class {{ .PythonServerName }}(fidl._server.ServerBase, ABC):
 {{ end -}}
 {{- end }}
 
-class {{ .PythonClientName }}(fidl._client.FidlClient):
+class {{ .PythonClientName }}(FidlClient):
     {{- if .DocComments }}
     """
     {{- range .DocComments }}
@@ -112,6 +117,7 @@ class {{ .PythonClientName }}(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
         return fidl._construct.construct_response_object(response_ident, response_obj)
 
 {{ range .PythonMethods -}}
@@ -150,7 +156,7 @@ class {{ .PythonClientName }}(fidl._client.FidlClient):
         {{ if .HasResponse -}}
         {{- if .PythonResponsePayload -}}
         return self._send_two_way_fidl_request(
-            {{ .Ordinal }}, "{{ $.Library }}", msg, fidl._fidl_common.normalize_identifier("{{ .PythonResponsePayload.PythonType.Identifier }}"),
+            {{ .Ordinal }}, "{{ $.Library }}", msg, normalize_identifier("{{ .PythonResponsePayload.PythonType.Identifier }}"),
         )
         {{- else -}}
         return self._send_two_way_fidl_request(
@@ -166,7 +172,7 @@ class {{ .PythonClientName }}(fidl._client.FidlClient):
 {{- end }}
 
 
-class {{ .PythonEventHandlerName }}(fidl._client.EventHandlerBase, ABC):
+class {{ .PythonEventHandlerName }}(EventHandlerBase, ABC):
     {{- if .DocComments }}
     """
     {{- range .DocComments }}
@@ -195,6 +201,7 @@ class {{ .PythonEventHandlerName }}(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
         return fidl._construct.construct_response_object(response_ident, response_obj)
 
 {{ range .PythonMethods -}}
@@ -211,7 +218,7 @@ class {{ .PythonEventHandlerName }}(fidl._client.EventHandlerBase, ABC):
 {{- end }}
 
 
-{{ .PythonMarkerName }} = fidl._library.ProtocolMarker("{{ .Marker }}")
+{{ .PythonMarkerName }} = FidlProtocolMarker("{{ .Marker }}")
 
 
 {{ end }}

@@ -210,6 +210,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "standard_eng",
                     "standard_userdebug_and_eng",
                     "testing_support",
+                    "tracing",
                 ]
             }
             (FeatureSupportLevel::Standard, BuildType::UserDebug) => {

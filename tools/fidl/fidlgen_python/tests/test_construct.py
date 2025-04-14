@@ -39,30 +39,16 @@ class Construct(unittest.TestCase):
 
     def test_unwrap_bad_union(self) -> None:
         ty = typing.cast(type, float | int | None)
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(TypeError):
             unwrap_innermost_type(ty)
 
     def test_unwrap_fidl_forward_ref(self) -> None:
         ty = ForwardRef("IpAddress", module=fnet.__name__)
         self.assertEqual(fnet.IpAddress, unwrap_innermost_type(ty))
 
-    def test_unwrap_fidl_forward_ref_from_globals(self) -> None:
-        ty = ForwardRef("fnet.IpAddress")
-        self.assertEqual(
-            fnet.IpAddress, unwrap_innermost_type(ty, globalns=globals())
-        )
-
-    def test_unwrap_fidl_forward_ref_from_locals(self) -> None:
-        ty = ForwardRef("local_fnet.IpAddress")
-        global fnet
-        local_fnet = fnet
-        self.assertEqual(
-            fnet.IpAddress, unwrap_innermost_type(ty, localns=locals())
-        )
-
     def test_unwrap_inception(self) -> None:
         ty = ForwardRef("tuple[ForwardRef('list[ForwardRef(\"str\")]')]")
-        self.assertEqual(str, unwrap_innermost_type(ty, globalns=globals()))
+        self.assertEqual(str, unwrap_innermost_type(ty))
 
     def test_unwrap_zx_type(self) -> None:
         ty = ForwardRef("zx.handle")
@@ -72,9 +58,9 @@ class Construct(unittest.TestCase):
         self.assertEqual(str, unwrap_innermost_type(str))
 
     def test_unwrap_multiple_type_arguments(self) -> None:
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(TypeError):
             unwrap_innermost_type(tuple[int, str])
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(TypeError):
             unwrap_innermost_type(tuple[tuple[int], str])
 
     def test_unwrap_bad_forward_ref(self) -> None:
@@ -82,12 +68,11 @@ class Construct(unittest.TestCase):
             unwrap_innermost_type(ForwardRef("foo"))
 
     def test_unwrap_bad_inception(self) -> None:
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(TypeError):
             unwrap_innermost_type(
                 ForwardRef(
                     "tuple[ForwardRef('list[ForwardRef(\"tuple[int, str]\")]')]"
                 ),
-                globalns=globals(),
             )
 
     def test_construct_response_object(self) -> None:
@@ -122,6 +107,6 @@ class Construct(unittest.TestCase):
         self.assertEqual(expected, got)
 
     def test_make_default_obj_composited_type(self) -> None:
-        expected = ffx.TargetIp(ip=None, scope_id=None)
+        expected = ffx.TargetIp(ip=None, scope_id=None)  # type: ignore[arg-type]
         got = make_default_obj_from_ident("fuchsia.developer.ffx/TargetIp")
         self.assertEqual(expected, got)

@@ -1523,13 +1523,13 @@ zx_status_t UsbXhci::HciFinalize() {
       zx_system_get_page_size()) {
     // We can't create multi-page contiguously physical uncached buffers.
     // This is presently not supported in the kernel.
+    // TODO(b/409558323): The above comment is no longer true.
     FDF_LOG(ERROR, "physically-contiguous buffer exceeds system pagesize");
     return ZX_ERR_NOT_SUPPORTED;
   }
   if (buffer_factory_->CreatePaged(bti_, zx_system_get_page_size(), false,
                                    &scratchpad_buffer_array_) != ZX_OK) {
-    FDF_LOG(ERROR, "buffer_factory_->CreateContiguous(buffer[0]): %s",
-            zx_status_get_string(status));
+    FDF_LOG(ERROR, "buffer_factory_->CreatePaged(buffer[0]): %s", zx_status_get_string(status));
     return ZX_ERR_INTERNAL;
   }
   if (is_32bit_ && (scratchpad_buffer_array_->phys()[0] >= UINT32_MAX)) {
@@ -1538,8 +1538,8 @@ zx_status_t UsbXhci::HciFinalize() {
   }
   uint64_t* scratchpad_buffer_array = static_cast<uint64_t*>(scratchpad_buffer_array_->virt());
   for (size_t i = 0; i < buffers - 1; i++) {
-    status =
-        buffer_factory_->CreateContiguous(bti_, page_size, align_log2, &scratchpad_buffers_[i]);
+    status = buffer_factory_->CreateContiguous(bti_, page_size, align_log2, true,
+                                               &scratchpad_buffers_[i]);
     if (status != ZX_OK) {
       FDF_LOG(ERROR, "buffer_factory_->CreateContiguous(buffer[%zu]): %s", i,
               zx_status_get_string(status));

@@ -6,7 +6,7 @@
 //! in this module provide a common interface for platform-specific buffers
 //! used by TCP.
 
-use netstack3_base::{Payload, SackBlock, SackBlocks, SeqNum};
+use netstack3_base::{Payload, SackBlocks, SeqNum};
 
 use arrayvec::ArrayVec;
 use core::fmt::Debug;
@@ -159,13 +159,11 @@ impl Assembler {
 
         let Self { outstanding, nxt, generation } = self;
         *generation = *generation + 1;
-        outstanding.insert(start..end, *generation);
+        let _: bool = outstanding.insert(start..end, *generation);
 
-        if let Some(advanced) = outstanding.pop_front_if(|r| r.range.start == *nxt) {
-            *nxt = advanced.range.end;
-            // The following unwrap is safe because it is invalid to have
-            // have a range where `end` is before `start`.
-            usize::try_from(advanced.range.end - advanced.range.start).unwrap()
+        if let Some(advanced) = outstanding.pop_front_if(|r| r.start() == *nxt) {
+            *nxt = advanced.end();
+            usize::try_from(advanced.len()).unwrap()
         } else {
             0
         }
@@ -201,7 +199,7 @@ impl Assembler {
         let mut heap = ArrayVec::<&SeqRange<_>, { SackBlocks::MAX_BLOCKS }>::new();
         for block in outstanding.iter() {
             if heap.is_full() {
-                if heap.last().is_some_and(|l| l.meta < block.meta) {
+                if heap.last().is_some_and(|l| l.meta() < block.meta()) {
                     // New block is later than the earliest block in the heap.
                     let _: Option<_> = heap.pop();
                 } else {
@@ -213,13 +211,10 @@ impl Assembler {
 
             heap.push(block);
             // Sort heap larger generation to lower.
-            heap.sort_by(|a, b| b.meta.cmp(&a.meta))
+            heap.sort_by(|a, b| b.meta().cmp(&a.meta()))
         }
 
-        SackBlocks::from_iter(heap.into_iter().map(|block| {
-            // Assembler is guaranteed to be in order, unwrap is safe.
-            SackBlock::try_new(block.range.start, block.range.end).unwrap()
-        }))
+        SackBlocks::from_iter(heap.into_iter().map(|block| block.to_sack_block()))
     }
 }
 
@@ -250,7 +245,7 @@ pub(crate) mod testutil {
 
     use either::Either;
     use netstack3_base::sync::Mutex;
-    use netstack3_base::{FragmentedPayload, WindowSize};
+    use netstack3_base::{FragmentedPayload, PayloadLen, WindowSize};
 
     use crate::internal::socket::accept_queue::ListenerNotifier;
 
@@ -270,7 +265,7 @@ pub(crate) mod testutil {
     /// *Readable* memory, once read, becomes writable.
     ///
     /// *Writable* memory, once marked as such, becomes readable.
-    #[cfg_attr(any(test, feature = "testutils"), derive(Clone, PartialEq, Eq))]
+    #[derive(Clone, PartialEq, Eq)]
     pub struct RingBuffer {
         pub(super) storage: Vec<u8>,
         /// The index where the reader starts to read.
@@ -672,6 +667,140 @@ pub(crate) mod testutil {
     impl ListenerNotifier for ProvidedBuffers {
         fn new_incoming_connections(&mut self, _: usize) {}
     }
+
+    #[derive(Debug)]
+    pub struct RepeatingPayload {
+        len: usize,
+    }
+
+    impl RepeatingPayload {
+        const REPEATING_BYTE: u8 = 0xAA;
+    }
+
+    impl PayloadLen for RepeatingPayload {
+        fn len(&self) -> usize {
+            self.len
+        }
+    }
+
+    impl Payload for RepeatingPayload {
+        fn slice(self, range: Range<u32>) -> Self {
+            Self { len: usize::try_from(range.end - range.start).unwrap() }
+        }
+
+        fn partial_copy(&self, offset: usize, dst: &mut [u8]) {
+            assert!(offset < self.len);
+            assert_eq!(dst.len() - offset, self.len);
+            dst.fill(Self::REPEATING_BYTE);
+        }
+
+        fn partial_copy_uninit(&self, offset: usize, dst: &mut [core::mem::MaybeUninit<u8>]) {
+            assert!(offset < self.len);
+            assert_eq!(dst.len() - offset, self.len);
+            dst.fill(core::mem::MaybeUninit::new(Self::REPEATING_BYTE));
+        }
+
+        fn new_empty() -> Self {
+            Self { len: 0 }
+        }
+    }
+
+    impl InnerPacketBuilder for RepeatingPayload {
+        fn bytes_len(&self) -> usize {
+            self.len
+        }
+
+        fn serialize(&self, buffer: &mut [u8]) {
+            buffer.fill(Self::REPEATING_BYTE)
+        }
+    }
+
+    /// A buffer that always has [`usize::MAX`] bytes available to write.
+    #[derive(Default, Debug, Eq, PartialEq)]
+    pub struct InfiniteSendBuffer;
+
+    impl InfiniteSendBuffer {
+        const LEN: usize = usize::MAX as usize;
+    }
+
+    impl Buffer for InfiniteSendBuffer {
+        fn capacity_range() -> (usize, usize) {
+            (0, Self::LEN)
+        }
+
+        fn limits(&self) -> BufferLimits {
+            BufferLimits { capacity: Self::LEN, len: Self::LEN }
+        }
+
+        fn target_capacity(&self) -> usize {
+            Self::LEN
+        }
+
+        fn request_capacity(&mut self, size: usize) {
+            unimplemented!("can't change capacity of infinite send buffer to {size}")
+        }
+    }
+
+    impl SendBuffer for InfiniteSendBuffer {
+        type Payload<'a> = RepeatingPayload;
+
+        fn mark_read(&mut self, _count: usize) {}
+
+        fn peek_with<'a, F, R>(&'a mut self, offset: usize, f: F) -> R
+        where
+            F: FnOnce(Self::Payload<'a>) -> R,
+        {
+            f(RepeatingPayload { len: Self::LEN - offset })
+        }
+    }
+
+    /// A buffer that has a controllable amount of [`RepeatingPayload`] bytes
+    /// available to read.
+    #[derive(Default, Debug, Eq, PartialEq)]
+    pub struct RepeatingSendBuffer(usize);
+
+    impl RepeatingSendBuffer {
+        /// Creates a new buffer with the provided `length`.
+        pub fn new(length: usize) -> Self {
+            Self(length)
+        }
+    }
+
+    impl Buffer for RepeatingSendBuffer {
+        fn capacity_range() -> (usize, usize) {
+            (0, usize::MAX)
+        }
+
+        fn limits(&self) -> BufferLimits {
+            let Self(len) = self;
+            BufferLimits { capacity: usize::MAX, len: *len }
+        }
+
+        fn target_capacity(&self) -> usize {
+            usize::MAX
+        }
+
+        fn request_capacity(&mut self, size: usize) {
+            unimplemented!("can't change capacity of repeatable send buffer to {size}")
+        }
+    }
+
+    impl SendBuffer for RepeatingSendBuffer {
+        type Payload<'a> = RepeatingPayload;
+
+        fn mark_read(&mut self, count: usize) {
+            let Self(len) = self;
+            *len = *len - count;
+        }
+
+        fn peek_with<'a, F, R>(&'a mut self, offset: usize, f: F) -> R
+        where
+            F: FnOnce(Self::Payload<'a>) -> R,
+        {
+            let Self(len) = self;
+            f(RepeatingPayload { len: *len - offset })
+        }
+    }
 }
 
 #[cfg(test)]
@@ -806,7 +935,7 @@ mod test {
     #[test_case([Range{ start: 10, end: 15 }, Range { start: 5, end: 10 }]
         => Assembler {
             outstanding: [
-                SeqRange{ range: Range { start: SeqNum::new(5), end: SeqNum::new(15) }, meta: 2 },
+                SeqRange::new(SeqNum::new(5)..SeqNum::new(15), 2).unwrap()
             ].into_iter().collect(),
             nxt: SeqNum::new(0),
             generation: 2,
@@ -819,7 +948,7 @@ mod test {
     #[test_case([Range{ start: 10, end: 15 }, Range { start: 10, end: 15 }, Range { start: 11, end: 12 }]
         => Assembler {
              outstanding: [
-                SeqRange{ range: Range { start: SeqNum::new(10), end: SeqNum::new(15) }, meta: 3 }
+                SeqRange::new(SeqNum::new(10)..SeqNum::new(15), 3).unwrap()
             ].into_iter().collect(),
             nxt: SeqNum::new(0), generation: 3 })]
     fn assembler_examples(ops: impl IntoIterator<Item = Range<u32>>) -> Assembler {

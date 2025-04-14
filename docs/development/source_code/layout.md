@@ -101,6 +101,11 @@ pattern:
  * `lib/` (optional)
  * `drivers/` (optional)
  * `examples/` (optional)
+ * `manifests/`
+    * This directory contains Jiri manifests.
+    * Jiri manifest files describe the set of projects that get synced when you
+      run `jiri update`. For more information, see the
+      [README](https://fuchsia.googlesource.com/jiri/+/refs/heads/main/README.md).
  * `tests/` (optional)
     * This directory contains integration tests that span multiple source code
       directories within the area

@@ -1003,13 +1003,22 @@ impl BinderProcess {
         };
         let owner = proxy.owner.upgrade().ok_or_else(|| errno!(ENOENT))?;
         let mut owner = owner.lock();
+        // Check if the subscriber already exists
+        if owner
+            .freeze_subscribers
+            .iter()
+            .find(|(bp, c)| bp.as_ptr() == self && *c == cookie)
+            .is_some()
+        {
+            return error!(EINVAL);
+        }
+        owner.freeze_subscribers.push((self.weak_self.clone(), cookie));
         let info = binder_frozen_state_info {
             cookie,
             is_frozen: if owner.freeze_status.frozen { 1 } else { 0 },
             reserved: 0,
         };
         self.enqueue_command(Command::FrozenBinder(info));
-        owner.freeze_subscribers.push((self.weak_self.clone(), cookie));
         Ok(())
     }
 
@@ -5049,7 +5058,7 @@ struct BinderFeaturesDir {
 
 impl BinderFeaturesDir {
     fn new() -> Self {
-        Self { features: BTreeMap::from([("freeze_notification".into(), true)]) }
+        Self { features: BTreeMap::from([("freeze_notification".into(), false)]) }
     }
 }
 
@@ -7550,7 +7559,7 @@ pub mod tests {
         let fs = anon_fs(current_task.kernel());
         let node = fs.create_node(
             &current_task,
-            Anon::default(),
+            Anon::new_for_binder_device(),
             FsNodeInfo::new_factory(FileMode::from_bits(0o600), current_task.as_fscred()),
         );
 

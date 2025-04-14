@@ -354,6 +354,7 @@ if (is_kernel) {
       "FUTEX_BLOCK_TRACING_ENABLED=$futex_block_tracing_enabled",
       "LOCK_TRACING_ENABLED=$lock_tracing_enabled",
       "EXPERIMENTAL_THREAD_SAMPLER_ENABLED=$experimental_thread_sampler_enabled",
+      "EXPERIMENTAL_KTRACE_STREAMING_ENABLED=$experimental_ktrace_streaming_enabled",
     ]
 
     if (kernel_no_userabi) {

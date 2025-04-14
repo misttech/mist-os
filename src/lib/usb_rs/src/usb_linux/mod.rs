@@ -27,7 +27,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct DeviceHandleInner(String);
+pub struct DeviceHandleInner(pub(crate) String);
 
 impl DeviceHandleInner {
     pub(crate) fn new(hdl: String) -> DeviceHandleInner {
@@ -135,20 +135,22 @@ impl DeviceHandleInner {
 /// the kernel.
 struct Urb {
     urb: UnsafeCell<usbdevfs_urb>,
+    buf: UnsafeCell<Pin<Box<[u8]>>>,
     waker: AtomicWaker,
     refs: AtomicU8,
 }
 
 impl Urb {
     /// Construct a new Urb value.
-    const fn new() -> Self {
+    fn new() -> Self {
+        let mut buf = UnsafeCell::new(Box::pin([]));
         Urb {
             urb: UnsafeCell::new(usbdevfs_urb {
                 type_: 0,
                 endpoint: 0,
                 status: 0,
                 flags: 0,
-                buffer: std::ptr::null_mut(),
+                buffer: buf.get_mut().as_mut_ptr() as *mut libc::c_void,
                 buffer_length: 0,
                 actual_length: 0,
                 start_frame: 0,
@@ -160,9 +162,41 @@ impl Urb {
                 // sophisticated here if we ever need to write to this.
                 iso_frame_desc: usbdevice_fs::__IncompleteArrayField::new(),
             }),
+            buf,
             waker: AtomicWaker::new(),
             refs: AtomicU8::new(0),
         }
+    }
+
+    /// Populate the buffer of this URB.
+    ///
+    /// # Safety
+    ///
+    /// This mutates the buffer geometry in place without additional
+    /// synchronization. It is generally only safe to call when the buffer is
+    /// not in use, i.e. when it has just been allocated from the free pool.
+    unsafe fn fill_buffer(&self, action: &BufferAction<'_>) -> Result<()> {
+        let mtu = action.mtu();
+        let urb = self.urb.get().as_mut().unwrap();
+        let buf = self.buf.get().as_mut().unwrap();
+
+        if buf.len() < mtu {
+            let new_buf = Pin::new(std::iter::repeat(0).take(mtu).collect());
+            *buf = new_buf;
+            urb.buffer = buf.as_mut_ptr() as *mut libc::c_void;
+            urb.actual_length = 0;
+        }
+
+        let len = if let BufferAction::CopyIn(contents) = action {
+            buf[..contents.len()].copy_from_slice(contents);
+            contents.len()
+        } else {
+            mtu
+        };
+
+        urb.buffer_length = len.try_into().map_err(|_| Error::BufferTooBig(len))?;
+
+        Ok(())
     }
 }
 
@@ -170,15 +204,6 @@ impl Urb {
 // shared with kernelspace concurrently.
 unsafe impl Send for Urb {}
 unsafe impl Sync for Urb {}
-
-/// We need to send void pointers across threads in a few places. This can be used to prevent us
-/// from ripping `Send` off of a bunch of our futures in the process.
-struct SafePointer(*mut libc::c_void);
-
-// SAFETY: The constructor of the data structure is responsible for ensuring the pointer is safe to
-// use in this way.
-unsafe impl Send for SafePointer {}
-unsafe impl Sync for SafePointer {}
 
 /// Thin wrapper around [`libc::ioctl`] that gives us a rusty error report.
 macro_rules! ioctl {
@@ -222,6 +247,7 @@ struct UrbRef<'a>(&'a InterfaceInner, usize);
 
 impl Drop for UrbRef<'_> {
     fn drop(&mut self) {
+        self.0.cancel_urb_by_id(self.1);
         if self.refs.fetch_sub(1, Ordering::Relaxed) == 1 {
             self.0.free_urb_by_id(self.1);
         }
@@ -233,6 +259,31 @@ impl std::ops::Deref for UrbRef<'_> {
 
     fn deref(&self) -> &Self::Target {
         &self.0.urbs[self.1]
+    }
+}
+
+/// What to do with the buffer associated with a URB when submitting.
+enum BufferAction<'a> {
+    /// Copy data into the buffer before submission
+    CopyIn(&'a [u8]),
+    /// Copy data out of the buffer after submission
+    CopyOut(&'a mut [u8]),
+}
+
+impl BufferAction<'_> {
+    /// What size of buffer should we allocate for this URB.
+    fn mtu(&self) -> usize {
+        match self {
+            // When copying in we're doing a write. We should allocate a
+            // slightly larger buffer so that future writes won't cause a
+            // reallocation.
+            Self::CopyIn(x) => x.len().next_power_of_two(),
+
+            // When copying out we're doing a read. No point in reading more
+            // data than the read call is prepared to receive as we'd have
+            // nowhere to put it.
+            Self::CopyOut(x) => x.len(),
+        }
     }
 }
 
@@ -250,6 +301,8 @@ trait IoctlStub: Send + Sync {
     ) -> Result<(), std::io::Error>;
     /// Stub for USBDEVFS_REAPURB
     fn reap_urb(&self, fd: RawFd, urb_ptr: *mut *mut usbdevfs_urb) -> Result<(), std::io::Error>;
+    /// Stub for USBDEVFS_DISCARDURB
+    fn discard_urb(&self, fd: RawFd, urb: *mut usbdevfs_urb) -> Result<(), std::io::Error>;
 }
 
 /// Internal state of [`Interface`]
@@ -277,19 +330,35 @@ pub struct InterfaceInner {
 
 impl InterfaceInner {
     /// Allocate a Urb from the pool.
-    async fn alloc_urb(&self) -> UrbRef<'_> {
+    async fn alloc_urb(&self, action: &BufferAction<'_>) -> Result<UrbRef<'_>> {
         poll_fn(move |ctx| {
             let mut queue = self.urb_queue.lock().unwrap();
 
             if let Some(got) = queue.free_urbs.pop_back() {
                 self.urbs[got].refs.store(1, Ordering::Relaxed);
-                return Poll::Ready(UrbRef(self, got));
+
+                // SAFETY: We just allocated this URB. We should be the only user.
+                unsafe {
+                    self.urbs[got].fill_buffer(action)?;
+                }
+                return Poll::Ready(Ok(UrbRef(self, got)));
             }
 
             queue.wakers.push(ctx.waker().clone());
             Poll::Pending
         })
         .await
+    }
+
+    /// Cancel any transactions on a Urb.
+    fn cancel_urb_by_id(&self, id: usize) {
+        if let Some(stubs) = &self.stubs {
+            let _ = stubs.discard_urb(self.file.as_raw_fd(), self.urbs[id].urb.get());
+        } else {
+            unsafe {
+                let _ = ioctl!(self.file.as_raw_fd(), USBDEVFS_DISCARDURB, self.urbs[id].urb.get());
+            }
+        }
     }
 
     /// Free a Urb back into the pool.
@@ -306,10 +375,9 @@ impl InterfaceInner {
         self: &Arc<Self>,
         address: u8,
         ty: u8,
-        buf: SafePointer,
-        len: libc::c_int,
+        buffer_action: BufferAction<'_>,
     ) -> Result<usize> {
-        let urb = self.alloc_urb().await;
+        let urb = self.alloc_urb(&buffer_action).await?;
 
         {
             // SAFETY: The allocation semantics should guarantee we're the only holder of this Urb,
@@ -320,8 +388,6 @@ impl InterfaceInner {
 
             urb_inner.type_ = ty;
             urb_inner.endpoint = address;
-            urb_inner.buffer = buf.0;
-            urb_inner.buffer_length = len;
             urb_inner.status = -1;
 
             let got = urb.refs.fetch_add(1, Ordering::Relaxed);
@@ -356,9 +422,16 @@ impl InterfaceInner {
         // SAFETY: As above. We should have the Urb back from the kernel and it is ours alone by
         // allocation.
         let (status, actual_length) = unsafe {
-            let urb = &*urb.urb.get();
-            (urb.status, urb.actual_length)
+            let urb_linux = &*urb.urb.get();
+            (urb_linux.status, urb_linux.actual_length as usize)
         };
+
+        if let BufferAction::CopyOut(buf) = buffer_action {
+            // SAFETY: As above.
+            unsafe {
+                buf[..actual_length].copy_from_slice(&(*urb.buf.get())[..actual_length]);
+            }
+        }
 
         if status == 0 {
             Ok(actual_length as usize)
@@ -521,8 +594,7 @@ impl BulkInEndpoint {
         let fut = self.inner.submit_urb(
             self.descriptor.address,
             USBDEVFS_URB_TYPE_BULK as u8,
-            SafePointer(buf.as_mut_ptr().cast::<libc::c_void>()),
-            buf.len().try_into().map_err(|_| Error::BufferTooBig(buf.len()))?,
+            BufferAction::CopyOut(buf),
         );
 
         fut.await
@@ -543,8 +615,7 @@ impl BulkOutEndpoint {
         let fut = self.inner.submit_urb(
             self.descriptor.address,
             USBDEVFS_URB_TYPE_BULK as u8,
-            SafePointer(buf.as_ptr().cast::<libc::c_void>().cast_mut()),
-            buf.len().try_into().map_err(|_| Error::BufferTooBig(buf.len()))?,
+            BufferAction::CopyIn(buf),
         );
 
         fut.await.and_then(|x| {
@@ -851,6 +922,44 @@ mod test {
                 }
             }
             Ok(())
+        }
+
+        fn discard_urb(&self, fd: RawFd, urb: *mut usbdevfs_urb) -> Result<(), std::io::Error> {
+            // SAFETY: The crate under test should never pass us an invalid pointer.
+            let urb = unsafe { urb.as_mut().unwrap() };
+            let dev = self.get_dev(fd)?;
+
+            assert_eq!(urb.type_, USBDEVFS_URB_TYPE_BULK as u8);
+            let endpoint =
+                dev.descriptor.endpoints.iter().find(|x| x.address == urb.endpoint).unwrap();
+
+            let mut buffers = dev.endpoint_buffers.lock().unwrap();
+            let buffer = buffers.entry(endpoint.address).or_default();
+
+            match endpoint.direction() {
+                EndpointDirection::Out => Err(std::io::Error::from_raw_os_error(libc::ENOENT)),
+                EndpointDirection::In => {
+                    let EndpointBuffer::WaitingReaders(readers) = buffer else {
+                        return Err(std::io::Error::from_raw_os_error(libc::ENOENT));
+                    };
+                    let mut found = false;
+
+                    readers.retain(|x| {
+                        if std::ptr::addr_eq(*x, urb) {
+                            found = true;
+                            false
+                        } else {
+                            true
+                        }
+                    });
+
+                    if found {
+                        Ok(())
+                    } else {
+                        Err(std::io::Error::from_raw_os_error(libc::ENOENT))
+                    }
+                }
+            }
         }
     }
 

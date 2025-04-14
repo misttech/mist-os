@@ -16,6 +16,7 @@
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/rapidjson.h>
 
+#include "lib/fit/defer.h"
 #include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/zxdb/client/client_object.h"
 #include "src/developer/debug/zxdb/client/frame.h"
@@ -330,9 +331,12 @@ void SymbolizerImpl::MMap(uint64_t address, uint64_t size, uint64_t module_id,
   }
 }
 
-void SymbolizerImpl::Backtrace(uint64_t address, AddressType type, LocationOutputFn output) {
+SymbolizerImpl::BacktraceStatus SymbolizerImpl::Backtrace(uint64_t address, AddressType type,
+                                                          LocationOutputFn output) {
   FX_LOGS(TRACE) << "Symbolizing backtrace for address 0x" << std::hex << address;
   InitProcess();
+  auto timer_stop = fit::defer([this] { analytics_builder_.TotalTimerStop(); });
+
   analytics_builder_.IncreaseNumberOfFrames();
 
   // Find the module to see if the stack might be corrupt.
@@ -359,8 +363,7 @@ void SymbolizerImpl::Backtrace(uint64_t address, AddressType type, LocationOutpu
   if (!module) {
     FX_LOGS(TRACE) << "Could not find matching module.";
     analytics_builder_.IncreaseNumberOfFramesInvalid();
-    analytics_builder_.TotalTimerStop();
-    return;
+    return BacktraceStatus::kNoOverlappingModule;
   }
 
   uint64_t call_address = address;
@@ -397,6 +400,21 @@ void SymbolizerImpl::Backtrace(uint64_t address, AddressType type, LocationOutpu
     output(stack.size() - i - 1, location, *module);
   }
 
+  // If no symbols were produced, it might be because the symbol file is unavailable.
+  if (!symbolized) {
+    // TODO(fdurso): Can this check be done faster like in ProcessSymbols::GetModuleForAddress?
+    bool has_symbol_file = false;
+    for (auto module_symbol : target_->GetSymbols()->GetModuleSymbols()) {
+      if (module_symbol->GetStatus().build_id == module->build_id) {
+        has_symbol_file = true;
+        break;
+      }
+    }
+    if (!has_symbol_file) {
+      return BacktraceStatus::kSymbolFileUnavailable;
+    }
+  }
+
   // One physical frame could be symbolized to multiple inlined frames. We're only counting the
   // number of physical frames symbolized.
   if (symbolized) {
@@ -405,7 +423,7 @@ void SymbolizerImpl::Backtrace(uint64_t address, AddressType type, LocationOutpu
   } else {
     FX_LOGS(WARNING) << "No stack frames symbolized for address 0x" << std::hex << address;
   }
-  analytics_builder_.TotalTimerStop();
+  return BacktraceStatus::kOk;
 }
 
 void SymbolizerImpl::Backtrace(uint64_t frame_id, uint64_t address, AddressType type,

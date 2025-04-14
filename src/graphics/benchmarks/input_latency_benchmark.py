@@ -53,8 +53,9 @@ class InputBenchmark(fuchsia_base_test.FuchsiaBaseTest):
 
         with self.dut.tracing.trace_session(
             categories=[
-                "input",
                 "gfx",
+                "input",
+                "kernel:ipc",
                 "magma",
             ],
             buffer_size=36,

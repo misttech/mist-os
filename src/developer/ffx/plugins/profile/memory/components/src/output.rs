@@ -4,19 +4,32 @@
 
 use attribution_processing::kernel_statistics::KernelStatistics;
 use attribution_processing::summary::{MemorySummary, PrincipalSummary, VmoSummary};
+use ffx_profile_memory_components_args::ComponentsCommand;
 
 use prettytable::{row, table, Table};
 
 pub fn write_summary(
     f: &mut dyn std::io::Write,
+    cmd: &ComponentsCommand,
     value: &MemorySummary,
     kernel_statistics: KernelStatistics,
 ) -> std::io::Result<()> {
-    write_summary_kernel_stats(f, &kernel_statistics)?;
+    if cmd.csv {
+        writeln!(
+        f,
+        "attributor, principal, vmo, committed_private, populated_private, committed_scaled, populated_scaled, committed_total, populated_total"
+        )?;
+    } else {
+        write_summary_kernel_stats(f, &kernel_statistics)?;
+    }
     for principal in &value.principals {
-        writeln!(f)?;
-        writeln!(f)?;
-        write_summary_principal(f, principal)?;
+        if cmd.csv {
+            write_summary_principal_csv(f, principal)?;
+        } else {
+            writeln!(f)?;
+            writeln!(f)?;
+            write_summary_principal(f, principal)?;
+        }
     }
     Ok(())
 }
@@ -158,6 +171,42 @@ fn write_summary_kernel_stats(
         w,
         "    vmo_discardable_unlocked_bytes: {}",
         format_bytes(value.memory_statistics.vmo_discardable_unlocked_bytes.unwrap() as f64)
+    )
+}
+
+fn write_summary_principal_csv(
+    w: &mut dyn std::io::Write,
+    value: &PrincipalSummary,
+) -> std::io::Result<()> {
+    let mut vmos: Vec<(&String, &VmoSummary)> = value.vmos.iter().collect();
+    vmos.sort_by_key(|(_, v)| -(v.populated_total as i64));
+    for (name, vmo) in vmos {
+        writeln!(
+            w,
+            "{}, {}, {}, {}, {}, {}, {}, {}, {}",
+            value.attributor.clone().unwrap_or_default(),
+            value.name,
+            name,
+            vmo.committed_private,
+            vmo.populated_private,
+            vmo.committed_scaled,
+            vmo.populated_scaled,
+            vmo.committed_total,
+            vmo.populated_total,
+        )?;
+    }
+
+    writeln!(
+        w,
+        "{}, {}, Total, {}, {}, {}, {}, {}, {}",
+        value.attributor.clone().unwrap_or_default(),
+        value.name,
+        value.committed_private,
+        value.populated_private,
+        value.committed_scaled,
+        value.populated_scaled,
+        value.committed_total,
+        value.populated_total,
     )
 }
 

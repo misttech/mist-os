@@ -7,6 +7,8 @@ library zx;
 @next
 type IobAllocateIdOptions = flexible bits : uint32 {};
 
+type IobWriteOptions = flexible bits : uint64 {};
+
 @transport("Syscall")
 closed protocol Iob {
     /// ## Summary
@@ -190,5 +192,103 @@ closed protocol Iob {
         blob vector<byte>:MAX;
     }) -> (struct {
         id uint32;
+    }) error Status;
+
+    /// ## Summary
+    ///
+    /// Performs a mediated write to an IOBuffer region.
+    ///
+    /// ## Declaration
+    /// ```c
+    /// #include <zircon/syscalls/iob.h>
+    ///
+    /// zx_status_t zx_iob_write(zx_handle_t handle,
+    ///                          zx_iob_write_options_t options,
+    ///                          uint32_t region_index,
+    ///                          const zx_iovec_t* vectors,
+    ///                          size_t num_vectors);
+    /// ```
+    ///
+    /// ## Description
+    ///
+    /// Performs a mediated write to an IOBuffer region.
+    ///
+    /// `options` must be zero.
+    ///
+    /// The IOBuffer handle used to interact with the region must admit mediated write access.
+    ///
+    /// There is a limit of 65535 bytes including any headers that the discipline might mandate, and
+    /// there can be no more than 8 vectors.
+    ///
+    /// ## Return value
+    ///
+    /// On success, the data is written to the specified region according to the semantics of the
+    /// discipline.
+    ///
+    /// ## Errors
+    ///
+    /// `ZX_ERR_ACCESS_DENIED`  The IOB handle does not have write permissions,
+    /// or the corresponding region does not have mediated write permissions.
+    ///
+    /// `ZX_ERR_BAD_HANDLE`  *handle* is not a valid handle.
+    ///
+    /// `ZX_ERR_INVALID_ARGS`  `options` was nonzero (there are no non-default options supported at
+    /// this time), the amount of data to write exceeds the limit, or the vectors are invalid.
+    ///
+    /// `ZX_ERR_IO_DATA_INTEGRITY`  The region has been corrupted.
+    ///
+    /// `ZX_ERR_NOT_FOUND`  A vector is invalid (e.g. points to invalid memory).
+    ///
+    /// `ZX_ERR_NO_SPACE`  The region has insufficient space to write the message.
+    ///
+    /// `ZX_ERR_OUT_OF_RANGE`  `region_index` exceeded the maximum region index.
+    ///
+    /// `ZX_ERR_WRONG_TYPE`  The handle is not an IOBuffer handle, or the corresponding region is not
+    /// of the required discipline.
+    strict Writev(resource struct {
+        handle Handle:IOB;
+        options IobWriteOptions;
+        region_index uint32;
+        vectors vector<Iovec>:MAX;
+    }) -> () error Status;
+
+    /// ## Summary
+    ///
+    /// Creates a shared region that can be used with multiple IOBuffer objects.
+    ///
+    /// ## Declaration
+    /// ```c
+    /// #include <zircon/syscalls-next.h>
+    ///
+    /// zx_status_t zx_iob_create_shared_region(uint64_t options,
+    ///                                         uint64_t size,
+    ///                                         zx_handle_t* out);
+    /// ```
+    ///
+    /// ## Description
+    ///
+    /// Creates a shared region that can be used with multiple IOBuffer objects.
+    ///
+    /// `options` must be zero. `size` must be a multiple of the page size.
+    ///
+    /// ## Return value
+    ///
+    /// On success, `ZX_OK` is returned and `out` will be populated with a new handle.
+    ///
+    /// ## Errors
+    ///
+    /// `ZX_ERR_ACCESS_DENIED` The proess does not have permissions to create shared IOBuffer
+    /// regions.
+    ///
+    /// `ZX_ERR_INVALID_ARGS` `options` was nonzero (there are no non-default options supported at
+    /// this time), or `size` was zero or not a multiple of the page size.
+    ///
+    /// `ZX_ERR_NO_MEMORY` Failure due to lack of memory to allocate the shared region.
+    @next
+    strict CreateSharedRegion(struct {
+        options uint64;
+        size uint64;
+    }) -> (resource struct {
+        out Handle;
     }) error Status;
 };

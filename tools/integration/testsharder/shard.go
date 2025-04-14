@@ -155,9 +155,9 @@ func (s *Shard) CreatePackageRepo(buildDir string, globalRepoMetadata string, ca
 	// Add the blobs we expect the shard to access if the caller wants us to
 	// set up a local package cache.
 	if cacheTestPackages {
-		var pkgManifests []string
+		pkgManifestsPerTest := make(map[string][]string)
 		for _, t := range s.Tests {
-			pkgManifests = append(pkgManifests, t.PackageManifests...)
+			pkgManifests := t.PackageManifests
 			if t.PackageManifestDepsFile != "" {
 				var pkgManifestDeps []string
 				if err := jsonutil.ReadFromFile(filepath.Join(buildDir, t.PackageManifestDepsFile), &pkgManifestDeps); err != nil {
@@ -166,6 +166,7 @@ func (s *Shard) CreatePackageRepo(buildDir string, globalRepoMetadata string, ca
 					pkgManifests = append(pkgManifests, pkgManifestDeps...)
 				}
 			}
+			pkgManifestsPerTest[t.Name] = pkgManifests
 		}
 
 		// Use delivery blobs if the config exists.
@@ -178,9 +179,11 @@ func (s *Shard) CreatePackageRepo(buildDir string, globalRepoMetadata string, ca
 		if err := os.MkdirAll(blobsDir, os.ModePerm); err != nil {
 			return err
 		}
-		for _, p := range pkgManifests {
-			if err := prepareBlobsForPackage(p, addedBlobs, buildDir, globalRepoMetadata, blobsDirRel, blobsDir); err != nil {
-				return err
+		for testName, pkgManifests := range pkgManifestsPerTest {
+			for _, p := range pkgManifests {
+				if err := prepareBlobsForPackage(p, testName, addedBlobs, buildDir, globalRepoMetadata, blobsDirRel, blobsDir); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -196,6 +199,7 @@ func (s *Shard) CreatePackageRepo(buildDir string, globalRepoMetadata string, ca
 // addedBlobs.
 func prepareBlobsForPackage(
 	manifestPath string,
+	testName string,
 	addedBlobs map[string]struct{},
 	buildDir string,
 	globalRepoMetadata string,
@@ -219,7 +223,7 @@ func prepareBlobsForPackage(
 			src := filepath.Join(globalRepoMetadata, blobsDirRel, blob.Merkle.String())
 			dst := filepath.Join(blobsDir, blob.Merkle.String())
 			if err := linkOrCopy(src, dst); err != nil {
-				return err
+				return fmt.Errorf("failed to copy blob %s from %s for %s: %w", blob.SourcePath, manifestPath, testName, err)
 			}
 			addedBlobs[blob.Merkle.String()] = struct{}{}
 		}
@@ -227,7 +231,7 @@ func prepareBlobsForPackage(
 
 	// Walk all subpackages and ensure their blobs are added too.
 	for _, subpackage := range manifest.Subpackages {
-		if err := prepareBlobsForPackage(subpackage.ManifestPath, addedBlobs, buildDir, globalRepoMetadata, blobsDirRel, blobsDir); err != nil {
+		if err := prepareBlobsForPackage(subpackage.ManifestPath, testName, addedBlobs, buildDir, globalRepoMetadata, blobsDirRel, blobsDir); err != nil {
 			return err
 		}
 	}

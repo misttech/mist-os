@@ -20,6 +20,7 @@ per-file             gc = file: /src/sys/pkg/OWNERS
 per-file gerrit-split-cl.fx=tombergan@google.com
 per-file get-main-pb=adamperry@google.com,vickiecheng@google.com
 per-file get-main-pb-path=adamperry@google.com,vickiecheng@google.com
+per-file gum.fx=chaselatta@google.com,djmurphy@google.com
 per-file iquery=crjohns@google.com
 per-file             is-incremental-publisher-running = file: /src/sys/pkg/OWNERS
 per-file lint=haowei@google.com,phosek@google.com

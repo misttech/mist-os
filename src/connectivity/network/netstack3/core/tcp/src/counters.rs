@@ -73,7 +73,6 @@ pub type TcpCountersWithSocket<I> = IpMarked<I, TcpCountersWithSocketInner<Count
 ///
 /// The counter type `C` is generic to facilitate testing.
 // TODO(https://fxbug.dev/42052878): Add counters for SYN cookies.
-// TODO(https://fxbug.dev/42078221): Add counters for SACK.
 #[derive(Default, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct TcpCountersWithSocketInner<C = Counter> {
@@ -122,8 +121,12 @@ pub struct TcpCountersWithSocketInner<C = Counter> {
     pub slow_start_retransmits: C,
     /// Count of retransmissions of segments while in fast recovery.
     pub fast_retransmits: C,
+    /// Count of retransmissions of segments while in SACK recovery.
+    pub sack_retransmits: C,
     /// Count of times fast recovery was initiated to recover from packet loss.
     pub fast_recovery: C,
+    /// Count of times SACK recovery was initiated to recover from packet loss.
+    pub sack_recovery: C,
     /// Count of times an established TCP connection transitioned to CLOSED.
     pub established_closed: C,
     /// Count of times an established TCP connection transitioned to CLOSED due
@@ -132,6 +135,10 @@ pub struct TcpCountersWithSocketInner<C = Counter> {
     /// Count of times an established TCP connection transitioned to CLOSED due
     /// to a timeout (e.g. a keep-alive or retransmit timeout).
     pub established_timedout: C,
+    /// Count of times loss recovery completes successfully.
+    pub loss_recovered: C,
+    /// Count of times duplicate ACKs were received.
+    pub dup_acks: C,
 }
 
 /// A composition of the TCP Counters with and without a socket.
@@ -170,10 +177,14 @@ impl<I: Ip> Inspectable for CombinedTcpCounters<'_, I> {
             retransmits,
             slow_start_retransmits,
             fast_retransmits,
+            sack_retransmits,
             fast_recovery,
+            sack_recovery,
             established_closed,
             established_resets,
             established_timedout,
+            loss_recovered,
+            dup_acks,
         } = with_socket.as_ref();
 
         // Note: Organize the "without socket" counters into helper structs to
@@ -214,6 +225,7 @@ impl<I: Ip> Inspectable for CombinedTcpCounters<'_, I> {
             inspector.record_counter("ResetsReceived", resets_received);
             inspector.record_counter("SynsReceived", syns_received);
             inspector.record_counter("FinsReceived", fins_received);
+            inspector.record_counter("DupAcks", dup_acks);
             inspector.record_child("Errors", |inspector| {
                 inspector.record_counter("ListenerQueueOverflow", listener_queue_overflow);
                 inspector.record_counter("PassiveOpenNoRouteErrors", passive_open_no_route_errors);
@@ -243,6 +255,7 @@ impl<I: Ip> Inspectable for CombinedTcpCounters<'_, I> {
             inspector.record_counter("Retransmits", retransmits);
             inspector.record_counter("SlowStartRetransmits", slow_start_retransmits);
             inspector.record_counter("FastRetransmits", fast_retransmits);
+            inspector.record_counter("SackRetransmits", sack_retransmits);
             inspector.record_child("Errors", |inspector| {
                 inspector.record_counter("SegmentSendErrors", segment_send_errors);
                 inspector.record_counter("ActiveOpenNoRouteErrors", active_open_no_route_errors);
@@ -251,6 +264,8 @@ impl<I: Ip> Inspectable for CombinedTcpCounters<'_, I> {
         inspector.record_counter("PassiveConnectionOpenings", passive_connection_openings);
         inspector.record_counter("ActiveConnectionOpenings", active_connection_openings);
         inspector.record_counter("FastRecovery", fast_recovery);
+        inspector.record_counter("SackRecovery", sack_recovery);
+        inspector.record_counter("LossRecovered", loss_recovered);
         inspector.record_counter("EstablishedClosed", established_closed);
         inspector.record_counter("EstablishedResets", established_resets);
         inspector.record_counter("EstablishedTimedout", established_timedout);
@@ -385,10 +400,14 @@ pub(crate) mod testutil {
                 retransmits,
                 slow_start_retransmits,
                 fast_retransmits,
+                sack_retransmits,
                 fast_recovery,
+                sack_recovery,
                 established_closed,
                 established_resets,
                 established_timedout,
+                loss_recovered,
+                dup_acks,
             } = counters;
             TcpCountersWithSocketInner {
                 received_segments_dispatched: received_segments_dispatched.get(),
@@ -411,10 +430,14 @@ pub(crate) mod testutil {
                 retransmits: retransmits.get(),
                 slow_start_retransmits: slow_start_retransmits.get(),
                 fast_retransmits: fast_retransmits.get(),
+                sack_retransmits: sack_retransmits.get(),
                 fast_recovery: fast_recovery.get(),
+                sack_recovery: sack_recovery.get(),
                 established_closed: established_closed.get(),
                 established_resets: established_resets.get(),
                 established_timedout: established_timedout.get(),
+                loss_recovered: loss_recovered.get(),
+                dup_acks: dup_acks.get(),
             }
         }
     }

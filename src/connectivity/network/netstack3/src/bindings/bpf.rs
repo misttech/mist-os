@@ -7,8 +7,8 @@ use ebpf::{
     Packet, ProgramArgument, Type, VerifiedEbpfProgram,
 };
 use ebpf_api::{
-    PinnedMap, __sk_buff, SKF_AD_OFF, SKF_AD_PROTOCOL, SKF_LL_OFF, SKF_NET_OFF, SK_BUF_TYPE,
-    SOCKET_FILTER_CBPF_CONFIG,
+    PinnedMap, __sk_buff, SKF_AD_OFF, SKF_AD_PROTOCOL, SKF_LL_OFF, SKF_NET_OFF,
+    SOCKET_FILTER_CBPF_CONFIG, SOCKET_FILTER_SK_BUF_TYPE,
 };
 use fidl_fuchsia_posix_socket_packet as fppacket;
 use netstack3_core::device_socket::Frame;
@@ -89,7 +89,7 @@ impl Packet for &'_ IpPacketForBpf<'_> {
 
 impl ProgramArgument for &'_ IpPacketForBpf<'_> {
     fn get_type() -> &'static Type {
-        &*SK_BUF_TYPE
+        &*SOCKET_FILTER_SK_BUF_TYPE
     }
 }
 

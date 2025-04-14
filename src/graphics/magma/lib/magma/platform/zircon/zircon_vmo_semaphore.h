@@ -10,8 +10,6 @@
 #include <lib/magma/util/short_macros.h>
 #include <lib/zx/vmo.h>
 
-#include <chrono>
-
 namespace magma {
 
 // VMO semaphores support timestamps.
@@ -29,8 +27,6 @@ class ZirconVmoSemaphore : public PlatformSemaphore {
     local_id_ = id;
   }
 
-  uint64_t koid() const { return koid_; }
-
   uint64_t id() const override { return local_id_ ? local_id_ : koid_; }
   uint64_t global_id() const override { return koid_; }
 
@@ -45,11 +41,7 @@ class ZirconVmoSemaphore : public PlatformSemaphore {
 
   bool WaitAsync(PlatformPort* port, uint64_t key) override;
 
-  zx_handle_t zx_handle() const { return vmo_.get(); }
-
-  static zx_signals_t zx_signal() { return ZX_USER_SIGNAL_0; }
-
-  zx_signals_t GetZxSignal() const override { return zx_signal(); }
+  zx_signals_t GetZxSignal() const override { return ZX_USER_SIGNAL_0; }
 
   bool GetTimestamp(uint64_t* timestamp_ns_out) override;
 

@@ -357,7 +357,8 @@ class Remote : public HasIo {
     zxio_ops_t ops = zxio_default_ops;
 
     // Operations we disallow "overloading" as this class manages the associated object's resources.
-    ops.close = Remote::Close<T>;
+    ops.destroy = Remote::Destroy<T>;
+    ops.close2 = Adaptor<T>::template From<&T::Close>;
     ops.release = Adaptor<T>::template From<&T::Release>;
     ops.borrow = Adaptor<T>::template From<&T::Borrow>;
     ops.clone = Adaptor<T>::template From<&T::Clone>;
@@ -406,20 +407,18 @@ class Remote : public HasIo {
     return ZX_OK;
   }
 
-  /// Helper that implements `zxio_ops_t::close` correctly for objects which derive `Remote`.
+  /// Helper that implements `zxio_ops_t::destroy` correctly for objects which derive `Remote`.
   /// This method is static since we destroy the object `T` represented by `zxio`, making it more
   /// clear when the object should no longer be used.
   template <typename T>
     requires std::is_base_of_v<Remote, T>
-  static zx_status_t Close(zxio_t* zxio, bool should_wait) {
+  static void Destroy(zxio_t* zxio) {
     T& instance = *reinterpret_cast<T*>(zxio);
-    const zx_status_t status = instance.CloseImpl(should_wait);
     instance.~T();
-    return status;
   }
 
-  zx_status_t CloseImpl(const bool should_wait) {
-    if (client_.is_valid() && should_wait) {
+  zx_status_t Close() {
+    if (client_.is_valid()) {
       const fidl::WireResult result = client_->Close();
       if (!result.ok()) {
         return result.status();

@@ -1565,6 +1565,7 @@ impl NamespaceNode {
             self.entry.node.update_info(|info| {
                 let now = utc::utc_now();
                 info.time_access = now;
+                info.pending_time_access_update = true;
             });
         }
     }

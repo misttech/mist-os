@@ -396,6 +396,17 @@ pub struct SystemActivityGovernor {
     /// The collection of ActivityGovernorListener that have registered through
     /// fuchsia.power.system.ActivityGovernor/RegisterListener.
     listeners: RefCell<Vec<fsystem::ActivityGovernorListenerProxy>>,
+    /// The collection of fsystem::SuspendBlockerProxy that have
+    /// been registered through
+    /// fuchsia.power.system.ActivityGovernor/RegisterSuspendBlocker.
+    suspend_blockers: RefCell<Vec<(fsystem::SuspendBlockerProxy, String)>>,
+    /// The collection of fsystem::SuspendBlockerProxy that have
+    /// been registered through
+    /// fuchsia.power.system.ActivityGovernor/RegisterSuspendBlocker but are not
+    /// active yet. Suspend blockers are moved to `suspend_blockers` at the
+    /// beginning of the next suspend cycle to prevent unnecessary
+    /// notifications during resume procedures.
+    pending_suspend_blockers: RefCell<Vec<(fsystem::SuspendBlockerProxy, String)>>,
     /// The manager used to modify cpu power element and trigger suspend.
     cpu_manager: Rc<CpuManager>,
     /// The context used to manage the boot_control power element.
@@ -549,6 +560,8 @@ impl SystemActivityGovernor {
             suspend_stats,
             lease_manager,
             listeners: RefCell::new(Vec::new()),
+            suspend_blockers: RefCell::new(Vec::new()),
+            pending_suspend_blockers: RefCell::new(Vec::new()),
             cpu_manager,
             boot_control,
             element_power_level_names,
@@ -833,6 +846,66 @@ impl SystemActivityGovernor {
                     }
                     let _ = responder.send();
                 }
+                Ok(fsystem::ActivityGovernorRequest::RegisterSuspendBlocker {
+                    responder,
+                    payload,
+                }) => {
+                    let res = match (payload.suspend_blocker, payload.name) {
+                        (Some(suspend_blocker), Some(name)) => {
+                            if name.is_empty() {
+                                log::warn!(
+                                    "Received invalid name while registering suspend blocker"
+                                );
+                                let _ = responder
+                                    .send(Err(fsystem::RegisterSuspendBlockerError::InvalidArgs));
+                                continue;
+                            }
+
+                            self.lease_manager
+                                .create_wake_lease(name.clone(), || {})
+                                .await
+                                .and_then(|client_token| {
+                                    client_token
+                                        .replace_handle(
+                                            zx::Rights::TRANSFER
+                                                | zx::Rights::DUPLICATE
+                                                | zx::Rights::WAIT,
+                                        )
+                                        .map_err(|status| {
+                                            anyhow::anyhow!(
+                                                "Failed to replace client token handle: {status}"
+                                            )
+                                        })
+                                })
+                                .and_then(|client_token| {
+                                    let proxy = suspend_blocker.into_proxy();
+                                    self.pending_suspend_blockers.borrow_mut().push((proxy, name));
+                                    Ok(client_token)
+                                })
+                                .or_else(|error| {
+                                    log::warn!(
+                                        error:?;
+                                        "Encountered error while registering wake lease"
+                                    );
+
+                                    Err(fsystem::RegisterSuspendBlockerError::Internal)
+                                })
+                        }
+                        (None, Some(_)) => {
+                            log::warn!("No suspend blocker provided in request");
+                            Err(fsystem::RegisterSuspendBlockerError::InvalidArgs)
+                        }
+                        (Some(_), None) => {
+                            log::warn!("No name provided in request");
+                            Err(fsystem::RegisterSuspendBlockerError::InvalidArgs)
+                        }
+                        (None, None) => {
+                            log::warn!("No arguments provided in request");
+                            Err(fsystem::RegisterSuspendBlockerError::InvalidArgs)
+                        }
+                    };
+                    let _ = responder.send(res);
+                }
                 Ok(fsystem::ActivityGovernorRequest::_UnknownMethod { ordinal, .. }) => {
                     log::warn!(ordinal:?; "Unknown ActivityGovernorRequest method");
                 }
@@ -927,6 +1000,65 @@ impl SystemActivityGovernor {
             }
         }
     }
+
+    async fn update_suspend_blockers(&self, is_suspending: bool) {
+        if is_suspending {
+            self.suspend_blockers
+                .borrow_mut()
+                .append(&mut self.pending_suspend_blockers.borrow_mut());
+        }
+
+        // A client may call RegisterSuspendBlocker which may cause another
+        // mutable borrow of suspend_blockers. Clone suspend_blockers to prevent this.
+        let suspend_blockers = self.suspend_blockers.borrow().clone();
+
+        let dead_blocker_ids = Rc::new(RefCell::new(Vec::new()));
+
+        log::info!(
+            "Running update_suspend_blockers(is_suspending={:?}) for {} suspend blockers",
+            is_suspending,
+            suspend_blockers.len()
+        );
+        futures::stream::iter(suspend_blockers)
+            .enumerate()
+            .for_each_concurrent(None, |(i, (suspend_blocker, name))| {
+            let dead_blocker_ids = dead_blocker_ids.clone();
+
+            async move {
+                let name2 = name.clone();
+                let _warn_task = fasync::Task::local(async move {
+                    loop {
+                        fasync::Timer::new(fasync::MonotonicDuration::from_seconds(10)).await;
+                        log::warn!(
+                            "No response from set_state from suspend_blocker '{name2}' ({i}) after 10 seconds!");
+                    }
+                });
+
+                if is_suspending {
+                    if let Err(e) = suspend_blocker.before_suspend().await {
+                        log::warn!(
+                            "Failed to call before_suspend on suspend blocker '{name}' ({i}): {e:?}"
+                        );
+                        dead_blocker_ids.borrow_mut().push(i);
+                    }
+                } else {
+                    if let Err(e) = suspend_blocker.after_resume().await {
+                        log::warn!(
+                            "Failed to call after_resume on suspend blocker '{name}' ({i}):  {e:?}"
+                        );
+                        dead_blocker_ids.borrow_mut().push(i);
+                    }
+                }
+            }})
+            .await;
+
+        // Remove suspend blockers that failed, starting from the highest index.
+        dead_blocker_ids.borrow_mut().sort();
+        dead_blocker_ids.borrow_mut().reverse();
+        for i in dead_blocker_ids.borrow().iter() {
+            self.suspend_blockers.borrow_mut().remove(*i);
+        }
+    }
 }
 
 #[async_trait(?Send)]
@@ -976,6 +1108,8 @@ impl SuspendResumeListener for SystemActivityGovernor {
     }
 
     async fn notify_on_suspend(&self) {
+        self.update_suspend_blockers(true).await;
+
         // A client may call RegisterListener while handling on_suspend which may cause another
         // mutable borrow of listeners. Clone the listeners to prevent this.
         let listeners: Vec<_> = self.listeners.borrow_mut().clone();
@@ -1005,7 +1139,9 @@ impl SuspendResumeListener for SystemActivityGovernor {
     }
 
     async fn notify_on_resume(&self) {
-        // A client may call RegisterListener while handling on_resume which may cause another
+        self.update_suspend_blockers(false).await;
+
+        // A client may call RegisterListener while handling on_suspend which may cause another
         // mutable borrow of listeners. Clone the listeners to prevent this.
         let listeners: Vec<_> = self.listeners.borrow_mut().clone();
 

@@ -7,15 +7,10 @@ mod fuchsia;
 #[cfg(target_os = "fuchsia")]
 use self::fuchsia as implementation;
 
-#[cfg(all(not(target_os = "fuchsia"), not(target_arch = "wasm32")))]
+#[cfg(not(target_os = "fuchsia"))]
 mod portable;
-#[cfg(all(not(target_os = "fuchsia"), not(target_arch = "wasm32")))]
+#[cfg(not(target_os = "fuchsia"))]
 use self::portable as implementation;
-
-#[cfg(all(not(target_os = "fuchsia"), target_arch = "wasm32"))]
-mod stub;
-#[cfg(all(not(target_os = "fuchsia"), target_arch = "wasm32"))]
-use self::stub as implementation;
 
 // Exports common to all target os.
 pub use implementation::executor::{
@@ -24,9 +19,7 @@ pub use implementation::executor::{
 pub use implementation::task::{unblock, JoinHandle, Task};
 pub use implementation::timer::Timer;
 
-#[cfg(not(target_arch = "wasm32"))]
 mod task_group;
-#[cfg(not(target_arch = "wasm32"))]
 pub use task_group::*;
 
 // Fuchsia specific exports.

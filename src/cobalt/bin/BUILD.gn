@@ -32,7 +32,6 @@ resource("config_for_tests") {
 group("tests") {
   testonly = true
   deps = [
-    ":cobalt-fuzzers",
     ":cobalt-manual-tests",
     ":cobalt_tests",
     "testing:tests",

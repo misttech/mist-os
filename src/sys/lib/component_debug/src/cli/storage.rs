@@ -4,8 +4,10 @@
 
 use crate::storage::{copy, delete, delete_all, list, make_directory};
 use anyhow::{format_err, Result};
-use fidl_fuchsia_sys2 as fsys;
 use moniker::Moniker;
+
+use flex_client::ProxyHasDomain;
+use flex_fuchsia_sys2 as fsys;
 
 async fn get_storage_admin(
     realm_query: fsys::RealmQueryProxy,
@@ -16,7 +18,8 @@ async fn get_storage_admin(
         format_err!("Error: {} is not a valid moniker ({})", storage_provider_moniker, e)
     })?;
 
-    let (storage_admin, server_end) = fidl::endpoints::create_proxy::<fsys::StorageAdminMarker>();
+    let (storage_admin, server_end) =
+        realm_query.domain().create_proxy::<fsys::StorageAdminMarker>();
 
     realm_query
         .connect_to_storage_admin(

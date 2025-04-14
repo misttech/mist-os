@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #ifdef __Fuchsia__
+#include <lib/zx/counter.h>
 #include <lib/zx/event.h>
 #include <lib/zx/vmo.h>
 #endif
@@ -122,6 +123,32 @@ class TestPlatformSemaphore : public testing::Test {
       EXPECT_FALSE(semaphore->Wait(0));
     }
   }
+
+  void TestImportCounter(bool one_shot = false) {
+#if !defined(__Fuchsia__)
+    GTEST_SKIP();
+#endif
+    zx::counter counter;
+    ASSERT_EQ(ZX_OK, zx::counter::create(/*options=*/0, &counter));
+
+    uint64_t flags = one_shot ? MAGMA_IMPORT_SEMAPHORE_ONE_SHOT : 0;
+
+    auto semaphore = magma::PlatformSemaphore::Import(counter.release(), flags);
+    ASSERT_TRUE(semaphore);
+
+    EXPECT_FALSE(semaphore->Wait(0));
+
+    semaphore->Signal();
+    EXPECT_TRUE(semaphore->Wait(0));
+
+    semaphore->Reset();
+
+    if (one_shot) {
+      EXPECT_TRUE(semaphore->Wait(0));
+    } else {
+      EXPECT_FALSE(semaphore->Wait(0));
+    }
+  }
 };
 
 }  // namespace
@@ -135,6 +162,10 @@ TEST_F(TestPlatformSemaphore, ImportEventOneShot) { TestImportEvent(/*one_shot=*
 TEST_F(TestPlatformSemaphore, ImportVmo) { TestImportVmo(); }
 
 TEST_F(TestPlatformSemaphore, ImportVmoOneShot) { TestImportVmo(/*one_shot=*/true); }
+
+TEST_F(TestPlatformSemaphore, ImportCounter) { TestImportCounter(); }
+
+TEST_F(TestPlatformSemaphore, ImportCounterOneShot) { TestImportCounter(/*one_shot=*/true); }
 
 TEST_F(TestPlatformSemaphore, Timestamp) {
   auto semaphore = magma::PlatformSemaphore::Create();

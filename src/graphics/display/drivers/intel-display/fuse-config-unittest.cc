@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-display/fuse-config.h"
 
-#include <lib/driver/mock-mmio/cpp/mock-mmio-range.h>
+#include <lib/driver/mock-mmio/cpp/globally-ordered-region.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio/mmio.h>
 
@@ -28,7 +28,8 @@ class FuseConfigTest : public ::testing::Test {
  protected:
   constexpr static int kMmioRangeSize = 0x60000;
   fdf_testing::ScopedGlobalLogger logger_;
-  mock_mmio::MockMmioRange mmio_range_{kMmioRangeSize, mock_mmio::MockMmioRange::Size::k32};
+  mock_mmio::GloballyOrderedRegion mmio_range_{kMmioRangeSize,
+                                               mock_mmio::GloballyOrderedRegion::Size::k32};
   fdf::MmioBuffer mmio_buffer_{mmio_range_.GetMmioBuffer()};
 };
 

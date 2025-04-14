@@ -37,7 +37,7 @@ TEST(AlphaModeTest, EqualityForDifferentValues) {
 TEST(AlphaModeTest, ToBanjoAlphaMode) {
   static constexpr coordinate_transformation_t banjo_transformation =
       AlphaMode::kPremultiplied.ToBanjo();
-  EXPECT_EQ(ALPHA_PREMULTIPLIED, banjo_transformation);
+  EXPECT_EQ(coordinate_transformation_t{ALPHA_PREMULTIPLIED}, banjo_transformation);
 }
 
 TEST(AlphaModeTest, ToFidlAlphaMode) {

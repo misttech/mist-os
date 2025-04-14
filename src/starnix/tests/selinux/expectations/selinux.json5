@@ -15,7 +15,6 @@
                 // keep-sorted start
                 "atsecure",
                 "bounds",
-                "bpf",
                 "capable_file",
                 "capable_net",
                 "cgroupfs_label",

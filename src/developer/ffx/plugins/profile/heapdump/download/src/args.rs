@@ -17,4 +17,6 @@ pub struct DownloadCommand {
     pub with_tags: bool,
     #[argh(option, description = "output protobuf file")]
     pub output_file: String,
+    #[argh(switch, description = "symbolize the generated profile")]
+    pub symbolize: bool,
 }

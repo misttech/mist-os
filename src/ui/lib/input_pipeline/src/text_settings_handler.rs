@@ -44,8 +44,17 @@ impl UnhandledInputHandler for TextSettingsHandler {
                 device_event: input_device::InputDeviceEvent::Keyboard(mut event),
                 device_descriptor,
                 event_time,
-                trace_id: _,
+                trace_id,
             } => {
+                fuchsia_trace::duration!(c"input", c"text_settings_handler");
+                if let Some(trace_id) = trace_id {
+                    fuchsia_trace::flow_step!(
+                        c"input",
+                        c"event_in_input_pipeline",
+                        trace_id.into()
+                    );
+                }
+
                 self.inspect_status
                     .count_received_event(input_device::InputEvent::from(unhandled_input_event));
                 let keymap_id = self.get_keymap_name();
@@ -61,7 +70,7 @@ impl UnhandledInputHandler for TextSettingsHandler {
                     device_descriptor,
                     event_time,
                     handled: input_device::Handled::No,
-                    trace_id: None,
+                    trace_id,
                 }]
             }
             // Pass a non-keyboard event through.

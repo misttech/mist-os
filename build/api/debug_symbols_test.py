@@ -4,7 +4,9 @@
 # found in the LICENSE file.
 
 import json
+import os
 import struct
+import subprocess
 import sys
 import tempfile
 import typing as T
@@ -12,7 +14,12 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, Path(__file__).parent)
-from debug_symbols import DebugSymbolsManifestParser, extract_gnu_build_id
+from debug_symbols import (
+    CommandPool,
+    DebugSymbolExporter,
+    DebugSymbolsManifestParser,
+    extract_gnu_build_id,
+)
 
 
 def write_json(path: Path, content: T.Any) -> None:
@@ -370,7 +377,9 @@ class DebugSymbolsManifestParserTest(unittest.TestCase):
                     "debug": "a/libfoo.so.unstripped",
                     "elf_build_id_file": "a.build_id",
                 },
-                {"debug": "b/libbar.so.unstripped"},
+                {
+                    "debug": "b/libbar.so.unstripped",
+                },
                 {
                     "debug": "c/.build-id/bu/ild_id_for_c.debug",
                 },
@@ -417,6 +426,347 @@ class DebugSymbolsManifestParserTest(unittest.TestCase):
         self.assertSetEqual(
             parser.extra_input_files,
             {a_build_id_file, self._root / "b/libbar.so.unstripped"},
+        )
+
+
+class CommandPoolTest(unittest.TestCase):
+    def test_run(self) -> None:
+        max_running = 0
+        running_commands: set[int] = set()
+        events_log: list[tuple[int, str, int]] = []
+
+        # A CommandRunnerType value to launch a command that sleeps for a specific
+        # number of seconds.
+        def command_runner(
+            cmd_id: int, sleep_time: float
+        ) -> subprocess.Popen[str]:
+            cmd_args = [
+                sys.executable,
+                "-c",
+                "import time; time.sleep({sleep_time})",
+            ]
+            running_commands.add(cmd_id)
+            nonlocal max_running
+            if len(running_commands) > max_running:
+                max_running = len(running_commands)
+            events_log.append((cmd_id, "start", len(running_commands)))
+            return subprocess.Popen(
+                cmd_args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+
+        def process_result(
+            cmd_id: int, sleep_time: float, proc: subprocess.Popen[str]
+        ) -> int:
+            events_log.append((cmd_id, "stop", len(running_commands)))
+            running_commands.discard(cmd_id)
+            return cmd_id
+
+        depth = 4
+        count = 16
+        command_pool = CommandPool(depth)
+        for n in range(count):
+            command_pool.add_command(0.3, command_runner)
+
+        self.assertSetEqual(running_commands, set())
+        self.assertListEqual(events_log, [])
+
+        result_ids = []
+        for result_id in command_pool.run(process_result):
+            self.assertTrue(len(running_commands) <= depth)
+            result_ids.append(result_id)
+
+        # Verify that each command run exactly once.
+        self.assertListEqual(sorted(result_ids), list(range(count)))
+
+        # Verify that no more than |depth| commands ran concurrently.
+        self.assertLessEqual(max_running, depth)
+
+        # Verify there are no running commands left.
+        self.assertEqual(len(running_commands), 0)
+
+        # Verify that each command was started and stopped once.
+        self.assertEqual(len(events_log), count * 2)
+
+        started_cmds = [
+            cmd_id for cmd_id, what, _ in events_log if what == "start"
+        ]
+        stopped_cmds = [
+            cmd_id for cmd_id, what, _ in events_log if what == "stop"
+        ]
+
+        self.assertListEqual(sorted(started_cmds), list(range(count)))
+        self.assertListEqual(sorted(stopped_cmds), list(range(count)))
+
+
+class DebugSymbolExporterTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self._td = tempfile.TemporaryDirectory()
+        self._root = Path(self._td.name)
+
+        # Generate several empty ELF files with a .build-id value.
+        # and a debug_symbols.json manifest to list them.
+        self._debug_symbol_files = {}
+        self._debug_manifest = self._root / "debug_symbols.json"
+
+        self._manifest_entries = []
+
+        for n in range(16):
+            debug_symbol_filename = f"debug_{n + 1}.so"
+            build_id = bytes.fromhex("4200000000%02x" % n)
+            self._manifest_entries.append(
+                {
+                    "debug": debug_symbol_filename,
+                    "elf_build_id": build_id.hex(),
+                    "label": f"//some:label_{n + 1}",
+                    "os": "fuchsia",
+                }
+            )
+            (self._root / debug_symbol_filename).write_bytes(
+                generate_elf_with_build_id(build_id)
+            )
+            self._debug_symbol_files[build_id.hex()] = debug_symbol_filename
+
+        # Create a fake dump_syms tool that simply prints the path of
+        # the input debug symbol file.
+        self._dump_syms = self._root / "dump_syms"
+        self._dump_syms.write_text(
+            f"""#!{sys.executable}
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-r", action="store_true")
+parser.add_argument("-n")
+parser.add_argument("-o")
+parser.add_argument("debug_symbol_file")
+
+args = parser.parse_args()
+
+print(args.debug_symbol_file)
+"""
+        )
+        self._dump_syms.chmod(0o755)
+
+    def tearDown(self) -> None:
+        self._td.cleanup()
+
+    def test_export_debug_symbols_no_breakpad(self) -> None:
+        log_lines: list[str] = []
+
+        def log(msg: str) -> None:
+            nonlocal log_lines
+            log_lines.append(msg)
+
+        err_lines: list[str] = []
+
+        def log_error(msg: str) -> None:
+            nonlocal err_lines
+            err_lines.append(msg)
+
+        exporter = DebugSymbolExporter(
+            build_dir=self._root,
+            dump_syms_tool=None,
+            log=log,
+            log_error=log_error,
+        )
+
+        exporter.parse_debug_symbols(self._manifest_entries)
+
+        output_dir = self._root / "out"
+
+        self.assertTrue(exporter.export_debug_symbols(output_dir))
+
+        self.assertTrue((output_dir / ".build-id").is_dir())
+
+        for build_id, symbol_filename in self._debug_symbol_files.items():
+            debug_file = (
+                output_dir
+                / ".build-id"
+                / build_id[0:2]
+                / f"{build_id[2:]}.debug"
+            )
+            self.assertTrue(debug_file.exists(), msg=f"For {debug_file}")
+            self.assertTrue(debug_file.is_symlink(), msg=f"For {debug_file}")
+            self.assertEqual(
+                debug_file.readlink(), self._root / symbol_filename
+            )
+
+        self.assertListEqual(err_lines, [])
+
+        self.assertListEqual(
+            log_lines,
+            [
+                f"Creating {output_dir}/build-ids.json",
+                f"Creating {output_dir}/build-ids.txt",
+                f"Creating 16 symlinks in {output_dir}",
+            ],
+        )
+
+        build_ids_txt = output_dir / "build-ids.txt"
+        self.assertTrue(build_ids_txt.is_file())
+        self.assertEqual(
+            build_ids_txt.read_text(),
+            """\
+420000000000
+420000000001
+420000000002
+420000000003
+420000000004
+420000000005
+420000000006
+420000000007
+420000000008
+420000000009
+42000000000a
+42000000000b
+42000000000c
+42000000000d
+42000000000e
+42000000000f
+""",
+        )
+
+        build_ids_json = output_dir / "build-ids.json"
+        self.assertTrue(build_ids_json.is_file())
+        self.assertDictEqual(
+            json.loads(build_ids_json.read_text()),
+            {
+                "420000000000": "//some:label_1",
+                "420000000001": "//some:label_2",
+                "420000000002": "//some:label_3",
+                "420000000003": "//some:label_4",
+                "420000000004": "//some:label_5",
+                "420000000005": "//some:label_6",
+                "420000000006": "//some:label_7",
+                "420000000007": "//some:label_8",
+                "420000000008": "//some:label_9",
+                "420000000009": "//some:label_10",
+                "42000000000a": "//some:label_11",
+                "42000000000b": "//some:label_12",
+                "42000000000c": "//some:label_13",
+                "42000000000d": "//some:label_14",
+                "42000000000e": "//some:label_15",
+                "42000000000f": "//some:label_16",
+            },
+        )
+
+    def test_export_debug_symbols_with_breakpad(self) -> None:
+        log_lines: list[str] = []
+
+        def log(msg: str) -> None:
+            nonlocal log_lines
+            log_lines.append(msg)
+
+        err_lines: list[str] = []
+
+        def log_error(msg: str) -> None:
+            nonlocal err_lines
+            err_lines.append(msg)
+
+        exporter = DebugSymbolExporter(
+            build_dir=self._root,
+            dump_syms_tool=self._dump_syms,
+            log=log,
+            log_error=log_error,
+        )
+
+        exporter.parse_debug_symbols(self._manifest_entries)
+
+        output_dir = self._root / "out"
+        self.assertTrue(exporter.export_debug_symbols(output_dir))
+
+        self.assertTrue((output_dir / ".build-id").is_dir())
+
+        for build_id, symbol_filename in self._debug_symbol_files.items():
+            debug_file = (
+                output_dir
+                / ".build-id"
+                / build_id[0:2]
+                / f"{build_id[2:]}.debug"
+            )
+            self.assertTrue(debug_file.exists(), msg=f"For {debug_file}")
+            self.assertTrue(debug_file.is_symlink(), msg=f"For {debug_file}")
+            self.assertEqual(
+                debug_file.readlink(), self._root / symbol_filename
+            )
+
+        self.assertListEqual(err_lines, [])
+
+        rel_root = os.path.relpath(self._root)
+
+        self.maxDiff = None
+        self.assertListEqual(
+            log_lines,
+            [
+                f"Creating {output_dir}/build-ids.json",
+                f"Creating {output_dir}/build-ids.txt",
+                f"Creating 16 symlinks in {output_dir}",
+                f"Generating 16 breakpad symbols in {output_dir}",
+                f"  - Creating .build-id/42/0000000000.sym FROM {rel_root}/debug_1.so",
+                f"  - Creating .build-id/42/0000000001.sym FROM {rel_root}/debug_2.so",
+                f"  - Creating .build-id/42/0000000002.sym FROM {rel_root}/debug_3.so",
+                f"  - Creating .build-id/42/0000000003.sym FROM {rel_root}/debug_4.so",
+                f"  - Creating .build-id/42/0000000004.sym FROM {rel_root}/debug_5.so",
+                f"  - Creating .build-id/42/0000000005.sym FROM {rel_root}/debug_6.so",
+                f"  - Creating .build-id/42/0000000006.sym FROM {rel_root}/debug_7.so",
+                f"  - Creating .build-id/42/0000000007.sym FROM {rel_root}/debug_8.so",
+                f"  - Creating .build-id/42/0000000008.sym FROM {rel_root}/debug_9.so",
+                f"  - Creating .build-id/42/0000000009.sym FROM {rel_root}/debug_10.so",
+                f"  - Creating .build-id/42/000000000a.sym FROM {rel_root}/debug_11.so",
+                f"  - Creating .build-id/42/000000000b.sym FROM {rel_root}/debug_12.so",
+                f"  - Creating .build-id/42/000000000c.sym FROM {rel_root}/debug_13.so",
+                f"  - Creating .build-id/42/000000000d.sym FROM {rel_root}/debug_14.so",
+                f"  - Creating .build-id/42/000000000e.sym FROM {rel_root}/debug_15.so",
+                f"  - Creating .build-id/42/000000000f.sym FROM {rel_root}/debug_16.so",
+                "Done!",
+            ],
+        )
+
+        build_ids_txt = output_dir / "build-ids.txt"
+        self.assertTrue(build_ids_txt.is_file())
+        self.assertEqual(
+            build_ids_txt.read_text(),
+            """\
+420000000000
+420000000001
+420000000002
+420000000003
+420000000004
+420000000005
+420000000006
+420000000007
+420000000008
+420000000009
+42000000000a
+42000000000b
+42000000000c
+42000000000d
+42000000000e
+42000000000f
+""",
+        )
+
+        build_ids_json = output_dir / "build-ids.json"
+        self.assertTrue(build_ids_json.is_file())
+        self.assertDictEqual(
+            json.loads(build_ids_json.read_text()),
+            {
+                "420000000000": "//some:label_1",
+                "420000000001": "//some:label_2",
+                "420000000002": "//some:label_3",
+                "420000000003": "//some:label_4",
+                "420000000004": "//some:label_5",
+                "420000000005": "//some:label_6",
+                "420000000006": "//some:label_7",
+                "420000000007": "//some:label_8",
+                "420000000008": "//some:label_9",
+                "420000000009": "//some:label_10",
+                "42000000000a": "//some:label_11",
+                "42000000000b": "//some:label_12",
+                "42000000000c": "//some:label_13",
+                "42000000000d": "//some:label_14",
+                "42000000000e": "//some:label_15",
+                "42000000000f": "//some:label_16",
+            },
         )
 
 

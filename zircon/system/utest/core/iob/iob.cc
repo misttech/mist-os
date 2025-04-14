@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/fit/defer.h>
 #include <lib/iob/blob-id-allocator.h>
 #include <lib/zx/iob.h>
 #include <lib/zx/process.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmar.h>
+#include <unistd.h>
 #include <zircon/errors.h>
 #include <zircon/limits.h>
 #include <zircon/process.h>
@@ -15,11 +17,14 @@
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/iob.h>
 #include <zircon/syscalls/object.h>
+#include <zircon/syscalls/port.h>
 #include <zircon/time.h>
 #include <zircon/types.h>
 
+#include <array>
 #include <cstdint>
 #include <cstring>
+#include <thread>
 
 #include <zxtest/zxtest.h>
 
@@ -32,6 +37,8 @@ const uint64_t kIoBufferEp0OnlyRwMap =
 const uint64_t kIoBufferRdOnlyMap = ZX_IOB_ACCESS_EP0_CAN_MAP_READ | ZX_IOB_ACCESS_EP1_CAN_MAP_READ;
 
 NEEDS_NEXT_SYSCALL(zx_iob_allocate_id);
+NEEDS_NEXT_SYSCALL(zx_iob_create_shared_region);
+NEEDS_NEXT_SYSCALL(zx_iob_writev);
 
 namespace {
 // An RAII Helper used to make sure that we don't accidentally leak any mapped
@@ -948,6 +955,728 @@ TEST(Iob, MapWhenPeerClosed) {
   zx::result<MappingHelper> region =
       MappingHelper::Create(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, ep0, 0, 0, ZX_PAGE_SIZE);
   EXPECT_OK(region.status_value());
+}
+
+TEST(IobSharedRegion, InvalidArgs) {
+  NEEDS_NEXT_SKIP(zx_iob_create_shared_region);
+
+  zx_handle_t handle;
+
+  // Non-zero options.
+  EXPECT_STATUS(zx_iob_create_shared_region(1, ZX_PAGE_SIZE, &handle), ZX_ERR_INVALID_ARGS);
+
+  // Zero size.
+  EXPECT_STATUS(zx_iob_create_shared_region(0, 0, &handle), ZX_ERR_INVALID_ARGS);
+
+  // Not multiple of page size
+  EXPECT_STATUS(zx_iob_create_shared_region(0, ZX_PAGE_SIZE + 3, &handle), ZX_ERR_INVALID_ARGS);
+}
+
+TEST(IobSharedRegion, CreateSucceeds) {
+  NEEDS_NEXT_SKIP(zx_iob_create_shared_region);
+
+  zx_handle_t handle;
+  EXPECT_OK(zx_iob_create_shared_region(0, ZX_PAGE_SIZE, &handle));
+  zx_handle_close(handle);
+}
+
+TEST(Iob, SharedRegionWithNonRingBufferDiscipline) {
+  NEEDS_NEXT_SKIP(zx_iob_create_shared_region);
+
+  zx_handle_t shared_region;
+  ASSERT_OK(zx_iob_create_shared_region(0, 2 * ZX_PAGE_SIZE, &shared_region));
+  [[maybe_unused]] auto clean_up_shared_region = [=] { zx_handle_close(shared_region); };
+
+  for (zx_iob_discipline_type_t type :
+       {ZX_IOB_DISCIPLINE_TYPE_NONE, ZX_IOB_DISCIPLINE_TYPE_ID_ALLOCATOR}) {
+    zx_iob_region_t config = {
+        .type = ZX_IOB_REGION_TYPE_SHARED,
+        .access = kIoBufferEpRwMap,
+        .discipline = zx_iob_discipline_t{.type = type},
+    };
+    reinterpret_cast<zx_iob_region_shared_t&>(config.max_extension) = {
+        .shared_region = shared_region,
+    };
+    zx::iob ep0, ep1;
+    EXPECT_STATUS(zx::iob::create(0, &config, 1, &ep0, &ep1), ZX_ERR_INVALID_ARGS, "type=%lu",
+                  type);
+  }
+}
+
+TEST(Iob, CreateWithMediatedWriteRingBufferDisciplineInvalidArgs) {
+  NEEDS_NEXT_SKIP(zx_iob_create_shared_region);
+
+  zx::iob ep0, ep1;
+
+  // With private region.
+  {
+    zx_iob_region_t config = {
+        .type = ZX_IOB_REGION_TYPE_PRIVATE,
+        .access = kIoBufferEpRwMap,
+        .size = ZX_PAGE_SIZE,
+        .discipline =
+            zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_MEDIATED_WRITE_RING_BUFFER},
+    };
+    EXPECT_STATUS(zx::iob::create(0, &config, 1, &ep0, &ep1), ZX_ERR_INVALID_ARGS);
+  }
+
+  // Region too small: it must be at least two pages.
+  {
+    zx_handle_t shared_region;
+    ASSERT_OK(zx_iob_create_shared_region(0, ZX_PAGE_SIZE, &shared_region));
+    [[maybe_unused]] auto clean_up_shared_region = [=] { zx_handle_close(shared_region); };
+
+    zx_iob_region_t config = {
+        .type = ZX_IOB_REGION_TYPE_SHARED,
+        .access = kIoBufferEpRwMap,
+        .discipline =
+            zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_MEDIATED_WRITE_RING_BUFFER},
+    };
+    reinterpret_cast<zx_iob_region_shared_t&>(config.max_extension) = {
+        .shared_region = shared_region,
+    };
+    EXPECT_STATUS(zx::iob::create(0, &config, 1, &ep0, &ep1), ZX_ERR_INVALID_ARGS);
+  }
+
+  // Non-zero size.
+  {
+    zx_handle_t shared_region;
+    ASSERT_OK(zx_iob_create_shared_region(0, 2 * ZX_PAGE_SIZE, &shared_region));
+    [[maybe_unused]] auto clean_up_shared_region = [=] { zx_handle_close(shared_region); };
+
+    zx_iob_region_t config = {
+        .type = ZX_IOB_REGION_TYPE_SHARED,
+        .access = kIoBufferEpRwMap,
+        .size = 2 * ZX_PAGE_SIZE,  // <- This should be zero
+        .discipline =
+            zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_MEDIATED_WRITE_RING_BUFFER},
+    };
+    reinterpret_cast<zx_iob_region_shared_t&>(config.max_extension) = {
+        .shared_region = shared_region,
+    };
+    EXPECT_STATUS(zx::iob::create(0, &config, 1, &ep0, &ep1), ZX_ERR_INVALID_ARGS);
+  }
+}
+
+TEST(Iob, CreateWithMediatedWriteRingBufferDisciplineSucceeds) {
+  NEEDS_NEXT_SKIP(zx_iob_create_shared_region);
+
+  zx::iob ep0, ep1;
+
+  zx_handle_t shared_region;
+  ASSERT_OK(zx_iob_create_shared_region(0, 2 * ZX_PAGE_SIZE, &shared_region));
+  [[maybe_unused]] auto clean_up_shared_region = [=] { zx_handle_close(shared_region); };
+
+  zx_iob_region_t config = {
+      .type = ZX_IOB_REGION_TYPE_SHARED,
+      .access = kIoBufferEpRwMap,
+      .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_MEDIATED_WRITE_RING_BUFFER},
+  };
+  reinterpret_cast<zx_iob_region_shared_t&>(config.max_extension) = {
+      .shared_region = shared_region,
+  };
+  EXPECT_OK(zx::iob::create(0, &config, 1, &ep0, &ep1));
+}
+
+TEST(Iob, IobWriteChecksRights) {
+  NEEDS_NEXT_SKIP(zx_iob_create_shared_region);
+
+  zx::iob ep0, ep1;
+
+  zx_handle_t shared_region;
+  ASSERT_OK(zx_iob_create_shared_region(0, 2 * ZX_PAGE_SIZE, &shared_region));
+  [[maybe_unused]] auto clean_up_shared_region = [=] { zx_handle_close(shared_region); };
+
+  zx_iob_region_t config = {
+      .type = ZX_IOB_REGION_TYPE_SHARED,
+      .access = ZX_IOB_ACCESS_EP0_CAN_MEDIATED_WRITE,
+      .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_MEDIATED_WRITE_RING_BUFFER},
+  };
+  reinterpret_cast<zx_iob_region_shared_t&>(config.max_extension) = {
+      .shared_region = shared_region,
+  };
+  ASSERT_OK(zx::iob::create(0, &config, 1, &ep0, &ep1));
+
+  // First, remove the write right from the handle.
+  zx::iob handle_with_no_rights;
+  ep0.duplicate(/*rights=*/0, &handle_with_no_rights);
+
+  char buffer[] = "hello";
+  zx_iovec_t vec = {
+      .buffer = buffer,
+      .capacity = sizeof(buffer),
+  };
+
+  EXPECT_STATUS(zx_iob_writev(handle_with_no_rights.get(), 0, 0, &vec, 1), ZX_ERR_ACCESS_DENIED);
+
+  // Endpoint 1 doesn't have mediated write access.
+  EXPECT_STATUS(zx_iob_writev(ep1.get(), 0, 0, &vec, 1), ZX_ERR_ACCESS_DENIED);
+
+  // Endpoint 0 does though.
+  EXPECT_OK(zx_iob_writev(ep0.get(), 0, 0, &vec, 1));
+}
+
+TEST(Iob, IobWriteInvalidArgs) {
+  NEEDS_NEXT_SKIP(zx_iob_create_shared_region);
+
+  zx::iob ep0, ep1;
+
+  zx_handle_t shared_region;
+  ASSERT_OK(zx_iob_create_shared_region(0, 2 * ZX_PAGE_SIZE, &shared_region));
+  [[maybe_unused]] auto clean_up_shared_region = [=] { zx_handle_close(shared_region); };
+
+  zx_iob_region_t config[] = {
+      {
+          .type = ZX_IOB_REGION_TYPE_SHARED,
+          .access = ZX_IOB_ACCESS_EP0_CAN_MEDIATED_WRITE,
+          .discipline =
+              zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_MEDIATED_WRITE_RING_BUFFER},
+      },
+      {
+          .type = ZX_IOB_REGION_TYPE_PRIVATE,
+          .access = kIoBufferEpRwMap,
+          .size = ZX_PAGE_SIZE,
+          .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_NONE},
+      },
+  };
+
+  reinterpret_cast<zx_iob_region_shared_t&>(config[0].max_extension) = {
+      .shared_region = shared_region,
+  };
+  ASSERT_OK(zx::iob::create(0, config, std::size(config), &ep0, &ep1));
+
+  char buffer[] = "hello";
+  zx_iovec_t vec = {
+      .buffer = buffer,
+      .capacity = sizeof(buffer),
+  };
+
+  // Invalid options.
+  EXPECT_STATUS(zx_iob_writev(ep0.get(), 1, 0, &vec, 1), ZX_ERR_INVALID_ARGS);
+
+  // Invalid handle.
+  EXPECT_STATUS(zx_iob_writev(ZX_HANDLE_INVALID, 0, 0, &vec, 1), ZX_ERR_BAD_HANDLE);
+
+  // Out of range region.
+  EXPECT_STATUS(zx_iob_writev(ep0.get(), 0, 2, &vec, 1), ZX_ERR_OUT_OF_RANGE);
+
+  // Wrong region type.
+  EXPECT_STATUS(zx_iob_writev(ep0.get(), 0, 1, &vec, 1), ZX_ERR_WRONG_TYPE);
+
+  // A bad iovec.
+  EXPECT_STATUS(zx_iob_writev(ep0.get(), 0, 0, reinterpret_cast<zx_iovec_t*>(1), 1),
+                ZX_ERR_INVALID_ARGS);
+
+  // iovec capacity overflow.
+  zx_iovec_t vecs[] = {{
+                           .buffer = buffer,
+                           .capacity = std::numeric_limits<size_t>::max(),
+                       },
+                       {
+                           .buffer = buffer,
+                           .capacity = std::numeric_limits<size_t>::max(),
+                       }};
+  EXPECT_STATUS(zx_iob_writev(ep0.get(), 0, 0, vecs, std::size(vecs)), ZX_ERR_INVALID_ARGS);
+
+  // Exceeds max message size.
+  constexpr size_t kMaxMessageSize = 65535 - 16;
+  auto large_buf = std::make_unique<uint8_t[]>(kMaxMessageSize + 1);
+  {
+    zx_iovec_t vec = {
+        .buffer = large_buf.get(),
+        .capacity = kMaxMessageSize + 1,
+    };
+    EXPECT_STATUS(zx_iob_writev(ep0.get(), 0, 0, &vec, 1), ZX_ERR_INVALID_ARGS);
+  }
+
+  // Exceeds buffer size.
+  {
+    zx_iovec_t vec = {
+        .buffer = large_buf.get(),
+        .capacity = PAGE_SIZE + 1,
+    };
+    EXPECT_STATUS(zx_iob_writev(ep0.get(), 0, 0, &vec, 1), ZX_ERR_NO_SPACE);
+  }
+
+  // Bad buffer.
+  {
+    zx_iovec_t vec = {
+        .buffer = reinterpret_cast<void*>(1),
+        .capacity = 5,
+    };
+    EXPECT_STATUS(zx_iob_writev(ep0.get(), 0, 0, &vec, 1), ZX_ERR_NOT_FOUND);
+  }
+
+  // Too many iovecs.
+  {
+    constexpr int kCount = 9;
+    char buffer[] = "hello";
+    zx_iovec_t vec[kCount];
+    for (int i = 0; i < kCount; ++i) {
+      vec[i] = {
+          .buffer = buffer,
+          .capacity = std::size(buffer),
+      };
+    }
+    EXPECT_STATUS(zx_iob_writev(ep0.get(), 0, 0, vec, kCount), ZX_ERR_INVALID_ARGS);
+  }
+
+  // Make sure that we could actually write to ep0.
+  EXPECT_OK(zx_iob_writev(ep0.get(), 0, 0, &vec, 1));
+}
+
+TEST(Iob, IobWriteCorrupt) {
+  NEEDS_NEXT_SKIP(zx_iob_create_shared_region);
+
+  zx::iob ep0, ep1;
+
+  zx_handle_t shared_region;
+  ASSERT_OK(zx_iob_create_shared_region(0, 2 * ZX_PAGE_SIZE, &shared_region));
+  [[maybe_unused]] auto clean_up_shared_region = [=] { zx_handle_close(shared_region); };
+
+  zx_iob_region_t config = {
+      .type = ZX_IOB_REGION_TYPE_SHARED,
+      .access = ZX_IOB_ACCESS_EP0_CAN_MEDIATED_WRITE | kIoBufferEpRwMap,
+      .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_MEDIATED_WRITE_RING_BUFFER},
+  };
+  reinterpret_cast<zx_iob_region_shared_t&>(config.max_extension) = {
+      .shared_region = shared_region,
+  };
+  ASSERT_OK(zx::iob::create(0, &config, 1, &ep0, &ep1));
+
+  zx::result<MappingHelper> mapping =
+      MappingHelper::Create(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, ep0, 0, 0, ZX_PAGE_SIZE * 2);
+  ASSERT_OK(mapping);
+
+  uint64_t* phead = reinterpret_cast<uint64_t*>(mapping->addr());
+  uint64_t* ptail = reinterpret_cast<uint64_t*>(mapping->addr() + 8);
+
+  // Corrupted tail: tail exceeds head.
+  *ptail = 8;
+
+  char buffer[] = "12345678abc";
+  zx_iovec_t vec = {
+      .buffer = buffer,
+      .capacity = sizeof(buffer),
+  };
+
+  EXPECT_STATUS(zx_iob_writev(ep0.get(), 0, 0, &vec, 1), ZX_ERR_IO_DATA_INTEGRITY);
+
+  // Misaligned head.
+  *phead = 9;
+  EXPECT_STATUS(zx_iob_writev(ep0.get(), 0, 0, &vec, 1), ZX_ERR_IO_DATA_INTEGRITY);
+
+  // Overflow of head pointer. The message gets rounded up to nearest 8 bytes and there's a 16 byte
+  // header.
+  *phead = *ptail = 0xffff'ffff'ffff'ffff - 16 - 16 + 1;
+  EXPECT_STATUS(zx_iob_writev(ep0.get(), 0, 0, &vec, 1), ZX_ERR_IO_DATA_INTEGRITY);
+
+  // There should be room to write a smaller message.
+  vec.capacity = 5;
+  EXPECT_OK(zx_iob_writev(ep0.get(), 0, 0, &vec, 1));
+}
+
+void IobWriteTest(bool use_two_iovecs) {
+  zx::iob ep0, ep1;
+
+  zx_handle_t shared_region;
+  ASSERT_OK(zx_iob_create_shared_region(0, 2 * ZX_PAGE_SIZE, &shared_region));
+  [[maybe_unused]] auto clean_up_shared_region = [=] { zx_handle_close(shared_region); };
+
+  zx_iob_region_t config = {
+      .type = ZX_IOB_REGION_TYPE_SHARED,
+      .access = ZX_IOB_ACCESS_EP0_CAN_MEDIATED_WRITE | kIoBufferEpRwMap,
+      .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_MEDIATED_WRITE_RING_BUFFER},
+  };
+  reinterpret_cast<zx_iob_region_shared_t&>(config.max_extension) = {
+      .shared_region = shared_region,
+  };
+  *reinterpret_cast<zx_iob_discipline_mediated_write_ring_buffer_t*>(config.discipline.reserved) = {
+      .tag = 0x0123456789abcdef,
+  };
+  ASSERT_OK(zx::iob::create(0, &config, 1, &ep0, &ep1));
+
+  zx::result<MappingHelper> mapping =
+      MappingHelper::Create(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, ep0, 0, 0, ZX_PAGE_SIZE * 2);
+  ASSERT_OK(mapping);
+
+  uint64_t* phead = reinterpret_cast<uint64_t*>(mapping->addr());
+  uint64_t* ptail = reinterpret_cast<uint64_t*>(mapping->addr() + 8);
+
+  // Write some messages and check that we see the expected updates to the buffer.
+  char buffer[] = "12345";
+  zx_iovec_t vec[2];
+  int iovec_count;
+
+  if (use_two_iovecs) {
+    constexpr int kOffset = 3;
+    vec[0] = {
+        .buffer = buffer,
+        .capacity = kOffset,
+    };
+    vec[1] = {
+        .buffer = buffer + kOffset,
+        .capacity = std::size(buffer) - kOffset,
+    };
+    iovec_count = 2;
+  } else {
+    vec[0] = {
+        .buffer = buffer,
+        .capacity = std::size(buffer),
+    };
+    iovec_count = 1;
+  }
+
+  const uint8_t expected[] = {
+      0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 0x01,  // tag
+      6,    0,    0,    0,    0,    0,    0,    0,     // length
+      '1',  '2',  '3',  '4',  '5',  0,                 // message
+  };
+  constexpr size_t kRoundedMessageSize = 8 + 16;
+
+  uint64_t last_head = 0;
+  for (unsigned i = 0; i < ZX_PAGE_SIZE / kRoundedMessageSize; ++i) {
+    EXPECT_OK(zx_iob_writev(ep0.get(), 0, 0, vec, iovec_count));
+
+    EXPECT_EQ(*phead, last_head + 8 + 16);
+    EXPECT_EQ(*ptail, 0);
+    EXPECT_BYTES_EQ(reinterpret_cast<uint8_t*>(mapping->addr() + ZX_PAGE_SIZE + last_head),
+                    expected, std::size(expected));
+    last_head = *phead;
+  }
+
+  // The next message we write should wrap the buffer, but there won't be any space.
+  EXPECT_STATUS(zx_iob_writev(ep0.get(), 0, 0, vec, iovec_count), ZX_ERR_NO_SPACE);
+
+  // Make some space, and then the next write should succeed.
+  *ptail += kRoundedMessageSize;
+  EXPECT_OK(zx_iob_writev(ep0.get(), 0, 0, vec, iovec_count));
+
+  EXPECT_EQ(*phead, last_head + 8 + 16);
+  EXPECT_EQ(*ptail, kRoundedMessageSize);
+
+  size_t amount_before_wrapping = ZX_PAGE_SIZE - last_head;
+  EXPECT_BYTES_EQ(reinterpret_cast<uint8_t*>(mapping->addr() + ZX_PAGE_SIZE + last_head), expected,
+                  amount_before_wrapping);
+  EXPECT_BYTES_EQ(reinterpret_cast<uint8_t*>(mapping->addr() + ZX_PAGE_SIZE),
+                  expected + amount_before_wrapping, std::size(expected) - amount_before_wrapping);
+}
+
+TEST(Iob, IobWriteSuccess) {
+  NEEDS_NEXT_SKIP(zx_iob_create_shared_region);
+
+  IobWriteTest(false);
+}
+
+TEST(Iob, IobWriteWithMultipleVectors) {
+  NEEDS_NEXT_SKIP(zx_iob_create_shared_region);
+
+  IobWriteTest(true);
+}
+
+TEST(Iob, IobWriteWithFaultSucceeds) {
+  NEEDS_NEXT_SKIP(zx_iob_create_shared_region);
+
+  zx::iob ep0, ep1;
+
+  zx_handle_t shared_region;
+  ASSERT_OK(zx_iob_create_shared_region(0, 2 * ZX_PAGE_SIZE, &shared_region));
+  [[maybe_unused]] auto clean_up_shared_region = [=] { zx_handle_close(shared_region); };
+
+  zx_iob_region_t config = {
+      .type = ZX_IOB_REGION_TYPE_SHARED,
+      .access = ZX_IOB_ACCESS_EP0_CAN_MEDIATED_WRITE | kIoBufferEpRwMap,
+      .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_MEDIATED_WRITE_RING_BUFFER},
+  };
+  reinterpret_cast<zx_iob_region_shared_t&>(config.max_extension) = {
+      .shared_region = shared_region,
+  };
+  ASSERT_OK(zx::iob::create(0, &config, 1, &ep0, &ep1));
+
+  // Create a VMO and map it. The first access to the mapping should trigger a page fault.
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(ZX_PAGE_SIZE, 0, &vmo));
+
+  zx_vaddr_t addr{0};
+  ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, ZX_PAGE_SIZE,
+                                       &addr));
+
+  auto clean_up = fit::defer([addr] { zx::vmar::root_self()->unmap(addr, ZX_PAGE_SIZE); });
+
+  zx_iovec_t vec = {
+      .buffer = reinterpret_cast<void*>(addr),
+      .capacity = 10,
+  };
+
+  // This should trigger a page fault on the VMO we created.
+  EXPECT_OK(zx_iob_writev(ep0.get(), 0, 0, &vec, 1));
+}
+
+TEST(Iob, IobWriteUpdatedSignal) {
+  NEEDS_NEXT_SKIP(zx_iob_create_shared_region);
+
+  zx::iob ep0, ep1;
+
+  zx_handle_t shared_region;
+  ASSERT_OK(zx_iob_create_shared_region(0, 2 * ZX_PAGE_SIZE, &shared_region));
+  [[maybe_unused]] auto clean_up_shared_region = [=] { zx_handle_close(shared_region); };
+
+  zx_iob_region_t config = {
+      .type = ZX_IOB_REGION_TYPE_SHARED,
+      .access = ZX_IOB_ACCESS_EP0_CAN_MEDIATED_WRITE | kIoBufferEpRwMap,
+      .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_MEDIATED_WRITE_RING_BUFFER},
+  };
+  reinterpret_cast<zx_iob_region_shared_t&>(config.max_extension) = {
+      .shared_region = shared_region,
+  };
+  ASSERT_OK(zx::iob::create(0, &config, 1, &ep0, &ep1));
+
+  zx::port port;
+  ASSERT_OK(zx::port::create(0, &port));
+  ASSERT_OK(
+      zx_object_wait_async(shared_region, port.get(), 0x5678, ZX_IOB_SHARED_REGION_UPDATED, 0));
+
+  zx_port_packet_t packet;
+  EXPECT_STATUS(port.wait(zx::time::infinite_past(), &packet), ZX_ERR_TIMED_OUT);
+
+  char buffer[] = "12345";
+  zx_iovec_t vec = {
+      .buffer = buffer,
+      .capacity = std::size(buffer),
+  };
+  EXPECT_OK(zx_iob_writev(ep0.get(), 0, 0, &vec, 1));
+
+  EXPECT_OK(port.wait(zx::time::infinite_past(), &packet));
+
+  EXPECT_EQ(packet.key, 0x5678);
+  EXPECT_EQ(packet.type, ZX_PKT_TYPE_SIGNAL_ONE);
+  EXPECT_EQ(packet.signal.trigger, ZX_IOB_SHARED_REGION_UPDATED);
+  EXPECT_EQ(packet.signal.observed, ZX_IOB_SHARED_REGION_UPDATED);
+}
+
+TEST(Iob, IobWriteMaxMessageSize) {
+  NEEDS_NEXT_SKIP(zx_iob_create_shared_region);
+
+  constexpr size_t kMaxMessageSize = 65535 - 16;
+  // Chosen so the buffer can fit two maximum sized messages.
+  constexpr size_t kRegionSize = 2 * (kMaxMessageSize / ZX_PAGE_SIZE + 2) * ZX_PAGE_SIZE;
+
+  zx::iob ep0, ep1;
+
+  zx_handle_t shared_region;
+  ASSERT_OK(zx_iob_create_shared_region(0, kRegionSize, &shared_region));
+  [[maybe_unused]] auto clean_up_shared_region = [=] { zx_handle_close(shared_region); };
+
+  zx_iob_region_t config = {
+      .type = ZX_IOB_REGION_TYPE_SHARED,
+      .access = ZX_IOB_ACCESS_EP0_CAN_MEDIATED_WRITE | kIoBufferEpRwMap,
+      .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_MEDIATED_WRITE_RING_BUFFER},
+  };
+  reinterpret_cast<zx_iob_region_shared_t&>(config.max_extension) = {
+      .shared_region = shared_region,
+  };
+  *reinterpret_cast<zx_iob_discipline_mediated_write_ring_buffer_t*>(config.discipline.reserved) = {
+      .tag = 0x0123456789abcdef,
+  };
+  ASSERT_OK(zx::iob::create(0, &config, 1, &ep0, &ep1));
+
+  zx::result<MappingHelper> mapping =
+      MappingHelper::Create(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, ep0, 0, 0, kRegionSize);
+  ASSERT_OK(mapping);
+
+  uint64_t* phead = reinterpret_cast<uint64_t*>(mapping->addr());
+
+  auto buffer = std::make_unique<uint8_t[]>(kMaxMessageSize);
+
+  for (size_t i = 0; i < kMaxMessageSize; ++i) {
+    buffer.get()[i] = static_cast<uint8_t>(i);
+  }
+
+  zx_iovec_t vec = {
+      .buffer = buffer.get(),
+      .capacity = kMaxMessageSize,
+  };
+
+  EXPECT_OK(zx_iob_writev(ep0.get(), 0, 0, &vec, 1));
+
+  const uint8_t expected[] = {
+      // tag
+      0xef,
+      0xcd,
+      0xab,
+      0x89,
+      0x67,
+      0x45,
+      0x23,
+      0x01,
+      // length
+      static_cast<uint8_t>(kMaxMessageSize),
+      static_cast<uint8_t>(kMaxMessageSize >> 8),
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+  };
+
+  // Check the expected data.
+  EXPECT_BYTES_EQ(reinterpret_cast<uint8_t*>(mapping->addr() + ZX_PAGE_SIZE), expected,
+                  std::size(expected));
+  EXPECT_BYTES_EQ(reinterpret_cast<uint8_t*>(mapping->addr() + ZX_PAGE_SIZE + std::size(expected)),
+                  buffer.get(), kMaxMessageSize);
+
+  const uint64_t head = *phead;
+  EXPECT_EQ(head, (kMaxMessageSize + 16 + 7) & ~6);
+
+  // Do the same again, but this time use the maximum number of iovecs.
+  constexpr size_t kMaxIovecs = 8;
+  zx_iovec_t vecs[kMaxIovecs];
+  uint8_t* buf = buffer.get();
+  size_t remaining = kMaxMessageSize;
+  size_t gap = kMaxMessageSize / kMaxIovecs;
+  for (size_t i = 0; i < kMaxIovecs - 1; ++i) {
+    vecs[i] = {
+        .buffer = buf,
+        .capacity = gap,
+    };
+    buf += gap;
+    remaining -= gap;
+  }
+  vecs[kMaxIovecs - 1] = {
+      .buffer = buf,
+      .capacity = remaining,
+  };
+
+  EXPECT_OK(zx_iob_writev(ep0.get(), 0, 0, vecs, kMaxIovecs));
+
+  EXPECT_BYTES_EQ(reinterpret_cast<uint8_t*>(mapping->addr() + ZX_PAGE_SIZE + head), expected,
+                  std::size(expected));
+  EXPECT_BYTES_EQ(
+      reinterpret_cast<uint8_t*>(mapping->addr() + ZX_PAGE_SIZE + head + std::size(expected)),
+      buffer.get(), kMaxMessageSize);
+}
+
+TEST(Iob, IobWriteMultiThreaded) {
+  NEEDS_NEXT_SKIP(zx_iob_create_shared_region);
+
+  zx::iob ep0, ep1;
+
+  zx_handle_t shared_region;
+  ASSERT_OK(zx_iob_create_shared_region(0, 2 * ZX_PAGE_SIZE, &shared_region));
+  [[maybe_unused]] auto clean_up_shared_region = [=] { zx_handle_close(shared_region); };
+
+  zx_iob_region_t config = {
+      .type = ZX_IOB_REGION_TYPE_SHARED,
+      .access = ZX_IOB_ACCESS_EP0_CAN_MEDIATED_WRITE | kIoBufferEpRwMap,
+      .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_MEDIATED_WRITE_RING_BUFFER},
+  };
+  reinterpret_cast<zx_iob_region_shared_t&>(config.max_extension) = {
+      .shared_region = shared_region,
+  };
+  *reinterpret_cast<zx_iob_discipline_mediated_write_ring_buffer_t*>(config.discipline.reserved) = {
+      .tag = 0x0123456789abcdef,
+  };
+  ASSERT_OK(zx::iob::create(0, &config, 1, &ep0, &ep1));
+
+  constexpr int kIterations = 1000;
+  auto writer_thread = [&](zx_iovec_t& vec) {
+    for (int i = 0; i < kIterations; ++i) {
+      for (;;) {
+        zx_status_t status = zx_iob_writev(ep0.get(), 0, 0, &vec, 1);
+        if (status == ZX_OK)
+          break;
+        EXPECT_EQ(status, ZX_ERR_NO_SPACE);
+        usleep(1000);
+      }
+    }
+  };
+
+  // Start two writer threads.
+  std::thread thread1([&] {
+    char buffer[] = "12345";
+    zx_iovec_t vec = {
+        .buffer = buffer,
+        .capacity = std::size(buffer),
+    };
+    writer_thread(vec);
+  });
+
+  std::thread thread2([&] {
+    char buffer[] = "67890abcde";
+    zx_iovec_t vec = {
+        .buffer = buffer,
+        .capacity = std::size(buffer),
+    };
+    writer_thread(vec);
+  });
+
+  zx::result<MappingHelper> mapping =
+      MappingHelper::Create(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, ep0, 0, 0, ZX_PAGE_SIZE * 2);
+  ASSERT_OK(mapping);
+
+  std::atomic_ref<uint64_t> phead(*reinterpret_cast<uint64_t*>(mapping->addr()));
+  std::atomic_ref<uint64_t> ptail(*reinterpret_cast<uint64_t*>(mapping->addr() + 8));
+
+  zx::port port;
+  ASSERT_OK(zx::port::create(0, &port));
+
+  // Read and verify the messages.
+  int thread1_message_count = 0, thread2_message_count = 0;
+  uint64_t tail = 0;
+  while (thread1_message_count < kIterations || thread2_message_count < kIterations) {
+    uint64_t head;
+
+    for (;;) {
+      head = phead.load(std::memory_order_acquire);
+      if (head > tail)
+        break;
+      ASSERT_OK(
+          zx_object_wait_async(shared_region, port.get(), 0x5678, ZX_IOB_SHARED_REGION_UPDATED, 0));
+      head = phead.load(std::memory_order_acquire);
+      if (head > tail)
+        break;
+      zx_port_packet_t packet;
+      EXPECT_OK(port.wait(zx::time::infinite(), &packet));
+    }
+
+    while (tail < head) {
+      // Tag
+      const uint8_t expected_tag[] = {0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 0x01};
+      EXPECT_BYTES_EQ(
+          reinterpret_cast<uint64_t*>(mapping->addr() + ZX_PAGE_SIZE + tail % ZX_PAGE_SIZE),
+          expected_tag, 8);
+
+      // Read the message length to determine which of the two messages we expect.
+      uint64_t message_len =
+          *reinterpret_cast<uint64_t*>(mapping->addr() + ZX_PAGE_SIZE + (tail + 8) % ZX_PAGE_SIZE);
+      if (message_len == 6) {
+        EXPECT_BYTES_EQ(
+            reinterpret_cast<uint8_t*>(mapping->addr() + ZX_PAGE_SIZE + (tail + 16) % ZX_PAGE_SIZE),
+            "12345", 6);
+        ++thread1_message_count;
+        tail += 16 + 8;
+      } else {
+        EXPECT_EQ(message_len, 11);
+        EXPECT_BYTES_EQ(
+            reinterpret_cast<uint8_t*>(mapping->addr() + ZX_PAGE_SIZE + (tail + 16) % ZX_PAGE_SIZE),
+            "67890abc", 8);
+        EXPECT_BYTES_EQ(
+            reinterpret_cast<uint8_t*>(mapping->addr() + ZX_PAGE_SIZE + (tail + 24) % ZX_PAGE_SIZE),
+            "de", 3);
+        ++thread2_message_count;
+        tail += 16 + 16;
+      }
+    }
+    EXPECT_EQ(head, tail);
+
+    ptail.store(tail, std::memory_order_release);
+  }
+
+  thread1.join();
+  thread2.join();
+
+  EXPECT_EQ(phead, ptail);
 }
 
 }  // namespace

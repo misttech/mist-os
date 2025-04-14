@@ -162,9 +162,34 @@ group("final_fuchsia_idk") {
   assert_no_deps = [ ":core" ]
 }
 
-# This targets generates a "final" IDK archive, including prebuilt binaries for
-# several target_cpu architectures.
-idk("final_fuchsia_idk.exported") {
+# Generates a "final" IDK archive, including prebuilt binaries for the
+# specified `target_cpus` architectures on all `api_levels`.
+template("final_fuchsia_idk_for_cpus_and_levels") {
+  assert(defined(invoker.output_name))
+  assert(defined(invoker.target_cpus))
+  assert(defined(invoker.api_levels))
+
+  idk(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "api_levels",
+                             "output_name",
+                             "target_cpus",
+                             "testonly",
+                           ])
+    if (defined(invoker.visibility)) {
+      visibility += invoker.visibility
+    }
+
+    sdk_collection_label = "//sdk:fuchsia_collection"
+    idk_subbuilds_label = "//sdk:fuchsia_collection_subbuilds"
+    idk_subbuilds_prefix = "idk_subbuild.fuchsia_collection_for_subbuilds"
+  }
+}
+
+# Generates the "final" IDK archive, including prebuilt binaries for all
+# supported target_cpu architectures on all Supported API levels.
+final_fuchsia_idk_for_cpus_and_levels("final_fuchsia_idk.exported") {
   visibility = []
   visibility = [
     ":final_fuchsia_idk",
@@ -176,10 +201,8 @@ idk("final_fuchsia_idk.exported") {
     ":final_fuchsia_idk_manifest_golden",
     ":final_fuchsia_sdk",
   ]
+
   output_name = "fuchsia_idk"
-  sdk_collection_label = "//sdk:fuchsia_collection"
-  idk_subbuilds_label = "//sdk:fuchsia_collection_subbuilds"
-  idk_subbuilds_prefix = "idk_subbuild.fuchsia_collection_for_subbuilds"
   target_cpus = idk_target_cpus
   api_levels = platform_version.idk_buildable_api_levels
 
@@ -230,7 +253,6 @@ run_fuchsia_bazel_sdk_tests("final_fuchsia_idk_bazel_sdk_tests") {
 # from the content of the in-tree IDK. This requires a working Bazel
 # workspace, but its output does not depend on the content of the
 # @fuchsia_sdk repository used by the platform build.
-#
 generate_fuchsia_bazel_sdk("final_fuchsia_sdk") {
   idk_export_target = "//sdk:final_fuchsia_idk.exported"
   idk_export_dir = "$root_build_dir/sdk/exported/fuchsia_idk"
@@ -256,6 +278,28 @@ sdk_final_manifest_golden("final_fuchsia_idk_manifest_golden") {
 }
 
 if (!is_host) {
+  # Generates a "final" IDK archive, including prebuilt binaries for
+  # several target_cpu architectures on all Supported API levels.
+  final_fuchsia_idk_for_cpus_and_levels("final_fuchsia_idk_head_only") {
+    output_name = "fuchsia_idk_head_only"
+    target_cpus = [ target_cpu ]
+    api_levels = []  # `PLATFORM` artifacts will be used as `HEAD`
+
+    # TODO(https://fxbug.dev/306723826): Deal with the fact that the mac builders
+    # are too slow to enable this setting, and therefore the mac IDK won't have
+    # per-api-level prebuilts.
+    if (host_os == "mac") {
+      api_levels = []
+    }
+  }
+
+  # Generates an exported "final" SDK that only supports the target CPU
+  # architecture and API level `HEAD`.
+  generate_fuchsia_bazel_sdk("final_fuchsia_sdk_head_only") {
+    idk_export_target = "//sdk:final_fuchsia_idk_head_only"
+    idk_export_dir = "$root_build_dir/sdk/exported/fuchsia_idk_head_only"
+  }
+
   # Template defining the targets used to build the  IDK.
   # When the target name is "fuchsia", all atoms will be built. Otherwise,
   # the subset needed for in-tree uses of the IDK will be built.
@@ -605,6 +649,7 @@ if (!is_host) {
     visibility = [
       ":exported_collection_for_tool_goldens",
       ":final_fuchsia_idk.exported",
+      ":final_fuchsia_idk_head_only",
       ":generate_compatibility_goldens",
       ":plasa_manifest",
       ":sdk_source_set_list",
@@ -1228,13 +1273,6 @@ sdk_molecule("core_licenses") {
 # defined in //build/bazel/bazel_sdk/BUILD.gn
 
 if (current_toolchain == default_toolchain) {
-  # The list of target cpu architectures supported by //sdk:bazel_in_tree_idk
-  if (bazel_fuchsia_sdk_all_cpus) {
-    _bazel_in_tree_idk_cpus = idk_target_cpus
-  } else {
-    _bazel_in_tree_idk_cpus = [ target_cpu ]
-  }
-
   # An IDK used to expose the SDK atoms to the in-tree Bazel workspace's
   # `@fuchsia_sdk` repository.
   #
@@ -1244,9 +1282,7 @@ if (current_toolchain == default_toolchain) {
   idk("bazel_in_tree_idk") {
     visibility = []
     visibility = [
-      ":bazel_in_tree_idk_tests_arm64",
-      ":bazel_in_tree_idk_tests_riscv64",
-      ":bazel_in_tree_idk_tests_x64",
+      ":bazel_in_tree_idk_tests_${target_cpu}",
       "//:ninja_subbuilds",
       "//build/bazel:fuchsia_in_tree_idk.hash",
       "//build/bazel:generate_main_workspace",
@@ -1269,12 +1305,9 @@ if (current_toolchain == default_toolchain) {
     idk_subbuilds_label = "//sdk:in_tree_collection_subbuilds"
     idk_subbuilds_prefix = "idk_subbuild.in_tree_collection_for_subbuilds"
 
-    target_cpus = _bazel_in_tree_idk_cpus
+    target_cpus = [ target_cpu ]
 
-    api_levels = []
-    if (bazel_fuchsia_sdk_all_api_levels) {
-      api_levels = platform_version.idk_buildable_api_levels
-    }
+    api_levels = []  # `PLATFORM` artifacts will be used as `HEAD`
 
     # TODO(https://fxbug.dev/306723826): Deal with the fact that the mac builders
     # are too slow to enable this setting, and therefore the mac IDK won't have
@@ -1290,7 +1323,7 @@ if (current_toolchain == default_toolchain) {
   # from the same IDK, is already checked by a different suite
   # of tests defined under //build/bazel/bazel_sdk.
   run_fuchsia_bazel_sdk_tests("bazel_in_tree_idk_tests") {
-    target_cpus = _bazel_in_tree_idk_cpus
+    target_cpus = [ target_cpu ]
 
     idk_exported_target = "//sdk:bazel_in_tree_idk"
     idk_exported_path = "$root_build_dir/sdk/exported/bazel_in_tree_idk"

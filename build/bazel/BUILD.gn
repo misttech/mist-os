@@ -35,8 +35,14 @@ group("generate_main_workspace") {
 # properly populated by Bazel. The symlink has a stable path of
 # $BAZEL_TOPDIR/fuchsia_sdk while the actual location of the repository
 # depends on Bazel internals (e.g. whether BzlMod is enabled or not).
+# TODO(https://fxbug.dev/406603905): Migrate to "//sdk:fuchsia_sdk_head_only".
 group("generate_fuchsia_sdk_repository") {
-  deps = [ ":final_fuchsia_in_tree_sdk" ]
+  deps = [
+    ":final_fuchsia_in_tree_sdk",
+
+    # Generates an SDK in `$BUILD_DIR/obj/sdk/final_fuchsia_sdk_head_only/`.
+    "//sdk:final_fuchsia_sdk_head_only",
+  ]
 }
 
 # LINT.IfChange

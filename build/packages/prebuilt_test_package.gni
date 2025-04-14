@@ -59,6 +59,7 @@ template("prebuilt_test_package") {
                              "deps",
                              "environments",
                              "log_settings",
+                             "package_deps",
                            ])
   }
 

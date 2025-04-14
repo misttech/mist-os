@@ -4,6 +4,7 @@
 """Abstract base class for wlan affordance."""
 
 import abc
+from typing import Sequence
 
 from honeydew.affordances import affordance
 from honeydew.affordances.connectivity.wlan.utils.types import (
@@ -86,14 +87,14 @@ class Wlan(affordance.Affordance):
         """
 
     @abc.abstractmethod
-    def get_iface_id_list(self) -> list[int]:
+    def get_iface_id_list(self) -> Sequence[int]:
         """Get list of wlan iface IDs on device.
 
         Returns:
             A list of wlan iface IDs that are present on the device.
 
         Raises:
-            HoneydewWlanError: Error from WLAN stack
+            HoneydewWlanError: DeviceMonitor.ListIfaces error
         """
 
     @abc.abstractmethod
@@ -107,18 +108,18 @@ class Wlan(affordance.Affordance):
             The currently configured country code from `phy_id`.
 
         Raises:
-            HoneydewWlanError: Error from WLAN stack
+            HoneydewWlanError: DeviceMonitor.GetCountry error
         """
 
     @abc.abstractmethod
-    def get_phy_id_list(self) -> list[int]:
+    def get_phy_id_list(self) -> Sequence[int]:
         """Get list of phy ids on device.
 
         Returns:
             A list of phy ids that is present on the device.
 
         Raises:
-            HoneydewWlanError: Error from WLAN stack
+            HoneydewWlanError: DeviceMonitor.ListPhys error
         """
 
     @abc.abstractmethod

@@ -393,7 +393,7 @@ impl ::core::fmt::Debug
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse {
     pub some_field: Option<i32>,
 }
@@ -929,7 +929,7 @@ impl ::core::fmt::Debug
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse {
     pub some_field: Option<i32>,
 }
@@ -2153,7 +2153,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsAjarProtocolStrictTwo
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
     pub some_field: Option<i32>,
 }
@@ -2678,7 +2678,7 @@ impl ::core::fmt::Debug
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {
     pub some_field: Option<i32>,
 }
@@ -3190,7 +3190,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsAjarProtocolStrictEve
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsAjarProtocolStrictEventTableRequest {
     pub some_field: Option<i32>,
 }
@@ -3706,7 +3706,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsAjarProtocolFlexibleE
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsAjarProtocolFlexibleEventTableRequest {
     pub some_field: Option<i32>,
 }
@@ -5301,7 +5301,7 @@ impl ::core::fmt::Debug
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse {
     pub some_field: Option<i32>,
 }
@@ -5843,7 +5843,7 @@ impl ::core::fmt::Debug
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse {
     pub some_field: Option<i32>,
 }
@@ -7031,7 +7031,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsClosedProtocolStrictT
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {
     pub some_field: Option<i32>,
 }
@@ -7560,7 +7560,7 @@ impl ::core::fmt::Debug
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {
     pub some_field: Option<i32>,
 }
@@ -8076,7 +8076,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsClosedProtocolStrictE
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsClosedProtocolStrictEventTableRequest {
     pub some_field: Option<i32>,
 }
@@ -9407,7 +9407,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsDriverProtocolStrictT
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsDriverProtocolStrictTwoWayTableResponse {
     pub some_field: Option<i32>,
 }
@@ -9936,7 +9936,7 @@ impl ::core::fmt::Debug
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse {
     pub some_field: Option<i32>,
 }
@@ -10461,7 +10461,7 @@ impl ::core::fmt::Debug
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse {
     pub some_field: Option<i32>,
 }
@@ -10994,7 +10994,7 @@ impl ::core::fmt::Debug
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse {
     pub some_field: Option<i32>,
 }
@@ -12727,7 +12727,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsProtocolStrictTwoWayU
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsProtocolStrictTwoWayTableResponse {
     pub some_field: Option<i32>,
 }
@@ -13243,7 +13243,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsProtocolStrictTwoWayU
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsProtocolStrictTwoWayTableErrResponse {
     pub some_field: Option<i32>,
 }
@@ -13760,7 +13760,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsProtocolFlexibleTwoWa
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayTableResponse {
     pub some_field: Option<i32>,
 }
@@ -14281,7 +14281,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsProtocolFlexibleTwoWa
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
     pub some_field: Option<i32>,
 }
@@ -14785,7 +14785,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsProtocolStrictEventUn
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsProtocolStrictEventTableRequest {
     pub some_field: Option<i32>,
 }
@@ -15287,7 +15287,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsProtocolFlexibleEvent
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UnknownInteractionsProtocolFlexibleEventTableRequest {
     pub some_field: Option<i32>,
 }

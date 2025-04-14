@@ -11,16 +11,15 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.error"]
+_ir_path = get_fidl_ir_map()["test.error"]
 add_ir_path(_ir_path)
 
 
 @dataclass
 class ExampleFooRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    s: str | None
+    s: str
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ExampleFooRequest"
@@ -39,20 +38,20 @@ class ExampleFooRequest:
             self, "test.error", "test.error/ExampleFooRequest"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "s": None,
+                "s": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class ExampleFooResponse:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    y: int | None
+    y: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ExampleFooResponse"
@@ -71,11 +70,13 @@ class ExampleFooResponse:
             self, "test.error", "test.error/Example_foo_Response"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "y": None,
+                "y": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
@@ -163,14 +164,14 @@ class ExampleFooResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -186,12 +187,20 @@ class ExampleFooResult:
         return cls(_empty=())
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class ExampleServer(fidl._server.ServerBase, ABC):
+class ExampleServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.error"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -209,6 +218,8 @@ class ExampleServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -229,7 +240,7 @@ class ExampleServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class ExampleClient(fidl._client.FidlClient):
+class ExampleClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.error"
 
@@ -237,6 +248,8 @@ class ExampleClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -253,13 +266,11 @@ class ExampleClient(fidl._client.FidlClient):
             1107623248440401476,
             "test.error",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.error/Example_foo_Result"
-            ),
+            normalize_identifier("test.error/Example_foo_Result"),
         )
 
 
-class ExampleEventHandler(fidl._client.EventHandlerBase, ABC):
+class ExampleEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.error"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -268,11 +279,11 @@ class ExampleEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-ExampleMarker = fidl._library.ProtocolMarker(
-    "(nondiscoverable) test.error/Example"
-)
+ExampleMarker = FidlProtocolMarker("(nondiscoverable) test.error/Example")

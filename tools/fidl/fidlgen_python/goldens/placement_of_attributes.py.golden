@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.placementofattributes"]
+_ir_path = get_fidl_ir_map()["test.placementofattributes"]
 add_ir_path(_ir_path)
 
 import fidl_test_exampleusing
@@ -20,9 +21,7 @@ import fidl_test_exampleusing
 
 @dataclass
 class ExampleProtocolMethodRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    arg: fidl_test_exampleusing.Empty | None
+    arg: fidl_test_exampleusing.Empty
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ExampleProtocolMethodRequest"
@@ -45,20 +44,20 @@ class ExampleProtocolMethodRequest:
             "test.placementofattributes/ExampleProtocolMethodRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "arg": None,
+                "arg": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class ExampleStruct:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    member: int | None
+    member: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ExampleStruct"
@@ -79,11 +78,13 @@ class ExampleStruct:
             "test.placementofattributes/ExampleStruct",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "member": None,
+                "member": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
@@ -225,12 +226,20 @@ EXAMPLE_CONST: int = 0
 Alias = int
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class ExampleProtocolServer(fidl._server.ServerBase, ABC):
+class ExampleProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.placementofattributes"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -248,6 +257,8 @@ class ExampleProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -265,7 +276,7 @@ class ExampleProtocolServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class ExampleProtocolClient(fidl._client.FidlClient):
+class ExampleProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.placementofattributes"
 
@@ -273,6 +284,8 @@ class ExampleProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -294,7 +307,7 @@ class ExampleProtocolClient(fidl._client.FidlClient):
         )
 
 
-class ExampleProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
+class ExampleProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.placementofattributes"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -303,11 +316,13 @@ class ExampleProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-ExampleProtocolMarker = fidl._library.ProtocolMarker(
+ExampleProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.placementofattributes/ExampleProtocol"
 )

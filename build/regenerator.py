@@ -153,7 +153,11 @@ def main() -> int:
         "--verbose",
         action="count",
         default=0,
-        help="Increase verbosity.",
+        help=(
+            "Increase verbosity. (To change the verbosity of this script "
+            "during `fx build`, run `fx gen` with the desired instances of "
+            "this argument.)"
+        ),
     )
     args = parser.parse_args()
 
@@ -193,7 +197,21 @@ def main() -> int:
     if not build_dir.is_dir():
         parser.error(f"Build directory missing or invalid: {build_dir}")
 
-    if not args.symlinks_only:
+    # Files that need to be deleted upon failure of regenerate().
+    build_ninja_stamp_path = build_dir / "build.ninja.stamp"
+    regenerator_outputs_dir = build_dir / "regenerator_outputs"
+    regenerator_inputs_path = regenerator_outputs_dir / "regenerator_inputs.txt"
+
+    def regenerate() -> int:
+        """Do the regeneration work.
+
+        If this function fails, call ensure_regenerator_will_run_again() to
+        ensure this script will be run again in the next build after the issue
+        is resolved.
+
+        Returns:
+            0 upon success and a positive integer otherwise.
+        """
         # Run `gn gen` in fuchsia_dir to regenerate the Ninja build plan.
         prebuilt_gn_subpath = f"prebuilt/third_party/gn/{args.host_tag}/gn"
         prebuilt_ninja_subpath = (
@@ -238,6 +256,8 @@ def main() -> int:
 
         # Patch build.ninja to ensure Ninja calls this script instead of `gn gen`
         # if any of the BUILD file changes.
+        # Do this as early as possible to that this script will be re-invoked if
+        # it later fails.
         log2("- Patching build.ninja")
         build_ninja_path = build_dir / "build.ninja"
         build_ninja = build_ninja_path.read_text()
@@ -260,6 +280,15 @@ def main() -> int:
             "--fuchsia-build-dir=.",
             f"--host-tag={args.host_tag}",
         ]
+
+        # Apply the current verbosity when Ninja calls this script.
+        # Note that this can only be changed by running `fx gen` because any
+        # call by Ninja will always pass the arguments specified the last time
+        # this script was run, regardless of the arguments to `fx build`.
+        if verbose >= 1:
+            regenerator_command_args += ["--verbose"]
+        if verbose >= 2:
+            regenerator_command_args += ["--verbose"]
         regenerator_command = " ".join(
             shlex.quote(str(a)) for a in regenerator_command_args
         )
@@ -272,6 +301,10 @@ def main() -> int:
             + build_ninja[pos2:]
         )
         build_ninja_path.write_text(build_ninja)
+
+        # From this point forward, an error will cause this script to run again
+        # on the next fx build. This is because build.ninja has been patched
+        # and build.ninja.stamp will be deleted upon error.
 
         # The list of extra inputs to add to the Ninja build plan.
         extra_ninja_build_inputs: T.Set[Path] = set()
@@ -298,7 +331,6 @@ def main() -> int:
         # will complain that they belong to the root_build_dir, and that no other GN target
         # generates them.
         #
-        regenerator_outputs_dir = build_dir / "regenerator_outputs"
         regenerator_outputs_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate content hash files for the Bazel workspace.
@@ -388,9 +420,6 @@ def main() -> int:
         # that `fx bazel` can invoke regenerator if any of these changes,
         # independent of Ninja-related changes.
         log2("- Writing regenerator_inputs.txt")
-        regenerator_inputs_path = (
-            regenerator_outputs_dir / "regenerator_inputs.txt"
-        )
         with regenerator_inputs_path.open("wt") as f:
             for input_path in sorted_extra_ninja_build_inputs:
                 f.write(f"{input_path}\n")
@@ -405,8 +434,22 @@ def main() -> int:
         build_ninja_d_path.write_text(build_ninja_d)
 
         log2("- Updating build.ninja.stamp timestamp")
-        build_ninja_stamp_path = build_dir / "build.ninja.stamp"
         build_ninja_stamp_path.touch()
+
+        return 0
+
+    def ensure_regenerator_will_run_again() -> None:
+        """Ensures this script run again the next time a build is attempted.
+
+        Deletes files used by Ninja and `fx bazel` to determine whether the
+        workspace needs to be regenerated. Call to ensure regeneration is run
+        again if it failed. Otherwise, for example, Ninja will see the updated
+        timestamp from GN gen and skip regeneration.
+        """
+        if build_ninja_stamp_path.exists():
+            os.remove(build_ninja_stamp_path)
+        if regenerator_inputs_path.exists():
+            os.remove(regenerator_inputs_path)
 
     # Create convenience symlinks in fuchsia_dir, these should only be used by
     # developers manually or by IDEs, but the build should never depend on them.
@@ -419,38 +462,51 @@ def main() -> int:
         log2(f"- Symlink {link_path} --> {relative_target}")
         link_path.symlink_to(relative_target)
 
-    log("Creating convenience symlinks.")
+    def create_convenience_symlinks() -> None:
+        log("Creating convenience symlinks.")
 
-    # These artifacts need to be in the source checkout.
-    # NOTE: Nothing should depend on this in the build, as some developers
-    # need to run multiple builds concurrently from the same source checkout
-    # but using different build directories.
+        # These artifacts need to be in the source checkout.
+        # NOTE: Nothing should depend on this in the build, as some developers
+        # need to run multiple builds concurrently from the same source checkout
+        # but using different build directories.
 
-    # These symlinks are useful for IDEs.
-    for artifact in ("compile_commands.json", "rust-project.json"):
-        if (build_dir / artifact).exists():
-            make_relative_symlink(fuchsia_dir / artifact, build_dir / artifact)
+        # These symlinks are useful for IDEs.
+        for artifact in ("compile_commands.json", "rust-project.json"):
+            if (build_dir / artifact).exists():
+                make_relative_symlink(
+                    fuchsia_dir / artifact, build_dir / artifact
+                )
 
-    # These symlink help debug Bazel issues. See //build/bazel/README.md
-    make_relative_symlink(
-        fuchsia_dir / "bazel-workspace",
-        build_dir / "gen" / "build" / "bazel" / "workspace",
-    )
+        # These symlink help debug Bazel issues. See //build/bazel/README.md
+        make_relative_symlink(
+            fuchsia_dir / "bazel-workspace",
+            build_dir / "gen" / "build" / "bazel" / "workspace",
+        )
 
-    make_relative_symlink(
-        fuchsia_dir / "bazel-bin",
-        build_dir / "gen" / "build" / "bazel" / "workspace" / "bazel-bin",
-    )
+        make_relative_symlink(
+            fuchsia_dir / "bazel-bin",
+            build_dir / "gen" / "build" / "bazel" / "workspace" / "bazel-bin",
+        )
 
-    make_relative_symlink(
-        fuchsia_dir / "bazel-out",
-        build_dir / "gen" / "build" / "bazel" / "workspace" / "bazel-out",
-    )
+        make_relative_symlink(
+            fuchsia_dir / "bazel-out",
+            build_dir / "gen" / "build" / "bazel" / "workspace" / "bazel-out",
+        )
 
-    make_relative_symlink(
-        fuchsia_dir / "bazel-repos",
-        build_dir / "gen" / "build" / "bazel" / "output_base" / "external",
-    )
+        make_relative_symlink(
+            fuchsia_dir / "bazel-repos",
+            build_dir / "gen" / "build" / "bazel" / "output_base" / "external",
+        )
+
+    if not args.symlinks_only:
+        result = regenerate()
+        if result != 0:
+            # A message will have been printed before returning the error.
+            log("Regeneration failed")
+            ensure_regenerator_will_run_again()
+            return result
+
+    create_convenience_symlinks()
 
     log("Done.")
     return 0

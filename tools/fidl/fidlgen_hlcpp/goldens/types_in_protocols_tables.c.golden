@@ -72,6 +72,7 @@ static const struct FidlCodedVector Vectorunboundednotnullable_37Pointer28test_t
 static const struct FidlCodedVector Vectorunboundednotnullable_38test_typesinprotocols_UnionNullableRefTable;
 static const struct FidlCodedVector Vectorunboundednullable_20fidl_internal_kUint8Table;
 static const struct FidlCodedVector Vectorunboundednullable_26StringunboundednotnullableTable;
+static const struct FidlCodedVector Vectorunboundednullable_28test_typesinprotocols_StructTable;
 static const struct FidlCodedVector Vectorunboundednullable_37Pointer28test_typesinprotocols_StructTable;
 const struct FidlCodedStruct test_typesinprotocols_ArrayBasicTable;
 const struct FidlCodedStruct test_typesinprotocols_ArrayCompoundTable;
@@ -992,6 +993,16 @@ static const struct FidlStructElement Fields36test_typesinprotocols_VectorOption
                 .element_type = kFidlStructElementType_Field,
                 .is_resource = kFidlIsResource_NotResource,
             },
+            .offset_v2 = 32,
+            .field_type = (const fidl_type_t*)&Vectorunboundednullable_28test_typesinprotocols_StructTable,
+        },
+    },
+    {
+        .field = {
+            .header = {
+                .element_type = kFidlStructElementType_Field,
+                .is_resource = kFidlIsResource_NotResource,
+            },
             .offset_v2 = 48,
             .field_type = (const fidl_type_t*)&Vectorunboundednullable_37Pointer28test_typesinprotocols_StructTable,
         },
@@ -1003,7 +1014,7 @@ const struct FidlCodedStruct test_typesinprotocols_VectorOptionalTable = {
     .is_empty = kFidlEmpty_IsNotEmpty,
     .size_v2 = 64,
     .elements = Fields36test_typesinprotocols_VectorOptional,
-    .element_count = 3,
+    .element_count = 4,
 };
 
 const struct FidlCodedTable test_typesinprotocols_ResourceTableTable = {
@@ -1623,6 +1634,14 @@ static const struct FidlCodedVector Vectorunboundednullable_26Stringunboundednot
     .max_count = 4294967295,
     .nullable = kFidlNullability_Nullable,
     .element_size_v2 = 16,
+};
+
+static const struct FidlCodedVector Vectorunboundednullable_28test_typesinprotocols_StructTable = {
+    .tag = kFidlTypeVector,
+    .element = (const fidl_type_t*)&test_typesinprotocols_StructTable,
+    .max_count = 4294967295,
+    .nullable = kFidlNullability_Nullable,
+    .element_size_v2 = 1,
 };
 
 static const struct FidlCodedVector Vectorunboundednullable_37Pointer28test_typesinprotocols_StructTable = {

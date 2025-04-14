@@ -165,8 +165,8 @@ impl EmulatorEngine for FemuEngine {
     }
 
     /// Get the AEMU binary path from the SDK manifest and verify it exists.
-    async fn load_emulator_binary(&mut self) -> Result<()> {
-        let emulator_binary = match get_host_tool(config::FEMU_TOOL).await {
+    fn load_emulator_binary(&mut self) -> Result<()> {
+        let emulator_binary = match get_host_tool(config::FEMU_TOOL) {
             Ok(aemu_path) => aemu_path.canonicalize().map_err(|e| {
                 bug!("Failed to canonicalize the path to the emulator binary: {aemu_path:?}: {e}")
             })?,

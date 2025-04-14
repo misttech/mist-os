@@ -14,5 +14,4 @@ import("//build/fidl/fidl.gni")
 fidl("examples.canvas.baseline") {
   sources = [ "canvas.test.fidl" ]
   excluded_checks = [ "wrong-prefix-for-platform-source-library" ]
-  enable_hlcpp = true
 }

@@ -1,0 +1,74 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//src/zircon/lib/zircon/libzircon.gni")
+import("../libc.gni")
+
+# This is only included in the new implementation.
+libc_source_set("threads") {
+  sources = []
+}
+
+group("unittests") {
+  testonly = true
+  deps = []
+}
+
+libc_source_set("mutex") {
+  public = [ "mutex.h" ]
+  public_deps = [ "//zircon/system/ulib/sync:sync-cpp" ]
+  sources = []
+}
+
+libc_source_set("thread-list") {
+  public_deps = [ ":thread-list.headers" ]
+  sources = [ "thread-list.cc" ]
+}
+
+# TODO(https://fxbug.dev/342469121): This can be folded into :thread-list when
+# musl-glue doesn't use basic_abi.
+source_set("thread-list.headers") {
+  visibility = [ ":*" ]
+  public = [ "thread-list.h" ]
+  public_deps = [
+    ":mutex",
+    "//zircon/third_party/ulib/musl:musl_internal",
+  ]
+  deps = [ "..:asm-linkage" ]
+}
+
+# This is linked into the legacy libc.so to implement the entry points used by
+# the legacy implementation.
+libc_source_set("musl-glue") {
+  sources = []
+  libc_deps = [
+    ":thread-list",
+    ":thread-list.musl-glue",
+  ]
+}
+
+libc_source_set("thread-list.musl-glue") {
+  visibility = [ ":*" ]
+
+  basic_abi = true
+  global_symbols = [
+    "__thread_list_add",
+    "__thread_list_erase",
+    "__thread_list_start",
+  ]
+  undefined_symbols = [
+    "${libc_namespace}_gAllThreads",
+    "${libc_namespace}_gAllThreadsLock",
+    "__assert_fail",
+    "_zx_thread_self",
+  ]
+  undefined_symbols += libzircon_linkage_names
+
+  sources = [ "musl-thread-list.cc" ]
+  deps = [
+    ":thread-list.headers",
+    "..:asm-linkage",
+    "//zircon/third_party/ulib/musl:musl_internal",
+  ]
+}

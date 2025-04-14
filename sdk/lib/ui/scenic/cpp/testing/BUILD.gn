@@ -27,7 +27,7 @@ sdk_source_set("testing") {
 
   deps = [
     "//sdk/fidl/fuchsia.scenic.scheduling:fuchsia.scenic.scheduling_hlcpp",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
     "//sdk/lib/async",

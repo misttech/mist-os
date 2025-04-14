@@ -28,6 +28,7 @@
 #include <ktl/move.h>
 #include <ktl/type_traits.h>
 #include <ktl/unique_ptr.h>
+#include <object/dispatcher.h>
 #include <object/handle.h>
 #include <object/signal_observer.h>
 
@@ -77,6 +78,7 @@ DECLARE_DISPTAG(StreamDispatcher, ZX_OBJ_TYPE_STREAM, "STRM")
 DECLARE_DISPTAG(MsiDispatcher, ZX_OBJ_TYPE_MSI, "MSID")
 DECLARE_DISPTAG(IoBufferDispatcher, ZX_OBJ_TYPE_IOB, "IOBD")
 DECLARE_DISPTAG(CounterDispatcher, ZX_OBJ_TYPE_COUNTER, "CNTD")
+DECLARE_DISPTAG(IoBufferSharedRegionDispatcher, ZX_OBJ_TYPE_IOB_SHARED_REGION, "IOSR")
 
 #undef DECLARE_DISPTAG
 

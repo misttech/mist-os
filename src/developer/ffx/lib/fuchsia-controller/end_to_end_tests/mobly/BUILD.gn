@@ -24,13 +24,16 @@ group("fuchsia_controller_tests_staging") {
 
 if (is_host) {
   target_identity_deps = [
-    "//sdk/fidl/fuchsia.device:fuchsia.device_host_test_data(${toolchain_variant.base})",
-    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_host_test_data(${toolchain_variant.base})",
-    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_host_test_data(${toolchain_variant.base})",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_host_test_data(${toolchain_variant.base})",
-    "//src/developer/ffx/fidl:fuchsia.developer.ffx_host_test_data(${toolchain_variant.base})",
     "//src/developer/ffx/lib/fuchsia-controller/tests:core_sdk_host_test_data",
     "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
+  ]
+
+  target_identity_libraries = [
+    "//sdk/fidl/fuchsia.device:fuchsia.device_python",
+    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_python",
+    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_python",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_python",
+    "//src/developer/ffx/fidl:fuchsia.developer.ffx_python",
   ]
 
   python_mobly_test("x64_target_identity_tests") {
@@ -39,6 +42,7 @@ if (is_host) {
       "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
       "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
     ]
+    libraries += target_identity_libraries
     params_source = "params_x64.yaml"
     environments = [ emu_env ]
     deps = target_identity_deps
@@ -50,6 +54,7 @@ if (is_host) {
       "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
       "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
     ]
+    libraries += target_identity_libraries
     params_source = "params_vim3.yaml"
     environments = [ vim3_env ]
     deps = target_identity_deps
@@ -61,6 +66,7 @@ if (is_host) {
       "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
       "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
     ]
+    libraries += target_identity_libraries
     params_source = "params_x64.yaml"
     environments = [
       nuc7_env,
@@ -74,6 +80,7 @@ if (is_host) {
     libraries = [
       "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
       "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
+      "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_python",
     ]
     environments = [
       emu_env,
@@ -82,7 +89,6 @@ if (is_host) {
       nuc11_env,
     ]
     deps = [
-      "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_host_test_data(${toolchain_variant.base})",
       "//src/developer/ffx/lib/fuchsia-controller/tests:core_sdk_host_test_data",
       "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
     ]
@@ -93,6 +99,8 @@ if (is_host) {
     libraries = [
       "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
       "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
+      "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_python",
+      "//src/developer/ffx/fidl:fuchsia.developer.ffx_python",
     ]
     environments = [
       emu_env,
@@ -101,8 +109,6 @@ if (is_host) {
       nuc11_env,
     ]
     deps = [
-      "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_host_test_data(${toolchain_variant.base})",
-      "//src/developer/ffx/fidl:fuchsia.developer.ffx_host_test_data(${toolchain_variant.base})",
       "//src/developer/ffx/lib/fuchsia-controller/tests:core_sdk_host_test_data",
       "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
     ]
@@ -119,6 +125,8 @@ if (is_host) {
     libraries = [
       "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
       "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
+      "//sdk/fidl/fuchsia.tracing:fuchsia.tracing_python",
+      "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_python",
     ]
     environments = [
       emu_env,
@@ -128,8 +136,6 @@ if (is_host) {
     ]
     deps = [
       ":tracing_runtime_deps",
-      "//sdk/fidl/fuchsia.tracing:fuchsia.tracing_host_test_data(${toolchain_variant.base})",
-      "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_host_test_data(${toolchain_variant.base})",
       "//src/developer/ffx/lib/fuchsia-controller/tests:core_sdk_host_test_data",
       "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
     ]
@@ -140,11 +146,11 @@ if (is_host) {
     libraries = [
       "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
       "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
+      "//sdk/fidl/fuchsia.bluetooth.sys:fuchsia.bluetooth.sys_python",
     ]
     multi_fuchsia_device = true
     deps = [
       ":tracing_runtime_deps",
-      "//sdk/fidl/fuchsia.bluetooth.sys:fuchsia.bluetooth.sys_host_test_data(${toolchain_variant.base})",
       "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
     ]
   }

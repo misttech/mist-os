@@ -442,7 +442,7 @@ async fn server_component_controller(
         task_complete.into_stream().map(Event::Completion),
     );
 
-    if let Some(event) = stream.next().await {
+    while let Some(event) = stream.next().await {
         match event {
             Event::Controller(Ok(frunner::ComponentControllerRequest::Stop { .. })) => {
                 log_info!("Stopping the container.");
@@ -468,9 +468,16 @@ async fn server_component_controller(
                 log_info!(result:?; "init process exited.");
             }
         }
+
+        // We treat any event in the stream as an invitation to shut down.
+        if !kernel.is_shutting_down() {
+            kernel.shut_down();
+        }
     }
 
     log_debug!("done listening for container-terminating events");
+
+    // In case the stream ended without an event, shut down the kernel here.
     if !kernel.is_shutting_down() {
         kernel.shut_down();
     }
@@ -589,10 +596,15 @@ async fn create_container(
 
                 pkg_dir_proxy
                     .open(&file_path, flags, &fio::Options::default(), server_end.into_channel())
-                    .expect("failed to open security exception file");
+                    .expect("open SELinux exceptions config file");
 
-                let contents =
-                    fuchsia_fs::file::read(&file).await.expect("reading security exception file");
+                let contents = match fuchsia_fs::file::read(&file).await {
+                    Ok(contents) => contents,
+                    Err(e) => {
+                        panic!("read SELinux exceptions from \"{}\" (error: {})", file_path, e);
+                    }
+                };
+
                 String::from_utf8(contents).expect("parsing security exception file")
             }
             None => security::DEFAULT_EXCEPTIONS_CONFIG.into(),
@@ -840,7 +852,10 @@ fn create_fs_context(
 
 pub fn set_rlimits(task: &Task, rlimits: &[String]) -> Result<(), Error> {
     let set_rlimit = |resource, value| {
-        task.thread_group.limits.lock().set(resource, rlimit { rlim_cur: value, rlim_max: value });
+        task.thread_group()
+            .limits
+            .lock()
+            .set(resource, rlimit { rlim_cur: value, rlim_max: value });
     };
 
     for rlimit in rlimits.iter() {

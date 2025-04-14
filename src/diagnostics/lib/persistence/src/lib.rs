@@ -34,6 +34,9 @@ struct TaggedPersist {
     pub max_bytes: usize,
     /// Persistence requests will be throttled to this. Requests received early will be delayed.
     pub min_seconds_between_fetch: i64,
+    /// Should this tag persist across multiple reboots?
+    #[serde(default)]
+    pub persist_across_boot: bool,
 }
 
 /// Configuration for a single tag for a single service.
@@ -44,6 +47,7 @@ pub struct TagConfig {
     pub selectors: Vec<String>,
     pub max_bytes: usize,
     pub min_seconds_between_fetch: i64,
+    pub persist_across_boot: bool,
 }
 
 /// Wrapper class for a valid tag name.
@@ -145,17 +149,22 @@ impl Display for ServiceName {
 const CONFIG_GLOB: &str = "/config/data/*.persist";
 
 fn try_insert_items(config: &mut Config, config_text: &str) -> Result<(), Error> {
-    let items = serde_json5::from_str::<Vec<TaggedPersist>>(config_text)?;
+    let items: Vec<TaggedPersist> = serde_json5::from_str(config_text)?;
     for item in items {
-        let TaggedPersist { tag, service_name, selectors, max_bytes, min_seconds_between_fetch } =
-            item;
+        let TaggedPersist {
+            tag,
+            service_name,
+            selectors,
+            max_bytes,
+            min_seconds_between_fetch,
+            persist_across_boot,
+        } = item;
         let tag = Tag::new(tag)?;
         let name = ServiceName::new(service_name)?;
-        if let Some(existing) = config
-            .entry(name.clone())
-            .or_default()
-            .insert(tag, TagConfig { selectors, max_bytes, min_seconds_between_fetch })
-        {
+        if let Some(existing) = config.entry(name.clone()).or_default().insert(
+            tag,
+            TagConfig { selectors, max_bytes, min_seconds_between_fetch, persist_across_boot },
+        ) {
             bail!("Duplicate TagConfig found: {:?}", existing);
         }
     }
@@ -186,9 +195,10 @@ mod test {
                 selectors,
                 max_bytes,
                 min_seconds_between_fetch,
+                persist_across_boot,
             }: TaggedPersist,
         ) -> Self {
-            Self { selectors, max_bytes, min_seconds_between_fetch }
+            Self { selectors, max_bytes, min_seconds_between_fetch, persist_across_boot }
         }
     }
 
@@ -198,7 +208,8 @@ mod test {
         let taga_servab = "[{tag: 'tag-a', service_name: 'serv-a', max_bytes: 10, \
                            min_seconds_between_fetch: 31, selectors: ['foo', 'bar']}, \
                            {tag: 'tag-a', service_name: 'serv-b', max_bytes: 20, \
-                           min_seconds_between_fetch: 32, selectors: ['baz']}, ]";
+                           min_seconds_between_fetch: 32, selectors: ['baz'], \
+                           persist_across_boot: true }]";
         let tagb_servb = "[{tag: 'tag-b', service_name: 'serv-b', max_bytes: 30, \
                           min_seconds_between_fetch: 33, selectors: ['quux']}]";
         // Numbers not allowed in names
@@ -213,6 +224,7 @@ mod test {
             max_bytes: 10,
             min_seconds_between_fetch: 31,
             selectors: vec!["foo".to_string(), "bar".to_string()],
+            persist_across_boot: false,
         };
         let persist_ba = TaggedPersist {
             tag: "tag-a".to_string(),
@@ -220,6 +232,7 @@ mod test {
             max_bytes: 20,
             min_seconds_between_fetch: 32,
             selectors: vec!["baz".to_string()],
+            persist_across_boot: true,
         };
         let persist_bb = TaggedPersist {
             tag: "tag-b".to_string(),
@@ -227,10 +240,11 @@ mod test {
             max_bytes: 30,
             min_seconds_between_fetch: 33,
             selectors: vec!["quux".to_string()],
+            persist_across_boot: false,
         };
 
-        assert!(try_insert_items(&mut config, taga_servab).is_ok());
-        assert!(try_insert_items(&mut config, tagb_servb).is_ok());
+        try_insert_items(&mut config, taga_servab).unwrap();
+        try_insert_items(&mut config, tagb_servb).unwrap();
         assert_eq!(config.len(), 2);
         let service_a = config.get("serv-a").unwrap();
         assert_eq!(service_a.len(), 1);

@@ -15,6 +15,7 @@ rustc_library("client") {
   deps = [
     "//sdk/fidl/fuchsia.fdomain:fuchsia.fdomain_rust",
     "//sdk/fidl/fuchsia.fdomain($fidl_toolchain)",
+    "//sdk/rust/zx-types",
     "//src/lib/fdomain/container:fdomain_macros",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fidl/rust/fidl_message",
@@ -44,6 +45,40 @@ rustc_library("client") {
     "src/socket.rs",
     "src/test.rs",
   ]
+}
+
+rustc_library("flex_fdomain") {
+  name = "flex_client"
+  edition = "2024"
+  with_unit_tests = true
+
+  deps = [
+    ":client",
+    "//src/lib/fuchsia-async",
+  ]
+  features = [ "fdomain" ]
+
+  sources = [ "src/flex.rs" ]
+  source_root = "src/flex.rs"
+}
+
+rustc_library("flex_fidl") {
+  name = "flex_client"
+  edition = "2024"
+  with_unit_tests = true
+
+  deps = [
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+  ]
+
+  if (is_fuchsia) {
+    deps += [ "//sdk/rust/zx" ]
+  }
+
+  sources = [ "src/flex.rs" ]
+
+  source_root = "src/flex.rs"
 }
 
 fuchsia_unittest_package("fdomain-client-tests") {

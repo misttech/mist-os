@@ -17,8 +17,8 @@ of the system. There are two ways to make that happen:
 For example, in order to use a test tool against the core nand driver, nandpart
 devices may be removed like so:
 
-```shell
-$ unbind /dev/sys/platform/raw_nand/aml-raw_nand/nand/fvm
+```posix-terminal
+unbind /dev/sys/platform/raw_nand/aml-raw_nand/nand/fvm
 ```
 
 Warning: Before removing a particular device, remove its descendants. By
@@ -37,8 +37,8 @@ drivers.
 For example, this command will test an existing ram-nand device making sure the
 test does not modify anything outside blocks \[100, 109\]:
 
-```shell
-$ /boot/test/sys/nand-test --device /dev/sys/platform/00:00:2e/nand-ctl/ram-nand-0 --first-block 100 --num-blocks 10
+```posix-terminal
+/boot/test/sys/nand-test --device /dev/sys/platform/ram-nand/nand-ctl/ram-nand-0 --first-block 100 --num-blocks 10
 ```
 
 ## Correctness testing
@@ -47,14 +47,14 @@ $ /boot/test/sys/nand-test --device /dev/sys/platform/00:00:2e/nand-ctl/ram-nand
 test.
 
 ```shell
-$ nand-util --device /dev/sys/platform/00:00:2e/nand-ctl/ram-nand-0 --check
+$ nand-util --device /dev/sys/platform/ram-nand/nand-ctl/ram-nand-0 --check
 ```
 
 ## Inspection / manipulation
 
-```shell
-$ nand-util --device /dev/sys/platform/raw_nand/aml-raw_nand/nand --info
-$ nand-util --device /dev/sys/platform/raw_nand/aml-raw_nand/nand/fvm --read --block 1 --page 2
+```posix-terminal
+nand-util --device /dev/sys/platform/raw_nand/aml-raw_nand/nand --info
+nand-util --device /dev/sys/platform/raw_nand/aml-raw_nand/nand/fvm --read --block 1 --page 2
 ```
 
 ## Grab an image
@@ -65,16 +65,16 @@ Note: If a file system is already mounted, unbind will fail, and forcing it to w
 likely to render the system unusable. Remember to netboot or use Zedboot as
 needed.
 
-```shell
-$ unbind /dev/sys/platform/raw_nand/aml-raw_nand/nand/fvm/ftl/block
-$ unbind /dev/sys/platform/raw_nand/aml-raw_nand/nand/fvm/ftl
-$ nand-util --device /dev/sys/platform/raw_nand/aml-raw_nand/nand/fvm --save --file /tmp/image
+```posix-terminal
+unbind /dev/sys/platform/raw_nand/aml-raw_nand/nand/fvm/ftl/block
+unbind /dev/sys/platform/raw_nand/aml-raw_nand/nand/fvm/ftl
+nand-util --device /dev/sys/platform/raw_nand/aml-raw_nand/nand/fvm --save --file /tmp/image
 ```
 
 Transfer the image file to the host:
 
-```shell
-$ out/default/host-tools/netcp :/tmp/image /tmp/saved_image_file
+```posix-terminal
+out/default/host-tools/netcp :/tmp/image /tmp/saved_image_file
 ```
 
 ## Replay
@@ -83,7 +83,7 @@ A saved nand image can be loaded on top of a ram-nand device using nand-loader.
 
 First, transfer the image to a device running Zircon. For example, on the host:
 
-```shell
+```posix-terminal
 echo /nand.dmp=/tmp/saved_image_file > /tmp/manifest.txt
 out/default/host-tools/minfs /tmp/image.dsk create --manifest /tmp/manifest.txt
 fx set bringup.x64
@@ -93,8 +93,8 @@ fx qemu -k -- -hda /tmp/image.dsk
 
 Then, inside zircon:
 
-```shell
-$ mkdir data/a
-$ mount /dev/class/block/000 data/a
-$ nand-loader data/a/nand.dmp
+```posix-terminal
+mkdir data/a
+mount /dev/class/block/000 data/a
+nand-loader data/a/nand.dmp
 ```

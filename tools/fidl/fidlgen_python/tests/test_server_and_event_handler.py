@@ -83,7 +83,9 @@ class TestEchoer(ffx.EchoServer):
         self, request: ffx.EchoEchoStringRequest
     ) -> ffx.EchoEchoStringResponse:
         return ffx.EchoEchoStringResponse(response=request.value)
-        # [END echo_server_impl]
+
+
+# [END echo_server_impl]
 
 
 class AsyncEchoer(ffx.EchoServer):
@@ -401,13 +403,13 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         t_server = FlexibleMethodTesterServer(server)  # type: ignore[abstract]
         server_task = asyncio.get_running_loop().create_task(t_server.serve())
         res1 = await t_client.some_method()
-        with self.assertRaisesRegex(RuntimeError, "Result error"):
+        with self.assertRaisesRegex(AssertionError, "Result error"):
             res1.unwrap()
         res2 = await t_client.some_method_without_error()
-        with self.assertRaisesRegex(RuntimeError, "Result framework error"):
+        with self.assertRaisesRegex(AssertionError, "Result framework error"):
             res2.unwrap()
         res3 = await t_client.some_method_just_error()
-        with self.assertRaisesRegex(RuntimeError, "Result error"):
+        with self.assertRaisesRegex(AssertionError, "Result error"):
             res3.unwrap()
         server_task.cancel()
 

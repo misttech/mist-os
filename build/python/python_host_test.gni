@@ -141,6 +141,7 @@ template("python_host_test") {
                            [
                              "environments",
                              "metadata",
+                             "package_deps",
                              "visibility",
                              "timeout_secs",
                            ])

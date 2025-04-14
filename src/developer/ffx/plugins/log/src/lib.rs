@@ -79,9 +79,9 @@ pub async fn log_impl(
         if symbolize_disabled {
             None
         } else {
-            Some(TransactionalSymbolizer::new(
-                RealSymbolizerProcess::new(!prettification_disabled).await?,
-            )?)
+            Some(TransactionalSymbolizer::new(RealSymbolizerProcess::new(
+                !prettification_disabled,
+            )?)?)
         },
         rcs_connector,
         include_timestamp,

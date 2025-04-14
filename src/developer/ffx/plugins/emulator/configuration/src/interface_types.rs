@@ -134,7 +134,7 @@ pub trait EmulatorEngine: Send + Sync {
 
     /// Determine the appropriate binary for the target engine, and load its path into the
     /// engine's configuration for future use.
-    async fn load_emulator_binary(&mut self) -> Result<()> {
+    fn load_emulator_binary(&mut self) -> Result<()> {
         let bt = Backtrace::force_capture();
         unimplemented!(
             "These default trait implementations are to allow for easier testing and \

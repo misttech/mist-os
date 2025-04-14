@@ -5,11 +5,11 @@
 #include "src/graphics/display/drivers/aml-canvas/aml-canvas.h"
 
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/driver/fake-bti/cpp/fake-bti.h>
 #include <lib/driver/logging/cpp/logger.h>
-#include <lib/driver/mock-mmio/cpp/mock-mmio-range.h>
+#include <lib/driver/mock-mmio/cpp/globally-ordered-region.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
-#include <lib/fake-bti/bti.h>
 
 #include <vector>
 
@@ -45,13 +45,13 @@ constexpr int kCanvasLutAddressOffset = 0x0014 * 4;
 class AmlCanvasTest : public testing::Test {
  public:
   void SetUp() override {
-    zx::bti bti;
-    EXPECT_OK(fake_bti_create(bti.reset_and_get_address()));
+    zx::result bti = fake_bti::CreateFakeBti();
+    EXPECT_OK(bti);
 
     auto endpoints = fidl::Endpoints<fuchsia_hardware_amlogiccanvas::Device>::Create();
 
     // TODO(136015): This test should invoke ::Create(), which requires a FakePDevFidl.
-    canvas_ = std::make_unique<AmlCanvas>(mmio_range_.GetMmioBuffer(), std::move(bti),
+    canvas_ = std::make_unique<AmlCanvas>(mmio_range_.GetMmioBuffer(), std::move(bti.value()),
                                           inspect::Inspector{});
 
     binding_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(endpoints.server),
@@ -149,7 +149,7 @@ class AmlCanvasTest : public testing::Test {
 
   void SetRegisterExpectations() {
     // TODO(costan): Remove the read expectations when we get rid of the unnecessary R/M/W.
-    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
         {.address = kCanvasLutDataLowOffset, .value = CanvasLutDataLowValue(), .write = true},
         {.address = kCanvasLutDataHighOffset, .value = CanvasLutDataHighValue(), .write = true},
         {.address = kCanvasLutAddressOffset,
@@ -161,7 +161,7 @@ class AmlCanvasTest : public testing::Test {
 
   void SetRegisterExpectations(uint8_t index) {
     // TODO(costan): Remove the read expectations when we get rid of the unnecessary R/M/W.
-    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
         {.address = kCanvasLutDataLowOffset, .value = CanvasLutDataLowValue(), .write = true},
         {.address = kCanvasLutDataHighOffset, .value = CanvasLutDataHighValue(), .write = true},
         {.address = kCanvasLutAddressOffset, .value = CanvasLutAddrValue(index), .write = true},
@@ -207,7 +207,8 @@ class AmlCanvasTest : public testing::Test {
   std::vector<uint8_t> canvas_indices_;
 
   constexpr static int kMmioRangeSize = 0x100;
-  mock_mmio::MockMmioRange mmio_range_{kMmioRangeSize, mock_mmio::MockMmioRange::Size::k32};
+  mock_mmio::GloballyOrderedRegion mmio_range_{kMmioRangeSize,
+                                               mock_mmio::GloballyOrderedRegion::Size::k32};
 
   // Note, set up to execute on testing thread.
   std::unique_ptr<AmlCanvas> canvas_;

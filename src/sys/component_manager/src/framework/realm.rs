@@ -26,7 +26,8 @@ use vfs::path::Path;
 use vfs::ToObjectRequest;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio,
+    fuchsia_async as fasync,
 };
 
 lazy_static! {
@@ -143,6 +144,10 @@ impl RealmCapabilityProvider {
             }
             fcomponent::RealmRequest::OpenController { child, controller, responder } => {
                 let res = Self::open_controller(component, child, controller).await;
+                responder.send(res)?;
+            }
+            fcomponent::RealmRequest::GetResolvedInfo { responder } => {
+                let res = Self::get_resolved_info(component).await;
                 responder.send(res)?;
             }
         }
@@ -332,6 +337,17 @@ impl RealmCapabilityProvider {
         }
         Ok(())
     }
+
+    async fn get_resolved_info(
+        component: &WeakComponentInstance,
+    ) -> Result<fresolution::Component, fcomponent::Error> {
+        let component = component.upgrade().map_err(|_| fcomponent::Error::InstanceDied)?;
+        let resolved_state = component
+            .lock_resolved_state()
+            .await
+            .map_err(|_| fcomponent::Error::InstanceCannotResolve)?;
+        Ok((&resolved_state.resolved_component).into())
+    }
 }
 
 #[cfg(test)]
@@ -355,7 +371,8 @@ mod tests {
     use std::collections::HashSet;
     use {
         fidl_fidl_examples_routing_echo as echo, fidl_fuchsia_component as fcomponent,
-        fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+        fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
+        fuchsia_async as fasync,
     };
 
     struct RealmCapabilityTest {
@@ -1371,5 +1388,36 @@ mod tests {
                 .expect_err("unexpected success");
             assert_eq!(err, fcomponent::Error::InstanceNotFound);
         }
+    }
+
+    #[fuchsia::test]
+    async fn get_resolved_info() {
+        let test = RealmCapabilityTest::new(
+            vec![("root", ComponentDeclBuilder::new().child_default("system").build())],
+            Moniker::root(),
+        )
+        .await;
+
+        let fidl_resolved_info = test
+            .realm_proxy
+            .get_resolved_info()
+            .await
+            .expect("fidl call failed")
+            .expect("get_resolved_info() failed");
+
+        let internal_resolved_info: fresolution::Component =
+            (&test.component().lock_resolved_state().await.unwrap().resolved_component).into();
+        // We can't assert_eq!(fidl_resolved_info, internal_resolved_info) because they hold
+        // handles, and even if the handles point to/represent the same data the actual handle
+        // numbers are different.
+        assert_eq!(fidl_resolved_info.url, internal_resolved_info.url);
+        let read_buffer = |data: fmem::Data| match data {
+            fmem::Data::Buffer(fmem::Buffer { vmo, size }) => Some(vmo.read_to_vec(0, size)),
+            _ => None,
+        };
+        assert_eq!(
+            fidl_resolved_info.decl.and_then(read_buffer),
+            internal_resolved_info.decl.and_then(read_buffer),
+        );
     }
 }

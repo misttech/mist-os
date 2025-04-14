@@ -229,11 +229,11 @@ mod tests {
                             let (proxy, server_end) =
                                 fidl::endpoints::create_proxy::<fio::NodeMarker>();
                             remote
-                                .deprecated_open(
-                                    fio::OpenFlags::RIGHT_READABLE,
-                                    fio::ModeType::empty(),
+                                .open(
                                     name,
-                                    server_end,
+                                    fio::PERM_READABLE,
+                                    &Default::default(),
+                                    server_end.into_channel(),
                                 )
                                 .context("Sending open failed")?;
                             value

@@ -1152,8 +1152,10 @@ async fn do_rule_list<C: NetCliDepsConnector>(
             let index = u32::from(index);
             let from = from.map(|from| from.to_string());
             let locally_generated = locally_generated.map(|x| x.to_string());
-            let bound_device =
-                bound_device.map(|froutes_ext::rules::InterfaceMatcher::DeviceName(name)| name);
+            let bound_device = bound_device.map(|matcher| match matcher {
+                froutes_ext::rules::InterfaceMatcher::DeviceName(name) => name,
+                froutes_ext::rules::InterfaceMatcher::Unbound => "unbound".into(),
+            });
             let mark_1 = mark_1.map(format_matcher);
             let mark_2 = mark_2.map(format_matcher);
             let action = match action {

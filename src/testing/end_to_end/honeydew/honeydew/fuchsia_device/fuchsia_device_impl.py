@@ -13,13 +13,13 @@ from datetime import datetime
 from functools import cached_property
 from typing import Any
 
-import fidl.fuchsia_buildinfo as f_buildinfo
-import fidl.fuchsia_developer_remotecontrol as fd_remotecontrol
-import fidl.fuchsia_diagnostics as f_diagnostics
-import fidl.fuchsia_feedback as f_feedback
-import fidl.fuchsia_hardware_power_statecontrol as fhp_statecontrol
-import fidl.fuchsia_hwinfo as f_hwinfo
-import fidl.fuchsia_io as f_io
+import fidl_fuchsia_buildinfo as f_buildinfo
+import fidl_fuchsia_developer_remotecontrol as fd_remotecontrol
+import fidl_fuchsia_diagnostics as f_diagnostics
+import fidl_fuchsia_feedback as f_feedback
+import fidl_fuchsia_hardware_power_statecontrol as fhp_statecontrol
+import fidl_fuchsia_hwinfo as f_hwinfo
+import fidl_fuchsia_io as f_io
 import fuchsia_controller_py as fcp
 import fuchsia_inspect
 
@@ -883,7 +883,7 @@ class FuchsiaDeviceImpl(
 
     # List all private properties
     @property
-    def _build_info(self) -> dict[str, Any]:
+    def _build_info(self) -> f_buildinfo.BuildInfo:
         """Returns the build information of the device.
 
         Returns:
@@ -908,7 +908,7 @@ class FuchsiaDeviceImpl(
             ) from status
 
     @property
-    def _device_info_from_fidl(self) -> dict[str, Any]:
+    def _device_info_from_fidl(self) -> f_hwinfo.DeviceInfo:
         """Returns the device information of the device.
 
         Returns:
@@ -931,7 +931,7 @@ class FuchsiaDeviceImpl(
             ) from status
 
     @property
-    def _product_info(self) -> dict[str, Any]:
+    def _product_info(self) -> f_hwinfo.ProductInfo:
         """Returns the product information of the device.
 
         Returns:
@@ -1043,18 +1043,14 @@ class FuchsiaDeviceImpl(
         ret: bytearray = bytearray()
         try:
             while True:
-                result: f_io.ReadableReadResult = asyncio.run(
+                response = asyncio.run(
                     file_proxy.read(count=f_io.MAX_BUF)
-                )
-                if result.err:
-                    raise fc_errors.FuchsiaControllerError(
-                        "read() failed. Received zx.Status {result.err}"
-                    )
-                if not result.response.data:
+                ).unwrap()
+                if not response.data:
                     break
-                ret.extend(result.response.data)
-        except fcp.ZxStatus as status:
-            raise fc_errors.FuchsiaControllerError("read() failed") from status
+                ret.extend(response.data)
+        except (AssertionError, fcp.ZxStatus) as e:
+            raise fc_errors.FuchsiaControllerError("read() failed") from e
 
         # Verify transfer.
         expected_size: int = attr_resp.attributes.content_size

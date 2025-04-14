@@ -47,6 +47,29 @@ if (board_configuration_label != false &&
                                    "label_no_toolchain") + ".bazel_input" ]
 }
 
+group("terminal") {
+  testonly = true
+  if (current_cpu == "x64") {
+    deps = [
+      ":product_bundle.x64",
+      ":product_bundle.x64_reduced_perf_variation",
+      ":product_bundle_with_netstack2.x64",
+      ":product_bundle_with_netstack2.x64_reduced_perf_variation",
+    ]
+  } else if (current_cpu == "arm64") {
+    deps = [
+      ":product_bundle.arm64",
+      ":product_bundle.qemu-arm64",
+      ":product_bundle.vim3",
+      ":product_bundle.vim3_reduced_perf_variation",
+      ":product_bundle_with_netstack2.arm64",
+      ":product_bundle_with_netstack2.qemu-arm64",
+      ":product_bundle_with_netstack2.vim3",
+      ":product_bundle_with_netstack2.vim3_reduced_perf_variation",
+    ]
+  }
+}
+
 if (target_cpu == "x64") {
   bazel_product_bundle("product_bundle.x64") {
     testonly = true
@@ -113,13 +136,15 @@ if (target_cpu == "arm64") {
 
   bazel_product_bundle("product_bundle.qemu-arm64") {
     testonly = true
+    image_use_vbmeta = false
     product_bundle_name = "terminal.qemu-arm64"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":product_bundle.qemu-arm64"
     bazel_product_image_target = ":image.qemu-arm64"
     bazel_recovery_image_target = "//products/zedboot:qemu-arm64"
     bazel_elf_sizes_target = ":elf_sizes.qemu-arm64"
-    bazel_inputs_from_gn = bazel_inputs
+    bazel_inputs_from_gn =
+        bazel_inputs + [ "//boards/qemu-arm64:qemu-arm64.bazel_input" ]
   }
 
   bazel_product_bundle("product_bundle.vim3") {
@@ -158,13 +183,15 @@ if (target_cpu == "arm64") {
 
   bazel_product_bundle("product_bundle_with_netstack2.qemu-arm64") {
     testonly = true
+    image_use_vbmeta = false
     product_bundle_name = "terminal_with_netstack2.qemu-arm64"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":product_bundle_with_netstack2.qemu-arm64"
-    bazel_product_image_target = ":image.qemu-arm64"
+    bazel_product_image_target = ":image_with_netstack2.qemu-arm64"
     bazel_recovery_image_target = "//products/zedboot:qemu-arm64"
-    bazel_elf_sizes_target = ":elf_sizes.qemu-arm64"
-    bazel_inputs_from_gn = bazel_inputs
+    bazel_elf_sizes_target = ":elf_sizes_with_netstack2.qemu-arm64"
+    bazel_inputs_from_gn =
+        bazel_inputs + [ "//boards/qemu-arm64:qemu-arm64.bazel_input" ]
   }
 
   bazel_product_bundle("product_bundle_with_netstack2.vim3") {

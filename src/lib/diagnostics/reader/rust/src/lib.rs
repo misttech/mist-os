@@ -301,6 +301,7 @@ pub struct ArchiveReader<T> {
     timeout: Option<MonotonicDuration>,
     batch_retrieval_timeout_seconds: Option<i64>,
     max_aggregated_content_size_bytes: Option<u64>,
+    format: Option<Format>,
     _phantom: PhantomData<T>,
 }
 
@@ -425,6 +426,7 @@ impl ArchiveReader<Logs> {
     pub fn logs() -> Self {
         ArchiveReader::<Logs> {
             timeout: None,
+            format: None,
             selectors: vec![],
             retry_config: RetryConfig::always(),
             archive: None,
@@ -434,13 +436,24 @@ impl ArchiveReader<Logs> {
         }
     }
 
+    #[doc(hidden)]
+    pub fn with_format(&mut self, format: Format) -> &mut Self {
+        self.format = Some(format);
+        self
+    }
+
     #[inline]
     fn format(&self) -> Format {
-        #[cfg(fuchsia_api_level_at_least = "HEAD")]
-        let ret = Format::Fxt;
-        #[cfg(fuchsia_api_level_less_than = "HEAD")]
-        let ret = Format::Json;
-        ret
+        match self.format {
+            Some(f) => f,
+            None => {
+                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                let ret = Format::Fxt;
+                #[cfg(fuchsia_api_level_less_than = "HEAD")]
+                let ret = Format::Json;
+                ret
+            }
+        }
     }
 
     /// Connects to the ArchiveAccessor and returns data matching provided selectors.
@@ -477,6 +490,7 @@ impl ArchiveReader<Inspect> {
     pub fn inspect() -> Self {
         ArchiveReader::<Inspect> {
             timeout: None,
+            format: None,
             selectors: vec![],
             retry_config: RetryConfig::always(),
             archive: None,

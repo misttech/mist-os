@@ -1,0 +1,18 @@
+[package]
+name = "bt-broadcast-assistant"
+version = "0.0.1"
+edition = "2021"
+license = "BSD-2-Clause"
+
+[dependencies]
+bt-bap = { path = "../bt-bap" }
+bt-bass = { path = "../bt-bass" }
+bt-common = { path = "../bt-common" }
+bt-gatt = { path = "../bt-gatt" }
+futures = "=0.3.30"
+parking_lot = "0.12.0"
+thiserror = "2.0.11"
+
+[dev-dependencies]
+assert_matches = "1.5.0"
+bt-bass = { workspace = true, features = ["test-utils"] }

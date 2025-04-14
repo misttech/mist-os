@@ -96,10 +96,6 @@ class DisplayInfo : public IdMappable<std::unique_ptr<DisplayInfo>, display::Dis
   // config stamp for that configuration; otherwise it stores an invalid stamp.
   display::DriverConfigStamp pending_layer_change_driver_config_stamp;
 
-  // Flag indicating that a new configuration was delayed during a layer change
-  // and should be reapplied after the layer change completes.
-  bool delayed_apply;
-
   // True when we're in the process of switching between display clients.
   bool switching_client = false;
 

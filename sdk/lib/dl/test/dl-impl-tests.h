@@ -6,6 +6,7 @@
 #define LIB_DL_TEST_DL_IMPL_TESTS_H_
 
 #include <lib/fit/defer.h>
+#include <lib/ld/testing/startup-ld-abi.h>
 
 #include "../runtime-dynamic-linker.h"
 #include "../tlsdesc-runtime-dynamic.h"
@@ -16,8 +17,6 @@
 #endif
 
 namespace dl::testing {
-
-extern const ld::abi::Abi<>& gStartupLdAbi;
 
 // This handles TLS runtime test support that need not be templated like the
 // rest of DlImplTests.  The only instance of this (empty) class is its own
@@ -94,7 +93,7 @@ class DlImplTests : public Base {
     Base::SetUp();
 
     fbl::AllocChecker ac;
-    dynamic_linker_ = RuntimeDynamicLinker::Create(gStartupLdAbi, ac);
+    dynamic_linker_ = RuntimeDynamicLinker::Create(ld::testing::gStartupLdAbi, ac);
     ASSERT_TRUE(ac.check());
   }
 

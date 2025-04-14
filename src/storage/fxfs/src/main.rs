@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Error;
-use fuchsia_component::server::MissingStartupHandle;
+use anyhow::{Context, Error};
 use fuchsia_runtime::HandleType;
 use fxfs::log::*;
 use fxfs::serialized_types::LATEST_VERSION;
@@ -28,7 +27,7 @@ async fn main() -> Result<(), Error> {
     Component::new()
         .run(
             fuchsia_runtime::take_startup_handle(HandleType::DirectoryRequest.into())
-                .ok_or(MissingStartupHandle)?
+                .context("Missing startup handle")?
                 .into(),
             fuchsia_runtime::take_startup_handle(HandleType::Lifecycle.into()).map(|h| h.into()),
         )

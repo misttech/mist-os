@@ -33,7 +33,7 @@ foreach(test, tests_with_err_logs) {
   }
 }
 
-package_deps = [
+package_deps_for_tests = [
   # netemul-sandbox is used to create hermetic test realms.
   "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
 
@@ -70,7 +70,7 @@ package_deps = [
 
 # RISC-V on Fuchsia does not support Golang.
 if (target_cpu != "riscv64") {
-  package_deps += [
+  package_deps_for_tests += [
     "//src/connectivity/network/netstack:component",
     "//src/connectivity/network/netstack:component-debug",
     "//src/connectivity/network/netstack:component-with-fast-udp-debug",
@@ -83,7 +83,8 @@ fuchsia_test_package("policy-integration-tests") {
     test_components += [ ":policy-${test}-integration-test" ]
   }
 
-  deps = package_deps + [ "//src/lib/testing/expectation:expectation_comparer" ]
+  deps = package_deps_for_tests +
+         [ "//src/lib/testing/expectation:expectation_comparer" ]
 }
 
 err_log_package_deps = []
@@ -94,16 +95,16 @@ foreach(test, tests_with_err_logs) {
     test_components = [ ":${name}" ]
     expectations = "expects/${name}.json5"
     treatment_of_cases_with_error_logs = "SKIP_CASES_WITH_ERROR_LOGS"
-    deps =
-        package_deps + [ "//src/lib/testing/expectation:expectation_comparer" ]
+    deps = package_deps_for_tests +
+           [ "//src/lib/testing/expectation:expectation_comparer" ]
   }
   with_err_logs_package_name = "${name}-with-err-logs"
   fuchsia_test_with_expectations_package(with_err_logs_package_name) {
     test_components = [ ":${name}" ]
     expectations = "expects/${name}.json5"
     treatment_of_cases_with_error_logs = "RUN_ONLY_CASES_WITH_ERROR_LOGS"
-    deps =
-        package_deps + [ "//src/lib/testing/expectation:expectation_comparer" ]
+    deps = package_deps_for_tests +
+           [ "//src/lib/testing/expectation:expectation_comparer" ]
     test_specs = {
       log_settings = {
         max_severity = "ERROR"

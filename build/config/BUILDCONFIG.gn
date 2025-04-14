@@ -46,9 +46,6 @@ target_platform = "${target_os}-${target_cpu}"
 if (current_cpu == "") {
   current_cpu = target_cpu
 }
-if (current_cpu == "wasm32") {
-  current_os = "unknown"
-}
 if (current_os == "") {
   current_os = target_os
 }
@@ -77,7 +74,6 @@ linux_x64_toolchain = "//build/toolchain:linux_x64"
 win_x64_toolchain = "//build/toolchain:win_x64"
 linux_arm64_toolchain = "//build/toolchain:linux_arm64"
 linux_arm_toolchain = "//build/toolchain:linux_arm"
-unknown_wasm32_toolchain = "//build/toolchain:unknown_wasm32-shared"
 
 set_default_toolchain(target_toolchain)
 
@@ -3150,7 +3146,7 @@ template("_fuchsia_shared_library") {
           cpu = current_cpu
           debug = rebase_path(link_output_file, root_build_dir)
           if (current_os != "mac" && current_os != "win") {
-            elf_build_id = rebased_output_file + ".build-id.stamp"
+            elf_build_id_file = rebased_output_file + ".build-id.stamp"
           }
           if (output_breakpad_syms && current_os == "fuchsia") {
             breakpad = rebased_output_file + ".sym"

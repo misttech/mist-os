@@ -43,15 +43,15 @@ impl MemoryObject {
 
     pub fn get_content_size(&self) -> u64 {
         match self {
-            Self::Vmo(vmo) => vmo.get_content_size().map_err(impossible_error).unwrap(),
+            Self::Vmo(vmo) => vmo.get_stream_size().map_err(impossible_error).unwrap(),
             Self::RingBuf(_) => self.get_size(),
         }
     }
 
-    pub fn set_content_size(&self, size: u64) {
+    pub fn set_content_size(&self, size: u64) -> Result<(), zx::Status> {
         match self {
-            Self::Vmo(vmo) => vmo.set_content_size(&size).map_err(impossible_error).unwrap(),
-            Self::RingBuf(_) => {}
+            Self::Vmo(vmo) => vmo.set_stream_size(size),
+            Self::RingBuf(_) => Ok(()),
         }
     }
 

@@ -69,27 +69,6 @@ TEST_F(BootupTrackerTest, StartRequestsOnly) {
   EXPECT_TRUE(bootup_completed());
 }
 
-TEST_F(BootupTrackerTest, StartHookHanging) {
-  WaitForBootup();
-
-  tracker->NotifyNewStartRequest("node_1", "driver_url");
-  TriggerBootupTimeout();
-  EXPECT_FALSE(bootup_completed());
-
-  tracker->NotifyNewStartRequest("node_2", "driver_url");
-  tracker->NotifyStartComplete("node_1");
-  TriggerBootupTimeout();
-  EXPECT_FALSE(bootup_completed());
-
-  TriggerBootupTimeout();
-  EXPECT_FALSE(bootup_completed());
-
-  // Bootup should complete after the update deadline is exceeded.
-  tracker->should_exceed_update_deadline = true;
-  TriggerBootupTimeout();
-  EXPECT_TRUE(bootup_completed());
-}
-
 TEST_F(BootupTrackerTest, StartAndBindRequests) {
   WaitForBootup();
 
@@ -150,23 +129,6 @@ TEST_F(BootupTrackerTest, OverlappingBindRequests) {
   // Complete the ongoing bind. Bootup should be complete.
   DriverIndexReplyWithDriver("node-c");
   VerifyNoOngoingBind();
-  TriggerBootupTimeout();
-  EXPECT_TRUE(bootup_completed());
-}
-
-TEST_F(BootupTrackerTest, BindHanging) {
-  WaitForBootup();
-
-  AddAndBindNode_EXPECT_BIND_START("node-a");
-  VerifyBindOngoingWithRequests({{"node-a", 1}});
-  TriggerBootupTimeout();
-  EXPECT_FALSE(bootup_completed());
-
-  TriggerBootupTimeout();
-  EXPECT_FALSE(bootup_completed());
-
-  // Bootup should complete after the update deadline is exceeded.
-  tracker->should_exceed_update_deadline = true;
   TriggerBootupTimeout();
   EXPECT_TRUE(bootup_completed());
 }

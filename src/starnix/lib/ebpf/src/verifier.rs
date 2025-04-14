@@ -4,6 +4,7 @@
 
 #![allow(unused_variables)]
 
+use crate::scalar_value::{ScalarValueData, U32Range, U32ScalarValueData, U64Range};
 use crate::visitor::{BpfVisitor, ProgramCounter, Register, Source};
 use crate::{
     DataWidth, EbpfError, EbpfInstruction, MapSchema, BPF_MAX_INSTS, BPF_STACK_SIZE,
@@ -164,21 +165,24 @@ impl StructDescriptor {
 
     /// Finds the field type for load/store at the specified location. None is returned if the
     /// access is invalid and the program must be rejected.
-    fn find_field(&self, base_offset: i64, field: Field) -> Option<&FieldDescriptor> {
-        let offset: usize = (base_offset).checked_add(field.offset as i64)?.try_into().ok()?;
-        let field_desc =
-            self.fields.iter().find(|f| f.offset <= offset && offset < f.offset + f.size())?;
+    fn find_field(&self, base_offset: ScalarValueData, field: Field) -> Option<&FieldDescriptor> {
+        let offset = base_offset + field.offset;
+        let field_desc = self.fields.iter().find(|f| {
+            f.offset <= offset.min() as usize && (offset.max() as usize) < f.offset + f.size()
+        })?;
         let is_valid_load = match field_desc.field_type {
             FieldType::Scalar { size } | FieldType::MutableScalar { size } => {
                 // For scalars check that the access is within the bounds of the field.
-                offset + field.width.bytes() <= field_desc.offset + size
+                ((offset + field.width.bytes()).max() as usize) <= field_desc.offset + size
             }
             FieldType::PtrToMemory { is_32_bit, .. }
             | FieldType::PtrToArray { is_32_bit, .. }
             | FieldType::PtrToEndArray { is_32_bit, .. } => {
                 let expected_width = if is_32_bit { DataWidth::U32 } else { DataWidth::U64 };
                 // Pointer loads are expected to load the whole field.
-                offset == field_desc.offset as usize && field.width == expected_width
+                offset.is_known()
+                    && offset.value as usize == field_desc.offset
+                    && field.width == expected_width
             }
         };
 
@@ -209,191 +213,6 @@ impl MemoryParameterSize {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct Range<T: Clone + Copy + std::fmt::Debug + PartialOrd + Ord + PartialEq + Eq> {
-    min: T,
-    max: T,
-}
-
-impl<T: Clone + Copy + std::fmt::Debug + PartialOrd + Ord + PartialEq + Eq> Range<T> {
-    const fn new(min: T, max: T) -> Self {
-        Self { min, max }
-    }
-}
-
-impl<T: Clone + Copy + std::fmt::Debug + PartialOrd + Ord + PartialEq + Eq> From<T> for Range<T> {
-    fn from(value: T) -> Self {
-        Self::new(value, value)
-    }
-}
-
-type U64Range = Range<u64>;
-
-impl U64Range {
-    const fn max() -> Self {
-        Self::new(0, u64::MAX)
-    }
-
-    fn extract_slices(value: u64, offset: usize, byte_count: usize) -> (u64, u64, u64) {
-        let v1 = if offset > 0 { NativeEndian::read_uint(&value.as_bytes(), offset) } else { 0 };
-        let v2 = NativeEndian::read_uint(&value.as_bytes()[offset..], byte_count);
-        let v3 = if offset + byte_count < 8 {
-            NativeEndian::read_uint(
-                &value.as_bytes()[(offset + byte_count)..],
-                8 - offset - byte_count,
-            )
-        } else {
-            0
-        };
-        if cfg!(target_endian = "little") {
-            (v1, v2, v3)
-        } else {
-            (v3, v2, v1)
-        }
-    }
-
-    fn assemble_slices(values: (u64, u64, u64), offset: usize, byte_count: usize) -> u64 {
-        let mut result: u64 = 0;
-        let (v1, v2, v3) =
-            if cfg!(target_endian = "little") { values } else { (values.2, values.1, values.0) };
-        if offset > 0 {
-            result.as_mut_bytes()[..offset].copy_from_slice(&v1.as_bytes()[..offset]);
-        }
-        result.as_mut_bytes()[offset..(offset + byte_count)]
-            .copy_from_slice(&v2.as_bytes()[..byte_count]);
-        result.as_mut_bytes()[(offset + byte_count)..]
-            .copy_from_slice(&v3.as_bytes()[..(8 - offset - byte_count)]);
-        result
-    }
-
-    /// Given a target and source values, each in the `target` and `source` ranges. Compute the
-    /// range of the result of the operation where `byte_count` bytes from `source` at offset
-    /// `source_offset` replace `byte_count` bytes from `target` at offset `target_offset`.
-    fn compute_range_for_bytes_swap(
-        target: U64Range,
-        source: U64Range,
-        target_offset: usize,
-        source_offset: usize,
-        byte_count: usize,
-    ) -> U64Range {
-        let (target_umin1, target_umin2, target_umin3) =
-            Self::extract_slices(target.min, target_offset, byte_count);
-        let (target_umax1, target_umax2, target_umax3) =
-            Self::extract_slices(target.max, target_offset, byte_count);
-        let (_, source_umin2, source_umin3) =
-            Self::extract_slices(source.min, source_offset, byte_count);
-        let (_, source_umax2, source_umax3) =
-            Self::extract_slices(source.max, source_offset, byte_count);
-
-        let (final_umin3, final_umax3) = (target_umin3, target_umax3);
-        let (final_umin2, final_umax2) =
-            if source_umax3 > source_umin3 { (0, u64::MAX) } else { (source_umin2, source_umax2) };
-        let (final_umin1, final_umax1) =
-            if target_umax3 > target_umin3 || target_umax2 > target_umin2 {
-                (0, u64::MAX)
-            } else {
-                (target_umin1, target_umax1)
-            };
-
-        let final_min = Self::assemble_slices(
-            (final_umin1, final_umin2, final_umin3),
-            target_offset,
-            byte_count,
-        );
-        let final_max = Self::assemble_slices(
-            (final_umax1, final_umax2, final_umax3),
-            target_offset,
-            byte_count,
-        );
-
-        Range::new(final_min, final_max)
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct ScalarValueData {
-    /// The value. Its interpresentation depends on `unknown_mask` and `unwritten_mask`.
-    value: u64,
-    /// A bit mask of unknown bits. A bit in `value` is valid (and can be used by the verifier)
-    /// if the equivalent mask in unknown_mask is 0.
-    unknown_mask: u64,
-    /// A bit mask of unwritten bits. A bit in `value` is written (and can be sent back to
-    /// userspace) if the equivalent mask in unknown_mask is 0. `unknown_mask` must always be a
-    /// subset of `unwritten_mask`.
-    unwritten_mask: u64,
-    /// The range of possible unsigned values of this scalar.
-    urange: U64Range,
-}
-
-/// Defines a partial ordering on `ScalarValueData` instances, capturing the notion of how "broad"
-/// a scalar value is in terms of the set of potential values it represents.
-///
-/// The ordering is defined such that `s1 > s2` if a proof that an eBPF program terminates
-/// in a state where a register or memory location has a scalar value `s1` is also a proof that
-/// the program terminates in a state where that location has scalar value `s2`.
-///
-/// In other words, a "broader" value represents a larger set of possible values, and
-/// proving termination with a broader type implies termination with any narrower value.
-///
-/// Examples:
-/// * `ScalarValueData { unknown_mask: 0, .. }` (a known scalar value) is less than
-///   `ScalarValueData { unknown_mask: u64::MAX, .. }` (an unknown scalar value).
-impl PartialOrd for ScalarValueData {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        fn mask_is_larger(m1: u64, m2: u64) -> bool {
-            m1 & m2 == m2
-        }
-
-        // If the values are equals, return the known result.
-        if self == other {
-            return Some(Ordering::Equal);
-        }
-
-        if mask_is_larger(self.unwritten_mask, other.unwritten_mask)
-            && mask_is_larger(self.unknown_mask, other.unknown_mask)
-            && self.value & !self.unknown_mask == other.value & !self.unknown_mask
-        {
-            return Some(Ordering::Greater);
-        }
-        if mask_is_larger(other.unwritten_mask, self.unwritten_mask)
-            && mask_is_larger(other.unknown_mask, self.unknown_mask)
-            && self.value & !other.unknown_mask == other.value & !other.unknown_mask
-        {
-            return Some(Ordering::Less);
-        }
-        None
-    }
-}
-
-impl From<u64> for ScalarValueData {
-    fn from(value: u64) -> Self {
-        Self { value, unknown_mask: 0, unwritten_mask: 0, urange: value.into() }
-    }
-}
-
-impl ScalarValueData {
-    const UNINITIALIZED: Self =
-        Self { value: 0, unknown_mask: u64::MAX, unwritten_mask: u64::MAX, urange: Range::max() };
-    const UNKNOWN_WRITTEN: Self =
-        Self { value: 0, unknown_mask: u64::MAX, unwritten_mask: 0, urange: Range::max() };
-
-    const fn is_known(&self) -> bool {
-        self.unknown_mask == 0
-    }
-
-    const fn is_fully_initialized(&self) -> bool {
-        self.unwritten_mask == 0
-    }
-
-    const fn is_uninitialized(&self) -> bool {
-        self.unwritten_mask == u64::MAX
-    }
-
-    const fn is_zero(&self) -> bool {
-        self.is_known() && self.value == 0
-    }
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum Type {
     /// A number.
@@ -404,13 +223,13 @@ pub enum Type {
     PtrToStack { offset: StackOffset },
     /// A pointer to the kernel memory. The full buffer is `buffer_size` bytes long. The pointer is
     /// situated at `offset` from the start of the buffer.
-    PtrToMemory { id: MemoryId, offset: i64, buffer_size: u64 },
+    PtrToMemory { id: MemoryId, offset: ScalarValueData, buffer_size: u64 },
     /// A pointer to a struct with the specified `StructDescriptor`.
-    PtrToStruct { id: MemoryId, offset: i64, descriptor: Arc<StructDescriptor> },
+    PtrToStruct { id: MemoryId, offset: ScalarValueData, descriptor: Arc<StructDescriptor> },
     /// A pointer to the kernel memory. The full buffer size is determined by an instance of
     /// `PtrToEndArray` with the same `id`. The pointer is situadted at `offset` from the start of
     /// the buffer.
-    PtrToArray { id: MemoryId, offset: i64 },
+    PtrToArray { id: MemoryId, offset: ScalarValueData },
     /// A pointer to the kernel memory that represents the first non accessible byte of a
     /// `PtrToArray` with the same `id`.
     PtrToEndArray { id: MemoryId },
@@ -497,6 +316,12 @@ impl PartialOrd for Type {
     }
 }
 
+impl From<ScalarValueData> for Type {
+    fn from(value: ScalarValueData) -> Self {
+        Self::ScalarValue(value)
+    }
+}
+
 impl From<u64> for Type {
     fn from(value: u64) -> Self {
         Self::ScalarValue(value.into())
@@ -543,12 +368,21 @@ impl Type {
             (
                 Self::PtrToStruct { id: id1, offset: offset1, descriptor: descriptor1 },
                 Self::PtrToStruct { id: id2, offset: offset2, descriptor: descriptor2 },
-            ) => id1 == id2 && offset1 == offset2 && descriptor1.is_subtype(descriptor2),
+            ) => id1 == id2 && offset1 <= offset2 && descriptor1.is_subtype(descriptor2),
 
             // Every type is a subtype of itself.
             (self_type, super_type) if self_type == super_type => true,
 
             _ => false,
+        }
+    }
+
+    /// Return true is `self` is guaranteed to be non-zero
+    pub fn is_non_zero(&self) -> bool {
+        match self {
+            Self::ScalarValue(d) => d.min() > 0,
+            Self::NullOr { .. } => false,
+            _ => true,
         }
     }
 
@@ -575,65 +409,65 @@ impl Type {
         type2: Self,
     ) -> Result<(Self, Self), String> {
         let result = match (jump_width, jump_type, type1.inner(context)?, type2.inner(context)?) {
-            (JumpWidth::W64, JumpType::Eq, Self::ScalarValue(data1), Self::ScalarValue(data2))
+            (JumpWidth::W64, JumpType::Eq, Type::ScalarValue(data1), Type::ScalarValue(data2))
                 if data1.is_fully_initialized() && data2.is_fully_initialized() =>
             {
-                let umin = std::cmp::max(data1.urange.min, data2.urange.min);
-                let umax = std::cmp::min(data1.urange.max, data2.urange.max);
-                let v = Self::ScalarValue(ScalarValueData {
-                    value: data1.value | data2.value,
-                    unknown_mask: data1.unknown_mask & data2.unknown_mask,
-                    unwritten_mask: 0,
-                    urange: Range::new(umin, umax),
-                });
+                let umin = std::cmp::max(data1.min(), data2.min());
+                let umax = std::cmp::min(data1.max(), data2.max());
+                let v = Type::ScalarValue(ScalarValueData::new(
+                    data1.value | data2.value,
+                    data1.unknown_mask & data2.unknown_mask,
+                    0,
+                    U64Range::new(umin, umax),
+                ));
                 (v.clone(), v)
             }
-            (JumpWidth::W32, JumpType::Eq, Self::ScalarValue(data1), Self::ScalarValue(data2))
+            (JumpWidth::W32, JumpType::Eq, Type::ScalarValue(data1), Type::ScalarValue(data2))
                 if data1.is_fully_initialized() && data2.is_fully_initialized() =>
             {
-                let maybe_umin = if data1.urange.min <= U32_MAX && data2.urange.min <= U32_MAX {
-                    Some(std::cmp::max(data1.urange.min, data2.urange.min))
+                let maybe_umin = if data1.min() <= U32_MAX && data2.min() <= U32_MAX {
+                    Some(std::cmp::max(data1.min(), data2.min()))
                 } else {
                     None
                 };
-                let maybe_umax = if data1.urange.max <= U32_MAX && data2.urange.max <= U32_MAX {
-                    Some(std::cmp::min(data1.urange.max, data2.urange.max))
+                let maybe_umax = if data1.max() <= U32_MAX && data2.max() <= U32_MAX {
+                    Some(std::cmp::min(data1.max(), data2.max()))
                 } else {
                     None
                 };
 
-                let urange1 = Range::new(
-                    maybe_umin.unwrap_or(data1.urange.min),
-                    maybe_umax.unwrap_or(data1.urange.max),
+                let urange1 = U64Range::new(
+                    maybe_umin.unwrap_or_else(|| data1.min()),
+                    maybe_umax.unwrap_or_else(|| data1.max()),
                 );
-                let v1 = Self::ScalarValue(ScalarValueData {
-                    value: data1.value | (data2.value & U32_MAX),
-                    unknown_mask: data1.unknown_mask & (data2.unknown_mask | (U32_MAX << 32)),
-                    unwritten_mask: 0,
-                    urange: urange1,
-                });
+                let v1 = Type::ScalarValue(ScalarValueData::new(
+                    data1.value | (data2.value & U32_MAX),
+                    data1.unknown_mask & (data2.unknown_mask | (U32_MAX << 32)),
+                    0,
+                    urange1,
+                ));
 
-                let urange2 = Range::new(
-                    maybe_umin.unwrap_or(data2.urange.min),
-                    maybe_umax.unwrap_or(data2.urange.max),
+                let urange2 = U64Range::new(
+                    maybe_umin.unwrap_or_else(|| data2.min()),
+                    maybe_umax.unwrap_or_else(|| data2.max()),
                 );
-                let v2 = Self::ScalarValue(ScalarValueData {
-                    value: data2.value | (data1.value & U32_MAX),
-                    unknown_mask: data2.unknown_mask & (data1.unknown_mask | (U32_MAX << 32)),
-                    unwritten_mask: 0,
-                    urange: urange2,
-                });
+                let v2 = Type::ScalarValue(ScalarValueData::new(
+                    data2.value | (data1.value & U32_MAX),
+                    data2.unknown_mask & (data1.unknown_mask | (U32_MAX << 32)),
+                    0,
+                    urange2,
+                ));
                 (v1, v2)
             }
-            (JumpWidth::W64, JumpType::Eq, Self::ScalarValue(data), Self::NullOr { id, .. })
-            | (JumpWidth::W64, JumpType::Eq, Self::NullOr { id, .. }, Self::ScalarValue(data))
+            (JumpWidth::W64, JumpType::Eq, Type::ScalarValue(data), Type::NullOr { id, .. })
+            | (JumpWidth::W64, JumpType::Eq, Type::NullOr { id, .. }, Type::ScalarValue(data))
                 if data.is_zero() =>
             {
                 context.set_null(id, true);
                 let zero = Type::from(0);
                 (zero.clone(), zero)
             }
-            (JumpWidth::W64, jump_type, Self::NullOr { id, inner }, Self::ScalarValue(data))
+            (JumpWidth::W64, jump_type, Type::NullOr { id, inner }, Type::ScalarValue(data))
                 if jump_type.is_strict() && data.is_zero() =>
             {
                 context.set_null(id, false);
@@ -641,13 +475,37 @@ impl Type {
                 inner.register_resource(context);
                 (inner, type2)
             }
-            (JumpWidth::W64, jump_type, Self::ScalarValue(data), Self::NullOr { id, inner })
+            (JumpWidth::W64, jump_type, Type::ScalarValue(data), Type::NullOr { id, inner })
                 if jump_type.is_strict() && data.is_zero() =>
             {
                 context.set_null(id, false);
                 let inner = *inner.clone();
                 inner.register_resource(context);
                 (type1, inner)
+            }
+
+            (JumpWidth::W64, JumpType::Lt, Type::ScalarValue(data1), Type::ScalarValue(data2))
+            | (JumpWidth::W64, JumpType::Gt, Type::ScalarValue(data2), Type::ScalarValue(data1)) => {
+                debug_assert!(data1.min() < u64::MAX);
+                debug_assert!(data2.max() > 0);
+                let new_max1 = std::cmp::min(data1.max(), data2.max() - 1);
+                debug_assert!(data1.min() <= new_max1);
+                let new_min2 = std::cmp::max(data2.min(), data1.min() + 1);
+                debug_assert!(new_min2 <= data2.max());
+                let new_range1 = U64Range::new(data1.min(), new_max1);
+                let new_range2 = U64Range::new(new_min2, data2.max());
+                (data1.update_range(new_range1).into(), data2.update_range(new_range2).into())
+            }
+
+            (JumpWidth::W64, JumpType::Le, Type::ScalarValue(data1), Type::ScalarValue(data2))
+            | (JumpWidth::W64, JumpType::Ge, Type::ScalarValue(data2), Type::ScalarValue(data1)) => {
+                let new_max1 = std::cmp::min(data1.max(), data2.max());
+                debug_assert!(data1.min() <= new_max1);
+                let new_min2 = std::cmp::max(data2.min(), data1.min());
+                debug_assert!(new_min2 <= data2.max());
+                let new_range1 = U64Range::new(data1.min(), new_max1);
+                let new_range2 = U64Range::new(new_min2, data2.max());
+                (data1.update_range(new_range1).into(), data2.update_range(new_range2).into())
             }
 
             (
@@ -667,8 +525,8 @@ impl Type {
                 JumpType::Ge,
                 Type::PtrToEndArray { id: id1 },
                 Type::PtrToArray { id: id2, offset },
-            ) if id1 == id2 && *offset >= 0 => {
-                context.update_array_bounds(id1.clone(), *offset as u64);
+            ) if id1 == id2 => {
+                context.update_array_bounds(id1.clone(), *offset);
                 (type1, type2)
             }
             (
@@ -682,8 +540,8 @@ impl Type {
                 JumpType::Gt,
                 Type::PtrToEndArray { id: id1 },
                 Type::PtrToArray { id: id2, offset },
-            ) if id1 == id2 && *offset >= -1 => {
-                context.update_array_bounds(id1.clone(), (*offset + 1) as u64);
+            ) if id1 == id2 => {
+                context.update_array_bounds(id1.clone(), *offset + 1);
                 (type1, type2)
             }
             (JumpWidth::W64, JumpType::Eq, _, _) => (type1.clone(), type1),
@@ -736,17 +594,16 @@ impl Type {
             }
             (Type::MemoryParameter { size, .. }, Type::PtrToMemory { offset, buffer_size, .. }) => {
                 let expected_size = size.size(context)?;
-                i64::try_from(*buffer_size)
-                    .ok()
-                    .and_then(|v| v.checked_sub(*offset))
-                    .and_then(|v| u64::try_from(v).ok())
-                    .and_then(|size_left| (expected_size <= size_left).then_some(()))
-                    .ok_or_else(|| format!("out of bound read at pc {}", context.pc))
+                let size_left = ScalarValueData::from(*buffer_size) - offset;
+                if expected_size > size_left.min() {
+                    return Err(format!("out of bound read at pc {}", context.pc));
+                }
+                Ok(())
             }
 
             (Type::MemoryParameter { size, input, output }, Type::PtrToStack { offset }) => {
                 let size = size.size(context)?;
-                let buffer_end = offset.checked_add(size).unwrap_or(StackOffset::INVALID);
+                let buffer_end = offset.add(size);
                 if !buffer_end.is_valid() {
                     Err(format!("out of bound access at pc {}", context.pc))
                 } else {
@@ -761,9 +618,9 @@ impl Type {
             }
             (
                 Type::StructParameter { id: id1 },
-                Type::PtrToMemory { id: id2, offset: 0, .. }
-                | Type::PtrToStruct { id: id2, offset: 0, .. },
-            ) if *id1 == *id2 => Ok(()),
+                Type::PtrToMemory { id: id2, offset, .. }
+                | Type::PtrToStruct { id: id2, offset, .. },
+            ) if offset.is_zero() && *id1 == *id2 => Ok(()),
             (
                 Type::ReleasableParameter { id: id1, inner: inner1 },
                 Type::Releasable { id: id2, inner: inner2 },
@@ -869,7 +726,7 @@ impl CallingContext {
         self.helpers = helpers;
     }
     pub fn set_args(&mut self, args: &[Type]) {
-        assert!(args.len() <= 5);
+        debug_assert!(args.len() <= 5);
         self.args = args.to_vec();
     }
     pub fn set_packet_type(&mut self, packet_type: Type) {
@@ -903,8 +760,8 @@ impl VerifiedEbpfProgram {
     // Convert the program to raw code. Can be used only when the program doesn't access any
     // structs and maps.
     pub fn to_code(self) -> Vec<EbpfInstruction> {
-        assert!(self.struct_access_instructions.is_empty());
-        assert!(self.maps.is_empty());
+        debug_assert!(self.struct_access_instructions.is_empty());
+        debug_assert!(self.maps.is_empty());
         self.code
     }
 
@@ -1042,40 +899,40 @@ const STACK_MAX_INDEX: usize = BPF_STACK_SIZE / STACK_ELEMENT_SIZE;
 /// An offset inside the stack. The offset is from the end of the stack.
 /// downward.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct StackOffset(u64);
+pub struct StackOffset(ScalarValueData);
 
 impl Default for StackOffset {
     fn default() -> Self {
-        Self(BPF_STACK_SIZE as u64)
+        Self(BPF_STACK_SIZE.into())
     }
 }
 
 impl StackOffset {
-    const INVALID: Self = Self(u64::MAX >> 1);
-
     /// Whether the current offset is valid.
     fn is_valid(&self) -> bool {
-        self.0 <= (BPF_STACK_SIZE as u64)
+        self.0.is_known() && self.0.value <= (BPF_STACK_SIZE as u64)
     }
 
     /// The value of the register.
-    fn reg(&self) -> u64 {
+    fn reg(&self) -> ScalarValueData {
         self.0
     }
 
     /// The index into the stack array this offset points to. Can be called only if `is_valid()`
     /// is true.
     fn array_index(&self) -> usize {
-        usize::try_from(self.0).unwrap() / STACK_ELEMENT_SIZE
+        debug_assert!(self.is_valid());
+        usize::try_from(self.0.value).unwrap() / STACK_ELEMENT_SIZE
     }
 
     /// The offset inside the aligned u64 in the stack.
     fn sub_index(&self) -> usize {
-        usize::try_from(self.0).unwrap() % STACK_ELEMENT_SIZE
+        debug_assert!(self.is_valid());
+        usize::try_from(self.0.value).unwrap() % STACK_ELEMENT_SIZE
     }
 
-    fn checked_add<T: TryInto<i64>>(self, rhs: T) -> Option<Self> {
-        (self.0 as i64).checked_add(rhs.try_into().ok()?).map(|v| Self(v as u64))
+    fn add<T: Into<ScalarValueData>>(self, rhs: T) -> Self {
+        Self(self.0 + rhs)
     }
 }
 
@@ -1126,7 +983,7 @@ impl Stack {
     ) -> Result<(), String> {
         for i in 0..bytes {
             self.store(pc, offset, Type::UNKNOWN_SCALAR, DataWidth::U8)?;
-            offset = offset.checked_add(1).unwrap();
+            offset = offset.add(1);
         }
         Ok(())
     }
@@ -1160,14 +1017,18 @@ impl Stack {
             return Ok(());
         }
 
+        if bytes as usize > BPF_STACK_SIZE {
+            return Err(format!("stack overflow at pc {}", pc));
+        }
+
         if !offset.is_valid() {
             return Err(format!("invalid stack offset at pc {}", pc));
         }
 
-        let end_offset = offset
-            .checked_add(bytes)
-            .filter(|v| v.is_valid())
-            .ok_or_else(|| format!("stack overflow at pc {}", pc))?;
+        let end_offset = offset.add(bytes);
+        if !end_offset.is_valid() {
+            return Err(format!("stack overflow at pc {}", pc))?;
+        }
 
         // Handle the case where all the data is contained in a single element excluding the last
         // byte (the case when the read ends at an element edge, i.e. `end_offset.sub_index()==0`,
@@ -1244,12 +1105,12 @@ impl Stack {
                     );
                     self.set(
                         index,
-                        Type::ScalarValue(ScalarValueData {
+                        Type::ScalarValue(ScalarValueData::new(
                             value,
                             unknown_mask,
                             unwritten_mask,
                             urange,
-                        }),
+                        )),
                     );
                 }
                 _ => {
@@ -1296,12 +1157,12 @@ impl Stack {
                         sub_index,
                         width.bytes(),
                     );
-                    Ok(Type::ScalarValue(ScalarValueData {
+                    Ok(Type::ScalarValue(ScalarValueData::new(
                         value,
                         unknown_mask,
                         unwritten_mask,
                         urange,
-                    }))
+                    )))
                 }
                 _ => Err(format!("incorrect load of {} bytes at pc {}", width.bytes(), pc)),
             }
@@ -1427,11 +1288,12 @@ impl ComputationContext {
         Ok(())
     }
 
-    fn update_array_bounds(&mut self, id: MemoryId, new_bound: u64) {
+    fn update_array_bounds(&mut self, id: MemoryId, new_bound: ScalarValueData) {
+        let new_bound_min = new_bound.min();
         self.array_bounds
             .entry(id)
-            .and_modify(|v| *v = std::cmp::max(*v, new_bound))
-            .or_insert(new_bound);
+            .and_modify(|v| *v = std::cmp::max(*v, new_bound_min))
+            .or_insert(new_bound_min);
     }
 
     fn get_map_schema(&self, argument: u8) -> Result<MapSchema, String> {
@@ -1468,18 +1330,13 @@ impl ComputationContext {
 
     fn check_memory_access(
         &self,
-        dst_offset: i64,
+        dst_offset: ScalarValueData,
         dst_buffer_size: u64,
         instruction_offset: i16,
         width: usize,
     ) -> Result<(), String> {
-        let final_offset = dst_offset
-            .checked_add(instruction_offset as i64)
-            .ok_or_else(|| format!("out of bound access at pc {}", self.pc))?;
-        let end_offset = final_offset
-            .checked_add(width as i64)
-            .ok_or_else(|| format!("out of bound access at pc {}", self.pc))?;
-        if final_offset < 0 || end_offset as u64 > dst_buffer_size {
+        let memory_range = dst_offset.urange + instruction_offset + U64Range::new(0, width as u64);
+        if memory_range.max > dst_buffer_size {
             return Err(format!("out of bound access at pc {}", self.pc));
         }
         Ok(())
@@ -1495,7 +1352,7 @@ impl ComputationContext {
         let addr = addr.inner(self)?;
         match *addr {
             Type::PtrToStack { offset } => {
-                let offset_sum = offset.checked_add(field.offset).unwrap_or(StackOffset::INVALID);
+                let offset_sum = offset.add(field.offset);
                 return self.stack.store(self.pc, offset_sum, value, field.width);
             }
             Type::PtrToMemory { offset, buffer_size, .. } => {
@@ -1545,7 +1402,7 @@ impl ComputationContext {
         let addr = addr.inner(self)?;
         match *addr {
             Type::PtrToStack { offset } => {
-                let offset_sum = offset.checked_add(field.offset).unwrap_or(StackOffset::INVALID);
+                let offset_sum = offset.add(field.offset);
                 self.stack.load(self.pc, offset_sum, field.width)
             }
             Type::PtrToMemory { ref id, offset, buffer_size, .. } => {
@@ -1562,7 +1419,7 @@ impl ComputationContext {
                         (Type::UNKNOWN_SCALAR, false)
                     }
                     FieldType::PtrToArray { id: array_id, is_32_bit } => (
-                        Type::PtrToArray { id: array_id.prepended(id.clone()), offset: 0 },
+                        Type::PtrToArray { id: array_id.prepended(id.clone()), offset: 0.into() },
                         *is_32_bit,
                     ),
                     FieldType::PtrToEndArray { id: array_id, is_32_bit } => {
@@ -1571,7 +1428,7 @@ impl ComputationContext {
                     FieldType::PtrToMemory { id: memory_id, buffer_size, is_32_bit } => (
                         Type::PtrToMemory {
                             id: memory_id.prepended(id.clone()),
-                            offset: 0,
+                            offset: 0.into(),
                             buffer_size: *buffer_size as u64,
                         },
                         *is_32_bit,
@@ -1647,14 +1504,14 @@ impl ComputationContext {
                 let id = verification_context.next_id();
                 Ok(Type::PtrToMemory {
                     id: id.into(),
-                    offset: 0,
+                    offset: 0.into(),
                     buffer_size: schema.value_size as u64,
                 })
             }
             Type::MemoryParameter { size, .. } => {
                 let buffer_size = size.size(self)?;
                 let id = verification_context.next_id();
-                Ok(Type::PtrToMemory { id: id.into(), offset: 0, buffer_size })
+                Ok(Type::PtrToMemory { id: id.into(), offset: 0.into(), buffer_size })
             }
             t => Ok(t.clone()),
         }
@@ -1672,83 +1529,45 @@ impl ComputationContext {
         op1: Type,
         op2: Type,
         alu_type: AluType,
-        op: impl Fn(u64, u64) -> u64,
+        op: impl Fn(ScalarValueData, ScalarValueData) -> ScalarValueData,
     ) -> Result<Type, String> {
         let result: Type = match (alu_type, op1.inner(context)?, op2.inner(context)?) {
-            (_, Type::ScalarValue(data1), Type::ScalarValue(data2))
-                if data1.is_known() && data2.is_known() =>
-            {
-                op(data1.value, data2.value).into()
-            }
-            (AluType::Bitwise, Type::ScalarValue(data1), Type::ScalarValue(data2)) => {
-                let unknown_mask = data1.unknown_mask | data2.unknown_mask;
-                let unwritten_mask = data1.unwritten_mask | data2.unwritten_mask;
-                let value = op(data1.value, data2.value) & !unknown_mask;
-                Type::ScalarValue(ScalarValueData {
-                    value,
-                    unknown_mask,
-                    unwritten_mask,
-                    urange: Range::max(),
-                })
-            }
-            (AluType::Shift, Type::ScalarValue(data1), Type::ScalarValue(data2))
-                if data2.is_known() =>
-            {
-                let value = op(data1.value, data2.value);
-                let unknown_mask = op(data1.unknown_mask, data2.value);
-                let unwritten_mask = op(data1.unwritten_mask, data2.value);
-                Type::ScalarValue(ScalarValueData {
-                    value,
-                    unknown_mask,
-                    unwritten_mask,
-                    urange: Range::max(),
-                })
-            }
-            (AluType::Arsh, Type::ScalarValue(data1), Type::ScalarValue(data2)) => {
-                let unknown_mask = data1.unknown_mask.overflowing_shr(data2.value as u32).0;
-                let unwritten_mask = data1.unwritten_mask.overflowing_shr(data2.value as u32).0;
-                let value = op(data1.value, data2.value) & !unknown_mask;
-                Type::ScalarValue(ScalarValueData {
-                    value,
-                    unknown_mask,
-                    unwritten_mask,
-                    urange: Range::max(),
-                })
+            (_, Type::ScalarValue(data1), Type::ScalarValue(data2)) => op(*data1, *data2).into(),
+            (
+                AluType::Add,
+                Type::ScalarValue(_),
+                Type::PtrToStack { .. } | Type::PtrToMemory { .. } | Type::PtrToStruct { .. },
+            ) => {
+                return Self::apply_computation(context, op2, op1, alu_type, op);
             }
             (alu_type, Type::PtrToStack { offset: x }, Type::ScalarValue(data))
-                if alu_type.is_ptr_compatible() && data.is_known() =>
+                if alu_type.is_ptr_compatible() =>
             {
-                Type::PtrToStack { offset: run_on_stack_offset(*x, |x| op(x, data.value)) }
+                Type::PtrToStack { offset: run_on_stack_offset(*x, |x| op(x, *data)) }
             }
             (
                 alu_type,
                 Type::PtrToMemory { id, offset: x, buffer_size },
                 Type::ScalarValue(data),
-            ) if alu_type.is_ptr_compatible() && data.is_known() => {
-                let offset = op(*x as u64, data.value);
-                Type::PtrToMemory {
-                    id: id.clone(),
-                    offset: offset as i64,
-                    buffer_size: *buffer_size,
-                }
+            ) if alu_type.is_ptr_compatible() => {
+                let offset = op(*x, *data);
+                Type::PtrToMemory { id: id.clone(), offset, buffer_size: *buffer_size }
             }
             (
                 alu_type,
                 Type::PtrToStruct { id, offset: x, descriptor },
                 Type::ScalarValue(data),
-            ) if alu_type.is_ptr_compatible() && data.is_known() => {
-                let offset = op(*x as u64, data.value);
-                Type::PtrToStruct {
-                    id: id.clone(),
-                    offset: offset as i64,
-                    descriptor: descriptor.clone(),
-                }
+            ) if alu_type.is_ptr_compatible() => {
+                let offset = op(*x, *data);
+                Type::PtrToStruct { id: id.clone(), offset, descriptor: descriptor.clone() }
             }
-            (alu_type, Type::PtrToArray { id, offset: x }, Type::ScalarValue(data))
-                if alu_type.is_ptr_compatible() && data.is_known() =>
-            {
-                let offset = op(*x as u64, data.value);
-                Type::PtrToArray { id: id.clone(), offset: offset as i64 }
+            (AluType::Add, Type::PtrToArray { id, offset: x }, Type::ScalarValue(data)) => {
+                let offset = x.checked_add(*data).ok_or_else(|| format!("XXX"))?;
+                Type::PtrToArray { id: id.clone(), offset }
+            }
+            (AluType::Sub, Type::PtrToArray { id, offset: x }, Type::ScalarValue(data)) => {
+                let offset = x.checked_sub(*data).ok_or_else(|| format!("XXX"))?;
+                Type::PtrToArray { id: id.clone(), offset }
             }
             (
                 AluType::Sub,
@@ -1764,7 +1583,7 @@ impl ComputationContext {
                 AluType::Sub,
                 Type::PtrToArray { id: id1, offset: x1 },
                 Type::PtrToArray { id: id2, offset: x2 },
-            ) if id1 == id2 => Type::from(op(*x1 as u64, *x2 as u64)),
+            ) if id1 == id2 => Type::from(op(*x1, *x2)),
             (AluType::Sub, Type::PtrToStack { offset: x1 }, Type::PtrToStack { offset: x2 }) => {
                 Type::from(op(x1.reg(), x2.reg()))
             }
@@ -1778,11 +1597,6 @@ impl ComputationContext {
                 Type::PtrToEndArray { id: id1, .. },
                 Type::PtrToArray { id: id2, .. },
             ) if id1 == id2 => Type::UNKNOWN_SCALAR,
-            (_, Type::ScalarValue(data1), Type::ScalarValue(data2))
-                if data1.is_fully_initialized() && data2.is_fully_initialized() =>
-            {
-                Type::UNKNOWN_SCALAR
-            }
             _ => Type::default(),
         };
         Ok(result)
@@ -1795,7 +1609,7 @@ impl ComputationContext {
         dst: Register,
         src: Source,
         alu_type: AluType,
-        op: impl Fn(u64, u64) -> u64,
+        op: impl Fn(ScalarValueData, ScalarValueData) -> ScalarValueData,
     ) -> Result<(), String> {
         if let Some(op_name) = op_name {
             bpf_log!(
@@ -1872,7 +1686,7 @@ impl ComputationContext {
         offset: i16,
         src: Register,
         alu_type: AluType,
-        op: impl Fn(u64, u64) -> u64,
+        op: impl Fn(ScalarValueData, ScalarValueData) -> ScalarValueData,
     ) -> Result<(), String> {
         self.raw_atomic_operation(
             op_name,
@@ -1896,7 +1710,7 @@ impl ComputationContext {
         offset: i16,
         src: Register,
         jump_width: JumpWidth,
-        op: impl Fn(u64, u64) -> bool,
+        op: impl Fn(ScalarValueData, ScalarValueData) -> Result<Option<bool>, ()>,
     ) -> Result<(), String> {
         self.log_atomic_operation(op_name, verification_context, true, dst, offset, src);
         let width = match jump_width {
@@ -1947,12 +1761,12 @@ impl ComputationContext {
         };
         let value = self.reg(dst)?;
         let new_value = match value {
-            Type::ScalarValue(data) => Type::ScalarValue(ScalarValueData {
-                value: bit_op(data.value),
-                unknown_mask: bit_op(data.unknown_mask),
-                unwritten_mask: bit_op(data.unwritten_mask),
-                urange: Range::max(),
-            }),
+            Type::ScalarValue(data) => Type::ScalarValue(ScalarValueData::new(
+                bit_op(data.value),
+                bit_op(data.unknown_mask),
+                bit_op(data.unwritten_mask),
+                U64Range::max(),
+            )),
             _ => Type::default(),
         };
         let mut next = self.next()?;
@@ -1966,20 +1780,10 @@ impl ComputationContext {
         jump_width: JumpWidth,
         op1: &Type,
         op2: &Type,
-        op: impl Fn(u64, u64) -> bool,
+        op: impl Fn(ScalarValueData, ScalarValueData) -> Result<Option<bool>, ()>,
     ) -> Result<Option<bool>, String> {
         match (jump_width, op1, op2) {
-            (_, Type::ScalarValue(data1), Type::ScalarValue(data2))
-                if data1.is_known() && data2.is_known() =>
-            {
-                Ok(Some(op(data1.value, data2.value)))
-            }
-
-            (_, Type::ScalarValue(data1), Type::ScalarValue(data2))
-                if data1.is_fully_initialized() && data2.is_fully_initialized() =>
-            {
-                Ok(None)
-            }
+            (_, Type::ScalarValue(data1), Type::ScalarValue(data2)) => op(*data1, *data2),
             (JumpWidth::W64, Type::ScalarValue(data), Type::NullOr { .. })
             | (JumpWidth::W64, Type::NullOr { .. }, Type::ScalarValue(data))
                 if data.is_zero() =>
@@ -1987,8 +1791,16 @@ impl ComputationContext {
                 Ok(None)
             }
 
+            (JumpWidth::W64, Type::ScalarValue(data), t) if data.is_zero() && t.is_non_zero() => {
+                op(1.into(), 0.into())
+            }
+
+            (JumpWidth::W64, t, Type::ScalarValue(data)) if data.is_zero() && t.is_non_zero() => {
+                op(0.into(), 1.into())
+            }
+
             (JumpWidth::W64, Type::PtrToStack { offset: x }, Type::PtrToStack { offset: y }) => {
-                Ok(Some(op(x.reg(), y.reg())))
+                op(x.reg(), y.reg())
             }
 
             (
@@ -2005,7 +1817,7 @@ impl ComputationContext {
                 JumpWidth::W64,
                 Type::PtrToArray { id: id1, offset: x, .. },
                 Type::PtrToArray { id: id2, offset: y, .. },
-            ) if *id1 == *id2 => Ok(Some(op(*x as u64, *y as u64))),
+            ) if *id1 == *id2 => op(*x, *y),
 
             (JumpWidth::W64, Type::PtrToArray { id: id1, .. }, Type::PtrToEndArray { id: id2 })
             | (JumpWidth::W64, Type::PtrToEndArray { id: id1 }, Type::PtrToArray { id: id2, .. })
@@ -2014,8 +1826,9 @@ impl ComputationContext {
                 Ok(None)
             }
 
-            _ => Err(format!("non permitted comparison at pc {}", self.pc)),
+            _ => Err(()),
         }
+        .map_err(|_| format!("non permitted comparison at pc {}", self.pc))
     }
 
     fn conditional_jump(
@@ -2027,7 +1840,7 @@ impl ComputationContext {
         offset: i16,
         jump_type: JumpType,
         jump_width: JumpWidth,
-        op: impl Fn(u64, u64) -> bool,
+        op: impl Fn(ScalarValueData, ScalarValueData) -> Result<Option<bool>, ()>,
     ) -> Result<(), String> {
         bpf_log!(
             self,
@@ -2267,7 +2080,7 @@ impl DataDependencies {
         }
         let addr = context.reg(dst)?;
         if let Type::PtrToStack { offset: stack_offset } = addr {
-            let stack_offset = stack_offset.checked_add(offset).unwrap_or(StackOffset::INVALID);
+            let stack_offset = stack_offset.add(offset);
             if !stack_offset.is_valid() {
                 return Err(format!("Invalid stack offset at {}", context.pc));
             }
@@ -2897,7 +2710,7 @@ impl BpfVisitor for DataDependencies {
         if self.registers.contains(&dst) {
             let addr = context.reg(src)?;
             if let Type::PtrToStack { offset: stack_offset } = addr {
-                let stack_offset = stack_offset.checked_add(offset).unwrap_or(StackOffset::INVALID);
+                let stack_offset = stack_offset.add(offset);
                 if !stack_offset.is_valid() {
                     return Err(format!("Invalid stack offset at {}", context.pc));
                 }
@@ -2964,7 +2777,7 @@ impl BpfVisitor for DataDependencies {
         let context = &context.computation_context;
         let addr = context.reg(dst)?;
         if let Type::PtrToStack { offset: stack_offset } = addr {
-            let stack_offset = stack_offset.checked_add(offset).unwrap_or(StackOffset::INVALID);
+            let stack_offset = stack_offset.add(offset);
             if !stack_offset.is_valid() {
                 return Err(format!("Invalid stack offset at {}", context.pc));
             }
@@ -2992,9 +2805,6 @@ struct TerminatingContext {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum AluType {
     Plain,
-    Bitwise,
-    Shift,
-    Arsh,
     Sub,
     Add,
 }
@@ -3071,9 +2881,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("add32"), context, dst, src, AluType::Plain, |x, y| {
-            alu32(x, y, |x, y| x.overflowing_add(y).0)
-        })
+        self.alu(Some("add32"), context, dst, src, AluType::Plain, |x, y| alu32(x, y, |x, y| x + y))
     }
     fn add64<'a>(
         &mut self,
@@ -3081,7 +2889,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("add"), context, dst, src, AluType::Add, |x, y| x.overflowing_add(y).0)
+        self.alu(Some("add"), context, dst, src, AluType::Add, |x, y| x + y)
     }
     fn and<'a>(
         &mut self,
@@ -3089,9 +2897,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("and32"), context, dst, src, AluType::Bitwise, |x, y| {
-            alu32(x, y, |x, y| x & y)
-        })
+        self.alu(Some("and32"), context, dst, src, AluType::Plain, |x, y| alu32(x, y, |x, y| x & y))
     }
     fn and64<'a>(
         &mut self,
@@ -3099,7 +2905,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("and"), context, dst, src, AluType::Bitwise, |x, y| x & y)
+        self.alu(Some("and"), context, dst, src, AluType::Plain, |x, y| x & y)
     }
     fn arsh<'a>(
         &mut self,
@@ -3107,11 +2913,8 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("arsh32"), context, dst, src, AluType::Arsh, |x, y| {
-            alu32(x, y, |x, y| {
-                let x = x as i32;
-                x.overflowing_shr(y).0 as u32
-            })
+        self.alu(Some("arsh32"), context, dst, src, AluType::Plain, |x, y| {
+            alu32(x, y, |x, y| x.ashr(y))
         })
     }
     fn arsh64<'a>(
@@ -3120,10 +2923,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("arsh"), context, dst, src, AluType::Arsh, |x, y| {
-            let x = x as i64;
-            x.overflowing_shr(y as u32).0 as u64
-        })
+        self.alu(Some("arsh"), context, dst, src, AluType::Plain, |x, y| x.ashr(y))
     }
     fn div<'a>(
         &mut self,
@@ -3131,9 +2931,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("div32"), context, dst, src, AluType::Plain, |x, y| {
-            alu32(x, y, |x, y| if y == 0 { 0 } else { x / y })
-        })
+        self.alu(Some("div32"), context, dst, src, AluType::Plain, |x, y| alu32(x, y, |x, y| x / y))
     }
     fn div64<'a>(
         &mut self,
@@ -3141,14 +2939,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(
-            Some("div"),
-            context,
-            dst,
-            src,
-            AluType::Plain,
-            |x, y| if y == 0 { 0 } else { x / y },
-        )
+        self.alu(Some("div"), context, dst, src, AluType::Plain, |x, y| x / y)
     }
     fn lsh<'a>(
         &mut self,
@@ -3156,8 +2947,8 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("lsh32"), context, dst, src, AluType::Shift, |x, y| {
-            alu32(x, y, |x, y| x.overflowing_shl(y).0)
+        self.alu(Some("lsh32"), context, dst, src, AluType::Plain, |x, y| {
+            alu32(x, y, |x, y| x << y)
         })
     }
     fn lsh64<'a>(
@@ -3166,9 +2957,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("lsh"), context, dst, src, AluType::Shift, |x, y| {
-            x.overflowing_shl(y as u32).0
-        })
+        self.alu(Some("lsh"), context, dst, src, AluType::Plain, |x, y| x << y)
     }
     fn r#mod<'a>(
         &mut self,
@@ -3176,9 +2965,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("mod32"), context, dst, src, AluType::Plain, |x, y| {
-            alu32(x, y, |x, y| if y == 0 { x } else { x % y })
-        })
+        self.alu(Some("mod32"), context, dst, src, AluType::Plain, |x, y| alu32(x, y, |x, y| x % y))
     }
     fn mod64<'a>(
         &mut self,
@@ -3186,14 +2973,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(
-            Some("mod"),
-            context,
-            dst,
-            src,
-            AluType::Plain,
-            |x, y| if y == 0 { x } else { x % y },
-        )
+        self.alu(Some("mod"), context, dst, src, AluType::Plain, |x, y| x % y)
     }
     fn mov<'a>(
         &mut self,
@@ -3209,7 +2989,7 @@ impl BpfVisitor for ComputationContext {
                 let unknown_mask = (data.unknown_mask as u32) as u64;
                 let unwritten_mask = (data.unwritten_mask as u32) as u64;
                 let urange = U64Range::compute_range_for_bytes_swap(0.into(), data.urange, 0, 0, 4);
-                Type::ScalarValue(ScalarValueData { value, unknown_mask, unwritten_mask, urange })
+                Type::ScalarValue(ScalarValueData::new(value, unknown_mask, unwritten_mask, urange))
             }
             _ => Type::default(),
         };
@@ -3237,9 +3017,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("mul32"), context, dst, src, AluType::Plain, |x, y| {
-            alu32(x, y, |x, y| x.overflowing_mul(y).0)
-        })
+        self.alu(Some("mul32"), context, dst, src, AluType::Plain, |x, y| alu32(x, y, |x, y| x * y))
     }
     fn mul64<'a>(
         &mut self,
@@ -3247,7 +3025,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("mul"), context, dst, src, AluType::Plain, |x, y| x.overflowing_mul(y).0)
+        self.alu(Some("mul"), context, dst, src, AluType::Plain, |x, y| x * y)
     }
     fn or<'a>(
         &mut self,
@@ -3255,9 +3033,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("or32"), context, dst, src, AluType::Bitwise, |x, y| {
-            alu32(x, y, |x, y| x | y)
-        })
+        self.alu(Some("or32"), context, dst, src, AluType::Plain, |x, y| alu32(x, y, |x, y| x | y))
     }
     fn or64<'a>(
         &mut self,
@@ -3265,7 +3041,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("or"), context, dst, src, AluType::Bitwise, |x, y| x | y)
+        self.alu(Some("or"), context, dst, src, AluType::Plain, |x, y| x | y)
     }
     fn rsh<'a>(
         &mut self,
@@ -3273,8 +3049,8 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("rsh32"), context, dst, src, AluType::Shift, |x, y| {
-            alu32(x, y, |x, y| x.overflowing_shr(y).0)
+        self.alu(Some("rsh32"), context, dst, src, AluType::Plain, |x, y| {
+            alu32(x, y, |x, y| x >> y)
         })
     }
     fn rsh64<'a>(
@@ -3283,9 +3059,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("rsh"), context, dst, src, AluType::Shift, |x, y| {
-            x.overflowing_shr(y as u32).0
-        })
+        self.alu(Some("rsh"), context, dst, src, AluType::Plain, |x, y| x >> y)
     }
     fn sub<'a>(
         &mut self,
@@ -3293,9 +3067,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("sub32"), context, dst, src, AluType::Plain, |x, y| {
-            alu32(x, y, |x, y| x.overflowing_sub(y).0)
-        })
+        self.alu(Some("sub32"), context, dst, src, AluType::Plain, |x, y| alu32(x, y, |x, y| x - y))
     }
     fn sub64<'a>(
         &mut self,
@@ -3303,7 +3075,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("sub"), context, dst, src, AluType::Sub, |x, y| x.overflowing_sub(y).0)
+        self.alu(Some("sub"), context, dst, src, AluType::Sub, |x, y| x - y)
     }
     fn xor<'a>(
         &mut self,
@@ -3311,9 +3083,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("xor32"), context, dst, src, AluType::Bitwise, |x, y| {
-            alu32(x, y, |x, y| x ^ y)
-        })
+        self.alu(Some("xor32"), context, dst, src, AluType::Plain, |x, y| alu32(x, y, |x, y| x ^ y))
     }
     fn xor64<'a>(
         &mut self,
@@ -3321,26 +3091,18 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("xor"), context, dst, src, AluType::Bitwise, |x, y| x ^ y)
+        self.alu(Some("xor"), context, dst, src, AluType::Plain, |x, y| x ^ y)
     }
 
     fn neg<'a>(&mut self, context: &mut Self::Context<'a>, dst: Register) -> Result<(), String> {
         bpf_log!(self, context, "neg32 {}", display_register(dst));
         self.alu(None, context, dst, Source::Value(0), AluType::Plain, |x, y| {
-            alu32(x, y, |x, _y| {
-                let x = x as i32;
-                let x = -x;
-                x as u32
-            })
+            alu32(x, y, |x, _y| -x)
         })
     }
     fn neg64<'a>(&mut self, context: &mut Self::Context<'a>, dst: Register) -> Result<(), String> {
         bpf_log!(self, context, "neg {}", display_register(dst));
-        self.alu(None, context, dst, Source::Value(0), AluType::Plain, |x, _y| {
-            let x = x as i64;
-            let x = -x;
-            x as u64
-        })
+        self.alu(None, context, dst, Source::Value(0), AluType::Plain, |x, _y| -x)
     }
 
     fn be<'a>(
@@ -3429,7 +3191,18 @@ impl BpfVisitor for ComputationContext {
             offset,
             JumpType::Eq,
             JumpWidth::W32,
-            |x, y| comp32(x, y, |x, y| x == y),
+            |x, y| {
+                comp32(x, y, |x, y| {
+                    // x == y
+                    if x.min == x.max && x.min == y.min && x.min == y.max {
+                        return Some(true);
+                    }
+                    if x.max < y.min || y.max < x.min {
+                        return Some(false);
+                    }
+                    None
+                })
+            },
         )
     }
     fn jeq64<'a>(
@@ -3447,7 +3220,18 @@ impl BpfVisitor for ComputationContext {
             offset,
             JumpType::Eq,
             JumpWidth::W64,
-            |x, y| x == y,
+            |x, y| {
+                comp64(x, y, |x, y| {
+                    // x == y
+                    if x.min == x.max && x.min == y.min && x.min == y.max {
+                        return Some(true);
+                    }
+                    if x.max < y.min || y.max < x.min {
+                        return Some(false);
+                    }
+                    None
+                })
+            },
         )
     }
     fn jne<'a>(
@@ -3465,7 +3249,18 @@ impl BpfVisitor for ComputationContext {
             offset,
             JumpType::Ne,
             JumpWidth::W32,
-            |x, y| comp32(x, y, |x, y| x != y),
+            |x, y| {
+                comp32(x, y, |x, y| {
+                    // x != y
+                    if x.min == x.max && x.min == y.min && x.min == y.max {
+                        return Some(false);
+                    }
+                    if x.max < y.min || y.max < x.min {
+                        return Some(true);
+                    }
+                    None
+                })
+            },
         )
     }
     fn jne64<'a>(
@@ -3483,7 +3278,18 @@ impl BpfVisitor for ComputationContext {
             offset,
             JumpType::Ne,
             JumpWidth::W64,
-            |x, y| x != y,
+            |x, y| {
+                comp64(x, y, |x, y| {
+                    // x != y
+                    if x.min == x.max && x.min == y.min && x.min == y.max {
+                        return Some(false);
+                    }
+                    if x.max < y.min || y.max < x.min {
+                        return Some(true);
+                    }
+                    None
+                })
+            },
         )
     }
     fn jge<'a>(
@@ -3501,7 +3307,18 @@ impl BpfVisitor for ComputationContext {
             offset,
             JumpType::Ge,
             JumpWidth::W32,
-            |x, y| comp32(x, y, |x, y| x >= y),
+            |x, y| {
+                comp32(x, y, |x, y| {
+                    // x >= y
+                    if x.min >= y.max {
+                        return Some(true);
+                    }
+                    if y.min > x.max {
+                        return Some(false);
+                    }
+                    None
+                })
+            },
         )
     }
     fn jge64<'a>(
@@ -3519,7 +3336,18 @@ impl BpfVisitor for ComputationContext {
             offset,
             JumpType::Ge,
             JumpWidth::W64,
-            |x, y| x >= y,
+            |x, y| {
+                comp64(x, y, |x, y| {
+                    // x >= y
+                    if x.min >= y.max {
+                        return Some(true);
+                    }
+                    if y.min > x.max {
+                        return Some(false);
+                    }
+                    None
+                })
+            },
         )
     }
     fn jgt<'a>(
@@ -3537,7 +3365,18 @@ impl BpfVisitor for ComputationContext {
             offset,
             JumpType::Gt,
             JumpWidth::W32,
-            |x, y| comp32(x, y, |x, y| x > y),
+            |x, y| {
+                comp32(x, y, |x, y| {
+                    // x > y
+                    if x.min > y.max {
+                        return Some(true);
+                    }
+                    if y.min >= x.max {
+                        return Some(false);
+                    }
+                    None
+                })
+            },
         )
     }
     fn jgt64<'a>(
@@ -3555,7 +3394,18 @@ impl BpfVisitor for ComputationContext {
             offset,
             JumpType::Gt,
             JumpWidth::W64,
-            |x, y| x > y,
+            |x, y| {
+                comp64(x, y, |x, y| {
+                    // x > y
+                    if x.min > y.max {
+                        return Some(true);
+                    }
+                    if y.min >= x.max {
+                        return Some(false);
+                    }
+                    None
+                })
+            },
         )
     }
     fn jle<'a>(
@@ -3573,7 +3423,18 @@ impl BpfVisitor for ComputationContext {
             offset,
             JumpType::Le,
             JumpWidth::W32,
-            |x, y| comp32(x, y, |x, y| x <= y),
+            |x, y| {
+                comp32(x, y, |x, y| {
+                    // x <= y
+                    if x.max <= y.min {
+                        return Some(true);
+                    }
+                    if y.max < x.min {
+                        return Some(false);
+                    }
+                    None
+                })
+            },
         )
     }
     fn jle64<'a>(
@@ -3591,7 +3452,18 @@ impl BpfVisitor for ComputationContext {
             offset,
             JumpType::Le,
             JumpWidth::W64,
-            |x, y| x <= y,
+            |x, y| {
+                comp64(x, y, |x, y| {
+                    // x <= y
+                    if x.max <= y.min {
+                        return Some(true);
+                    }
+                    if y.max < x.min {
+                        return Some(false);
+                    }
+                    None
+                })
+            },
         )
     }
     fn jlt<'a>(
@@ -3609,7 +3481,18 @@ impl BpfVisitor for ComputationContext {
             offset,
             JumpType::Lt,
             JumpWidth::W32,
-            |x, y| comp32(x, y, |x, y| x < y),
+            |x, y| {
+                comp32(x, y, |x, y| {
+                    // x < y
+                    if x.max < y.min {
+                        return Some(true);
+                    }
+                    if y.max <= x.min {
+                        return Some(false);
+                    }
+                    None
+                })
+            },
         )
     }
     fn jlt64<'a>(
@@ -3627,7 +3510,18 @@ impl BpfVisitor for ComputationContext {
             offset,
             JumpType::Lt,
             JumpWidth::W64,
-            |x, y| x < y,
+            |x, y| {
+                comp64(x, y, |x, y| {
+                    // x < y
+                    if x.max < y.min {
+                        return Some(true);
+                    }
+                    if y.max <= x.min {
+                        return Some(false);
+                    }
+                    None
+                })
+            },
         )
     }
     fn jsge<'a>(
@@ -3789,7 +3683,15 @@ impl BpfVisitor for ComputationContext {
             offset,
             JumpType::Unknown,
             JumpWidth::W32,
-            |x, y| comp32(x, y, |x, y| x & y != 0),
+            |x, y| {
+                comp32(x, y, |x, y| {
+                    // x & y != 0
+                    if x.min != x.max || y.min != y.max {
+                        return None;
+                    }
+                    Some(x.min & y.min != 0)
+                })
+            },
         )
     }
     fn jset64<'a>(
@@ -3807,7 +3709,15 @@ impl BpfVisitor for ComputationContext {
             offset,
             JumpType::Unknown,
             JumpWidth::W64,
-            |x, y| x & y != 0,
+            |x, y| {
+                comp64(x, y, |x, y| {
+                    // x & y != 0
+                    if x.min != x.max || y.min != y.max {
+                        return None;
+                    }
+                    Some(x.min & y.min != 0)
+                })
+            },
         )
     }
 
@@ -3869,7 +3779,7 @@ impl BpfVisitor for ComputationContext {
             dst,
             offset,
             src,
-            AluType::Bitwise,
+            AluType::Plain,
             |x, y| alu32(x, y, |x, y| x & y),
         )
     }
@@ -3890,7 +3800,7 @@ impl BpfVisitor for ComputationContext {
             dst,
             offset,
             src,
-            AluType::Bitwise,
+            AluType::Plain,
             |x, y| x & y,
         )
     }
@@ -3911,7 +3821,7 @@ impl BpfVisitor for ComputationContext {
             dst,
             offset,
             src,
-            AluType::Bitwise,
+            AluType::Plain,
             |x, y| alu32(x, y, |x, y| x | y),
         )
     }
@@ -3932,7 +3842,7 @@ impl BpfVisitor for ComputationContext {
             dst,
             offset,
             src,
-            AluType::Bitwise,
+            AluType::Plain,
             |x, y| x | y,
         )
     }
@@ -3953,7 +3863,7 @@ impl BpfVisitor for ComputationContext {
             dst,
             offset,
             src,
-            AluType::Bitwise,
+            AluType::Plain,
             |x, y| alu32(x, y, |x, y| x ^ y),
         )
     }
@@ -3974,7 +3884,7 @@ impl BpfVisitor for ComputationContext {
             dst,
             offset,
             src,
-            AluType::Bitwise,
+            AluType::Plain,
             |x, y| x ^ y,
         )
     }
@@ -4028,7 +3938,16 @@ impl BpfVisitor for ComputationContext {
         src: Register,
     ) -> Result<(), String> {
         self.raw_atomic_cmpxchg("cmpxchg32", context, dst, offset, src, JumpWidth::W32, |x, y| {
-            comp32(x, y, |x, y| x == y)
+            comp32(x, y, |x, y| {
+                // x == y
+                if x.min == x.max && x.min == y.min && x.min == y.max {
+                    return Some(true);
+                }
+                if x.max < y.min || y.max < x.min {
+                    return Some(false);
+                }
+                None
+            })
         })
     }
 
@@ -4039,7 +3958,18 @@ impl BpfVisitor for ComputationContext {
         offset: i16,
         src: Register,
     ) -> Result<(), String> {
-        self.raw_atomic_cmpxchg("cmpxchg", context, dst, offset, src, JumpWidth::W64, |x, y| x == y)
+        self.raw_atomic_cmpxchg("cmpxchg", context, dst, offset, src, JumpWidth::W64, |x, y| {
+            comp64(x, y, |x, y| {
+                // x == y
+                if x.min == x.max && x.min == y.min && x.min == y.max {
+                    return Some(true);
+                }
+                if x.max < y.min || y.max < x.min {
+                    return Some(false);
+                }
+                None
+            })
+        })
     }
 
     fn load<'a>(
@@ -4203,20 +4133,66 @@ impl BpfVisitor for ComputationContext {
     }
 }
 
-fn alu32(x: u64, y: u64, op: impl FnOnce(u32, u32) -> u32) -> u64 {
-    op(x as u32, y as u32) as u64
+fn alu32(
+    x: ScalarValueData,
+    y: ScalarValueData,
+    op: impl FnOnce(U32ScalarValueData, U32ScalarValueData) -> U32ScalarValueData,
+) -> ScalarValueData {
+    op(U32ScalarValueData::from(x), U32ScalarValueData::from(y)).into()
 }
 
-fn comp32(x: u64, y: u64, op: impl FnOnce(u32, u32) -> bool) -> bool {
-    op(x as u32, y as u32)
+fn comp64(
+    x: ScalarValueData,
+    y: ScalarValueData,
+    op: impl FnOnce(U64Range, U64Range) -> Option<bool>,
+) -> Result<Option<bool>, ()> {
+    if !x.is_fully_initialized() || !y.is_fully_initialized() {
+        return Err(());
+    }
+    Ok(op(x.urange, y.urange))
 }
 
-fn scomp64(x: u64, y: u64, op: impl FnOnce(i64, i64) -> bool) -> bool {
-    op(x as i64, y as i64)
+fn comp32(
+    x: ScalarValueData,
+    y: ScalarValueData,
+    op: impl FnOnce(U32Range, U32Range) -> Option<bool>,
+) -> Result<Option<bool>, ()> {
+    let x = U32ScalarValueData::from(x);
+    let y = U32ScalarValueData::from(y);
+    if !x.is_fully_initialized() || !y.is_fully_initialized() {
+        return Err(());
+    }
+    Ok(op(x.urange, y.urange))
 }
 
-fn scomp32(x: u64, y: u64, op: impl FnOnce(i32, i32) -> bool) -> bool {
-    op(x as i32, y as i32)
+fn scomp64(
+    x: ScalarValueData,
+    y: ScalarValueData,
+    op: impl FnOnce(i64, i64) -> bool,
+) -> Result<Option<bool>, ()> {
+    if !x.is_fully_initialized() || !y.is_fully_initialized() {
+        return Err(());
+    }
+    if !x.is_known() || !y.is_known() {
+        return Ok(None);
+    }
+    Ok(Some(op(x.value as i64, y.value as i64)))
+}
+
+fn scomp32(
+    x: ScalarValueData,
+    y: ScalarValueData,
+    op: impl FnOnce(i32, i32) -> bool,
+) -> Result<Option<bool>, ()> {
+    let x = U32ScalarValueData::from(x);
+    let y = U32ScalarValueData::from(y);
+    if !x.is_fully_initialized() || !y.is_fully_initialized() {
+        return Err(());
+    }
+    if !x.is_known() || !y.is_known() {
+        return Ok(None);
+    }
+    Ok(Some(op(x.value as i32, y.value as i32)))
 }
 
 fn print_offset<T: Into<i32>>(offset: T) -> String {
@@ -4232,7 +4208,7 @@ fn print_offset<T: Into<i32>>(offset: T) -> String {
 
 fn run_on_stack_offset<F>(v: StackOffset, f: F) -> StackOffset
 where
-    F: FnOnce(u64) -> u64,
+    F: FnOnce(ScalarValueData) -> ScalarValueData,
 {
     StackOffset(f(v.reg()))
 }
@@ -4351,21 +4327,21 @@ mod tests {
 
         // Store data in the range [8, 26) and verify that `read_data_ptr()` fails for any
         // reads outside of that range.
-        assert!(s.store(1, StackOffset(8), Type::UNKNOWN_SCALAR, DataWidth::U64).is_ok());
-        assert!(s.store(1, StackOffset(16), Type::UNKNOWN_SCALAR, DataWidth::U64).is_ok());
-        assert!(s.store(1, StackOffset(24), Type::UNKNOWN_SCALAR, DataWidth::U16).is_ok());
+        assert!(s.store(1, StackOffset(8.into()), Type::UNKNOWN_SCALAR, DataWidth::U64).is_ok());
+        assert!(s.store(1, StackOffset(16.into()), Type::UNKNOWN_SCALAR, DataWidth::U64).is_ok());
+        assert!(s.store(1, StackOffset(24.into()), Type::UNKNOWN_SCALAR, DataWidth::U16).is_ok());
 
         for offset in 0..32 {
             for end in (offset + 1)..32 {
                 assert_eq!(
-                    s.read_data_ptr(2, StackOffset(offset), (end - offset) as u64).is_ok(),
+                    s.read_data_ptr(2, StackOffset(offset.into()), (end - offset) as u64).is_ok(),
                     offset >= 8 && end <= 26
                 );
             }
         }
 
         // Verify that overflows are handled properly.
-        assert!(s.read_data_ptr(2, StackOffset(12), u64::MAX - 2).is_err());
+        assert!(s.read_data_ptr(2, StackOffset(12.into()), u64::MAX - 2).is_err());
     }
 
     #[test]
@@ -4391,8 +4367,8 @@ mod tests {
                         for max_old in values.iter().filter(|v| *v >= old) {
                             for max_new in values.iter().filter(|v| *v >= new) {
                                 let range = U64Range::compute_range_for_bytes_swap(
-                                    Range::new(*min_old, *max_old),
-                                    Range::new(*min_new, *max_new),
+                                    U64Range::new(*min_old, *max_old),
+                                    U64Range::new(*min_new, *max_new),
                                     1,
                                     0,
                                     1,

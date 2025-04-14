@@ -5,10 +5,13 @@
 import("../libc.gni")
 
 source_set("pthread") {
-  deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
   sources = [
     "pthread_getname_np.c",
     "pthread_setname_np.c",
+  ]
+  deps = [
+    "//zircon/system/ulib/runtime",
+    "//zircon/third_party/ulib/musl:musl_internal",
   ]
 }
 

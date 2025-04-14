@@ -73,6 +73,6 @@ rust_library(
         "//third_party/rust_crates/vendor/proc-macro-error-1.0.4:proc_macro_error",
         "//third_party/rust_crates/vendor/proc-macro2-1.0.94:proc_macro2",
         "//third_party/rust_crates/vendor/quote-1.0.38:quote",
-        "//third_party/rust_crates/vendor/syn-2.0.87:syn",
+        "//third_party/rust_crates/vendor/syn-2.0.100:syn",
     ],
 )

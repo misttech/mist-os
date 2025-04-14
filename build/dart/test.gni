@@ -185,6 +185,7 @@ template("dart_test") {
     forward_variables_from(invoker,
                            [
                              "environments",
+                             "package_deps",
                              "timeout_secs",
                            ])
 

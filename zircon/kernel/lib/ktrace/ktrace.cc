@@ -22,6 +22,7 @@
 #include <fbl/alloc_checker.h>
 #include <hypervisor/ktrace.h>
 #include <kernel/koid.h>
+#include <kernel/mp.h>
 #include <ktl/atomic.h>
 #include <ktl/iterator.h>
 #include <lk/init.h>
@@ -92,7 +93,7 @@ KTraceState::~KTraceState() {
   }
 }
 
-void KTraceState::Init(uint32_t target_bufsize, uint32_t initial_groups) {
+void KTraceState::Init(uint32_t target_bufsize, bool start_tracing) {
   Guard<Mutex> guard(&lock_);
   ASSERT_MSG(target_bufsize_ == 0,
              "Double init of KTraceState instance (tgt_bs %u, new tgt_bs %u)!", target_bufsize_,
@@ -102,7 +103,7 @@ void KTraceState::Init(uint32_t target_bufsize, uint32_t initial_groups) {
   // Allocations are rounded up to the nearest page size.
   target_bufsize_ = fbl::round_up(target_bufsize, static_cast<uint32_t>(PAGE_SIZE));
 
-  if (initial_groups == 0) {
+  if (!start_tracing) {
     // Writes should be disabled and there should be no in-flight writes.
     [[maybe_unused]] uint64_t observed;
     DEBUG_ASSERT_MSG((observed = write_state_.load(ktl::memory_order_acquire)) == 0, "0x%lx",
@@ -118,17 +119,11 @@ void KTraceState::Init(uint32_t target_bufsize, uint32_t initial_groups) {
   // Now that writes have been enabled, we can report the names.
   ReportStaticNames();
   ReportThreadProcessNames();
-  // Finally, set the group mask to allow non-name writes to proceed.
-  SetGroupMask(initial_groups);
   is_started_ = true;
 }
 
-zx_status_t KTraceState::Start(uint32_t groups, StartMode mode) {
+zx_status_t KTraceState::Start(StartMode mode) {
   Guard<Mutex> guard(&lock_);
-
-  if (groups == 0) {
-    return ZX_ERR_INVALID_ARGS;
-  }
 
   if (zx_status_t status = AllocBuffer(); status != ZX_OK) {
     return status;
@@ -171,15 +166,6 @@ zx_status_t KTraceState::Start(uint32_t groups, StartMode mode) {
   // It's possible that a |ReserveRaw| failure may have disabled writes so make
   // sure they are enabled.
   EnableWrites();
-  SetGroupMask(groups);
-
-  DiagsPrintf(INFO, "Enabled category mask: 0x%03x\n", groups);
-  DiagsPrintf(INFO, "Trace category states:\n");
-  for (const fxt::InternedCategory& category : fxt::InternedCategory::Iterate()) {
-    DiagsPrintf(INFO, "  %-20s : 0x%03x : %s\n", category.string(), (1u << category.index()),
-                KTrace::CategoryEnabled(category) ? "enabled" : "disabled");
-  }
-
   return ZX_OK;
 }
 
@@ -190,7 +176,7 @@ zx_status_t KTraceState::Stop() {
   // new writers from starting write operations.  The non-write lock prevents
   // another thread from starting another trace session until we have finished
   // the stop operation.
-  ClearMaskDisableWrites();
+  DisableWrites();
 
   // Now wait until any lingering write operations have finished.  This
   // should never take any significant amount of time.  If it does, we are
@@ -585,32 +571,102 @@ uint64_t* KTraceState::ReserveRaw(uint32_t num_words) {
 
 }  // namespace internal
 
-// The global ktrace state.
-KTrace KTrace::instance_;
+//
+// Implement the single buffer specializations for KTraceImpl.
+//
 
-zx_status_t KTrace::Control(uint32_t action, uint32_t options) {
-  using StartMode = ::internal::KTraceState::StartMode;
-  switch (action) {
-    case KTRACE_ACTION_START:
-    case KTRACE_ACTION_START_CIRCULAR: {
-      const StartMode start_mode =
-          (action == KTRACE_ACTION_START) ? StartMode::Saturate : StartMode::Circular;
-      return internal_state_.Start(options ? options : KTRACE_GRP_ALL, start_mode);
-    }
+template <>
+void KTraceImpl<BufferMode::kSingle>::Init(uint32_t bufsize, uint32_t initial_grpmask) {
+  cpu_context_map_.Init();
+  internal_state_.Init(bufsize, initial_grpmask);
+  set_categories_bitmask(initial_grpmask);
+}
 
-    case KTRACE_ACTION_STOP:
-      return internal_state_.Stop();
-
-    case KTRACE_ACTION_REWIND:
-      return internal_state_.Rewind();
-
-    default:
-      return ZX_ERR_INVALID_ARGS;
+template <>
+zx_status_t KTraceImpl<BufferMode::kSingle>::Start(uint32_t action, uint32_t categories) {
+  if (categories == 0) {
+    return ZX_ERR_INVALID_ARGS;
   }
+
+  using StartMode = ::internal::KTraceState::StartMode;
+  const StartMode start_mode =
+      (action == KTRACE_ACTION_START) ? StartMode::Saturate : StartMode::Circular;
+
+  const zx_status_t status = internal_state_.Start(start_mode);
+  if (status != ZX_OK) {
+    return status;
+  }
+  // We need to set the categories bitmask after calling internal_state_.Start because that
+  // method emits a bunch of static metadata that should not be interspersed with arbitrary
+  // trace records.
+  set_categories_bitmask(categories);
+
+  DiagsPrintf(INFO, "Enabled category mask: 0x%03x\n", categories);
+  DiagsPrintf(INFO, "Trace category states:\n");
+  for (const fxt::InternedCategory& category : fxt::InternedCategory::Iterate()) {
+    DiagsPrintf(INFO, "  %-20s : 0x%03x : %s\n", category.string(), (1u << category.index()),
+                KTrace::CategoryEnabled(category) ? "enabled" : "disabled");
+  }
+
   return ZX_OK;
 }
 
-void KTrace::InitHook(unsigned) {
+template <>
+zx_status_t KTraceImpl<BufferMode::kSingle>::Stop() {
+  set_categories_bitmask(0u);
+  return internal_state_.Stop();
+}
+
+template <>
+zx_status_t KTraceImpl<BufferMode::kSingle>::Rewind() {
+  return internal_state_.Rewind();
+}
+
+template <>
+zx::result<internal::KTraceState::PendingCommit> KTraceImpl<BufferMode::kSingle>::Reserve(
+    uint64_t header) {
+  return internal_state_.Reserve(header);
+}
+
+template <>
+zx::result<size_t> KTraceImpl<BufferMode::kSingle>::ReadUser(user_out_ptr<void> ptr, uint32_t off,
+                                                             size_t len) {
+  const ssize_t ret = internal_state_.ReadUser(ptr, off, len);
+  if (ret < 0) {
+    return zx::error(static_cast<zx_status_t>(ret));
+  }
+  return zx::ok(ret);
+}
+
+//
+// TODO(https://fxbug.dev/404539312): Implement the per-CPU buffer specializations for KTraceImpl.
+//
+
+template <>
+void KTraceImpl<BufferMode::kPerCpu>::DisableWrites() {
+  // Start off by disabling writes.
+  // It may be possible to do this with relaxed semantics, but we do it with release semantics
+  // out of an abundance of caution.
+  writes_enabled_.store(false, ktl::memory_order_release);
+
+  // Wait for any in-progress writes to complete.
+  // We accomplish this by:
+  // 1. Disabling interrupts on this core, thus preventing this thread from being migrated across
+  //    CPUs. We could alternatively just disable preemption, but mp_sync_exec requires interrupts
+  //    to be disabled when using MP_IPI_TARGET_ALL_BUT_LOCAL.
+  // 2. Sending an IPI that runs a no-op to all other cores. Since writes run with interrupts
+  //    disabled, the mere fact that a core is able to process an IPI means that it is not
+  //    currently performing a trace record write. Additionally, mp_sync_exec issues a memory
+  //    barrier that ensures that every other core will see that writes are disabled after
+  //    processing the IPI.
+  InterruptDisableGuard irq_guard;
+  auto wait_for_write_completion = [](void*) {};
+  mp_sync_exec(MP_IPI_TARGET_ALL_BUT_LOCAL, 0, wait_for_write_completion, nullptr);
+}
+
+// The InitHook is the same for both the single and per-CPU buffer implementation of KTrace.
+template <BufferMode Mode>
+void KTraceImpl<Mode>::InitHook(unsigned) {
   const uint32_t bufsize = gBootOptions->ktrace_bufsize << 20;
   const uint32_t initial_grpmask = gBootOptions->ktrace_grpmask;
 

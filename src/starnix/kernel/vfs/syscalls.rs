@@ -1686,6 +1686,7 @@ pub fn sys_memfd_create(
         & !(MFD_CLOEXEC | MFD_ALLOW_SEALING | MFD_HUGETLB | HUGE_SHIFTED_MASK | MFD_NOEXEC_SEAL)
         != 0
     {
+        track_stub!(TODO("https://fxbug.dev/322875665"), "memfd_create unknown flags", flags);
         return error!(EINVAL);
     }
 
@@ -1699,7 +1700,7 @@ pub fn sys_memfd_create(
     };
 
     if flags & !MFD_NOEXEC_SEAL != 0 {
-        track_stub!(TODO("https://fxbug.dev/322875665"), "memfd_create unknown flags", flags);
+        track_stub!(TODO("https://fxbug.dev/408561758"), "MFD_NOEXEC_SEAL");
     }
 
     let name = current_task.read_c_string_to_vec(user_name, MEMFD_NAME_MAX_LEN).map_err(|e| {
@@ -1968,7 +1969,7 @@ pub fn sys_pidfd_open(
 
     let blocking = (flags & PIDFD_NONBLOCK) == 0;
     let open_flags = if blocking { OpenFlags::empty() } else { OpenFlags::NONBLOCK };
-    let file = new_pidfd(current_task, &task.thread_group, open_flags);
+    let file = new_pidfd(current_task, task.thread_group(), open_flags);
     current_task.add_file(file, FdFlags::CLOEXEC)
 }
 
@@ -2243,7 +2244,11 @@ pub fn sys_pselect6(
     )?;
 
     if !timeout_addr.is_null()
-        && !current_task.thread_group.read().personality.contains(PersonalityFlags::STICKY_TIMEOUTS)
+        && !current_task
+            .thread_group()
+            .read()
+            .personality
+            .contains(PersonalityFlags::STICKY_TIMEOUTS)
     {
         let now = zx::MonotonicInstant::get();
         let remaining = std::cmp::max(deadline - now, zx::MonotonicDuration::from_seconds(0));
@@ -2283,7 +2288,11 @@ pub fn sys_select(
     )?;
 
     if !timeout_addr.is_null()
-        && !current_task.thread_group.read().personality.contains(PersonalityFlags::STICKY_TIMEOUTS)
+        && !current_task
+            .thread_group()
+            .read()
+            .personality
+            .contains(PersonalityFlags::STICKY_TIMEOUTS)
     {
         let now = zx::MonotonicInstant::get();
         let remaining = std::cmp::max(deadline - now, zx::MonotonicDuration::from_seconds(0));
@@ -2519,7 +2528,7 @@ pub fn poll(
     mask: Option<SigSet>,
     deadline: zx::MonotonicInstant,
 ) -> Result<usize, Errno> {
-    if num_fds < 0 || num_fds as u64 > current_task.thread_group.get_rlimit(Resource::NOFILE) {
+    if num_fds < 0 || num_fds as u64 > current_task.thread_group().get_rlimit(Resource::NOFILE) {
         return error!(EINVAL);
     }
 
@@ -2722,12 +2731,20 @@ pub fn sys_fadvise64(
     advice: u32,
 ) -> Result<(), Errno> {
     match advice {
-        POSIX_FADV_NORMAL
-        | POSIX_FADV_RANDOM
-        | POSIX_FADV_SEQUENTIAL
-        | POSIX_FADV_WILLNEED
-        | POSIX_FADV_DONTNEED
-        | POSIX_FADV_NOREUSE => (),
+        POSIX_FADV_NORMAL => track_stub!(TODO("https://fxbug.dev/297434181"), "POSIX_FADV_NORMAL"),
+        POSIX_FADV_RANDOM => track_stub!(TODO("https://fxbug.dev/297434181"), "POSIX_FADV_RANDOM"),
+        POSIX_FADV_SEQUENTIAL => {
+            track_stub!(TODO("https://fxbug.dev/297434181"), "POSIX_FADV_SEQUENTIAL")
+        }
+        POSIX_FADV_WILLNEED => {
+            track_stub!(TODO("https://fxbug.dev/297434181"), "POSIX_FADV_WILLNEED")
+        }
+        POSIX_FADV_DONTNEED => {
+            track_stub!(TODO("https://fxbug.dev/297434181"), "POSIX_FADV_DONTNEED")
+        }
+        POSIX_FADV_NOREUSE => {
+            track_stub!(TODO("https://fxbug.dev/297434181"), "POSIX_FADV_NOREUSE")
+        }
         _ => {
             track_stub!(TODO("https://fxbug.dev/322875684"), "fadvise64 unknown advice", advice);
             return error!(EINVAL);
@@ -2748,8 +2765,6 @@ pub fn sys_fadvise64(
     if file.flags().contains(OpenFlags::PATH) {
         return error!(EBADF);
     }
-
-    track_stub!(TODO("https://fxbug.dev/297434181"), "fadvise64");
 
     Ok(())
 }

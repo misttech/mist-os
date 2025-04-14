@@ -3243,13 +3243,12 @@ impl StatsLogger {
     }
 
     /// Log metrics that will be used to analyze when roaming would happen before roams are
-    /// enabled. This doesn't effect general disconnect metrics, including ones that include roam
-    /// event codes.
+    /// enabled.
     async fn log_would_roam_connect(&mut self) {
         self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
             self.cobalt_1dot1_proxy,
             log_occurrence,
-            metrics::POLICY_ROAM_DISCONNECT_COUNT_METRIC_ID,
+            metrics::POLICY_ROAM_ATTEMPT_COUNT_METRIC_ID,
             1,
             &[],
         ));

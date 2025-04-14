@@ -5,7 +5,7 @@
 use anyhow::Result;
 use cm_rust::{ConfigNestedValueType, ConfigValueType};
 use std::str::FromStr;
-use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
+use {flex_fuchsia_component_decl as fdecl, flex_fuchsia_sys2 as fsys};
 
 use crate::cli::show::config_table_print;
 use crate::config::{resolve_config_decls, UseConfigurationOrConfigField};

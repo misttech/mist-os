@@ -296,7 +296,15 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| {
             let x = x as i64;
-            x.overflowing_shr(y as u32).0 as u64
+            if y > u32::MAX.into() {
+                if x >= 0 {
+                    0
+                } else {
+                    u64::MAX
+                }
+            } else {
+                x.overflowing_shr(y as u32).0 as u64
+            }
         })
     }
     fn div<'a>(

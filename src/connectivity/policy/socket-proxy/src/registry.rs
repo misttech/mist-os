@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Implements fuchsia.netpol.socketproxy.NetworkRegistry.
+//! Implements fuchsia.net.policy.socketproxy.NetworkRegistry.
 
 use anyhow::{Context, Error};
 use fidl::endpoints::{ControlHandle, RequestStream};
-use fidl_fuchsia_netpol_socketproxy::{
+use fidl_fuchsia_net_policy_socketproxy::{
     self as fnp_socketproxy, FuchsiaNetworksRequest, Network, NetworkDnsServers, NetworkInfo,
     StarnixNetworksRequest,
 };
@@ -390,7 +390,7 @@ impl Registry {
             }
         };
 
-        info!("Starting fuchsia.netpol.socketproxy.StarnixNetworks server");
+        info!("Starting fuchsia.net.policy.socketproxy.StarnixNetworks server");
         self.networks.starnix.lock().await.networks.as_mut().clear();
         stream
             .map(|result| result.context("failed request"))
@@ -448,7 +448,7 @@ impl Registry {
             }
         };
 
-        info!("Starting fuchsia.netpol.socketproxy.FuchsiaNetworks server");
+        info!("Starting fuchsia.net.policy.socketproxy.FuchsiaNetworks server");
         self.networks.fuchsia.lock().await.networks.as_mut().clear();
         stream
             .map(|result| result.context("failed request"))

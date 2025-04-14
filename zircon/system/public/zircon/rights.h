@@ -133,8 +133,13 @@ typedef uint32_t zx_rights_t;
 
 #define ZX_DEFAULT_COUNTER_RIGHTS (ZX_RIGHTS_BASIC | ZX_RIGHTS_IO | ZX_RIGHT_SIGNAL)
 
+#define ZX_DEFAULT_IOB_SHARED_REGION_RIGHTS \
+  (ZX_RIGHTS_BASIC | ZX_RIGHT_WAIT | ZX_RIGHTS_PROPERTY | ZX_RIGHT_SIGNAL)
+
+#if __mistos__
 #define ZX_DEFAULT_STARNIX_TASK_RIGHTS                                                        \
   (ZX_RIGHTS_BASIC | ZX_RIGHTS_IO | ZX_RIGHTS_PROPERTY | ZX_RIGHT_DESTROY | ZX_RIGHT_SIGNAL | \
    ZX_RIGHT_MANAGE_THREAD)
+#endif  // __mistos__
 
 #endif  // ZIRCON_RIGHTS_H_

@@ -32,7 +32,7 @@ class MainServiceTest : public UnitTestFixture {
       : clock_(dispatcher()),
         cobalt_(dispatcher(), services(), &clock_),
         main_service_(dispatcher(), services(), &clock_, &InspectRoot(), &cobalt_,
-                      /*startup_annotations=*/{}, {},
+                      /*startup_annotations=*/{}, {}, /*dlog=*/std::nullopt,
                       MainService::Options{
                           BuildTypeConfig{},
                           "",
@@ -40,6 +40,7 @@ class MainServiceTest : public UnitTestFixture {
                           LastReboot::Options{
                               .is_first_instance = kIsFirstInstance,
                               .reboot_log = RebootLog(RebootReason::kUserRequest, "reboot log",
+                                                      /*dlog=*/std::nullopt,
                                                       /*last_boot_uptime=*/zx::sec(100),
                                                       /*last_boot_runtime=*/zx::sec(90),
                                                       /*critical_process=*/std::nullopt),

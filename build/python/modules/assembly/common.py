@@ -8,13 +8,13 @@ import os
 import shutil
 from dataclasses import dataclass
 from functools import total_ordering
-from typing import Iterable, TextIO, Union
+from typing import Any, Iterable, TextIO
 
 import serialization
 
 __all__ = ["FileEntry", "FilePath", "fast_copy", "fast_copy_makedirs"]
 
-FilePath = Union[str, os.PathLike]
+FilePath = str | os.PathLike[Any]
 
 
 # TODO(https://fxbug.dev/42170926) Move to python module at //build/python/modules/file_entry
@@ -36,10 +36,10 @@ class FileEntry:
         """Destination accessor method"""
         return str(self.destination)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((self.destination, self.source))
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: Any) -> bool:
         if isinstance(other, self.__class__):
             return (
                 self.source == other.source
@@ -48,7 +48,7 @@ class FileEntry:
         else:
             return False
 
-    def __lt__(self, other) -> bool:
+    def __lt__(self, other: Any) -> bool:
         if not isinstance(other, FileEntry):
             raise ValueError("other is not a FileEntry")
         return (self.source, self.destination) < (
@@ -81,7 +81,7 @@ class FileEntry:
             file.write("{}={}\n".format(dst, src))
 
 
-def fast_copy(src: FilePath, dst: FilePath, **kwargs) -> FilePath:
+def fast_copy(src: FilePath, dst: FilePath, **kwargs: Any) -> FilePath:
     """A wrapper around os and os.path fns to correctly copy a file using a
     hardlink.
     """
@@ -95,7 +95,7 @@ def fast_copy(src: FilePath, dst: FilePath, **kwargs) -> FilePath:
     return src
 
 
-def fast_copy_makedirs(src: FilePath, dst: FilePath, **kwargs) -> FilePath:
+def fast_copy_makedirs(src: FilePath, dst: FilePath, **kwargs: Any) -> FilePath:
     """Run `fast_copy`, making the destination directory if it doesn't exist"""
     # Create parents if they don't exist
     os.makedirs(os.path.dirname(dst), exist_ok=True)

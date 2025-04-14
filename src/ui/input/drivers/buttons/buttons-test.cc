@@ -770,8 +770,7 @@ TEST_P(ParameterizedButtonsTest, CamMute) {
 
 TEST_P(ParameterizedButtonsTest, DirectButtonWakeable) {
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
-    env.SetExpectedInterruptOptions(
-        static_cast<fuchsia_hardware_gpio::InterruptOptions>(ZX_INTERRUPT_WAKE_VECTOR));
+    env.SetExpectedInterruptOptions(fuchsia_hardware_gpio::InterruptOptions::kWakeable);
     env.SetExpectedInterruptMode(fuchsia_hardware_gpio::InterruptMode::kEdgeHigh);
   });
 

@@ -158,7 +158,7 @@ impl BpfProgramContext for SeccompFilter {
 }
 
 static SECCOMP_DATA_TYPE: LazyLock<Type> =
-    LazyLock::new(|| Type::PtrToMemory { id: MemoryId::new(), offset: 0, buffer_size: 0 });
+    LazyLock::new(|| Type::PtrToMemory { id: MemoryId::new(), offset: 0.into(), buffer_size: 0 });
 
 impl ProgramArgument for &'_ SeccompData {
     fn get_type() -> &'static Type {
@@ -425,7 +425,7 @@ impl SeccompState {
             "type=SECCOMP: uid={} gid={} pid={} comm={} syscall={} ip={} ARCH={} SYSCALL={}",
             uid,
             gid,
-            task.thread_group.leader,
+            task.thread_group().leader,
             comm,
             syscall.decl.number,
             task.thread_state.registers.instruction_pointer_register(),
@@ -459,7 +459,7 @@ impl SeccompState {
             SeccompAction::KillThread => {
                 let siginfo = SignalInfo::default(SIGSYS);
 
-                let is_last_thread = current_task.thread_group.read().tasks_count() == 1;
+                let is_last_thread = current_task.thread_group().read().tasks_count() == 1;
                 let mut task_state = current_task.write();
 
                 if is_last_thread {

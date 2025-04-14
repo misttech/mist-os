@@ -668,6 +668,11 @@ func TestApplyModifiers(t *testing.T) {
 		return s
 	}
 
+	bootTestShard := func(s *Shard) *Shard {
+		s.IsBootTest = true
+		return s
+	}
+
 	testCases := []struct {
 		name      string
 		shards    []*Shard
@@ -711,6 +716,24 @@ func TestApplyModifiers(t *testing.T) {
 			},
 			expected: []*Shard{
 				shardWithModify(shard(env1, "fuchsia", 1, 2, 3), makeModifyDetails(2, StopOnSuccess, false, 0, 1, 2)),
+				shardWithModify(shard(env2, "linux", 1, 2, 3), makeModifyDetails(2, StopOnSuccess, false, 0, 1, 2)),
+			},
+		},
+		{
+			name: "default max attempts doesn't affect boot test",
+			shards: []*Shard{
+				bootTestShard(shard(env1, "fuchsia", 1, 2, 3)),
+				shard(env2, "linux", 1, 2, 3),
+			},
+			modifiers: []ModifierMatch{
+				{Modifier: TestModifier{Name: "*", TotalRuns: -1, MaxAttempts: 2}},
+			},
+			expected: []*Shard{
+				bootTestShard(
+					shardWithModify(
+						shard(env1, "fuchsia", 1, 2, 3), makeModifyDetails(1, StopOnSuccess, false, 0, 1, 2),
+					),
+				),
 				shardWithModify(shard(env2, "linux", 1, 2, 3), makeModifyDetails(2, StopOnSuccess, false, 0, 1, 2)),
 			},
 		},

@@ -5,7 +5,7 @@ use crate::PublishOptions;
 use diagnostics_log_types::Severity;
 use fidl_fuchsia_logger::{LogSinkMarker, LogSinkProxy};
 use fuchsia_async as fasync;
-use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component_client::connect_to_protocol;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};

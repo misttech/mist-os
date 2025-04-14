@@ -1499,7 +1499,7 @@ void Node::StopDriverComponent() {
                static_cast<int>(self->name_.size()), self->name_.data(), result->error_value());
         }
 
-        LOGF(INFO, "Destroyed driver component for %s", self->MakeComponentMoniker().c_str());
+        LOGF(DEBUG, "Destroyed driver component for %s", self->MakeComponentMoniker().c_str());
         self->driver_component_->state = DriverState::kStopped;
         self->GetNodeShutdownCoordinator().CheckNodeState();
       });
@@ -1518,7 +1518,7 @@ void Node::on_fidl_error(fidl::UnbindInfo info) {
   }
 
   if (GetNodeState() == NodeState::kWaitingOnDriver) {
-    LOGF(INFO, "Node: %s: realm channel had expected shutdown.", MakeComponentMoniker().c_str());
+    LOGF(DEBUG, "Node: %s: realm channel had expected shutdown.", MakeComponentMoniker().c_str());
     GetNodeShutdownCoordinator().CheckNodeState();
     return;
   }
@@ -1550,21 +1550,6 @@ Node::GetNodeProperties(std::string_view parent_name) const {
     return std::nullopt;
   }
   return {it->second};
-}
-
-std::optional<std::vector<fuchsia_driver_framework::NodeProperty>>
-Node::GetDeprecatedNodeProperties(std::string_view parent_name) const {
-  auto node_properties = GetNodeProperties(parent_name);
-  if (!node_properties) {
-    return std::nullopt;
-  }
-
-  std::vector<fuchsia_driver_framework::NodeProperty> deprecated_properties;
-  deprecated_properties.reserve(node_properties->size());
-  for (auto& property : node_properties.value()) {
-    deprecated_properties.emplace_back(ToDeprecatedProperty(property));
-  }
-  return deprecated_properties;
 }
 
 Node::DriverComponent::DriverComponent(
@@ -1721,7 +1706,7 @@ Devnode::Target Node::CreateDevfsPassthrough(
       [node = weak_from_this(), allow_controller_connection,
        node_name = name_](fidl::ServerEnd<fuchsia_device::Controller> server_end) {
         if (!allow_controller_connection) {
-          LOGF(ERROR,
+          LOGF(WARNING,
                "Connection to %s controller interface failed, as that node did not"
                " include controller support in its DevAddArgs",
                node_name.c_str());

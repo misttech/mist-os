@@ -64,7 +64,10 @@ bool MoonflowerPartitioner::SupportsPartition(const PartitionSpec& spec) const {
   constexpr PartitionSpec supported_specs[] = {
       PartitionSpec(paver::Partition::kBootloaderA, "dtbo"),
       PartitionSpec(paver::Partition::kBootloaderB, "dtbo"),
-      PartitionSpec(paver::Partition::kZirconA), PartitionSpec(paver::Partition::kZirconB),
+      PartitionSpec(paver::Partition::kBootloaderA, "recovery_zbi"),
+      PartitionSpec(paver::Partition::kBootloaderB, "recovery_zbi"),
+      PartitionSpec(paver::Partition::kZirconA),
+      PartitionSpec(paver::Partition::kZirconB),
       PartitionSpec(paver::Partition::kFuchsiaVolumeManager)};
   return std::any_of(std::cbegin(supported_specs), std::cend(supported_specs),
                      [&](const PartitionSpec& supported) { return SpecMatches(spec, supported); });
@@ -80,12 +83,16 @@ zx::result<std::string> MoonflowerPartitioner::PartitionNameForSpec(
   std::string part_name;
   switch (spec.partition) {
     case Partition::kBootloaderA:
-      // Check that spec.content_type == "dtbo" if we start using other bootloader components.
-      part_name = "dtbo_a";
-      break;
     case Partition::kBootloaderB:
-      // Check that spec.content_type == "dtbo" if we start using other bootloader components.
-      part_name = "dtbo_b";
+      if (spec.content_type == "dtbo") {
+        part_name = "dtbo";
+      } else if (spec.content_type == "recovery_zbi") {
+        part_name = "vendor_boot";
+      } else {
+        ERROR("Unsupported bootloader partition type %s\n", std::string(spec.content_type).c_str());
+        return zx::error(ZX_ERR_NOT_SUPPORTED);
+      }
+      part_name += spec.partition == Partition::kBootloaderA ? "_a" : "_b";
       break;
     case Partition::kZirconA:
       part_name = "boot_a";

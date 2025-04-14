@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/config/fuchsia/target_api_level.gni")
 import("//build/rust/rustc_library.gni")
 
 group("rust") {
@@ -45,10 +46,13 @@ rustc_library("lib") {
 
   if (is_fuchsia || is_mistos) {
     deps += [
-      "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
       "//sdk/rust/zx",
       "//third_party/rust_crates:thiserror",
     ]
+
+    if (current_build_target_api_level == "PLATFORM") {
+      deps += [ "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust" ]
+    }
 
     sources += [ "src/logs_legacy.rs" ]
   }

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_UART_NS8250_H_
-#define LIB_UART_NS8250_H_
+#ifndef ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_NS8250_H_
+#define ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_NS8250_H_
 
 #include <lib/acpi_lite/debug_port.h>
 #include <lib/stdcompat/array.h>
@@ -276,42 +276,37 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig, IoRegType
     }
   }();
 
-  template <typename... Args>
-  explicit DriverImpl(Args&&... args) : Base(std::forward<Args>(args)...) {}
+  using Base::TryMatch;
 
-  using Base::MaybeCreate;
-
-  static std::optional<DriverImpl> MaybeCreate(
+  static std::optional<Config<DriverImpl>> TryMatch(
       const acpi_lite::AcpiDebugPortDescriptor& debug_port) {
     if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_I8250_MMIO32_UART) {
       if (debug_port.type == acpi_lite::AcpiDebugPortDescriptor::Type::kMmio) {
-        return DriverImpl(KdrvConfig{.mmio_phys = debug_port.address});
+        return Config<DriverImpl>(KdrvConfig{.mmio_phys = debug_port.address});
       }
-    }
-
-    if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_I8250_PIO_UART) {
+    } else if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_I8250_PIO_UART) {
       if (debug_port.type == acpi_lite::AcpiDebugPortDescriptor::Type::kPio) {
-        return DriverImpl(KdrvConfig{.base = static_cast<uint16_t>(debug_port.address)});
+        return Config<DriverImpl>(KdrvConfig{.base = static_cast<uint16_t>(debug_port.address)});
       }
     }
-    return {};
+    return std::nullopt;
   }
 
-  static std::optional<DriverImpl> MaybeCreate(std::string_view string) {
+  static std::optional<Config<DriverImpl>> TryMatch(std::string_view string) {
     if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_I8250_PIO_UART) {
       if (string == "legacy") {
-        return DriverImpl{kLegacyConfig};
+        return Config<DriverImpl>{kLegacyConfig};
       }
     }
-    return Base::MaybeCreate(string);
+    return Base::TryMatch(string);
   }
 
-  static bool MatchDevicetree(const devicetree::PropertyDecoder& decoder) {
+  static bool TrySelect(const devicetree::PropertyDecoder& decoder) {
     if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_I8250_PIO_UART) {
       return false;
     } else {
       // Check that the compatible property contains a compatible devicetree binding.
-      if (!Base::MatchDevicetree(decoder)) {
+      if (!Base::TrySelect(decoder)) {
         return false;
       }
 
@@ -335,6 +330,9 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig, IoRegType
       }
     }
   }
+
+  template <typename... Args>
+  explicit DriverImpl(Args&&... args) : Base(std::forward<Args>(args)...) {}
 
   template <class IoProvider>
   void Init(IoProvider& io) {
@@ -593,4 +591,4 @@ using PxaDriver =
 }  // namespace ns8250
 }  // namespace uart
 
-#endif  // LIB_UART_NS8250_H_
+#endif  // ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_NS8250_H_

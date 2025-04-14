@@ -2,14 +2,42 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
-use heapdump_snapshot::Snapshot;
+use anyhow::{Context, Result};
+use heapdump_snapshot::{ExecutableRegion, Snapshot};
 use itertools::Itertools;
 use prost::Message;
 use std::collections::hash_map::{Entry, HashMap};
+use std::collections::HashSet;
 use std::io::Write;
 
-fn build_profile(snapshot: &Snapshot, with_tags: bool) -> Result<pprof::Profile> {
+// Tries to instantiate a symbolizer instance to resolve addresses in the given address space.
+//
+// Fails gracefully returning None if (at least) one of the provided ExecutableRegion entries
+// does not have the necessary information. This can happen with old heapdump collector builds
+// from before the `name` and `vaddr` fields were added to the FIDL table.
+fn instantiate_symbolizer(
+    executable_regions: &HashMap<u64, ExecutableRegion>,
+) -> Result<ffx_symbolize::Symbolizer> {
+    let mut symbolizer = ffx_symbolize::Symbolizer::new()?;
+    let mut symbolizer_module_ids = HashMap::new();
+    for (address, info) in executable_regions {
+        let module_id = symbolizer_module_ids
+            .entry(info.build_id.clone())
+            .or_insert_with(|| symbolizer.add_module(&info.name, &info.build_id));
+        symbolizer.add_mapping(
+            *module_id,
+            ffx_symbolize::MappingDetails {
+                start_addr: *address,
+                size: info.size,
+                vaddr: info.vaddr.context("missing vaddr")?,
+                flags: ffx_symbolize::MappingFlags::EXECUTE,
+            },
+        )?;
+    }
+    Ok(symbolizer)
+}
+
+fn build_profile(snapshot: &Snapshot, with_tags: bool, symbolize: bool) -> Result<pprof::Profile> {
     let mut st = pprof::StringTableBuilder::default();
 
     let mut pprof = pprof::Profile {
@@ -40,6 +68,84 @@ fn build_profile(snapshot: &Snapshot, with_tags: bool) -> Result<pprof::Profile>
         resolver
     };
 
+    // If symbolization was requested, populate its own view of the mappings too.
+    let symbolizer = if symbolize {
+        if let Ok(symbolizer) = instantiate_symbolizer(&snapshot.executable_regions) {
+            Some(symbolizer)
+        } else {
+            eprintln!(
+                "WARNING: Automatic symbolization could not be performed, likely due to an \
+                 incompatible version of the Heapdump collector running on the device. Please run \
+                 \"fx pprof ...\" manually on the generated file."
+            );
+            None
+        }
+    } else {
+        None
+    };
+
+    // Helper function that interns data on a function.
+    let mut interned_functions = HashMap::new();
+    let mut intern_function = |function_name: &str, file_name: &str| -> u64 {
+        let function_name = st.intern(function_name);
+        let file_name = st.intern(file_name);
+        let next_id = (interned_functions.len() + 1) as u64;
+        *interned_functions.entry((function_name, file_name)).or_insert_with(|| {
+            pprof.function.push(pprof::Function {
+                id: next_id,
+                name: function_name,
+                filename: file_name,
+                ..Default::default()
+            });
+            next_id
+        })
+    };
+
+    // Helper function that translates an address into symbolized stack frames. While doing it, also
+    // keep track of resolved and unresolved mappings.
+    let mut resolved_mapping_ids = HashSet::new();
+    let mut unresolved_mapping_ids = HashSet::new();
+    let mut address_to_symbolized_lines =
+        |mapping_id: u64, program_address: u64| -> Option<Vec<pprof::Line>> {
+            if let Some(symbolizer) = &symbolizer {
+                match symbolizer.resolve_addr(program_address) {
+                    Ok(resolved_locations) => {
+                        let mut result = Vec::new();
+                        for resolved_location in resolved_locations {
+                            let function_name = &resolved_location.function;
+                            let (file_name, line) = match resolved_location.file_and_line.as_ref() {
+                                Some((file_name, line)) => {
+                                    (file_name.as_str(), i64::try_from(*line).unwrap())
+                                }
+                                None => ("", 0),
+                            };
+                            let function_id = intern_function(function_name, &file_name);
+                            result.push(pprof::Line { function_id, line });
+                        }
+
+                        // We managed to symbolize an address from this mapping, which proves that
+                        // it was resolved.
+                        resolved_mapping_ids.insert(mapping_id);
+
+                        return Some(result);
+                    }
+                    Err(ffx_symbolize::ResolveError::SymbolNotFound) => {
+                        // Even if this specific address could not be symbolized, the mapping as a
+                        // whole was resolved.
+                        resolved_mapping_ids.insert(mapping_id);
+                    }
+                    Err(ffx_symbolize::ResolveError::NoOverlappingModule) => {
+                        unreachable!("the address belongs to mapping {}", mapping_id)
+                    }
+                    Err(ffx_symbolize::ResolveError::SymbolFileUnavailable) => {
+                        unresolved_mapping_ids.insert(mapping_id);
+                    }
+                }
+            }
+
+            None
+        };
+
     // Fill the Locations with all the program addresses referenced in the snapshot and store their
     // assigned IDs.
     let mut address_to_location_id = HashMap::new();
@@ -48,13 +154,32 @@ fn build_profile(snapshot: &Snapshot, with_tags: bool) -> Result<pprof::Profile>
             let next_id = address_to_location_id.len() as u64 + 1;
             if let Entry::Vacant(e) = address_to_location_id.entry(*address) {
                 e.insert(next_id);
+
+                let mapping_id = module_map.resolve(*address);
+                let symbolized_lines = if mapping_id != 0 {
+                    address_to_symbolized_lines(mapping_id, *address)
+                } else {
+                    None
+                };
+
                 pprof.location.push(pprof::Location {
                     id: next_id,
-                    mapping_id: module_map.resolve(*address),
+                    mapping_id,
                     address: *address,
+                    line: symbolized_lines.unwrap_or(vec![]),
                     ..Default::default()
                 });
             }
+        }
+    }
+
+    // Mark resolved mappings.
+    for mapping in &mut pprof.mapping {
+        if resolved_mapping_ids.contains(&mapping.id) {
+            mapping.has_functions = true;
+            mapping.has_filenames = true;
+            mapping.has_line_numbers = true;
+            mapping.has_inline_frames = true;
         }
     }
 
@@ -124,6 +249,15 @@ fn build_profile(snapshot: &Snapshot, with_tags: bool) -> Result<pprof::Profile>
     }
 
     pprof.string_table = st.build();
+
+    // Print warnings about unresolved mappings.
+    for mapping in &pprof.mapping {
+        if unresolved_mapping_ids.contains(&mapping.id) {
+            let build_id = &pprof.string_table[mapping.build_id as usize];
+            eprintln!("WARNING: Unresolved build ID \"{build_id}\".");
+        }
+    }
+
     Ok(pprof)
 }
 
@@ -131,8 +265,9 @@ pub fn export_to_pprof(
     snapshot: &Snapshot,
     dest: &mut std::fs::File,
     with_tags: bool,
+    symbolize: bool,
 ) -> Result<()> {
-    let buf = build_profile(snapshot, with_tags)?.encode_to_vec();
+    let buf = build_profile(snapshot, with_tags, symbolize)?.encode_to_vec();
     dest.write_all(&buf)?;
     Ok(())
 }
@@ -374,7 +509,7 @@ mod tests {
     #[test_case(false ; "aggregated")]
     fn test_build_profile(with_tags: bool) {
         let snapshot = generate_fake_snapshot();
-        let profile = build_profile(&snapshot, with_tags).unwrap();
+        let profile = build_profile(&snapshot, with_tags, false).unwrap();
         assert_profile_matches_fake_snapshot(&profile, with_tags);
     }
 
@@ -387,7 +522,7 @@ mod tests {
 
         // Write a snapshot to it.
         let snapshot = generate_fake_snapshot();
-        export_to_pprof(&snapshot, &mut tempfile, with_tags).unwrap();
+        export_to_pprof(&snapshot, &mut tempfile, with_tags, false).unwrap();
 
         // Read it back.
         let mut buf = Vec::new();

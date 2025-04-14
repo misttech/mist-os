@@ -224,7 +224,7 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct TableLargeArray {
     pub a: Option<[u32; 100]>,
 }
@@ -348,7 +348,7 @@ impl ::core::fmt::Debug for WireTableLargeArray {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct TableSmallArray {
     pub a: Option<[u32; 2]>,
 }

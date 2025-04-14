@@ -35,7 +35,6 @@
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.hardware.pty.Device",
-                "fuchsia.logger.Log",
                 "fuchsia.media.Audio",
                 "fuchsia.net.name.Lookup",
                 "fuchsia.pkg.RepositoryManager",

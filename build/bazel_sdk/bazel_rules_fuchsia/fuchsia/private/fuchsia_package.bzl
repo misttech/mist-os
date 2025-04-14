@@ -10,8 +10,8 @@ load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_ATTRS", "get_fuchsia_api_level
 load(
     ":fuchsia_debug_symbols.bzl",
     "FUCHSIA_DEBUG_SYMBOLS_ATTRS",
-    "collect_debug_symbols",
     "find_and_process_unstripped_binaries",
+    "merge_debug_symbol_infos",
     "strip_resources",
 )
 load(":fuchsia_package_resource.bzl", "fuchsia_find_all_package_resources")
@@ -562,7 +562,7 @@ def _build_fuchsia_package_impl(ctx):
     # for this once all dependencies use the right rules to expose
     # their debug symbols.
     #
-    fuchsia_debug_symbols_info = collect_debug_symbols(
+    fuchsia_debug_symbol_info = merge_debug_symbol_infos(
         _debug_info,
         ctx.attr.subpackages,
         ctx.attr.test_components,
@@ -584,11 +584,11 @@ def _build_fuchsia_package_impl(ctx):
             meta_far = meta_far,
             package_resources = package_resources,
             packaged_components = packaged_components,
-            build_id_dirs = fuchsia_debug_symbols_info.build_id_dirs.values(),
+            build_id_dirs = fuchsia_debug_symbol_info.build_id_dirs_mapping.values(),
         ),
-        fuchsia_debug_symbols_info,
+        fuchsia_debug_symbol_info,
         OutputGroupInfo(
-            build_id_dirs = depset(transitive = fuchsia_debug_symbols_info.build_id_dirs.values()),
+            build_id_dirs = depset(transitive = fuchsia_debug_symbol_info.build_id_dirs_mapping.values()),
         ),
     ]
 

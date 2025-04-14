@@ -2,7 +2,7 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ComposedProtocolOneWayAnonComposedRequest {
     pub a: Option<u16>,
 }
@@ -359,7 +359,7 @@ impl ::core::fmt::Debug for WireOptionalComposedProtocolTwoWayAnonComposedReques
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ComposedProtocolTwoWayAnonComposedResponse {
     pub a: Option<u16>,
 }
@@ -485,7 +485,7 @@ impl ::core::fmt::Debug for WireComposedProtocolTwoWayAnonComposedResponse {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ComposedProtocolTwoWayAnonComposedWithErrorRequest {
     pub a: Option<u16>,
 }
@@ -1083,7 +1083,7 @@ impl ::core::fmt::Debug for WireOptionalComposedProtocolOnAnonComposedRequest {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct TablePayload {
     pub a: Option<u16>,
 }
@@ -2021,7 +2021,7 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct MainProtocolOneWayAnonRequest {
     pub a: Option<u16>,
 }
@@ -2381,7 +2381,7 @@ impl ::core::fmt::Debug for WireOptionalMainProtocolTwoWayAnonRequest {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct MainProtocolTwoWayAnonResponse {
     pub a: Option<u16>,
 }
@@ -2505,7 +2505,7 @@ impl ::core::fmt::Debug for WireMainProtocolTwoWayAnonResponse {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct MainProtocolTwoWayAnonWithErrorRequest {
     pub a: Option<u16>,
 }

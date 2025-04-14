@@ -27,6 +27,7 @@ pub fn new_socket_file<L>(
     socket_type: SocketType,
     open_flags: OpenFlags,
     protocol: SocketProtocol,
+    kernel_private: bool,
 ) -> Result<FileHandle, Errno>
 where
     L: LockBefore<FileOpsCore>,
@@ -36,6 +37,7 @@ where
         current_task,
         Socket::new(current_task, domain, socket_type, protocol)?,
         open_flags,
+        kernel_private,
     ))
 }
 

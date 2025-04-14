@@ -6,8 +6,9 @@
 		zxio_attr_set;
 		zxio_bind;
 		zxio_clone;
-		zxio_close;
+		zxio_destroy;
 		zxio_connect;
+		zxio_close;
 		zxio_create;
 		zxio_create_symlink;
 		zxio_create_with_info;

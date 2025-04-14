@@ -5,9 +5,10 @@
 use crate::io::{Directory, RemoteDirectory};
 use crate::path::RemoteComponentStoragePath;
 use anyhow::{anyhow, Result};
-use fidl::endpoints::create_proxy;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_sys2::StorageAdminProxy;
+
+use flex_client::ProxyHasDomain;
+use flex_fuchsia_io as fio;
+use flex_fuchsia_sys2::StorageAdminProxy;
 
 /// Delete a file component's storage.
 ///
@@ -17,7 +18,7 @@ use fidl_fuchsia_sys2::StorageAdminProxy;
 pub async fn delete(storage_admin: StorageAdminProxy, path: String) -> Result<()> {
     let remote_path = RemoteComponentStoragePath::parse(&path)?;
 
-    let (dir_proxy, server) = create_proxy::<fio::DirectoryMarker>();
+    let (dir_proxy, server) = storage_admin.domain().create_proxy::<fio::DirectoryMarker>();
     let server = server.into_channel();
     let storage_dir = RemoteDirectory::from_proxy(dir_proxy);
 
@@ -52,7 +53,7 @@ pub async fn delete(storage_admin: StorageAdminProxy, path: String) -> Result<()
 mod test {
     use super::*;
     use crate::storage::test::setup_fake_storage_admin;
-    use fidl_fuchsia_io as fio;
+    use flex_fuchsia_io as fio;
     use futures::TryStreamExt;
 
     pub fn dirents(names: Vec<&'static str>) -> Vec<u8> {

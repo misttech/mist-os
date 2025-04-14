@@ -232,8 +232,8 @@
             metric_type: "Integer",
         },
         {
-            selector: "bootstrap/power-broker:root/broker/topology/stats:at_capacity_history_duration_ns",
-            metric_id: 10,
+            selector: "bootstrap/power-broker:root/broker/topology/stats:at_capacity_history_duration_seconds",
+            metric_id: 11,
             metric_type: "Integer",
         },
     ],

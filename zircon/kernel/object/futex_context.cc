@@ -14,6 +14,7 @@
 #include <trace.h>
 #include <zircon/types.h>
 
+#include <fbl/intrusive_hash_table.h>
 #include <fbl/null_lock.h>
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/scheduler.h>
@@ -160,7 +161,7 @@ struct SetBlockingFutexIdState {
 
 FutexContext::FutexState::~FutexState() {}
 
-FutexContext::FutexContext() { LTRACE_ENTRY; }
+FutexContext::FutexContext() : active_futexes_(fbl::HashTableOption::DelayedInit) { LTRACE_ENTRY; }
 
 FutexContext::~FutexContext() {
   LTRACE_ENTRY;
@@ -169,6 +170,34 @@ FutexContext::~FutexContext() {
   // destroyed themselves by the time the process has exited.
   DEBUG_ASSERT(active_futexes_.is_empty());
   DEBUG_ASSERT(free_futexes_.is_empty());
+}
+
+zx_status_t FutexContext::Init(ProcessType type) {
+  size_t num_buckets;
+  switch (type) {
+    case ProcessType::Regular:
+      num_buckets = 37;
+      break;
+    case ProcessType::Shared:
+      // A FutexContext used by a group of shared processes tends to have *many* active futexes.
+      num_buckets = 1031;
+      break;
+    default:
+      panic("unknown ProcessType %u", static_cast<uint32_t>(type));
+  };
+
+  fbl::AllocChecker ac;
+  auto storage = ktl::make_unique<ActiveFutexMap::BucketType[]>(&ac, num_buckets);
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  {
+    Guard<SpinLock, IrqSave> pool_lock_guard{&pool_lock_};
+    active_futexes_.Init(ktl::move(storage), num_buckets);
+  }
+
+  return ZX_OK;
 }
 
 zx_status_t FutexContext::GrowFutexStatePool() {

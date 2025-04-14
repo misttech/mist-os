@@ -191,10 +191,11 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   }
 
   void Unpin(uint64_t offset, uint64_t len) override {
+    __UNINITIALIZED VmCowPages::DeferredOps deferred(cow_pages_.get());
     Guard<VmoLockType> guard{lock()};
     auto cow_range = GetCowRange(offset, len);
     ASSERT(cow_range);
-    cow_pages_locked()->UnpinLocked(*cow_range);
+    cow_pages_locked()->UnpinLocked(*cow_range, &deferred);
   }
 
   // See VmObject::DebugIsRangePinned
@@ -363,6 +364,16 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
 
   void MaybeDeadTransition() {}
 
+  // Constructs and returns a |DeferredOps| that can be passed into other methods on this VMO that
+  // require one.
+  VmCowPages::DeferredOps MakeDeferredOps() { return VmCowPages::DeferredOps(cow_pages_.get()); }
+
+  // TODO(https://fxbug.dev/338300943): This is a temporary method to allow constructing a
+  // |DeferredOps| under the lock. See the related comments on |DeferredOps::LockedTag|.
+  VmCowPages::DeferredOps MakeDeferredOpsLocked() TA_REQ(lock()) {
+    return VmCowPages::DeferredOps(cow_pages_.get(), VmCowPages::DeferredOps::LockedTag{});
+  }
+
  private:
   // private constructor (use Create())
   VmObjectPaged(uint32_t options, fbl::RefPtr<VmHierarchyState> hierarchy_state,
@@ -395,30 +406,20 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   // Unified function that implements both CommitRange and CommitRangePinned
   zx_status_t CommitRangeInternal(uint64_t offset, uint64_t len, bool pin, bool write);
 
-  // Internal decommit range helper that expects the lock to be held.
-  zx_status_t DecommitRangeLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
-
-  // Internal prefetch range helper that expects the lock to be held.
-  zx_status_t PrefetchRangeLocked(uint64_t offset, uint64_t len, Guard<VmoLockType>* guard)
-      TA_REQ(lock());
-
   // see GetAttributedMemoryInRange
   AttributionCounts GetAttributedMemoryInRangeLocked(uint64_t offset_bytes,
                                                      uint64_t len_bytes) const TA_REQ(lock());
 
   // internal read/write routine that takes a templated copy function to help share some code
   template <typename T>
-  zx_status_t ReadWriteInternalLocked(uint64_t offset, size_t len, bool write,
-                                      VmObjectReadWriteOptions options, T copyfunc,
-                                      Guard<VmoLockType>* guard) TA_REQ(lock());
+  zx_status_t ReadWriteInternal(uint64_t offset, size_t len, bool write,
+                                VmObjectReadWriteOptions options, T copyfunc);
 
-  // Zeroes a partial range in a page. May use CallUnlocked on the passed in guard. The page to zero
-  // is looked up using page_base_offset, and will be committed if needed. The range of
-  // [zero_start_offset, zero_end_offset) is relative to the page and so [0, PAGE_SIZE) would zero
-  // the entire page.
-  zx_status_t ZeroPartialPageLocked(uint64_t page_base_offset, uint64_t zero_start_offset,
-                                    uint64_t zero_end_offset, Guard<VmoLockType>* guard)
-      TA_REQ(lock());
+  // Zeroes a partial range in a page. The page to zero is looked up using page_base_offset, and
+  // will be committed if needed. The range of [zero_start_offset, zero_end_offset) is relative to
+  // the page and so [0, PAGE_SIZE) would zero the entire page.
+  zx_status_t ZeroPartialPage(uint64_t page_base_offset, uint64_t zero_start_offset,
+                              uint64_t zero_end_offset);
 
   // Internal helper for ZeroRange*.
   zx_status_t ZeroRangeInternal(uint64_t offset, uint64_t len, bool dirty_track);

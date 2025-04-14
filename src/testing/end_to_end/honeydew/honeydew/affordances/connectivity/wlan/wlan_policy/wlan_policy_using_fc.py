@@ -8,9 +8,9 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Protocol, TypeVar
 
-import fidl.fuchsia_wlan_policy as f_wlan_policy
+import fidl_fuchsia_wlan_common as f_wlan_common
+import fidl_fuchsia_wlan_policy as f_wlan_policy
 from fuchsia_controller_py import Channel, ZxStatus
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 
@@ -21,7 +21,6 @@ from honeydew.affordances.connectivity.wlan.utils.types import (
     Credential,
     NetworkConfig,
     NetworkIdentifier,
-    RequestStatus,
     SecurityType,
 )
 from honeydew.affordances.connectivity.wlan.wlan_policy import wlan_policy
@@ -49,27 +48,15 @@ _CLIENT_LISTENER_PROXY = FidlEndpoint(
 )
 
 
-_T_co = TypeVar("_T_co", covariant=True)
-
-
-class AsyncIterator(Protocol[_T_co]):
-    """A FIDL iterator."""
-
-    async def get_next(self) -> _T_co:
-        """Get the next element."""
-
-
-async def collect_iterator(
-    iterator: AsyncIterator[_T_co], err_type: type | None = None
-) -> list[_T_co]:
-    """Collect all elements from a FIDL iterator.
+async def collect_network_config_iterator(
+    iterator: (f_wlan_policy.NetworkConfigIteratorClient),
+) -> (list[f_wlan_policy.NetworkConfigIteratorGetNextResponse]):
+    """Collect all elements from a NetworkConfigIterator.
 
     Will check for errors during collection.
 
     Args:
         iterator: Iterator to collect elements from.
-        err_type: Error class for the result error. Defaults to None for no
-            error checking.
 
     Returns:
         All elements collected from iterator.
@@ -77,27 +64,63 @@ async def collect_iterator(
     Raises:
         HoneydewWlanError: Error from WLAN stack.
     """
-    elements: list[_T_co] = []
+    elements = []
     while True:
         try:
-            res = await iterator.get_next()
+            response = await iterator.get_next()
         except ZxStatus as status:
             if status.raw() == ZxStatus.ZX_ERR_PEER_CLOSED:
                 # The server closed the channel, signifying the end of elements.
                 break
+            raise wlan_errors.HoneydewWlanError(
+                f"{type(iterator).__name__}.GetNext() transport error"
+            ) from status
+
+        elements.append(response)
+
+    return elements
+
+
+async def collect_scan_result_iterator(
+    iterator: (f_wlan_policy.ScanResultIteratorClient),
+) -> (list[f_wlan_policy.ScanResultIteratorGetNextResponse]):
+    """Collect all elements from a ScanResultIterator.
+
+    Will check for errors during collection.
+
+    Args:
+        iterator: Iterator to collect elements from.
+
+    Returns:
+        All elements collected from iterator.
+
+    Raises:
+        HoneydewWlanError: Error from WLAN stack.
+    """
+    elements = []
+    while True:
+        try:
+            result = await iterator.get_next()
+        except ZxStatus as status:
+            if status.raw() == ZxStatus.ZX_ERR_PEER_CLOSED:
+                # The server closed the channel, signifying the end of elements.
+                break
+            raise wlan_errors.HoneydewWlanError(
+                f"{type(iterator).__name__}.GetNext() transport error"
+            ) from status
+
+        try:
+            response = result.unwrap()
+        except AssertionError as e:
+            if result.err is not None:
+                raise wlan_errors.HoneydewWlanError(
+                    f"{type(iterator).__name__}.GetNext() error: {f_wlan_policy.ScanErrorCode(result.err).name}"
+                ) from e
             else:
                 raise wlan_errors.HoneydewWlanError(
-                    f"{type(iterator).__name__}.GetNext() error {status}"
-                ) from status
-
-        # Check for error
-        err = getattr(res, "err", None)
-        if err and err_type:
-            raise wlan_errors.HoneydewWlanError(
-                f"{type(iterator).__name__}.GetNext() {err_type.__name__} {err_type(err).name}"
-            )
-
-        elements.append(res)
+                    f"{type(iterator).__name__}.GetNext() framework error"
+                ) from e
+        elements.append(response)
 
     return elements
 
@@ -204,7 +227,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
     # pylint: disable-next=invalid-overridden-method
     async def connect(
         self, target_ssid: str, security_type: SecurityType
-    ) -> RequestStatus:
+    ) -> f_wlan_common.RequestStatus:
         """Triggers connection to a network.
 
         Args:
@@ -237,7 +260,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
             resp = await self._client_controller.proxy.connect(
                 id_=NetworkIdentifier(target_ssid, security_type).to_fidl(),
             )
-            return RequestStatus.from_fidl(resp.status)
+            return f_wlan_common.RequestStatus(resp.status)
         except ZxStatus as status:
             raise wlan_errors.HoneydewWlanError(
                 f"ClientController.Connect() error {status}"
@@ -325,13 +348,11 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
                 f"ClientController.GetSavedNetworks() error {status}"
             ) from status
 
-        return [
-            NetworkConfig.from_fidl(config)
-            for resp in await collect_iterator(
-                iterator, f_wlan_policy.ScanErrorCode
-            )
-            for config in resp.configs
-        ]
+        configs = []
+        for resp in await collect_network_config_iterator(iterator):
+            for config in resp.configs:
+                configs.append(NetworkConfig.from_fidl(config))
+        return configs
 
     @asyncmethod
     # pylint: disable-next=invalid-overridden-method
@@ -532,13 +553,17 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
                 f"ClientController.ScanForNetworks() error {status}"
             ) from status
 
-        return list(
-            {
-                bytes(scan_result.id_.ssid).decode("utf-8")
-                for res in await collect_iterator(iterator)
-                for scan_result in res.response.scan_results
-            }
-        )
+        scan_results = set()
+        responses = await collect_scan_result_iterator(iterator)
+        for r in responses:
+            assert r.scan_results is not None, f"{r!r} missing scan_results"
+            for scan_result in r.scan_results:
+                assert (
+                    scan_result.id_ is not None
+                ), f"{scan_result!r} missing id"
+                scan_results.add(bytes(scan_result.id_.ssid).decode("utf-8"))
+
+        return list(scan_results)
 
     def set_new_update_listener(self) -> None:
         """Sets the update listener stream of the facade to a new stream.
@@ -629,11 +654,11 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
             resp = (
                 await self._client_controller.proxy.start_client_connections()
             )
-            status = RequestStatus.from_fidl(resp.status)
-            if status != RequestStatus.ACKNOWLEDGED:
+            status = f_wlan_common.RequestStatus(resp.status)
+            if status != f_wlan_common.RequestStatus.ACKNOWLEDGED:
                 raise wlan_errors.HoneydewWlanError(
                     "ClientController.StartClientConnections() returned "
-                    f"request status {status}"
+                    f"request status {status.name}"
                 )
         except ZxStatus as status:
             raise wlan_errors.HoneydewWlanError(
@@ -666,11 +691,11 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
 
         try:
             resp = await self._client_controller.proxy.stop_client_connections()
-            status = RequestStatus.from_fidl(resp.status)
-            if status != RequestStatus.ACKNOWLEDGED:
+            status = f_wlan_common.RequestStatus(resp.status)
+            if status != f_wlan_common.RequestStatus.ACKNOWLEDGED:
                 raise wlan_errors.HoneydewWlanError(
                     "ClientController.StopClientConnections() returned "
-                    f"request status {status}"
+                    f"request status {status.name}"
                 )
         except ZxStatus as status:
             raise wlan_errors.HoneydewWlanError(

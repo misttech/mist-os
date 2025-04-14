@@ -55,9 +55,6 @@ declare_args() {
   # includes the IDK/SDK in exchange for reduced coverage of target CPU
   # architecture support. For example, `fx build //sdk:final_fuchsia_idk`.
   #
-  # Note: The in-tree Bazel SDK ignores this variable and the variable it
-  # overrides unless `bazel_fuchsia_sdk_all_cpus` is true.
-  #
   # To override the set of API levels, see
   #`override_idk_buildable_api_levels`.
   override_idk_target_cpus = false

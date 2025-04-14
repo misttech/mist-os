@@ -205,9 +205,13 @@ pub struct FsNodeInfo {
     pub time_access: UtcInstant,
     pub time_modify: UtcInstant,
     pub casefold: bool,
-    // If this node is fscrypt encrypted, stores the id of the user wrapping key used to encrypt
-    // it.
+    // If this node is fscrypt encrypted, stores the id of the user wrapping key used to encrypt it.
     pub wrapping_key_id: Option<[u8; 16]>,
+    // Used to indicate to filesystems that manage timestamps that an access has occurred and to
+    // update the node's atime.
+    // This only impacts accesses within Starnix. Most Fuchsia programs are not expected to maintain
+    // access times. If the file handle is transferred out of Starnix, there may be inconsistencies.
+    pub pending_time_access_update: bool,
 }
 
 impl FsNodeInfo {
@@ -848,10 +852,10 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
 
     /// Called when the FsNode is freed by the Kernel.
     fn forget(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<'_, FileOpsCore>,
-        _node: &FsNode,
         _current_task: &CurrentTask,
+        _info: FsNodeInfo,
     ) -> Result<(), Errno> {
         Ok(())
     }
@@ -912,6 +916,24 @@ macro_rules! fs_node_impl_symlink {
 #[macro_export]
 macro_rules! fs_node_impl_dir_readonly {
     () => {
+        fn check_access(
+            &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            node: &$crate::vfs::FsNode,
+            current_task: &$crate::task::CurrentTask,
+            access: starnix_uapi::file_mode::Access,
+            info: &starnix_sync::RwLock<$crate::vfs::FsNodeInfo>,
+            reason: $crate::vfs::CheckAccessReason,
+        ) -> Result<(), starnix_uapi::errors::Errno> {
+            if access.contains(starnix_uapi::file_mode::Access::WRITE) {
+                return starnix_uapi::error!(
+                    EROFS,
+                    format!("check_access failed: read-only directory")
+                );
+            }
+            node.default_check_access_impl(current_task, access, reason, info.read())
+        }
+
         fn mkdir(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
@@ -1285,16 +1307,11 @@ impl FsNode {
         self.ops.as_ref()
     }
 
-    /// Returns an error if this node is encrypted and locked.
-    pub fn fail_if_locked<L>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        current_task: &CurrentTask,
-    ) -> Result<(), Errno>
-    where
-        L: LockEqualOrBefore<FileOpsCore>,
-    {
-        let node_info = self.fetch_and_refresh_info(locked, current_task)?;
+    /// Returns an error if this node is encrypted and locked. Does not require
+    /// fetch_and_refresh_info because FS_IOC_SET_ENCRYPTION_POLICY updates info and once a node is
+    /// encrypted, it remains encrypted forever.
+    pub fn fail_if_locked(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+        let node_info = self.info();
         if let Some(wrapping_key_id) = node_info.wrapping_key_id {
             if !current_task
                 .kernel()
@@ -1739,9 +1756,9 @@ impl FsNode {
         )?;
         self.check_sticky_bit(current_task, child)?;
         if child.is_dir() {
-            security::check_fs_node_rmdir_access(current_task, self, child)?;
+            security::check_fs_node_rmdir_access(current_task, self, child, name)?;
         } else {
-            security::check_fs_node_unlink_access(current_task, self, child)?;
+            security::check_fs_node_unlink_access(current_task, self, child, name)?;
         }
         let mut locked = locked.cast_locked::<FileOpsCore>();
         self.ops().unlink(&mut locked, self, current_task, name, child)?;
@@ -1844,7 +1861,7 @@ impl FsNode {
         if length > MAX_LFS_FILESIZE as u64 {
             return error!(EINVAL);
         }
-        if length > current_task.thread_group.get_rlimit(Resource::FSIZE) {
+        if length > current_task.thread_group().get_rlimit(Resource::FSIZE) {
             send_standard_signal(current_task, SignalInfo::default(SIGXFSZ));
             return error!(EFBIG);
         }
@@ -1896,7 +1913,7 @@ impl FsNode {
     {
         let allocate_size = checked_add_offset_and_length(offset as usize, length as usize)
             .map_err(|_| errno!(EFBIG))? as u64;
-        if allocate_size > current_task.thread_group.get_rlimit(Resource::FSIZE) {
+        if allocate_size > current_task.thread_group().get_rlimit(Resource::FSIZE) {
             send_standard_signal(current_task, SignalInfo::default(SIGXFSZ));
             return error!(EFBIG);
         }
@@ -2020,7 +2037,7 @@ impl FsNode {
         if access.contains(Access::EXEC) && !self.is_dir() {
             mount.check_noexec_filesystem()?;
         }
-        self.ops.check_access(
+        self.ops().check_access(
             &mut locked.cast_locked::<FileOpsCore>(),
             self,
             current_task,
@@ -2685,9 +2702,11 @@ impl Releasable for FsNode {
         if let Some(fs) = self.fs.upgrade() {
             fs.remove_node(&self);
         }
-        if let Err(err) =
-            self.ops.forget(&mut locked.cast_locked::<FileOpsCore>(), &self, current_task)
-        {
+        if let Err(err) = self.ops.forget(
+            &mut locked.cast_locked::<FileOpsCore>(),
+            current_task,
+            self.info.into_inner(),
+        ) {
             log_error!("Error on FsNodeOps::forget: {err:?}");
         }
     }

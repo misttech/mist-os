@@ -211,6 +211,7 @@ void Injector::Inject(std::vector<fuchsia::ui::pointerinjector::Event> events,
 
       if (event.has_trace_flow_id()) {
         TRACE_FLOW_END("input", "dispatch_event_to_scenic", event.trace_flow_id());
+        TRACE_FLOW_BEGIN("input", "input_event_in_scenic", event.trace_flow_id());
       }
       ForwardEvent(event, stream_id);
       continue;

@@ -200,8 +200,11 @@ size_t crashlog_to_string(ktl::span<char> target, zircon_crash_reason_t reason) 
   if (static_cast<bool>(regions & RenderRegion::Dlog)) {
     // Finally, if we have been configured to do so, render as much of the
     // recent debug log as we can fit into the crashlog memory.
+
+    // LINT.IfChange
     constexpr ktl::string_view kHeader{"\n--- BEGIN DLOG DUMP ---\n"};
     constexpr ktl::string_view kFooter{"\n--- END DLOG DUMP ---\n"};
+    // LINT.ThenChange(//src/developer/forensics/feedback/reboot_log/reboot_log.cc)
 
     outfile.Write(kHeader);
     if (gBootOptions->render_dlog_to_crashlog) {

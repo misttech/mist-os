@@ -332,6 +332,7 @@ void UITestRealm::ConfigureScenic() {
           {
               component_testing::Config{
                   .name = "fuchsia.scenic.FrameSchedulerMinPredictedFrameDurationInUs"},
+              component_testing::Config{.name = "fuchsia.scenic.FramePredictionMarginInUs"},
               component_testing::Config{.name = "fuchsia.scenic.ICanHazDisplayId"},
               component_testing::Config{.name = "fuchsia.scenic.ICanHazDisplayMode"},
               component_testing::Config{.name = "fuchsia.scenic.MaxDisplayHorizontalResolutionPx"},

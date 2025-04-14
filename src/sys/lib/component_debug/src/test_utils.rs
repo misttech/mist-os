@@ -9,7 +9,7 @@ use moniker::Moniker;
 use std::collections::HashMap;
 use std::fs::{create_dir_all, write};
 use tempfile::TempDir;
-use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
+use {fidl_fuchsia_component_decl as fcdecl, flex_fuchsia_io as fio, flex_fuchsia_sys2 as fsys};
 
 #[derive(Clone)]
 pub struct File {

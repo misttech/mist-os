@@ -395,6 +395,7 @@ macro_rules! make_structs_and_support_functions {
 pub enum JsonTargetAddress {
     Ip { ip: String, ssh_port: u16 },
     VSock { cid: u32 },
+    Usb { cid: u32 },
 }
 
 impl From<ffx::TargetAddrInfo> for JsonTargetAddress {
@@ -406,6 +407,7 @@ impl From<ffx::TargetAddrInfo> for JsonTargetAddress {
                 JsonTargetAddress::Ip { ip: tai.to_string(), ssh_port: tai.port().unwrap() }
             }
             TargetAddr::VSockCtx(cid) => JsonTargetAddress::VSock { cid: *cid },
+            TargetAddr::UsbCtx(cid) => JsonTargetAddress::Usb { cid: *cid },
         }
     }
 }

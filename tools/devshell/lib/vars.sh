@@ -371,7 +371,7 @@ function fx-check-default-target {
   fx-error "The build level device \"$FUCHSIA_NODENAME\" is being overridden by the user level device \"$effective_default_target\"."
   fx-error "Here are all of the ffx default values set: $(ffx config get --select all target.default)"
   # shellcheck disable=SC2016
-  fx-error 'Please run `ffx target default unset; ffx target default unset --level global` to fix this.'
+  fx-error 'Please run `ffx target default unset` to fix this.'
   return 1
 }
 

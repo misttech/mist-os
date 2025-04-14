@@ -99,6 +99,7 @@ source_set("userspace_test_main") {
 test_names = [
   # keep-sorted start
   "anon_inode",
+  "initial_sid",
   "ioctl",
   "load_policy",
   "memfd",
@@ -116,12 +117,12 @@ test_names = [
 resource("policies") {
   sources = [
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/anon_inode_policy.pp",
+    "//src/starnix/lib/selinux/testdata/composite_policies/compiled/initial_sids_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/ioctl_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/memfd_transition.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/minimal_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/selinuxfs_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/socket_policy.pp",
-    "//src/starnix/lib/selinux/testdata/composite_policies/compiled/socket_transition_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/timerslack.pp",
   ]
   outputs = "data/policies/{{source_file_part}}"

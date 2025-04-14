@@ -22,7 +22,6 @@
                 "fuchsia.cobalt.AggregateAndUpload",
                 "fuchsia.fshost.Admin",
                 "fuchsia.hardware.power.statecontrol.Admin",
-                "fuchsia.logger.Log",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.process.Launcher",
                 "fuchsia.wlan.policy.ClientListener",

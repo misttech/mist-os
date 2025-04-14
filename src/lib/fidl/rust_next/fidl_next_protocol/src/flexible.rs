@@ -172,3 +172,50 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use fidl_next_codec::chunks;
+
+    use super::{Flexible, WireFlexible};
+    use crate::testing::{assert_decoded, assert_encoded};
+    use crate::FrameworkError;
+
+    #[test]
+    fn encode_flexible_result() {
+        assert_encoded(
+            Flexible::<()>::Ok(()),
+            &chunks![
+                0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x01, 0x00,
+            ],
+        );
+        assert_encoded(
+            Flexible::<()>::FrameworkErr(FrameworkError::UnknownMethod),
+            &chunks![
+                0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFE, 0xFF, 0xFF, 0xFF, 0x00, 0x00,
+                0x01, 0x00,
+            ],
+        );
+    }
+
+    #[test]
+    fn decode_flexible_result() {
+        assert_decoded::<WireFlexible<()>>(
+            &mut chunks![
+                0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x01, 0x00,
+            ],
+            |x| assert!(matches!(x.as_ref(), Flexible::Ok(()))),
+        );
+        assert_decoded::<WireFlexible<()>>(
+            &mut chunks![
+                0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFE, 0xFF, 0xFF, 0xFF, 0x00, 0x00,
+                0x01, 0x00,
+            ],
+            |x| {
+                assert!(matches!(x.as_ref(), Flexible::FrameworkErr(FrameworkError::UnknownMethod)))
+            },
+        );
+    }
+}

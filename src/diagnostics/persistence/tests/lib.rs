@@ -11,6 +11,7 @@ use fidl_fuchsia_samplertestcontroller::{SamplerTestControllerMarker, SamplerTes
 use fidl_test_persistence_factory::{ControllerMarker, ControllerProxy};
 use fuchsia_component_test::RealmInstance;
 use log::*;
+use pretty_assertions::{assert_eq, StrComparison};
 use serde_json::Value;
 use std::fs::File;
 use std::io::Read;
@@ -46,10 +47,10 @@ static KEY_FROM_INSPECT_SOURCE: &str = "integer_1";
 pub(crate) const TEST_PERSISTENCE_SERVICE_NAME: &str =
     "fuchsia.diagnostics.persist.DataPersistence-test-service";
 
-enum Published {
+enum Published<'a> {
     Waiting,
     Empty,
-    Int(i32),
+    Int(&'a str, i32),
     SizeError,
 }
 
@@ -142,7 +143,7 @@ async fn diagnostics_persistence_integration() {
     let realm = realm.restart().await;
     verify_diagnostics_persistence_publication(Published::Waiting).await;
     realm.set_update_completed().await;
-    verify_diagnostics_persistence_publication(Published::Int(42)).await;
+    verify_diagnostics_persistence_publication(Published::Int("test-component-metric", 42)).await;
     expect_file_change(FileChange {
         old: FileState::None,
         new: FileState::None,
@@ -252,6 +253,41 @@ async fn diagnostics_persistence_integration() {
         file_name: persisted_data_path_2,
         after: None,
     });
+
+    // Restart twice to purge the cache.
+    let realm = realm.restart().await;
+    let realm = realm.restart().await;
+
+    // Tags with persist_across_boot should write to /cache/current
+    // immediately, not waiting for an update to trigger.
+    const TAG_PERSISTED: &str = "test-component-metric-across-boot";
+    let tag_persisted_path = format!("/tmp/cache/current/test-service/{TAG_PERSISTED}");
+
+    realm.set_inspect(Some(8i64)).await;
+    assert_eq!(
+        File::open(&tag_persisted_path).map(|_| ()).map_err(|e| e.kind()),
+        Err(std::io::ErrorKind::NotFound)
+    );
+    assert_eq!(realm.request_persistence(TAG_PERSISTED).await, PersistResult::Queued);
+    expect_file_change(FileChange {
+        old: FileState::None,
+        new: FileState::Int(8),
+        file_name: &tag_persisted_path,
+        after: None,
+    });
+
+    let realm = realm.restart().await;
+    expect_file_change(FileChange {
+        old: FileState::None,
+        new: FileState::Int(8),
+        file_name: &tag_persisted_path,
+        after: None,
+    });
+    verify_diagnostics_persistence_publication(Published::Waiting).await;
+    realm.set_update_completed().await;
+    verify_diagnostics_persistence_publication(Published::Int(TAG_PERSISTED, 8)).await;
+
+    realm.instance.destroy().await.expect("Failed to destroy realm");
 }
 
 /// The Inspect source may not publish Inspect (via take_and_serve_directory_handle()) until
@@ -279,7 +315,7 @@ async fn wait_for_inspect_source() {
 
 impl TestRealm {
     async fn create() -> TestRealm {
-        let instance = test_topology::create().await.expect("initialized topology");
+        let instance = test_topology::create().await;
         // Start up the Persistence component during realm creation - as happens during startup
         // in a real system - so that it can publish the previous boot's stored data, if any.
         let _persistence_binder = instance
@@ -322,7 +358,10 @@ impl TestRealm {
 
     /// Ask for a tag's associated data to be persisted.
     async fn request_persistence(&self, tag: &str) -> PersistResult {
-        self.persistence.persist(tag).await.unwrap()
+        self.persistence
+            .persist(tag)
+            .await
+            .unwrap_or_else(|e| panic!("persist should work for {tag:?}: {e:?}"))
     }
 
     /// Ask for a tag's associated data to be persisted.
@@ -330,7 +369,7 @@ impl TestRealm {
         self.persistence
             .persist_tags(&tags.iter().map(|t| t.to_string()).collect::<Vec<String>>())
             .await
-            .unwrap()
+            .unwrap_or_else(|e| panic!("persist should work for {tags:?}: {e:?}"))
     }
 
     /// Tear down the realm to make sure everything is gone before you restart it.
@@ -500,9 +539,9 @@ fn json_strings_match(observed: &str, expected: &str, context: &str) -> bool {
     }
 
     if observed_json != expected_json {
-        warn!("Observed != expected in {}", context);
-        warn!("Observed: {:?}", observed_json);
-        warn!("Expected: {:?}", expected_json);
+        let observed = serde_json::to_string_pretty(&observed_json).unwrap();
+        let expected = serde_json::to_string_pretty(&expected_json).unwrap();
+        warn!("Observed != expected in {}\n{}", context, StrComparison::new(&observed, &expected));
     }
     observed_json == expected_json
 }
@@ -560,7 +599,7 @@ fn collapse_realm_builder_strings(data: &str) -> String {
 }
 
 /// Verify that the expected data is published by Persistence in its Inspect hierarchy.
-async fn verify_diagnostics_persistence_publication(published: Published) {
+async fn verify_diagnostics_persistence_publication<'a>(published: Published<'a>) {
     let mut inspect_fetcher = ArchiveReader::inspect();
     inspect_fetcher.retry(RetryConfig::never());
     inspect_fetcher.add_selector("realm_builder*/persistence:root");
@@ -618,7 +657,7 @@ fn expected_size_error() -> String {
     .to_string()
 }
 
-fn expected_diagnostics_persistence_inspect(published: Published) -> String {
+fn expected_diagnostics_persistence_inspect<'a>(published: Published<'a>) -> String {
     let variant = match published {
         Published::Waiting => "".to_string(),
         Published::Empty => r#""published":0,"persist":{}"#.to_string(),
@@ -631,20 +670,21 @@ fn expected_diagnostics_persistence_inspect(published: Published) -> String {
             }
             "#
         .replace("%SIZE_ERROR%", &expected_size_error()),
-        Published::Int(number) => {
+        Published::Int(tag, number) => {
             let number_str = number.to_string();
+            let persist_size = 96 + number_str.len();
             r#"
                 "published":0,
                 "persist": {
                     "test-service": {
-                        "test-component-metric": {
+                        "%TAG%": {
                             "@timestamps": {
                                 "before_utc":0,
                                 "after_utc":0,
                                 "before_monotonic":0,
                                 "after_monotonic":0
                             },
-                            "@persist_size": 98,
+                            "@persist_size": %PERSIST_SIZE%,
                             "realm_builder/single_counter": {
                                 "samples": {
                                     "optional": %NUMBER%,
@@ -655,6 +695,8 @@ fn expected_diagnostics_persistence_inspect(published: Published) -> String {
                     }
                 }
             "#
+            .replace("%TAG%", tag)
+            .replace("%PERSIST_SIZE%", &persist_size.to_string())
             .replace("%NUMBER%", &number_str)
         }
     };

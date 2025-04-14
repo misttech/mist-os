@@ -53,7 +53,7 @@ impl Socket {
             .transaction(
                 ordinals::WRITE_SOCKET,
                 proto::SocketWriteSocketRequest { handle: hid, data },
-                move |x| Responder::WriteSocket(x, hid),
+                move |x| Responder::WriteSocket(x),
             )
             .map(move |x| x.map(|y| assert!(y.wrote as usize == len)))
     }

@@ -35,7 +35,6 @@
 #include "sdmmc-partition-device.h"
 #include "sdmmc-rpmb-device.h"
 #include "sdmmc-types.h"
-#include "src/storage/lib/block_server/block_server.h"
 
 namespace sdmmc {
 
@@ -89,7 +88,7 @@ struct ReadWriteMetadata {
   SdmmcBlockDevice* const block_device;
 };
 
-class SdmmcBlockDevice : public block_server::Interface {
+class SdmmcBlockDevice {
  public:
   static constexpr char kHardwarePowerElementName[] = "sdmmc-hardware";
 
@@ -141,6 +140,8 @@ class SdmmcBlockDevice : public block_server::Interface {
   fidl::WireSyncClient<fuchsia_driver_framework::Node>& block_node() { return block_node_; }
   std::string_view block_name() const { return block_name_; }
   SdmmcRootDevice* parent() { return parent_; }
+  void OnRequests(const block_server::Session& session, const PartitionDevice& partition,
+                  cpp20::span<block_server::Request> requests);
 
   // Visible for testing.
   void SetBlockInfo(uint32_t block_size, uint64_t block_count);
@@ -227,14 +228,6 @@ class SdmmcBlockDevice : public block_server::Interface {
   // transitions to the Power Broker.
   void WatchHardwareRequiredLevel();
 
-  // block_server::Interface
-  void StartThread(block_server::Thread) override;
-  void OnNewSession(block_server::Session) override;
-  void OnRequests(const block_server::Session&, cpp20::span<block_server::Request>) override;
-  void Log(std::string_view msg) const override {
-    FDF_LOGL(INFO, logger(), "%.*s", static_cast<int>(msg.size()), msg.data());
-  }
-
   SdmmcRootDevice* const parent_;
   // Only accessed by ProbeSd, ProbeMmc, SuspendPower, ResumePower, and WorkerLoop.
   std::unique_ptr<SdmmcDevice> sdmmc_;
@@ -314,7 +307,6 @@ class SdmmcBlockDevice : public block_server::Interface {
 
   std::vector<std::unique_ptr<PartitionDevice>> child_partition_devices_;
   std::unique_ptr<RpmbDevice> child_rpmb_device_;
-  std::optional<block_server::BlockServer> block_server_ TA_GUARDED(queue_lock_);
   EmmcPartition current_partition_ TA_GUARDED(worker_lock_) = EmmcPartition::USER_DATA_PARTITION;
 };
 

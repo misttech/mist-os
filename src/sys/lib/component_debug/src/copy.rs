@@ -2,18 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::endpoints::create_proxy;
-
 use crate::io::{Directory, DirentKind, LocalDirectory, RemoteDirectory};
 use crate::path::{
     add_source_filename_to_path_if_absent, open_parent_subdir_readable, LocalOrRemoteDirectoryPath,
 };
 use anyhow::{bail, Result};
-use fidl::endpoints::ServerEnd;
+use flex_client::fidl::ServerEnd;
+use flex_client::ProxyHasDomain;
 use regex::Regex;
 use std::path::PathBuf;
 use thiserror::Error;
-use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
+use {flex_fuchsia_io as fio, flex_fuchsia_sys2 as fsys};
 
 #[derive(Error, Debug)]
 pub enum CopyError {
@@ -291,7 +290,7 @@ async fn open_component_dir_for_moniker(
     moniker: &str,
     dir_type: &fsys::OpenDirType,
 ) -> Result<fio::DirectoryProxy> {
-    let (dir, server_end) = create_proxy::<fio::DirectoryMarker>();
+    let (dir, server_end) = realm_query.domain().create_proxy::<fio::DirectoryMarker>();
     let server_end = ServerEnd::new(server_end.into_channel());
     let flags = match dir_type {
         fsys::OpenDirType::PackageDir => fio::OpenFlags::RIGHT_READABLE,

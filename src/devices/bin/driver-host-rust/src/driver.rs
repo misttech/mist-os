@@ -5,7 +5,7 @@
 use crate::loader::{Library, LoaderService};
 use crate::modules::ModulesAndSymbols;
 use crate::utils::*;
-use fdf::OnDispatcher;
+use fdf::{CurrentDispatcher, OnDispatcher};
 use fdf_component::Incoming;
 use fidl::client::decode_transaction_body;
 use fidl::encoding::{DefaultFuchsiaResourceDialect, EmptyStruct, ResultType};
@@ -203,6 +203,12 @@ struct DriverInner {
 
 impl Drop for DriverInner {
     fn drop(&mut self) {
+        self.destroy();
+    }
+}
+
+impl DriverInner {
+    fn destroy(&mut self) {
         if let Some(token) = self.token.take() {
             self.hooks.destroy(token);
         }
@@ -403,53 +409,55 @@ impl Driver {
         let (server_chan, client_chan) = fdf::Channel::<[u8]>::create();
         {
             let self_clone = self.clone();
-            let inner = self.inner.lock();
-            let dispatcher = inner.dispatcher.as_ref().expect("dispatcher should always be valid");
-            let dispatcher_ref = dispatcher.clone();
-            dispatcher.spawn_task(async move {
-                {
-                    let mut inner = self_clone.inner.lock();
-                    let hooks = &inner.hooks;
+            self.inner
+                .lock()
+                .dispatcher
+                .as_ref()
+                .expect("dispatcher should always be valid")
+                .spawn_task(async move {
+                    {
+                        let mut inner = self_clone.inner.lock();
+                        let hooks = &inner.hooks;
 
-                    inner.token = Some(hooks.initialize(server_chan.into_driver_handle()));
-                };
+                        inner.token = Some(hooks.initialize(server_chan.into_driver_handle()));
+                    };
 
-                let start_msg =
-                    fidl_fdf::DriverRequest::start_as_message(fdf::Arena::new(), start_args, 1)
-                        .expect("Failed to create start message");
-                if let Err(e) = client_chan.write(start_msg) {
-                    completer.send(Err(e)).unwrap();
-                    return;
-                }
-
-                // It's possible that this may never return if the driver blocks its main thread
-                // after replying? In that case we would probably want another dispatcher.
-                match client_chan.read_bytes(dispatcher_ref).await {
-                    Err(e) => {
+                    let start_msg =
+                        fidl_fdf::DriverRequest::start_as_message(fdf::Arena::new(), start_args, 1)
+                            .expect("Failed to create start message");
+                    if let Err(e) = client_chan.write(start_msg) {
                         completer.send(Err(e)).unwrap();
+                        return;
                     }
-                    Ok(None) => {
-                        // Invalid response.
-                        completer.send(Err(Status::INTERNAL)).unwrap();
-                    }
-                    Ok(Some(msg)) => {
-                        let buf = msg.data().unwrap().to_vec();
-                        let buf = fidl::MessageBufEtc::new_with(buf, Vec::new());
-                        match decode_transaction_body::<
-                            ResultType<EmptyStruct, i32>,
-                            DefaultFuchsiaResourceDialect,
-                            0x27be00ae42aa60c2,
-                        >(buf)
-                        {
-                            Ok(status) => {
-                                let ret = status.map_err(Status::from_raw).map(|_| client_chan);
-                                completer.send(ret).unwrap();
-                            }
-                            Err(_) => completer.send(Err(Status::INVALID_ARGS)).unwrap(),
-                        };
-                    }
-                };
-            })?;
+
+                    // It's possible that this may never return if the driver blocks its main thread
+                    // after replying? In that case we would probably want another dispatcher.
+                    match client_chan.read_bytes(CurrentDispatcher).await {
+                        Err(e) => {
+                            completer.send(Err(e)).unwrap();
+                        }
+                        Ok(None) => {
+                            // Invalid response.
+                            completer.send(Err(Status::INTERNAL)).unwrap();
+                        }
+                        Ok(Some(msg)) => {
+                            let buf = msg.data().unwrap().to_vec();
+                            let buf = fidl::MessageBufEtc::new_with(buf, Vec::new());
+                            match decode_transaction_body::<
+                                ResultType<EmptyStruct, i32>,
+                                DefaultFuchsiaResourceDialect,
+                                0x27be00ae42aa60c2,
+                            >(buf)
+                            {
+                                Ok(status) => {
+                                    let ret = status.map_err(Status::from_raw).map(|_| client_chan);
+                                    completer.send(ret).unwrap();
+                                }
+                                Err(_) => completer.send(Err(Status::INVALID_ARGS)).unwrap(),
+                            };
+                        }
+                    };
+                })?;
         }
         let client_chan = match task_result.await.unwrap() {
             Err(e) => {
@@ -485,12 +493,13 @@ impl Driver {
                 .unwrap();
         });
 
-        let inner = self.inner.lock();
-        let dispatcher = inner.dispatcher.as_ref().expect("dispatcher should always be valid");
-        let dispatcher_ref = dispatcher.clone();
-        let dispatcher_ref2 = dispatcher.clone();
         let weak_self = Arc::downgrade(&self);
-        dispatcher.spawn_task(async move {
+        self.inner
+            .lock()
+            .dispatcher
+            .as_ref()
+            .expect("dispatcher should always be valid")
+            .spawn_task(async move {
             // Wait for driver manager to issue stop or the driver to have dropped its end of the
             // driver channel.
             futures::select! {
@@ -500,7 +509,7 @@ impl Driver {
                     match client_chan.write(stop_msg) {
                         Ok(()) => {
                             // Wait for client_chan to receive peer_closed.
-                            match client_chan.read_bytes(dispatcher_ref).await {
+                            match client_chan.read_bytes(CurrentDispatcher).await {
                                 Err(e) => {
                                     assert_eq!(e, Status::PEER_CLOSED, "Unexpected status {e}");
                                 }
@@ -520,7 +529,7 @@ impl Driver {
                         }
                     };
                 },
-                _ = client_chan.read_bytes(dispatcher_ref2).fuse() => {
+                _ = client_chan.read_bytes(CurrentDispatcher).fuse() => {
                     let _ = exit_sender.send(());
                 },
             };
@@ -564,10 +573,10 @@ impl Driver {
                     let _ = shutdown_signaler.send(Arc::downgrade(&this));
                 }
 
-                // This should be the last strong reference to the driver. The destroy hook will run
-                // in its destructor.
-                Arc::try_unwrap(this)
-                    .expect("Someone unexpected is holding onto a reference of driver");
+                // Trigger destroy hook.
+                // In theory this should be the last reference to the driver, however if shutdown
+                // is invoked from the main driver_host thread, it's not guaranteed.
+                this.inner.lock().destroy();
 
                 let _ = driver_request.close_with_epitaph(zx::Status::OK);
             });

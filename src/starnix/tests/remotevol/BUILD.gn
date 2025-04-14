@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 
 group("tests") {
@@ -11,19 +12,49 @@ group("tests") {
   deps = [
     ":starnix_remotevol_key_file_integration_test",
     ":starnix_remotevol_shutdown_integration_test",
+    "//src/starnix/tests/remotevol/stat:tests",
+    "//src/starnix/tests/remotevol/symlinks:tests",
   ]
 }
 
 test_deps = [
-  "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-  "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
   "//src/lib/diagnostics/reader/rust",
   "//src/lib/fuchsia",
   "//src/lib/fuchsia-component-test",
-  "//src/lib/fuchsia-fs",
   "//third_party/rust_crates:futures",
   "//third_party/rust_crates:log",
 ]
+
+rustc_library("remotevol_fuchsia_test_util") {
+  testonly = true
+  name = "remotevol_fuchsia_test_util"
+  edition = "2021"
+  source_root = "lib/fuchsia.rs"
+  sources = [ source_root ]
+  deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
+    "//src/lib/diagnostics/reader/rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component-test",
+    "//src/lib/fuchsia-fs",
+    "//third_party/rust_crates:log",
+  ]
+}
+
+rustc_library("remotevol_linux_test_util") {
+  testonly = true
+  name = "remotevol_linux_test_util"
+  edition = "2021"
+  source_root = "lib/linux.rs"
+  sources = [ source_root ]
+  deps = [
+    "//src/starnix/lib/linux_uapi",
+    "//third_party/rust_crates:libc",
+    "//third_party/rust_crates:zerocopy",
+  ]
+}
 
 rustc_test("remotevol_shutdown_integration_test_bin") {
   edition = "2021"
@@ -31,6 +62,8 @@ rustc_test("remotevol_shutdown_integration_test_bin") {
   sources = [ source_root ]
   deps = test_deps
   deps += [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//src/lib/fuchsia-fs",
     "//src/sys/lib/component-events",
     "//third_party/rust_crates:assert_matches",
   ]
@@ -42,10 +75,10 @@ rustc_test("remotevol_key_file_integration_test_bin") {
   sources = [ source_root ]
   deps = test_deps
   deps += [
+    ":remotevol_fuchsia_test_util",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-fs",
     "//src/storage/fxfs/test-fxfs/fidl/fuchsia.test.fxfs:fuchsia.test.fxfs_rust",
   ]
 }

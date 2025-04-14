@@ -560,12 +560,12 @@ zx_status_t PageRequest::Wait(bool suspendable) {
 
 void PageRequest::CancelRequest() {
   // Nothing to cancel if the request isn't initialized yet.
-  if (!IsInitialized()) {
+  // We may inspect src_ here as src_ is only set by Init, and Init and CancelRequest must only be
+  // called by the owner of the PageRequest, providing implicit serialization.
+  if (!src_) {
     return;
   }
-  DEBUG_ASSERT(src_);
   src_->CancelRequest(this);
-  DEBUG_ASSERT(!IsInitialized());
 }
 
 PageRequest* LazyPageRequest::get() {

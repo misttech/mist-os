@@ -9,11 +9,11 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <zircon/types.h>
 
 #include <gtest/gtest.h>
 
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/media/drivers/amlogic_decoder/device_ctx.h"
 
@@ -46,7 +46,7 @@ class FakeClock : public fidl::testing::WireTestBase<fuchsia_hardware_clock::Clo
 };
 
 struct IncomingNamespace {
-  fake_pdev::FakePDevFidl pdev_server;
+  fdf_fake::FakePDev pdev_server;
   component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
   FakeSysmem fake_sysmem;
   component::OutgoingDirectory outgoing_sysmem{async_get_default_dispatcher()};
@@ -61,7 +61,7 @@ struct IncomingNamespace {
 class BindingTest : public testing::Test {
  protected:
   void InitPdev() {
-    fake_pdev::FakePDevFidl::Config config;
+    fdf_fake::FakePDev::Config config;
     config.use_fake_bti = true;
     config.use_fake_irq = true;
 

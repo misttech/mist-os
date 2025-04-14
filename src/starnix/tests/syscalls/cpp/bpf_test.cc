@@ -384,22 +384,19 @@ class BpfMapTest : public testing::Test {
 };  // namespace
 
 TEST_F(BpfMapTest, Map) {
-  EXPECT_EQ(bpf(BPF_MAP_UPDATE_ELEM,
-                (union bpf_attr){
-                    .map_fd = (unsigned)map_fd(),
-                    .key = (uintptr_t)(int[]){1},
-                    .value = (uintptr_t)(int[]){2},
-                }),
-            0)
-      << strerror(errno);
-  EXPECT_EQ(bpf(BPF_MAP_UPDATE_ELEM,
-                (union bpf_attr){
-                    .map_fd = (unsigned)map_fd(),
-                    .key = (uintptr_t)(int[]){2},
-                    .value = (uintptr_t)(int[]){3},
-                }),
-            0)
-      << strerror(errno);
+  const int NUM_VALUES = 2;
+
+  for (int i = 0; i < NUM_VALUES; ++i) {
+    int v = i + 1;
+    EXPECT_EQ(bpf(BPF_MAP_UPDATE_ELEM,
+                  (union bpf_attr){
+                      .map_fd = (unsigned)map_fd(),
+                      .key = (uintptr_t)(&i),
+                      .value = (uintptr_t)(&v),
+                  }),
+              0)
+        << strerror(errno);
+  }
 
   std::vector<int> keys;
   int next_key;
@@ -417,11 +414,23 @@ TEST_F(BpfMapTest, Map) {
     last_key = &next_key;
   }
   std::sort(keys.begin(), keys.end());
-  EXPECT_EQ(keys.size(), 2u);
-  EXPECT_EQ(keys[0], 1);
-  EXPECT_EQ(keys[1], 2);
+  EXPECT_EQ(keys.size(), static_cast<size_t>(NUM_VALUES));
+  for (int i = 0; i < NUM_VALUES; ++i) {
+    EXPECT_EQ(keys[i], i);
+  }
 
-  // BPF_MAP_LOOKUP_ELEM is not yet implemented
+  for (int i = 0; i < NUM_VALUES; ++i) {
+    int v;
+    EXPECT_EQ(bpf(BPF_MAP_LOOKUP_ELEM,
+                  (union bpf_attr){
+                      .map_fd = (unsigned)map_fd(),
+                      .key = (uintptr_t)(&i),
+                      .value = (uintptr_t)(&v),
+                  }),
+              0)
+        << strerror(errno);
+    EXPECT_EQ(v, i + 1);
+  }
 
   CheckMapInfo();
 }

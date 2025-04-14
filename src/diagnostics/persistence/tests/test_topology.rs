@@ -4,7 +4,6 @@
 
 use std::sync::atomic::{AtomicU16, Ordering};
 
-use anyhow::Error;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_update::ListenerMarker;
 use fidl_test_persistence_factory::ControllerMarker;
@@ -19,7 +18,7 @@ const PERSISTENCE_URL: &str = "#meta/persistence.cm";
 pub static REALM_NAME_PATTERN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"persistence-test-\d{5}").unwrap());
 
-pub async fn create() -> Result<RealmInstance, Error> {
+pub async fn create() -> RealmInstance {
     static COUNTER: AtomicU16 = AtomicU16::new(0);
 
     // We want deterministic realm names of a fixed length. Add a fixed-size
@@ -32,14 +31,20 @@ pub async fn create() -> Result<RealmInstance, Error> {
         *REALM_NAME_PATTERN
     );
 
-    let builder =
-        RealmBuilder::with_params(RealmBuilderParams::new().realm_name(realm_name)).await?;
-    let single_counter =
-        builder.add_child("single_counter", SINGLE_COUNTER_URL, ChildOptions::new()).await?;
-    let persistence =
-        builder.add_child("persistence", PERSISTENCE_URL, ChildOptions::new()).await?;
-
-    let config_server = crate::mock_filesystems::create_config_data(&builder).await?;
+    let builder = RealmBuilder::with_params(RealmBuilderParams::new().realm_name(realm_name))
+        .await
+        .expect("Failed to create realm builder");
+    let single_counter = builder
+        .add_child("single_counter", SINGLE_COUNTER_URL, ChildOptions::new())
+        .await
+        .expect("Failed to create single_counter");
+    let persistence = builder
+        .add_child("persistence", PERSISTENCE_URL, ChildOptions::new())
+        .await
+        .expect("Failed to create persistence");
+    let config_server = crate::mock_filesystems::create_config_data(&builder)
+        .await
+        .expect("Failed to create filesystem from config");
     builder
         .add_route(
             Route::new()
@@ -51,9 +56,12 @@ pub async fn create() -> Result<RealmInstance, Error> {
                 .from(&config_server)
                 .to(&persistence),
         )
-        .await?;
+        .await
+        .expect("Failed to add route for /config/data directory");
 
-    let cache_server = crate::mock_filesystems::create_cache_server(&builder).await?;
+    let cache_server = crate::mock_filesystems::create_cache_server(&builder)
+        .await
+        .expect("Failed to create cache server");
     builder
         .add_route(
             Route::new()
@@ -65,9 +73,12 @@ pub async fn create() -> Result<RealmInstance, Error> {
                 .from(&cache_server)
                 .to(&persistence),
         )
-        .await?;
+        .await
+        .expect("Failed to add route for /cache directory");
 
-    let update_server = crate::mock_fidl::handle_update_check_services(&builder).await?;
+    let update_server = crate::mock_fidl::handle_update_check_services(&builder)
+        .await
+        .expect("Failed to create update server");
     builder
         .add_route(
             Route::new()
@@ -75,7 +86,8 @@ pub async fn create() -> Result<RealmInstance, Error> {
                 .from(&update_server)
                 .to(&persistence),
         )
-        .await?;
+        .await
+        .expect("Failed to add route for fuchsia.update.Listener");
     builder
         .add_route(
             Route::new()
@@ -83,7 +95,8 @@ pub async fn create() -> Result<RealmInstance, Error> {
                 .from(&update_server)
                 .to(Ref::parent()),
         )
-        .await?;
+        .await
+        .expect("Failed to add route for fuchsia.update.Controller");
 
     builder
         .add_route(
@@ -94,7 +107,8 @@ pub async fn create() -> Result<RealmInstance, Error> {
                 .from(&single_counter)
                 .to(Ref::parent()),
         )
-        .await?;
+        .await
+        .expect("Failed to add route for fuchsia.samplertestcontroller.SamplerTestController");
 
     builder
         .add_route(
@@ -103,7 +117,8 @@ pub async fn create() -> Result<RealmInstance, Error> {
                 .from(&persistence)
                 .to(Ref::parent()),
         )
-        .await?;
+        .await
+        .expect("Failed to add route for persistence");
 
     builder
         .add_route(
@@ -115,31 +130,18 @@ pub async fn create() -> Result<RealmInstance, Error> {
                 .from(Ref::parent())
                 .to(&persistence),
         )
-        .await?;
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.logger.Log"))
-                .from(Ref::parent())
-                .to(&single_counter),
-        )
-        .await?;
+        .await
+        .expect("Failed to add route for fuchsia.diagnostics.ArchiveAccessor");
     builder
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
                 .from(Ref::parent())
-                .to(&persistence),
-        )
-        .await?;
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .from(Ref::parent())
+                .to(&persistence)
                 .to(&single_counter),
         )
-        .await?;
+        .await
+        .expect("Failed to add route for fuchsia.logger.LogSink");
 
     builder
         .add_route(
@@ -151,8 +153,8 @@ pub async fn create() -> Result<RealmInstance, Error> {
                 .from(&persistence)
                 .to(Ref::parent()),
         )
-        .await?;
+        .await
+        .expect("Failed to add route for fuchsia.component.Binder");
 
-    let instance = builder.build().await?;
-    Ok(instance)
+    builder.build().await.expect("Failed to build test realm")
 }

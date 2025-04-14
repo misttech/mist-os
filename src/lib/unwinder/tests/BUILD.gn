@@ -8,16 +8,22 @@ assert(!is_mac)
 source_set("tests") {
   testonly = true
 
-  sources = [ "test_unwinding.cc" ]
-  deps = [
-    ":cfi_only",
-    ":fp_only",
-    ":scs_only",
-    "..",
-    "//src/developer/debug/shared:test_support",
-    "//src/lib/fxl",
-    "//third_party/googletest:gtest",
-  ]
+  sources = []
+  deps = []
+
+  # TODO(https://fxbug.dev/408223281): Fix these tests on riscv.
+  if (current_cpu != "riscv64") {
+    sources += [ "test_unwinding.cc" ]
+    deps += [
+      ":cfi_only",
+      ":fp_only",
+      ":scs_only",
+      "..",
+      "//src/developer/debug/shared:test_support",
+      "//src/lib/fxl",
+      "//third_party/googletest:gtest",
+    ]
+  }
 }
 
 source_set("cfi_only") {

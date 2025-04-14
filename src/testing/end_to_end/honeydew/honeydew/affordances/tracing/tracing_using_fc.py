@@ -8,8 +8,8 @@ import logging
 import os
 from datetime import datetime
 
-import fidl.fuchsia_tracing as f_tracing
-import fidl.fuchsia_tracing_controller as f_tracingcontroller
+import fidl_fuchsia_tracing as f_tracing
+import fidl_fuchsia_tracing_controller as f_tracingcontroller
 import fuchsia_controller_py as fc
 from fidl import AsyncSocket
 
@@ -78,7 +78,7 @@ class TracingUsingFc(tracing.Tracing):
         self._name: str = device_name
         self._fc_transport: fc_transport.FuchsiaController = fuchsia_controller
 
-        self._trace_controller_proxy: f_tracingcontroller.Session.Client | None
+        self._trace_controller_proxy: f_tracingcontroller.SessionClient | None
 
         self._trace_socket: AsyncSocket | None
         self._session_initialized: bool
@@ -238,23 +238,23 @@ class TracingUsingFc(tracing.Tracing):
 
         try:
             assert self._trace_controller_proxy is not None
-            stop_tracing_result = asyncio.run(
+            stop_tracing_response = asyncio.run(
                 self._trace_controller_proxy.stop_tracing(write_results=True)
-            )
-            if stop_tracing_result.response is not None:
-                stop_tracing_response = stop_tracing_result.response
-                provider_stats = stop_tracing_response.provider_stats
-                for p in provider_stats:
-                    if p.records_dropped and p.records_dropped > 0:
-                        _LOGGER.warning(
-                            "%s records were dropped for %s!",
-                            p.records_dropped,
-                            p.name,
-                        )
-        except fc.ZxStatus as status:
+            ).unwrap()
+            assert (
+                stop_tracing_response.provider_stats is not None
+            ), f"{stop_tracing_response!r} missing provider_stats"
+            for p in stop_tracing_response.provider_stats:
+                if p.records_dropped and p.records_dropped > 0:
+                    _LOGGER.warning(
+                        "%s records were dropped for %s!",
+                        p.records_dropped,
+                        p.name,
+                    )
+        except (AssertionError, fc.ZxStatus) as e:
             raise TracingError(
                 "fuchsia.tracing.controller.Stop FIDL Error"
-            ) from status
+            ) from e
         self._tracing_active = False
 
     def terminate(self) -> None:

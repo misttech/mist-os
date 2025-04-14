@@ -30,7 +30,7 @@ constexpr std::string_view kUMSProductDescription = "USB Mass Storage";
 constexpr std::string_view kRNDISProductDescription = "RNDIS Ethernet";
 constexpr std::string_view kTestProductDescription = "USB Function Test";
 constexpr std::string_view kADBProductDescription = "ADB";
-constexpr std::string_view kOvernetProductDescription = "Overnet";
+constexpr std::string_view kVsockBridgeProductDescription = "VSOCK Bridge";
 constexpr std::string_view kFastbootProductDescription = "Fastboot";
 
 constexpr peripheral::wire::FunctionDescriptor kCDCFunctionDescriptor = {
@@ -57,10 +57,10 @@ constexpr peripheral::wire::FunctionDescriptor kADBFunctionDescriptor = {
     .interface_protocol = USB_PROTOCOL_ADB,
 };
 
-constexpr peripheral::wire::FunctionDescriptor kOvernetFunctionDescriptor = {
+constexpr peripheral::wire::FunctionDescriptor kFfxFunctionDescriptor = {
     .interface_class = USB_CLASS_VENDOR,
-    .interface_subclass = USB_SUBCLASS_OVERNET,
-    .interface_protocol = USB_PROTOCOL_OVERNET,
+    .interface_subclass = USB_SUBCLASS_VSOCK_BRIDGE,
+    .interface_protocol = USB_PROTOCOL_VSOCK_BRIDGE,
 };
 
 constexpr peripheral::wire::FunctionDescriptor kFastbootFunctionDescriptor = {

@@ -31,6 +31,7 @@ template("lacewing_fidl_wrapper") {
       if (defined(invoker.deps)) {
         deps += invoker.deps
       }
+      forward_variables_from(invoker, [ "package_deps" ])
       if (defined(invoker.device_test_realm)) {
         _device_test_realm = invoker.device_test_realm
       } else {
@@ -64,6 +65,7 @@ template("lacewing_fidl_wrapper") {
                  "device_test_realm",
                  "device_test_target_name",
                  "device_test_url",
+                 "package_deps",
                  "test_specs",
                ])
   }

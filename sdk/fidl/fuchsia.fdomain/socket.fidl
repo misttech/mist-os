@@ -22,6 +22,12 @@ type SocketType = flexible enum {
     DATAGRAM = 1;
 };
 
+// Data resulting from reading a socket.
+type SocketData = struct {
+    data vector<uint8>;
+    is_datagram bool;
+};
+
 // FDomain operations on sockets
 @no_resource
 open protocol Socket {
@@ -43,9 +49,7 @@ open protocol Socket {
     flexible ReadSocket(struct {
         handle HandleId;
         max_bytes uint64;
-    }) -> (struct {
-        data vector<uint8>;
-    }) error Error;
+    }) -> (SocketData) error Error;
 
     // Write to a socket. This will attempt to write all the data passed, and
     // will block and retry whenever it is safe (e.g. it should never return
@@ -75,7 +79,7 @@ open protocol Socket {
     flexible -> OnSocketStreamingData(struct {
         handle HandleId;
         socket_message flexible union {
-            1: data vector<uint8>;
+            1: data SocketData;
             2: stopped AioStopped;
         };
     });

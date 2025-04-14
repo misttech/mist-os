@@ -93,8 +93,17 @@ impl InputHandler for MouseInjectorHandler {
                     input_device::InputDeviceDescriptor::Mouse(ref mouse_device_descriptor),
                 event_time,
                 handled: input_device::Handled::No,
-                trace_id: _,
+                trace_id,
             } => {
+                fuchsia_trace::duration!(c"input", c"mouse_injector_hander");
+                let tracing_id = match trace_id {
+                    Some(id) => {
+                        fuchsia_trace::flow_end!(c"input", c"event_in_input_pipeline", id.into());
+                        id
+                    }
+                    None => fuchsia_trace::Id::new(),
+                };
+
                 self.inspect_status
                     .count_received_event(input_device::InputEvent::from(input_event.clone()));
                 // TODO(https://fxbug.dev/42171756): Investigate latency introduced by waiting for update_cursor_renderer
@@ -118,7 +127,12 @@ impl InputHandler for MouseInjectorHandler {
 
                 // Handle the event.
                 if let Err(e) = self
-                    .send_event_to_scenic(&mouse_event, &mouse_device_descriptor, event_time)
+                    .send_event_to_scenic(
+                        &mouse_event,
+                        &mouse_device_descriptor,
+                        event_time,
+                        tracing_id.into(),
+                    )
                     .await
                 {
                     self.metrics_logger.log_error(
@@ -327,6 +341,7 @@ impl MouseInjectorHandler {
             pointerinjector::EventPhase::Add,
             self.inner().current_position,
             None,
+            None,
         )];
         device_proxy.inject(events_to_send).await.context("Failed to ADD new MouseDevice.")?;
 
@@ -413,6 +428,7 @@ impl MouseInjectorHandler {
         mouse_event: &mouse_binding::MouseEvent,
         mouse_descriptor: &mouse_binding::MouseDeviceDescriptor,
         event_time: zx::MonotonicInstant,
+        tracing_id: u64,
     ) -> Result<(), anyhow::Error> {
         let injector = self.inner().injectors.get(&mouse_descriptor.device_id).cloned();
         if let Some(injector) = injector {
@@ -431,7 +447,11 @@ impl MouseInjectorHandler {
                 pointerinjector::EventPhase::Change,
                 self.inner().current_position,
                 relative_motion,
+                Some(tracing_id),
             )];
+
+            fuchsia_trace::flow_begin!(c"input", c"dispatch_event_to_scenic", tracing_id.into());
+
             let _ = injector.inject(events_to_send).await;
 
             Ok(())
@@ -458,6 +478,7 @@ impl MouseInjectorHandler {
         phase: pointerinjector::EventPhase,
         current_position: Position,
         relative_motion: Option<[f32; 2]>,
+        trace_id: Option<u64>,
     ) -> pointerinjector::Event {
         let pointer_sample = pointerinjector::PointerSample {
             pointer_id: Some(0),
@@ -509,7 +530,7 @@ impl MouseInjectorHandler {
         pointerinjector::Event {
             timestamp: Some(event_time.into_nanos()),
             data: Some(pointerinjector::Data::PointerSample(pointer_sample)),
-            trace_flow_id: None,
+            trace_flow_id: trace_id,
             ..Default::default()
         }
     }
@@ -572,6 +593,7 @@ mod tests {
     use crate::testing_utilities::{
         assert_handler_ignores_input_event_sequence, create_mouse_event,
         create_mouse_event_with_handled, create_mouse_pointer_sample_event,
+        create_mouse_pointer_sample_event_phase_add,
         create_mouse_pointer_sample_event_with_wheel_physical_pixel,
     };
     use assert_matches::assert_matches;
@@ -944,16 +966,7 @@ mod tests {
         // Handle event.
         let handle_event_fut = mouse_handler.handle_input_event(input_event);
         let expected_events = vec![
-            create_mouse_pointer_sample_event(
-                pointerinjector::EventPhase::Add,
-                vec![],
-                expected_position,
-                None, /*relative_motion*/
-                None, /*wheel_delta_v*/
-                None, /*wheel_delta_h*/
-                None, /*is_precision_scroll*/
-                event_time,
-            ),
+            create_mouse_pointer_sample_event_phase_add(vec![], expected_position, event_time),
             create_mouse_pointer_sample_event(
                 pointerinjector::EventPhase::Change,
                 vec![],
@@ -1073,16 +1086,7 @@ mod tests {
             y: DISPLAY_WIDTH_IN_PHYSICAL_PX * 0.75,
         };
         let expected_events = vec![
-            create_mouse_pointer_sample_event(
-                pointerinjector::EventPhase::Add,
-                vec![],
-                expected_position,
-                None, /*relative_motion*/
-                None, /*wheel_delta_v*/
-                None, /*wheel_delta_h*/
-                None, /*is_precision_scroll*/
-                event_time,
-            ),
+            create_mouse_pointer_sample_event_phase_add(vec![], expected_position, event_time),
             create_mouse_pointer_sample_event(
                 pointerinjector::EventPhase::Change,
                 vec![],
@@ -1183,14 +1187,9 @@ mod tests {
         let handle_event_fut = mouse_handler.handle_input_event(input_event);
         let expected_position = Position { x: 0.0, y: 0.0 };
         let expected_events = vec![
-            create_mouse_pointer_sample_event(
-                pointerinjector::EventPhase::Add,
+            create_mouse_pointer_sample_event_phase_add(
                 pressed_buttons.clone(),
                 expected_position,
-                None, /*relative_motion*/
-                None, /*wheel_delta_v*/
-                None, /*wheel_delta_h*/
-                None, /*is_precision_scroll*/
                 event_time,
             ),
             create_mouse_pointer_sample_event(
@@ -1313,14 +1312,9 @@ mod tests {
         assert_eq!(
             injector_stream_receiver.next().await.map(|events| events.concat()),
             Some(vec![
-                create_mouse_pointer_sample_event(
-                    pointerinjector::EventPhase::Add,
+                create_mouse_pointer_sample_event_phase_add(
                     vec![1],
                     expected_position,
-                    None, /*relative_motion*/
-                    None, /*wheel_delta_v*/
-                    None, /*wheel_delta_h*/
-                    None, /*is_precision_scroll*/
                     event_time1,
                 ),
                 create_mouse_pointer_sample_event(
@@ -1471,14 +1465,9 @@ mod tests {
         assert_eq!(
             injector_stream_receiver.next().await.map(|events| events.concat()),
             Some(vec![
-                create_mouse_pointer_sample_event(
-                    pointerinjector::EventPhase::Add,
+                create_mouse_pointer_sample_event_phase_add(
                     vec![1],
                     expected_position,
-                    None, /*relative_motion*/
-                    None, /*wheel_delta_v*/
-                    None, /*wheel_delta_h*/
-                    None, /*is_precision_scroll*/
                     event_time1,
                 ),
                 create_mouse_pointer_sample_event(
@@ -1673,16 +1662,7 @@ mod tests {
         assert_eq!(
             injector_stream_receiver.next().await.map(|events| events.concat()),
             Some(vec![
-                create_mouse_pointer_sample_event(
-                    pointerinjector::EventPhase::Add,
-                    vec![1],
-                    zero_position,
-                    None, /*relative_motion*/
-                    None, /*wheel_delta_v*/
-                    None, /*wheel_delta_h*/
-                    None, /*is_precision_scroll*/
-                    event_time1,
-                ),
+                create_mouse_pointer_sample_event_phase_add(vec![1], zero_position, event_time1,),
                 create_mouse_pointer_sample_event(
                     pointerinjector::EventPhase::Change,
                     vec![1],
@@ -2144,14 +2124,9 @@ mod tests {
         assert_eq!(
             injector_stream_receiver.next().await.map(|events| events.concat()),
             Some(vec![
-                create_mouse_pointer_sample_event(
-                    pointerinjector::EventPhase::Add,
+                create_mouse_pointer_sample_event_phase_add(
                     vec![1],
                     expected_position,
-                    None, /*relative_motion*/
-                    None, /*wheel_delta_v*/
-                    None, /*wheel_delta_h*/
-                    None, /*is_precision_scroll*/
                     event_time1,
                 ),
                 create_mouse_pointer_sample_event(

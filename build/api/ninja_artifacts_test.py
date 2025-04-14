@@ -134,18 +134,16 @@ class NinjaArtifactsTest(unittest.TestCase):
             last_targets_path.write_text("foo")
 
             # Create mock NinjaRunner instance to avoid calling Ninja binary.
-            ninja_runner = MockNinjaRunner(
-                "bar\nfoo\nzoo\n../ignored\n'quoted'\n"
-            )
+            ninja_runner = MockNinjaRunner("bar\nfoo\nzoo\n'quoted'\n")
             self.assertListEqual(
                 ninja_artifacts.get_last_build_artifacts(
                     build_dir, ninja_runner
                 ),
-                ["bar", "foo", "zoo", "quoted"],
+                ["bar", "foo", "zoo", "'quoted'"],
             )
             self.assertEqual(ninja_runner.command_build_dir, str(build_dir))
             self.assertListEqual(
-                ninja_runner.command_args, ["-t", "inputs", "foo"]
+                ninja_runner.command_args, ["-t", "outputs", "foo"]
             )
 
             last_ninja_artifacts_path = (
@@ -153,7 +151,7 @@ class NinjaArtifactsTest(unittest.TestCase):
             )
             self.assertTrue(last_ninja_artifacts_path.exists())
             self.assertEqual(
-                last_ninja_artifacts_path.read_text(), "bar\nfoo\nzoo\nquoted"
+                last_ninja_artifacts_path.read_text(), "bar\nfoo\nzoo\n'quoted'"
             )
 
             # Modify last_ninja_build_targets.txt and verify the cache was regenerated.
@@ -177,10 +175,91 @@ class NinjaArtifactsTest(unittest.TestCase):
             )
             self.assertEqual(ninja_runner.command_build_dir, str(build_dir))
             self.assertListEqual(
-                ninja_runner.command_args, ["-t", "inputs", "bar", "zoo"]
+                ninja_runner.command_args, ["-t", "outputs", "bar", "zoo"]
             )
             self.assertEqual(
                 last_ninja_artifacts_path.read_text(), "second\ncall"
+            )
+
+    def test_get_last_build_sources(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Setup fake source and build directory.
+            build_gn_path = Path(temp_dir) / "BUILD.gn"
+            build_gn_path.write_text("# Fake BUILD.gn\n")
+
+            build_dir = Path(temp_dir) / "out"
+            build_dir.mkdir(parents=True)
+
+            build_ninja_d_path = (
+                build_dir / ninja_artifacts.NINJA_BUILD_PLAN_DEPS_FILE
+            )
+            build_ninja_d_path.write_text("build.ninja.stamp: ../BUILD.gn")
+
+            last_targets_path = (
+                build_dir / ninja_artifacts.LAST_NINJA_TARGETS_FILE
+            )
+            last_targets_path.write_text("foo")
+
+            # Create mock NinjaRunner instance to avoid calling Ninja binary.
+            ninja_runner = MockNinjaRunner(
+                "../src/foo\n../src/bar\noutput_file\nout_dir/out_file\n../src/zoo\n"
+            )
+            self.assertListEqual(
+                ninja_artifacts.get_last_build_sources(build_dir, ninja_runner),
+                ["../src/foo", "../src/bar", "../src/zoo"],
+            )
+            self.assertEqual(ninja_runner.command_build_dir, str(build_dir))
+            self.assertListEqual(
+                ninja_runner.command_args,
+                [
+                    "-t",
+                    "inputs",
+                    "--no-shell-escape",
+                    "--dependency-order",
+                    "foo",
+                ],
+            )
+
+            last_ninja_sources_path = (
+                build_dir / ninja_artifacts.LAST_NINJA_SOURCES_FILE
+            )
+            self.assertTrue(last_ninja_sources_path.exists())
+            self.assertEqual(
+                last_ninja_sources_path.read_text(),
+                "../src/foo\n../src/bar\n../src/zoo",
+            )
+
+            # Modify last_ninja_build_targets.txt and verify the cache was regenerated.
+
+            last_targets_path.write_text("bar zoo")
+            last_targets_stat = last_targets_path.stat()
+            os.utime(
+                last_targets_path,
+                times=(
+                    last_targets_stat.st_atime,
+                    last_targets_stat.st_mtime + 1,
+                ),
+            )
+
+            ninja_runner = MockNinjaRunner("../second\n../call\n")
+            self.assertListEqual(
+                ninja_artifacts.get_last_build_sources(build_dir, ninja_runner),
+                ["../second", "../call"],
+            )
+            self.assertEqual(ninja_runner.command_build_dir, str(build_dir))
+            self.assertListEqual(
+                ninja_runner.command_args,
+                [
+                    "-t",
+                    "inputs",
+                    "--no-shell-escape",
+                    "--dependency-order",
+                    "bar",
+                    "zoo",
+                ],
+            )
+            self.assertEqual(
+                last_ninja_sources_path.read_text(), "../second\n../call"
             )
 
 

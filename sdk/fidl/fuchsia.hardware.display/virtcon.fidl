@@ -3,8 +3,16 @@
 // found in the LICENSE file.
 library fuchsia.hardware.display;
 
+// TODO(https://fxbug.dev/408475481): Remove this concept after the only
+// allowed Mode value is FALLBACK.
 type VirtconMode = strict enum : uint8 {
-    INACTIVE = 0; // the virtcon is never visible.
-    FALLBACK = 1; // the virtcon is visible if there is no main client.
-    FORCED = 2; // the virtcon is visible even if there is a main client.
+    /// The Virtcon client owns the displays when there is no Primary client.
+    FALLBACK = 0;
+
+    /// The Virtcon client owns the displays even when a Primary client is
+    /// connected.
+    //
+    // TODO(https://fxbug.dev/408475481): Remove this enum member, so the
+    // Virtcon always has lower priority than the Primary client.
+    FORCED = 1;
 };

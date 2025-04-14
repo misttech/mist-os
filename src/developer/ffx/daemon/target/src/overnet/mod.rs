@@ -3,4 +3,6 @@
 // found in the LICENSE file.
 
 pub mod host_pipe;
+#[cfg(not(target_os = "macos"))]
+pub mod usb;
 pub mod vsock;

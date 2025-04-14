@@ -111,6 +111,7 @@ system-update-committer
 ?time-zone-info-service
 ?timekeeper
 ?toolbox
+?trace_manager
 ?triage-detect
 ?tzdata-provider
 ?uart

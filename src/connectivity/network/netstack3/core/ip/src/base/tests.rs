@@ -9,7 +9,7 @@ use core::convert::Infallible as Never;
 
 use assert_matches::assert_matches;
 use ip_test_macro::ip_test;
-use netstack3_base::testutil::{MultipleDevicesId, TestIpExt};
+use netstack3_base::testutil::{MultipleDevicesId, MultipleDevicesIdState, TestIpExt};
 use netstack3_base::{CtxPair, SubnetMatcher};
 use packet::{InnerPacketBuilder as _, Serializer};
 use packet_formats::ip::IpProto;
@@ -21,7 +21,8 @@ use crate::{Destination, Entry, Metric, NextHop, RawMetric};
 use super::*;
 
 struct IpFakeCoreCtx<I: IpLayerIpExt> {
-    counters: IpCounters<I>,
+    stack_wide_counters: IpCounters<I>,
+    per_device_counters: MultipleDevicesIdState<IpCounters<I>>,
     rules_table: Rc<RefCell<RulesTable<I, MultipleDevicesId>>>,
     main_table_id: RoutingTableId<I, MultipleDevicesId>,
     routing_tables: Rc<
@@ -46,7 +47,8 @@ impl<I: IpLayerIpExt> Default for IpFakeCoreCtx<I> {
             rules_table,
             routing_tables: Rc::new(RefCell::new(route_tables)),
             main_table_id,
-            counters: Default::default(),
+            stack_wide_counters: Default::default(),
+            per_device_counters: Default::default(),
             device_mtu: Mtu::max(),
         }
     }
@@ -54,7 +56,15 @@ impl<I: IpLayerIpExt> Default for IpFakeCoreCtx<I> {
 
 impl<I: IpLayerIpExt> CounterContext<IpCounters<I>> for IpFakeCoreCtx<I> {
     fn counters(&self) -> &IpCounters<I> {
-        &self.counters
+        &self.stack_wide_counters
+    }
+}
+
+impl<I: IpLayerIpExt> ResourceCounterContext<MultipleDevicesId, IpCounters<I>>
+    for IpFakeCoreCtx<I>
+{
+    fn per_resource_counters(&self, resource: &MultipleDevicesId) -> &IpCounters<I> {
+        self.per_device_counters.state(resource)
     }
 }
 

@@ -79,7 +79,14 @@ class FakeLogSink : public fuchsia::logger::LogSink {
       callback_.value()(std::nullopt, status);
       return;
     }
-    auto content = BytesToVmo(data.get(), actual);
+
+    fuchsia::diagnostics::FormattedContent content;
+    fuchsia::mem::Buffer buffer;
+    zx::vmo vmo;
+    zx::vmo::create(kMaxDatagramSize, 0, &vmo);
+    vmo.set_prop_content_size(actual);
+    vmo.write(data.get(), 0, actual);
+    content.set_fxt(std::move(vmo));
     callback_.value()(std::make_optional(std::move(content)), ZX_OK);
   }
 
@@ -159,7 +166,19 @@ std::vector<fuchsia::logger::LogMessage> RetrieveLogsAsLogMessage(zx::channel re
           return;
         }
         assert(content.has_value());
-        ParseFormattedContent(std::move(*content), ret);
+        uint64_t size = 0;
+        content->fxt().get_prop_content_size(&size);
+        std::unique_ptr<unsigned char[]> data = std::make_unique<unsigned char[]>(size);
+        content->fxt().read(data.get(), 0, size);
+
+        auto messages =
+            diagnostics::accessor2logger::ConvertFormattedFXTToLogMessages(data.get(), size, false)
+                .take_value();
+        for (auto& msg : messages) {
+          // TODO(b/409318971): Remove this.
+          msg.value().tags.insert(msg.value().tags.begin(), "test_moniker");
+          ret.push_back(msg.take_value());
+        }
       });
   loop.Run();
   return ret;

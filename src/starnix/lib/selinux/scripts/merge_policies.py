@@ -50,6 +50,9 @@ _ORDERED_POLICY_STATEMENT_REGEXS = [
     "allow[ \t\v]+[^ \t\v]+[ \t\v]+[^ \t\v:]+([ \t\v]*:[ \t\v]*[^ \t\v]+)[ \t\v]+.*",
     "neverallow[ \t\v]+[^ \t\v]+[ \t\v]+[^ \t\v:]+([ \t\v]*:[ \t\v]*[^ \t\v]+)[ \t\v]+.*",
     "dontaudit[ \t\v]+[^ \t\v]+.*",
+    "allowxperm[ \t\v]+[^ \t\v]+[ \t\v]+[^ \t\v:]+([ \t\v]*:[ \t\v]*[^ \t\v]+)[ \t\v]+[^ \t\v]+.*",
+    "auditallowxperm[ \t\v]+[^ \t\v]+[ \t\v]+[^ \t\v:]+([ \t\v]*:[ \t\v]*[^ \t\v]+)[ \t\v]+[^ \t\v]+.*",
+    "dontauditxperm[ \t\v]+[^ \t\v]+[ \t\v]+[^ \t\v:]+([ \t\v]*:[ \t\v]*[^ \t\v]+)[ \t\v]+[^ \t\v]+.*",
     "typebounds[ \t\v]+[^ \t\v]+.*",
     "type_transition[ \t\v]+[^ \t\v]+[ \t\v]+[^ \t\v:]+([ \t\v]*:[ \t\v]*[^ \t\v]+)[ \t\v]+[^ \t\v]+",
     "type_member[ \t\v]+[^ \t\v]+.*",
@@ -99,7 +102,9 @@ def compile_text_policy_to_binary_policy(
     subprocess.run(
         [
             checkpolicy_executable_path,
-            "--mls",
+            "-M",  # Enable Multi-Level Security.
+            "-S",  # Sort ocontexts consistent with semanage behaviour.
+            "-O",  # Optimize out redundant rules.
             "-c",
             "33",
             "--output",

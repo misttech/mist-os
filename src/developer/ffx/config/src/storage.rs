@@ -8,7 +8,7 @@ use crate::api::ConfigError;
 use crate::environment::Environment;
 use crate::nested::{nested_get, nested_remove, nested_set};
 use crate::{ConfigLevel, EnvironmentContext};
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use config_macros::include_default;
 use fuchsia_lockfile::Lockfile;
 use futures::stream::FuturesUnordered;
@@ -514,18 +514,16 @@ impl Config {
     fn get_level_mut(&mut self, level: ConfigLevel) -> Result<&mut ConfigFile> {
         match level {
             ConfigLevel::Runtime => bail!("No mutable access to runtime level configuration"),
-            ConfigLevel::User => self
-                .user
-                .as_mut()
-                .context("Tried to write to unconfigured user level configuration"),
-            ConfigLevel::Build => self
-                .build
-                .as_mut()
-                .context("Tried to write to unconfigured build level configuration"),
+            ConfigLevel::User => {
+                self.user.as_mut().ok_or_else(|| anyhow!(ConfigError::UnconfiguredLevel { level }))
+            }
+            ConfigLevel::Build => {
+                self.build.as_mut().ok_or_else(|| anyhow!(ConfigError::UnconfiguredLevel { level }))
+            }
             ConfigLevel::Global => self
                 .global
                 .as_mut()
-                .context("Tried to write to unconfigured global level configuration"),
+                .ok_or_else(|| anyhow!(ConfigError::UnconfiguredLevel { level })),
             ConfigLevel::Default => bail!("No mutable access to default level configuration"),
         }
     }

@@ -40,8 +40,8 @@ use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     arch_union_wrapper, c_char, errno, error, uapi, SIOCGIFADDR, SIOCGIFFLAGS, SIOCGIFHWADDR,
-    SIOCGIFINDEX, SIOCGIFMTU, SIOCGIFNETMASK, SIOCSIFADDR, SIOCSIFFLAGS, SIOCSIFNETMASK,
-    SOL_SOCKET, SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO, SO_SNDTIMEO, SO_TYPE,
+    SIOCGIFINDEX, SIOCGIFMTU, SIOCGIFNAME, SIOCGIFNETMASK, SIOCSIFADDR, SIOCSIFFLAGS,
+    SIOCSIFNETMASK, SOL_SOCKET, SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO, SO_SNDTIMEO, SO_TYPE,
 };
 use static_assertions::const_assert;
 use std::collections::VecDeque;
@@ -465,14 +465,18 @@ impl Socket {
     /// Creates a `FileHandle` where the associated `FsNode` contains a socket.
     ///
     /// # Parameters
-    /// - `kernel`: The kernel that is used to fetch `SocketFs`, to store the created socket node.
+    /// - `current_task`: The task that is used to fetch `SocketFs`, to store the created socket
+    ///   node.
     /// - `socket`: The socket to store in the `FsNode`.
     /// - `open_flags`: The `OpenFlags` which are used to create the `FileObject`.
+    /// - `kernel_private`: `true` if the socket will be used internally by the kernel, and should
+    ///   therefore not be security labeled nor access-checked.
     pub fn new_file<L>(
         locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         socket: SocketHandle,
         open_flags: OpenFlags,
+        kernel_private: bool,
     ) -> FileHandle
     where
         L: LockBefore<FileOpsCore>,
@@ -484,7 +488,7 @@ impl Socket {
         let mode = mode!(IFSOCK, 0o777);
         let node = fs.create_node(
             current_task,
-            Anon::default(),
+            Anon::new_for_socket(kernel_private),
             FsNodeInfo::new_factory(mode, current_task.as_fscred()),
         );
         security::socket_post_create(&socket, &node);
@@ -736,6 +740,10 @@ impl Socket {
                 current_task
                     .write_multi_arch_object(IfReqPtr::new(current_task, user_addr), out_ifreq)?;
                 Ok(SUCCESS)
+            }
+            SIOCGIFNAME => {
+                track_stub!(TODO("https://fxbug.dev/325639438"), "SIOCGIFNAME");
+                error!(EINVAL)
             }
             SIOCSIFADDR => {
                 if security::check_task_capable(current_task, CAP_NET_ADMIN).is_err() {
@@ -1204,6 +1212,7 @@ where
         SocketType::Datagram,
         OpenFlags::RDWR,
         SocketProtocol::from_raw(NetlinkFamily::Route.as_raw()),
+        /* kernel_private=*/ true,
     )?;
 
     // Send the request to get the link details with the requested
@@ -1331,6 +1340,7 @@ where
         SocketType::Datagram,
         OpenFlags::RDWR,
         SocketProtocol::from_raw(NetlinkFamily::Route.as_raw()),
+        /* kernel_private=*/ true,
     )?;
 
     // Send the request to set the link flags with the requested interface name.

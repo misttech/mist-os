@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fake-bti/bti.h>
+#include <lib/driver/fake-bti/cpp/fake-bti.h>
 #include <lib/fdio/directory.h>
 #include <lib/mmio-ptr/fake.h>
 
@@ -31,8 +31,9 @@ fidl::SyncClient<fuchsia_sysmem2::Allocator> ConnectToSysmem() {
 class FakeOwner : public DecoderCore::Owner {
  public:
   explicit FakeOwner(MmioRegisters* mmio) : mmio_(mmio) {
-    zx_status_t status = fake_bti_create(bti_.reset_and_get_address());
-    EXPECT_EQ(ZX_OK, status);
+    zx::result bti = fake_bti::CreateFakeBti();
+    EXPECT_EQ(ZX_OK, bti.status_value());
+    bti_ = std::move(bti.value());
     allocator_ = ConnectToSysmem();
   }
 

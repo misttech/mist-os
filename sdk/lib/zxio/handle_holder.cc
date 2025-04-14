@@ -15,7 +15,7 @@ namespace zxio {
 namespace {
 
 // A zxio_handle_holder is a zxio object instance that holds on to a handle and
-// allows it to be closed or released via zxio_close() / zxio_release(). It is
+// allows it to be closed or released via zxio_destroy() / zxio_release(). It is
 // useful for wrapping objects that zxio does not understand.
 struct zxio_handle_holder {
   zxio_t io;
@@ -31,10 +31,7 @@ zxio_handle_holder& zxio_get_handle_holder(zxio_t* io) {
 
 constexpr zxio_ops_t zxio_handle_holder_ops = []() {
   zxio_ops_t ops = zxio_default_ops;
-  ops.close = [](zxio_t* io, const bool should_wait) {
-    zxio_get_handle_holder(io).~zxio_handle_holder();
-    return ZX_OK;
-  };
+  ops.destroy = [](zxio_t* io) { zxio_get_handle_holder(io).~zxio_handle_holder(); };
   ops.release = [](zxio_t* io, zx_handle_t* out_handle) {
     const zx_handle_t handle = zxio_get_handle_holder(io).handle.release();
     if (handle == ZX_HANDLE_INVALID) {

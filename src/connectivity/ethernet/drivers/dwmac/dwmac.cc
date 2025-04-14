@@ -4,12 +4,12 @@
 
 #include "dwmac.h"
 
+#include <fidl/fuchsia.boot.metadata/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
 #include <fuchsia/hardware/ethernet/mac/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/hw/arch_ops.h>
-#include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fit/defer.h>
 #include <lib/fzl/vmar-manager.h>
@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <zircon/compiler.h>
 
+#include <ddktl/metadata_server.h>
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 #include <fbl/ref_counted.h>
@@ -475,30 +476,41 @@ zx_status_t DWMacDevice::ShutDown() {
 
 zx_status_t DWMacDevice::GetMAC(zx_device_t* dev) {
   // look for MAC address device metadata
-  // metadata is padded so we need buffer size > 6 bytes
-  uint8_t buffer[16];
-  size_t actual;
-  zx_status_t status = device_get_fragment_metadata(dev, kPdevFragment, DEVICE_METADATA_MAC_ADDRESS,
-                                                    buffer, sizeof(buffer), &actual);
-  if (status != ZX_OK || actual < 6) {
-    zxlogf(ERROR, "dwmac: MAC address metadata load failed. Falling back on HW setting.");
+  zx::result metadata_result =
+      ddk::GetMetadataIfExists<fuchsia_boot_metadata::MacAddressMetadata>(dev, kPdevFragment);
+  if (metadata_result.is_error()) {
+    zxlogf(ERROR, "Failed to get MAC address metadata: %s", metadata_result.status_string());
+    return metadata_result.status_value();
+  }
+
+  std::array<uint8_t, 6> octets;
+  if (metadata_result.value().has_value()) {
+    const auto& metadata = metadata_result.value().value();
+    if (!metadata.mac_address().has_value()) {
+      zxlogf(ERROR, "MAC address metadata missing mac_address field");
+      return ZX_ERR_INTERNAL;
+    }
+    octets = metadata.mac_address().value().octets();
+  } else {
+    zxlogf(WARNING, "Falling back on HW setting: MAC address metadata does not exist");
+
     // read MAC address from hardware register
     uint32_t hi = mmio_->Read32(DW_MAC_MAC_MACADDR0HI);
     uint32_t lo = mmio_->Read32(DW_MAC_MAC_MACADDR0LO);
 
     /* Extract the MAC address from the high and low words */
-    buffer[0] = static_cast<uint8_t>(lo & 0xff);
-    buffer[1] = static_cast<uint8_t>((lo >> 8) & 0xff);
-    buffer[2] = static_cast<uint8_t>((lo >> 16) & 0xff);
-    buffer[3] = static_cast<uint8_t>((lo >> 24) & 0xff);
-    buffer[4] = static_cast<uint8_t>(hi & 0xff);
-    buffer[5] = static_cast<uint8_t>((hi >> 8) & 0xff);
+    octets[0] = static_cast<uint8_t>(lo & 0xff);
+    octets[1] = static_cast<uint8_t>((lo >> 8) & 0xff);
+    octets[2] = static_cast<uint8_t>((lo >> 16) & 0xff);
+    octets[3] = static_cast<uint8_t>((lo >> 24) & 0xff);
+    octets[4] = static_cast<uint8_t>(hi & 0xff);
+    octets[5] = static_cast<uint8_t>((hi >> 8) & 0xff);
   }
 
-  zxlogf(INFO, "dwmac: MAC address %02x:%02x:%02x:%02x:%02x:%02x", buffer[0], buffer[1], buffer[2],
-         buffer[3], buffer[4], buffer[5]);
+  zxlogf(INFO, "MAC address %02x:%02x:%02x:%02x:%02x:%02x", octets[0], octets[1], octets[2],
+         octets[3], octets[4], octets[5]);
   fbl::AutoLock lock(&state_lock_);
-  memcpy(mac_.data(), buffer, sizeof mac_);
+  mac_ = octets;
   return ZX_OK;
 }
 

@@ -309,7 +309,7 @@ impl DeviceOps for Arc<DevPtsDevice> {
             // /dev/tty
             DeviceType::TTY => {
                 let controlling_terminal = current_task
-                    .thread_group
+                    .thread_group()
                     .read()
                     .process_group
                     .session
@@ -351,7 +351,7 @@ impl DeviceOps for Arc<DevPtsDevice> {
                 if !flags.contains(OpenFlags::NOCTTY) {
                     // Opening a replica sets the process' controlling TTY when possible. An error indicates it cannot
                     // be set, and is ignored silently.
-                    let _ = current_task.thread_group.set_controlling_terminal(
+                    let _ = current_task.thread_group().set_controlling_terminal(
                         current_task,
                         &terminal,
                         false, /* is_main */
@@ -626,7 +626,7 @@ where
         TIOCSCTTY => {
             // Make the given terminal the controlling terminal of the calling process.
             let steal = bool::from(arg);
-            current_task.thread_group.set_controlling_terminal(
+            current_task.thread_group().set_controlling_terminal(
                 current_task,
                 terminal,
                 is_main,
@@ -637,7 +637,7 @@ where
         }
         TIOCNOTTY => {
             // Release the controlling terminal.
-            current_task.thread_group.release_controlling_terminal(
+            current_task.thread_group().release_controlling_terminal(
                 locked,
                 current_task,
                 terminal,
@@ -647,14 +647,14 @@ where
         }
         TIOCGPGRP => {
             // Get the foreground process group.
-            let pgid = current_task.thread_group.get_foreground_process_group(terminal)?;
+            let pgid = current_task.thread_group().get_foreground_process_group(terminal)?;
             current_task.write_object(UserRef::<pid_t>::new(user_addr), &pgid)?;
             Ok(SUCCESS)
         }
         TIOCSPGRP => {
             // Set the foreground process group.
             let pgid = current_task.read_object(UserRef::<pid_t>::new(user_addr))?;
-            current_task.thread_group.set_foreground_process_group(
+            current_task.thread_group().set_foreground_process_group(
                 locked,
                 current_task,
                 terminal,
@@ -1233,7 +1233,7 @@ mod tests {
         let _opened_main = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
         // Opening the main terminal should not set the terminal of the session.
         assert!(task
-            .thread_group
+            .thread_group()
             .read()
             .process_group
             .session
@@ -1250,7 +1250,7 @@ mod tests {
         )
         .expect("open file");
         assert!(task
-            .thread_group
+            .thread_group()
             .read()
             .process_group
             .session
@@ -1263,7 +1263,7 @@ mod tests {
             open_file_with_flags(&mut locked, &task, &fs, "0".into(), OpenFlags::RDWR)
                 .expect("open file");
         assert!(task
-            .thread_group
+            .thread_group()
             .read()
             .process_group
             .session
@@ -1277,7 +1277,7 @@ mod tests {
         let (kernel, task1, mut locked) = create_kernel_task_and_unlocked();
         tty_device_init(&mut locked, &task1);
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        task2.thread_group.setsid(&mut locked).expect("setsid");
+        task2.thread_group().setsid(&mut locked).expect("setsid");
 
         let fs = ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
         let opened_main = open_ptmx_and_unlock(&mut locked, &task1, &fs).expect("ptmx");
@@ -1292,7 +1292,7 @@ mod tests {
         set_controlling_terminal(&mut locked, &task1, &opened_main, false).unwrap();
         assert_eq!(
             ioctl::<i32>(&mut locked, &task1, &opened_main, TIOCGPGRP, &0),
-            Ok(task1.thread_group.read().process_group.leader)
+            Ok(task1.thread_group().read().process_group.leader)
         );
         assert_eq!(
             ioctl::<i32>(&mut locked, &task2, &opened_replica, TIOCGPGRP, &0),
@@ -1353,7 +1353,7 @@ mod tests {
             error!(EINVAL)
         );
 
-        task2.thread_group.setsid(&mut locked).expect("setsid");
+        task2.thread_group().setsid(&mut locked).expect("setsid");
 
         // One cannot associate a terminal that is already associated with another process.
         assert_eq!(
@@ -1378,7 +1378,7 @@ mod tests {
             .expect("Associate terminal to task2");
 
         assert!(task1
-            .thread_group
+            .thread_group()
             .read()
             .process_group
             .session
@@ -1392,12 +1392,12 @@ mod tests {
         let (kernel, init, mut locked) = create_kernel_task_and_unlocked();
         tty_device_init(&mut locked, &init);
         let task1 = init.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        task1.thread_group.setsid(&mut locked).expect("setsid");
+        task1.thread_group().setsid(&mut locked).expect("setsid");
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        task2.thread_group.setpgid(&mut locked, &task2, 0).expect("setpgid");
-        let task2_pgid = task2.thread_group.read().process_group.leader;
+        task2.thread_group().setpgid(&mut locked, &task2, 0).expect("setpgid");
+        let task2_pgid = task2.thread_group().read().process_group.leader;
 
-        assert_ne!(task2_pgid, task1.thread_group.read().process_group.leader);
+        assert_ne!(task2_pgid, task1.thread_group().read().process_group.leader);
 
         let fs = ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
         let _opened_main = open_ptmx_and_unlock(&mut locked, &init, &fs).expect("ptmx");
@@ -1415,7 +1415,7 @@ mod tests {
         // The foreground process group should be the one of task1
         assert_eq!(
             ioctl::<i32>(&mut locked, &task1, &opened_replica, TIOCGPGRP, &0),
-            Ok(task1.thread_group.read().process_group.leader)
+            Ok(task1.thread_group().read().process_group.leader)
         );
 
         // Cannot change the foreground process group to a negative pid.
@@ -1431,7 +1431,7 @@ mod tests {
         );
 
         // Cannot change the foreground process group to a process group in another session.
-        let init_pgid = init.thread_group.read().process_group.leader;
+        let init_pgid = init.thread_group().read().process_group.leader;
         assert_eq!(
             ioctl::<i32>(&mut locked, &task2, &opened_replica, TIOCSPGRP, &init_pgid),
             error!(EPERM)
@@ -1450,7 +1450,7 @@ mod tests {
         // Check that the foreground process has been changed.
         let terminal = Arc::clone(
             &task1
-                .thread_group
+                .thread_group()
                 .read()
                 .process_group
                 .session
@@ -1480,7 +1480,7 @@ mod tests {
         let (kernel, task1, mut locked) = create_kernel_task_and_unlocked();
         tty_device_init(&mut locked, &task1);
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        task2.thread_group.setsid(&mut locked).expect("setsid");
+        task2.thread_group().setsid(&mut locked).expect("setsid");
 
         let fs = ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
         let _opened_main = open_ptmx_and_unlock(&mut locked, &task1, &fs).expect("ptmx");
@@ -1504,7 +1504,7 @@ mod tests {
         // Detach the terminal
         ioctl::<i32>(&mut locked, &task2, &opened_replica, TIOCNOTTY, &0).expect("detach terminal");
         assert!(task2
-            .thread_group
+            .thread_group()
             .read()
             .process_group
             .session

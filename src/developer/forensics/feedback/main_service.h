@@ -48,7 +48,7 @@ class MainService {
               timekeeper::Clock* clock, inspect::Node* inspect_root, cobalt::Logger* cobalt,
               const Annotations& startup_annotations,
               fidl::InterfaceRequest<fuchsia::process::lifecycle::Lifecycle> lifecycle_channel,
-              Options options);
+              std::optional<std::string> dlog, Options options);
 
   template <typename Protocol>
   ::fidl::InterfaceRequestHandler<Protocol> GetHandler();

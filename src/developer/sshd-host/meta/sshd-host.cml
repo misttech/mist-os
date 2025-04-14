@@ -124,7 +124,6 @@
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.location.namedplace.RegulatoryRegionConfigurator",
                 "fuchsia.location.namedplace.RegulatoryRegionWatcher",
-                "fuchsia.logger.Log",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.net.http.Loader",
                 "fuchsia.net.interfaces.admin.Installer",

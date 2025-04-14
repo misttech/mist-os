@@ -4,7 +4,7 @@
 
 use crate::policy::parser::ByValue;
 use crate::policy::{Policy, TypeId};
-use crate::ObjectClass;
+use crate::KernelClass;
 
 use anyhow::{anyhow, bail};
 use std::collections::HashMap;
@@ -12,7 +12,8 @@ use std::num::NonZeroU64;
 
 /// Encapsulates a set of access-check exceptions parsed from a supplied configuration.
 pub(super) struct ExceptionsConfig {
-    entries: HashMap<ExceptionsEntry, NonZeroU64>,
+    todo_deny_entries: HashMap<ExceptionsEntry, NonZeroU64>,
+    permissive_entries: HashMap<TypeId, NonZeroU64>,
 }
 
 impl ExceptionsConfig {
@@ -25,11 +26,14 @@ impl ExceptionsConfig {
         exceptions_config: &str,
     ) -> Result<Self, anyhow::Error> {
         let lines = exceptions_config.lines();
-        let mut result = Self { entries: HashMap::with_capacity(lines.clone().count()) };
+        let mut result = Self {
+            todo_deny_entries: HashMap::with_capacity(lines.clone().count()),
+            permissive_entries: HashMap::new(),
+        };
         for line in lines {
             result.parse_config_line(policy, line)?;
         }
-        result.entries.shrink_to_fit();
+        result.todo_deny_entries.shrink_to_fit();
         Ok(result)
     }
 
@@ -39,9 +43,12 @@ impl ExceptionsConfig {
         &self,
         source: TypeId,
         target: TypeId,
-        class: ObjectClass,
+        class: KernelClass,
     ) -> Option<NonZeroU64> {
-        self.entries.get(&ExceptionsEntry { source, target, class }).copied()
+        self.todo_deny_entries
+            .get(&ExceptionsEntry { source, target, class })
+            .or_else(|| self.permissive_entries.get(&source))
+            .copied()
     }
 
     fn parse_config_line(
@@ -56,13 +63,10 @@ impl ExceptionsConfig {
                     // "todo_deny" lines have the form:
                     //   todo_deny b/<id> <source> <target> <class>
 
-                    // Parse the bug Id, which must be present, prefixed by "b/"
-                    let bug = parts.next().ok_or_else(|| anyhow!("Expected bug identifier"))?;
-                    let bug_id_part = bug.strip_prefix("b/").or_else(|| bug.strip_prefix("https://fxbug.dev/"))
-                        .ok_or_else(|| anyhow!("Expected bug Identifier of the form b/<id> or https://fxbug.dev/<id>"))?;
-                    let bug_id = bug_id_part
-                        .parse::<NonZeroU64>()
-                        .map_err(|_| anyhow!("Malformed bug Id: {}", bug_id_part))?;
+                    // Parse the bug Id, which must be present
+                    let bug_id = bug_ref_to_id(
+                        parts.next().ok_or_else(|| anyhow!("Expected bug identifier"))?,
+                    )?;
 
                     // Parse the source & target types. If either of these is not defined by the
                     // `policy` then the statement is ignored.
@@ -81,7 +85,28 @@ impl ExceptionsConfig {
                         .ok_or_else(|| anyhow!("Target class missing or unrecognized"))?;
 
                     if let (Some(source), Some(target)) = (stype, ttype) {
-                        self.entries.insert(ExceptionsEntry { source, target, class }, bug_id);
+                        self.todo_deny_entries
+                            .insert(ExceptionsEntry { source, target, class }, bug_id);
+                    } else {
+                        println!("Ignoring statement: {}", line);
+                    }
+                }
+                "todo_permissive" => {
+                    // "todo_permissive" lines have the form:
+                    //   todo_permissive b/<id> <source>
+
+                    // Parse the bug Id, which must be present
+                    let bug_id = bug_ref_to_id(
+                        parts.next().ok_or_else(|| anyhow!("Expected bug identifier"))?,
+                    )?;
+
+                    // Parse the source type. The statement is ignored if the type is not defined by policy.
+                    let stype = policy.type_id_by_name(
+                        parts.next().ok_or_else(|| anyhow!("Expected source type"))?,
+                    );
+
+                    if let Some(source) = stype {
+                        self.permissive_entries.insert(source, bug_id);
                     } else {
                         println!("Ignoring statement: {}", line);
                     }
@@ -99,13 +124,24 @@ impl ExceptionsConfig {
 struct ExceptionsEntry {
     source: TypeId,
     target: TypeId,
-    class: ObjectClass,
+    class: KernelClass,
 }
 
-/// Returns the kernel `ObjectClass` corresponding to the supplied `name`, if any.
+/// Returns the numeric bug Id parsed from a bug URL reference.
+fn bug_ref_to_id(bug_ref: &str) -> Result<NonZeroU64, anyhow::Error> {
+    let bug_id_part = bug_ref
+        .strip_prefix("b/")
+        .or_else(|| bug_ref.strip_prefix("https://fxbug.dev/"))
+        .ok_or_else(|| {
+            anyhow!("Expected bug Identifier of the form b/<id> or https://fxbug.dev/<id>")
+        })?;
+    bug_id_part.parse::<NonZeroU64>().map_err(|_| anyhow!("Malformed bug Id: {}", bug_id_part))
+}
+
+/// Returns the `KernelClass` corresponding to the supplied `name`, if any.
 /// `None` is returned if no such kernel object class exists in the Starnix implementation.
-fn object_class_by_name(name: &str) -> Option<ObjectClass> {
-    ObjectClass::all_variants().into_iter().find(|class| class.name() == name)
+fn object_class_by_name(name: &str) -> Option<KernelClass> {
+    KernelClass::all_variants().into_iter().find(|class| class.name() == name)
 }
 
 #[cfg(test)]
@@ -190,7 +226,7 @@ mod tests {
         let config = ExceptionsConfig::new(&test_data.policy, TEST_CONFIG)
             .expect("Config with unresolved types is valid");
 
-        assert_eq!(config.entries.len(), 3);
+        assert_eq!(config.todo_deny_entries.len(), 3);
     }
 
     #[test]
@@ -202,21 +238,21 @@ mod tests {
 
         // Matching source, target & class will resolve to the corresponding bug Id.
         assert_eq!(
-            config.lookup(test_data.defined_source, test_data.defined_target, ObjectClass::File),
+            config.lookup(test_data.defined_source, test_data.defined_target, KernelClass::File),
             Some(NonZeroU64::new(1).unwrap())
         );
 
         // Mismatched class, source or target returns no Id.
         assert_eq!(
-            config.lookup(test_data.defined_source, test_data.defined_target, ObjectClass::Dir),
+            config.lookup(test_data.defined_source, test_data.defined_target, KernelClass::Dir),
             None
         );
         assert_eq!(
-            config.lookup(test_data.unmatched_type, test_data.defined_target, ObjectClass::File),
+            config.lookup(test_data.unmatched_type, test_data.defined_target, KernelClass::File),
             None
         );
         assert_eq!(
-            config.lookup(test_data.defined_source, test_data.unmatched_type, ObjectClass::File),
+            config.lookup(test_data.defined_source, test_data.unmatched_type, KernelClass::File),
             None
         );
     }

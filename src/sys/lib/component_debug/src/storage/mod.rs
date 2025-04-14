@@ -20,8 +20,8 @@ pub mod test {
 
     use fidl::endpoints::{RequestStream, ServerEnd};
     use fidl::handle::AsyncChannel;
-    use fidl_fuchsia_io as fio;
-    use fidl_fuchsia_sys2::{StorageAdminProxy, StorageAdminRequest};
+    use flex_fuchsia_io as fio;
+    use flex_fuchsia_sys2::{StorageAdminProxy, StorageAdminRequest};
     use futures::TryStreamExt;
     use std::fs::{create_dir, write};
     use tempfile::tempdir;

@@ -106,8 +106,11 @@ impl Symbolizer {
 
     /// Resolve a single address.
     pub fn resolve_addr(&self, addr: u64) -> Result<Vec<ResolvedLocation>, ResolveError> {
-        type LocationCallbackContext = Vec<ResolvedLocation>;
-        let mut locations: LocationCallbackContext = vec![];
+        struct LocationCallbackContext {
+            locations: Vec<ResolvedLocation>,
+        }
+
+        let mut context = LocationCallbackContext { locations: vec![] };
 
         /// Callback for collecting the locations resolved by the symbolizer. Can't be a closure
         /// because it needs to be passed as a function pointer to C which uses an explicit callback
@@ -115,36 +118,49 @@ impl Symbolizer {
         ///
         /// # Safety
         ///
-        /// `context` must be a unique pointer to `locations` on the stack above. May only be called
+        /// `context` must be a unique pointer to `context` on the stack above. May only be called
         /// inside `Symbolizer::resolve_addr`.
         unsafe extern "C" fn location_callback(
             location: *const symbolizer_sys::symbolizer_location_t,
             context: *mut c_void,
         ) {
             // SAFETY: provided by the safety contract of the function
-            let locations: &mut LocationCallbackContext =
+            let context: &mut LocationCallbackContext =
                 unsafe { (context as *mut LocationCallbackContext).as_mut().unwrap() };
 
             // SAFETY: the C++ side of the callback interface guarantees that the location pointer
             // meets the safety requirements of this function.
-            locations.push(unsafe { ResolvedLocation::from_raw(location) });
+            if let Some(resolved_location) = unsafe { ResolvedLocation::from_raw(location) } {
+                context.locations.push(resolved_location)
+            };
         }
 
         // SAFETY: self.inner was allocated by process_new and has not been freed. The provided
         // callback will not mutate the provided locations or dereference null pointers.
-        unsafe {
+        let result = unsafe {
             symbolizer_sys::symbolizer_resolve_address(
                 self.inner.as_ptr(),
                 addr,
                 Some(location_callback),
-                &mut locations as *mut _ as *mut c_void,
-            );
-        }
+                &mut context as *mut _ as *mut c_void,
+            )
+        };
 
-        if locations.is_empty() {
-            Err(ResolveError::NoOverlappingModule)
-        } else {
-            Ok(locations)
+        match result {
+            symbolizer_sys::ResolveAddressStatus_Ok => {
+                if !context.locations.is_empty() {
+                    Ok(context.locations)
+                } else {
+                    Err(ResolveError::SymbolNotFound)
+                }
+            }
+            symbolizer_sys::ResolveAddressStatus_NoOverlappingModule => {
+                Err(ResolveError::NoOverlappingModule)
+            }
+            symbolizer_sys::ResolveAddressStatus_SymbolFileUnavailable => {
+                Err(ResolveError::SymbolFileUnavailable)
+            }
+            _ => unreachable!("all the cases should have already been handled"),
         }
     }
 }
@@ -191,13 +207,22 @@ pub enum ResolveError {
     /// address not overlapping with any mappings.
     #[error("Provided address does not correspond to a mapped module.")]
     NoOverlappingModule,
+
+    /// The C++ side did not find a function at the given address.
+    #[error("Provided address does not correspond to a function.")]
+    SymbolNotFound,
+
+    /// The symbol file that would provide debug information about the requested address could not
+    /// be loaded.
+    #[error("Symbol file is not available.")]
+    SymbolFileUnavailable,
 }
 
 /// A single source location resolved from an address.
 #[derive(Clone, PartialEq)]
 pub struct ResolvedLocation {
     /// The function name of the location.
-    pub function: Option<String>,
+    pub function: String,
     /// The source file for the referenced function.
     pub file_and_line: Option<(String, u32)>,
     /// The name of the library (if any) in which this location is found.
@@ -214,12 +239,12 @@ impl ResolvedLocation {
     ///
     /// Each of the non-null pointers on the pointed-to `symbolizer_location_t` must be valid to
     /// read from for their respective `${POINTER_NAME}_len` bytes.
-    unsafe fn from_raw(raw: *const symbolizer_sys::symbolizer_location_t) -> Self {
+    unsafe fn from_raw(raw: *const symbolizer_sys::symbolizer_location_t) -> Option<Self> {
         // SAFETY: provided by the safety contract of the function
         let raw = unsafe { raw.as_ref().unwrap() };
 
         // SAFETY: provided by the safety contract of the function
-        let function = unsafe { string_from_pointer_and_len(raw.function, raw.function_len) };
+        let function = unsafe { string_from_pointer_and_len(raw.function, raw.function_len) }?;
 
         // SAFETY: provided by the safety contract of the function
         let file_and_line =
@@ -228,7 +253,7 @@ impl ResolvedLocation {
         // SAFETY: provided by the safety contract of the function
         let library = string_from_pointer_and_len(raw.library, raw.library_len);
 
-        Self { function, file_and_line, library, library_offset: raw.library_offset }
+        Some(Self { function, file_and_line, library, library_offset: raw.library_offset })
     }
 }
 

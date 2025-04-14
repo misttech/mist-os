@@ -45,6 +45,13 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
             builder.kernel_arg(KernelArg::NetsvcNetboot(true));
         };
 
+        if config.include_tracing {
+            if context.build_type == &BuildType::User {
+                anyhow::bail!("tracing can't be included in user builds");
+            }
+            builder.platform_bundle("tracing");
+        };
+
         if matches!(context.build_type, BuildType::Eng | BuildType::UserDebug) {
             builder.platform_bundle("ptysvc");
             builder.platform_bundle("kernel_debug_broker_userdebug");

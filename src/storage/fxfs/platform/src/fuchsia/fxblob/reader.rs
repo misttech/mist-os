@@ -34,7 +34,7 @@ mod tests {
     use delivery_blob::CompressionMode;
     use fidl_fuchsia_io::{self as fio};
     use fuchsia_async as fasync;
-    use fuchsia_component::client::connect_to_protocol_at_dir_svc;
+    use fuchsia_component_client::connect_to_protocol_at_dir_svc;
 
     /// Read a blob using BlobReader API and return its contents as a boxed slice.
     async fn read_blob(

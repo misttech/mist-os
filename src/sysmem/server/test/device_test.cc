@@ -17,7 +17,6 @@
 
 #include <gtest/gtest.h>
 
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/sysmem/server/allocator.h"
 #include "src/sysmem/server/buffer_collection.h"
 #include "src/sysmem/server/logical_buffer_collection.h"

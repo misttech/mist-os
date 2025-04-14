@@ -40,6 +40,12 @@ pub enum PacketType {
     /// reset to avoid data loss. It should also only ever be the last vsock packet in a given
     /// usb packet.
     Sync = b'S',
+    /// An outbound echo request. The other end should reply to this with the same body and all the
+    /// same fields in a [`PacketType::EchoReply`] packet, no matter the state of the connection.
+    Echo = b'E',
+    /// A reply to a [`PacketType::Echo`] request packet. The body and all header fields should be
+    /// set the same as the original echo packet's.
+    EchoReply = b'e',
     /// Connect to a cid:port pair from a cid:port pair on the other side. The payload must be empty.
     Connect = b'C',
     /// Notify the other end that this connection should be closed. The other end should respond

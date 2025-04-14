@@ -286,6 +286,33 @@ impl TargetCollection {
         self.targets.borrow().len() == 0
     }
 
+    /// Remove a known-invalid address from all targets. Only allowed for
+    /// VSOCK/USB addresses right now.
+    pub fn remove_address(&self, addr: TargetAddr) {
+        assert!(matches!(addr, TargetAddr::UsbCtx(_) | TargetAddr::VSockCtx(_)));
+
+        let mut drop_ids = Vec::new();
+
+        for (&id, target) in self.targets.borrow().iter() {
+            let addrs_empty = {
+                let mut addrs = target.addrs.borrow_mut();
+                addrs.retain(|x| x.addr != addr);
+                addrs.is_empty()
+            };
+
+            if addrs_empty {
+                drop_ids.push(id);
+            } else if target.is_connected() {
+                target.disconnect();
+                target.maybe_reconnect(None);
+            }
+        }
+
+        for id in drop_ids {
+            self.remove_target_from_list(id);
+        }
+    }
+
     pub fn remove_target_from_list(&self, tid: u64) {
         let target = self.targets.borrow_mut().remove(&tid);
         if let Some(target) = target {
@@ -422,12 +449,16 @@ impl TargetCollection {
     fn find_matching_target(&self, new_target: &Target) -> (Option<Rc<Target>>, bool) {
         // Look for a target by primary ID first
         let new_ids = new_target.ids();
+        let has_vsock_or_usb = new_target.has_vsock_or_usb_addr();
         let mut network_changed = false;
         let mut to_update =
             new_ids.iter().find_map(|id| self.targets.borrow().get(id).map(|t| t.clone()));
 
         // If we haven't yet found a target, try to find one by all IDs, nodename, serial, or address.
-        if to_update.is_none() {
+        if let Some(to_update) = &to_update {
+            tracing::debug!("Matched target by id: {to_update:?}");
+            network_changed = has_vsock_or_usb && !to_update.has_vsock_or_usb_addr();
+        } else {
             let new_ips = new_target
                 .addrs()
                 .iter()
@@ -487,12 +518,19 @@ impl TargetCollection {
                     );
                     to_update.replace(target.clone());
 
+                    let to_update_has_vsock_or_usb = target.has_vsock_or_usb_addr();
+
                     // The effect of returning true for network_changed
                     // is to trigger reconnecting the host_pipe to the target.
-                    // The main reason to do this is for user mode networking
-                    // with an emulator, where the port mapped to SSH changes,
-                    // but the host pipe is using the old port mapped to an old
-                    // instance.
+                    //
+                    // If we've gained USB or VSOCK networking, we always do
+                    // this as we'd always prefer to be using USB or VSOCK
+                    // networking.
+                    //
+                    // Otherwise, the main reason to do this is for user mode
+                    // networking with an emulator, where the port mapped to SSH
+                    // changes, but the host pipe is using the old port mapped
+                    // to an old instance.
                     //
                     // A side-effect of this physical targets that respond to
                     // mDNS on IPv4 and IPv6, the address will change quickly
@@ -501,7 +539,11 @@ impl TargetCollection {
                     //
                     // To avoid that, only return network changed if the port
                     // is specified as well as a change.
-                    network_changed = if let Some(target_ssh_port) = target.ssh_port() {
+                    network_changed = if has_vsock_or_usb != to_update_has_vsock_or_usb {
+                        has_vsock_or_usb
+                    } else if has_vsock_or_usb {
+                        false
+                    } else if let Some(target_ssh_port) = target.ssh_port() {
                         new_port.unwrap_or_default() != target_ssh_port
                     } else {
                         false
@@ -509,9 +551,6 @@ impl TargetCollection {
                     break;
                 }
             }
-        } else {
-            tracing::debug!("Matched target by id: {to_update:?}");
-            network_changed = false
         }
 
         (to_update, network_changed)
@@ -654,7 +693,7 @@ impl TargetCollection {
             let is_too_old = Utc::now().signed_duration_since(t.timestamp).num_milliseconds()
                 as i128
                 > MDNS_MAX_AGE.as_millis() as i128;
-            !is_too_old || t.is_manual()
+            !is_too_old || t.is_manual() || !t.is_ip()
         });
         to_update.update_boot_timestamp(new_target.boot_timestamp_nanos());
 
@@ -674,14 +713,18 @@ impl TargetCollection {
             }
         } else {
             if to_update.ssh_host_address.borrow().is_none() {
-                tracing::debug!(
-                    "Setting ssh_host_address to {:?} for {}@{}",
-                    new_target.ssh_host_address,
-                    to_update.nodename_str(),
-                    to_update.id()
-                );
-                *to_update.ssh_host_address.borrow_mut() =
-                    new_target.ssh_host_address.borrow().clone();
+                if new_target.ssh_host_address.borrow().is_some() {
+                    tracing::debug!(
+                        "Setting ssh_host_address to {:?} for {}@{}",
+                        new_target.ssh_host_address,
+                        to_update.nodename_str(),
+                        to_update.id()
+                    );
+                    *to_update.ssh_host_address.borrow_mut() =
+                        new_target.ssh_host_address.borrow().clone();
+                } else if to_update.ssh_address().is_some() {
+                    to_update.refresh_ssh_host_addr();
+                }
             }
         }
 
@@ -1888,6 +1931,92 @@ mod tests {
             let target = targets.next().expect("Merging resulted in no targets.");
             assert!(targets.next().is_none());
             assert_eq!(target.nodename(), None);
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_target_remove_address() {
+        let ip1 = "f111::3".parse().unwrap();
+        let mut addr_set = BTreeSet::new();
+        addr_set.replace(TargetIpAddr::new(ip1, 0xbadf00d, 0));
+        let t1 = Target::new_with_addrs::<String>(None, addr_set);
+        let t2 = Target::new_named("this-is-a-crunchy-falafel");
+        let tc = TargetCollection::new_with_queue();
+        t2.addrs.borrow_mut().replace(TargetAddr::UsbCtx(3).into());
+        tc.merge_insert(t1);
+        tc.merge_insert(t2);
+
+        {
+            let targets = tc.targets.borrow();
+            let mut targets = targets.values();
+            let mut target1 = targets.next().expect("Merging resulted in no targets.");
+            let mut target2 = targets.next().expect("Merging resulted in only one target.");
+
+            if target1.nodename().is_none() {
+                std::mem::swap(&mut target1, &mut target2);
+            }
+            assert!(targets.next().is_none());
+            assert_eq!(target1.nodename_str(), "this-is-a-crunchy-falafel");
+            assert_eq!(target2.nodename(), None);
+        }
+
+        tc.remove_address(TargetAddr::UsbCtx(3));
+
+        {
+            let targets = tc.targets.borrow();
+            let mut targets = targets.values();
+            let target = targets.next().expect("Merging resulted in no targets.");
+            assert!(targets.next().is_none());
+            assert_eq!(target.nodename(), None);
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_target_remove_address_no_drop() {
+        let ip1 = "f111::3".parse().unwrap();
+        let ip2 = "f111::4".parse().unwrap();
+        let mut addr_set = BTreeSet::new();
+        addr_set.replace(TargetIpAddr::new(ip1, 0xbadf00d, 0));
+        let t1 = Target::new_with_addrs::<String>(None, addr_set);
+        let t2 = Target::new_named("this-is-a-crunchy-falafel");
+        let tc = TargetCollection::new_with_queue();
+        t2.addrs.borrow_mut().replace(TargetAddr::UsbCtx(3).into());
+        t2.addrs.borrow_mut().replace(TargetAddr::new(ip2, 0, 0).into());
+        tc.merge_insert(t1);
+        tc.merge_insert(t2);
+
+        {
+            let targets = tc.targets.borrow();
+            let mut targets = targets.values();
+            let mut target1 = targets.next().expect("Merging resulted in no targets.");
+            let mut target2 = targets.next().expect("Merging resulted in only one target.");
+
+            if target1.nodename().is_none() {
+                std::mem::swap(&mut target1, &mut target2);
+            }
+            assert!(targets.next().is_none());
+            assert_eq!(target1.nodename_str(), "this-is-a-crunchy-falafel");
+            assert_eq!(target2.nodename(), None);
+        }
+
+        tc.remove_address(TargetAddr::UsbCtx(3));
+
+        {
+            let targets = tc.targets.borrow();
+            let mut targets = targets.values();
+            let mut target1 = targets.next().expect("Merging resulted in no targets.");
+            let mut target2 = targets.next().expect("Merging resulted in only one target.");
+
+            if target1.nodename().is_none() {
+                std::mem::swap(&mut target1, &mut target2);
+            }
+            assert!(targets.next().is_none());
+            assert_eq!(target1.nodename_str(), "this-is-a-crunchy-falafel");
+            assert_eq!(target2.nodename(), None);
+            assert_eq!(target1.addrs.borrow().len(), 1);
+
+            let addr = target1.addrs.borrow().iter().next().unwrap().addr.clone();
+            assert_eq!(addr, TargetAddr::new(ip2, 0, 0));
         }
     }
 

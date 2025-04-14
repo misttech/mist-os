@@ -35,6 +35,7 @@ class Atom(object):
         self.deps: Sequence[str] = json["deps"]
         self.files: Sequence[File] = [File(f) for f in json["files"]]
         self.type: str = json["type"]
+        self.stable = json["stable"]
 
     def __str__(self) -> str:
         return str(self.id)

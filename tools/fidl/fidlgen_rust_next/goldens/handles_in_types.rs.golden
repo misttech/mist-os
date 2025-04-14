@@ -101,7 +101,7 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct EmptyResourceTable {}
 
 impl EmptyResourceTable {
@@ -495,7 +495,7 @@ impl ::core::convert::From<ObjType> for WireObjType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct TableWithHandle {
     pub h: Option<::fidl_next::fuchsia::zx::Handle>,
 }

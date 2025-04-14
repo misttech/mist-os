@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_UART_UART_H_
-#define LIB_UART_UART_H_
+#ifndef ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_UART_H_
+#define ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_UART_H_
 
 #include <lib/arch/intrin.h>
 #include <lib/devicetree/devicetree.h>
@@ -86,7 +86,7 @@ class Config {
   }
 
  private:
-  config_type config_;
+  config_type config_ = {};
 };
 
 //
@@ -224,41 +224,37 @@ class DriverBase {
   static constexpr uint32_t kType = ZBI_TYPE_KERNEL_DRIVER;
   static constexpr uint32_t kExtra = KdrvExtra;
 
-  explicit DriverBase(const config_type& cfg) : cfg_(cfg) {}
-
-  constexpr bool operator==(const Driver& other) const {
-    return memcmp(&cfg_, &other.cfg_, sizeof(cfg_)) == 0;
-  }
-  constexpr bool operator!=(const Driver& other) const { return !(*this == other); }
-
-  // API to fill a ZBI item describing this UART.
-  void FillItem(void* payload) const { memcpy(payload, &cfg_, sizeof(config_type)); }
-
-  // API to match a ZBI item describing this UART.
-  static std::optional<Driver> MaybeCreate(const zbi_header_t& header, const void* payload) {
+  static std::optional<uart::Config<Driver>> TryMatch(const zbi_header_t& header,
+                                                      const void* payload) {
     static_assert(alignof(config_type) <= ZBI_ALIGNMENT);
     if (header.type == ZBI_TYPE_KERNEL_DRIVER && header.extra == KdrvExtra &&
         header.length >= sizeof(config_type)) {
-      return Driver{*reinterpret_cast<const config_type*>(payload)};
+      return Config<Driver>{*reinterpret_cast<const config_type*>(payload)};
     }
     return {};
   }
 
-  // API to match a configuration string.
-  static std::optional<Driver> MaybeCreate(std::string_view string) {
+  static std::optional<uart::Config<Driver>> TryMatch(std::string_view string) {
+    printf("TryMatch::BASE\n");
     const auto config_name = Driver::kConfigName;
     if (string.substr(0, config_name.size()) == config_name) {
       string.remove_prefix(config_name.size());
       auto config = ParseConfig<KdrvConfig>(string);
       if (config) {
-        return Driver{*config};
+        return Config<Driver>{*config};
       }
     }
     return {};
   }
 
+  // API to match DBG2 Table (ACPI). Currently only 16550 compatible uarts are supported.
+  static std::optional<uart::Config<Driver>> TryMatch(
+      const acpi_lite::AcpiDebugPortDescriptor& debug_port) {
+    return {};
+  }
+
   // API to match a devicetree bindings.
-  static bool MatchDevicetree(const devicetree::PropertyDecoder& decoder) {
+  static bool TrySelect(const devicetree::PropertyDecoder& decoder) {
     if constexpr (Driver::kDevicetreeBindings.size() == 0) {
       return false;
     } else {
@@ -278,10 +274,11 @@ class DriverBase {
     }
   }
 
-  // API to match DBG2 Table (ACPI). Currently only 16550 compatible uarts are supported.
-  static std::optional<Driver> MaybeCreate(const acpi_lite::AcpiDebugPortDescriptor& debug_port) {
-    return {};
-  }
+  explicit DriverBase(const config_type& cfg) : cfg_(cfg) {}
+  explicit DriverBase(const Config<Driver>& tagged_config) : DriverBase(*tagged_config) {}
+
+  // API to fill a ZBI item describing this UART.
+  void FillItem(void* payload) const { memcpy(payload, &cfg_, sizeof(config_type)); }
 
   // API to reproduce a configuration string.
   void Unparse(FILE* out) const {
@@ -667,4 +664,4 @@ void UnparseConfig(const zbi_dcfg_simple_pio_t& config, FILE* out);
 
 }  // namespace uart
 
-#endif  // LIB_UART_UART_H_
+#endif  // ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_UART_H_

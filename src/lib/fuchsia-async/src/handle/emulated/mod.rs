@@ -740,7 +740,7 @@ impl Channel {
 }
 
 /// Socket options available portable
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SocketOpts {
     /// A bytestream style socket
     STREAM,
@@ -779,6 +779,17 @@ impl Drop for Socket {
     fn drop(&mut self) {
         hdl_close(self.0);
     }
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct SocketInfo {
+    pub options: SocketOpts,
+    pub rx_buf_max: usize,
+    pub rx_buf_size: usize,
+    pub rx_buf_available: usize,
+    pub tx_buf_max: usize,
+    pub tx_buf_size: usize,
 }
 
 impl Socket {
@@ -934,6 +945,41 @@ impl Socket {
     /// Get an OnSignals that returns when this handle's peer closes.
     pub fn on_closed(&self) -> on_signals::OnSignalsRef<'_> {
         on_signals::OnSignalsRef::new(self, Signals::OBJECT_PEER_CLOSED)
+    }
+
+    /// Get info about the socket.
+    pub fn info(&self) -> Result<SocketInfo, zx_status::Status> {
+        with_handle(self.0, |h, side| match h {
+            HdlRef::StreamSocket(obj) => {
+                let read = obj.q.side_mut(side.opposite());
+                let rx_buf_size = read.capacity();
+                let rx_buf_available = read.len();
+                let write = obj.q.side_mut(side);
+                let tx_buf_size = write.len();
+                Ok(SocketInfo {
+                    options: SocketOpts::STREAM,
+                    rx_buf_max: usize::MAX,
+                    rx_buf_size,
+                    rx_buf_available,
+                    tx_buf_max: usize::MAX,
+                    tx_buf_size,
+                })
+            }
+            HdlRef::DatagramSocket(obj) => {
+                let read = obj.q.side_mut(side.opposite());
+                let rx_buf_size = read.iter().map(Vec::len).sum();
+                let rx_buf_available = read.front().map(|x| x.len()).unwrap_or(0);
+                Ok(SocketInfo {
+                    options: SocketOpts::DATAGRAM,
+                    rx_buf_max: usize::MAX,
+                    rx_buf_size,
+                    rx_buf_available,
+                    tx_buf_max: usize::MAX,
+                    tx_buf_size: 0,
+                })
+            }
+            _ => panic!("Non socket passed to Socket::info"),
+        })
     }
 }
 

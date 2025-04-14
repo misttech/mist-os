@@ -102,6 +102,8 @@ pub struct BoardInformation {
     pub tee_trusted_app_guids: Vec<uuid::Uuid>,
 
     /// Release version that this board config corresponds to.
+    /// TODO(https://fxbug.dev/397489730): Make this a mandatory field
+    /// once these changes have rolled into all downstream repositories.
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub release_version: Option<String>,

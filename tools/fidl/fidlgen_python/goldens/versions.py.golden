@@ -11,16 +11,15 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.versions"]
+_ir_path = get_fidl_ir_map()["test.versions"]
 add_ir_path(_ir_path)
 
 
 @dataclass
 class Struct:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    x: int | None
+    x: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Struct"
@@ -37,11 +36,13 @@ class Struct:
     def encode(self) -> tuple[bytes, list[tuple[int, int, int, int, int]]]:
         return encode_fidl_object(self, "test.versions", "test.versions/Struct")
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "x": None,
+                "x": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
@@ -177,12 +178,20 @@ CONST: int = 0
 Alias = str
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class OtherProtocolServer(fidl._server.ServerBase, ABC):
+class OtherProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.versions"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -191,12 +200,14 @@ class OtherProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-class OtherProtocolClient(fidl._client.FidlClient):
+class OtherProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.versions"
 
@@ -204,12 +215,14 @@ class OtherProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-class OtherProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
+class OtherProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.versions"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -218,22 +231,32 @@ class OtherProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-OtherProtocolMarker = fidl._library.ProtocolMarker(
+OtherProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.versions/OtherProtocol"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class ProtocolServer(fidl._server.ServerBase, ABC):
+class ProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.versions"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -251,6 +274,8 @@ class ProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -267,7 +292,7 @@ class ProtocolServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class ProtocolClient(fidl._client.FidlClient):
+class ProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.versions"
 
@@ -275,6 +300,8 @@ class ProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -292,7 +319,7 @@ class ProtocolClient(fidl._client.FidlClient):
         )
 
 
-class ProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
+class ProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.versions"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -301,11 +328,11 @@ class ProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-ProtocolMarker = fidl._library.ProtocolMarker(
-    "(nondiscoverable) test.versions/Protocol"
-)
+ProtocolMarker = FidlProtocolMarker("(nondiscoverable) test.versions/Protocol")

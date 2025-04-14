@@ -7,6 +7,7 @@
 mod array;
 mod buffer;
 mod hashmap;
+mod lock;
 mod ring_buffer;
 mod vmar;
 
@@ -47,7 +48,7 @@ fn new_map_id() -> u32 {
     MAP_IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum MapError {
     // Equivalent of EINVAL.
     InvalidParam,
@@ -385,7 +386,7 @@ mod test {
     use super::*;
 
     #[fuchsia::test]
-    fn test_sharing() {
+    fn test_sharing_array() {
         let schema = MapSchema {
             map_type: bpf_map_type_BPF_MAP_TYPE_ARRAY,
             key_size: 4,
@@ -402,5 +403,89 @@ mod test {
         let value = [0, 1, 2, 3];
         map1.update(MapKey::from_vec(key.clone()), &value, 0).unwrap();
         assert_eq!(&map2.lookup(&key).unwrap(), &value);
+    }
+
+    #[fuchsia::test]
+    fn test_hash_map() {
+        let schema = MapSchema {
+            map_type: bpf_map_type_BPF_MAP_TYPE_HASH,
+            key_size: 5,
+            value_size: 25,
+            max_entries: 10000,
+        };
+
+        let get_key = |i| {
+            MapKey::from_vec(vec![
+                (i & 0xffusize) as u8,
+                0,
+                ((i >> 4) & 0xffusize) as u8,
+                0,
+                ((i >> 8) & 0xffusize) as u8,
+            ])
+        };
+        let get_value = |i, v| format!("--{:010} {:010}--", i, v).into_bytes();
+
+        let map = Map::new(schema, 0).unwrap();
+
+        for i in 0..10000 {
+            assert!(map.update(get_key(i), &get_value(i, 0), 0).is_ok());
+        }
+
+        // Should fail to add another entry when the map is full.
+        assert_eq!(map.update(get_key(10001), &get_value(10001, 1), 0), Err(MapError::SizeLimit));
+
+        for i in 0..10000 {
+            assert_eq!(map.lookup(&get_key(i)), Some(get_value(i, 0)));
+        }
+
+        // Update some elements.
+        for i in 8000..9000 {
+            assert!(map.update(get_key(i), &get_value(i, 1), 0).is_ok());
+        }
+        for i in 8000..9000 {
+            assert_eq!(map.lookup(&get_key(i)), Some(get_value(i, 1)));
+        }
+
+        // Delete half of the entries.
+        for i in 5000..10000 {
+            assert!(map.delete(&get_key(i)).is_ok());
+        }
+        for i in 5000..10000 {
+            assert_eq!(map.lookup(&get_key(i)), None);
+        }
+
+        // Replace removed entries with new ones
+        for i in 10000..15000 {
+            assert!(map.update(get_key(i), &get_value(i, 2), 0).is_ok());
+        }
+        for i in 0..5000 {
+            assert_eq!(map.lookup(&get_key(i)), Some(get_value(i, 0)));
+        }
+        for i in 10000..15000 {
+            assert_eq!(map.lookup(&get_key(i)), Some(get_value(i, 2)));
+        }
+    }
+
+    #[fuchsia::test]
+    fn test_hash_map_update_direct() {
+        let schema = MapSchema {
+            map_type: bpf_map_type_BPF_MAP_TYPE_HASH,
+            key_size: 5,
+            value_size: 11,
+            max_entries: 10,
+        };
+
+        let map = Map::new(schema, 0).unwrap();
+        let key = MapKey::from_vec("12345".to_string().into_bytes());
+        let value = (0..11).collect::<Vec<u8>>();
+        assert!(map.update(key.clone(), &value, 0).is_ok());
+
+        // Access a value directly the way eBPF programs do.
+        let ptr = map.get_raw(&key).unwrap();
+        unsafe {
+            *(ptr as *mut u32) = 0xabacadae;
+        }
+
+        assert_eq!(map.lookup(&key), Some(vec![0xae, 0xad, 0xac, 0xab, 4, 5, 6, 7, 8, 9, 10]));
     }
 }

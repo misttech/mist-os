@@ -111,7 +111,8 @@ test("usb-peripheral-unittest-bin") {
     "//sdk/lib/driver/testing/cpp",
     "//src/devices/testing/mock-ddk",
     "//src/devices/usb/lib/usb",
-    "//zircon/system/ulib/zxtest",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
   ]
 }
 

@@ -27,6 +27,23 @@
             from: "parent",
             to: "#memory_monitor2",
         },
+        {
+            protocol: "fuchsia.memorypressure.Provider",
+            from: "#memory_pressure_signaler",
+            to: "#memory_monitor2",
+        },
+        {
+            config: [
+                "fuchsia.memory.CaptureOnPressureChange",
+                "fuchsia.memory.CriticalCaptureDelay",
+                "fuchsia.memory.ImminentOomCaptureDelay",
+                "fuchsia.memory.NormalCaptureDelay",
+                "fuchsia.memory.WarningCaptureDelay",
+            ],
+            from: "parent",
+            to: "#memory_monitor2",
+            availability: "same_as_target",
+        },
     ],
     expose: [
         {

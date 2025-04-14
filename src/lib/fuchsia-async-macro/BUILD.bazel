@@ -4,6 +4,8 @@
 
 load("@rules_rust//rust:defs.bzl", "rust_proc_macro")
 
+package(default_visibility = ["//visibility:public"])
+
 rust_proc_macro(
     name = "fuchsia-async-macro",
     srcs = ["src/lib.rs"],

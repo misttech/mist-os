@@ -22,4 +22,7 @@ pub struct ComponentsCommand {
         description = "outputs the unprocessed memory information from the device as json."
     )]
     pub debug_json: bool,
+
+    #[argh(switch, description = "outputs data in csv format.")]
+    pub csv: bool,
 }

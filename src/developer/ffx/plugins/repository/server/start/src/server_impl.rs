@@ -5,6 +5,7 @@
 use crate::target;
 use anyhow::{anyhow, Context};
 use camino::{Utf8Path, Utf8PathBuf};
+use errors::FfxError;
 use ffx_command_error::{bug, return_bug, return_user_error, Result};
 use ffx_config::environment::EnvironmentKind;
 use ffx_config::EnvironmentContext;
@@ -23,6 +24,7 @@ use pkg::{
 };
 use signal_hook::consts::signal::{SIGHUP, SIGINT, SIGTERM};
 use signal_hook::iterator::Signals;
+use std::error::Error as _;
 use std::fs;
 use std::io::Write;
 use std::sync::Arc;
@@ -159,18 +161,28 @@ pub async fn serve_impl_validate_args(
             //  For validating the arguments to this command, we're only checking for there being
             // 1 device identified as the target. If there is more than one or zero, print an error.
             Err(fho::Error::User(e)) => {
-                if let Some(ee) = e.downcast_ref::<FfxTargetError>() {
+                // This is a little bit of a hack, based on insider information of the Error structure.
+                // fho::Error::User can be based on the error type, FfxError.
+                // FfxError can be caused by the domain specific error FfxTargetError.
+                // FfxTargetError provides the detail of which error was encountered. If it is
+                // because a device cannot be targeted because there are too many, or zero and none
+                // explicitly requested, return the error and stop looping.
+                if let Some(ee) = e.downcast_ref::<FfxError>() {
                     match ee {
-                        FfxTargetError::OpenTargetError { err, .. } => {
-                            if err == &fidl_fuchsia_developer_ffx::OpenTargetError::TargetNotFound
-                                || err
-                                    == &fidl_fuchsia_developer_ffx::OpenTargetError::QueryAmbiguous
-                            {
-                                return_user_error!("{e} To disable auto-registration use the `--no-device` option.")
+                        FfxError::OpenTargetError { .. } => {
+                            if let Some(source) = ee.source() {
+                                match source.downcast_ref::<FfxTargetError>() {
+                                    Some(FfxTargetError::OpenTargetError { err, .. } )
+                                     if err == &fidl_fuchsia_developer_ffx::OpenTargetError::QueryAmbiguous ||
+                                     err == &fidl_fuchsia_developer_ffx::OpenTargetError::TargetNotFound => return_user_error!(e),
+                                    _ => ()
+                                }
                             }
                         }
                         _ => (),
                     };
+                } else {
+                    tracing::warn!("Expected error to be downcasted to FfxError but wasn't. Maybe the Error structure changed? {e:?}");
                 }
             }
             _ => (),
@@ -940,6 +952,52 @@ mod test {
         Connector::try_from_env(&env).await.expect("Could not make RCS test connector")
     }
 
+    async fn make_no_target_connector(test_env: &TestEnv) -> Connector<RemoteControlProxyHolder> {
+        let fake_injector = FakeInjector {
+            remote_factory_closure: Box::new(|| {
+                Box::pin(async move {
+                    Err::<RemoteControlProxy, anyhow::Error>(
+                        FfxTargetError::OpenTargetError {
+                            err: fidl_fuchsia_developer_ffx::OpenTargetError::TargetNotFound,
+                            target: None,
+                        }
+                        .into(),
+                    )
+                })
+            }),
+            ..Default::default()
+        };
+
+        let env =
+            FhoEnvironment::new_with_args(&test_env.context, &["some", "repo", "start", "test"]);
+        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+
+        Connector::try_from_env(&env).await.expect("Could not make RCS test connector")
+    }
+
+    async fn make_ambiguous_connector(test_env: &TestEnv) -> Connector<RemoteControlProxyHolder> {
+        let fake_injector = FakeInjector {
+            remote_factory_closure: Box::new(|| {
+                Box::pin(async move {
+                    Err::<RemoteControlProxy, anyhow::Error>(
+                        FfxTargetError::OpenTargetError {
+                            err: fidl_fuchsia_developer_ffx::OpenTargetError::QueryAmbiguous,
+                            target: None,
+                        }
+                        .into(),
+                    )
+                })
+            }),
+            ..Default::default()
+        };
+
+        let env =
+            FhoEnvironment::new_with_args(&test_env.context, &["some", "repo", "start", "test"]);
+        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+
+        Connector::try_from_env(&env).await.expect("Could not make RCS test connector")
+    }
+
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_serve_impl_validate_args() {
         let env = get_test_env().await;
@@ -1323,6 +1381,82 @@ mod test {
                 }
             };
         }
+    }
+
+    #[fuchsia::test]
+    async fn test_serve_impl_validate_args_no_device() {
+        let env = get_test_env().await;
+
+        let instance_root = env.isolate_root.path().join("repo_instances");
+        fs::create_dir_all(&instance_root).expect("instance root dir");
+
+        let repo_path = env.isolate_root.path().join("repo_path");
+        fs::create_dir_all(&repo_path).expect("repo path dir");
+
+        let cmd = StartCommand {
+            repository: Some("some_repo".into()),
+            trusted_root: None,
+            address: Some((REPO_IPV4_ADDR, 8888).into()),
+            repo_path: Some(Utf8PathBuf::from_path_buf(repo_path.clone()).expect("utf8 repo_path")),
+            product_bundle: None,
+            alias: vec![],
+            storage_type: None,
+            alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
+            port_path: None,
+            no_device: false,
+            refresh_metadata: false,
+            auto_publish: None,
+            background: false,
+            foreground: true,
+            disconnected: false,
+        };
+
+        let rcs_proxy_connector = make_no_target_connector(&env).await;
+
+        let result = serve_impl_validate_args(&cmd, &rcs_proxy_connector, &env.context).await;
+
+        let err = result.expect_err("Expected an error but did not get one");
+
+        let expected: String = "No devices/emulators found. Please ensure the device you want to use is connected and reachable, or an emulator is started.".into();
+        assert_eq!(err.to_string(), expected);
+    }
+
+    #[fuchsia::test]
+    async fn test_serve_impl_validate_args_too_many_devices() {
+        let env = get_test_env().await;
+
+        let instance_root = env.isolate_root.path().join("repo_instances");
+        fs::create_dir_all(&instance_root).expect("instance root dir");
+
+        let repo_path = env.isolate_root.path().join("repo_path");
+        fs::create_dir_all(&repo_path).expect("repo path dir");
+
+        let cmd = StartCommand {
+            repository: Some("some_repo".into()),
+            trusted_root: None,
+            address: Some((REPO_IPV4_ADDR, 8888).into()),
+            repo_path: Some(Utf8PathBuf::from_path_buf(repo_path.clone()).expect("utf8 repo_path")),
+            product_bundle: None,
+            alias: vec![],
+            storage_type: None,
+            alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
+            port_path: None,
+            no_device: false,
+            refresh_metadata: false,
+            auto_publish: None,
+            background: false,
+            foreground: true,
+            disconnected: false,
+        };
+
+        let rcs_proxy_connector = make_ambiguous_connector(&env).await;
+
+        let result = serve_impl_validate_args(&cmd, &rcs_proxy_connector, &env.context).await;
+
+        let err = result.expect_err("Expected an error but did not get one");
+
+        let expected: String = "More than one device/emulator found. Use `ffx target list` to list known targets and choose a target with `ffx -t`.".into();
+        assert_eq!(err.to_string(), expected);
     }
 
     #[fuchsia::test]

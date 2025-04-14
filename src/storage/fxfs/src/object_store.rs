@@ -969,7 +969,7 @@ impl ObjectStore {
             FsverityState::None,
             options,
             false,
-            overwrite_ranges,
+            &overwrite_ranges,
         );
         if let Some(descriptor) = fsverity_descriptor {
             match data_object_handle.read_attr(FSVERITY_MERKLE_ATTRIBUTE_ID).await? {
@@ -1036,7 +1036,7 @@ impl ObjectStore {
             FsverityState::None,
             options,
             false,
-            Vec::new(),
+            &[],
         ))
     }
 

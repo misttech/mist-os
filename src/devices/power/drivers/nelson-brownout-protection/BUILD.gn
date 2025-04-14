@@ -69,7 +69,6 @@ test("nelson-brownout-protection-test-bin") {
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//src/devices/bus/testing/fake-pdev",
     "//src/devices/gpio/testing/fake-gpio",
     "//src/devices/testing/mock-ddk",
     "//zircon/system/ulib/zxtest",

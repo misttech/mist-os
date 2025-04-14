@@ -8,6 +8,14 @@ use input_device_constants::InputDeviceType;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+fn default_frame_prediction_margin_in_us() -> u64 {
+    3000
+}
+
+fn is_default_frame_prediction_margin(val: &u64) -> bool {
+    *val == default_frame_prediction_margin_in_us()
+}
+
 /// Platform configuration options for the UI area.
 #[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
@@ -25,6 +33,11 @@ pub struct PlatformUiConfig {
     /// The minimum frame duration for frame scheduler.
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub frame_scheduler_min_predicted_frame_duration_in_us: u64,
+
+    /// Safety margin added to prediction time to reduce impact of noise and misprediction.
+    /// Unfortunately this means minimum possible latency is increased by the same amount.
+    #[serde(skip_serializing_if = "is_default_frame_prediction_margin")]
+    pub frame_prediction_margin_in_us: u64,
 
     /// Scenic shifts focus from view to view as the user interacts with the UI.
     /// Set to false for Smart displays, as they use a different programmatic focus change scheme.
@@ -45,7 +58,7 @@ pub struct PlatformUiConfig {
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub display_rotation: u64,
 
-    // TODO(132584): change to float when supported in structured config.
+    // TODO(https://fxbug.dev/324217535): change to float when supported in structured config.
     // The density of the display, in pixels per mm.
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub display_pixel_density: String,
@@ -84,6 +97,7 @@ impl Default for PlatformUiConfig {
             enabled: Default::default(),
             sensor_config: Default::default(),
             frame_scheduler_min_predicted_frame_duration_in_us: Default::default(),
+            frame_prediction_margin_in_us: default_frame_prediction_margin_in_us(),
             pointer_auto_focus: true,
             display_composition: false,
             supported_input_devices: Default::default(),

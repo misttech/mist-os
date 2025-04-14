@@ -44,16 +44,11 @@ group("hermetic_tests") {
     ":echo-cpp-wire-client-shared-test",
     ":echo-cpp-wire-client-sync-test",
     ":echo-cpp-wire-client-test",
-    ":echo-hlcpp-client-sync-test",
-    ":echo-hlcpp-client-test",
-    ":echo-hlcpp-multi-client-test",
     ":echo-launcher-cpp-wire-test",
-    ":echo-launcher-hlcpp-test",
     ":echo-launcher-rust-test",
     ":echo-rust-client-sync-test",
     ":echo-rust-client-test",
     ":echo-service-cpp-wire-test",
-    ":echo-service-hlcpp-test",
     ":echo-service-rust-test",
   ]
 
@@ -89,53 +84,7 @@ if (current_cpu != "riscv64") {
   }
 }
 
-# HLCPP example integration test packages
-fuchsia_test_package("echo-hlcpp-client-test") {
-  test_components = [ ":fidl_examples_test" ]
-  deps = [
-    "//examples/fidl/echo-realm:echo_realm",
-    "//examples/fidl/hlcpp/client:echo-client",
-    "//examples/fidl/hlcpp/server:echo-server",
-  ]
-}
-
-fuchsia_test_package("echo-hlcpp-client-sync-test") {
-  test_components = [ ":fidl_examples_test" ]
-  deps = [
-    "//examples/fidl/echo-realm:echo_realm",
-    "//examples/fidl/hlcpp/client_sync:echo-client",
-    "//examples/fidl/hlcpp/server:echo-server",
-  ]
-}
-
-fuchsia_test_package("echo-hlcpp-multi-client-test") {
-  test_components = [ ":fidl_examples_test" ]
-  deps = [
-    "//examples/fidl/echo-realm:echo_realm",
-    "//examples/fidl/hlcpp/multiple_clients/client:echo-client",
-    "//examples/fidl/hlcpp/multiple_clients/server:echo-server",
-  ]
-}
-
-fuchsia_test_package("echo-launcher-hlcpp-test") {
-  test_components = [ ":fidl_examples_test" ]
-  deps = [
-    "//examples/fidl/echo-realm:echo_realm",
-    "//examples/fidl/hlcpp/request_pipelining/client:echo-client",
-    "//examples/fidl/hlcpp/request_pipelining/server:echo-server",
-  ]
-}
-
-fuchsia_test_package("echo-service-hlcpp-test") {
-  test_components = [ ":fidl_examples_test" ]
-  deps = [
-    "//examples/fidl/echo-realm:echo_realm",
-    "//examples/fidl/hlcpp/services/client:echo-client",
-    "//examples/fidl/hlcpp/services/server:echo-server",
-  ]
-}
-
-# New C++ bindings natural types example integration test packages
+# C++ natural example integration test packages
 fuchsia_test_package("echo-cpp-client-test") {
   test_components = [ ":fidl_examples_test" ]
   deps = [
@@ -154,7 +103,7 @@ fuchsia_test_package("echo-cpp-client-sync-test") {
   ]
 }
 
-# LLCPP example integration test packages
+# C++ wire example integration test packages
 fuchsia_test_package("echo-cpp-wire-client-test") {
   test_components = [ ":fidl_examples_test" ]
   deps = [

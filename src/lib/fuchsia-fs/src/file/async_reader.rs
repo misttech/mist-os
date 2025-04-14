@@ -3,14 +3,15 @@
 // found in the LICENSE file.
 
 use fidl::client::QueryResponseFut;
-use fidl::endpoints::Proxy as _;
+use flex_fuchsia_io as fio;
 use futures::io::AsyncRead;
 use std::cmp::min;
 use std::convert::TryInto as _;
 use std::future::Future as _;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use {fidl_fuchsia_io as fio, zx_status};
+
+use flex_client::fidl::Proxy as _;
 
 /// Wraps a `fidl_fuchsia_io::FileProxy` and implements `futures::io::AsyncRead`, which allows one
 /// to perform asynchronous file reads that don't block the current thread while waiting for data.
@@ -23,8 +24,14 @@ pub struct AsyncReader {
 #[derive(Debug)]
 enum State {
     Empty,
-    Forwarding { fut: QueryResponseFut<Result<Vec<u8>, i32>>, zero_byte_request: bool },
-    Bytes { bytes: Vec<u8>, offset: usize },
+    Forwarding {
+        fut: QueryResponseFut<Result<Vec<u8>, i32>, flex_client::Dialect>,
+        zero_byte_request: bool,
+    },
+    Bytes {
+        bytes: Vec<u8>,
+        offset: usize,
+    },
 }
 
 impl AsyncReader {

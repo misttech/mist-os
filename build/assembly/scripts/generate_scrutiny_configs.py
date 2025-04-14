@@ -32,23 +32,24 @@ def collect_aib_artifacts(
     static_packages = set()
     bootfs_packages = set()
     for pkg in aib.packages:
+        package_str = str(pkg.package)
         if pkg.set == "base":
-            name = pkg.package.removeprefix("packages/")
+            name = package_str.removeprefix("packages/")
             static_packages.add(name)
         elif pkg.set == "cache":
-            name = pkg.package.removeprefix("packages/")
+            name = package_str.removeprefix("packages/")
             static_packages.add(name)
         elif pkg.set == "flexible":
-            name = pkg.package.removeprefix("packages/")
+            name = package_str.removeprefix("packages/")
             static_packages.add(name)
         elif pkg.set == "bootfs":
-            name = pkg.package.removeprefix("packages/")
+            name = package_str.removeprefix("packages/")
             bootfs_packages.add(name)
     for base_driver in aib.base_drivers:
-        name = base_driver.package.removeprefix("packages/")
+        name = str(base_driver.package).removeprefix("packages/")
         static_packages.add(name)
     for boot_driver in aib.boot_drivers:
-        name = boot_driver.package.removeprefix("packages/")
+        name = str(boot_driver.package).removeprefix("packages/")
         bootfs_packages.add(name)
 
     bootfs_files = set()
@@ -59,9 +60,10 @@ def collect_aib_artifacts(
         with open(manifest_path, "r") as f:
             manifest = json_load(PackageManifest, f)
             for blob in manifest.blobs:
-                if blob.path.startswith("meta/"):
+                blob_path = str(blob.path)
+                if blob_path.startswith("meta/"):
                     continue
-                path = blob.path.removeprefix("bootfs/")
+                path = blob_path.removeprefix("bootfs/")
                 bootfs_files.add(path)
 
     cmdline = set()

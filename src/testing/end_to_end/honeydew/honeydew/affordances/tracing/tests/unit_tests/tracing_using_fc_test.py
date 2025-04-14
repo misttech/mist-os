@@ -10,7 +10,7 @@ from collections.abc import Callable
 from typing import Any
 from unittest import mock
 
-import fidl.fuchsia_tracing_controller as f_tracingcontroller
+import fidl_fuchsia_tracing_controller as f_tracingcontroller
 import fuchsia_controller_py as fc
 from parameterized import param, parameterized
 
@@ -236,6 +236,9 @@ class TracingFCTests(unittest.TestCase):
         f_tracingcontroller.SessionClient,
         "stop_tracing",
         new_callable=mock.AsyncMock,
+        return_value=f_tracingcontroller.SessionStopTracingResult(
+            response=f_tracingcontroller.StopResult(provider_stats=[])
+        ),
     )
     def test_stop(
         self,
@@ -369,19 +372,21 @@ class TracingFCTests(unittest.TestCase):
         """Test for Tracing.stop() method with Warning."""
         # Perform setup based on parameters.
         records_dropped = parameterized_dict.get("dropped")
-        mock_tracingcontroller_stop.return_value = mock.Mock(
-            response=f_tracingcontroller.StopResult(
-                provider_stats=[
-                    f_tracingcontroller.ProviderStats(
-                        name="virtual-console.cm",
-                        pid=4566,
-                        buffering_mode=1,
-                        buffer_wrapped_count=0,
-                        records_dropped=records_dropped,
-                        percentage_durable_buffer_used=0.0,
-                        non_durable_bytes_written=16,
-                    )
-                ]
+        mock_tracingcontroller_stop.return_value = (
+            f_tracingcontroller.SessionStopTracingResult(
+                response=f_tracingcontroller.StopResult(
+                    provider_stats=[
+                        f_tracingcontroller.ProviderStats(
+                            name="virtual-console.cm",
+                            pid=4566,
+                            buffering_mode=1,
+                            buffer_wrapped_count=0,
+                            records_dropped=records_dropped,
+                            percentage_durable_buffer_used=0.0,
+                            non_durable_bytes_written=16,
+                        )
+                    ]
+                )
             )
         )
 
@@ -513,6 +518,9 @@ class TracingFCTests(unittest.TestCase):
         f_tracingcontroller.SessionClient,
         "stop_tracing",
         new_callable=mock.AsyncMock,
+        return_value=f_tracingcontroller.SessionStopTracingResult(
+            response=f_tracingcontroller.StopResult(provider_stats=[])
+        ),
     )
     @mock.patch.object(fc, "Channel")
     @mock.patch.object(fc, "Socket")

@@ -15,11 +15,14 @@ ffx_plugin("ffx_profile_memory") {
   edition = "2021"
 
   deps = [
+    "//sdk/fidl/fuchsia.memory.attribution.plugin:fuchsia.memory.attribution.plugin_rust",
     "//sdk/fidl/fuchsia.memory.inspection:fuchsia.memory.inspection_rust",
+    "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
-    "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/writer:lib",
-    "//src/developer/ffx/lib/writer:lib",
+    "//src/developer/ffx/plugins/audio/ffx_optional_moniker",
+    "//src/developer/ffx/plugins/profile/memory/components:ffx_profile_memory_components",
+    "//src/developer/ffx/plugins/profile/memory/components:ffx_profile_memory_components_args",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/performance/memory/attribution/processing",
@@ -42,6 +45,7 @@ ffx_plugin("ffx_profile_memory") {
   args_sources = [ "src/args.rs" ]
   args_deps = [
     "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
   ]
 
@@ -55,6 +59,7 @@ ffx_plugin("ffx_profile_memory") {
   ]
 
   test_deps = [
+    "//src/developer/ffx/lib/target/holders:lib",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:pretty_assertions",

@@ -11,7 +11,7 @@ device.
 import asyncio
 import typing
 
-import fidl.fuchsia_developer_remotecontrol as remotecontrol
+import fidl_fuchsia_developer_remotecontrol as remotecontrol
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 from mobly import asserts, base_test, test_runner
 from mobly_controller import fuchsia_device

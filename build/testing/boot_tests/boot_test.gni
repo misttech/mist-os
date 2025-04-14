@@ -108,6 +108,7 @@ template("_boot_test") {
     is_boot_test = true
     product_bundle = name
     expects_ssh = false
+    disable_fastboot = true
 
     forward_variables_from(invoker,
                            [
@@ -177,8 +178,8 @@ template("_boot_test") {
 #      in //build/testing/environments.gni.
 #    - Type: list of strings
 #
-#  * zbi, qemu_kernel, vbmeta, efi_disk
-#    - Optional: A label specifying a ZBI, QEMU kernel, VBMeta, UEFI
+#  * zbi, qemu_kernel, vbmeta, dtbo, efi_disk
+#    - Optional: A label specifying a ZBI, QEMU kernel, VBMeta, dtbo, UEFI
 #      executable, or a bootable UEFI filesystem or disk image, respectively.
 #      At least one of these parameters must be set, but each on their own is
 #      optional.
@@ -206,8 +207,9 @@ template("boot_test") {
          "boot_test(\"$target_name\") must define `environments`")
   assert(
       defined(invoker.zbi) || defined(invoker.qemu_kernel) ||
-          defined(invoker.vbmeta) || defined(invoker.efi_disk),
-      "boot_test(\"$target_name\") must define at least one of `zbi`, `qemu_kernel`, `vbmeta`, `efi_disk`")
+          defined(invoker.vbmeta) || defined(invoker.efi_disk) ||
+          defined(invoker.dtbo),
+      "boot_test(\"$target_name\") must define at least one of `zbi`, `qemu_kernel`, `vbmeta`, `efi_disk`, `dtbo`")
 
   main_target = target_name
   image_manifest_target = "_boot_test.${target_name}.image_manifest"
@@ -221,6 +223,7 @@ template("boot_test") {
                              "zbi",
                              "qemu_kernel",
                              "vbmeta",
+                             "dtbo",
                            ])
     testonly = true
     data_keys = [ "images" ]
@@ -233,6 +236,9 @@ template("boot_test") {
     }
     if (defined(vbmeta)) {
       deps += [ vbmeta ]
+    }
+    if (defined(dtbo)) {
+      deps += [ dtbo ]
     }
 
     # For general QEMU support it is convenient to include the default QEMU boot

@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.transitivedependencies"]
+_ir_path = get_fidl_ir_map()["test.transitivedependencies"]
 add_ir_path(_ir_path)
 
 import fidl_test_middle
@@ -20,9 +21,7 @@ import fidl_test_middle
 
 @dataclass
 class Baz:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    g: fidl_test_middle.Bar | None
+    g: fidl_test_middle.Bar
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Baz"
@@ -43,10 +42,12 @@ class Baz:
             "test.transitivedependencies/Baz",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "g": None,
+                "g": None,  # type: ignore[arg-type,unused-ignore]
             }
         )

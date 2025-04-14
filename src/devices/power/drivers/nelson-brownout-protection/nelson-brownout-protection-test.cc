@@ -4,6 +4,7 @@
 
 #include "nelson-brownout-protection.h"
 
+#include <lib/async-default/include/lib/async/default.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -13,7 +14,6 @@
 
 #include <zxtest/zxtest.h>
 
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 

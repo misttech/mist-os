@@ -61,7 +61,7 @@ host_test_data("test_data") {
     "test_data/rfc_example/.build-dir",
     "test_data/rfc_example/fuchsia_env.toml",
     "test_data/rfc_example/out/fuchsia_build_config.json",
-    "test_data/rfc_example/out/sdk/manifest/core",
+    "test_data/rfc_example/out/some-internal-idk-root/meta/manifest.json",
   ]
 }
 

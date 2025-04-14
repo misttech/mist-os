@@ -15,14 +15,21 @@
 
 #ifdef __Fuchsia__
 #include <lib/zx/channel.h>
+#include <lib/zx/counter.h>
 #include <lib/zx/vmo.h>
 #endif
 
 namespace {
 
+enum class SemaphoreType : uint8_t {
+  Default,
+  Vmo,
+  Counter,
+};
+
 class TestPlatformPort : public testing::Test {
  public:
-  void TestSemaphore(bool vmo_semaphore = false) {
+  void TestSemaphore(SemaphoreType type) {
     std::shared_ptr<magma::PlatformPort> port(magma::PlatformPort::Create());
 
     std::unique_ptr<std::thread> thread;
@@ -37,18 +44,33 @@ class TestPlatformPort : public testing::Test {
     thread->join();
 
     std::shared_ptr<magma::PlatformSemaphore> semaphore;
-    if (vmo_semaphore) {
+    switch (type) {
+      case SemaphoreType::Default:
+        semaphore = std::shared_ptr<magma::PlatformSemaphore>(magma::PlatformSemaphore::Create());
+        break;
+      case SemaphoreType::Vmo: {
 #if !defined(__Fuchsia__)
-      GTEST_SKIP();
+        GTEST_SKIP();
 #else
-      constexpr uint32_t kSize = 1;  // expect a page
-      zx::vmo vmo;
-      ASSERT_EQ(ZX_OK, zx::vmo::create(kSize, /*options=*/0, &vmo));
-      semaphore = std::shared_ptr<magma::PlatformSemaphore>(
-          magma::PlatformSemaphore::Import(vmo.release(), /*flags=*/0));
+        constexpr uint32_t kSize = 1;  // expect a page
+        zx::vmo vmo;
+        ASSERT_EQ(ZX_OK, zx::vmo::create(kSize, /*options=*/0, &vmo));
+        semaphore = std::shared_ptr<magma::PlatformSemaphore>(
+            magma::PlatformSemaphore::Import(vmo.release(), /*flags=*/0));
 #endif
-    } else {
-      semaphore = std::shared_ptr<magma::PlatformSemaphore>(magma::PlatformSemaphore::Create());
+        break;
+      }
+      case SemaphoreType::Counter: {
+#if !defined(__Fuchsia__)
+        GTEST_SKIP();
+#else
+        zx::counter counter;
+        ASSERT_EQ(ZX_OK, zx::counter::create(/*options=*/0, &counter));
+        semaphore = std::shared_ptr<magma::PlatformSemaphore>(
+            magma::PlatformSemaphore::Import(counter.release(), /*flags=*/0));
+#endif
+        break;
+      }
     }
     ASSERT_TRUE(semaphore);
 
@@ -161,8 +183,10 @@ class TestPlatformPort : public testing::Test {
 
 }  // namespace
 
-TEST_F(TestPlatformPort, Semaphore) { TestSemaphore(); }
+TEST_F(TestPlatformPort, Semaphore) { TestSemaphore(SemaphoreType::Default); }
 
-TEST_F(TestPlatformPort, VmoSemaphore) { TestSemaphore(/*vmo_semaphore=*/true); }
+TEST_F(TestPlatformPort, VmoSemaphore) { TestSemaphore(SemaphoreType::Vmo); }
+
+TEST_F(TestPlatformPort, CounterSemaphore) { TestSemaphore(SemaphoreType::Counter); }
 
 TEST_F(TestPlatformPort, Handle) { TestHandle(); }

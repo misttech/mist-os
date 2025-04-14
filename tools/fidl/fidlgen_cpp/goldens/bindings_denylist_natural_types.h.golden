@@ -32,10 +32,6 @@ class DenyEachBindingOnlyDenyGoRequest;
 
 class DenyEachBindingOnlyDenyGoResponse;
 
-class DenyEachBindingOnlyDenyLibfuzzerRequest;
-
-class DenyEachBindingOnlyDenyLibfuzzerResponse;
-
 class DenyEachBindingOnlyDenyPythonRequest;
 
 class DenyEachBindingOnlyDenyPythonResponse;
@@ -57,8 +53,6 @@ class OnlyLlcpp;
 class DenyEachBindingOnlyDenyDartResult;
 
 class DenyEachBindingOnlyDenyGoResult;
-
-class DenyEachBindingOnlyDenyLibfuzzerResult;
 
 class DenyEachBindingOnlyDenyPythonResult;
 
@@ -627,241 +621,6 @@ class DenyEachBindingOnlyDenyGoResult {
         return ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult::Tag::kResponse;
       case 2:
         return ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult::Tag::kErr;
-      default:
-        return std::nullopt;
-    }
-  }
-};
-
-class DenyEachBindingOnlyDenyLibfuzzerRequest {
- private:
-  struct Storage_;
-
- public:
-  DenyEachBindingOnlyDenyLibfuzzerRequest(Storage_ storage) noexcept;
-  DenyEachBindingOnlyDenyLibfuzzerRequest(bool a) noexcept;
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
-  // Default constructs a |DenyEachBindingOnlyDenyLibfuzzerRequest| only if all of its members are default constructible.
-  DenyEachBindingOnlyDenyLibfuzzerRequest() = default;
-#pragma clang diagnostic pop
-
-  DenyEachBindingOnlyDenyLibfuzzerRequest(DenyEachBindingOnlyDenyLibfuzzerRequest&&) noexcept = default;
-  DenyEachBindingOnlyDenyLibfuzzerRequest& operator=(DenyEachBindingOnlyDenyLibfuzzerRequest&&) noexcept = default;
-  DenyEachBindingOnlyDenyLibfuzzerRequest(const DenyEachBindingOnlyDenyLibfuzzerRequest& other) noexcept;
-  DenyEachBindingOnlyDenyLibfuzzerRequest& operator=(const DenyEachBindingOnlyDenyLibfuzzerRequest& other) noexcept;
-
-  bool operator==(const DenyEachBindingOnlyDenyLibfuzzerRequest& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest, 1>::Equal(this, &other);
-  }
-  bool operator!=(const DenyEachBindingOnlyDenyLibfuzzerRequest& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest, 1>::Equal(this, &other);
-  }
-
-  bool
-  a() const {
-    return storage_.a;
-  }
-
-  bool& a() {
-    return storage_.a;
-  }
-
-  // Setter for a.
-  //
-
-  DenyEachBindingOnlyDenyLibfuzzerRequest& a(bool value);
-
-  DenyEachBindingOnlyDenyLibfuzzerRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
-
- private:
-  struct Storage_ final {
-    bool a = {};
-  };
-
-  Storage_ storage_;
-  Storage_ CloneStorage_() const;
-
-  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest, 1>;
-  friend struct ::fidl::internal::MemberVisitor<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest>;
-  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, bool, fidl::internal::NaturalCodingConstraintEmpty>{
-      &Storage_::a, 0});
-  static constexpr auto kPadding = std::make_tuple();
-};
-
-class DenyEachBindingOnlyDenyLibfuzzerResponse {
- private:
-  struct Storage_;
-
- public:
-  DenyEachBindingOnlyDenyLibfuzzerResponse(Storage_ storage) noexcept;
-  DenyEachBindingOnlyDenyLibfuzzerResponse(int32_t b) noexcept;
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
-  // Default constructs a |DenyEachBindingOnlyDenyLibfuzzerResponse| only if all of its members are default constructible.
-  DenyEachBindingOnlyDenyLibfuzzerResponse() = default;
-#pragma clang diagnostic pop
-
-  DenyEachBindingOnlyDenyLibfuzzerResponse(DenyEachBindingOnlyDenyLibfuzzerResponse&&) noexcept = default;
-  DenyEachBindingOnlyDenyLibfuzzerResponse& operator=(DenyEachBindingOnlyDenyLibfuzzerResponse&&) noexcept = default;
-  DenyEachBindingOnlyDenyLibfuzzerResponse(const DenyEachBindingOnlyDenyLibfuzzerResponse& other) noexcept;
-  DenyEachBindingOnlyDenyLibfuzzerResponse& operator=(const DenyEachBindingOnlyDenyLibfuzzerResponse& other) noexcept;
-
-  bool operator==(const DenyEachBindingOnlyDenyLibfuzzerResponse& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse, 4>::Equal(this, &other);
-  }
-  bool operator!=(const DenyEachBindingOnlyDenyLibfuzzerResponse& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse, 4>::Equal(this, &other);
-  }
-
-  int32_t
-  b() const {
-    return storage_.b;
-  }
-
-  int32_t& b() {
-    return storage_.b;
-  }
-
-  // Setter for b.
-  //
-
-  DenyEachBindingOnlyDenyLibfuzzerResponse& b(int32_t value);
-
-  DenyEachBindingOnlyDenyLibfuzzerResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
-
- private:
-  struct Storage_ final {
-    int32_t b = {};
-  };
-
-  Storage_ storage_;
-  Storage_ CloneStorage_() const;
-
-  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse, 4>;
-  friend struct ::fidl::internal::MemberVisitor<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse>;
-  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, int32_t, fidl::internal::NaturalCodingConstraintEmpty>{
-      &Storage_::b, 0});
-  static constexpr auto kPadding = std::make_tuple();
-};
-
-class DenyEachBindingOnlyDenyLibfuzzerResult {
- private:
-  using Storage_ =
-      std::variant<
-          std::monostate, ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse, uint32_t>;
-
- public:
-  // TODO: share union tag types between wire & natural.
-  enum class Tag : fidl_xunion_tag_t {
-    kResponse = 1,  // 0x1
-    kErr = 2,       // 0x2
-  };
-
-  DenyEachBindingOnlyDenyLibfuzzerResult(DenyEachBindingOnlyDenyLibfuzzerResult&& other) noexcept
-      : DenyEachBindingOnlyDenyLibfuzzerResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
-    *storage_ = std::move(*other.storage_);
-  }
-  DenyEachBindingOnlyDenyLibfuzzerResult& operator=(DenyEachBindingOnlyDenyLibfuzzerResult&& other) noexcept {
-    if (this != &other) {
-      *storage_ = std::move(*other.storage_);
-    }
-    return *this;
-  }
-  DenyEachBindingOnlyDenyLibfuzzerResult(const DenyEachBindingOnlyDenyLibfuzzerResult& other) noexcept : DenyEachBindingOnlyDenyLibfuzzerResult(other.CloneStorage_()) {}
-  DenyEachBindingOnlyDenyLibfuzzerResult& operator=(const DenyEachBindingOnlyDenyLibfuzzerResult& other) noexcept {
-    if (this != &other) {
-      storage_ = other.CloneStorage_();
-    }
-    return *this;
-  }
-
-  bool operator==(const DenyEachBindingOnlyDenyLibfuzzerResult& other) const noexcept {
-    return *storage_ == *other.storage_;
-  }
-  bool operator!=(const DenyEachBindingOnlyDenyLibfuzzerResult& other) const noexcept {
-    return *storage_ != *other.storage_;
-  }
-
-  constexpr ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult::Tag Which() const {
-    return DenyEachBindingOnlyDenyLibfuzzerResult::IndexToTag(storage_->index()).value();
-  }
-  static DenyEachBindingOnlyDenyLibfuzzerResult WithResponse(::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse val) {
-    return DenyEachBindingOnlyDenyLibfuzzerResult(std::make_shared<Storage_>(
-        std::in_place_index_t<1>{},
-        std::move(val)));
-  }
-
-  const ::fidl::internal::UnionMemberView<1, Storage_> response() const {
-    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
-  }
-
-  ::fidl::internal::UnionMemberView<1, Storage_> response() {
-    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
-  }
-
-  // Sets the union to hold the response member.
-  //
-
-  DenyEachBindingOnlyDenyLibfuzzerResult& response(::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse value) {
-    storage_->emplace<1>(std::move(value));
-    return *this;
-  }
-  static DenyEachBindingOnlyDenyLibfuzzerResult WithErr(uint32_t val) {
-    return DenyEachBindingOnlyDenyLibfuzzerResult(std::make_shared<Storage_>(
-        std::in_place_index_t<2>{},
-        std::move(val)));
-  }
-
-  const ::fidl::internal::UnionMemberView<2, Storage_> err() const {
-    return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
-  }
-
-  ::fidl::internal::UnionMemberView<2, Storage_> err() {
-    return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
-  }
-
-  // Sets the union to hold the err member.
-  //
-
-  DenyEachBindingOnlyDenyLibfuzzerResult& err(uint32_t value) {
-    storage_->emplace<2>(std::move(value));
-    return *this;
-  }
-
-  DenyEachBindingOnlyDenyLibfuzzerResult(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
-      : storage_(std::make_shared<Storage_>()) {}
-
- private:
-  std::shared_ptr<Storage_> storage_;
-  std::shared_ptr<Storage_> CloneStorage_() const;
-  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult>;
-  static constexpr auto kMembers = std::make_tuple(
-      ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
-
-  explicit DenyEachBindingOnlyDenyLibfuzzerResult(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
-
-  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult::Tag tag) {
-    switch (tag) {
-      case ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult::Tag::kResponse:
-        return 1;
-      case ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult::Tag::kErr:
-        return 2;
-      default: {
-        decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
-        return 0;
-      }
-    }
-  }
-
-  static constexpr std::optional<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult::Tag> IndexToTag(size_t index) {
-    switch (index) {
-      case 1:
-        return ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult::Tag::kResponse;
-      case 2:
-        return ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult::Tag::kErr;
       default:
         return std::nullopt;
     }
@@ -1755,40 +1514,6 @@ inline DenyEachBindingOnlyDenyGoResponse& DenyEachBindingOnlyDenyGoResponse::b(i
   return *this;
 }
 
-inline DenyEachBindingOnlyDenyLibfuzzerRequest::DenyEachBindingOnlyDenyLibfuzzerRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline DenyEachBindingOnlyDenyLibfuzzerRequest::DenyEachBindingOnlyDenyLibfuzzerRequest(bool a) noexcept
-    : storage_({.a = std::move(a)}) {}
-inline DenyEachBindingOnlyDenyLibfuzzerRequest::DenyEachBindingOnlyDenyLibfuzzerRequest(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenyLibfuzzerRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline DenyEachBindingOnlyDenyLibfuzzerRequest::DenyEachBindingOnlyDenyLibfuzzerRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyLibfuzzerRequest(Storage_{
-                                                                                                                                                          .a = {},
-                                                                                                                                                      }) {}
-inline DenyEachBindingOnlyDenyLibfuzzerRequest& DenyEachBindingOnlyDenyLibfuzzerRequest::a(bool value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-
-inline DenyEachBindingOnlyDenyLibfuzzerResponse::DenyEachBindingOnlyDenyLibfuzzerResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline DenyEachBindingOnlyDenyLibfuzzerResponse::DenyEachBindingOnlyDenyLibfuzzerResponse(int32_t b) noexcept
-    : storage_({.b = std::move(b)}) {}
-inline DenyEachBindingOnlyDenyLibfuzzerResponse::DenyEachBindingOnlyDenyLibfuzzerResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse(other.CloneStorage_()) {}
-inline DenyEachBindingOnlyDenyLibfuzzerResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline DenyEachBindingOnlyDenyLibfuzzerResponse::DenyEachBindingOnlyDenyLibfuzzerResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyLibfuzzerResponse(Storage_{
-                                                                                                                                                            .b = {},
-                                                                                                                                                        }) {}
-inline DenyEachBindingOnlyDenyLibfuzzerResponse& DenyEachBindingOnlyDenyLibfuzzerResponse::b(int32_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-
 inline DenyEachBindingOnlyDenyPythonRequest::DenyEachBindingOnlyDenyPythonRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline DenyEachBindingOnlyDenyPythonRequest::DenyEachBindingOnlyDenyPythonRequest(bool a) noexcept
     : storage_({.a = std::move(a)}) {}
@@ -2005,44 +1730,6 @@ struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnl
     : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse, 4> {};
 
 template <>
-struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest> : public std::true_type {};
-
-template <>
-struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 0;
-  static constexpr uint32_t kPrimarySize = 1;
-  static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasPointer = false;
-};
-
-template <>
-struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest> : public std::true_type {};
-
-template <>
-struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest, 1> {};
-
-template <>
-struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse> : public std::true_type {};
-
-template <>
-struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 0;
-  static constexpr uint32_t kPrimarySize = 4;
-  static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasPointer = false;
-};
-
-template <>
-struct IsStruct<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse> : public std::true_type {};
-
-template <>
-struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse, 4> {};
-
-template <>
 struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonRequest> : public std::true_type {};
 
 template <>
@@ -2250,25 +1937,6 @@ struct IsUnion<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult> : publi
 template <>
 struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult> {};
-
-template <>
-struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult> : public std::true_type {};
-
-template <>
-struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasPointer = true;
-};
-
-template <>
-struct IsUnion<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult> : public std::true_type {};
-
-template <>
-struct internal::NaturalCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalUnionCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult> {};
 
 template <>
 struct IsFidlType<::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResult> : public std::true_type {};

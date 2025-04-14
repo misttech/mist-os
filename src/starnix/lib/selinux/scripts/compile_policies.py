@@ -117,14 +117,6 @@ _COMPOSITE_POLICY_PATHS = [
     (
         [
             "base_policy.conf",
-            "new_file/test_policy.conf",
-            "new_file/socket_transition_policy.conf",
-        ],
-        "socket_transition_policy.pp",
-    ),
-    (
-        [
-            "base_policy.conf",
             "new_file/type_transition_policy.conf",
         ],
         "type_transition_policy.pp",
@@ -168,6 +160,12 @@ _COMPOSITE_POLICY_PATHS = [
             "new_file/with_additional_domain_policy.conf",
         ],
         "with_additional_domain_policy.pp",
+    ),
+    (
+        [
+            "initial_sids_policy.conf",
+        ],
+        "initial_sids_policy.pp",
     ),
 ]
 

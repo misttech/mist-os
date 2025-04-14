@@ -17,14 +17,12 @@ hlcpp_visibility = [
 
   # FIDL implementation, tests, examples.
   "//examples/fidl/fuchsia.examples:*",
-  "//examples/fidl/hlcpp/*",
   "//sdk/ctf/tests/pkg/fidl/cpp:*",
   "//src/lib/fostr/*",
   "//src/sys/fuzzing/fidl:*",
   "//src/testing/fidl/*",
   "//src/tests/fidl/*",
   "//tools/fidl/fidlc/testdata:*",
-  "//examples/fuzzers/fidl:*",
 
   # Misc buildsystem stuff.
   "//sdk/ctf/*",
@@ -52,9 +50,6 @@ hlcpp_visibility = [
   "//examples/diagnostics/inspect/codelab/fidl:*",
   "//examples/diagnostics/inspect/cpp:*",
   "//examples/diagnostics/workshop/*",
-  "//examples/drivers/driver_test_realm/hermetic/cpp:*",
-  "//examples/drivers/transport/tests:*",
-  "//examples/fidl/new/canvas/*",
   "//examples/intl/wisdom/*",
   "//sdk/lib/component/tests:*",
   "//sdk/lib/driver/component/cpp:*",

@@ -4,7 +4,7 @@
 
 # buildifier: disable=module-docstring
 load(":fuchsia_component_manifest.bzl", "ensure_compiled_component_manifest")
-load(":fuchsia_debug_symbols.bzl", "collect_debug_symbols")
+load(":fuchsia_debug_symbols.bzl", "merge_debug_symbol_infos")
 load(
     ":providers.bzl",
     "FuchsiaComponentInfo",
@@ -158,7 +158,7 @@ def _fuchsia_component_impl(ctx):
         moniker = ctx.attr.moniker.format(COMPONENT_NAME = component_name),
         run_tag = label_name(str(ctx.label)),
     ) + [
-        collect_debug_symbols(ctx.attr.deps),
+        merge_debug_symbol_infos(ctx.attr.deps),
     ]
 
 _fuchsia_component = rule(

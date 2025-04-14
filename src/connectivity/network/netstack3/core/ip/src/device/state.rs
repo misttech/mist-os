@@ -27,6 +27,7 @@ use netstack3_base::{
 use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 use packet_formats::utils::NonZeroDuration;
 
+use crate::internal::counters::{IpCounters, IpCountersIpExt};
 use crate::internal::device::dad::DadBindingsTypes;
 use crate::internal::device::route_discovery::Ipv6RouteDiscoveryState;
 use crate::internal::device::router_solicitation::RsState;
@@ -52,7 +53,7 @@ pub const RETRANS_TIMER_DEFAULT: NonZeroDuration = NonZeroDuration::from_secs(1)
 const DEFAULT_HOP_LIMIT: NonZeroU8 = NonZeroU8::new(64).unwrap();
 
 /// An `Ip` extension trait adding IP device state properties.
-pub trait IpDeviceStateIpExt: BroadcastIpExt {
+pub trait IpDeviceStateIpExt: BroadcastIpExt + IpCountersIpExt {
     /// Information stored about an IP address assigned to an interface.
     type AssignedAddressState<BT: IpDeviceStateBindingsTypes>: AssignedAddressState<Address = Self::Addr>
         + Debug;
@@ -340,6 +341,9 @@ pub struct IpDeviceState<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> 
 
     /// The flags for this device.
     flags: Mutex<IpMarked<I, IpDeviceFlags>>,
+
+    /// The IP counters for this device.
+    ip_counters: IpCounters<I>,
 }
 
 impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes>
@@ -409,6 +413,7 @@ impl<I: IpDeviceStateIpExt, BC: IpDeviceStateBindingsTypes + TimerContext> IpDev
             }),
             default_hop_limit: Default::default(),
             flags: Default::default(),
+            ip_counters: Default::default(),
         }
     }
 }
@@ -701,6 +706,11 @@ impl Ipv6NetworkLearnedParameters {
     pub fn retrans_timer_or_default(&self) -> NonZeroDuration {
         self.retrans_timer.clone().unwrap_or(RETRANS_TIMER_DEFAULT)
     }
+
+    /// Forgets any learned network parameters, resetting to the default values.
+    pub fn reset(&mut self) {
+        *self = Default::default()
+    }
 }
 
 /// The state common to all IPv6 devices.
@@ -836,6 +846,11 @@ impl<BT: IpDeviceStateBindingsTypes> DualStackIpDeviceState<BT> {
     /// Access the MLD counters associated with this specific device state.
     pub fn mld_counters(&self) -> &MldCounters {
         self.ipv6.mld_counters()
+    }
+
+    /// Access the IP counters associated with this specific device state.
+    pub fn ip_counters<I: IpDeviceStateIpExt>(&self) -> &IpCounters<I> {
+        &self.ip_state::<I>().ip_counters
     }
 }
 

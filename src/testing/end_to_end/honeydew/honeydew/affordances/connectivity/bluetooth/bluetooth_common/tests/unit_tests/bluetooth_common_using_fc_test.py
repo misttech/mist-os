@@ -10,8 +10,8 @@ from collections.abc import Callable
 from typing import Any
 from unittest import mock
 
-import fidl.fuchsia_bluetooth as f_bt
-import fidl.fuchsia_bluetooth_sys as f_btsys_controller
+import fidl_fuchsia_bluetooth as f_bt
+import fidl_fuchsia_bluetooth_sys as f_btsys_controller
 from parameterized import param, parameterized
 
 from honeydew import affordances_capable
@@ -46,11 +46,11 @@ _SAMPLE_KNOWN_DEVICES_OUTPUT = f_btsys_controller.AccessWatchPeersResponse(
         ),
     ],
     removed=[
-        f_bt.PeerId(value="0"),
+        f_bt.PeerId(value=0),
     ],
 )
 
-_ACTUAL_KNOWN_DEVICE_OUTPUT: f_btsys_controller.AccessWatchPeersResponse = {
+_ACTUAL_KNOWN_DEVICE_OUTPUT = {
     "16085008211800713200": {
         "address": [88, 111, 107, 249, 15, 248],
         "appearance": None,
@@ -198,7 +198,7 @@ class BluetoothCommonFCTests(unittest.TestCase):
         """Test for BluetoothGap.connect_device() method."""
         self.bluetooth_common_fc_obj._access_controller_proxy = mock.MagicMock()
         self.bluetooth_common_fc_obj.loop = mock.MagicMock()
-        dummy_identifier = "0"
+        dummy_identifier = 0
         self.bluetooth_common_fc_obj.connect_device(
             identifier=dummy_identifier,
             connection_type=parameterized_dict["transport"],
@@ -215,7 +215,7 @@ class BluetoothCommonFCTests(unittest.TestCase):
         """Test for BluetoothGap.forget_device() method."""
         self.bluetooth_common_fc_obj._access_controller_proxy = mock.MagicMock()
         self.bluetooth_common_fc_obj.loop = mock.MagicMock()
-        dummy_identifier = "0"
+        dummy_identifier = 0
         self.bluetooth_common_fc_obj.forget_device(
             identifier=dummy_identifier,
         )
@@ -247,7 +247,7 @@ class BluetoothCommonFCTests(unittest.TestCase):
                 f_btsys_controller.HostInfo(
                     addresses=[
                         f_bt.Address(
-                            bytes_=[88, 111, 107, 249, 15, 248], type_="0"
+                            bytes_=[88, 111, 107, 249, 15, 248], type_=0
                         )
                     ]
                 )
@@ -300,7 +300,7 @@ class BluetoothCommonFCTests(unittest.TestCase):
         """Test for BluetoothGap.pair_device() method."""
         self.bluetooth_common_fc_obj._access_controller_proxy = mock.MagicMock()
         self.bluetooth_common_fc_obj.loop = mock.MagicMock()
-        dummy_identifier = "0"
+        dummy_identifier = 0
         self.bluetooth_common_fc_obj.pair_device(
             identifier=dummy_identifier,
             connection_type=parameterized_dict["transport"],

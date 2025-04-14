@@ -35,10 +35,6 @@ The present documentation focuses on the details of the creation process of the
 IDK.
 The documentation included in the IDK, hosted under `//idk/docs`, contains
 information regarding how to work with the IDK.
-Lastly, some examples of SDK distributions can be found under `//scripts/sdk`;
-most notably it contains a [frontend](#frontend) generating a workspace
-enabling Fuchsia development using [Bazel][bazel] - this distribution is
-currently used to test versions of the IDK before they are published.
 
 ## What belongs in the IDK? {#what-belongs-in-an-idk}
 
@@ -90,8 +86,8 @@ the evolution of the API surface.
 The term frontend is used to describe any process that ingests the Fuchsia IDK
 archive and applies transformations to it.
 
-[In the Fuchsia tree][frontends], frontends are used to generate SDK
-distributions, e.g. a Bazel-ready workspace.
+In the Fuchsia tree, frontends are used to generate SDK distributions, e.g. a Bazel-ready
+workspace.
 
 Frontends may also be used to adapt a Fuchsia IDK archive for consumption in a
 particular development environment by for example generating build files for a
@@ -161,14 +157,8 @@ While locally iterating on some public API, having to repeatedly update
 reference files can be tedious. In order to turn the build errors into warnings,
 configure then build with this extra GN argument: `warn_no_sdk_changes=true`.
 
-### Producing an SDK distribution {#producing-an-sdk-distribution}
-
-This is done by running a frontend. See the [frontend documentation][frontends]
-for more details.
 
 
 [backend]: /build/sdk/README.md
-[frontends]: /scripts/sdk/README.md
-[bazel]: https://bazel.build/
 [fx-config]: /docs/development/build/fx.md#configure-a-build
 [fx-build-target]: /docs/development/build/fx.md#building-a-specific-target

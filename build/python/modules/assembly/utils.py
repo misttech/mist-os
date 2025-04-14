@@ -5,10 +5,12 @@
 Utility functions for dealing with class members which are sets and lists.
 """
 
+from typing import Any
+
 __all__ = ["difference_field", "intersect_field"]
 
 
-def intersect_field(item_a, item_b, field: str, result) -> None:
+def intersect_field(item_a: Any, item_b: Any, field: str, result: Any) -> None:
     """Set the named field in `result` if the value for that field is the same
     in items A and B.
     """
@@ -18,7 +20,7 @@ def intersect_field(item_a, item_b, field: str, result) -> None:
         setattr(result, field, value_a)
 
 
-def difference_field(item_a, item_b, field: str, result) -> None:
+def difference_field(item_a: Any, item_b: Any, field: str, result: Any) -> None:
     """Set the named field in `result` to the value from item_a if the value for that field is different
     in items A and B.
     """

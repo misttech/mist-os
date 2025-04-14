@@ -29,7 +29,9 @@ use crate::internal::base::{
     BufferSizes, BuffersRefMut, ConnectionError, IcmpErrorResult, KeepAlive, SocketOptions,
 };
 use crate::internal::buffer::{Assembler, BufferLimits, IntoBuffers, ReceiveBuffer, SendBuffer};
-use crate::internal::congestion::CongestionControl;
+use crate::internal::congestion::{
+    CongestionControl, CongestionControlSendOutcome, LossRecoveryMode, LossRecoverySegment,
+};
 use crate::internal::counters::TcpCountersRefs;
 use crate::internal::rtt::{Estimator, Rto, RttSampler};
 
@@ -73,8 +75,7 @@ const SWS_PROBE_TIMEOUT: Duration = Duration::from_millis(100);
 const SWS_BUFFER_FACTOR: u32 = 2;
 
 /// Whether netstack3 senders support receiving selective acks.
-// TODO(https://fxbug.dev/42078221): Tell the peer we can do SACK.
-const SACK_PERMITTED: bool = false;
+const SACK_PERMITTED: bool = true;
 
 /// A trait abstracting an identifier for a state machine.
 ///
@@ -181,10 +182,8 @@ impl<Error> Closed<Error> {
     /// TCP will either drop the incoming segment or generate a RST.
     pub(crate) fn on_segment(&self, segment: &Segment<impl Payload>) -> Option<Segment<()>> {
         let segment_len = segment.len();
-        let Segment {
-            header: SegmentHeader { seq: seg_seq, ack: seg_ack, wnd: _, control, options: _ },
-            data: _,
-        } = segment;
+        let SegmentHeader { seq: seg_seq, ack: seg_ack, wnd: _, control, options: _, push: _ } =
+            segment.header();
 
         // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-65):
         //   If the state is CLOSED (i.e., TCB does not exist) then
@@ -243,11 +242,11 @@ enum ListenOnSegmentDisposition<I: Instant> {
 impl Listen {
     fn on_segment<I: Instant>(
         &self,
-        Segment { header: SegmentHeader { seq, ack, wnd: _, control, options }, data: _ }: Segment<
-            impl Payload,
-        >,
+        seg: Segment<impl Payload>,
         now: I,
     ) -> ListenOnSegmentDisposition<I> {
+        let (header, _data) = seg.into_parts();
+        let SegmentHeader { seq, ack, wnd: _, control, options, push: _ } = header;
         let Listen { iss, buffer_sizes, device_mss, default_mss, user_timeout } = *self;
         let smss = options.mss().unwrap_or(default_mss).min(device_mss);
         // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-65):
@@ -373,12 +372,12 @@ impl<I: Instant + 'static, ActiveOpen> SynSent<I, ActiveOpen> {
     /// the segment is dropped or an RST is generated.
     fn on_segment(
         &self,
-        Segment {
-            header: SegmentHeader { seq: seg_seq, ack: seg_ack, wnd: seg_wnd, control, options },
-            data: _,
-        }: Segment<impl Payload>,
+        seg: Segment<impl Payload>,
         now: I,
     ) -> SynSentOnSegmentDisposition<I, ActiveOpen> {
+        let (header, _data) = seg.into_parts();
+        let SegmentHeader { seq: seg_seq, ack: seg_ack, wnd: seg_wnd, control, options, push: _ } =
+            header;
         let SynSent {
             iss,
             timestamp: syn_sent_ts,
@@ -466,15 +465,17 @@ impl<I: Instant + 'static, ActiveOpen> SynSent<I, ActiveOpen> {
                                 .window_scale()
                                 .map(|snd_wnd_scale| (rcv_wnd_scale, snd_wnd_scale))
                                 .unwrap_or_default();
+                            let next = iss + 1;
                             let established = Established {
                                 snd: Send {
-                                    nxt: iss + 1,
-                                    max: iss + 1,
+                                    nxt: next,
+                                    max: next,
                                     una: seg_ack,
                                     // This segment has a SYN, do not scale.
                                     wnd: seg_wnd << WindowScale::default(),
                                     wl1: seg_seq,
                                     wl2: seg_ack,
+                                    last_push: next,
                                     buffer: (),
                                     rtt_sampler: RttSampler::default(),
                                     rtt_estimator,
@@ -661,6 +662,7 @@ pub(crate) struct Send<I, S, const FIN_QUEUED: bool> {
     wnd_max: WindowSize,
     wl1: SeqNum,
     wl2: SeqNum,
+    last_push: SeqNum,
     rtt_sampler: RttSampler<I>,
     rtt_estimator: Estimator,
     timer: Option<SendTimer<I>>,
@@ -680,6 +682,7 @@ impl<I> Send<I, (), false> {
             wnd_max,
             wl1,
             wl2,
+            last_push,
             rtt_sampler,
             rtt_estimator,
             timer,
@@ -695,6 +698,7 @@ impl<I> Send<I, (), false> {
             wnd_max,
             wl1,
             wl2,
+            last_push,
             rtt_sampler,
             rtt_estimator,
             timer,
@@ -1280,6 +1284,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             buffer,
             wl1: _,
             wl2: _,
+            last_push,
             rtt_sampler,
             rtt_estimator,
             timer,
@@ -1291,16 +1296,6 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         let mss = u32::from(congestion_control.mss());
         let mut zero_window_probe = false;
         let mut override_sws = false;
-
-        let increment_retransmit_counters = |congestion_control: &CongestionControl<I>| {
-            counters.increment(|c| &c.retransmits);
-            if congestion_control.in_fast_recovery() {
-                counters.increment(|c| &c.fast_retransmits);
-            }
-            if congestion_control.in_slow_start() {
-                counters.increment(|c| &c.slow_start_retransmits);
-            }
-        };
 
         match timer {
             Some(SendTimer::Retrans(retrans_timer)) => {
@@ -1316,11 +1311,13 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                     //         expires after RTO seconds (for the value of
                     //         RTO after the doubling operation outlined in
                     //         5.5).
+
+                    // NB: congestion control needs to know the value of SND.NXT
+                    // before we rewind it.
+                    congestion_control.on_retransmission_timeout(*snd_nxt);
                     *snd_nxt = *snd_una;
                     retrans_timer.backoff(now);
-                    congestion_control.on_retransmission_timeout();
                     counters.increment(|c| &c.timeouts);
-                    increment_retransmit_counters(congestion_control);
                 }
             }
             Some(SendTimer::ZeroWindowProbe(retrans_timer)) => {
@@ -1388,25 +1385,23 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
 
         // Find the sequence number for the next segment, we start with snd_nxt
         // unless a fast retransmit is needed.
-        let (next_seg, loss_recovery) = match congestion_control.fast_retransmit() {
-            None => (*snd_nxt, false),
-            Some(seg) => {
-                increment_retransmit_counters(congestion_control);
-                (seg, true)
-            }
-        };
+        //
+        // Bail early if congestion control tells us not to send anything.
+        let CongestionControlSendOutcome {
+            next_seg,
+            congestion_limit,
+            congestion_window,
+            loss_recovery,
+        } = congestion_control.poll_send(*snd_una, *snd_nxt, *snd_wnd, readable_bytes)?;
+
         // First calculate the unused window, note that if our peer has shrank
         // their window (it is strongly discouraged), the following conversion
         // will fail and we return early.
-        let unused_window =
-            u32::try_from(*snd_una + *snd_wnd - next_seg).ok_checked::<TryFromIntError>()?;
-        let cwnd = congestion_control.cwnd();
-        // If we don't have space in the congestion window return early.
-        let unused_congestion_window =
-            u32::try_from(*snd_una + cwnd - next_seg).ok_checked::<TryFromIntError>()?;
+        let snd_limit = *snd_una + *snd_wnd;
+        let unused_window = u32::try_from(snd_limit - next_seg).ok_checked::<TryFromIntError>()?;
         let offset =
             usize::try_from(next_seg - *snd_una).unwrap_or_else(|TryFromIntError { .. }| {
-                panic!("next_seg({:?}) should never fall behind snd.una({:?})", *snd_nxt, *snd_una);
+                panic!("next_seg({:?}) should never fall behind snd.una({:?})", next_seg, *snd_una);
             });
         let available = u32::try_from(readable_bytes + usize::from(FIN_QUEUED) - offset)
             .unwrap_or_else(|_| WindowSize::MAX.into());
@@ -1414,9 +1409,8 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         // the bytes that are available, additionally, if in zero window probe
         // mode, allow at least one byte past the limit to be sent.
         let can_send = unused_window
-            .min(unused_congestion_window)
+            .min(congestion_limit)
             .min(available)
-            .min(mss)
             .min(limit)
             .max(u32::from(zero_window_probe));
 
@@ -1442,7 +1436,11 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             //  - the segment is not a FIN (a FIN segment never needs to be
             //    delayed).
             //  - this is not a loss-recovery frame.
-            if bytes_to_send < mss && !has_fin && !loss_recovery {
+            let loss_recovery_allow_delay = match loss_recovery {
+                LossRecoverySegment::Yes { rearm_retransmit: _, mode: _ } => false,
+                LossRecoverySegment::No => true,
+            };
+            if bytes_to_send < mss && !has_fin && loss_recovery_allow_delay {
                 if bytes_to_send == 0 {
                     return None;
                 }
@@ -1525,13 +1523,37 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                     // No further trimming necessary.
                     None => bytes_to_send,
                 };
-                let (seg, discarded) = Segment::with_data_options(
-                    next_seg,
-                    Some(ack),
-                    has_fin.then_some(Control::FIN),
-                    wnd,
+
+                // From https://datatracker.ietf.org/doc/html/rfc9293#section-3.9.1.2:
+                //
+                //  A TCP endpoint MAY implement PUSH flags on SEND calls
+                //  (MAY-15). If PUSH flags are not implemented, then the
+                //  sending TCP peer: (1) MUST NOT buffer data indefinitely
+                //  (MUST-60), and (2) MUST set the PSH bit in the last buffered
+                //  segment
+                //
+                // Given we don't have a well established SEND call boundary in
+                // Fuchsia, we can't quite fulfill it, so we apply the PSH bit
+                // in 2 situations:
+                // - If there's no more data available in the send buffer.
+                // - (borrowed from Linux behavior) it's been snd_wnd_max / 2 in
+                // sequence space number that we haven't pushed.
+                let no_more_data_to_send = u32::try_from(readable_bytes - offset)
+                    .is_ok_and(|avail| avail == bytes_to_send);
+
+                let periodic_push =
+                    next_seg.after_or_eq(*last_push + snd_wnd_max.halved().max(WindowSize::ONE));
+                let push = no_more_data_to_send || periodic_push;
+                let (seg, discarded) = Segment::new(
+                    SegmentHeader {
+                        seq: next_seg,
+                        ack: Some(ack),
+                        control: has_fin.then_some(Control::FIN),
+                        wnd,
+                        options: Options::Segment(SegmentOptions { sack_blocks }),
+                        push,
+                    },
                     readable.slice(0..bytes_to_send),
-                    Options::Segment(SegmentOptions { sack_blocks }),
                 );
                 debug_assert_eq!(discarded, 0);
                 seg
@@ -1544,34 +1566,65 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             "len" => seg.len(),
             "can_send" => can_send,
             "snd_wnd" => u32::from(*snd_wnd),
-            "cwnd" => u32::from(cwnd),
+            "cwnd" => congestion_window,
             "unused_window" => unused_window,
             "available" => available,
         );
         let seq_max = next_seg + seg.len();
         rtt_sampler.on_will_send_segment(now, next_seg..seq_max, *snd_max);
+        congestion_control.on_will_send_segment(seg.len());
 
         if seq_max.after(*snd_nxt) {
             *snd_nxt = seq_max;
+        } else {
+            // Anything before SND.NXT is possibly a retransmission caused by
+            // loss recovery.
+            match loss_recovery {
+                LossRecoverySegment::Yes { rearm_retransmit: _, ref mode } => match mode {
+                    LossRecoveryMode::FastRecovery => counters.increment(|c| &c.fast_retransmits),
+                    LossRecoveryMode::SackRecovery => counters.increment(|c| &c.sack_retransmits),
+                },
+                LossRecoverySegment::No => (),
+            }
         }
         if seq_max.after(*snd_max) {
             *snd_max = seq_max;
+        } else {
+            // Anything before SDN.MAX is considered a retransmitted segment.
+            counters.increment(|c| &c.retransmits);
+            if congestion_control.in_slow_start() {
+                counters.increment(|c| &c.slow_start_retransmits);
+            }
         }
+
+        // Record the last pushed segment.
+        if seg.header().push {
+            *last_push = seg.header().seq;
+        }
+
         // Per https://tools.ietf.org/html/rfc6298#section-5:
         //   (5.1) Every time a packet containing data is sent (including a
         //         retransmission), if the timer is not running, start it
         //         running so that it will expire after RTO seconds (for the
         //         current value of RTO).
-        match timer {
-            Some(SendTimer::Retrans(_)) | Some(SendTimer::ZeroWindowProbe(_)) => {}
-            Some(SendTimer::KeepAlive(_)) | Some(SendTimer::SWSProbe { at: _ }) | None => {
-                *timer = Some(SendTimer::Retrans(RetransTimer::new(
-                    now,
-                    rtt_estimator.rto(),
-                    *user_timeout,
-                    DEFAULT_MAX_RETRIES,
-                )))
+        let update_rto = match timer {
+            Some(SendTimer::Retrans(_)) | Some(SendTimer::ZeroWindowProbe(_)) => {
+                // Loss recovery might have asked us to rearm either way, check
+                // with it.
+                match loss_recovery {
+                    LossRecoverySegment::Yes { rearm_retransmit, mode: _ } => rearm_retransmit,
+                    LossRecoverySegment::No => false,
+                }
             }
+            Some(SendTimer::KeepAlive(_)) | Some(SendTimer::SWSProbe { at: _ }) | None => true,
+        };
+        if update_rto {
+            *timer = Some(SendTimer::Retrans(RetransTimer::new(
+                now,
+                rtt_estimator.rto(),
+                *user_timeout,
+                DEFAULT_MAX_RETRIES,
+            )))
         }
         Some(seg)
     }
@@ -1585,6 +1638,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         seg_seq: SeqNum,
         seg_ack: SeqNum,
         seg_wnd: UnscaledWindowSize,
+        seg_sack_blocks: &SackBlocks,
         pure_ack: bool,
         rcv: R,
         now: I,
@@ -1605,6 +1659,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             wnd: snd_wnd,
             wl1: snd_wl1,
             wl2: snd_wl2,
+            last_push: _,
             wnd_max,
             buffer,
             rtt_sampler,
@@ -1649,134 +1704,148 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             //   If the ACK acks something not yet sent (SEG.ACK >
             //   SND.NXT) then send an ACK, drop the segment, and
             //   return.
-            (Some(rcv.make_ack(*snd_max)), DataAcked::No)
-        } else {
-            let (trace, data_acked) = if seg_ack.after(*snd_una) {
-                // The unwrap is safe because the result must be positive.
-                let acked = u32::try_from(seg_ack - *snd_una)
-                    .ok_checked::<TryFromIntError>()
-                    .and_then(NonZeroU32::new)
-                    .unwrap_or_else(|| {
-                        panic!("seg_ack({:?}) - snd_una({:?}) must be positive", seg_ack, snd_una);
-                    });
-                let BufferLimits { len, capacity: _ } = buffer.limits();
-                let fin_acked = FIN_QUEUED && seg_ack == *snd_una + len + 1;
-                // Remove the acked bytes from the send buffer. The following
-                // operation should not panic because we are in this branch
-                // means seg_ack is before snd.max, thus seg_ack - snd.una
-                // cannot exceed the buffer length.
-                buffer.mark_read(
-                    NonZeroUsize::try_from(acked)
-                        .unwrap_or_else(|TryFromIntError { .. }| {
-                            // we've checked that acked must be smaller than the outstanding
-                            // bytes we have in the buffer; plus in Rust, any allocation can
-                            // only have a size up to isize::MAX bytes.
-                            panic!(
-                                "acked({:?}) must be smaller than isize::MAX({:?})",
-                                acked,
-                                isize::MAX
-                            )
-                        })
-                        .get()
-                        - usize::from(fin_acked),
-                );
-                *snd_una = seg_ack;
-                // If the incoming segment acks something that has been sent
-                // but not yet retransmitted (`snd.nxt < seg_ack <= snd.max`),
-                // bump `snd.nxt` as well.
-                if seg_ack.after(*snd_nxt) {
-                    *snd_nxt = seg_ack;
-                }
-                // If the incoming segment acks the sequence number that we used
-                // for RTT estimate, feed the sample to the estimator.
-                if let Some(rtt) = rtt_sampler.on_ack(now, seg_ack) {
-                    rtt_estimator.sample(rtt);
-                }
-
-                // It is possible, however unlikely, that we get here without an
-                // RTT estimation - in case the first data segment that we send
-                // out gets retransmitted. In that case, simply don't update
-                // congestion control which at worst causes slow start to take
-                // one extra step.
-                if let Some(rtt) = rtt_estimator.srtt() {
-                    congestion_control.on_ack(acked, now, rtt);
-                }
-
-                // At least one byte of data was ACKed by the peer.
-                (true, DataAcked::Yes)
-            } else {
-                // Per RFC 5681 (https://www.rfc-editor.org/rfc/rfc5681#section-2):
-                //   DUPLICATE ACKNOWLEDGMENT: An acknowledgment is considered a
-                //   "duplicate" in the following algorithms when (a) the receiver of
-                //   the ACK has outstanding data, (b) the incoming acknowledgment
-                //   carries no data, (c) the SYN and FIN bits are both off, (d) the
-                //   acknowledgment number is equal to the greatest acknowledgment
-                //   received on the given connection (TCP.UNA from [RFC793]) and (e)
-                //   the advertised window in the incoming acknowledgment equals the
-                //   advertised window in the last incoming acknowledgment.
-                let is_dup_ack = {
-                    snd_nxt.after(*snd_una) // (a)
-                && pure_ack // (b) & (c)
-                && seg_ack == *snd_una // (d)
-                && seg_wnd == *snd_wnd // (e)
-                };
-                if is_dup_ack {
-                    let fast_recovery_initiated = congestion_control.on_dup_ack(seg_ack);
-                    if fast_recovery_initiated {
-                        counters.increment(|c| &c.fast_recovery);
-                    }
-                }
-                // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-72):
-                //   If the ACK is a duplicate (SEG.ACK < SND.UNA), it can be
-                //   ignored.
-                (is_dup_ack, DataAcked::No)
-            };
-
-            // Per RFC 9293
-            // (https://datatracker.ietf.org/doc/html/rfc9293#section-3.10.7.4-2.5.2.2.2.3.2.2):
-            //   If SND.UNA =< SEG.ACK =< SND.NXT, the send window should be
-            //   updated.  If (SND.WL1 < SEG.SEQ or (SND.WL1 = SEG.SEQ and
-            //   SND.WL2 =< SEG.ACK)), set SND.WND <- SEG.WND, set
-            //   SND.WL1 <- SEG.SEQ, and set SND.WL2 <- SEG.ACK.
-            if !snd_una.after(seg_ack)
-                && (snd_wl1.before(seg_seq) || (seg_seq == *snd_wl1 && !snd_wl2.after(seg_ack)))
-            {
-                *snd_wnd = seg_wnd;
-                *snd_wl1 = seg_seq;
-                *snd_wl2 = seg_ack;
-                *wnd_max = seg_wnd.max(*wnd_max);
-                if seg_wnd != WindowSize::ZERO
-                    && matches!(timer, Some(SendTimer::ZeroWindowProbe(_)))
-                {
-                    *timer = None;
-                    // We need to ensure that we're reset when exiting ZWP as if
-                    // we're going to retransmit. The actual retransmit handling
-                    // will be performed by poll_send.
-                    *snd_nxt = *snd_una;
-                }
-            }
-
-            // Only generate traces for interesting things.
-            if trace {
-                trace_instant!(c"tcp::Send::process_ack",
-                    "id" => id.trace_id(),
-                    "seg_ack" => u32::from(seg_ack),
-                    "snd_nxt" => u32::from(*snd_nxt),
-                    "snd_wnd" => u32::from(*snd_wnd),
-                    "rtt_ms" => u32::try_from(
-                        // If we don't have an RTT sample yet use zero to
-                        // signal.
-                        rtt_estimator.srtt().unwrap_or(Duration::ZERO).as_millis()
-                    ).unwrap_or(u32::MAX),
-                    "cwnd" => u32::from(congestion_control.cwnd()),
-                    "ssthresh" => congestion_control.slow_start_threshold(),
-                    "fast_recovery" => congestion_control.in_fast_recovery(),
-                    "acked" => data_acked == DataAcked::Yes,
-                );
-            }
-
-            (None, data_acked)
+            return (Some(rcv.make_ack(*snd_max)), DataAcked::No);
         }
+
+        let bytes_acked = match u32::try_from(seg_ack - *snd_una) {
+            Ok(acked) => NonZeroU32::new(acked),
+            Err(TryFromIntError { .. }) => {
+                // We've received an ACK prior to SND.UNA. This must be an out
+                // of order acknowledgement. Ignore it.
+                return (None, DataAcked::No);
+            }
+        };
+
+        let is_dup_ack_by_sack =
+            congestion_control.preprocess_ack(seg_ack, *snd_nxt, seg_sack_blocks);
+        let (is_dup_ack, data_acked) = if let Some(acked) = bytes_acked {
+            let BufferLimits { len, capacity: _ } = buffer.limits();
+            let fin_acked = FIN_QUEUED && seg_ack == *snd_una + len + 1;
+            // Remove the acked bytes from the send buffer. The following
+            // operation should not panic because we are in this branch
+            // means seg_ack is before snd.max, thus seg_ack - snd.una
+            // cannot exceed the buffer length.
+            buffer.mark_read(
+                NonZeroUsize::try_from(acked)
+                    .unwrap_or_else(|TryFromIntError { .. }| {
+                        // we've checked that acked must be smaller than the outstanding
+                        // bytes we have in the buffer; plus in Rust, any allocation can
+                        // only have a size up to isize::MAX bytes.
+                        panic!(
+                            "acked({:?}) must be smaller than isize::MAX({:?})",
+                            acked,
+                            isize::MAX
+                        )
+                    })
+                    .get()
+                    - usize::from(fin_acked),
+            );
+            *snd_una = seg_ack;
+            // If the incoming segment acks something that has been sent
+            // but not yet retransmitted (`snd.nxt < seg_ack <= snd.max`),
+            // bump `snd.nxt` as well.
+            if seg_ack.after(*snd_nxt) {
+                *snd_nxt = seg_ack;
+            }
+            // If the incoming segment acks the sequence number that we used
+            // for RTT estimate, feed the sample to the estimator.
+            if let Some(rtt) = rtt_sampler.on_ack(now, seg_ack) {
+                rtt_estimator.sample(rtt);
+            }
+
+            // Note that we may not have an RTT estimation yet, see
+            // CongestionControl::on_ack.
+            let recovered = congestion_control.on_ack(seg_ack, acked, now, rtt_estimator.srtt());
+            if recovered {
+                counters.increment(|c| &c.loss_recovered);
+            }
+
+            // This can be a duplicate ACK according to the SACK-based algorithm
+            // in RFC 6675. Use that if available, otherwise given we've
+            // received a new acknowledgement this is not a duplicate ACK.
+            let is_dup_ack = is_dup_ack_by_sack.unwrap_or(false);
+
+            // At least one byte of data was ACKed by the peer.
+            (is_dup_ack, DataAcked::Yes)
+        } else {
+            // Check if this is a duplicate ACK according to RFC 5681 if we
+            // don't have this information from the SACK blocks.
+            let is_dup_ack = is_dup_ack_by_sack.unwrap_or_else(|| {
+                // Per RFC 5681
+                //   (https://www.rfc-editor.org/rfc/rfc5681#section-2):
+                //   DUPLICATE ACKNOWLEDGMENT: An acknowledgment is considered a
+                //   "duplicate" in the following algorithms when (a) the
+                //   receiver of the ACK has outstanding data, (b) the incoming
+                //   acknowledgment carries no data, (c) the SYN and FIN bits
+                //   are both off, (d) the acknowledgment number is equal to the
+                //   greatest acknowledgment received on the given connection
+                //   (TCP.UNA from [RFC793]) and (e) the advertised window in
+                //   the incoming acknowledgment equals the advertised window in
+                //   the last incoming acknowledgment.
+                snd_nxt.after(*snd_una) // (a)
+                    && pure_ack // (b) & (c)
+                    && seg_ack == *snd_una // (d)
+                    && seg_wnd == *snd_wnd // (e)
+            });
+
+            // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-72):
+            //   If the ACK is a duplicate (SEG.ACK < SND.UNA), it can be
+            //   ignored.
+            (is_dup_ack, DataAcked::No)
+        };
+
+        if is_dup_ack {
+            counters.increment(|c| &c.dup_acks);
+            let new_loss_recovery = congestion_control.on_dup_ack(seg_ack, *snd_nxt);
+            match new_loss_recovery {
+                Some(LossRecoveryMode::FastRecovery) => counters.increment(|c| &c.fast_recovery),
+                Some(LossRecoveryMode::SackRecovery) => counters.increment(|c| &c.sack_recovery),
+                None => (),
+            }
+        }
+
+        // Per RFC 9293
+        // (https://datatracker.ietf.org/doc/html/rfc9293#section-3.10.7.4-2.5.2.2.2.3.2.2):
+        //   If SND.UNA =< SEG.ACK =< SND.NXT, the send window should be
+        //   updated.  If (SND.WL1 < SEG.SEQ or (SND.WL1 = SEG.SEQ and
+        //   SND.WL2 =< SEG.ACK)), set SND.WND <- SEG.WND, set
+        //   SND.WL1 <- SEG.SEQ, and set SND.WL2 <- SEG.ACK.
+        if !snd_una.after(seg_ack)
+            && (snd_wl1.before(seg_seq) || (seg_seq == *snd_wl1 && !snd_wl2.after(seg_ack)))
+        {
+            *snd_wnd = seg_wnd;
+            *snd_wl1 = seg_seq;
+            *snd_wl2 = seg_ack;
+            *wnd_max = seg_wnd.max(*wnd_max);
+            if seg_wnd != WindowSize::ZERO && matches!(timer, Some(SendTimer::ZeroWindowProbe(_))) {
+                *timer = None;
+                // We need to ensure that we're reset when exiting ZWP as if
+                // we're going to retransmit. The actual retransmit handling
+                // will be performed by poll_send.
+                *snd_nxt = *snd_una;
+            }
+        }
+
+        // Only generate traces for interesting things.
+        if data_acked == DataAcked::Yes || is_dup_ack {
+            trace_instant!(c"tcp::Send::process_ack",
+                "id" => id.trace_id(),
+                "seg_ack" => u32::from(seg_ack),
+                "snd_nxt" => u32::from(*snd_nxt),
+                "snd_wnd" => u32::from(*snd_wnd),
+                "rtt_ms" => u32::try_from(
+                    // If we don't have an RTT sample yet use zero to
+                    // signal.
+                    rtt_estimator.srtt().unwrap_or(Duration::ZERO).as_millis()
+                ).unwrap_or(u32::MAX),
+                "cwnd" => congestion_control.inspect_cwnd().cwnd(),
+                "ssthresh" => congestion_control.slow_start_threshold(),
+                "loss_recovery" => congestion_control.inspect_loss_recovery_mode().is_some(),
+                "acked" => data_acked == DataAcked::Yes,
+            );
+        }
+
+        (None, data_acked)
     }
 
     fn update_mss(&mut self, mss: Mss, seq: SeqNum) -> ShouldRetransmit {
@@ -1794,10 +1863,6 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         if mss >= self.congestion_control.mss() {
             return ShouldRetransmit::No;
         }
-
-        // Update the MSS, and let congestion control update the congestion window
-        // accordingly.
-        self.congestion_control.update_mss(mss);
 
         // Per [RFC 8201 section 5.4], rewind SND.NXT to the sequence number of the
         // segment that exceeded the MTU, and try to send some more data. This will
@@ -1819,6 +1884,10 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         //
         // [RFC 8201 section 5.4]: https://datatracker.ietf.org/doc/html/rfc8201#section-5.4
         self.nxt = seq;
+
+        // Update the MSS, and let congestion control update the congestion window
+        // accordingly.
+        self.congestion_control.update_mss(mss, self.una, self.nxt);
 
         // Have the caller trigger an immediate retransmit of up to the new MSS.
         //
@@ -1846,6 +1915,7 @@ impl<I: Instant, S: SendBuffer> Send<I, S, { FinQueued::NO }> {
             wnd,
             wl1,
             wl2,
+            last_push,
             buffer,
             rtt_sampler,
             rtt_estimator,
@@ -1861,6 +1931,7 @@ impl<I: Instant, S: SendBuffer> Send<I, S, { FinQueued::NO }> {
             wnd,
             wl1,
             wl2,
+            last_push,
             buffer,
             rtt_sampler,
             rtt_estimator,
@@ -2377,7 +2448,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
 
             // Reset the connection if we receive new data while the socket is being closed
             // and the receiver has been shut down.
-            if rst_on_new_data && (incoming.header.seq + incoming.data.len()).after(rcv.nxt()) {
+            if rst_on_new_data && (incoming.header().seq + incoming.data().len()).after(rcv.nxt()) {
                 return (
                     Some(Segment::rst(snd_max)),
                     self.transition_to_state(
@@ -2392,15 +2463,11 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             // past this line.
             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-69):
             //   first check sequence number
-            let is_rst = incoming.header.control == Some(Control::RST);
+            let is_rst = incoming.header().control == Some(Control::RST);
             // pure ACKs (empty segments) don't need to be ack'ed.
             let pure_ack = incoming.len() == 0;
             let needs_ack = !pure_ack;
-            let Segment {
-                header:
-                    SegmentHeader { seq: seg_seq, ack: seg_ack, wnd: seg_wnd, control, options: _ },
-                data,
-            } = match incoming.overlap(rcv.nxt(), rcv.wnd()) {
+            let segment = match incoming.overlap(rcv.nxt(), rcv.wnd()) {
                 Some(incoming) => incoming,
                 None => {
                     // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-69):
@@ -2424,6 +2491,17 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                     return (segment, NewlyClosed::No);
                 }
             };
+            let (
+                SegmentHeader {
+                    seq: seg_seq,
+                    ack: seg_ack,
+                    wnd: seg_wnd,
+                    control,
+                    options: seg_options,
+                    push: _,
+                },
+                data,
+            ) = segment.into_parts();
             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-70):
             //   second check the RST bit
             //   If the RST bit is set then, any outstanding RECEIVEs and SEND
@@ -2491,7 +2569,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         // Note: We don't support sending data with SYN, so we don't
                         // store the `SND` variables because they can be easily derived
                         // from ISS: SND.UNA=ISS and SND.NXT=ISS+1.
-                        if seg_ack != *iss + 1 {
+                        let next = *iss + 1;
+                        if seg_ack != next {
                             return (Some(Segment::rst(seg_ack)), NewlyClosed::No);
                         } else {
                             let mut rtt_estimator = Estimator::default();
@@ -2512,12 +2591,13 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                 .unwrap_or_default();
                             let established = Established {
                                 snd: Send {
-                                    nxt: *iss + 1,
-                                    max: *iss + 1,
+                                    nxt: next,
+                                    max: next,
                                     una: seg_ack,
                                     wnd: seg_wnd << snd_wnd_scale,
                                     wl1: seg_seq,
                                     wl2: seg_ack,
+                                    last_push: next,
                                     buffer: snd_buffer,
                                     rtt_sampler: RttSampler::default(),
                                     rtt_estimator,
@@ -2561,6 +2641,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             seg_seq,
                             seg_ack,
                             seg_wnd,
+                            seg_options.sack_blocks(),
                             pure_ack,
                             rcv.get_mut(),
                             now,
@@ -2578,6 +2659,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             seg_seq,
                             seg_ack,
                             seg_wnd,
+                            seg_options.sack_blocks(),
                             pure_ack,
                             &*closed_rcv,
                             now,
@@ -2597,6 +2679,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             seg_seq,
                             seg_ack,
                             seg_wnd,
+                            seg_options.sack_blocks(),
                             pure_ack,
                             &*closed_rcv,
                             now,
@@ -2624,6 +2707,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             seg_seq,
                             seg_ack,
                             seg_wnd,
+                            seg_options.sack_blocks(),
                             pure_ack,
                             rcv.get_mut(),
                             now,
@@ -2664,6 +2748,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             seg_seq,
                             seg_ack,
                             seg_wnd,
+                            seg_options.sack_blocks(),
                             pure_ack,
                             &*closed_rcv,
                             now,
@@ -3216,14 +3301,16 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 let (snd_wnd_scale, rcv_wnd_scale) = snd_wnd_scale
                     .map(|snd_wnd_scale| (snd_wnd_scale, *rcv_wnd_scale))
                     .unwrap_or_default();
+                let next = *iss + 1;
                 let finwait1 = FinWait1 {
                     snd: Send {
-                        nxt: *iss + 1,
-                        max: *iss + 1,
-                        una: *iss + 1,
+                        nxt: next,
+                        max: next,
+                        una: next,
                         wnd: WindowSize::DEFAULT,
                         wl1: *iss,
                         wl2: *irs,
+                        last_push: next,
                         buffer: snd_buffer,
                         rtt_sampler: RttSampler::default(),
                         rtt_estimator: Estimator::NoSample,
@@ -3557,6 +3644,7 @@ pub(super) enum CloseReason<I: Instant> {
 #[cfg(test)]
 mod test {
     use alloc::vec;
+    use alloc::vec::Vec;
     use core::fmt::Debug;
     use core::num::NonZeroU16;
     use core::time::Duration;
@@ -3565,21 +3653,24 @@ mod test {
     use net_types::ip::Ipv4;
     use netstack3_base::testutil::{FakeInstant, FakeInstantCtx};
     use netstack3_base::{FragmentedPayload, InstantContext as _, Options, SackBlock};
-    use test_case::test_case;
+    use test_case::{test_case, test_matrix};
 
     use super::*;
-    use crate::internal::base::testutil::{
-        DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE, DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE,
-    };
     use crate::internal::base::DEFAULT_FIN_WAIT2_TIMEOUT;
-    use crate::internal::buffer::testutil::RingBuffer;
+    use crate::internal::buffer::testutil::{InfiniteSendBuffer, RepeatingSendBuffer, RingBuffer};
     use crate::internal::buffer::Buffer;
     use crate::internal::congestion::DUP_ACK_THRESHOLD;
     use crate::internal::counters::testutil::CounterExpectations;
     use crate::internal::counters::TcpCountersWithSocketInner;
+    use crate::internal::testutil::{
+        DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE, DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE,
+    };
 
-    const ISS_1: SeqNum = SeqNum::new(100);
-    const ISS_2: SeqNum = SeqNum::new(300);
+    const TEST_IRS: SeqNum = SeqNum::new(100);
+    const TEST_ISS: SeqNum = SeqNum::new(300);
+
+    const ISS_1: SeqNum = SeqNum::new(500);
+    const ISS_2: SeqNum = SeqNum::new(700);
 
     const RTT: Duration = Duration::from_millis(500);
 
@@ -3789,17 +3880,66 @@ mod test {
     impl State<FakeInstant, RingBuffer, NullBuffer, ()> {
         fn new_syn_rcvd(instant: FakeInstant) -> Self {
             State::SynRcvd(SynRcvd {
-                iss: ISS_2,
-                irs: ISS_1,
+                iss: TEST_ISS,
+                irs: TEST_IRS,
                 timestamp: Some(instant),
                 retrans_timer: RetransTimer::new(instant, Rto::DEFAULT, None, DEFAULT_MAX_RETRIES),
                 simultaneous_open: Some(()),
                 buffer_sizes: Default::default(),
-                smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+                smss: DEVICE_MAXIMUM_SEGMENT_SIZE,
                 rcv_wnd_scale: WindowScale::default(),
                 snd_wnd_scale: Some(WindowScale::default()),
                 sack_permitted: SACK_PERMITTED,
             })
+        }
+    }
+
+    impl<S, const FIN_QUEUED: bool> Send<FakeInstant, S, FIN_QUEUED> {
+        fn default_for_test_at(seq: SeqNum, buffer: S) -> Self {
+            Self {
+                nxt: seq,
+                max: seq,
+                una: seq,
+                wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
+                buffer,
+                wl1: TEST_IRS + 1,
+                wl2: seq,
+                last_push: seq,
+                rtt_estimator: Estimator::default(),
+                rtt_sampler: RttSampler::default(),
+                timer: None,
+                congestion_control: CongestionControl::cubic_with_mss(DEVICE_MAXIMUM_SEGMENT_SIZE),
+                wnd_scale: WindowScale::default(),
+            }
+        }
+
+        fn default_for_test(buffer: S) -> Self {
+            Self::default_for_test_at(TEST_ISS + 1, buffer)
+        }
+    }
+
+    impl<R: ReceiveBuffer> Recv<FakeInstant, R> {
+        fn default_for_test_at(seq: SeqNum, buffer: R) -> Self {
+            let BufferLimits { capacity, len } = buffer.limits();
+            let avail_buffer = capacity - len;
+            Self {
+                buffer: RecvBufferState::Open { buffer, assembler: Assembler::new(seq) },
+                timer: None,
+                mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
+                remaining_quickacks: 0,
+                last_segment_at: None,
+                wnd_scale: WindowScale::default(),
+                last_window_update: (
+                    seq,
+                    WindowSize::from_u32(avail_buffer.try_into().unwrap()).unwrap(),
+                ),
+                sack_permitted: SACK_PERMITTED,
+            }
+        }
+
+        fn default_for_test(buffer: R) -> Self {
+            Self::default_for_test_at(TEST_IRS + 1, buffer)
         }
     }
 
@@ -3824,11 +3964,11 @@ mod test {
         }
     }
 
-    #[test_case(Segment::rst(ISS_1) => None; "drop RST")]
-    #[test_case(Segment::rst_ack(ISS_1, ISS_2) => None; "drop RST|ACK")]
-    #[test_case(Segment::syn(ISS_1, UnscaledWindowSize::from(0), HandshakeOptions::default().into()) => Some(Segment::rst_ack(SeqNum::new(0), ISS_1 + 1)); "reset SYN")]
-    #[test_case(Segment::syn_ack(ISS_1, ISS_2, UnscaledWindowSize::from(0), HandshakeOptions::default().into()) => Some(Segment::rst(ISS_2)); "reset SYN|ACK")]
-    #[test_case(Segment::data(ISS_1, ISS_2, UnscaledWindowSize::from(0), &[0, 1, 2][..]) => Some(Segment::rst(ISS_2)); "reset data segment")]
+    #[test_case(Segment::rst(TEST_IRS) => None; "drop RST")]
+    #[test_case(Segment::rst_ack(TEST_IRS, TEST_ISS) => None; "drop RST|ACK")]
+    #[test_case(Segment::syn(TEST_IRS, UnscaledWindowSize::from(0), HandshakeOptions::default().into()) => Some(Segment::rst_ack(SeqNum::new(0), TEST_IRS + 1)); "reset SYN")]
+    #[test_case(Segment::syn_ack(TEST_IRS, TEST_ISS, UnscaledWindowSize::from(0), HandshakeOptions::default().into()) => Some(Segment::rst(TEST_ISS)); "reset SYN|ACK")]
+    #[test_case(Segment::with_data(TEST_IRS, TEST_ISS, UnscaledWindowSize::from(0), &[0, 1, 2][..]) => Some(Segment::rst(TEST_ISS)); "reset data segment")]
     fn segment_arrives_when_closed(
         incoming: impl Into<Segment<&'static [u8]>>,
     ) -> Option<Segment<()>> {
@@ -3837,29 +3977,29 @@ mod test {
     }
 
     #[test_case(
-        Segment::rst_ack(ISS_2, ISS_1 - 1), RTT
+        Segment::rst_ack(TEST_ISS, TEST_IRS - 1), RTT
     => SynSentOnSegmentDisposition::Ignore; "unacceptable ACK with RST")]
     #[test_case(
-        Segment::ack(ISS_2, ISS_1 - 1, UnscaledWindowSize::from(u16::MAX)), RTT
+        Segment::ack(TEST_ISS, TEST_IRS - 1, UnscaledWindowSize::from(u16::MAX)), RTT
     => SynSentOnSegmentDisposition::SendRst(
-        Segment::rst(ISS_1-1),
+        Segment::rst(TEST_IRS-1),
     ); "unacceptable ACK without RST")]
     #[test_case(
-        Segment::rst_ack(ISS_2, ISS_1), RTT
+        Segment::rst_ack(TEST_ISS, TEST_IRS), RTT
     => SynSentOnSegmentDisposition::EnterClosed(
         Closed { reason: Some(ConnectionError::ConnectionRefused) },
     ); "acceptable ACK(ISS) with RST")]
     #[test_case(
-        Segment::rst_ack(ISS_2, ISS_1 + 1), RTT
+        Segment::rst_ack(TEST_ISS, TEST_IRS + 1), RTT
     => SynSentOnSegmentDisposition::EnterClosed(
         Closed { reason: Some(ConnectionError::ConnectionRefused) },
     ); "acceptable ACK(ISS+1) with RST")]
     #[test_case(
-        Segment::rst(ISS_2), RTT
+        Segment::rst(TEST_ISS), RTT
     => SynSentOnSegmentDisposition::Ignore; "RST without ack")]
     #[test_case(
         Segment::syn(
-            ISS_2,
+            TEST_ISS,
             UnscaledWindowSize::from(u16::MAX),
             HandshakeOptions {
                 window_scale: Some(WindowScale::default()),
@@ -3867,17 +4007,18 @@ mod test {
         ), RTT
     => SynSentOnSegmentDisposition::SendSynAckAndEnterSynRcvd(
         Segment::syn_ack(
-            ISS_1,
-            ISS_2 + 1,
+            TEST_IRS,
+            TEST_ISS + 1,
             UnscaledWindowSize::from(u16::MAX),
             HandshakeOptions {
                 mss: Some(Mss::default::<Ipv4>()),
                 window_scale: Some(WindowScale::default()),
+                sack_permitted: SACK_PERMITTED,
                 ..Default::default()
             }.into()),
         SynRcvd {
-            iss: ISS_1,
-            irs: ISS_2,
+            iss: TEST_IRS,
+            irs: TEST_ISS,
             timestamp: Some(FakeInstant::from(RTT)),
             retrans_timer: RetransTimer::new(
                 FakeInstant::from(RTT),
@@ -3890,20 +4031,20 @@ mod test {
             smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             rcv_wnd_scale: WindowScale::default(),
             snd_wnd_scale: Some(WindowScale::default()),
-            sack_permitted: SACK_PERMITTED,
+            sack_permitted: false,
         }
     ); "SYN only")]
     #[test_case(
-        Segment::fin(ISS_2, ISS_1 + 1, UnscaledWindowSize::from(u16::MAX)), RTT
+        Segment::fin(TEST_ISS, TEST_IRS + 1, UnscaledWindowSize::from(u16::MAX)), RTT
     => SynSentOnSegmentDisposition::Ignore; "acceptable ACK with FIN")]
     #[test_case(
-        Segment::ack(ISS_2, ISS_1 + 1, UnscaledWindowSize::from(u16::MAX)), RTT
+        Segment::ack(TEST_ISS, TEST_IRS + 1, UnscaledWindowSize::from(u16::MAX)), RTT
     => SynSentOnSegmentDisposition::Ignore; "acceptable ACK(ISS+1) with nothing")]
     #[test_case(
-        Segment::ack(ISS_2, ISS_1, UnscaledWindowSize::from(u16::MAX)), RTT
+        Segment::ack(TEST_ISS, TEST_IRS, UnscaledWindowSize::from(u16::MAX)), RTT
     => SynSentOnSegmentDisposition::Ignore; "acceptable ACK(ISS) without RST")]
     #[test_case(
-        Segment::syn(ISS_2, UnscaledWindowSize::from(u16::MAX), HandshakeOptions::default().into()),
+        Segment::syn(TEST_ISS, UnscaledWindowSize::from(u16::MAX), HandshakeOptions::default().into()),
         TEST_USER_TIMEOUT.get()
     => SynSentOnSegmentDisposition::EnterClosed(Closed {
         reason: None
@@ -3913,7 +4054,7 @@ mod test {
         delay: Duration,
     ) -> SynSentOnSegmentDisposition<FakeInstant, ()> {
         let syn_sent = SynSent {
-            iss: ISS_1,
+            iss: TEST_IRS,
             timestamp: Some(FakeInstant::default()),
             retrans_timer: RetransTimer::new(
                 FakeInstant::default(),
@@ -3930,27 +4071,28 @@ mod test {
         syn_sent.on_segment(incoming, FakeInstant::from(delay))
     }
 
-    #[test_case(Segment::rst(ISS_2) => ListenOnSegmentDisposition::Ignore; "ignore RST")]
-    #[test_case(Segment::ack(ISS_2, ISS_1, UnscaledWindowSize::from(u16::MAX)) =>
-        ListenOnSegmentDisposition::SendRst(Segment::rst(ISS_1)); "reject ACK")]
-    #[test_case(Segment::syn(ISS_2, UnscaledWindowSize::from(u16::MAX),
+    #[test_case(Segment::rst(TEST_ISS) => ListenOnSegmentDisposition::Ignore; "ignore RST")]
+    #[test_case(Segment::ack(TEST_ISS, TEST_IRS, UnscaledWindowSize::from(u16::MAX)) =>
+        ListenOnSegmentDisposition::SendRst(Segment::rst(TEST_IRS)); "reject ACK")]
+    #[test_case(Segment::syn(TEST_ISS, UnscaledWindowSize::from(u16::MAX),
         HandshakeOptions {
             window_scale: Some(WindowScale::default()),
             ..Default::default()
         }.into()) =>
         ListenOnSegmentDisposition::SendSynAckAndEnterSynRcvd(
             Segment::syn_ack(
-                ISS_1,
-                ISS_2 + 1,
+                TEST_IRS,
+                TEST_ISS + 1,
                 UnscaledWindowSize::from(u16::MAX),
                 HandshakeOptions {
                     mss: Some(Mss::default::<Ipv4>()),
                     window_scale: Some(WindowScale::default()),
+                    sack_permitted: SACK_PERMITTED,
                     ..Default::default()
                 }.into()),
             SynRcvd {
-                iss: ISS_1,
-                irs: ISS_2,
+                iss: TEST_IRS,
+                irs: TEST_ISS,
                 timestamp: Some(FakeInstant::default()),
                 retrans_timer: RetransTimer::new(
                     FakeInstant::default(),
@@ -3961,7 +4103,7 @@ mod test {
                 simultaneous_open: None,
                 buffer_sizes: BufferSizes::default(),
                 smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                sack_permitted: SACK_PERMITTED,
+                sack_permitted: false,
                 rcv_wnd_scale: WindowScale::default(),
                 snd_wnd_scale: Some(WindowScale::default()),
             }); "accept syn")]
@@ -3969,7 +4111,7 @@ mod test {
         incoming: Segment<()>,
     ) -> ListenOnSegmentDisposition<FakeInstant> {
         let listen = Closed::<Initial>::listen(
-            ISS_1,
+            TEST_IRS,
             Default::default(),
             DEVICE_MAXIMUM_SEGMENT_SIZE,
             DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
@@ -3979,118 +4121,93 @@ mod test {
     }
 
     #[test_case(
-        Segment::ack(ISS_1, ISS_2, UnscaledWindowSize::from(u16::MAX)),
+        Segment::ack(TEST_IRS, TEST_ISS, UnscaledWindowSize::from(u16::MAX)),
         None
     => Some(
-        Segment::ack(ISS_2 + 1, ISS_1 + 1, UnscaledWindowSize::from(u16::MAX))
+        Segment::ack(TEST_ISS + 1, TEST_IRS + 1, UnscaledWindowSize::from(u16::MAX))
     ); "OTW segment")]
     #[test_case(
-        Segment::rst_ack(ISS_1, ISS_2),
+        Segment::rst_ack(TEST_IRS, TEST_ISS),
         None
     => None; "OTW RST")]
     #[test_case(
-        Segment::rst_ack(ISS_1 + 1, ISS_2),
+        Segment::rst_ack(TEST_IRS + 1, TEST_ISS),
         Some(State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) }))
     => None; "acceptable RST")]
     #[test_case(
-        Segment::syn(ISS_1 + 1, UnscaledWindowSize::from(u16::MAX),
+        Segment::syn(TEST_IRS + 1, UnscaledWindowSize::from(u16::MAX),
         HandshakeOptions { window_scale: Some(WindowScale::default()), ..Default::default() }.into()),
         Some(State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) }))
     => Some(
-        Segment::rst(ISS_2 + 1)
+        Segment::rst(TEST_ISS + 1)
     ); "duplicate syn")]
     #[test_case(
-        Segment::ack(ISS_1 + 1, ISS_2, UnscaledWindowSize::from(u16::MAX)),
+        Segment::ack(TEST_IRS + 1, TEST_ISS, UnscaledWindowSize::from(u16::MAX)),
         None
     => Some(
-        Segment::rst(ISS_2)
+        Segment::rst(TEST_ISS)
     ); "unacceptable ack (ISS)")]
     #[test_case(
-        Segment::ack(ISS_1 + 1, ISS_2 + 1, UnscaledWindowSize::from(u16::MAX)),
+        Segment::ack(TEST_IRS + 1, TEST_ISS + 1, UnscaledWindowSize::from(u16::MAX)),
         Some(State::Established(
             Established {
                 snd: Send {
-                    nxt: ISS_2 + 1,
-                    max: ISS_2 + 1,
-                    una: ISS_2 + 1,
-                    wnd: WindowSize::DEFAULT,
-                    wnd_max: WindowSize::DEFAULT,
-                    buffer: NullBuffer,
-                    wl1: ISS_1 + 1,
-                    wl2: ISS_2 + 1,
                     rtt_estimator: Estimator::Measured {
                         srtt: RTT,
                         rtt_var: RTT / 2,
                     },
-                    rtt_sampler: RttSampler::default(),
-                    timer: None,
-                    congestion_control: CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
-                    wnd_scale: WindowScale::default(),
+                    ..Send::default_for_test(NullBuffer)
                 }.into(),
                 rcv: Recv {
-                    buffer: RecvBufferState::Open {
-                        buffer: RingBuffer::default(),
-                        assembler: Assembler::new(ISS_1 + 1),
-                    },
                     remaining_quickacks: quickack_counter(BufferLimits {
                         capacity: WindowSize::DEFAULT.into(),
                         len: 0,
-                    }, DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
-                    last_segment_at: None,
-                    timer: None,
-                    mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                    wnd_scale: WindowScale::default(),
-                    last_window_update: (ISS_1 + 1, WindowSize::DEFAULT),
-                    sack_permitted: SACK_PERMITTED,
+                    }, DEVICE_MAXIMUM_SEGMENT_SIZE),
+                    ..Recv::default_for_test(RingBuffer::default())
                 }.into(),
             }
         ))
     => None; "acceptable ack (ISS + 1)")]
     #[test_case(
-        Segment::ack(ISS_1 + 1, ISS_2 + 2, UnscaledWindowSize::from(u16::MAX)),
+        Segment::ack(TEST_IRS + 1, TEST_ISS + 2, UnscaledWindowSize::from(u16::MAX)),
         None
     => Some(
-        Segment::rst(ISS_2 + 2)
+        Segment::rst(TEST_ISS + 2)
     ); "unacceptable ack (ISS + 2)")]
     #[test_case(
-        Segment::ack(ISS_1 + 1, ISS_2 - 1, UnscaledWindowSize::from(u16::MAX)),
+        Segment::ack(TEST_IRS + 1, TEST_ISS - 1, UnscaledWindowSize::from(u16::MAX)),
         None
     => Some(
-        Segment::rst(ISS_2 - 1)
+        Segment::rst(TEST_ISS - 1)
     ); "unacceptable ack (ISS - 1)")]
     #[test_case(
-        Segment::new(ISS_1 + 1, None, None, UnscaledWindowSize::from(u16::MAX)),
+        Segment::new_empty(
+            SegmentHeader {
+                seq: TEST_IRS + 1,
+                wnd: UnscaledWindowSize::from(u16::MAX),
+                ..Default::default()
+            }
+        ),
         None
     => None; "no ack")]
     #[test_case(
-        Segment::fin(ISS_1 + 1, ISS_2 + 1, UnscaledWindowSize::from(u16::MAX)),
+        Segment::fin(TEST_IRS + 1, TEST_ISS + 1, UnscaledWindowSize::from(u16::MAX)),
         Some(State::CloseWait(CloseWait {
             snd: Send {
-                nxt: ISS_2 + 1,
-                max: ISS_2 + 1,
-                una: ISS_2 + 1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer: NullBuffer,
-                wl1: ISS_1 + 1,
-                wl2: ISS_2 + 1,
-                rtt_estimator: Estimator::Measured{
+                rtt_estimator: Estimator::Measured {
                     srtt: RTT,
                     rtt_var: RTT / 2,
                 },
-                rtt_sampler: RttSampler::default(),
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
-                    wnd_scale: WindowScale::default(),
+                ..Send::default_for_test(NullBuffer)
             }.into(),
             closed_rcv: RecvParams {
-                ack: ISS_1 + 2,
+                ack: TEST_IRS + 2,
                 wnd: WindowSize::from_u32(u32::from(u16::MAX - 1)).unwrap(),
                 wnd_scale: WindowScale::ZERO,
             }
         }))
     => Some(
-        Segment::ack(ISS_2 + 1, ISS_1 + 2, UnscaledWindowSize::from(u16::MAX - 1))
+        Segment::ack(TEST_ISS + 1, TEST_IRS + 2, UnscaledWindowSize::from(u16::MAX - 1))
     ); "fin")]
     fn segment_arrives_when_syn_rcvd(
         incoming: Segment<()>,
@@ -4107,7 +4224,7 @@ mod test {
                 &counters.refs(),
             );
         match expected {
-            Some(new_state) => assert_eq!(new_state, state),
+            Some(new_state) => assert_eq!(state, new_state),
             None => assert_matches!(state, State::SynRcvd(_)),
         };
         seg
@@ -4122,92 +4239,64 @@ mod test {
             state.abort(&counters.refs()),
             (Some(seg), NewlyClosed::Yes) => seg
         );
-        assert_eq!(segment.header.control, Some(Control::RST));
-        assert_eq!(segment.header.seq, ISS_2 + 1);
-        assert_eq!(segment.header.ack, Some(ISS_1 + 1));
+        assert_eq!(segment.header().control, Some(Control::RST));
+        assert_eq!(segment.header().seq, TEST_ISS + 1);
+        assert_eq!(segment.header().ack, Some(TEST_IRS + 1));
     }
 
     #[test_case(
-        Segment::syn(ISS_2 + 1, UnscaledWindowSize::from(u16::MAX), HandshakeOptions::default().into()),
+        Segment::syn(TEST_IRS + 1, UnscaledWindowSize::from(u16::MAX), HandshakeOptions::default().into()),
         Some(State::Closed (
             Closed { reason: Some(ConnectionError::ConnectionReset) },
         ))
-    => Some(Segment::rst(ISS_1 + 1)); "duplicate syn")]
+    => Some(Segment::rst(TEST_ISS + 1)); "duplicate syn")]
     #[test_case(
-        Segment::rst(ISS_2 + 1),
+        Segment::rst(TEST_IRS + 1),
         Some(State::Closed (
             Closed { reason: Some(ConnectionError::ConnectionReset) },
         ))
     => None; "accepatable rst")]
     #[test_case(
-        Segment::ack(ISS_2 + 1, ISS_1 + 2, UnscaledWindowSize::from(u16::MAX)),
+        Segment::ack(TEST_ISS + 1, TEST_IRS + 2, UnscaledWindowSize::from(u16::MAX)),
         None
     => Some(
-        Segment::ack(ISS_1 + 1, ISS_2 + 1, UnscaledWindowSize::from(2))
+        Segment::ack(TEST_ISS + 1, TEST_IRS + 1, UnscaledWindowSize::from(2))
     ); "unacceptable ack")]
     #[test_case(
-        Segment::ack(ISS_2 + 1, ISS_1 + 1, UnscaledWindowSize::from(u16::MAX)),
+        Segment::ack(TEST_IRS + 1, TEST_ISS + 1, UnscaledWindowSize::from(u16::MAX)),
         None
     => None; "pure ack")]
     #[test_case(
-        Segment::fin(ISS_2 + 1, ISS_1 + 1, UnscaledWindowSize::from(u16::MAX)),
+        Segment::fin(TEST_IRS + 1, TEST_ISS + 1, UnscaledWindowSize::from(u16::MAX)),
         Some(State::CloseWait(CloseWait {
-            snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer: NullBuffer,
-                wl1: ISS_2 + 1,
-                wl2: ISS_1 + 1,
-                rtt_estimator: Estimator::default(),
-                rtt_sampler: RttSampler::default(),
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
-                    wnd_scale: WindowScale::default(),
-            }.into(),
+            snd: Send::default_for_test(NullBuffer).into(),
             closed_rcv: RecvParams {
-                ack: ISS_2 + 2,
+                ack: TEST_IRS + 2,
                 wnd: WindowSize::new(1).unwrap(),
                 wnd_scale: WindowScale::ZERO,
             }
         }))
     => Some(
-        Segment::ack(ISS_1 + 1, ISS_2 + 2, UnscaledWindowSize::from(1))
+        Segment::ack(TEST_ISS + 1, TEST_IRS + 2, UnscaledWindowSize::from(1))
     ); "pure fin")]
     #[test_case(
-        Segment::piggybacked_fin(ISS_2 + 1, ISS_1 + 1, UnscaledWindowSize::from(u16::MAX), "A".as_bytes()),
+        Segment::piggybacked_fin(TEST_IRS + 1, TEST_ISS + 1, UnscaledWindowSize::from(u16::MAX), "A".as_bytes()),
         Some(State::CloseWait(CloseWait {
-            snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer: NullBuffer,
-                wl1: ISS_2 + 1,
-                wl2: ISS_1 + 1,
-                rtt_estimator: Estimator::default(),
-                rtt_sampler: RttSampler::default(),
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
-                    wnd_scale: WindowScale::default(),
-            }.into(),
+            snd: Send::default_for_test(NullBuffer).into(),
             closed_rcv: RecvParams {
-                ack: ISS_2 + 3,
+                ack: TEST_IRS + 3,
                 wnd: WindowSize::ZERO,
                 wnd_scale: WindowScale::ZERO,
             }
         }))
     => Some(
-        Segment::ack(ISS_1 + 1, ISS_2 + 3, UnscaledWindowSize::from(0))
+        Segment::ack(TEST_ISS + 1, TEST_IRS + 3, UnscaledWindowSize::from(0))
     ); "fin with 1 byte")]
     #[test_case(
-        Segment::piggybacked_fin(ISS_2 + 1, ISS_1 + 1, UnscaledWindowSize::from(u16::MAX), "AB".as_bytes()),
+        Segment::piggybacked_fin(TEST_IRS + 1, TEST_ISS + 1, UnscaledWindowSize::from(u16::MAX), "AB".as_bytes()),
         None
     => Some(
-        Segment::ack(ISS_1 + 1, ISS_2 + 3, UnscaledWindowSize::from(0))
+        Segment::ack(TEST_ISS + 1, TEST_IRS + 3, UnscaledWindowSize::from(0))
     ); "fin with 2 bytes")]
     fn segment_arrives_when_established(
         incoming: Segment<&[u8]>,
@@ -4215,38 +4304,8 @@ mod test {
     ) -> Option<Segment<()>> {
         let counters = FakeTcpCounters::default();
         let mut state = State::Established(Established {
-            snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer: NullBuffer,
-                wl1: ISS_2 + 1,
-                wl2: ISS_1 + 1,
-                rtt_estimator: Estimator::default(),
-                rtt_sampler: RttSampler::default(),
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(
-                    DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                ),
-                wnd_scale: WindowScale::default(),
-            }
-            .into(),
-            rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::new(2),
-                    assembler: Assembler::new(ISS_2 + 1),
-                },
-                timer: None,
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_2 + 1, WindowSize::new(2).unwrap()),
-                sack_permitted: SACK_PERMITTED,
-            }
-            .into(),
+            snd: Send::default_for_test(NullBuffer).into(),
+            rcv: Recv::default_for_test(RingBuffer::new(2)).into(),
         });
         let (seg, passive_open) = state
             .on_segment_with_default_options::<_, ClientlessBufferProvider>(
@@ -4267,46 +4326,18 @@ mod test {
         let counters = FakeTcpCounters::default();
         // Tests the common behavior when data segment arrives in states that
         // have a receive state.
-        let new_snd = || Send {
-            nxt: ISS_1 + 1,
-            max: ISS_1 + 1,
-            una: ISS_1 + 1,
-            wnd: WindowSize::DEFAULT,
-            wnd_max: WindowSize::DEFAULT,
-            buffer: NullBuffer,
-            wl1: ISS_2 + 1,
-            wl2: ISS_1 + 1,
-            rtt_estimator: Estimator::default(),
-            rtt_sampler: RttSampler::default(),
-            timer: None,
-            congestion_control: CongestionControl::cubic_with_mss(
-                DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-            ),
-            wnd_scale: WindowScale::default(),
-        };
-        let new_rcv = || Recv {
-            buffer: RecvBufferState::Open {
-                buffer: RingBuffer::new(TEST_BYTES.len()),
-                assembler: Assembler::new(ISS_2 + 1),
-            },
-            timer: None,
-            remaining_quickacks: 0,
-            last_segment_at: None,
-            mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-            wnd_scale: WindowScale::default(),
-            last_window_update: (ISS_2 + 1, WindowSize::new(TEST_BYTES.len()).unwrap()),
-            sack_permitted: SACK_PERMITTED,
-        };
+        let new_snd = || Send::default_for_test(NullBuffer);
+        let new_rcv = || Recv::default_for_test(RingBuffer::new(TEST_BYTES.len()));
         for mut state in [
             State::Established(Established { snd: new_snd().into(), rcv: new_rcv().into() }),
             State::FinWait1(FinWait1 { snd: new_snd().queue_fin().into(), rcv: new_rcv().into() }),
-            State::FinWait2(FinWait2 { last_seq: ISS_1 + 1, rcv: new_rcv(), timeout_at: None }),
+            State::FinWait2(FinWait2 { last_seq: TEST_ISS + 1, rcv: new_rcv(), timeout_at: None }),
         ] {
             assert_eq!(
                 state.on_segment_with_default_options::<_, ClientlessBufferProvider>(
-                    Segment::data(
-                        ISS_2 + 1,
-                        ISS_1 + 1,
+                    Segment::with_data(
+                        TEST_IRS + 1,
+                        TEST_ISS + 1,
                         UnscaledWindowSize::from(u16::MAX),
                         TEST_BYTES
                     ),
@@ -4315,8 +4346,8 @@ mod test {
                 ),
                 (
                     Some(Segment::ack(
-                        ISS_1 + 1,
-                        ISS_2 + 1 + TEST_BYTES.len(),
+                        TEST_ISS + 1,
+                        TEST_IRS + 1 + TEST_BYTES.len(),
                         UnscaledWindowSize::from(0)
                     )),
                     None
@@ -4337,43 +4368,16 @@ mod test {
         let counters = FakeTcpCounters::default();
         // Tests the common behavior when ack segment arrives in states that
         // have a send state.
-        let new_snd = || Send {
-            nxt: ISS_1 + 1,
-            max: ISS_1 + 1,
-            una: ISS_1 + 1,
-            wnd: WindowSize::DEFAULT,
-            wnd_max: WindowSize::DEFAULT,
-            buffer: RingBuffer::with_data(TEST_BYTES.len(), TEST_BYTES),
-            wl1: ISS_2 + 1,
-            wl2: ISS_1 + 1,
-            rtt_estimator: Estimator::default(),
-            rtt_sampler: RttSampler::default(),
-            timer: None,
-            congestion_control: CongestionControl::cubic_with_mss(
-                DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-            ),
-            wnd_scale: WindowScale::default(),
-        };
-        let new_rcv = || Recv {
-            buffer: RecvBufferState::Open {
-                buffer: NullBuffer,
-                assembler: Assembler::new(ISS_2 + 1),
-            },
-            timer: None,
-            remaining_quickacks: 0,
-            last_segment_at: None,
-            mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-            wnd_scale: WindowScale::default(),
-            last_window_update: (ISS_2 + 1, WindowSize::ZERO),
-            sack_permitted: SACK_PERMITTED,
-        };
+        let new_snd =
+            || Send::default_for_test(RingBuffer::with_data(TEST_BYTES.len(), TEST_BYTES));
+        let new_rcv = || Recv::default_for_test(NullBuffer);
         for mut state in [
             State::Established(Established { snd: new_snd().into(), rcv: new_rcv().into() }),
             State::FinWait1(FinWait1 { snd: new_snd().queue_fin().into(), rcv: new_rcv().into() }),
             State::Closing(Closing {
                 snd: new_snd().queue_fin(),
                 closed_rcv: RecvParams {
-                    ack: ISS_2 + 1,
+                    ack: TEST_IRS + 1,
                     wnd: WindowSize::ZERO,
                     wnd_scale: WindowScale::default(),
                 },
@@ -4381,7 +4385,7 @@ mod test {
             State::CloseWait(CloseWait {
                 snd: new_snd().into(),
                 closed_rcv: RecvParams {
-                    ack: ISS_2 + 1,
+                    ack: TEST_IRS + 1,
                     wnd: WindowSize::ZERO,
                     wnd_scale: WindowScale::default(),
                 },
@@ -4389,7 +4393,7 @@ mod test {
             State::LastAck(LastAck {
                 snd: new_snd().queue_fin(),
                 closed_rcv: RecvParams {
-                    ack: ISS_2 + 1,
+                    ack: TEST_IRS + 1,
                     wnd: WindowSize::ZERO,
                     wnd_scale: WindowScale::default(),
                 },
@@ -4401,18 +4405,22 @@ mod test {
                     FakeInstant::default(),
                     &counters.refs(),
                 ),
-                Some(Segment::data(
-                    ISS_1 + 1,
-                    ISS_2 + 1,
-                    UnscaledWindowSize::from(0),
+                Some(Segment::new_assert_no_discard(
+                    SegmentHeader {
+                        seq: TEST_ISS + 1,
+                        ack: Some(TEST_IRS + 1),
+                        wnd: UnscaledWindowSize::from(0),
+                        push: true,
+                        ..Default::default()
+                    },
                     FragmentedPayload::new_contiguous(TEST_BYTES)
                 ))
             );
             assert_eq!(
                 state.on_segment_with_default_options::<_, ClientlessBufferProvider>(
                     Segment::<()>::ack(
-                        ISS_2 + 1,
-                        ISS_1 + 1 + TEST_BYTES.len(),
+                        TEST_IRS + 1,
+                        TEST_ISS + 1 + TEST_BYTES.len(),
                         UnscaledWindowSize::from(u16::MAX)
                     ),
                     FakeInstant::default(),
@@ -4434,66 +4442,49 @@ mod test {
                 State::FinWait1(f) => f.snd.into_inner(),
                 State::Closing(c) => c.snd,
             };
-            assert_eq!(snd.nxt, ISS_1 + 1 + TEST_BYTES.len());
-            assert_eq!(snd.max, ISS_1 + 1 + TEST_BYTES.len());
-            assert_eq!(snd.una, ISS_1 + 1 + TEST_BYTES.len());
+            assert_eq!(snd.nxt, TEST_ISS + 1 + TEST_BYTES.len());
+            assert_eq!(snd.max, TEST_ISS + 1 + TEST_BYTES.len());
+            assert_eq!(snd.una, TEST_ISS + 1 + TEST_BYTES.len());
             assert_eq!(snd.buffer.limits().len, 0);
         }
     }
 
     #[test_case(
-        Segment::syn(ISS_2 + 2, UnscaledWindowSize::from(u16::MAX),
+        Segment::syn(TEST_IRS + 2, UnscaledWindowSize::from(u16::MAX),
             HandshakeOptions::default().into()),
         Some(State::Closed (
             Closed { reason: Some(ConnectionError::ConnectionReset) },
         ))
-    => Some(Segment::rst(ISS_1 + 1)); "syn")]
+    => Some(Segment::rst(TEST_ISS + 1)); "syn")]
     #[test_case(
-        Segment::rst(ISS_2 + 2),
+        Segment::rst(TEST_IRS + 2),
         Some(State::Closed (
             Closed { reason: Some(ConnectionError::ConnectionReset) },
         ))
     => None; "rst")]
     #[test_case(
-        Segment::fin(ISS_2 + 2, ISS_1 + 1, UnscaledWindowSize::from(u16::MAX)),
+        Segment::fin(TEST_IRS + 2, TEST_ISS + 1, UnscaledWindowSize::from(u16::MAX)),
         None
     => None; "ignore fin")]
     #[test_case(
-        Segment::data(ISS_2, ISS_1 + 1, UnscaledWindowSize::from(u16::MAX), "a".as_bytes()),
-        None => Some(Segment::ack(ISS_1 + 1, ISS_2 + 2, UnscaledWindowSize::from(u16::MAX)));
+        Segment::with_data(TEST_IRS, TEST_ISS + 1, UnscaledWindowSize::from(u16::MAX), "a".as_bytes()),
+        None => Some(Segment::ack(TEST_ISS + 1, TEST_IRS + 2, UnscaledWindowSize::from(u16::MAX)));
         "ack old data")]
     #[test_case(
-        Segment::data(ISS_2 + 2, ISS_1 + 1, UnscaledWindowSize::from(u16::MAX), "Hello".as_bytes()),
+        Segment::with_data(TEST_IRS + 2, TEST_ISS + 1, UnscaledWindowSize::from(u16::MAX), "Hello".as_bytes()),
         Some(State::Closed (
             Closed { reason: Some(ConnectionError::ConnectionReset) },
         ))
-    => Some(Segment::rst(ISS_1 + 1)); "reset on new data")]
+    => Some(Segment::rst(TEST_ISS + 1)); "reset on new data")]
     fn segment_arrives_when_close_wait(
         incoming: Segment<&[u8]>,
         expected: Option<State<FakeInstant, RingBuffer, NullBuffer, ()>>,
     ) -> Option<Segment<()>> {
         let counters = FakeTcpCounters::default();
         let mut state = State::CloseWait(CloseWait {
-            snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer: NullBuffer,
-                wl1: ISS_2 + 1,
-                wl2: ISS_1 + 1,
-                rtt_estimator: Estimator::default(),
-                rtt_sampler: RttSampler::default(),
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(
-                    DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                ),
-                wnd_scale: WindowScale::default(),
-            }
-            .into(),
+            snd: Send::default_for_test(NullBuffer).into(),
             closed_rcv: RecvParams {
-                ack: ISS_2 + 2,
+                ack: TEST_IRS + 2,
                 wnd: WindowSize::DEFAULT,
                 wnd_scale: WindowScale::ZERO,
             },
@@ -4516,8 +4507,10 @@ mod test {
     fn active_passive_open(sack_permitted: bool) {
         let mut clock = FakeInstantCtx::default();
         let counters = FakeTcpCounters::default();
-        let (syn_sent, mut syn_seg) = Closed::<Initial>::connect(
-            ISS_1,
+        let passive_iss = ISS_2;
+        let active_iss = ISS_1;
+        let (syn_sent, syn_seg) = Closed::<Initial>::connect(
+            active_iss,
             clock.now(),
             (),
             Default::default(),
@@ -4528,7 +4521,7 @@ mod test {
         assert_eq!(
             syn_seg,
             Segment::syn(
-                ISS_1,
+                active_iss,
                 UnscaledWindowSize::from(u16::MAX),
                 HandshakeOptions {
                     mss: Some(DEVICE_MAXIMUM_SEGMENT_SIZE),
@@ -4542,7 +4535,7 @@ mod test {
         assert_eq!(
             syn_sent,
             SynSent {
-                iss: ISS_1,
+                iss: active_iss,
                 timestamp: Some(clock.now()),
                 retrans_timer: RetransTimer::new(
                     clock.now(),
@@ -4559,7 +4552,7 @@ mod test {
         );
         let mut active = State::SynSent(syn_sent);
         let mut passive = State::Listen(Closed::<Initial>::listen(
-            ISS_2,
+            passive_iss,
             Default::default(),
             DEVICE_MAXIMUM_SEGMENT_SIZE,
             DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
@@ -4568,10 +4561,12 @@ mod test {
         clock.sleep(RTT / 2);
 
         // Update the SYN segment to match what the test wants.
-        {
-            let opt = assert_matches!(&mut syn_seg.header.options, Options::Handshake(o) => o);
+        let syn_seg = {
+            let (mut header, data) = syn_seg.into_parts();
+            let opt = assert_matches!(&mut header.options, Options::Handshake(o) => o);
             opt.sack_permitted = sack_permitted;
-        }
+            Segment::new_assert_no_discard(header, data)
+        };
 
         let (seg, passive_open) = passive
             .on_segment_with_default_options::<_, ClientlessBufferProvider>(
@@ -4579,13 +4574,13 @@ mod test {
                 clock.now(),
                 &counters.refs(),
             );
-        let mut syn_ack = seg.expect("failed to generate a syn-ack segment");
+        let syn_ack = seg.expect("failed to generate a syn-ack segment");
         assert_eq!(passive_open, None);
         assert_eq!(
             syn_ack,
             Segment::syn_ack(
-                ISS_2,
-                ISS_1 + 1,
+                passive_iss,
+                active_iss + 1,
                 UnscaledWindowSize::from(u16::MAX),
                 HandshakeOptions {
                     mss: Some(DEVICE_MAXIMUM_SEGMENT_SIZE),
@@ -4597,8 +4592,8 @@ mod test {
             )
         );
         assert_matches!(passive, State::SynRcvd(ref syn_rcvd) if syn_rcvd == &SynRcvd {
-            iss: ISS_2,
-            irs: ISS_1,
+            iss: passive_iss,
+            irs: active_iss,
             timestamp: Some(clock.now()),
             retrans_timer: RetransTimer::new(
                 clock.now(),
@@ -4616,10 +4611,12 @@ mod test {
         clock.sleep(RTT / 2);
 
         // Update the SYN ACK segment to match what the test wants.
-        {
-            let opt = assert_matches!(&mut syn_ack.header.options, Options::Handshake(o) => o);
+        let syn_ack = {
+            let (mut header, data) = syn_ack.into_parts();
+            let opt = assert_matches!(&mut header.options, Options::Handshake(o) => o);
             opt.sack_permitted = sack_permitted;
-        }
+            Segment::new_assert_no_discard(header, data)
+        };
 
         let (seg, passive_open) = active
             .on_segment_with_default_options::<_, ClientlessBufferProvider>(
@@ -4629,41 +4626,24 @@ mod test {
             );
         let ack_seg = seg.expect("failed to generate a ack segment");
         assert_eq!(passive_open, None);
-        assert_eq!(ack_seg, Segment::ack(ISS_1 + 1, ISS_2 + 1, UnscaledWindowSize::from(u16::MAX)));
+        assert_eq!(
+            ack_seg,
+            Segment::ack(active_iss + 1, passive_iss + 1, UnscaledWindowSize::from(u16::MAX))
+        );
         let established = assert_matches!(&active, State::Established(e) => e);
         assert_eq!(
             established,
             &Established {
                 snd: Send {
-                    nxt: ISS_1 + 1,
-                    max: ISS_1 + 1,
-                    una: ISS_1 + 1,
-                    wnd: WindowSize::DEFAULT,
-                    wnd_max: WindowSize::DEFAULT,
-                    buffer: RingBuffer::default(),
-                    wl1: ISS_2,
-                    wl2: ISS_1 + 1,
+                    wl1: passive_iss,
                     rtt_estimator: Estimator::Measured { srtt: RTT, rtt_var: RTT / 2 },
-                    rtt_sampler: RttSampler::default(),
-                    timer: None,
-                    congestion_control: CongestionControl::cubic_with_mss(
-                        DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE
-                    ),
-                    wnd_scale: WindowScale::default(),
+                    ..Send::default_for_test_at(active_iss + 1, RingBuffer::default())
                 }
                 .into(),
                 rcv: Recv {
-                    buffer: RecvBufferState::Open {
-                        buffer: RingBuffer::default(),
-                        assembler: Assembler::new(ISS_2 + 1),
-                    },
-                    timer: None,
                     remaining_quickacks: default_quickack_counter(),
-                    last_segment_at: None,
-                    mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
-                    wnd_scale: WindowScale::default(),
-                    last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
                     sack_permitted,
+                    ..Recv::default_for_test_at(passive_iss + 1, RingBuffer::default())
                 }
                 .into()
             }
@@ -4682,35 +4662,15 @@ mod test {
             established,
             &Established {
                 snd: Send {
-                    nxt: ISS_2 + 1,
-                    max: ISS_2 + 1,
-                    una: ISS_2 + 1,
-                    wnd: WindowSize::DEFAULT,
-                    wnd_max: WindowSize::DEFAULT,
-                    buffer: RingBuffer::default(),
-                    wl1: ISS_1 + 1,
-                    wl2: ISS_2 + 1,
+                    wl1: active_iss + 1,
                     rtt_estimator: Estimator::Measured { srtt: RTT, rtt_var: RTT / 2 },
-                    rtt_sampler: RttSampler::default(),
-                    timer: None,
-                    congestion_control: CongestionControl::cubic_with_mss(
-                        DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE
-                    ),
-                    wnd_scale: WindowScale::default(),
+                    ..Send::default_for_test_at(passive_iss + 1, RingBuffer::default())
                 }
                 .into(),
                 rcv: Recv {
-                    buffer: RecvBufferState::Open {
-                        buffer: RingBuffer::default(),
-                        assembler: Assembler::new(ISS_1 + 1),
-                    },
-                    timer: None,
                     remaining_quickacks: default_quickack_counter(),
-                    last_segment_at: None,
-                    mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
-                    wnd_scale: WindowScale::default(),
-                    last_window_update: (ISS_1 + 1, WindowSize::DEFAULT),
                     sack_permitted,
+                    ..Recv::default_for_test_at(active_iss + 1, RingBuffer::default())
                 }
                 .into()
             }
@@ -4875,35 +4835,18 @@ mod test {
             established,
             Established {
                 snd: Send {
-                    nxt: ISS_1 + 1,
-                    max: ISS_1 + 1,
-                    una: ISS_1 + 1,
-                    wnd: WindowSize::DEFAULT,
-                    wnd_max: WindowSize::DEFAULT,
-                    buffer: RingBuffer::default(),
                     wl1: ISS_2 + 1,
-                    wl2: ISS_1 + 1,
                     rtt_estimator: Estimator::Measured { srtt: RTT, rtt_var: RTT / 2 },
-                    rtt_sampler: RttSampler::default(),
-                    timer: None,
                     congestion_control: CongestionControl::cubic_with_mss(
                         DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE
                     ),
-                    wnd_scale: WindowScale::default(),
+                    ..Send::default_for_test_at(ISS_1 + 1, RingBuffer::default())
                 }
                 .into(),
                 rcv: Recv {
-                    buffer: RecvBufferState::Open {
-                        buffer: RingBuffer::default(),
-                        assembler: Assembler::new(ISS_2 + 1),
-                    },
-                    timer: None,
                     remaining_quickacks: default_quickack_counter() - 1,
                     last_segment_at: Some(clock.now()),
-                    mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
-                    wnd_scale: WindowScale::default(),
-                    last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
-                    sack_permitted: SACK_PERMITTED,
+                    ..Recv::default_for_test_at(ISS_2 + 1, RingBuffer::default())
                 }
                 .into()
             }
@@ -4914,35 +4857,18 @@ mod test {
             established,
             Established {
                 snd: Send {
-                    nxt: ISS_2 + 1,
-                    max: ISS_2 + 1,
-                    una: ISS_2 + 1,
-                    wnd: WindowSize::DEFAULT,
-                    wnd_max: WindowSize::DEFAULT,
-                    buffer: RingBuffer::default(),
                     wl1: ISS_1 + 1,
-                    wl2: ISS_2 + 1,
                     rtt_estimator: Estimator::Measured { srtt: RTT, rtt_var: RTT / 2 },
-                    rtt_sampler: RttSampler::default(),
-                    timer: None,
                     congestion_control: CongestionControl::cubic_with_mss(
                         DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE
                     ),
-                    wnd_scale: WindowScale::default(),
+                    ..Send::default_for_test_at(ISS_2 + 1, RingBuffer::default())
                 }
                 .into(),
                 rcv: Recv {
-                    buffer: RecvBufferState::Open {
-                        buffer: RingBuffer::default(),
-                        assembler: Assembler::new(ISS_1 + 1),
-                    },
-                    timer: None,
                     remaining_quickacks: default_quickack_counter() - 1,
                     last_segment_at: Some(clock.now()),
-                    mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
-                    wnd_scale: WindowScale::default(),
-                    last_window_update: (ISS_1 + 1, WindowSize::DEFAULT),
-                    sack_permitted: SACK_PERMITTED,
+                    ..Recv::default_for_test_at(ISS_1 + 1, RingBuffer::default())
                 }
                 .into()
             }
@@ -4952,41 +4878,26 @@ mod test {
     const BUFFER_SIZE: usize = 16;
     const TEST_BYTES: &[u8] = "Hello".as_bytes();
 
-    #[test]
-    fn established_receive() {
+    #[test_case(true; "sack permitted")]
+    #[test_case(false; "sack not permitted")]
+    fn established_receive(sack_permitted: bool) {
         let clock = FakeInstantCtx::default();
         let counters = FakeTcpCounters::default();
         let mut established = State::Established(Established {
             snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
                 wnd: WindowSize::ZERO,
                 wnd_max: WindowSize::ZERO,
                 buffer: NullBuffer,
-                wl1: ISS_2 + 1,
-                wl2: ISS_1 + 1,
-                rtt_estimator: Estimator::default(),
-                rtt_sampler: RttSampler::default(),
-                timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(Mss(
                     NonZeroU16::new(5).unwrap()
                 )),
-                wnd_scale: WindowScale::default(),
+                ..Send::default_for_test(NullBuffer)
             }
             .into(),
             rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::new(BUFFER_SIZE),
-                    assembler: Assembler::new(ISS_2 + 1),
-                },
-                timer: None,
-                remaining_quickacks: 0,
-                last_segment_at: None,
                 mss: Mss(NonZeroU16::new(5).unwrap()),
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
-                sack_permitted: SACK_PERMITTED,
+                sack_permitted,
+                ..Recv::default_for_test(RingBuffer::new(BUFFER_SIZE))
             }
             .into(),
         });
@@ -4994,14 +4905,19 @@ mod test {
         // Received an expected segment at rcv.nxt.
         assert_eq!(
             established.on_segment_with_default_options::<_, ClientlessBufferProvider>(
-                Segment::data(ISS_2 + 1, ISS_1 + 1, UnscaledWindowSize::from(0), TEST_BYTES,),
+                Segment::with_data(
+                    TEST_IRS + 1,
+                    TEST_ISS + 1,
+                    UnscaledWindowSize::from(0),
+                    TEST_BYTES,
+                ),
                 clock.now(),
                 &counters.refs(),
             ),
             (
                 Some(Segment::ack(
-                    ISS_1 + 1,
-                    ISS_2 + 1 + TEST_BYTES.len(),
+                    TEST_ISS + 1,
+                    TEST_IRS + 1 + TEST_BYTES.len(),
                     UnscaledWindowSize::from((BUFFER_SIZE - TEST_BYTES.len()) as u16),
                 )),
                 None
@@ -5016,11 +4932,12 @@ mod test {
         );
 
         // Receive an out-of-order segment.
+        let segment_start = TEST_IRS + 1 + TEST_BYTES.len() * 2;
         assert_eq!(
             established.on_segment_with_default_options::<_, ClientlessBufferProvider>(
-                Segment::data(
-                    ISS_2 + 1 + TEST_BYTES.len() * 2,
-                    ISS_1 + 1,
+                Segment::with_data(
+                    segment_start,
+                    TEST_ISS + 1,
                     UnscaledWindowSize::from(0),
                     TEST_BYTES,
                 ),
@@ -5028,10 +4945,24 @@ mod test {
                 &counters.refs()
             ),
             (
-                Some(Segment::ack(
-                    ISS_1 + 1,
-                    ISS_2 + 1 + TEST_BYTES.len(),
+                Some(Segment::ack_with_options(
+                    TEST_ISS + 1,
+                    TEST_IRS + 1 + TEST_BYTES.len(),
                     UnscaledWindowSize::from(u16::try_from(BUFFER_SIZE).unwrap()),
+                    SegmentOptions {
+                        sack_blocks: if sack_permitted {
+                            [SackBlock::try_new(
+                                segment_start,
+                                segment_start + u32::try_from(TEST_BYTES.len()).unwrap(),
+                            )
+                            .unwrap()]
+                            .into_iter()
+                            .collect()
+                        } else {
+                            SackBlocks::default()
+                        }
+                    }
+                    .into()
                 )),
                 None
             ),
@@ -5048,9 +4979,9 @@ mod test {
         // Receive the next segment that fills the hole.
         assert_eq!(
             established.on_segment_with_default_options::<_, ClientlessBufferProvider>(
-                Segment::data(
-                    ISS_2 + 1 + TEST_BYTES.len(),
-                    ISS_1 + 1,
+                Segment::with_data(
+                    TEST_IRS + 1 + TEST_BYTES.len(),
+                    TEST_ISS + 1,
                     UnscaledWindowSize::from(0),
                     TEST_BYTES,
                 ),
@@ -5059,8 +4990,8 @@ mod test {
             ),
             (
                 Some(Segment::ack(
-                    ISS_1 + 1,
-                    ISS_2 + 1 + 3 * TEST_BYTES.len(),
+                    TEST_ISS + 1,
+                    TEST_IRS + 1 + 3 * TEST_BYTES.len(),
                     UnscaledWindowSize::from_usize(BUFFER_SIZE - 2 * TEST_BYTES.len()),
                 )),
                 None
@@ -5083,37 +5014,14 @@ mod test {
         assert_eq!(send_buffer.enqueue_data(TEST_BYTES), 5);
         let mut established = State::Established(Established {
             snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1,
+                una: TEST_ISS,
+                wl2: TEST_ISS,
                 wnd: WindowSize::ZERO,
                 wnd_max: WindowSize::ZERO,
-                buffer: send_buffer,
-                wl1: ISS_2,
-                wl2: ISS_1,
-                rtt_sampler: RttSampler::default(),
-                rtt_estimator: Estimator::default(),
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(
-                    DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                ),
-                wnd_scale: WindowScale::default(),
+                ..Send::default_for_test_at(TEST_ISS + 1, send_buffer)
             }
             .into(),
-            rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::new(BUFFER_SIZE),
-                    assembler: Assembler::new(ISS_2 + 1),
-                },
-                timer: None,
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
-                sack_permitted: SACK_PERMITTED,
-            }
-            .into(),
+            rcv: Recv::default_for_test(RingBuffer::new(BUFFER_SIZE)).into(),
         });
         // Data queued but the window is not opened, nothing to send.
         assert_eq!(
@@ -5127,7 +5035,7 @@ mod test {
                            counters: &TcpCountersRefs<'_>| {
             assert_eq!(
                 established.on_segment_with_default_options::<(), ClientlessBufferProvider>(
-                    Segment::ack(ISS_2 + 1, ack, UnscaledWindowSize::from_usize(win)),
+                    Segment::ack(TEST_IRS + 1, ack, UnscaledWindowSize::from_usize(win)),
                     now,
                     counters
                 ),
@@ -5135,24 +5043,24 @@ mod test {
             );
         };
         // Open up the window by 1 byte.
-        open_window(&mut established, ISS_1 + 1, 1, clock.now(), &counters.refs());
+        open_window(&mut established, TEST_ISS + 1, 1, clock.now(), &counters.refs());
         assert_eq!(
             established.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
-            Some(Segment::data(
-                ISS_1 + 1,
-                ISS_2 + 1,
+            Some(Segment::with_data(
+                TEST_ISS + 1,
+                TEST_IRS + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
                 FragmentedPayload::new_contiguous(&TEST_BYTES[1..2]),
             ))
         );
 
         // Open up the window by 10 bytes, but the MSS is limited to 2 bytes.
-        open_window(&mut established, ISS_1 + 2, 10, clock.now(), &counters.refs());
+        open_window(&mut established, TEST_ISS + 2, 10, clock.now(), &counters.refs());
         assert_eq!(
             established.poll_send_with_default_options(2, clock.now(), &counters.refs()),
-            Some(Segment::data(
-                ISS_1 + 2,
-                ISS_2 + 1,
+            Some(Segment::with_data(
+                TEST_ISS + 2,
+                TEST_IRS + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
                 FragmentedPayload::new_contiguous(&TEST_BYTES[2..4]),
             ))
@@ -5166,11 +5074,15 @@ mod test {
                 clock.now(),
                 &SocketOptions { nagle_enabled: false, ..SocketOptions::default_for_state_tests() }
             ),
-            Ok(Segment::data(
-                ISS_1 + 4,
-                ISS_2 + 1,
-                UnscaledWindowSize::from_usize(BUFFER_SIZE),
-                FragmentedPayload::new_contiguous(&TEST_BYTES[4..5]),
+            Ok(Segment::new_assert_no_discard(
+                SegmentHeader {
+                    seq: TEST_ISS + 4,
+                    ack: Some(TEST_IRS + 1),
+                    wnd: UnscaledWindowSize::from_usize(BUFFER_SIZE),
+                    push: true,
+                    ..Default::default()
+                },
+                FragmentedPayload::new_contiguous(&TEST_BYTES[4..]),
             ))
         );
 
@@ -5254,10 +5166,14 @@ mod test {
         for i in 0..3 {
             assert_eq!(
                 state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
-                Some(Segment::data(
-                    ISS_1 + 1,
-                    ISS_1 + 1,
-                    UnscaledWindowSize::from(u16::MAX),
+                Some(Segment::new_assert_no_discard(
+                    SegmentHeader {
+                        seq: ISS_1 + 1,
+                        ack: Some(ISS_1 + 1),
+                        wnd: UnscaledWindowSize::from(u16::MAX),
+                        push: true,
+                        ..Default::default()
+                    },
                     FragmentedPayload::new_contiguous(TEST_BYTES),
                 ))
             );
@@ -5290,7 +5206,7 @@ mod test {
         clock.sleep(Rto::DEFAULT.get());
         assert_eq!(
             state.poll_send_with_default_options(1, clock.now(), &counters.refs(),),
-            Some(Segment::data(
+            Some(Segment::with_data(
                 ISS_1 + 1 + 1,
                 ISS_1 + 1,
                 UnscaledWindowSize::from(u16::MAX),
@@ -5323,7 +5239,7 @@ mod test {
         assert_eq!(state.poll_send_at(), Some(clock.now() + Rto::DEFAULT.get()));
         assert_eq!(
             state.poll_send_with_default_options(1, clock.now(), &counters.refs()),
-            Some(Segment::data(
+            Some(Segment::with_data(
                 ISS_1 + 1 + 3,
                 ISS_1 + 1,
                 UnscaledWindowSize::from(u16::MAX),
@@ -5355,52 +5271,22 @@ mod test {
         assert_eq!(send_buffer.enqueue_data(TEST_BYTES), 5);
         // Set up the state machine to start with Established.
         let mut state = State::Established(Established {
-            snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer: send_buffer.clone(),
-                wl1: ISS_2,
-                wl2: ISS_1,
-                rtt_sampler: RttSampler::default(),
-                rtt_estimator: Estimator::default(),
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(
-                    DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                ),
-                wnd_scale: WindowScale::default(),
-            }
-            .into(),
-            rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::new(BUFFER_SIZE),
-                    assembler: Assembler::new(ISS_2 + 1),
-                },
-                timer: None,
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
-                sack_permitted: SACK_PERMITTED,
-            }
-            .into(),
+            snd: Send::default_for_test(send_buffer.clone()).into(),
+            rcv: Recv::default_for_test(RingBuffer::new(BUFFER_SIZE)).into(),
         });
         let last_wnd = WindowSize::new(BUFFER_SIZE - 1).unwrap();
         let last_wnd_scale = WindowScale::default();
         // Transition the state machine to CloseWait by sending a FIN.
         assert_eq!(
             state.on_segment_with_default_options::<(), ClientlessBufferProvider>(
-                Segment::fin(ISS_2 + 1, ISS_1 + 1, UnscaledWindowSize::from(u16::MAX)),
+                Segment::fin(TEST_IRS + 1, TEST_ISS + 1, UnscaledWindowSize::from(u16::MAX)),
                 clock.now(),
                 &counters.refs(),
             ),
             (
                 Some(Segment::ack(
-                    ISS_1 + 1,
-                    ISS_2 + 2,
+                    TEST_ISS + 1,
+                    TEST_IRS + 2,
                     UnscaledWindowSize::from_usize(BUFFER_SIZE - 1)
                 )),
                 None
@@ -5418,32 +5304,20 @@ mod test {
         assert_eq!(
             state,
             State::LastAck(LastAck {
-                snd: Send {
-                    nxt: ISS_1 + 1,
-                    max: ISS_1 + 1,
-                    una: ISS_1 + 1,
-                    wnd: WindowSize::DEFAULT,
-                    wnd_max: WindowSize::DEFAULT,
-                    buffer: send_buffer,
-                    wl1: ISS_2 + 1,
-                    wl2: ISS_1 + 1,
-                    rtt_sampler: RttSampler::default(),
-                    rtt_estimator: Estimator::default(),
-                    timer: None,
-                    congestion_control: CongestionControl::cubic_with_mss(
-                        DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE
-                    ),
-                    wnd_scale: WindowScale::default(),
-                },
-                closed_rcv: RecvParams { ack: ISS_2 + 2, wnd: last_wnd, wnd_scale: last_wnd_scale }
+                snd: Send::default_for_test(send_buffer),
+                closed_rcv: RecvParams {
+                    ack: TEST_IRS + 2,
+                    wnd: last_wnd,
+                    wnd_scale: last_wnd_scale
+                }
             })
         );
         // When the send window is not big enough, there should be no FIN.
         assert_eq!(
             state.poll_send_with_default_options(2, clock.now(), &counters.refs()),
-            Some(Segment::data(
-                ISS_1 + 1,
-                ISS_2 + 2,
+            Some(Segment::with_data(
+                TEST_ISS + 1,
+                TEST_IRS + 2,
                 last_wnd >> WindowScale::default(),
                 FragmentedPayload::new_contiguous(&TEST_BYTES[..2]),
             ))
@@ -5451,10 +5325,15 @@ mod test {
         // We should be able to send out all remaining bytes together with a FIN.
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
-            Some(Segment::piggybacked_fin(
-                ISS_1 + 3,
-                ISS_2 + 2,
-                last_wnd >> WindowScale::default(),
+            Some(Segment::new_assert_no_discard(
+                SegmentHeader {
+                    seq: TEST_ISS + 3,
+                    ack: Some(TEST_IRS + 2),
+                    control: Some(Control::FIN),
+                    wnd: last_wnd >> WindowScale::default(),
+                    push: true,
+                    ..Default::default()
+                },
                 FragmentedPayload::new_contiguous(&TEST_BYTES[2..]),
             ))
         );
@@ -5463,8 +5342,8 @@ mod test {
         assert_eq!(
             state.on_segment_with_default_options::<(), ClientlessBufferProvider>(
                 Segment::ack(
-                    ISS_2 + 2,
-                    ISS_1 + 1 + TEST_BYTES.len(),
+                    TEST_IRS + 2,
+                    TEST_ISS + 1 + TEST_BYTES.len(),
                     UnscaledWindowSize::from(u16::MAX)
                 ),
                 clock.now(),
@@ -5478,8 +5357,8 @@ mod test {
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
             Some(Segment::fin(
-                ISS_1 + 1 + TEST_BYTES.len(),
-                ISS_2 + 2,
+                TEST_ISS + 1 + TEST_BYTES.len(),
+                TEST_IRS + 2,
                 last_wnd >> WindowScale::default()
             ))
         );
@@ -5488,8 +5367,8 @@ mod test {
         assert_eq!(
             state.on_segment_with_default_options::<(), ClientlessBufferProvider>(
                 Segment::ack(
-                    ISS_2 + 2,
-                    ISS_1 + 1 + TEST_BYTES.len() + 1,
+                    TEST_IRS + 2,
+                    TEST_ISS + 1 + TEST_BYTES.len() + 1,
                     UnscaledWindowSize::from(u16::MAX),
                 ),
                 clock.now(),
@@ -5513,8 +5392,8 @@ mod test {
     fn syn_rcvd_active_close() {
         let counters = FakeTcpCounters::default();
         let mut state: State<_, RingBuffer, NullBuffer, ()> = State::SynRcvd(SynRcvd {
-            iss: ISS_1,
-            irs: ISS_2,
+            iss: TEST_ISS,
+            irs: TEST_IRS,
             timestamp: None,
             retrans_timer: RetransTimer {
                 at: FakeInstant::default(),
@@ -5544,7 +5423,7 @@ mod test {
                 FakeInstant::default(),
                 &counters.refs()
             ),
-            Some(Segment::fin(ISS_1 + 1, ISS_2 + 1, UnscaledWindowSize::from(u16::MAX)))
+            Some(Segment::fin(TEST_ISS + 1, TEST_IRS + 1, UnscaledWindowSize::from(u16::MAX)))
         );
     }
 
@@ -5557,35 +5436,15 @@ mod test {
         // Set up the state machine to start with Established.
         let mut state = State::Established(Established {
             snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer: send_buffer.clone(),
-                wl1: ISS_2,
-                wl2: ISS_1,
-                rtt_sampler: RttSampler::default(),
-                rtt_estimator: Estimator::default(),
-                timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(Mss(
                     NonZeroU16::new(5).unwrap()
                 )),
-                wnd_scale: WindowScale::default(),
+                ..Send::default_for_test(send_buffer.clone())
             }
             .into(),
             rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::new(BUFFER_SIZE),
-                    assembler: Assembler::new(ISS_2 + 1),
-                },
-                timer: None,
-                remaining_quickacks: 0,
-                last_segment_at: None,
                 mss: Mss(NonZeroU16::new(5).unwrap()),
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
-                sack_permitted: SACK_PERMITTED,
+                ..Recv::default_for_test(RingBuffer::new(BUFFER_SIZE))
             }
             .into(),
         });
@@ -5610,9 +5469,9 @@ mod test {
         // Poll for 2 bytes.
         assert_eq!(
             state.poll_send_with_default_options(2, clock.now(), &counters.refs()),
-            Some(Segment::data(
-                ISS_1 + 1,
-                ISS_2 + 1,
+            Some(Segment::with_data(
+                TEST_ISS + 1,
+                TEST_IRS + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
                 FragmentedPayload::new_contiguous(&TEST_BYTES[..2])
             ))
@@ -5621,10 +5480,15 @@ mod test {
         // And we should send the rest of the buffer together with the FIN.
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
-            Some(Segment::piggybacked_fin(
-                ISS_1 + 3,
-                ISS_2 + 1,
-                UnscaledWindowSize::from_usize(BUFFER_SIZE),
+            Some(Segment::new_assert_no_discard(
+                SegmentHeader {
+                    seq: TEST_ISS + 3,
+                    ack: Some(TEST_IRS + 1),
+                    control: Some(Control::FIN),
+                    wnd: UnscaledWindowSize::from_usize(BUFFER_SIZE),
+                    push: true,
+                    ..Default::default()
+                },
                 FragmentedPayload::new_contiguous(&TEST_BYTES[2..])
             ))
         );
@@ -5632,9 +5496,9 @@ mod test {
         // Test that the recv state works in FIN_WAIT_1.
         assert_eq!(
             state.on_segment_with_default_options::<_, ClientlessBufferProvider>(
-                Segment::data(
-                    ISS_2 + 1,
-                    ISS_1 + 1 + 1,
+                Segment::with_data(
+                    TEST_IRS + 1,
+                    TEST_ISS + 1 + 1,
                     UnscaledWindowSize::from(u16::MAX),
                     TEST_BYTES
                 ),
@@ -5643,8 +5507,8 @@ mod test {
             ),
             (
                 Some(Segment::ack(
-                    ISS_1 + TEST_BYTES.len() + 2,
-                    ISS_2 + TEST_BYTES.len() + 1,
+                    TEST_ISS + TEST_BYTES.len() + 2,
+                    TEST_IRS + TEST_BYTES.len() + 1,
                     UnscaledWindowSize::from_usize(BUFFER_SIZE - TEST_BYTES.len()),
                 )),
                 None
@@ -5667,10 +5531,15 @@ mod test {
         clock.sleep(Rto::DEFAULT.get());
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
-            Some(Segment::piggybacked_fin(
-                ISS_1 + 2,
-                ISS_2 + TEST_BYTES.len() + 1,
-                UnscaledWindowSize::from_usize(BUFFER_SIZE),
+            Some(Segment::new_assert_no_discard(
+                SegmentHeader {
+                    seq: TEST_ISS + 2,
+                    ack: Some(TEST_IRS + TEST_BYTES.len() + 1),
+                    control: Some(Control::FIN),
+                    wnd: UnscaledWindowSize::from_usize(BUFFER_SIZE),
+                    push: true,
+                    ..Default::default()
+                },
                 FragmentedPayload::new_contiguous(&TEST_BYTES[1..]),
             ))
         );
@@ -5679,8 +5548,8 @@ mod test {
         assert_eq!(
             state.on_segment_with_default_options::<(), ClientlessBufferProvider>(
                 Segment::ack(
-                    ISS_2 + TEST_BYTES.len() + 1,
-                    ISS_1 + TEST_BYTES.len() + 2,
+                    TEST_IRS + TEST_BYTES.len() + 1,
+                    TEST_ISS + TEST_BYTES.len() + 2,
                     UnscaledWindowSize::from(u16::MAX)
                 ),
                 clock.now(),
@@ -5693,9 +5562,9 @@ mod test {
         // Test that the recv state works in FIN_WAIT_2.
         assert_eq!(
             state.on_segment_with_default_options::<_, ClientlessBufferProvider>(
-                Segment::data(
-                    ISS_2 + 1 + TEST_BYTES.len(),
-                    ISS_1 + TEST_BYTES.len() + 2,
+                Segment::with_data(
+                    TEST_IRS + 1 + TEST_BYTES.len(),
+                    TEST_ISS + TEST_BYTES.len() + 2,
                     UnscaledWindowSize::from(u16::MAX),
                     TEST_BYTES
                 ),
@@ -5704,8 +5573,8 @@ mod test {
             ),
             (
                 Some(Segment::ack(
-                    ISS_1 + TEST_BYTES.len() + 2,
-                    ISS_2 + 2 * TEST_BYTES.len() + 1,
+                    TEST_ISS + TEST_BYTES.len() + 2,
+                    TEST_IRS + 2 * TEST_BYTES.len() + 1,
                     UnscaledWindowSize::from_usize(BUFFER_SIZE - TEST_BYTES.len()),
                 )),
                 None
@@ -5725,8 +5594,8 @@ mod test {
         assert_eq!(
             state.on_segment_with_default_options::<(), ClientlessBufferProvider>(
                 Segment::fin(
-                    ISS_2 + 2 * TEST_BYTES.len() + 1,
-                    ISS_1 + TEST_BYTES.len() + 2,
+                    TEST_IRS + 2 * TEST_BYTES.len() + 1,
+                    TEST_ISS + TEST_BYTES.len() + 2,
                     UnscaledWindowSize::from(u16::MAX)
                 ),
                 clock.now(),
@@ -5734,8 +5603,8 @@ mod test {
             ),
             (
                 Some(Segment::ack(
-                    ISS_1 + TEST_BYTES.len() + 2,
-                    ISS_2 + 2 * TEST_BYTES.len() + 2,
+                    TEST_ISS + TEST_BYTES.len() + 2,
+                    TEST_IRS + 2 * TEST_BYTES.len() + 2,
                     UnscaledWindowSize::from_usize(BUFFER_SIZE - 1),
                 )),
                 None
@@ -5776,49 +5645,20 @@ mod test {
         // Test that we can transition from FIN-WAIT-2 to TIME-WAIT directly
         // with one FIN-ACK segment.
         let mut state = State::FinWait1(FinWait1 {
-            snd: Send {
-                nxt: ISS_1 + 2,
-                max: ISS_1 + 2,
-                una: ISS_1 + 1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer: NullBuffer,
-                wl1: ISS_2,
-                wl2: ISS_1,
-                rtt_sampler: RttSampler::default(),
-                rtt_estimator: Estimator::default(),
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(
-                    DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                ),
-                wnd_scale: WindowScale::default(),
-            }
-            .into(),
-            rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::new(BUFFER_SIZE),
-                    assembler: Assembler::new(ISS_2 + 1),
-                },
-                timer: None,
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
-                sack_permitted: SACK_PERMITTED,
-            }
-            .into(),
+            snd: Send { una: TEST_ISS + 1, ..Send::default_for_test_at(TEST_ISS + 2, NullBuffer) }
+                .into(),
+            rcv: Recv::default_for_test(RingBuffer::new(BUFFER_SIZE)).into(),
         });
         assert_eq!(
             state.on_segment_with_default_options::<(), ClientlessBufferProvider>(
-                Segment::fin(ISS_2 + 1, ISS_1 + 2, UnscaledWindowSize::from(u16::MAX)),
+                Segment::fin(TEST_IRS + 1, TEST_ISS + 2, UnscaledWindowSize::from(u16::MAX)),
                 FakeInstant::default(),
                 &counters.refs(),
             ),
             (
                 Some(Segment::ack(
-                    ISS_1 + 2,
-                    ISS_2 + 2,
+                    TEST_ISS + 2,
+                    TEST_IRS + 2,
                     UnscaledWindowSize::from_usize(BUFFER_SIZE - 1)
                 )),
                 None
@@ -5833,40 +5673,12 @@ mod test {
         let counters = FakeTcpCounters::default();
         let mut send_buffer = RingBuffer::new(BUFFER_SIZE);
         assert_eq!(send_buffer.enqueue_data(TEST_BYTES), 5);
+
+        let iss = ISS_1;
         // Set up the state machine to start with Established.
         let mut state = State::Established(Established {
-            snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer: send_buffer.clone(),
-                wl1: ISS_2,
-                wl2: ISS_1,
-                rtt_sampler: RttSampler::default(),
-                rtt_estimator: Estimator::default(),
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(
-                    DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                ),
-                wnd_scale: WindowScale::default(),
-            }
-            .into(),
-            rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::new(BUFFER_SIZE),
-                    assembler: Assembler::new(ISS_1 + 1),
-                },
-                timer: None,
-                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_1 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                sack_permitted: SACK_PERMITTED,
-            }
-            .into(),
+            snd: Send::default_for_test_at(iss + 1, send_buffer.clone()).into(),
+            rcv: Recv::default_for_test_at(iss + 1, RingBuffer::new(BUFFER_SIZE)).into(),
         });
         assert_eq!(
             state.close(
@@ -5889,18 +5701,23 @@ mod test {
         let fin = state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs());
         assert_eq!(
             fin,
-            Some(Segment::piggybacked_fin(
-                ISS_1 + 1,
-                ISS_1 + 1,
-                UnscaledWindowSize::from_usize(BUFFER_SIZE),
+            Some(Segment::new_assert_no_discard(
+                SegmentHeader {
+                    seq: iss + 1,
+                    ack: Some(iss + 1),
+                    control: Some(Control::FIN),
+                    wnd: UnscaledWindowSize::from_usize(BUFFER_SIZE),
+                    push: true,
+                    ..Default::default()
+                },
                 FragmentedPayload::new_contiguous(TEST_BYTES),
             ))
         );
         assert_eq!(
             state.on_segment_with_default_options::<_, ClientlessBufferProvider>(
                 Segment::piggybacked_fin(
-                    ISS_1 + 1,
-                    ISS_1 + 1,
+                    iss + 1,
+                    iss + 1,
                     UnscaledWindowSize::from_usize(BUFFER_SIZE),
                     TEST_BYTES,
                 ),
@@ -5909,8 +5726,8 @@ mod test {
             ),
             (
                 Some(Segment::ack(
-                    ISS_1 + TEST_BYTES.len() + 2,
-                    ISS_1 + TEST_BYTES.len() + 2,
+                    iss + TEST_BYTES.len() + 2,
+                    iss + TEST_BYTES.len() + 2,
                     UnscaledWindowSize::from_usize(BUFFER_SIZE - TEST_BYTES.len() - 1),
                 )),
                 None
@@ -5923,8 +5740,8 @@ mod test {
         assert_eq!(
             state.on_segment_with_default_options::<(), ClientlessBufferProvider>(
                 Segment::ack(
-                    ISS_1 + TEST_BYTES.len() + 2,
-                    ISS_1 + TEST_BYTES.len() + 2,
+                    iss + TEST_BYTES.len() + 2,
+                    iss + TEST_BYTES.len() + 2,
                     UnscaledWindowSize::from_usize(BUFFER_SIZE - TEST_BYTES.len() - 1),
                 ),
                 clock.now(),
@@ -5962,9 +5779,9 @@ mod test {
         let mut clock = FakeInstantCtx::default();
         let counters = FakeTcpCounters::default();
         let mut time_wait = State::<_, NullBuffer, NullBuffer, ()>::TimeWait(TimeWait {
-            last_seq: ISS_1 + 2,
+            last_seq: TEST_ISS + 2,
             closed_rcv: RecvParams {
-                ack: ISS_2 + 2,
+                ack: TEST_IRS + 2,
                 wnd: WindowSize::DEFAULT,
                 wnd_scale: WindowScale::default(),
             },
@@ -5975,53 +5792,30 @@ mod test {
         clock.sleep(Duration::from_secs(1));
         assert_eq!(
             time_wait.on_segment_with_default_options::<(), ClientlessBufferProvider>(
-                Segment::fin(ISS_2 + 2, ISS_1 + 2, UnscaledWindowSize::from(u16::MAX)),
+                Segment::fin(TEST_IRS + 2, TEST_ISS + 2, UnscaledWindowSize::from(u16::MAX)),
                 clock.now(),
                 &counters.refs(),
             ),
-            (Some(Segment::ack(ISS_1 + 2, ISS_2 + 2, UnscaledWindowSize::from(u16::MAX))), None),
+            (
+                Some(Segment::ack(TEST_ISS + 2, TEST_IRS + 2, UnscaledWindowSize::from(u16::MAX))),
+                None
+            ),
         );
         assert_eq!(time_wait.poll_send_at(), Some(clock.now() + MSL * 2));
     }
 
     #[test_case(
         State::Established(Established {
-            snd: Send {
-                nxt: ISS_1,
-                max: ISS_1,
-                una: ISS_1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer: NullBuffer,
-                wl1: ISS_2,
-                wl2: ISS_1,
-                rtt_estimator: Estimator::Measured { srtt: RTT, rtt_var: RTT / 2 },
-                rtt_sampler: RttSampler::default(),
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
-                wnd_scale: WindowScale::default(),
-            }.into(),
-            rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::default(),
-                    assembler: Assembler::new(ISS_2 + 5),
-                },
-                timer: None,
-                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_2 + 5, WindowSize::DEFAULT),
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                sack_permitted: SACK_PERMITTED,
-            }.into(),
+            snd: Send::default_for_test_at(TEST_ISS, NullBuffer).into(),
+            rcv: Recv::default_for_test_at(TEST_IRS + 5, RingBuffer::default()).into(),
         }),
-        Segment::data(ISS_2, ISS_1, UnscaledWindowSize::from(u16::MAX), TEST_BYTES) =>
-        Some(Segment::ack(ISS_1, ISS_2 + 5, UnscaledWindowSize::from(u16::MAX))); "retransmit data"
+        Segment::with_data(TEST_IRS, TEST_ISS, UnscaledWindowSize::from(u16::MAX), TEST_BYTES) =>
+        Some(Segment::ack(TEST_ISS, TEST_IRS + 5, UnscaledWindowSize::from(u16::MAX))); "retransmit data"
     )]
     #[test_case(
         State::SynRcvd(SynRcvd {
-            iss: ISS_1,
-            irs: ISS_2,
+            iss: TEST_ISS,
+            irs: TEST_IRS,
             timestamp: None,
             retrans_timer: RetransTimer {
                 at: FakeInstant::default(),
@@ -6036,9 +5830,9 @@ mod test {
             snd_wnd_scale: Some(WindowScale::default()),
             sack_permitted: SACK_PERMITTED,
         }),
-        Segment::syn_ack(ISS_2, ISS_1 + 1, UnscaledWindowSize::from(u16::MAX),
+        Segment::syn_ack(TEST_IRS, TEST_ISS + 1, UnscaledWindowSize::from(u16::MAX),
         HandshakeOptions { window_scale: Some(WindowScale::default()), ..Default::default() }.into()) =>
-        Some(Segment::ack(ISS_1 + 1, ISS_2 + 1, UnscaledWindowSize::from(u16::MAX))); "retransmit syn_ack"
+        Some(Segment::ack(TEST_ISS + 1, TEST_IRS + 1, UnscaledWindowSize::from(u16::MAX))); "retransmit syn_ack"
     )]
     // Regression test for https://fxbug.dev/42058963
     fn ack_to_retransmitted_segment(
@@ -6060,7 +5854,9 @@ mod test {
         let mut clock = FakeInstantCtx::default();
         let counters = FakeTcpCounters::default();
         let mut send_buffer = RingBuffer::default();
-        for b in b'A'..=b'D' {
+        let first_payload_byte = b'A';
+        let last_payload_byte = b'D';
+        for b in first_payload_byte..=last_payload_byte {
             assert_eq!(
                 send_buffer.enqueue_data(&[b; DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE]),
                 DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE
@@ -6068,37 +5864,13 @@ mod test {
         }
         let mut state: State<_, _, _, ()> = State::Established(Established {
             snd: Send {
-                nxt: ISS_1,
-                max: ISS_1,
-                una: ISS_1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer: send_buffer,
-                wl1: ISS_2,
-                wl2: ISS_1,
-                rtt_estimator: Estimator::Measured { srtt: RTT, rtt_var: RTT / 2 },
-                rtt_sampler: RttSampler::default(),
-                timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(
                     DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 ),
-                wnd_scale: WindowScale::default(),
+                ..Send::default_for_test_at(TEST_ISS, send_buffer.clone())
             }
             .into(),
-            rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::default(),
-                    assembler: Assembler::new(ISS_2),
-                },
-                timer: None,
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_2, WindowSize::DEFAULT),
-                sack_permitted: SACK_PERMITTED,
-            }
-            .into(),
+            rcv: Recv::default_for_test_at(TEST_IRS, RingBuffer::default()).into(),
         });
 
         assert_eq!(
@@ -6107,9 +5879,9 @@ mod test {
                 clock.now(),
                 &counters.refs(),
             ),
-            Some(Segment::data(
-                ISS_1,
-                ISS_2,
+            Some(Segment::with_data(
+                TEST_ISS,
+                TEST_IRS,
                 UnscaledWindowSize::from(u16::MAX),
                 FragmentedPayload::new_contiguous(&[b'A'; DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE])
             ))
@@ -6119,7 +5891,7 @@ mod test {
             clock.sleep(Duration::from_millis(10));
             assert_eq!(
                 state.on_segment_with_default_options::<(), ClientlessBufferProvider>(
-                    Segment::ack(ISS_2, ISS_1, UnscaledWindowSize::from(u16::MAX)),
+                    Segment::ack(TEST_IRS, TEST_ISS, UnscaledWindowSize::from(u16::MAX)),
                     clock.now(),
                     counters,
                 ),
@@ -6132,12 +5904,16 @@ mod test {
                     clock.now(),
                     counters,
                 ),
-                Some(Segment::data(
-                    ISS_1
-                        + u32::from(expected_byte - b'A')
-                            * u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
-                    ISS_2,
-                    UnscaledWindowSize::from(u16::MAX),
+                Some(Segment::new_assert_no_discard(
+                    SegmentHeader {
+                        seq: TEST_ISS
+                            + u32::from(expected_byte - first_payload_byte)
+                                * u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
+                        ack: Some(TEST_IRS),
+                        wnd: UnscaledWindowSize::from(u16::MAX),
+                        push: expected_byte == last_payload_byte,
+                        ..Default::default()
+                    },
                     FragmentedPayload::new_contiguous(
                         &[expected_byte; DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE]
                     )
@@ -6149,9 +5925,11 @@ mod test {
         // into the network.
         CounterExpectations::default().assert_counters(&counters);
         dup_ack(b'B', &counters.refs());
-        CounterExpectations { fast_recovery: 1, ..Default::default() }.assert_counters(&counters);
+        CounterExpectations { fast_recovery: 0, dup_acks: 1, ..Default::default() }
+            .assert_counters(&counters);
         dup_ack(b'C', &counters.refs());
-        CounterExpectations { fast_recovery: 1, ..Default::default() }.assert_counters(&counters);
+        CounterExpectations { fast_recovery: 0, dup_acks: 2, ..Default::default() }
+            .assert_counters(&counters);
         // The third dup ack will cause a fast retransmit of the first segment
         // at snd.una.
         dup_ack(b'A', &counters.refs());
@@ -6159,6 +5937,7 @@ mod test {
             retransmits: 1,
             fast_recovery: 1,
             fast_retransmits: 1,
+            dup_acks: 3,
             ..Default::default()
         }
         .assert_counters(&counters);
@@ -6168,6 +5947,7 @@ mod test {
             retransmits: 1,
             fast_recovery: 1,
             fast_retransmits: 1,
+            dup_acks: 4,
             ..Default::default()
         }
         .assert_counters(&counters);
@@ -6177,8 +5957,8 @@ mod test {
         assert_eq!(
             state.on_segment_with_default_options::<(), ClientlessBufferProvider>(
                 Segment::ack(
-                    ISS_2,
-                    ISS_1 + u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
+                    TEST_IRS,
+                    TEST_ISS + u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
                     UnscaledWindowSize::from(u16::MAX)
                 ),
                 clock.now(),
@@ -6188,9 +5968,19 @@ mod test {
         );
         let established = assert_matches!(state, State::Established(established) => established);
         assert_eq!(
-            u32::from(established.snd.congestion_control.cwnd()),
+            established.snd.congestion_control.inspect_cwnd().cwnd(),
             2 * u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE)
         );
+        assert_eq!(established.snd.congestion_control.inspect_loss_recovery_mode(), None);
+        CounterExpectations {
+            retransmits: 1,
+            fast_recovery: 1,
+            fast_retransmits: 1,
+            dup_acks: 4,
+            loss_recovered: 1,
+            ..Default::default()
+        }
+        .assert_counters(&counters);
     }
 
     #[test]
@@ -6198,38 +5988,8 @@ mod test {
         let mut clock = FakeInstantCtx::default();
         let counters = FakeTcpCounters::default();
         let mut state: State<_, _, _, ()> = State::Established(Established {
-            snd: Send {
-                nxt: ISS_1,
-                max: ISS_1,
-                una: ISS_1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer: RingBuffer::default(),
-                wl1: ISS_2,
-                wl2: ISS_1,
-                rtt_estimator: Estimator::Measured { srtt: RTT, rtt_var: RTT / 2 },
-                rtt_sampler: RttSampler::default(),
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(
-                    DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                ),
-                wnd_scale: WindowScale::default(),
-            }
-            .into(),
-            rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::default(),
-                    assembler: Assembler::new(ISS_2),
-                },
-                timer: None,
-                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_2, WindowSize::DEFAULT),
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                sack_permitted: SACK_PERMITTED,
-            }
-            .into(),
+            snd: Send::default_for_test_at(TEST_ISS, RingBuffer::default()).into(),
+            rcv: Recv::default_for_test_at(TEST_IRS, RingBuffer::default()).into(),
         });
 
         let socket_options = {
@@ -6261,7 +6021,7 @@ mod test {
             state.on_segment::<&[u8], ClientlessBufferProvider>(
                 &FakeStateMachineDebugId,
                 &counters.refs(),
-                Segment::ack(ISS_2, ISS_1, UnscaledWindowSize::from(u16::MAX)),
+                Segment::ack(TEST_IRS, TEST_ISS, UnscaledWindowSize::from(u16::MAX)),
                 clock.now(),
                 socket_options,
                 false, /* defunct */
@@ -6283,7 +6043,7 @@ mod test {
                     clock.now(),
                     socket_options,
                 ),
-                Ok(Segment::ack(ISS_1 - 1, ISS_2, UnscaledWindowSize::from(u16::MAX)))
+                Ok(Segment::ack(TEST_ISS - 1, TEST_IRS, UnscaledWindowSize::from(u16::MAX)))
             );
             clock.sleep(keep_alive.interval.into());
             assert_matches!(state, State::Established(_));
@@ -6373,24 +6133,7 @@ mod test {
             };
             assert_eq!(buffer.limits().len, DATA_LEN);
 
-            let mut snd = Send::<FakeInstant, _, HAS_FIN> {
-                nxt: ISS_1,
-                max: ISS_1,
-                una: ISS_1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer,
-                wl1: ISS_2,
-                wl2: ISS_1,
-                rtt_estimator: Estimator::Measured { srtt: RTT, rtt_var: RTT / 2 },
-                rtt_sampler: RttSampler::default(),
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(
-                    DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                ),
-                wnd_scale: WindowScale::default(),
-            };
-
+            let mut snd = Send::<FakeInstant, _, HAS_FIN>::default_for_test_at(TEST_ISS, buffer);
             let counters = FakeTcpCounters::default();
 
             f(snd
@@ -6398,7 +6141,7 @@ mod test {
                     &FakeStateMachineDebugId,
                     &counters.refs(),
                     &RecvParams {
-                        ack: ISS_1,
+                        ack: TEST_ISS,
                         wnd: WindowSize::DEFAULT,
                         wnd_scale: WindowScale::ZERO,
                     },
@@ -6411,7 +6154,7 @@ mod test {
 
         let f = |segment: Segment<FragmentedPayload<'_, 2>>| {
             let segment_len = segment.len();
-            let Segment { header: _, data } = segment;
+            let (SegmentHeader { .. }, data) = segment.into_parts();
             let data_len = data.len();
 
             if has_fin && reserved_bytes == 0 {
@@ -6443,37 +6186,12 @@ mod test {
         // Set up the state machine to start with Established.
         let mut state = State::Established(Established {
             snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
                 wnd: WindowSize::ZERO,
                 wnd_max: WindowSize::ZERO,
-                buffer: send_buffer.clone(),
-                wl1: ISS_2,
-                wl2: ISS_1,
-                rtt_sampler: RttSampler::default(),
-                rtt_estimator: Estimator::default(),
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(
-                    DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                ),
-                wnd_scale: WindowScale::default(),
+                ..Send::default_for_test(send_buffer.clone())
             }
             .into(),
-            rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::new(BUFFER_SIZE),
-                    assembler: Assembler::new(ISS_2 + 1),
-                },
-                timer: None,
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
-                sack_permitted: SACK_PERMITTED,
-            }
-            .into(),
+            rcv: Recv::default_for_test(RingBuffer::new(BUFFER_SIZE)).into(),
         });
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
@@ -6485,9 +6203,9 @@ mod test {
         clock.sleep(Rto::DEFAULT.get());
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
-            Some(Segment::data(
-                ISS_1 + 1,
-                ISS_2 + 1,
+            Some(Segment::with_data(
+                TEST_ISS + 1,
+                TEST_IRS + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
                 FragmentedPayload::new_contiguous(&TEST_BYTES[0..1])
             ))
@@ -6496,7 +6214,7 @@ mod test {
         // The receiver still has a zero window.
         assert_eq!(
             state.on_segment_with_default_options::<(), ClientlessBufferProvider>(
-                Segment::ack(ISS_2 + 1, ISS_1 + 1, UnscaledWindowSize::from(0)),
+                Segment::ack(TEST_IRS + 1, TEST_ISS + 1, UnscaledWindowSize::from(0)),
                 clock.now(),
                 &counters.refs(),
             ),
@@ -6520,9 +6238,9 @@ mod test {
         clock.sleep(Rto::DEFAULT.get());
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
-            Some(Segment::data(
-                ISS_1 + 1,
-                ISS_2 + 1,
+            Some(Segment::with_data(
+                TEST_ISS + 1,
+                TEST_IRS + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
                 FragmentedPayload::new_contiguous(&TEST_BYTES[0..1])
             ))
@@ -6531,7 +6249,7 @@ mod test {
         // The receiver now opens its receive window.
         assert_eq!(
             state.on_segment_with_default_options::<(), ClientlessBufferProvider>(
-                Segment::ack(ISS_2 + 1, ISS_1 + 2, UnscaledWindowSize::from(u16::MAX)),
+                Segment::ack(TEST_IRS + 1, TEST_ISS + 2, UnscaledWindowSize::from(u16::MAX)),
                 clock.now(),
                 &counters.refs(),
             ),
@@ -6540,10 +6258,14 @@ mod test {
         assert_eq!(state.poll_send_at(), None);
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
-            Some(Segment::data(
-                ISS_1 + 2,
-                ISS_2 + 1,
-                UnscaledWindowSize::from_usize(BUFFER_SIZE),
+            Some(Segment::new_assert_no_discard(
+                SegmentHeader {
+                    seq: TEST_ISS + 2,
+                    ack: Some(TEST_IRS + 1),
+                    wnd: UnscaledWindowSize::from_usize(BUFFER_SIZE),
+                    push: true,
+                    ..Default::default()
+                },
                 FragmentedPayload::new_contiguous(&TEST_BYTES[1..])
             ))
         );
@@ -6557,38 +6279,8 @@ mod test {
         assert_eq!(send_buffer.enqueue_data(TEST_BYTES), 5);
         // Set up the state machine to start with Established.
         let mut state: State<_, _, _, ()> = State::Established(Established {
-            snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer: send_buffer.clone(),
-                wl1: ISS_2,
-                wl2: ISS_1,
-                rtt_sampler: RttSampler::default(),
-                rtt_estimator: Estimator::default(),
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(
-                    DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                ),
-                wnd_scale: WindowScale::default(),
-            }
-            .into(),
-            rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::new(BUFFER_SIZE),
-                    assembler: Assembler::new(ISS_2 + 1),
-                },
-                timer: None,
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
-                sack_permitted: SACK_PERMITTED,
-            }
-            .into(),
+            snd: Send::default_for_test(send_buffer.clone()).into(),
+            rcv: Recv::default_for_test(RingBuffer::new(BUFFER_SIZE)).into(),
         });
         let mut socket_options =
             SocketOptions { nagle_enabled: true, ..SocketOptions::default_for_state_tests() };
@@ -6600,9 +6292,9 @@ mod test {
                 clock.now(),
                 &socket_options
             ),
-            Ok(Segment::data(
-                ISS_1 + 1,
-                ISS_2 + 1,
+            Ok(Segment::with_data(
+                TEST_ISS + 1,
+                TEST_IRS + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
                 FragmentedPayload::new_contiguous(&TEST_BYTES[0..3])
             ))
@@ -6626,11 +6318,15 @@ mod test {
                 clock.now(),
                 &socket_options
             ),
-            Ok(Segment::data(
-                ISS_1 + 4,
-                ISS_2 + 1,
-                UnscaledWindowSize::from_usize(BUFFER_SIZE),
-                FragmentedPayload::new_contiguous(&TEST_BYTES[3..5])
+            Ok(Segment::new_assert_no_discard(
+                SegmentHeader {
+                    seq: TEST_ISS + 4,
+                    ack: Some(TEST_IRS + 1),
+                    wnd: UnscaledWindowSize::from_usize(BUFFER_SIZE),
+                    push: true,
+                    ..Default::default()
+                },
+                FragmentedPayload::new_contiguous(&TEST_BYTES[3..])
             ))
         );
     }
@@ -6640,7 +6336,7 @@ mod test {
         let clock = FakeInstantCtx::default();
         let counters = FakeTcpCounters::default();
         let (syn_sent, syn) = Closed::<Initial>::connect(
-            ISS_1,
+            TEST_ISS,
             clock.now(),
             (),
             Default::default(),
@@ -6667,7 +6363,10 @@ mod test {
                 clock.now(),
                 &counters.refs(),
             ),
-            (Some(Segment::ack(ISS_1 + 1, ISS_1 + 1, UnscaledWindowSize::from(u16::MAX))), None)
+            (
+                Some(Segment::ack(TEST_ISS + 1, TEST_ISS + 1, UnscaledWindowSize::from(u16::MAX))),
+                None
+            )
         );
         match state {
             State::Closed(_)
@@ -6689,9 +6388,9 @@ mod test {
         // Since the MSS of the connection is 1, we can only get the first byte.
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
-            Some(Segment::data(
-                ISS_1 + 1,
-                ISS_1 + 1,
+            Some(Segment::with_data(
+                TEST_ISS + 1,
+                TEST_ISS + 1,
                 UnscaledWindowSize::from(u16::MAX),
                 FragmentedPayload::new_contiguous(&TEST_BYTES[..1]),
             ))
@@ -6715,37 +6414,11 @@ mod test {
         // Set up the state machine to start with Established.
         let mut state: State<_, _, _, ()> = State::Established(Established {
             snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer: send_buffer.clone(),
-                wl1: ISS_2 + 1,
-                wl2: ISS_1 + 1,
-                rtt_sampler: RttSampler::default(),
                 rtt_estimator: Estimator::Measured { srtt: rtt, rtt_var: Duration::ZERO },
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(
-                    DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                ),
-                wnd_scale: WindowScale::default(),
+                ..Send::default_for_test(send_buffer.clone())
             }
             .into(),
-            rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::new(BUFFER_SIZE),
-                    assembler: Assembler::new(ISS_2 + 1),
-                },
-                timer: None,
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
-                sack_permitted: SACK_PERMITTED,
-            }
-            .into(),
+            rcv: Recv::default_for_test(RingBuffer::new(BUFFER_SIZE)).into(),
         });
         let mut times = 0;
         let start = clock.now();
@@ -6762,8 +6435,8 @@ mod test {
         ) {
             if zero_window_probe {
                 let zero_window_ack = Segment::ack(
-                    seg.header.ack.unwrap(),
-                    seg.header.seq,
+                    seg.header().ack.unwrap(),
+                    seg.header().seq,
                     UnscaledWindowSize::from(0),
                 );
                 assert_matches!(
@@ -6811,13 +6484,13 @@ mod test {
         CounterExpectations {
             established_closed: 1,
             established_timedout: 1,
-            fast_retransmits: if zero_window_probe { 1 } else { 0 },
             fast_recovery: if zero_window_probe { 1 } else { 0 },
             // Note: We don't want to assert on these counters having a specific
             // value, so copy in their actual value.
             timeouts: counters.stack_wide.timeouts.get(),
             retransmits: counters.stack_wide.retransmits.get(),
             slow_start_retransmits: counters.stack_wide.slow_start_retransmits.get(),
+            dup_acks: counters.stack_wide.dup_acks.get(),
             ..Default::default()
         }
         .assert_counters(&counters);
@@ -6846,106 +6519,35 @@ mod test {
     #[test_case(
         State::Established(Established {
             snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer: RingBuffer::new(BUFFER_SIZE),
-                wl1: ISS_2,
-                wl2: ISS_1,
-                rtt_sampler: RttSampler::default(),
                 rtt_estimator: Estimator::Measured {
                     srtt: Rto::DEFAULT.get(),
                     rtt_var: Duration::ZERO,
                 },
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(
-                    DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                ),
-                wnd_scale: WindowScale::default(),
+                ..Send::default_for_test(RingBuffer::new(BUFFER_SIZE))
             }.into(),
-            rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::new(
-                        TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize,
-                    ),
-                    assembler: Assembler::new(ISS_2 + 1),
-                },
-                timer: None,
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (
-                    ISS_2 + 1,
-                    WindowSize::new(TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize).unwrap()
-                ),
-                sack_permitted: SACK_PERMITTED,
-            }.into(),
+            rcv: Recv::default_for_test(RingBuffer::new(
+                TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize,
+            )).into(),
         }); "established")]
     #[test_case(
         State::FinWait1(FinWait1 {
             snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer: RingBuffer::new(BUFFER_SIZE),
-                wl1: ISS_2,
-                wl2: ISS_1,
-                rtt_sampler: RttSampler::default(),
                 rtt_estimator: Estimator::Measured {
                     srtt: Rto::DEFAULT.get(),
                     rtt_var: Duration::ZERO,
                 },
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(
-                    DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                ),
-                wnd_scale: WindowScale::default(),
+                ..Send::default_for_test(RingBuffer::new(BUFFER_SIZE))
             }.into(),
-            rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::new(
-                        TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize,
-                    ),
-                    assembler: Assembler::new(ISS_2 + 1),
-                },
-                timer: None,
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (
-                    ISS_2 + 1,
-                    WindowSize::new(TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize).unwrap()
-                ),
-                sack_permitted: SACK_PERMITTED,
-            }.into(),
+            rcv: Recv::default_for_test(RingBuffer::new(
+                TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize,
+            )).into(),
         }); "fin_wait_1")]
     #[test_case(
         State::FinWait2(FinWait2 {
-            last_seq: ISS_1 + 1,
-            rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::new(
-                        TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize,
-                    ),
-                    assembler: Assembler::new(ISS_2 + 1),
-                },
-                timer: None,
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (
-                    ISS_2 + 1,
-                    WindowSize::new(TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize).unwrap()
-                ),
-                sack_permitted: SACK_PERMITTED,
-            },
+            last_seq: TEST_ISS + 1,
+            rcv: Recv::default_for_test(RingBuffer::new(
+                TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize,
+            )),
             timeout_at: None,
         }); "fin_wait_2")]
     fn delayed_ack(mut state: State<FakeInstant, RingBuffer, RingBuffer, ()>) {
@@ -6957,9 +6559,9 @@ mod test {
             state.on_segment::<_, ClientlessBufferProvider>(
                 &FakeStateMachineDebugId,
                 &counters.refs(),
-                Segment::data(
-                    ISS_2 + 1,
-                    ISS_1 + 1,
+                Segment::with_data(
+                    TEST_IRS + 1,
+                    TEST_ISS + 1,
                     UnscaledWindowSize::from(u16::MAX),
                     TEST_BYTES,
                 ),
@@ -6980,8 +6582,8 @@ mod test {
                 &socket_options
             ),
             Ok(Segment::ack(
-                ISS_1 + 1,
-                ISS_2 + 1 + TEST_BYTES.len(),
+                TEST_ISS + 1,
+                TEST_IRS + 1 + TEST_BYTES.len(),
                 UnscaledWindowSize::from_u32(2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE)),
             ))
         );
@@ -6989,7 +6591,7 @@ mod test {
             vec![b'0'; u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize];
 
         let expect_last_window_update = (
-            ISS_2 + 1 + TEST_BYTES.len(),
+            TEST_IRS + 1 + TEST_BYTES.len(),
             WindowSize::from_u32(2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE)).unwrap(),
         );
         assert_eq!(state.recv_mut().unwrap().last_window_update, expect_last_window_update);
@@ -6998,9 +6600,9 @@ mod test {
             state.on_segment::<_, ClientlessBufferProvider>(
                 &FakeStateMachineDebugId,
                 &counters.refs(),
-                Segment::data(
-                    ISS_2 + 1 + TEST_BYTES.len(),
-                    ISS_1 + 1,
+                Segment::with_data(
+                    TEST_IRS + 1 + TEST_BYTES.len(),
+                    TEST_ISS + 1,
                     UnscaledWindowSize::from(u16::MAX),
                     &full_segment_sized_payload[..],
                 ),
@@ -7022,9 +6624,9 @@ mod test {
             state.on_segment::<_, ClientlessBufferProvider>(
                 &FakeStateMachineDebugId,
                 &counters.refs(),
-                Segment::data(
-                    ISS_2 + 1 + TEST_BYTES.len() + full_segment_sized_payload.len(),
-                    ISS_1 + 1,
+                Segment::with_data(
+                    TEST_IRS + 1 + TEST_BYTES.len() + full_segment_sized_payload.len(),
+                    TEST_ISS + 1,
                     UnscaledWindowSize::from(u16::MAX),
                     &full_segment_sized_payload[..],
                 ),
@@ -7034,8 +6636,8 @@ mod test {
             ),
             (
                 Some(Segment::ack(
-                    ISS_1 + 1,
-                    ISS_2 + 1 + TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE),
+                    TEST_ISS + 1,
+                    TEST_IRS + 1 + TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE),
                     UnscaledWindowSize::from(0),
                 )),
                 None,
@@ -7047,65 +6649,38 @@ mod test {
         assert_eq!(
             state.recv_mut().unwrap().last_window_update,
             (
-                ISS_2 + 1 + TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE),
+                TEST_IRS + 1 + TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE),
                 WindowSize::ZERO,
             )
         );
         assert_eq!(state.poll_send_at(), None);
     }
 
-    #[test]
-    fn immediate_ack_if_out_of_order_or_fin() {
+    #[test_case(true; "sack permitted")]
+    #[test_case(false; "sack not permitted")]
+    fn immediate_ack_if_out_of_order_or_fin(sack_permitted: bool) {
         let clock = FakeInstantCtx::default();
         let counters = FakeTcpCounters::default();
         let socket_options =
             SocketOptions { delayed_ack: true, ..SocketOptions::default_for_state_tests() };
         let mut state: State<_, _, _, ()> = State::Established(Established {
-            snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer: RingBuffer::new(BUFFER_SIZE),
-                wl1: ISS_2,
-                wl2: ISS_1,
-                rtt_sampler: RttSampler::default(),
-                rtt_estimator: Estimator::Measured {
-                    srtt: Rto::DEFAULT.get(),
-                    rtt_var: Duration::ZERO,
-                },
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(
-                    DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                ),
-                wnd_scale: WindowScale::default(),
-            }
-            .into(),
+            snd: Send::default_for_test(RingBuffer::new(BUFFER_SIZE)).into(),
             rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::new(TEST_BYTES.len() + 1),
-                    assembler: Assembler::new(ISS_2 + 1),
-                },
-                timer: None,
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_2 + 1, WindowSize::new(TEST_BYTES.len() + 1).unwrap()),
-                sack_permitted: SACK_PERMITTED,
+                sack_permitted,
+                ..Recv::default_for_test(RingBuffer::new(TEST_BYTES.len() + 1))
             }
             .into(),
         });
         // Upon receiving an out-of-order segment, we should send an ACK
         // immediately.
+        let segment_start = TEST_IRS + 2;
         assert_eq!(
             state.on_segment::<_, ClientlessBufferProvider>(
                 &FakeStateMachineDebugId,
                 &counters.refs(),
-                Segment::data(
-                    ISS_2 + 2,
-                    ISS_1 + 1,
+                Segment::with_data(
+                    segment_start,
+                    TEST_ISS + 1,
                     UnscaledWindowSize::from(u16::MAX),
                     &TEST_BYTES[1..]
                 ),
@@ -7114,10 +6689,24 @@ mod test {
                 false, /* defunct */
             ),
             (
-                Some(Segment::ack(
-                    ISS_1 + 1,
-                    ISS_2 + 1,
-                    UnscaledWindowSize::from(u16::try_from(TEST_BYTES.len() + 1).unwrap())
+                Some(Segment::ack_with_options(
+                    TEST_ISS + 1,
+                    TEST_IRS + 1,
+                    UnscaledWindowSize::from(u16::try_from(TEST_BYTES.len() + 1).unwrap()),
+                    SegmentOptions {
+                        sack_blocks: if sack_permitted {
+                            [SackBlock::try_new(
+                                segment_start,
+                                segment_start + u32::try_from(TEST_BYTES.len()).unwrap() - 1,
+                            )
+                            .unwrap()]
+                            .into_iter()
+                            .collect()
+                        } else {
+                            SackBlocks::default()
+                        }
+                    }
+                    .into()
                 )),
                 None,
                 DataAcked::No,
@@ -7131,9 +6720,9 @@ mod test {
             state.on_segment::<_, ClientlessBufferProvider>(
                 &FakeStateMachineDebugId,
                 &counters.refs(),
-                Segment::data(
-                    ISS_2 + 1,
-                    ISS_1 + 1,
+                Segment::with_data(
+                    TEST_IRS + 1,
+                    TEST_ISS + 1,
                     UnscaledWindowSize::from(u16::MAX),
                     &TEST_BYTES[..1]
                 ),
@@ -7143,8 +6732,8 @@ mod test {
             ),
             (
                 Some(Segment::ack(
-                    ISS_1 + 1,
-                    ISS_2 + 1 + TEST_BYTES.len(),
+                    TEST_ISS + 1,
+                    TEST_IRS + 1 + TEST_BYTES.len(),
                     UnscaledWindowSize::from(1),
                 )),
                 None,
@@ -7159,8 +6748,8 @@ mod test {
                 &FakeStateMachineDebugId,
                 &counters.refs(),
                 Segment::fin(
-                    ISS_2 + 1 + TEST_BYTES.len(),
-                    ISS_1 + 1,
+                    TEST_IRS + 1 + TEST_BYTES.len(),
+                    TEST_ISS + 1,
                     UnscaledWindowSize::from(u16::MAX),
                 ),
                 clock.now(),
@@ -7169,8 +6758,8 @@ mod test {
             ),
             (
                 Some(Segment::ack(
-                    ISS_1 + 1,
-                    ISS_2 + 1 + TEST_BYTES.len() + 1,
+                    TEST_ISS + 1,
+                    TEST_IRS + 1 + TEST_BYTES.len() + 1,
                     UnscaledWindowSize::from(0),
                 )),
                 None,
@@ -7186,20 +6775,8 @@ mod test {
         let mut clock = FakeInstantCtx::default();
         let counters = FakeTcpCounters::default();
         let mut state: State<_, _, NullBuffer, ()> = State::FinWait2(FinWait2 {
-            last_seq: ISS_1,
-            rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: NullBuffer,
-                    assembler: Assembler::new(ISS_2),
-                },
-                timer: None,
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_2, WindowSize::DEFAULT),
-                sack_permitted: SACK_PERMITTED,
-            },
+            last_seq: TEST_ISS,
+            rcv: Recv::default_for_test_at(TEST_IRS, NullBuffer),
             timeout_at: None,
         });
         assert_eq!(
@@ -7258,7 +6835,7 @@ mod test {
 
     #[test_case(
         State::SynSent(SynSent{
-            iss: ISS_1,
+            iss: TEST_ISS,
             timestamp: Some(FakeInstant::default()),
             retrans_timer: RetransTimer::new(
                 FakeInstant::default(),
@@ -7275,8 +6852,8 @@ mod test {
     => DEFAULT_MAX_SYN_RETRIES.get(); "syn_sent")]
     #[test_case(
         State::SynRcvd(SynRcvd{
-            iss: ISS_1,
-            irs: ISS_2,
+            iss: TEST_ISS,
+            irs: TEST_IRS,
             timestamp: Some(FakeInstant::default()),
             retrans_timer: RetransTimer::new(
                 FakeInstant::default(),
@@ -7329,7 +6906,7 @@ mod test {
         let mut clock = FakeInstantCtx::default();
         let counters = FakeTcpCounters::default();
         let (syn_sent, syn_seg) = Closed::<Initial>::connect(
-            ISS_1,
+            TEST_ISS,
             clock.now(),
             (),
             BufferSizes { receive: buffer_size, ..Default::default() },
@@ -7340,7 +6917,7 @@ mod test {
         assert_eq!(
             syn_seg,
             Segment::syn(
-                ISS_1,
+                TEST_ISS,
                 UnscaledWindowSize::from(u16::try_from(buffer_size).unwrap_or(u16::MAX)),
                 HandshakeOptions {
                     mss: Some(DEVICE_MAXIMUM_SEGMENT_SIZE),
@@ -7355,8 +6932,8 @@ mod test {
         let (seg, passive_open) = active
             .on_segment_with_default_options::<(), ClientlessBufferProvider>(
                 Segment::syn_ack(
-                    ISS_2,
-                    ISS_1 + 1,
+                    TEST_IRS,
+                    TEST_ISS + 1,
                     UnscaledWindowSize::from(u16::MAX),
                     HandshakeOptions {
                         mss: Some(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
@@ -7382,8 +6959,8 @@ mod test {
     #[test_case(
         u16::MAX as usize,
         Segment::syn_ack(
-            ISS_2 + 1 + u16::MAX as usize,
-            ISS_1 + 1,
+            TEST_IRS + 1 + u16::MAX as usize,
+            TEST_ISS + 1,
             UnscaledWindowSize::from(u16::MAX),
             Options::default(),
         )
@@ -7391,26 +6968,26 @@ mod test {
     #[test_case(
         u16::MAX as usize + 1,
         Segment::syn_ack(
-            ISS_2 + 1 + u16::MAX as usize,
-            ISS_1 + 1,
+            TEST_IRS + 1 + u16::MAX as usize,
+            TEST_ISS + 1,
             UnscaledWindowSize::from(u16::MAX),
             Options::default(),
         )
     )]
     #[test_case(
         u16::MAX as usize,
-        Segment::data(
-            ISS_2 + 1 + u16::MAX as usize,
-            ISS_1 + 1,
+        Segment::with_data(
+            TEST_IRS + 1 + u16::MAX as usize,
+            TEST_ISS + 1,
             UnscaledWindowSize::from(u16::MAX),
             &TEST_BYTES[..],
         )
     )]
     #[test_case(
         u16::MAX as usize + 1,
-        Segment::data(
-            ISS_2 + 1 + u16::MAX as usize,
-            ISS_1 + 1,
+        Segment::with_data(
+            TEST_IRS + 1 + u16::MAX as usize,
+            TEST_ISS + 1,
             UnscaledWindowSize::from(u16::MAX),
             &TEST_BYTES[..],
         )
@@ -7420,8 +6997,8 @@ mod test {
         let buffer_sizes = BufferSizes { send: 0, receive: receive_buf_size };
         let rcv_wnd_scale = buffer_sizes.rwnd().scale();
         let mut syn_rcvd: State<_, RingBuffer, RingBuffer, ()> = State::SynRcvd(SynRcvd {
-            iss: ISS_1,
-            irs: ISS_2,
+            iss: TEST_ISS,
+            irs: TEST_IRS,
             timestamp: None,
             retrans_timer: RetransTimer::new(
                 FakeInstant::default(),
@@ -7443,33 +7020,17 @@ mod test {
                 FakeInstant::default(),
                 &counters.refs()
             ),
-            (Some(Segment::ack(ISS_1 + 1, ISS_2 + 1, buffer_sizes.rwnd_unscaled())), None),
+            (Some(Segment::ack(TEST_ISS + 1, TEST_IRS + 1, buffer_sizes.rwnd_unscaled())), None),
         )
     }
 
     #[test]
     fn poll_send_reserving_buffer() {
         const RESERVED_BYTES: usize = 3;
-        let mut snd: Send<FakeInstant, _, false> = Send {
-            nxt: ISS_1 + 1,
-            max: ISS_1 + 1,
-            una: ISS_1 + 1,
-            wnd: WindowSize::DEFAULT,
-            wnd_max: WindowSize::DEFAULT,
-            wnd_scale: WindowScale::default(),
-            wl1: ISS_1,
-            wl2: ISS_2,
-            buffer: ReservingBuffer {
-                buffer: RingBuffer::with_data(TEST_BYTES.len(), TEST_BYTES),
-                reserved_bytes: RESERVED_BYTES,
-            },
-            rtt_sampler: RttSampler::default(),
-            rtt_estimator: Estimator::default(),
-            timer: None,
-            congestion_control: CongestionControl::cubic_with_mss(
-                DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-            ),
-        };
+        let mut snd: Send<FakeInstant, _, false> = Send::default_for_test(ReservingBuffer {
+            buffer: RingBuffer::with_data(TEST_BYTES.len(), TEST_BYTES),
+            reserved_bytes: RESERVED_BYTES,
+        });
 
         let counters = FakeTcpCounters::default();
 
@@ -7478,7 +7039,7 @@ mod test {
                 &FakeStateMachineDebugId,
                 &counters.refs(),
                 &RecvParams {
-                    ack: ISS_2 + 1,
+                    ack: TEST_IRS + 1,
                     wnd: WindowSize::DEFAULT,
                     wnd_scale: WindowScale::ZERO,
                 },
@@ -7486,15 +7047,15 @@ mod test {
                 FakeInstant::default(),
                 &SocketOptions::default_for_state_tests(),
             ),
-            Some(Segment::data(
-                ISS_1 + 1,
-                ISS_2 + 1,
+            Some(Segment::with_data(
+                TEST_ISS + 1,
+                TEST_IRS + 1,
                 WindowSize::DEFAULT >> WindowScale::default(),
                 FragmentedPayload::new_contiguous(&TEST_BYTES[..TEST_BYTES.len() - RESERVED_BYTES])
             ))
         );
 
-        assert_eq!(snd.nxt, ISS_1 + 1 + (TEST_BYTES.len() - RESERVED_BYTES));
+        assert_eq!(snd.nxt, TEST_ISS + 1 + (TEST_BYTES.len() - RESERVED_BYTES));
     }
 
     #[test]
@@ -7502,17 +7063,8 @@ mod test {
         const MULTIPLE: usize = 3;
         const CAP: usize = TEST_BYTES.len() * MULTIPLE;
         let mut rcv: Recv<FakeInstant, RingBuffer> = Recv {
-            buffer: RecvBufferState::Open {
-                buffer: RingBuffer::new(CAP),
-                assembler: Assembler::new(ISS_1),
-            },
-            timer: None,
-            remaining_quickacks: 0,
-            last_segment_at: None,
             mss: Mss(NonZeroU16::new(TEST_BYTES.len() as u16).unwrap()),
-            wnd_scale: WindowScale::default(),
-            last_window_update: (ISS_1, WindowSize::new(CAP).unwrap()),
-            sack_permitted: SACK_PERMITTED,
+            ..Recv::default_for_test_at(TEST_IRS, RingBuffer::new(CAP))
         };
 
         fn get_buffer(rcv: &mut Recv<FakeInstant, RingBuffer>) -> &mut RingBuffer {
@@ -7530,7 +7082,7 @@ mod test {
         }
         let assembler = assert_matches!(&mut rcv.buffer,
             RecvBufferState::Open { ref mut assembler, .. } => assembler);
-        assert_eq!(assembler.insert(ISS_1..ISS_1 + CAP), CAP);
+        assert_eq!(assembler.insert(TEST_IRS..TEST_IRS + CAP), CAP);
         // Since the buffer is full, we now get a zero window.
         assert_eq!(rcv.calculate_window_size().window_size, WindowSize::ZERO);
 
@@ -7559,49 +7111,40 @@ mod test {
         // Tests the common behavior when ack segment arrives in states that
         // have a send state.
         let new_snd = || Send {
-            nxt: ISS_1 + 1,
-            max: ISS_1 + 1,
-            una: ISS_1 + 1,
             wnd: wnd_size,
-            wnd_max: WindowSize::DEFAULT,
-            buffer: RingBuffer::with_data(TEST_BYTES.len(), TEST_BYTES),
-            wl1: ISS_2 + 1,
-            wl2: ISS_1 + 1,
-            rtt_estimator: Estimator::default(),
-            rtt_sampler: RttSampler::default(),
-            timer: None,
-            congestion_control: CongestionControl::cubic_with_mss(
-                DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-            ),
             wnd_scale: snd_wnd_scale,
+            ..Send::default_for_test(RingBuffer::with_data(TEST_BYTES.len(), TEST_BYTES))
         };
         let new_rcv = || Recv {
-            buffer: RecvBufferState::Open {
-                buffer: RingBuffer::new(wnd_size.into()),
-                assembler: Assembler::new(ISS_2 + 1),
-            },
-            timer: None,
-            remaining_quickacks: 0,
-            last_segment_at: None,
-            mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             wnd_scale: rcv_wnd_scale,
-            last_window_update: (ISS_2 + 1, WindowSize::ZERO),
-            sack_permitted: SACK_PERMITTED,
+            ..Recv::default_for_test(RingBuffer::new(wnd_size.into()))
         };
         for mut state in [
             State::Established(Established { snd: new_snd().into(), rcv: new_rcv().into() }),
             State::FinWait1(FinWait1 { snd: new_snd().queue_fin().into(), rcv: new_rcv().into() }),
             State::Closing(Closing {
                 snd: new_snd().queue_fin(),
-                closed_rcv: RecvParams { ack: ISS_2 + 1, wnd: wnd_size, wnd_scale: rcv_wnd_scale },
+                closed_rcv: RecvParams {
+                    ack: TEST_IRS + 1,
+                    wnd: wnd_size,
+                    wnd_scale: rcv_wnd_scale,
+                },
             }),
             State::CloseWait(CloseWait {
                 snd: new_snd().into(),
-                closed_rcv: RecvParams { ack: ISS_2 + 1, wnd: wnd_size, wnd_scale: rcv_wnd_scale },
+                closed_rcv: RecvParams {
+                    ack: TEST_IRS + 1,
+                    wnd: wnd_size,
+                    wnd_scale: rcv_wnd_scale,
+                },
             }),
             State::LastAck(LastAck {
                 snd: new_snd().queue_fin(),
-                closed_rcv: RecvParams { ack: ISS_2 + 1, wnd: wnd_size, wnd_scale: rcv_wnd_scale },
+                closed_rcv: RecvParams {
+                    ack: TEST_IRS + 1,
+                    wnd: wnd_size,
+                    wnd_scale: rcv_wnd_scale,
+                },
             }),
         ] {
             assert_eq!(
@@ -7610,12 +7153,16 @@ mod test {
                     FakeInstant::default(),
                     &counters.refs(),
                 ),
-                Some(Segment::data(
-                    ISS_1 + 1,
-                    ISS_2 + 1,
-                    // We expect this to be wnd_size >> rcv_wnd_scale, which
-                    // equals 1024 >> 8 == 4
-                    UnscaledWindowSize::from(4),
+                Some(Segment::new_assert_no_discard(
+                    SegmentHeader {
+                        seq: TEST_ISS + 1,
+                        ack: Some(TEST_IRS + 1),
+                        // We expect this to be wnd_size >> rcv_wnd_scale, which
+                        // equals 1024 >> 8 == 4
+                        wnd: UnscaledWindowSize::from(4),
+                        push: true,
+                        ..Default::default()
+                    },
                     FragmentedPayload::new_contiguous(TEST_BYTES)
                 ))
             );
@@ -7627,22 +7174,14 @@ mod test {
     fn snd_silly_window_avoidance(prompted_window_update: bool) {
         const CAP: usize = TEST_BYTES.len() * 2;
         let mut snd: Send<FakeInstant, RingBuffer, false> = Send {
-            nxt: ISS_1 + 1,
-            max: ISS_1 + 1,
-            una: ISS_1 + 1,
+            wl1: TEST_IRS,
+            wl2: TEST_ISS,
             wnd: WindowSize::new(CAP).unwrap(),
-            wnd_scale: WindowScale::default(),
-            wnd_max: WindowSize::DEFAULT,
-            wl1: ISS_1,
-            wl2: ISS_2,
-            buffer: RingBuffer::new(CAP),
-            rtt_sampler: RttSampler::default(),
-            rtt_estimator: Estimator::default(),
-            timer: None,
             congestion_control: CongestionControl::cubic_with_mss(Mss(NonZeroU16::new(
                 TEST_BYTES.len() as u16,
             )
             .unwrap())),
+            ..Send::default_for_test(RingBuffer::new(CAP))
         };
 
         let mut clock = FakeInstantCtx::default();
@@ -7658,7 +7197,7 @@ mod test {
                 &FakeStateMachineDebugId,
                 &counters.refs(),
                 &RecvParams {
-                    ack: ISS_2 + 1,
+                    ack: TEST_IRS + 1,
                     wnd: WindowSize::DEFAULT,
                     wnd_scale: WindowScale::ZERO,
                 },
@@ -7666,9 +7205,9 @@ mod test {
                 clock.now(),
                 &SocketOptions::default_for_state_tests(),
             ),
-            Some(Segment::data(
-                ISS_1 + 1,
-                ISS_2 + 1,
+            Some(Segment::with_data(
+                TEST_ISS + 1,
+                TEST_IRS + 1,
                 UnscaledWindowSize::from(u16::MAX),
                 FragmentedPayload::new_contiguous(TEST_BYTES),
             )),
@@ -7678,12 +7217,13 @@ mod test {
             snd.process_ack(
                 &FakeStateMachineDebugId,
                 &counters.refs(),
-                ISS_2 + 1,
-                ISS_1 + 1 + TEST_BYTES.len(),
+                TEST_IRS + 1,
+                TEST_ISS + 1 + TEST_BYTES.len(),
                 UnscaledWindowSize::from(0),
+                &SackBlocks::EMPTY,
                 true,
                 &RecvParams {
-                    ack: ISS_2 + 1,
+                    ack: TEST_IRS + 1,
                     wnd_scale: WindowScale::default(),
                     wnd: WindowSize::DEFAULT,
                 },
@@ -7700,7 +7240,7 @@ mod test {
                 &FakeStateMachineDebugId,
                 &counters.refs(),
                 &RecvParams {
-                    ack: ISS_2 + 1,
+                    ack: TEST_IRS + 1,
                     wnd: WindowSize::DEFAULT,
                     wnd_scale: WindowScale::ZERO,
                 },
@@ -7728,7 +7268,7 @@ mod test {
                 &FakeStateMachineDebugId,
                 &counters.refs(),
                 &RecvParams {
-                    ack: ISS_2 + 1,
+                    ack: TEST_IRS + 1,
                     wnd: WindowSize::DEFAULT,
                     wnd_scale: WindowScale::ZERO,
                 },
@@ -7736,9 +7276,9 @@ mod test {
                 clock.now(),
                 &SocketOptions::default_for_state_tests(),
             ),
-            Some(Segment::data(
-                ISS_1 + 1 + TEST_BYTES.len(),
-                ISS_2 + 1,
+            Some(Segment::with_data(
+                TEST_ISS + 1 + TEST_BYTES.len(),
+                TEST_IRS + 1,
                 UnscaledWindowSize::from(u16::MAX),
                 FragmentedPayload::new_contiguous(&TEST_BYTES[..1]),
             ))
@@ -7751,12 +7291,13 @@ mod test {
                 snd.process_ack(
                     &FakeStateMachineDebugId,
                     &counters.refs(),
-                    ISS_2 + 1,
-                    ISS_1 + 1 + TEST_BYTES.len() + 1,
+                    TEST_IRS + 1,
+                    TEST_ISS + 1 + TEST_BYTES.len() + 1,
                     UnscaledWindowSize::from(3),
+                    &SackBlocks::EMPTY,
                     true,
                     &RecvParams {
-                        ack: ISS_2 + 1,
+                        ack: TEST_IRS + 1,
                         wnd_scale: WindowScale::default(),
                         wnd: WindowSize::DEFAULT,
                     },
@@ -7771,12 +7312,13 @@ mod test {
                 snd.process_ack(
                     &FakeStateMachineDebugId,
                     &counters.refs(),
-                    ISS_2 + 1,
-                    ISS_1 + 1 + TEST_BYTES.len(),
+                    TEST_IRS + 1,
+                    TEST_ISS + 1 + TEST_BYTES.len(),
                     UnscaledWindowSize::from(0),
+                    &SackBlocks::EMPTY,
                     true,
                     &RecvParams {
-                        ack: ISS_2 + 1,
+                        ack: TEST_IRS + 1,
                         wnd_scale: WindowScale::default(),
                         wnd: WindowSize::DEFAULT,
                     },
@@ -7792,12 +7334,13 @@ mod test {
                 snd.process_ack(
                     &FakeStateMachineDebugId,
                     &counters.refs(),
-                    ISS_2 + 1,
-                    ISS_1 + 1 + TEST_BYTES.len(),
+                    TEST_IRS + 1,
+                    TEST_ISS + 1 + TEST_BYTES.len(),
                     UnscaledWindowSize::from(3),
+                    &SackBlocks::EMPTY,
                     true,
                     &RecvParams {
-                        ack: ISS_2 + 1,
+                        ack: TEST_IRS + 1,
                         wnd_scale: WindowScale::default(),
                         wnd: WindowSize::DEFAULT,
                     },
@@ -7814,7 +7357,7 @@ mod test {
                 &FakeStateMachineDebugId,
                 &counters.refs(),
                 &RecvParams {
-                    ack: ISS_2 + 1,
+                    ack: TEST_IRS + 1,
                     wnd: WindowSize::DEFAULT,
                     wnd_scale: WindowScale::ZERO,
                 },
@@ -7838,7 +7381,7 @@ mod test {
                 &FakeStateMachineDebugId,
                 &counters.refs(),
                 &RecvParams {
-                    ack: ISS_2 + 1,
+                    ack: TEST_IRS + 1,
                     wnd: WindowSize::DEFAULT,
                     wnd_scale: WindowScale::ZERO,
                 },
@@ -7846,9 +7389,9 @@ mod test {
                 clock.now(),
                 &SocketOptions::default_for_state_tests(),
             ),
-            Some(Segment::data(
-                ISS_1 + 1 + TEST_BYTES.len() + seq_index,
-                ISS_2 + 1,
+            Some(Segment::with_data(
+                TEST_ISS + 1 + TEST_BYTES.len() + seq_index,
+                TEST_IRS + 1,
                 UnscaledWindowSize::from(u16::MAX),
                 FragmentedPayload::new_contiguous(&TEST_BYTES[seq_index..3 + seq_index]),
             ))
@@ -7859,22 +7402,14 @@ mod test {
     fn snd_enter_zwp_on_negative_window_update() {
         const CAP: usize = TEST_BYTES.len() * 2;
         let mut snd: Send<FakeInstant, RingBuffer, false> = Send {
-            nxt: ISS_1 + 1,
-            max: ISS_1 + 1,
-            una: ISS_1 + 1,
             wnd: WindowSize::new(CAP).unwrap(),
-            wnd_scale: WindowScale::default(),
-            wnd_max: WindowSize::DEFAULT,
-            wl1: ISS_1,
-            wl2: ISS_2,
-            buffer: RingBuffer::new(CAP),
-            rtt_sampler: RttSampler::default(),
-            rtt_estimator: Estimator::default(),
-            timer: None,
+            wl1: TEST_IRS,
+            wl2: TEST_ISS,
             congestion_control: CongestionControl::cubic_with_mss(Mss(NonZeroU16::new(
                 TEST_BYTES.len() as u16,
             )
             .unwrap())),
+            ..Send::default_for_test(RingBuffer::new(CAP))
         };
 
         let clock = FakeInstantCtx::default();
@@ -7890,7 +7425,7 @@ mod test {
                 &FakeStateMachineDebugId,
                 &counters.refs(),
                 &RecvParams {
-                    ack: ISS_2 + 1,
+                    ack: TEST_IRS + 1,
                     wnd: WindowSize::DEFAULT,
                     wnd_scale: WindowScale::ZERO,
                 },
@@ -7898,9 +7433,9 @@ mod test {
                 clock.now(),
                 &SocketOptions::default_for_state_tests(),
             ),
-            Some(Segment::data(
-                ISS_1 + 1,
-                ISS_2 + 1,
+            Some(Segment::with_data(
+                TEST_ISS + 1,
+                TEST_IRS + 1,
                 UnscaledWindowSize::from(u16::MAX),
                 FragmentedPayload::new_contiguous(TEST_BYTES),
             )),
@@ -7921,12 +7456,13 @@ mod test {
             snd.process_ack(
                 &FakeStateMachineDebugId,
                 &counters.refs(),
-                ISS_2 + 1,
-                ISS_1 + 1 + TEST_BYTES.len(),
+                TEST_IRS + 1,
+                TEST_ISS + 1 + TEST_BYTES.len(),
                 UnscaledWindowSize::from(0),
+                &SackBlocks::EMPTY,
                 true,
                 &RecvParams {
-                    ack: ISS_2 + 1,
+                    ack: TEST_IRS + 1,
                     wnd_scale: WindowScale::default(),
                     wnd: WindowSize::DEFAULT,
                 },
@@ -7943,7 +7479,7 @@ mod test {
                 &FakeStateMachineDebugId,
                 &counters.refs(),
                 &RecvParams {
-                    ack: ISS_2 + 1,
+                    ack: TEST_IRS + 1,
                     wnd: WindowSize::DEFAULT,
                     wnd_scale: WindowScale::ZERO,
                 },
@@ -7961,62 +7497,43 @@ mod test {
     fn ack_uses_snd_max() {
         let counters = FakeTcpCounters::default();
         let mss = Mss(NonZeroU16::new(u16::try_from(TEST_BYTES.len()).unwrap()).unwrap());
-
         let mut clock = FakeInstantCtx::default();
         let mut buffer = RingBuffer::new(BUFFER_SIZE);
         assert_eq!(buffer.enqueue_data(TEST_BYTES), TEST_BYTES.len());
         assert_eq!(buffer.enqueue_data(TEST_BYTES), TEST_BYTES.len());
 
         // This connection has the same send and receive seqnum space.
+        let iss = ISS_1 + 1;
         let mut state: State<_, _, _, ()> = State::Established(Established {
             snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer,
-                wl1: ISS_1,
-                wl2: ISS_1,
-                rtt_sampler: RttSampler::default(),
-                rtt_estimator: Estimator::NoSample,
-                timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(mss),
-                wnd_scale: WindowScale::default(),
+                ..Send::default_for_test_at(iss, buffer)
             }
             .into(),
-            rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::new(BUFFER_SIZE),
-                    assembler: Assembler::new(ISS_1 + 1),
-                },
-                timer: None,
-                mss,
-                wnd_scale: WindowScale::default(),
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                last_window_update: (ISS_1 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
-                sack_permitted: SACK_PERMITTED,
-            }
-            .into(),
+            rcv: Recv { mss, ..Recv::default_for_test_at(iss, RingBuffer::new(BUFFER_SIZE)) }
+                .into(),
         });
 
         // Send the first two data segments.
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
-            Some(Segment::data(
-                ISS_1 + 1,
-                ISS_1 + 1,
+            Some(Segment::with_data(
+                iss,
+                iss,
                 UnscaledWindowSize::from(u16::try_from(BUFFER_SIZE).unwrap()),
                 FragmentedPayload::new_contiguous(TEST_BYTES),
             )),
         );
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
-            Some(Segment::data(
-                ISS_1 + 1 + TEST_BYTES.len(),
-                ISS_1 + 1,
-                UnscaledWindowSize::from(u16::try_from(BUFFER_SIZE).unwrap()),
+            Some(Segment::new_assert_no_discard(
+                SegmentHeader {
+                    seq: iss + TEST_BYTES.len(),
+                    ack: Some(iss),
+                    wnd: UnscaledWindowSize::from(u16::try_from(BUFFER_SIZE).unwrap()),
+                    push: true,
+                    ..Default::default()
+                },
                 FragmentedPayload::new_contiguous(TEST_BYTES),
             )),
         );
@@ -8025,9 +7542,9 @@ mod test {
         clock.sleep(Rto::DEFAULT.get());
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
-            Some(Segment::data(
-                ISS_1 + 1,
-                ISS_1 + 1,
+            Some(Segment::with_data(
+                iss,
+                iss,
                 UnscaledWindowSize::from(u16::try_from(BUFFER_SIZE).unwrap()),
                 FragmentedPayload::new_contiguous(TEST_BYTES),
             )),
@@ -8037,9 +7554,9 @@ mod test {
         // avoid getting stuck in an ACK cycle.
         assert_eq!(
             state.on_segment_with_default_options::<_, ClientlessBufferProvider>(
-                Segment::data(
-                    ISS_1 + 1,
-                    ISS_1 + 1,
+                Segment::with_data(
+                    iss,
+                    iss,
                     UnscaledWindowSize::from(u16::try_from(BUFFER_SIZE).unwrap()),
                     TEST_BYTES,
                 ),
@@ -8048,8 +7565,8 @@ mod test {
             ),
             (
                 Some(Segment::ack(
-                    ISS_1 + 1 + 2 * TEST_BYTES.len(),
-                    ISS_1 + 1 + TEST_BYTES.len(),
+                    iss + 2 * TEST_BYTES.len(),
+                    iss + TEST_BYTES.len(),
                     UnscaledWindowSize::from(
                         u16::try_from(BUFFER_SIZE - TEST_BYTES.len()).unwrap()
                     ),
@@ -8064,7 +7581,7 @@ mod test {
         State::Closed(Closed { reason: None }) => NewlyClosed::No; "closed to closed")]
     #[test_case(
         State::SynSent(SynSent {
-            iss: ISS_1,
+            iss: TEST_ISS,
             timestamp: Some(FakeInstant::default()),
             retrans_timer: RetransTimer::new(
                 FakeInstant::default(),
@@ -8081,7 +7598,7 @@ mod test {
         State::Closed(Closed { reason: None }) => NewlyClosed::Yes; "non-closed to closed")]
     #[test_case(
         State::SynSent(SynSent {
-                iss: ISS_1,
+                iss: TEST_ISS,
                 timestamp: Some(FakeInstant::default()),
                 retrans_timer: RetransTimer::new(
                     FakeInstant::default(),
@@ -8097,8 +7614,8 @@ mod test {
             },
         ),
         State::SynRcvd(SynRcvd {
-            iss: ISS_1,
-            irs: ISS_2,
+            iss: TEST_ISS,
+            irs: TEST_IRS,
             timestamp: None,
             retrans_timer: RetransTimer::new(
                 FakeInstant::default(),
@@ -8133,60 +7650,42 @@ mod test {
         const TEST_BYTES: &[u8] = "Hello".as_bytes();
 
         let new_snd = || Send {
-            nxt: ISS_1 + 1,
-            max: ISS_1 + 1,
-            una: ISS_1 + 1,
-            wnd: WindowSize::ZERO,
-            wnd_max: WindowSize::ZERO,
-            buffer: NullBuffer,
-            wl1: ISS_2 + 1,
-            wl2: ISS_1 + 1,
-            rtt_estimator: Estimator::default(),
-            rtt_sampler: RttSampler::default(),
-            timer: None,
             congestion_control: CongestionControl::cubic_with_mss(MSS),
-            wnd_scale: WindowScale::default(),
+            ..Send::default_for_test(NullBuffer)
         };
-        let new_rcv = || Recv {
-            buffer: RecvBufferState::Open {
-                buffer: RingBuffer::new(BUFFER_SIZE),
-                assembler: Assembler::new(ISS_2 + 1),
-            },
-            timer: None,
-            mss: MSS,
-            remaining_quickacks: 0,
-            last_segment_at: None,
-            wnd_scale: WindowScale::default(),
-            last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
-            sack_permitted: SACK_PERMITTED,
-        };
+        let new_rcv = || Recv { mss: MSS, ..Recv::default_for_test(RingBuffer::new(BUFFER_SIZE)) };
 
         let clock = FakeInstantCtx::default();
         let counters = FakeTcpCounters::default();
         for mut state in [
             State::Established(Established { snd: new_snd().into(), rcv: new_rcv().into() }),
             State::FinWait1(FinWait1 { snd: new_snd().queue_fin().into(), rcv: new_rcv().into() }),
-            State::FinWait2(FinWait2 { last_seq: ISS_1 + 1, rcv: new_rcv(), timeout_at: None }),
+            State::FinWait2(FinWait2 { last_seq: TEST_ISS + 1, rcv: new_rcv(), timeout_at: None }),
         ] {
             // At the beginning, our last window update was greater than MSS, so there's no
             // need to send an update.
             assert_matches!(state.poll_receive_data_dequeued(), None);
-            let expect_window_update = (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap());
+            let expect_window_update = (TEST_IRS + 1, WindowSize::new(BUFFER_SIZE).unwrap());
             assert_eq!(state.recv_mut().unwrap().last_window_update, expect_window_update);
 
             // Receive a segment that almost entirely fills the buffer.  We now have less
             // than MSS of available window, which means we won't send an update.
 
             let seg = state.on_segment_with_options::<_, ClientlessBufferProvider>(
-                Segment::data(ISS_2 + 1, ISS_1 + 1, UnscaledWindowSize::from(0), TEST_BYTES),
+                Segment::with_data(
+                    TEST_IRS + 1,
+                    TEST_ISS + 1,
+                    UnscaledWindowSize::from(0),
+                    TEST_BYTES,
+                ),
                 clock.now(),
                 &counters.refs(),
                 &SocketOptions { delayed_ack, ..SocketOptions::default_for_state_tests() },
             );
 
             let expect_ack = (!delayed_ack).then_some(Segment::ack(
-                ISS_1 + 1,
-                ISS_2 + 1 + TEST_BYTES.len(),
+                TEST_ISS + 1,
+                TEST_IRS + 1 + TEST_BYTES.len(),
                 UnscaledWindowSize::from((BUFFER_SIZE - TEST_BYTES.len()) as u16),
             ));
             assert_eq!(seg, (expect_ack, None));
@@ -8195,7 +7694,7 @@ mod test {
             let expect_window_update = if delayed_ack {
                 expect_window_update
             } else {
-                (ISS_2 + 1 + TEST_BYTES.len(), WindowSize::new(0).unwrap())
+                (TEST_IRS + 1 + TEST_BYTES.len(), WindowSize::new(0).unwrap())
             };
             assert_eq!(state.recv_mut().unwrap().last_window_update, expect_window_update);
 
@@ -8213,14 +7712,14 @@ mod test {
                 assert_eq!(
                     state.poll_receive_data_dequeued(),
                     Some(Segment::ack(
-                        ISS_1 + 1,
-                        ISS_2 + 1 + TEST_BYTES.len(),
+                        TEST_ISS + 1,
+                        TEST_IRS + 1 + TEST_BYTES.len(),
                         UnscaledWindowSize::from(BUFFER_SIZE as u16)
                     ))
                 );
                 assert_eq!(
                     state.recv_mut().unwrap().last_window_update,
-                    (ISS_2 + 1 + TEST_BYTES.len(), WindowSize::new(BUFFER_SIZE).unwrap())
+                    (TEST_IRS + 1 + TEST_BYTES.len(), WindowSize::new(BUFFER_SIZE).unwrap())
                 );
                 // Delack timer must've been reset if it was set.
                 assert!(state.recv_mut().unwrap().timer.is_none());
@@ -8252,55 +7751,23 @@ mod test {
         const MSS: Mss = Mss(NonZeroU16::new(65000).unwrap());
         const WINDOW: WindowSize = WindowSize::from_u32(500).unwrap();
         let mut recv = Recv::<FakeInstant, _> {
-            buffer: RecvBufferState::Open {
-                buffer: RingBuffer::new(WINDOW.into()),
-                assembler: Assembler::new(ISS_2 + 1),
-            },
-            timer: None,
             mss: MSS,
-            remaining_quickacks: 0,
-            last_segment_at: None,
-            wnd_scale: WindowScale::default(),
-            last_window_update: (ISS_2 + 1, WindowSize::from_u32(1).unwrap()),
-            sack_permitted: SACK_PERMITTED,
+            last_window_update: (TEST_IRS + 1, WindowSize::from_u32(1).unwrap()),
+            ..Recv::default_for_test(RingBuffer::new(WINDOW.into()))
         };
-        let seg = recv.poll_receive_data_dequeued(ISS_1).expect("generates segment");
-        assert_eq!(seg.header.ack, Some(recv.nxt()));
-        assert_eq!(seg.header.wnd << recv.wnd_scale, WINDOW);
+        let seg = recv.poll_receive_data_dequeued(TEST_ISS).expect("generates segment");
+        assert_eq!(seg.header().ack, Some(recv.nxt()));
+        assert_eq!(seg.header().wnd << recv.wnd_scale, WINDOW);
     }
 
     #[test]
     fn quickack_period() {
         let mut quickack = default_quickack_counter();
         let mut state = State::Established(Established::<FakeInstant, _, _> {
-            snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
-                wnd: WindowSize::ZERO,
-                wnd_max: WindowSize::ZERO,
-                buffer: NullBuffer,
-                wl1: ISS_2 + 1,
-                wl2: ISS_1 + 1,
-                rtt_estimator: Estimator::default(),
-                rtt_sampler: RttSampler::default(),
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(DEVICE_MAXIMUM_SEGMENT_SIZE),
-                wnd_scale: WindowScale::default(),
-            }
-            .into(),
+            snd: Send::default_for_test(NullBuffer).into(),
             rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::default(),
-                    assembler: Assembler::new(ISS_2 + 1),
-                },
-                timer: None,
-                mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
                 remaining_quickacks: quickack,
-                last_segment_at: None,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
-                sack_permitted: SACK_PERMITTED,
+                ..Recv::default_for_test(RingBuffer::default())
             }
             .into(),
         });
@@ -8310,11 +7777,8 @@ mod test {
         let data = vec![0u8; usize::from(DEVICE_MAXIMUM_SEGMENT_SIZE)];
         while quickack != 0 {
             let seq = state.recv_mut().unwrap().nxt();
-            let (segment, _) = Segment::with_data(
-                seq,
-                Some(ISS_1 + 1),
-                None,
-                WindowSize::ZERO >> WindowScale::default(),
+            let segment = Segment::new_assert_no_discard(
+                SegmentHeader { seq, ack: Some(TEST_ISS + 1), ..Default::default() },
                 &data[..],
             );
             let (seg, passive_open) = state.on_segment_with_options::<_, ClientlessBufferProvider>(
@@ -8328,18 +7792,19 @@ mod test {
 
             assert_eq!(passive_open, None);
             let seg = seg.expect("no segment generated");
-            assert_eq!(seg.header.ack, Some(seq + u32::try_from(data.len()).unwrap()));
+            assert_eq!(seg.header().ack, Some(seq + u32::try_from(data.len()).unwrap()));
             assert_eq!(recv.remaining_quickacks, quickack - 1);
             quickack -= 1;
             state.buffers_mut().into_receive_buffer().unwrap().reset();
         }
 
         // The next segment will be delayed.
-        let (segment, _) = Segment::with_data(
-            state.recv_mut().unwrap().nxt(),
-            Some(ISS_1 + 1),
-            None,
-            WindowSize::ZERO >> WindowScale::default(),
+        let segment = Segment::new_assert_no_discard(
+            SegmentHeader {
+                seq: state.recv_mut().unwrap().nxt(),
+                ack: Some(TEST_ISS + 1),
+                ..Default::default()
+            },
             &data[..],
         );
         let (seg, passive_open) = state.on_segment_with_options::<_, ClientlessBufferProvider>(
@@ -8356,48 +7821,20 @@ mod test {
     #[test]
     fn quickack_reset_out_of_window() {
         let mut state = State::Established(Established::<FakeInstant, _, _> {
-            snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
-                wnd: WindowSize::ZERO,
-                wnd_max: WindowSize::ZERO,
-                buffer: NullBuffer,
-                wl1: ISS_2 + 1,
-                wl2: ISS_1 + 1,
-                rtt_estimator: Estimator::default(),
-                rtt_sampler: RttSampler::default(),
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(DEVICE_MAXIMUM_SEGMENT_SIZE),
-                wnd_scale: WindowScale::default(),
-            }
-            .into(),
-            rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::default(),
-                    assembler: Assembler::new(ISS_2 + 1),
-                },
-                timer: None,
-                mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
-                // quickacks start at zero.
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
-                sack_permitted: SACK_PERMITTED,
-            }
-            .into(),
+            snd: Send::default_for_test(NullBuffer).into(),
+            rcv: Recv::default_for_test(RingBuffer::default()).into(),
         });
         let clock = FakeInstantCtx::default();
         let counters = FakeTcpCounters::default();
         let data = vec![0u8; usize::from(DEVICE_MAXIMUM_SEGMENT_SIZE)];
 
-        let (segment, _) = Segment::with_data(
-            // Generate a segment that is out of the receiving window.
-            state.recv_mut().unwrap().nxt() - i32::try_from(data.len() + 1).unwrap(),
-            Some(ISS_1 + 1),
-            None,
-            WindowSize::ZERO >> WindowScale::default(),
+        let segment = Segment::new_assert_no_discard(
+            SegmentHeader {
+                // Generate a segment that is out of the receiving window.
+                seq: state.recv_mut().unwrap().nxt() - i32::try_from(data.len() + 1).unwrap(),
+                ack: Some(TEST_ISS + 1),
+                ..Default::default()
+            },
             &data[..],
         );
         let (seg, passive_open) = state
@@ -8409,7 +7846,7 @@ mod test {
         assert_eq!(passive_open, None);
         let recv = state.recv_mut().unwrap();
         let seg = seg.expect("expected segment");
-        assert_eq!(seg.header.ack, Some(recv.nxt()));
+        assert_eq!(seg.header().ack, Some(recv.nxt()));
         assert_eq!(recv.remaining_quickacks, default_quickack_counter());
     }
 
@@ -8417,46 +7854,22 @@ mod test {
     fn quickack_reset_rto() {
         let mut clock = FakeInstantCtx::default();
         let mut state = State::Established(Established::<FakeInstant, _, _> {
-            snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
-                wnd: WindowSize::ZERO,
-                wnd_max: WindowSize::ZERO,
-                buffer: NullBuffer,
-                wl1: ISS_2 + 1,
-                wl2: ISS_1 + 1,
-                rtt_estimator: Estimator::default(),
-                rtt_sampler: RttSampler::default(),
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(DEVICE_MAXIMUM_SEGMENT_SIZE),
-                wnd_scale: WindowScale::default(),
-            }
-            .into(),
+            snd: Send::default_for_test(NullBuffer).into(),
             rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::default(),
-                    assembler: Assembler::new(ISS_2 + 1),
-                },
-                timer: None,
-                mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
-                // quickacks start at zero.
-                remaining_quickacks: 0,
                 last_segment_at: Some(clock.now()),
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
-                sack_permitted: SACK_PERMITTED,
+                ..Recv::default_for_test(RingBuffer::default())
             }
             .into(),
         });
         let counters = FakeTcpCounters::default();
         let data = vec![0u8; usize::from(DEVICE_MAXIMUM_SEGMENT_SIZE)];
 
-        let (segment, _) = Segment::with_data(
-            state.recv_mut().unwrap().nxt(),
-            Some(ISS_1 + 1),
-            None,
-            WindowSize::ZERO >> WindowScale::default(),
+        let segment = Segment::new_assert_no_discard(
+            SegmentHeader {
+                seq: state.recv_mut().unwrap().nxt(),
+                ack: Some(TEST_ISS + 1),
+                ..Default::default()
+            },
             &data[..],
         );
         clock.sleep(Rto::DEFAULT.get());
@@ -8469,7 +7882,7 @@ mod test {
         assert_eq!(passive_open, None);
         let recv = state.recv_mut().unwrap();
         let seg = seg.expect("expected segment");
-        assert_eq!(seg.header.ack, Some(recv.nxt()));
+        assert_eq!(seg.header().ack, Some(recv.nxt()));
         // This just sent an ack back to us, so it burns one off the default
         // counter's value.
         assert_eq!(recv.remaining_quickacks, default_quickack_counter() - 1);
@@ -8480,49 +7893,22 @@ mod test {
     #[test_case(false; "sack not permitted")]
     fn receiver_selective_acks(sack_permitted: bool) {
         let mut state = State::Established(Established::<FakeInstant, _, _> {
-            snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer: RingBuffer::default(),
-                wl1: ISS_2 + 1,
-                wl2: ISS_1 + 1,
-                rtt_estimator: Estimator::default(),
-                rtt_sampler: RttSampler::default(),
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(DEVICE_MAXIMUM_SEGMENT_SIZE),
-                wnd_scale: WindowScale::default(),
-            }
-            .into(),
-            rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::default(),
-                    assembler: Assembler::new(ISS_2 + 1),
-                },
-                timer: None,
-                mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
-                // quickacks start at zero.
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
-                sack_permitted,
-            }
-            .into(),
+            snd: Send::default_for_test(RingBuffer::default()).into(),
+            rcv: Recv { sack_permitted, ..Recv::default_for_test(RingBuffer::default()) }.into(),
         });
         let clock = FakeInstantCtx::default();
         let counters = FakeTcpCounters::default();
         let data = vec![0u8; usize::from(DEVICE_MAXIMUM_SEGMENT_SIZE)];
         let mss = u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE);
         // Send an out of order segment.
-        let seg_start = ISS_2 + 1 + mss;
-        let (segment, _) = Segment::with_data(
-            seg_start,
-            Some(ISS_1 + 1),
-            None,
-            WindowSize::DEFAULT >> WindowScale::default(),
+        let seg_start = TEST_IRS + 1 + mss;
+        let segment = Segment::new_assert_no_discard(
+            SegmentHeader {
+                seq: seg_start,
+                ack: Some(TEST_ISS + 1),
+                wnd: WindowSize::DEFAULT >> WindowScale::default(),
+                ..Default::default()
+            },
             &data[..],
         );
         let (seg, passive_open) = state
@@ -8533,14 +7919,15 @@ mod test {
             );
         assert_eq!(passive_open, None);
         let seg = seg.expect("expected segment");
-        assert_eq!(seg.header.ack, Some(ISS_2 + 1));
+        assert_eq!(seg.header().ack, Some(TEST_IRS + 1));
         let expect = if sack_permitted {
             SackBlocks::from_iter([SackBlock::try_new(seg_start, seg_start + mss).unwrap()])
         } else {
             SackBlocks::default()
         };
-        let sack_blocks = assert_matches!(seg.header.options, Options::Segment(o) => o.sack_blocks);
-        assert_eq!(sack_blocks, expect);
+        let sack_blocks =
+            assert_matches!(&seg.header().options, Options::Segment(o) => &o.sack_blocks);
+        assert_eq!(sack_blocks, &expect);
 
         // If we need to send data now, sack blocks should be present.
         assert_eq!(
@@ -8550,11 +7937,11 @@ mod test {
         let seg = state
             .poll_send_with_default_options(mss, clock.now(), &counters.refs())
             .expect("generates segment");
-        assert_eq!(seg.header.ack, Some(ISS_2 + 1));
+        assert_eq!(seg.header().ack, Some(TEST_IRS + 1));
 
         // The exact same sack blocks are present there.
         let sack_blocks =
-            assert_matches!(&seg.header.options, Options::Segment(o) => &o.sack_blocks);
+            assert_matches!(&seg.header().options, Options::Segment(o) => &o.sack_blocks);
         assert_eq!(sack_blocks, &expect);
         // If there are sack blocks, the segment length should have been
         // restricted.
@@ -8568,11 +7955,8 @@ mod test {
 
         // Now receive the out of order block, no SACK should be present
         // anymore.
-        let (segment, _) = Segment::with_data(
-            ISS_2 + 1,
-            Some(ISS_1 + 1),
-            None,
-            WindowSize::DEFAULT >> WindowScale::default(),
+        let segment = Segment::new_assert_no_discard(
+            SegmentHeader { seq: TEST_IRS + 1, ack: Some(TEST_ISS + 1), ..Default::default() },
             &data[..],
         );
         let (seg, passive_open) = state
@@ -8583,9 +7967,9 @@ mod test {
             );
         assert_eq!(passive_open, None);
         let seg = seg.expect("expected segment");
-        assert_eq!(seg.header.ack, Some(ISS_2 + (2 * mss) + 1));
+        assert_eq!(seg.header().ack, Some(TEST_IRS + (2 * mss) + 1));
         let sack_blocks =
-            assert_matches!(&seg.header.options, Options::Segment(o) => &o.sack_blocks);
+            assert_matches!(&seg.header().options, Options::Segment(o) => &o.sack_blocks);
         assert_eq!(sack_blocks, &SackBlocks::default());
     }
 
@@ -8604,37 +7988,8 @@ mod test {
     #[test_case(RttTestScenario::AckPartial)]
     fn rtt(scenario: RttTestScenario) {
         let mut state = State::Established(Established::<FakeInstant, _, _> {
-            snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer: RingBuffer::default(),
-                wl1: ISS_2 + 1,
-                wl2: ISS_1 + 1,
-                rtt_estimator: Estimator::default(),
-                rtt_sampler: RttSampler::default(),
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(DEVICE_MAXIMUM_SEGMENT_SIZE),
-                wnd_scale: WindowScale::default(),
-            }
-            .into(),
-            rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::default(),
-                    assembler: Assembler::new(ISS_2 + 1),
-                },
-                timer: None,
-                mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
-                // quickacks start at zero.
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
-                sack_permitted: SACK_PERMITTED,
-            }
-            .into(),
+            snd: Send::default_for_test(RingBuffer::default()).into(),
+            rcv: Recv::default_for_test(RingBuffer::default()).into(),
         });
 
         const CLOCK_STEP: Duration = Duration::from_millis(1);
@@ -8654,10 +8009,10 @@ mod test {
         let seg = state
             .poll_send_with_default_options(data_len_u32, clock.now(), &counters.refs())
             .expect("generate segment");
-        assert_eq!(seg.header.seq, ISS_1 + 1);
+        assert_eq!(seg.header().seq, TEST_ISS + 1);
         assert_eq!(seg.len(), data_len_u32);
         let expect_sampler = RttSampler::Tracking {
-            range: (ISS_1 + 1)..(ISS_1 + 1 + seg.len()),
+            range: (TEST_ISS + 1)..(TEST_ISS + 1 + seg.len()),
             timestamp: clock.now(),
         };
         assert_eq!(state.assert_established().snd.rtt_sampler, expect_sampler);
@@ -8666,7 +8021,7 @@ mod test {
         let seg = state
             .poll_send_with_default_options(data_len_u32, clock.now(), &counters.refs())
             .expect("generate segment");
-        assert_eq!(seg.header.seq, ISS_1 + 1 + data.len());
+        assert_eq!(seg.header().seq, TEST_ISS + 1 + data.len());
         assert_eq!(seg.len(), data_len_u32);
         // The probe for RTT doesn't change.
         let established = state.assert_established();
@@ -8676,10 +8031,10 @@ mod test {
         assert_eq!(established.snd.rtt_estimator.srtt(), None);
 
         let (retransmit, ack_number) = match scenario {
-            RttTestScenario::AckPartial => (false, ISS_1 + 1 + 1),
-            RttTestScenario::AckOne => (false, ISS_1 + 1 + data.len()),
-            RttTestScenario::AckTwo => (false, ISS_1 + 1 + data.len() * 2),
-            RttTestScenario::Retransmit => (true, ISS_1 + 1 + data.len() * 2),
+            RttTestScenario::AckPartial => (false, TEST_ISS + 1 + 1),
+            RttTestScenario::AckOne => (false, TEST_ISS + 1 + data.len()),
+            RttTestScenario::AckTwo => (false, TEST_ISS + 1 + data.len() * 2),
+            RttTestScenario::Retransmit => (true, TEST_ISS + 1 + data.len() * 2),
         };
 
         if retransmit {
@@ -8690,7 +8045,7 @@ mod test {
                 .poll_send_with_default_options(data_len_u32, clock.now(), &counters.refs())
                 .expect("generate segment");
             // First segment is retransmitted.
-            assert_eq!(seg.header.seq, ISS_1 + 1);
+            assert_eq!(seg.header().seq, TEST_ISS + 1);
             // Retransmit should've cleared the mark.
             assert_eq!(state.assert_established().snd.rtt_sampler, RttSampler::NotTracking);
         } else {
@@ -8699,7 +8054,11 @@ mod test {
 
         assert_eq!(
             state.on_segment_with_default_options::<(), ClientlessBufferProvider>(
-                Segment::ack(ISS_2 + 1, ack_number, WindowSize::DEFAULT >> WindowScale::default()),
+                Segment::ack(
+                    TEST_IRS + 1,
+                    ack_number,
+                    WindowSize::DEFAULT >> WindowScale::default()
+                ),
                 clock.now(),
                 &counters.refs()
             ),
@@ -8721,8 +8080,8 @@ mod test {
         let seg = state
             .poll_send_with_default_options(data_len_u32, clock.now(), &counters.refs())
             .expect("generate segment");
-        let seq = seg.header.seq;
-        assert_eq!(seq, ISS_1 + 1 + data.len() * 2);
+        let seq = seg.header().seq;
+        assert_eq!(seq, TEST_ISS + 1 + data.len() * 2);
         let expect_sampler =
             RttSampler::Tracking { range: seq..(seq + seg.len()), timestamp: clock.now() };
         assert_eq!(state.assert_established().snd.rtt_sampler, expect_sampler);
@@ -8734,8 +8093,8 @@ mod test {
         assert_eq!(
             state.on_segment_with_default_options::<(), ClientlessBufferProvider>(
                 Segment::ack(
-                    ISS_2 + 1,
-                    ISS_1 + 1 + data.len() * 2,
+                    TEST_IRS + 1,
+                    TEST_ISS + 1 + data.len() * 2,
                     WindowSize::DEFAULT >> WindowScale::default()
                 ),
                 clock.now(),
@@ -8752,37 +8111,8 @@ mod test {
         let payload = "Hello World".as_bytes();
         assert_eq!(buffer.enqueue_data(payload), payload.len());
         let mut state = State::<_, _, _, ()>::Established(Established {
-            snd: Send {
-                nxt: ISS_1 + 1,
-                max: ISS_1 + 1,
-                una: ISS_1 + 1,
-                wnd: WindowSize::DEFAULT,
-                wnd_max: WindowSize::DEFAULT,
-                buffer,
-                wl1: ISS_2 + 1,
-                wl2: ISS_1 + 1,
-                rtt_estimator: Estimator::default(),
-                rtt_sampler: RttSampler::default(),
-                timer: None,
-                congestion_control: CongestionControl::cubic_with_mss(DEVICE_MAXIMUM_SEGMENT_SIZE),
-                wnd_scale: WindowScale::default(),
-            }
-            .into(),
-            rcv: Recv {
-                buffer: RecvBufferState::Open {
-                    buffer: RingBuffer::default(),
-                    assembler: Assembler::new(ISS_2 + 1),
-                },
-                timer: None,
-                mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
-                // quickacks start at zero.
-                remaining_quickacks: 0,
-                last_segment_at: None,
-                wnd_scale: WindowScale::default(),
-                last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
-                sack_permitted: SACK_PERMITTED,
-            }
-            .into(),
+            snd: Send::default_for_test(buffer).into(),
+            rcv: Recv::default_for_test(RingBuffer::default()).into(),
         });
 
         let socket_options =
@@ -8801,8 +8131,11 @@ mod test {
         assert_eq!(seg.len(), u32::try_from(payload.len()).unwrap());
         // Receive duplicate acks repeatedly before this payload until we hit
         // fast retransmit.
-        let ack =
-            Segment::ack(ISS_2 + 1, seg.header.seq, WindowSize::DEFAULT >> WindowScale::default());
+        let ack = Segment::ack(
+            TEST_IRS + 1,
+            seg.header().seq,
+            WindowSize::DEFAULT >> WindowScale::default(),
+        );
 
         let mut dup_acks = 0;
         let seg = loop {
@@ -8839,6 +8172,522 @@ mod test {
             }
         };
         assert_eq!(seg.len(), u32::try_from(payload.len()).unwrap());
-        assert_eq!(seg.header.seq, ack.header.ack.unwrap());
+        assert_eq!(seg.header().seq, ack.header().ack.unwrap());
+    }
+
+    #[test]
+    fn sack_recovery_rearms_rto() {
+        let mss = DEVICE_MAXIMUM_SEGMENT_SIZE;
+        let una = TEST_ISS + 1;
+        let nxt = una + (u32::from(DUP_ACK_THRESHOLD) + 1) * u32::from(mss);
+
+        let mut congestion_control = CongestionControl::cubic_with_mss(mss);
+        // Inflate the congestion window so we won't hit congestion during test.
+        congestion_control.inflate_cwnd(20 * u32::from(mss));
+        let mut state = State::<_, _, _, ()>::Established(Established {
+            snd: Send {
+                nxt,
+                max: nxt,
+                una,
+                wl1: TEST_IRS + 1,
+                wl2: una,
+                congestion_control,
+                ..Send::default_for_test(InfiniteSendBuffer::default())
+            }
+            .into(),
+            rcv: Recv::default_for_test(RingBuffer::default()).into(),
+        });
+
+        let socket_options = SocketOptions::default_for_state_tests();
+        const RTT: Duration = Duration::from_millis(1);
+        let mut clock = FakeInstantCtx::default();
+        let counters = FakeTcpCounters::default();
+        // Send a single segment, we should've set RTO.
+        let seg = state
+            .poll_send(
+                &FakeStateMachineDebugId,
+                &counters.refs(),
+                u32::MAX,
+                clock.now(),
+                &socket_options,
+            )
+            .expect("should not close");
+        assert_eq!(seg.len(), u32::from(mss));
+        let start_rto = assert_matches!(
+            state.assert_established().snd.timer,
+            Some(SendTimer::Retrans(RetransTimer{at, ..})) => at
+        );
+        clock.sleep(RTT);
+
+        // Receive an ACK with SACK blocks that put us in SACK recovery.
+        let ack = Segment::ack_with_options(
+            TEST_IRS + 1,
+            una,
+            WindowSize::DEFAULT >> WindowScale::default(),
+            SegmentOptions {
+                sack_blocks: [SackBlock::try_new(
+                    nxt - u32::from(DUP_ACK_THRESHOLD) * u32::from(mss),
+                    nxt,
+                )
+                .unwrap()]
+                .into_iter()
+                .collect(),
+            }
+            .into(),
+        );
+        let (seg, passive_open, data_acked, newly_closed) = state
+            .on_segment::<(), ClientlessBufferProvider>(
+                &FakeStateMachineDebugId,
+                &counters.refs(),
+                ack,
+                clock.now(),
+                &socket_options,
+                false,
+            );
+        assert_eq!(seg, None);
+        assert_eq!(passive_open, None);
+        assert_eq!(data_acked, DataAcked::No);
+        assert_eq!(newly_closed, NewlyClosed::No);
+        assert_eq!(
+            state.assert_established().snd.congestion_control.inspect_loss_recovery_mode(),
+            Some(LossRecoveryMode::SackRecovery)
+        );
+
+        let seg = state
+            .poll_send(
+                &FakeStateMachineDebugId,
+                &counters.refs(),
+                u32::MAX,
+                clock.now(),
+                &socket_options,
+            )
+            .expect("should not close");
+        assert_eq!(seg.len(), u32::from(mss));
+        // SACK retransmission.
+        assert_eq!(seg.header().seq, una);
+        // RTO is rearmed.
+        let new_rto = assert_matches!(
+            state.assert_established().snd.timer,
+            Some(SendTimer::Retrans(RetransTimer { at, .. })) => at
+        );
+        assert!(new_rto > start_rto, "{new_rto:?} > {start_rto:?}");
+
+        CounterExpectations {
+            retransmits: 1,
+            sack_recovery: 1,
+            sack_retransmits: 1,
+            dup_acks: 1,
+            ..Default::default()
+        }
+        .assert_counters(&counters);
+    }
+
+    // Define an enum here so test case name generation with test matrix works
+    // better.
+    enum SackPermitted {
+        Yes,
+        No,
+    }
+
+    // Test a connection that is limited only by a theoretical congestion
+    // window, provided in multiples of MSS.
+    //
+    // This is a bit large for a unit test, but the set up to prove that traffic
+    // is only limited by the congestion window is not achievable when the
+    // entire stack is hooked up. Namely this test is proving 2 things:
+    //
+    // - When provided with infinite bytes to send and a receiver with an
+    //   impossibly large window, a TCP sender still paces the connection based
+    //   on the congestion window estimate. It is very hard to provide an
+    //   infinite data source and boundless receiver in a full integration test.
+    // - After sending enough bytes and going through enough congestion events,
+    //   the TCP sender has an _acceptable_ estimate of what the congestion
+    //   window is.
+    #[test_matrix(
+        [1, 2, 3, 5, 20, 50],
+        [SackPermitted::Yes, SackPermitted::No]
+    )]
+    fn congestion_window_limiting(theoretical_window: u32, sack_permitted: SackPermitted) {
+        netstack3_base::testutil::set_logger_for_test();
+
+        let mss = DEVICE_MAXIMUM_SEGMENT_SIZE;
+        let generate_sack = match sack_permitted {
+            SackPermitted::Yes => true,
+            SackPermitted::No => false,
+        };
+
+        // The test argument is the theoretical window in terms of multiples
+        // of mss.
+        let theoretical_window = theoretical_window * u32::from(mss);
+
+        // Ensure we're not going to ever be blocked by the receiver window.
+        let snd_wnd = WindowSize::MAX;
+        let wnd_scale = snd_wnd.scale();
+        // Instantiate with a buffer that always reports it has data to send.
+        let buffer = InfiniteSendBuffer::default();
+
+        let mut state = State::<FakeInstant, _, _, ()>::Established(Established {
+            snd: Send {
+                wnd: snd_wnd,
+                wnd_max: snd_wnd,
+                wnd_scale,
+                congestion_control: CongestionControl::cubic_with_mss(mss),
+                ..Send::default_for_test(buffer)
+            }
+            .into(),
+            rcv: Recv { mss, ..Recv::default_for_test(RingBuffer::default()) }.into(),
+        });
+
+        let socket_options = SocketOptions::default_for_state_tests();
+        let mut clock = FakeInstantCtx::default();
+        let counters = FakeTcpCounters::default();
+
+        assert!(state.assert_established().snd.congestion_control.in_slow_start());
+
+        let poll_until_empty =
+            |state: &mut State<_, _, _, _>, segments: &mut Vec<(SeqNum, u32)>, now| loop {
+                match state.poll_send(
+                    &FakeStateMachineDebugId,
+                    &counters.refs(),
+                    u32::MAX,
+                    now,
+                    &socket_options,
+                ) {
+                    Ok(seg) => {
+                        // All sent segments controlled only by congestion
+                        // window should send MSS.
+                        assert_eq!(seg.len(), u32::from(mss));
+                        segments.push((seg.header().seq, seg.len()));
+                    }
+                    Err(closed) => {
+                        assert_eq!(closed, NewlyClosed::No);
+                        break;
+                    }
+                }
+            };
+
+        let mut pending_segments = Vec::new();
+        let mut pending_acks = Vec::new();
+        let mut receiver = Assembler::new(TEST_ISS + 1);
+        let mut total_sent = 0;
+        let mut total_sent_rounds = 0;
+
+        // Ensure the test doesn't run for too long.
+        let mut loops = 500;
+        let mut continue_running = |state: &mut State<_, _, _, _>| {
+            loops -= 1;
+            assert!(loops > 0, "test seems to have stalled");
+
+            // Run the connection until we have crossed a number of interesting
+            // congestion events.
+            const CONGESTION_EVENTS: u64 = 10;
+            let event_count =
+                counters.stack_wide.timeouts.get() + counters.stack_wide.loss_recovered.get();
+            let congestion_control = &state.assert_established().snd.congestion_control;
+            event_count <= CONGESTION_EVENTS
+                // Continue running until we've left loss recovery or slow
+                // start.
+                || congestion_control.inspect_loss_recovery_mode().is_some() || congestion_control.in_slow_start()
+        };
+
+        while continue_running(&mut state) {
+            // Use a somewhat large RTT. When SACK recovery is in use, the
+            // infinite amount of available data combined with the RTO rearms on
+            // retransmission causes it to always have more data to send, so the
+            // RTT is effectively what's driving the clock in that case.
+            clock.sleep(Duration::from_millis(10));
+            if pending_acks.is_empty() {
+                poll_until_empty(&mut state, &mut pending_segments, clock.now());
+            } else {
+                for (ack, sack_blocks) in pending_acks.drain(..) {
+                    let seg: Segment<()> = Segment::ack_with_options(
+                        TEST_IRS + 1,
+                        ack,
+                        snd_wnd >> wnd_scale,
+                        SegmentOptions { sack_blocks }.into(),
+                    );
+                    let (seg, passive_open, data_acked, newly_closed) = state
+                        .on_segment::<_, ClientlessBufferProvider>(
+                        &FakeStateMachineDebugId,
+                        &counters.refs(),
+                        seg,
+                        clock.now(),
+                        &socket_options,
+                        false,
+                    );
+
+                    assert_eq!(seg, None);
+                    assert_eq!(passive_open, None);
+                    assert_eq!(newly_closed, NewlyClosed::No);
+                    // When we hit the congestion window duplicate acks will
+                    // start to be sent out so we can't really assert on
+                    // data_acked.
+                    let _: DataAcked = data_acked;
+
+                    poll_until_empty(&mut state, &mut pending_segments, clock.now());
+                }
+            }
+
+            let established = state.assert_established();
+            let congestion_control = &established.snd.congestion_control;
+            let ssthresh = congestion_control.slow_start_threshold();
+            let cwnd = congestion_control.inspect_cwnd().cwnd();
+            let in_slow_start = congestion_control.in_slow_start();
+            let in_loss_recovery = congestion_control.inspect_loss_recovery_mode().is_some();
+            let pipe = congestion_control.pipe();
+            let sent = u32::try_from(pending_segments.len()).unwrap() * u32::from(mss);
+            let recovery_counters = if generate_sack {
+                (
+                    counters.stack_wide.sack_retransmits.get(),
+                    counters.stack_wide.sack_recovery.get(),
+                )
+            } else {
+                (
+                    counters.stack_wide.fast_retransmits.get(),
+                    counters.stack_wide.fast_recovery.get(),
+                )
+            };
+
+            if !in_slow_start {
+                total_sent += sent;
+                total_sent_rounds += 1;
+            }
+
+            // This test is a bit hard to debug when things go wrong, so emit
+            // the steps in logs.
+            log::debug!(
+                "ssthresh={ssthresh}, \
+                    cwnd={cwnd}, \
+                    sent={sent}, \
+                    pipe={pipe}, \
+                    in_slow_start={in_slow_start}, \
+                    in_loss_recovery={in_loss_recovery}, \
+                    total_retransmits={}, \
+                    (retransmits,recovery)={:?}",
+                counters.stack_wide.retransmits.get(),
+                recovery_counters,
+            );
+
+            if pending_segments.is_empty() {
+                assert_matches!(established.snd.timer, Some(SendTimer::Retrans(_)));
+                // Nothing to do. Move the clock to hit RTO.
+                clock.sleep_until(state.poll_send_at().expect("must have timeout"));
+                log::debug!("RTO");
+                continue;
+            }
+
+            let mut available = theoretical_window;
+            for (seq, len) in pending_segments.drain(..) {
+                // Drop segments that don't fit the congestion window.
+                if available < len {
+                    break;
+                }
+                available -= len;
+                // Generate all the acks.
+                if seq.after_or_eq(receiver.nxt()) {
+                    let _: usize = receiver.insert(seq..(seq + len));
+                }
+                let sack_blocks =
+                    if generate_sack { receiver.sack_blocks() } else { SackBlocks::default() };
+                pending_acks.push((receiver.nxt(), sack_blocks));
+            }
+        }
+
+        // The effective average utilization of the congestion window at every
+        // RTT, not including the slow start periods.
+        let avg_sent = total_sent / total_sent_rounds;
+        // Define the tolerance as a range based on the theoretical window. This
+        // is simply the tightest round integer value that we could find that
+        // makes the test pass. Given we're not closely tracking how many
+        // congestion events happening the estimate varies a lot, even with a
+        // big average over the non slow-start periods.
+        let tolerance = (theoretical_window / 3).max(u32::from(mss));
+        let low_range = theoretical_window - tolerance;
+        let high_range = theoretical_window + tolerance;
+        assert!(
+            avg_sent >= low_range && avg_sent <= high_range,
+            "{low_range} <= {avg_sent} <= {high_range}"
+        );
+    }
+
+    // Tests that out of order ACKs including SACK blocks are discarded. This is
+    // a regression test for https://fxbug.dev/409599338.
+    #[test]
+    fn out_of_order_ack_with_sack_blocks() {
+        let send_segments = u32::from(DUP_ACK_THRESHOLD + 2);
+        let mss = DEVICE_MAXIMUM_SEGMENT_SIZE;
+
+        let send_bytes = send_segments * u32::from(mss);
+        // Ensure we're not going to ever be blocked by the receiver window.
+        let snd_wnd = WindowSize::from_u32(send_bytes).unwrap();
+        let wnd_scale = snd_wnd.scale();
+        let mut congestion_control = CongestionControl::cubic_with_mss(mss);
+        congestion_control.inflate_cwnd(snd_wnd.into());
+
+        let start = TEST_ISS + 1;
+
+        let mut state = State::<FakeInstant, _, _, ()>::Established(Established {
+            snd: Send {
+                congestion_control,
+                wnd_scale,
+                wnd: snd_wnd,
+                wnd_max: snd_wnd,
+                ..Send::default_for_test_at(
+                    start,
+                    RepeatingSendBuffer::new(usize::try_from(send_bytes).unwrap()),
+                )
+            }
+            .into(),
+            rcv: Recv::default_for_test(RingBuffer::default()).into(),
+        });
+        let socket_options = SocketOptions::default_for_state_tests();
+        let clock = FakeInstantCtx::default();
+        let counters = FakeTcpCounters::default();
+        let sent = core::iter::from_fn(|| {
+            match state.poll_send(
+                &FakeStateMachineDebugId,
+                &counters.refs(),
+                u32::MAX,
+                clock.now(),
+                &socket_options,
+            ) {
+                Ok(seg) => Some(seg.len()),
+                Err(newly_closed) => {
+                    assert_eq!(newly_closed, NewlyClosed::No);
+                    None
+                }
+            }
+        })
+        .sum::<u32>();
+        assert_eq!(sent, send_segments * u32::from(mss));
+
+        // First receive a cumulative ACK for the entire transfer.
+        let end = state.assert_established().snd.nxt;
+        let seg = Segment::<()>::ack(TEST_IRS + 1, end, snd_wnd >> wnd_scale);
+        assert_eq!(
+            state.on_segment::<_, ClientlessBufferProvider>(
+                &FakeStateMachineDebugId,
+                &counters.refs(),
+                seg,
+                clock.now(),
+                &socket_options,
+                false
+            ),
+            (None, None, DataAcked::Yes, NewlyClosed::No)
+        );
+        assert_eq!(state.assert_established().snd.congestion_control.pipe(), 0);
+        assert_matches!(
+            state.poll_send(
+                &FakeStateMachineDebugId,
+                &counters.refs(),
+                u32::MAX,
+                clock.now(),
+                &socket_options
+            ),
+            Err(NewlyClosed::No)
+        );
+
+        // Then receive an out of order ACK that only acknowledges the
+        // DUP_ACK_THRESHOLD segments after the first one.
+        let sack_block = SackBlock::try_new(
+            start + u32::from(mss),
+            start + u32::from(DUP_ACK_THRESHOLD + 1) * u32::from(mss),
+        )
+        .unwrap();
+        assert!(sack_block.right().before(end));
+        let seg = Segment::<()>::ack_with_options(
+            TEST_IRS + 1,
+            start,
+            snd_wnd >> wnd_scale,
+            SegmentOptions { sack_blocks: [sack_block].into_iter().collect() }.into(),
+        );
+        assert_eq!(
+            state.on_segment::<_, ClientlessBufferProvider>(
+                &FakeStateMachineDebugId,
+                &counters.refs(),
+                seg,
+                clock.now(),
+                &socket_options,
+                false
+            ),
+            (None, None, DataAcked::No, NewlyClosed::No)
+        );
+        // The out of order ACK should not be considered in the scoreboard for
+        // bytes in flight and we should not be in recovery mode.
+        let congestion_control = &state.assert_established().snd.congestion_control;
+        assert_eq!(congestion_control.pipe(), 0);
+        assert_eq!(congestion_control.inspect_loss_recovery_mode(), None);
+        // No more segments should be generated.
+        assert_matches!(
+            state.poll_send(
+                &FakeStateMachineDebugId,
+                &counters.refs(),
+                u32::MAX,
+                clock.now(),
+                &socket_options
+            ),
+            Err(NewlyClosed::No)
+        );
+    }
+
+    #[test]
+    fn push_segments() {
+        let send_segments = 16;
+        let mss = DEVICE_MAXIMUM_SEGMENT_SIZE;
+        let send_bytes = send_segments * u32::from(mss);
+        // Use a receiver window that can take 4 Mss at a time, so we should set
+        // the PSH bit every 2 MSS.
+        let snd_wnd = WindowSize::from_u32(4 * u32::from(mss)).unwrap();
+        let wnd_scale = snd_wnd.scale();
+        let mut state = State::<FakeInstant, _, _, ()>::Established(Established {
+            snd: Send {
+                congestion_control: CongestionControl::cubic_with_mss(mss),
+                wnd_scale,
+                wnd: snd_wnd,
+                wnd_max: snd_wnd,
+                ..Send::default_for_test(RepeatingSendBuffer::new(
+                    usize::try_from(send_bytes).unwrap(),
+                ))
+            }
+            .into(),
+            rcv: Recv::default_for_test(RingBuffer::default()).into(),
+        });
+        let socket_options = SocketOptions::default_for_state_tests();
+        let clock = FakeInstantCtx::default();
+        let counters = FakeTcpCounters::default();
+
+        for i in 0..send_segments {
+            let seg = state
+                .poll_send(
+                    &FakeStateMachineDebugId,
+                    &counters.refs(),
+                    u32::MAX,
+                    clock.now(),
+                    &socket_options,
+                )
+                .expect("produces segment");
+            let is_last = i == (send_segments - 1);
+            // Given the we set the max window to 4 MSS, SND.NXT must advance at
+            // least 2 MSS for us to set the PSH bit, which means it's observed
+            // every 2nd segment generated after the first one.
+            let is_periodic = i != 0 && i % 2 == 0;
+            // Ensure that our math is correct and we're checking both
+            // conditions with this test.
+            assert!(!(is_last && is_periodic));
+            assert_eq!(seg.header().push, is_last || is_periodic, "at {i}");
+            let ack =
+                Segment::ack(TEST_IRS + 1, seg.header().seq + seg.len(), snd_wnd >> wnd_scale);
+            assert_eq!(
+                state.on_segment::<(), ClientlessBufferProvider>(
+                    &FakeStateMachineDebugId,
+                    &counters.refs(),
+                    ack,
+                    clock.now(),
+                    &socket_options,
+                    false
+                ),
+                (None, None, DataAcked::Yes, NewlyClosed::No)
+            );
+        }
     }
 }

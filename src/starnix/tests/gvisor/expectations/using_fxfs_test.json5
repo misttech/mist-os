@@ -49,17 +49,6 @@
                 // This is not compatible with Fxfs's current truncate implementation
                 // which conservatively zeroes for security.
                 "MMapFileTest.WriteSharedTruncateUp",
-
-                // TODO(https://fxbug.dev/353327849) re-enable once cause identified
-                "StatTimesTest.DirCreateDir",
-                "StatTimesTest.DirCreateFile",
-                "StatTimesTest.DirRemoveFile",
-                "StatTimesTest.FileChmod",
-                "StatTimesTest.FileRename",
-                "StatTimesTest.FileRenameOpenFD",
-                "StatTimesTest.FileTruncate",
-                "StatTimesTest.FileUtimes",
-                "StatTimesTest.FileWrite",
             ],
         },
     ],

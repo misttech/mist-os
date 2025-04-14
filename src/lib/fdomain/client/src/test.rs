@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{AnyHandle, Client, Error, FDomainTransport};
+use crate::channel::HandleOp;
+use crate::{AnyHandle, Client, Error, FDomainTransport, HandleBased};
 use fdomain_container::wire::FDomainCodec;
 use fdomain_container::FDomain;
 use fidl_fuchsia_fdomain::Error as FDomainError;
@@ -110,6 +111,52 @@ async fn socket() {
     }
 
     assert_eq!(TEST_STR, got.as_slice());
+}
+
+#[fuchsia::test]
+async fn datagram_socket() {
+    let (client, _) = TestFDomain::new_client();
+
+    let (a, b) = client.create_datagram_socket();
+    const TEST_STR_1: &[u8] = b"Feral Cats Move In Mysterious Ways";
+    const TEST_STR_2: &[u8] = b"Joyous Throbbing! Jubilant Pulsing!";
+
+    a.write_all(TEST_STR_1).await.unwrap();
+    a.write_all(TEST_STR_2).await.unwrap();
+
+    let mut buf = [0u8; 2];
+
+    let new_bytes = b.read(&mut buf).await.unwrap();
+    assert_eq!(new_bytes, 2);
+    assert_eq!(&TEST_STR_1[..2], &buf);
+
+    let new_bytes = b.read(&mut buf).await.unwrap();
+    assert_eq!(new_bytes, 2);
+    assert_eq!(&TEST_STR_2[..2], &buf);
+}
+
+#[fuchsia::test]
+async fn datagram_socket_underflow() {
+    let (client, _) = TestFDomain::new_client();
+
+    let (a, b) = client.create_datagram_socket();
+    const TEST_STR_1: &[u8] = b"Feral Cats Move In Mysterious Ways";
+    const TEST_STR_2: &[u8] = b"Joyous Throbbing! Jubilant Pulsing!";
+
+    a.write_all(TEST_STR_1).await.unwrap();
+    a.write_all(TEST_STR_2).await.unwrap();
+
+    const MAX_LEN: usize =
+        if TEST_STR_1.len() > TEST_STR_2.len() { TEST_STR_1.len() } else { TEST_STR_2.len() };
+    let mut buf = [0u8; MAX_LEN * 2];
+
+    let new_bytes = b.read(&mut buf).await.unwrap();
+    assert_eq!(new_bytes, TEST_STR_1.len());
+    assert_eq!(TEST_STR_1, &buf[..TEST_STR_1.len()]);
+
+    let new_bytes = b.read(&mut buf).await.unwrap();
+    assert_eq!(new_bytes, TEST_STR_2.len());
+    assert_eq!(TEST_STR_2, &buf[..TEST_STR_2.len()]);
 }
 
 #[fuchsia::test]
@@ -414,4 +461,85 @@ async fn channel_read_stream_read() {
     let b = stream.rejoin(writer);
     let read_3 = b.recv_msg().await.unwrap();
     assert_eq!(test_str_b, read_3.bytes.as_slice());
+}
+
+#[fuchsia::test]
+async fn channel_too_big() {
+    let (client, _) = TestFDomain::new_client();
+
+    let (a, b) = client.create_channel();
+
+    // Test with fdomain_write
+    let err = a
+        .fdomain_write(&[0xABu8; zx_types::ZX_CHANNEL_MAX_MSG_BYTES as usize + 1], vec![])
+        .await
+        .unwrap_err();
+
+    let Error::FDomain(FDomainError::TargetError(i)) = err else { panic!() };
+
+    assert_eq!(fidl::Status::OUT_OF_RANGE.into_raw(), i);
+
+    let mut too_many_handles =
+        Vec::with_capacity(zx_types::ZX_CHANNEL_MAX_MSG_HANDLES as usize + 1);
+    for _ in 0..(zx_types::ZX_CHANNEL_MAX_MSG_HANDLES + 1) {
+        too_many_handles.push(client.create_event().into_handle());
+    }
+
+    let err = a.fdomain_write(b"", too_many_handles).await.unwrap_err();
+
+    let Error::FDomain(FDomainError::TargetError(i)) = err else { panic!() };
+
+    assert_eq!(fidl::Status::OUT_OF_RANGE.into_raw(), i);
+
+    // Test with zircon-like write
+    let err =
+        a.write(&[0xABu8; zx_types::ZX_CHANNEL_MAX_MSG_BYTES as usize + 1], vec![]).unwrap_err();
+
+    let Error::FDomain(FDomainError::TargetError(i)) = err else { panic!() };
+
+    assert_eq!(fidl::Status::OUT_OF_RANGE.into_raw(), i);
+
+    let mut too_many_handles =
+        Vec::with_capacity(zx_types::ZX_CHANNEL_MAX_MSG_HANDLES as usize + 1);
+    for _ in 0..(zx_types::ZX_CHANNEL_MAX_MSG_HANDLES + 1) {
+        too_many_handles.push(client.create_event().into_handle());
+    }
+
+    let err = a.write(b"", too_many_handles).unwrap_err();
+
+    let Error::FDomain(FDomainError::TargetError(i)) = err else { panic!() };
+
+    assert_eq!(fidl::Status::OUT_OF_RANGE.into_raw(), i);
+
+    // Test with fdomain_write_etc
+    let err = a
+        .fdomain_write_etc(&[0xABu8; zx_types::ZX_CHANNEL_MAX_MSG_BYTES as usize + 1], vec![])
+        .await
+        .unwrap_err();
+
+    let Error::FDomain(FDomainError::TargetError(i)) = err else { panic!() };
+
+    assert_eq!(fidl::Status::OUT_OF_RANGE.into_raw(), i);
+
+    let mut too_many_handles =
+        Vec::with_capacity(zx_types::ZX_CHANNEL_MAX_MSG_HANDLES as usize + 1);
+    for _ in 0..(zx_types::ZX_CHANNEL_MAX_MSG_HANDLES + 1) {
+        too_many_handles
+            .push(HandleOp::Move(client.create_event().into_handle(), fidl::Rights::SAME_RIGHTS));
+    }
+
+    let err = a.fdomain_write_etc(b"", too_many_handles).await.unwrap_err();
+
+    let Error::FDomain(FDomainError::TargetError(i)) = err else { panic!() };
+
+    assert_eq!(fidl::Status::OUT_OF_RANGE.into_raw(), i);
+
+    // Make sure channel still functions
+    const TEST_STR_1: &[u8] = b"Feral Cats Move In Mysterious Ways";
+
+    a.fdomain_write(TEST_STR_1, vec![]).await.unwrap();
+
+    let msg = b.recv_msg().await.unwrap();
+
+    assert_eq!(TEST_STR_1, msg.bytes.as_slice());
 }

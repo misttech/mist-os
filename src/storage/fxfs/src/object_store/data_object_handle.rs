@@ -102,7 +102,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         fsverity_state: FsverityState,
         options: HandleOptions,
         trace: bool,
-        overwrite_ranges: Vec<Range<u64>>,
+        overwrite_ranges: &[Range<u64>],
     ) -> Self {
         Self {
             handle: StoreObjectHandle::new(owner, object_id, permanent_keys, options, trace),
@@ -2885,7 +2885,7 @@ mod tests {
                 .await
                 .expect("open failed");
             let oid = root_directory.lookup("foo").await.expect("lookup failed");
-            if let Some((oid, _)) = oid {
+            if let Some((oid, _, _)) = oid {
                 let object = ObjectStore::open_object(store, oid, HandleOptions::default(), None)
                     .await
                     .expect("open_object failed");

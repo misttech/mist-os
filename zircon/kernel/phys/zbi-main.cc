@@ -43,7 +43,7 @@ void PhysMain(void* zbi, arch::EarlyTicks ticks) {
   // Note we don't do this after parsing ZBI items and before parsing command
   // line options, because if kernel.serial overrode what the ZBI items said,
   // we shouldn't be sending output to the wrong UART in between.
-  SetUartConsole(uart::all::MakeDriver(boot_options.serial));
+  SetUartConsole(boot_options.serial);
 
   // Perform any architecture-specific set up.
   ArchSetUp(zbi);

@@ -192,7 +192,12 @@ class SegmentManager {
   bool CompareValidBlocks(uint32_t blocks, uint32_t segno, bool section)
       __TA_EXCLUDES(sentry_lock_);
   uint32_t GetValidBlocks(uint32_t segno, bool section) const __TA_REQUIRES_SHARED(sentry_lock_);
+  // It check if there are enough free sections to write a checkpoint pack when adding
+  // |freed_sections| of free sections and |needed_blocks| of dirty data pages.
   bool HasNotEnoughFreeSecs(size_t freed_sections = 0, size_t needed_blocks = 0);
+  // It check if there are enough blocks to write a checkpoint pack in ssr mode when
+  // adding |needed_blocks| of dirty data pages.
+  zx::result<> HasEnoughSsrBlocks(size_t needed_blocks = 0) __TA_EXCLUDES(sentry_lock_);
   uint32_t Utilization();
   uint32_t CursegSegno(int type);
   uint8_t CursegAllocType(int type);
@@ -208,6 +213,7 @@ class SegmentManager {
   bool SecUsageCheck(uint32_t secno) const __TA_REQUIRES_SHARED(seglist_lock_);
   bool IsValidBlock(uint32_t segno, uint64_t offset) __TA_EXCLUDES(sentry_lock_);
 
+  block_t GetSectionCountForCheckpoint();
   block_t PrefreeSegments() __TA_EXCLUDES(seglist_lock_);
   block_t FreeSections() __TA_EXCLUDES(segmap_lock_);
   block_t FreeSegments() __TA_EXCLUDES(segmap_lock_);
@@ -275,7 +281,9 @@ class SegmentManager {
   const CursegInfo *CURSEG_I(CursegType type) const {
     return &curseg_array_[static_cast<int>(type)];
   }
-
+  size_t GetAvailableBlockCountOnCurseg(CursegType type) const __TA_REQUIRES_SHARED(sentry_lock_) {
+    return sit_info_->sentries[CURSEG_I(type)->segno].ckpt_invalid_blocks;
+  }
   block_t StartBlock(uint32_t segno) const {
     return (seg0_blkaddr_ + (GetR2LSegNo(segno) << superblock_info_.GetLogBlocksPerSeg()));
   }
@@ -462,7 +470,8 @@ class SegmentManager {
   block_t ovp_segments_ = 0;                                          // # of overprovision segments
   std::array<int64_t, 2> ckpt_invalid_blocks_ __TA_GUARDED(sentry_lock_) = {
       0};  // # of checkpointed invalid blocks that SSR can allocate. ckpt_invalid_blocks_[0] and
-           // ckpt_invalid_blocks_[1] tracks invalid blocks for data and node respectively.
+           // ckpt_invalid_blocks_[1] track the number of invalid blocks for data and node
+           // respectively.
 
   bool disable_gc_for_test_ = false;
 };

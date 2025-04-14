@@ -25,8 +25,7 @@ example code and rewriting it yourself based on the tutorials.
 If you're using C++ and wondering which tutorial to follow, take a look
 at the [C++ bindings comparison][c-family].
 
-  * [New C++ bindings][cpp]
-  * [High Level C++ (HLCPP)][hlcpp]
+  * [C++ bindings][cpp]
   * [Rust][rust]
 
 <!-- xrefs -->
@@ -34,7 +33,6 @@ at the [C++ bindings comparison][c-family].
 [fidl-concepts]: /docs/concepts/fidl/overview.md
 [compiling-fidl]: /docs/development/languages/fidl/tutorials/fidl.md
 [cpp]: cpp/README.md
-[hlcpp]: hlcpp/README.md
 [rust]: rust/README.md
 [c]: /docs/development/languages/fidl/tutorials/tutorial-c.md
 [c-family]: /docs/development/languages/fidl/guides/c-family-comparison.md

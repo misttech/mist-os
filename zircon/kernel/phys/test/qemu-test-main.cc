@@ -24,7 +24,7 @@ void PhysMain(void* bootloader_data, arch::EarlyTicks ticks) {
 
   InitStdout();
 
-  SetUartConsole(uart::all::MakeDriver({uart::qemu::kConfig}));
+  SetUartConsole(uart::qemu::kConfig);
 
   static BootOptions boot_opts;
   boot_opts.serial = uart::qemu::kConfig;

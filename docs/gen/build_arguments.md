@@ -79,7 +79,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2124
+From //build/config/BUILDCONFIG.gn:2120
 
 ### allowed_test_device_types
 
@@ -88,7 +88,7 @@ these device types will be used for tests.
 
 **Current value (from the default):** `[]`
 
-From //build/testing/test_spec.gni:12
+From //build/testing/test_spec.gni:13
 
 ### always_zedboot
 
@@ -248,36 +248,6 @@ remote inputs, and more.
 
 From //build/bazel/logging.gni:9
 
-### bazel_fuchsia_sdk_all_api_levels
-
-Set to true to populate the @fuchsia_sdk external repository with prebuilt
-binaries for all API levels, or a subset of them. Possible values are:
-
-  false: The default, which is to only build targets for which the IDK
-      contains artifacts built at "PLATFORM".
-
-  true: To build for all API levels listed in
-      platform_version.idk_buildable_api_levels, which defaults to
-      all Supported API levels plus the current in-development API level,
-      unless `override_idk_buildable_api_levels` is also set.
-      See //build/config/fuchsia/platform_versions.gni.
-
-
-**Current value (from the default):** `false`
-
-From //build/bazel/bazel_fuchsia_sdk.gni:29
-
-### bazel_fuchsia_sdk_all_cpus
-
-Set to true to populate the @fuchsia_sdk external repository with prebuilt
-binaries for all supported target CPU architectures. By default, only those
-for the current build configuration's `target_cpu` value will be generated
-to save about 3 minutes of build time when they are not needed.
-
-**Current value (from the default):** `false`
-
-From //build/bazel/bazel_fuchsia_sdk.gni:15
-
 ### bazel_product_bundle_board
 
 **Current value for `target_cpu = "arm64"`:** `"arm64"`
@@ -366,7 +336,7 @@ Valid options: all, minimal, toplevel (default since Bazel 7.1)
 
 **Current value (from the default):** `"toplevel"`
 
-From //build/bazel/remote_services.gni:31
+From //build/bazel/remote_services.gni:32
 
 ### bazel_rbe_exec_strategy
 
@@ -376,10 +346,11 @@ that is used.
 Supported options:
   "remote": on cache-miss, build remotely (default)
   "local": on cache-miss, build locally
+  "nocache": force execution, as if cache-miss.
 
 **Current value (from the default):** `"remote"`
 
-From //build/bazel/remote_services.gni:24
+From //build/bazel/remote_services.gni:25
 
 ### bazel_upload_build_events
 
@@ -400,7 +371,7 @@ Valid options:
 
 **Current value (from the default):** `""`
 
-From //build/bazel/remote_services.gni:47
+From //build/bazel/remote_services.gni:48
 
 ### blobfs_capacity
 
@@ -699,27 +670,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8718609333096658993"`
-
-From //out/not-default/args.gn:10
-
-**Overridden from the default:** `""`
-
-From //build/info/info.gni:17
-
-**Current value for `target_cpu = "riscv64"`:** `"8718609333096658993"`
-
-From //out/not-default/args.gn:10
-
-**Overridden from the default:** `""`
-
-From //build/info/info.gni:17
-
-**Current value for `target_cpu = "x64"`:** `"8718609333096658993"`
-
-From //out/not-default/args.gn:10
-
-**Overridden from the default:** `""`
+**Current value (from the default):** `""`
 
 From //build/info/info.gni:17
 
@@ -734,7 +685,7 @@ only want to build and define a small subset of the tree.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:16
+From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
@@ -742,7 +693,7 @@ From //BUILD.gn:123
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:16
+From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
@@ -750,7 +701,7 @@ From //BUILD.gn:123
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:16
+From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
@@ -1237,20 +1188,20 @@ This should never be set as a build argument.
   cflags = []
   ldflags = []
   runtime = [{
-  breakpad = "debug/.build-id/67/098d2b5544e441811c7327c47a385dfe99fc30.sym"
-  debug = "debug/.build-id/67/098d2b5544e441811c7327c47a385dfe99fc30.debug"
+  breakpad = "debug/.build-id/90/0dd4ec2d9143389f6bc9a42b43683c04d8dd07.sym"
+  debug = "debug/.build-id/90/0dd4ec2d9143389f6bc9a42b43683c04d8dd07.debug"
   dist = "aarch64-unknown-fuchsia/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/99/4a02e8ad8c55ada654cfd7a15f30bb60ce88ad.sym"
-  debug = "debug/.build-id/99/4a02e8ad8c55ada654cfd7a15f30bb60ce88ad.debug"
+  breakpad = "debug/.build-id/79/ca71080bbd41bbb398b3c32cf1c00dc636410d.sym"
+  debug = "debug/.build-id/79/ca71080bbd41bbb398b3c32cf1c00dc636410d.debug"
   dist = "aarch64-unknown-fuchsia/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/92/882334401f44bb618953b412292ea9a1cf5efa.sym"
-  debug = "debug/.build-id/92/882334401f44bb618953b412292ea9a1cf5efa.debug"
+  breakpad = "debug/.build-id/19/9cdb726a2d0933705b970d66c38f02d1d68703.sym"
+  debug = "debug/.build-id/19/9cdb726a2d0933705b970d66c38f02d1d68703.debug"
   dist = "aarch64-unknown-fuchsia/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1260,25 +1211,25 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=address"]
   ldflags = []
   runtime = [{
-  breakpad = "debug/.build-id/fb/b1ddca7070daa2b3a47c52aa78ddf85c588086.sym"
-  debug = "debug/.build-id/fb/b1ddca7070daa2b3a47c52aa78ddf85c588086.debug"
+  breakpad = "debug/.build-id/df/a0a762e387100a767b52cbf3e76d2bffb4e685.sym"
+  debug = "debug/.build-id/df/a0a762e387100a767b52cbf3e76d2bffb4e685.debug"
   dist = "clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.asan.so"
   soname = "libclang_rt.asan.so"
 }, {
-  breakpad = "debug/.build-id/ec/bba758f38873503c695527b51741c7838b23ad.sym"
-  debug = "debug/.build-id/ec/bba758f38873503c695527b51741c7838b23ad.debug"
+  breakpad = "debug/.build-id/e7/8e6bcb2356a9d675c937e87b87f8a5697b3e46.sym"
+  debug = "debug/.build-id/e7/8e6bcb2356a9d675c937e87b87f8a5697b3e46.debug"
   dist = "aarch64-unknown-fuchsia/asan/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/17/bd152e787139d6de349d806b981befe832b2cc.sym"
-  debug = "debug/.build-id/17/bd152e787139d6de349d806b981befe832b2cc.debug"
+  breakpad = "debug/.build-id/b5/63768cb29cf8bf6f279227e0b9f86b80c6d2ff.sym"
+  debug = "debug/.build-id/b5/63768cb29cf8bf6f279227e0b9f86b80c6d2ff.debug"
   dist = "aarch64-unknown-fuchsia/asan/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/7a/f9caa4e4d312cd03d161f3b5e64ba3e6577e78.sym"
-  debug = "debug/.build-id/7a/f9caa4e4d312cd03d161f3b5e64ba3e6577e78.debug"
+  breakpad = "debug/.build-id/81/81cad31ec8331d47143e4498efcc2f7ae37732.sym"
+  debug = "debug/.build-id/81/81cad31ec8331d47143e4498efcc2f7ae37732.debug"
   dist = "aarch64-unknown-fuchsia/asan/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1288,25 +1239,25 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=undefined"]
   ldflags = []
   runtime = [{
-  breakpad = "debug/.build-id/26/b8cf1f9a7183970a4b1347d6f24dddc2f62352.sym"
-  debug = "debug/.build-id/26/b8cf1f9a7183970a4b1347d6f24dddc2f62352.debug"
+  breakpad = "debug/.build-id/be/6154a0b880163ffd12dc64e48c4bf28debb044.sym"
+  debug = "debug/.build-id/be/6154a0b880163ffd12dc64e48c4bf28debb044.debug"
   dist = "clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
   soname = "libclang_rt.ubsan_standalone.so"
 }, {
-  breakpad = "debug/.build-id/67/098d2b5544e441811c7327c47a385dfe99fc30.sym"
-  debug = "debug/.build-id/67/098d2b5544e441811c7327c47a385dfe99fc30.debug"
+  breakpad = "debug/.build-id/90/0dd4ec2d9143389f6bc9a42b43683c04d8dd07.sym"
+  debug = "debug/.build-id/90/0dd4ec2d9143389f6bc9a42b43683c04d8dd07.debug"
   dist = "aarch64-unknown-fuchsia/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/99/4a02e8ad8c55ada654cfd7a15f30bb60ce88ad.sym"
-  debug = "debug/.build-id/99/4a02e8ad8c55ada654cfd7a15f30bb60ce88ad.debug"
+  breakpad = "debug/.build-id/79/ca71080bbd41bbb398b3c32cf1c00dc636410d.sym"
+  debug = "debug/.build-id/79/ca71080bbd41bbb398b3c32cf1c00dc636410d.debug"
   dist = "aarch64-unknown-fuchsia/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/92/882334401f44bb618953b412292ea9a1cf5efa.sym"
-  debug = "debug/.build-id/92/882334401f44bb618953b412292ea9a1cf5efa.debug"
+  breakpad = "debug/.build-id/19/9cdb726a2d0933705b970d66c38f02d1d68703.sym"
+  debug = "debug/.build-id/19/9cdb726a2d0933705b970d66c38f02d1d68703.debug"
   dist = "aarch64-unknown-fuchsia/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1316,25 +1267,25 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=hwaddress"]
   ldflags = []
   runtime = [{
-  breakpad = "debug/.build-id/d8/5a303d6056996f1553a201e24c9c40d2bb7edb.sym"
-  debug = "debug/.build-id/d8/5a303d6056996f1553a201e24c9c40d2bb7edb.debug"
+  breakpad = "debug/.build-id/7c/a2e5243a2d84f789cb04c32279015884c99a07.sym"
+  debug = "debug/.build-id/7c/a2e5243a2d84f789cb04c32279015884c99a07.debug"
   dist = "clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.hwasan.so"
   soname = "libclang_rt.hwasan.so"
 }, {
-  breakpad = "debug/.build-id/1d/61848424947d98b0f8dde93e176b58ec0308ad.sym"
-  debug = "debug/.build-id/1d/61848424947d98b0f8dde93e176b58ec0308ad.debug"
+  breakpad = "debug/.build-id/6c/1fe38128c7ffa7969af51f01715ffb424709da.sym"
+  debug = "debug/.build-id/6c/1fe38128c7ffa7969af51f01715ffb424709da.debug"
   dist = "aarch64-unknown-fuchsia/hwasan/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/9a/abade020129c0392017df27167aa8d3394d8cc.sym"
-  debug = "debug/.build-id/9a/abade020129c0392017df27167aa8d3394d8cc.debug"
+  breakpad = "debug/.build-id/19/4e0917da3eac089c5b7fe4a77d04f5cab94f1c.sym"
+  debug = "debug/.build-id/19/4e0917da3eac089c5b7fe4a77d04f5cab94f1c.debug"
   dist = "aarch64-unknown-fuchsia/hwasan/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/69/23a72a14c1138055ebf196a476b17a90cbc03c.sym"
-  debug = "debug/.build-id/69/23a72a14c1138055ebf196a476b17a90cbc03c.debug"
+  breakpad = "debug/.build-id/d4/8fd12ce22cc36ec109f9e3f7d86fac04c1eaeb.sym"
+  debug = "debug/.build-id/d4/8fd12ce22cc36ec109f9e3f7d86fac04c1eaeb.debug"
   dist = "aarch64-unknown-fuchsia/hwasan/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1349,25 +1300,25 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=address"]
   ldflags = ["-static-libstdc++"]
   runtime = [{
-  breakpad = "debug/.build-id/fb/b1ddca7070daa2b3a47c52aa78ddf85c588086.sym"
-  debug = "debug/.build-id/fb/b1ddca7070daa2b3a47c52aa78ddf85c588086.debug"
+  breakpad = "debug/.build-id/df/a0a762e387100a767b52cbf3e76d2bffb4e685.sym"
+  debug = "debug/.build-id/df/a0a762e387100a767b52cbf3e76d2bffb4e685.debug"
   dist = "clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.asan.so"
   soname = "libclang_rt.asan.so"
 }, {
-  breakpad = "debug/.build-id/ec/bba758f38873503c695527b51741c7838b23ad.sym"
-  debug = "debug/.build-id/ec/bba758f38873503c695527b51741c7838b23ad.debug"
+  breakpad = "debug/.build-id/e7/8e6bcb2356a9d675c937e87b87f8a5697b3e46.sym"
+  debug = "debug/.build-id/e7/8e6bcb2356a9d675c937e87b87f8a5697b3e46.debug"
   dist = "aarch64-unknown-fuchsia/asan/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/17/bd152e787139d6de349d806b981befe832b2cc.sym"
-  debug = "debug/.build-id/17/bd152e787139d6de349d806b981befe832b2cc.debug"
+  breakpad = "debug/.build-id/b5/63768cb29cf8bf6f279227e0b9f86b80c6d2ff.sym"
+  debug = "debug/.build-id/b5/63768cb29cf8bf6f279227e0b9f86b80c6d2ff.debug"
   dist = "aarch64-unknown-fuchsia/asan/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/7a/f9caa4e4d312cd03d161f3b5e64ba3e6577e78.sym"
-  debug = "debug/.build-id/7a/f9caa4e4d312cd03d161f3b5e64ba3e6577e78.debug"
+  breakpad = "debug/.build-id/81/81cad31ec8331d47143e4498efcc2f7ae37732.sym"
+  debug = "debug/.build-id/81/81cad31ec8331d47143e4498efcc2f7ae37732.debug"
   dist = "aarch64-unknown-fuchsia/asan/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1377,25 +1328,25 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=undefined"]
   ldflags = ["-static-libstdc++"]
   runtime = [{
-  breakpad = "debug/.build-id/26/b8cf1f9a7183970a4b1347d6f24dddc2f62352.sym"
-  debug = "debug/.build-id/26/b8cf1f9a7183970a4b1347d6f24dddc2f62352.debug"
+  breakpad = "debug/.build-id/be/6154a0b880163ffd12dc64e48c4bf28debb044.sym"
+  debug = "debug/.build-id/be/6154a0b880163ffd12dc64e48c4bf28debb044.debug"
   dist = "clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
   soname = "libclang_rt.ubsan_standalone.so"
 }, {
-  breakpad = "debug/.build-id/67/098d2b5544e441811c7327c47a385dfe99fc30.sym"
-  debug = "debug/.build-id/67/098d2b5544e441811c7327c47a385dfe99fc30.debug"
+  breakpad = "debug/.build-id/90/0dd4ec2d9143389f6bc9a42b43683c04d8dd07.sym"
+  debug = "debug/.build-id/90/0dd4ec2d9143389f6bc9a42b43683c04d8dd07.debug"
   dist = "aarch64-unknown-fuchsia/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/99/4a02e8ad8c55ada654cfd7a15f30bb60ce88ad.sym"
-  debug = "debug/.build-id/99/4a02e8ad8c55ada654cfd7a15f30bb60ce88ad.debug"
+  breakpad = "debug/.build-id/79/ca71080bbd41bbb398b3c32cf1c00dc636410d.sym"
+  debug = "debug/.build-id/79/ca71080bbd41bbb398b3c32cf1c00dc636410d.debug"
   dist = "aarch64-unknown-fuchsia/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/92/882334401f44bb618953b412292ea9a1cf5efa.sym"
-  debug = "debug/.build-id/92/882334401f44bb618953b412292ea9a1cf5efa.debug"
+  breakpad = "debug/.build-id/19/9cdb726a2d0933705b970d66c38f02d1d68703.sym"
+  debug = "debug/.build-id/19/9cdb726a2d0933705b970d66c38f02d1d68703.debug"
   dist = "aarch64-unknown-fuchsia/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1405,25 +1356,25 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=hwaddress"]
   ldflags = ["-static-libstdc++"]
   runtime = [{
-  breakpad = "debug/.build-id/d8/5a303d6056996f1553a201e24c9c40d2bb7edb.sym"
-  debug = "debug/.build-id/d8/5a303d6056996f1553a201e24c9c40d2bb7edb.debug"
+  breakpad = "debug/.build-id/7c/a2e5243a2d84f789cb04c32279015884c99a07.sym"
+  debug = "debug/.build-id/7c/a2e5243a2d84f789cb04c32279015884c99a07.debug"
   dist = "clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.hwasan.so"
   soname = "libclang_rt.hwasan.so"
 }, {
-  breakpad = "debug/.build-id/1d/61848424947d98b0f8dde93e176b58ec0308ad.sym"
-  debug = "debug/.build-id/1d/61848424947d98b0f8dde93e176b58ec0308ad.debug"
+  breakpad = "debug/.build-id/6c/1fe38128c7ffa7969af51f01715ffb424709da.sym"
+  debug = "debug/.build-id/6c/1fe38128c7ffa7969af51f01715ffb424709da.debug"
   dist = "aarch64-unknown-fuchsia/hwasan/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/9a/abade020129c0392017df27167aa8d3394d8cc.sym"
-  debug = "debug/.build-id/9a/abade020129c0392017df27167aa8d3394d8cc.debug"
+  breakpad = "debug/.build-id/19/4e0917da3eac089c5b7fe4a77d04f5cab94f1c.sym"
+  debug = "debug/.build-id/19/4e0917da3eac089c5b7fe4a77d04f5cab94f1c.debug"
   dist = "aarch64-unknown-fuchsia/hwasan/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/69/23a72a14c1138055ebf196a476b17a90cbc03c.sym"
-  debug = "debug/.build-id/69/23a72a14c1138055ebf196a476b17a90cbc03c.debug"
+  breakpad = "debug/.build-id/d4/8fd12ce22cc36ec109f9e3f7d86fac04c1eaeb.sym"
+  debug = "debug/.build-id/d4/8fd12ce22cc36ec109f9e3f7d86fac04c1eaeb.debug"
   dist = "aarch64-unknown-fuchsia/hwasan/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1433,17 +1384,17 @@ This should never be set as a build argument.
   cflags = []
   ldflags = []
   runtime = [{
-  debug = "debug/.build-id/20/fd162bb26177cc1d27b33f6f8cca601d7c3257.debug"
+  debug = "debug/.build-id/bf/882d0e313c4ebd420df7a7da39fc99c9167b14.debug"
   dist = "riscv64-unknown-fuchsia/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  debug = "debug/.build-id/3c/8993f1d524edf37dac3db06c85524e3d2f8878.debug"
+  debug = "debug/.build-id/bf/12aff2e7a482967b4441f6b1e179ef168ba876.debug"
   dist = "riscv64-unknown-fuchsia/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  debug = "debug/.build-id/ec/c36a006c5b8441ff85d8ec28ac8778e5b8b4bc.debug"
+  debug = "debug/.build-id/27/46eab14854f576ee2a5159de485e019b99f6ce.debug"
   dist = "riscv64-unknown-fuchsia/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1453,21 +1404,21 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=address"]
   ldflags = []
   runtime = [{
-  debug = "debug/.build-id/78/1b8d33a77bdd5e2aabeac729762ae6761e9462.debug"
+  debug = "debug/.build-id/73/9a679e0fc07fa5dde4d99eab86eca16d20d641.debug"
   dist = "clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.asan.so"
   soname = "libclang_rt.asan.so"
 }, {
-  debug = "debug/.build-id/f2/f76b36216bb48f8b3a40f9e6ddb9d6f9ad4695.debug"
+  debug = "debug/.build-id/d7/d36714920bec73b0a1fe1cb96f3a07fb6a4f03.debug"
   dist = "riscv64-unknown-fuchsia/asan/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  debug = "debug/.build-id/62/32edb347b39281c0703461d3909fd768ed118b.debug"
+  debug = "debug/.build-id/c2/ddecc4b4dd59e38e9d013fec4d52cc586a53af.debug"
   dist = "riscv64-unknown-fuchsia/asan/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  debug = "debug/.build-id/9b/6ce41b8dcc422793cc993043fefd60b9f8d550.debug"
+  debug = "debug/.build-id/e3/f248aad068bc0d31b9cccc26987bdbc3e3b8fd.debug"
   dist = "riscv64-unknown-fuchsia/asan/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1477,21 +1428,21 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=undefined"]
   ldflags = []
   runtime = [{
-  debug = "debug/.build-id/58/65e3ef33b0f83fd2898d0bc48a1660a034640c.debug"
+  debug = "debug/.build-id/4e/9964eff5e57ff0b6c49c0c114cef4afc38af91.debug"
   dist = "clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
   soname = "libclang_rt.ubsan_standalone.so"
 }, {
-  debug = "debug/.build-id/20/fd162bb26177cc1d27b33f6f8cca601d7c3257.debug"
+  debug = "debug/.build-id/bf/882d0e313c4ebd420df7a7da39fc99c9167b14.debug"
   dist = "riscv64-unknown-fuchsia/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  debug = "debug/.build-id/3c/8993f1d524edf37dac3db06c85524e3d2f8878.debug"
+  debug = "debug/.build-id/bf/12aff2e7a482967b4441f6b1e179ef168ba876.debug"
   dist = "riscv64-unknown-fuchsia/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  debug = "debug/.build-id/ec/c36a006c5b8441ff85d8ec28ac8778e5b8b4bc.debug"
+  debug = "debug/.build-id/27/46eab14854f576ee2a5159de485e019b99f6ce.debug"
   dist = "riscv64-unknown-fuchsia/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1501,21 +1452,21 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=hwaddress"]
   ldflags = []
   runtime = [{
-  debug = "debug/.build-id/87/3effc9bcfdd3c0f7793da37fb8a62ffac83511.debug"
+  debug = "debug/.build-id/c8/ddb6bf78d22f3402d6d04024289d5b8e43980c.debug"
   dist = "clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.hwasan.so"
   soname = "libclang_rt.hwasan.so"
 }, {
-  debug = "debug/.build-id/20/fd162bb26177cc1d27b33f6f8cca601d7c3257.debug"
+  debug = "debug/.build-id/bf/882d0e313c4ebd420df7a7da39fc99c9167b14.debug"
   dist = "riscv64-unknown-fuchsia/hwasan/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  debug = "debug/.build-id/3c/8993f1d524edf37dac3db06c85524e3d2f8878.debug"
+  debug = "debug/.build-id/bf/12aff2e7a482967b4441f6b1e179ef168ba876.debug"
   dist = "riscv64-unknown-fuchsia/hwasan/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  debug = "debug/.build-id/19/1a289efe0eb8b8a1c18bc53fc43d78999f1012.debug"
+  debug = "debug/.build-id/63/77a2e54776c7de132c6bab9ad9781e1210e197.debug"
   dist = "riscv64-unknown-fuchsia/hwasan/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1530,21 +1481,21 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=address"]
   ldflags = ["-static-libstdc++"]
   runtime = [{
-  debug = "debug/.build-id/78/1b8d33a77bdd5e2aabeac729762ae6761e9462.debug"
+  debug = "debug/.build-id/73/9a679e0fc07fa5dde4d99eab86eca16d20d641.debug"
   dist = "clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.asan.so"
   soname = "libclang_rt.asan.so"
 }, {
-  debug = "debug/.build-id/f2/f76b36216bb48f8b3a40f9e6ddb9d6f9ad4695.debug"
+  debug = "debug/.build-id/d7/d36714920bec73b0a1fe1cb96f3a07fb6a4f03.debug"
   dist = "riscv64-unknown-fuchsia/asan/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  debug = "debug/.build-id/62/32edb347b39281c0703461d3909fd768ed118b.debug"
+  debug = "debug/.build-id/c2/ddecc4b4dd59e38e9d013fec4d52cc586a53af.debug"
   dist = "riscv64-unknown-fuchsia/asan/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  debug = "debug/.build-id/9b/6ce41b8dcc422793cc993043fefd60b9f8d550.debug"
+  debug = "debug/.build-id/e3/f248aad068bc0d31b9cccc26987bdbc3e3b8fd.debug"
   dist = "riscv64-unknown-fuchsia/asan/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1554,21 +1505,21 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=undefined"]
   ldflags = ["-static-libstdc++"]
   runtime = [{
-  debug = "debug/.build-id/58/65e3ef33b0f83fd2898d0bc48a1660a034640c.debug"
+  debug = "debug/.build-id/4e/9964eff5e57ff0b6c49c0c114cef4afc38af91.debug"
   dist = "clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
   soname = "libclang_rt.ubsan_standalone.so"
 }, {
-  debug = "debug/.build-id/20/fd162bb26177cc1d27b33f6f8cca601d7c3257.debug"
+  debug = "debug/.build-id/bf/882d0e313c4ebd420df7a7da39fc99c9167b14.debug"
   dist = "riscv64-unknown-fuchsia/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  debug = "debug/.build-id/3c/8993f1d524edf37dac3db06c85524e3d2f8878.debug"
+  debug = "debug/.build-id/bf/12aff2e7a482967b4441f6b1e179ef168ba876.debug"
   dist = "riscv64-unknown-fuchsia/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  debug = "debug/.build-id/ec/c36a006c5b8441ff85d8ec28ac8778e5b8b4bc.debug"
+  debug = "debug/.build-id/27/46eab14854f576ee2a5159de485e019b99f6ce.debug"
   dist = "riscv64-unknown-fuchsia/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1578,21 +1529,21 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=hwaddress"]
   ldflags = ["-static-libstdc++"]
   runtime = [{
-  debug = "debug/.build-id/87/3effc9bcfdd3c0f7793da37fb8a62ffac83511.debug"
+  debug = "debug/.build-id/c8/ddb6bf78d22f3402d6d04024289d5b8e43980c.debug"
   dist = "clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.hwasan.so"
   soname = "libclang_rt.hwasan.so"
 }, {
-  debug = "debug/.build-id/20/fd162bb26177cc1d27b33f6f8cca601d7c3257.debug"
+  debug = "debug/.build-id/bf/882d0e313c4ebd420df7a7da39fc99c9167b14.debug"
   dist = "riscv64-unknown-fuchsia/hwasan/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  debug = "debug/.build-id/3c/8993f1d524edf37dac3db06c85524e3d2f8878.debug"
+  debug = "debug/.build-id/bf/12aff2e7a482967b4441f6b1e179ef168ba876.debug"
   dist = "riscv64-unknown-fuchsia/hwasan/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  debug = "debug/.build-id/19/1a289efe0eb8b8a1c18bc53fc43d78999f1012.debug"
+  debug = "debug/.build-id/63/77a2e54776c7de132c6bab9ad9781e1210e197.debug"
   dist = "riscv64-unknown-fuchsia/hwasan/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1602,20 +1553,20 @@ This should never be set as a build argument.
   cflags = []
   ldflags = []
   runtime = [{
-  breakpad = "debug/.build-id/72/8c2a355209ecbab28ead8b1cee32a36fa76b3b.sym"
-  debug = "debug/.build-id/72/8c2a355209ecbab28ead8b1cee32a36fa76b3b.debug"
+  breakpad = "debug/.build-id/a5/498ea202b7665f3f7717210d50de567f46d8a0.sym"
+  debug = "debug/.build-id/a5/498ea202b7665f3f7717210d50de567f46d8a0.debug"
   dist = "x86_64-unknown-fuchsia/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/2d/c86ee58ab1e0127284b349fab5d1ed11221115.sym"
-  debug = "debug/.build-id/2d/c86ee58ab1e0127284b349fab5d1ed11221115.debug"
+  breakpad = "debug/.build-id/04/7358dc4e2f2382f3ca0fb4bf5bd495e246d020.sym"
+  debug = "debug/.build-id/04/7358dc4e2f2382f3ca0fb4bf5bd495e246d020.debug"
   dist = "x86_64-unknown-fuchsia/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/05/8c0101c14ce7614e97d9e867f68884b1cca4f0.sym"
-  debug = "debug/.build-id/05/8c0101c14ce7614e97d9e867f68884b1cca4f0.debug"
+  breakpad = "debug/.build-id/dd/72888febf9598da7f13aabfba6124a2fb61152.sym"
+  debug = "debug/.build-id/dd/72888febf9598da7f13aabfba6124a2fb61152.debug"
   dist = "x86_64-unknown-fuchsia/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1625,25 +1576,25 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=address"]
   ldflags = []
   runtime = [{
-  breakpad = "debug/.build-id/86/db77fbbed697296ff144b08cfac45ebd8010ca.sym"
-  debug = "debug/.build-id/86/db77fbbed697296ff144b08cfac45ebd8010ca.debug"
+  breakpad = "debug/.build-id/fe/c7fc285e2beb614148b90e0fdc490d508aebe6.sym"
+  debug = "debug/.build-id/fe/c7fc285e2beb614148b90e0fdc490d508aebe6.debug"
   dist = "clang/21/lib/x86_64-unknown-fuchsia/libclang_rt.asan.so"
   soname = "libclang_rt.asan.so"
 }, {
-  breakpad = "debug/.build-id/4c/9a442d9ab07a7a3a6b9045c1dd38356cd7bbd3.sym"
-  debug = "debug/.build-id/4c/9a442d9ab07a7a3a6b9045c1dd38356cd7bbd3.debug"
+  breakpad = "debug/.build-id/f4/3b07a5254080f96de31fac23afa5288911d71d.sym"
+  debug = "debug/.build-id/f4/3b07a5254080f96de31fac23afa5288911d71d.debug"
   dist = "x86_64-unknown-fuchsia/asan/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/f4/02f87095ee019ec7c94878a10bf7440ef2f9a2.sym"
-  debug = "debug/.build-id/f4/02f87095ee019ec7c94878a10bf7440ef2f9a2.debug"
+  breakpad = "debug/.build-id/73/227228568b2d1952e39030165c5058d70539cc.sym"
+  debug = "debug/.build-id/73/227228568b2d1952e39030165c5058d70539cc.debug"
   dist = "x86_64-unknown-fuchsia/asan/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/ee/11dce8dccd34941247931491df5bf4f8501251.sym"
-  debug = "debug/.build-id/ee/11dce8dccd34941247931491df5bf4f8501251.debug"
+  breakpad = "debug/.build-id/c4/c6cd307765a6c2997e41e0421f1e8c1de917f3.sym"
+  debug = "debug/.build-id/c4/c6cd307765a6c2997e41e0421f1e8c1de917f3.debug"
   dist = "x86_64-unknown-fuchsia/asan/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1653,25 +1604,25 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=undefined"]
   ldflags = []
   runtime = [{
-  breakpad = "debug/.build-id/10/77f3992a8db47f942d8be19d53404f2c0040a4.sym"
-  debug = "debug/.build-id/10/77f3992a8db47f942d8be19d53404f2c0040a4.debug"
+  breakpad = "debug/.build-id/33/a58189bc109f6c227c582c12ad6b05be020224.sym"
+  debug = "debug/.build-id/33/a58189bc109f6c227c582c12ad6b05be020224.debug"
   dist = "clang/21/lib/x86_64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
   soname = "libclang_rt.ubsan_standalone.so"
 }, {
-  breakpad = "debug/.build-id/72/8c2a355209ecbab28ead8b1cee32a36fa76b3b.sym"
-  debug = "debug/.build-id/72/8c2a355209ecbab28ead8b1cee32a36fa76b3b.debug"
+  breakpad = "debug/.build-id/a5/498ea202b7665f3f7717210d50de567f46d8a0.sym"
+  debug = "debug/.build-id/a5/498ea202b7665f3f7717210d50de567f46d8a0.debug"
   dist = "x86_64-unknown-fuchsia/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/2d/c86ee58ab1e0127284b349fab5d1ed11221115.sym"
-  debug = "debug/.build-id/2d/c86ee58ab1e0127284b349fab5d1ed11221115.debug"
+  breakpad = "debug/.build-id/04/7358dc4e2f2382f3ca0fb4bf5bd495e246d020.sym"
+  debug = "debug/.build-id/04/7358dc4e2f2382f3ca0fb4bf5bd495e246d020.debug"
   dist = "x86_64-unknown-fuchsia/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/05/8c0101c14ce7614e97d9e867f68884b1cca4f0.sym"
-  debug = "debug/.build-id/05/8c0101c14ce7614e97d9e867f68884b1cca4f0.debug"
+  breakpad = "debug/.build-id/dd/72888febf9598da7f13aabfba6124a2fb61152.sym"
+  debug = "debug/.build-id/dd/72888febf9598da7f13aabfba6124a2fb61152.debug"
   dist = "x86_64-unknown-fuchsia/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1686,25 +1637,25 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=address"]
   ldflags = ["-static-libstdc++"]
   runtime = [{
-  breakpad = "debug/.build-id/86/db77fbbed697296ff144b08cfac45ebd8010ca.sym"
-  debug = "debug/.build-id/86/db77fbbed697296ff144b08cfac45ebd8010ca.debug"
+  breakpad = "debug/.build-id/fe/c7fc285e2beb614148b90e0fdc490d508aebe6.sym"
+  debug = "debug/.build-id/fe/c7fc285e2beb614148b90e0fdc490d508aebe6.debug"
   dist = "clang/21/lib/x86_64-unknown-fuchsia/libclang_rt.asan.so"
   soname = "libclang_rt.asan.so"
 }, {
-  breakpad = "debug/.build-id/4c/9a442d9ab07a7a3a6b9045c1dd38356cd7bbd3.sym"
-  debug = "debug/.build-id/4c/9a442d9ab07a7a3a6b9045c1dd38356cd7bbd3.debug"
+  breakpad = "debug/.build-id/f4/3b07a5254080f96de31fac23afa5288911d71d.sym"
+  debug = "debug/.build-id/f4/3b07a5254080f96de31fac23afa5288911d71d.debug"
   dist = "x86_64-unknown-fuchsia/asan/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/f4/02f87095ee019ec7c94878a10bf7440ef2f9a2.sym"
-  debug = "debug/.build-id/f4/02f87095ee019ec7c94878a10bf7440ef2f9a2.debug"
+  breakpad = "debug/.build-id/73/227228568b2d1952e39030165c5058d70539cc.sym"
+  debug = "debug/.build-id/73/227228568b2d1952e39030165c5058d70539cc.debug"
   dist = "x86_64-unknown-fuchsia/asan/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/ee/11dce8dccd34941247931491df5bf4f8501251.sym"
-  debug = "debug/.build-id/ee/11dce8dccd34941247931491df5bf4f8501251.debug"
+  breakpad = "debug/.build-id/c4/c6cd307765a6c2997e41e0421f1e8c1de917f3.sym"
+  debug = "debug/.build-id/c4/c6cd307765a6c2997e41e0421f1e8c1de917f3.debug"
   dist = "x86_64-unknown-fuchsia/asan/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1714,25 +1665,25 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=undefined"]
   ldflags = ["-static-libstdc++"]
   runtime = [{
-  breakpad = "debug/.build-id/10/77f3992a8db47f942d8be19d53404f2c0040a4.sym"
-  debug = "debug/.build-id/10/77f3992a8db47f942d8be19d53404f2c0040a4.debug"
+  breakpad = "debug/.build-id/33/a58189bc109f6c227c582c12ad6b05be020224.sym"
+  debug = "debug/.build-id/33/a58189bc109f6c227c582c12ad6b05be020224.debug"
   dist = "clang/21/lib/x86_64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
   soname = "libclang_rt.ubsan_standalone.so"
 }, {
-  breakpad = "debug/.build-id/72/8c2a355209ecbab28ead8b1cee32a36fa76b3b.sym"
-  debug = "debug/.build-id/72/8c2a355209ecbab28ead8b1cee32a36fa76b3b.debug"
+  breakpad = "debug/.build-id/a5/498ea202b7665f3f7717210d50de567f46d8a0.sym"
+  debug = "debug/.build-id/a5/498ea202b7665f3f7717210d50de567f46d8a0.debug"
   dist = "x86_64-unknown-fuchsia/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/2d/c86ee58ab1e0127284b349fab5d1ed11221115.sym"
-  debug = "debug/.build-id/2d/c86ee58ab1e0127284b349fab5d1ed11221115.debug"
+  breakpad = "debug/.build-id/04/7358dc4e2f2382f3ca0fb4bf5bd495e246d020.sym"
+  debug = "debug/.build-id/04/7358dc4e2f2382f3ca0fb4bf5bd495e246d020.debug"
   dist = "x86_64-unknown-fuchsia/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/05/8c0101c14ce7614e97d9e867f68884b1cca4f0.sym"
-  debug = "debug/.build-id/05/8c0101c14ce7614e97d9e867f68884b1cca4f0.debug"
+  breakpad = "debug/.build-id/dd/72888febf9598da7f13aabfba6124a2fb61152.sym"
+  debug = "debug/.build-id/dd/72888febf9598da7f13aabfba6124a2fb61152.debug"
   dist = "x86_64-unknown-fuchsia/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1914,7 +1865,7 @@ from infra builds, and later inspection.
 
 **Current value (from the default):** `"//out/not-default/comparison-reports"`
 
-From //build/toolchain/rbe.gni:221
+From //build/toolchain/rbe.gni:228
 
 ### compilation_mode
 
@@ -2131,7 +2082,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:206
+From //build/toolchain/rbe.gni:213
 
 ### cxx_rbe_download_obj_files
 
@@ -2143,7 +2094,7 @@ and not restricted environments that lack direct network access.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:228
+From //build/toolchain/rbe.gni:235
 
 ### cxx_rbe_enable
 
@@ -2152,7 +2103,7 @@ Remote execution offers increased build parallelism and caching.
 
 **Current value (from the default):** `false`
 
-From //build/toolchain/rbe.gni:159
+From //build/toolchain/rbe.gni:163
 
 ### cxx_rbe_exec_strategy
 
@@ -2171,11 +2122,14 @@ One of:
 
   * "racing": Race local vs. remote execution, take the first to finish.
 
+  * "nocache": Force remote execution without using cached results.
+        This can be useful for benchmarking cache-miss scenarios.
+
   (There are other rewrapper options that are not exposed.)
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:182
+From //build/toolchain/rbe.gni:189
 
 ### cxx_rbe_full_toolchain
 
@@ -2190,7 +2144,7 @@ Use this primarily for debugging and as an emergency workaround.
 
 **Current value (from the default):** `false`
 
-From //build/toolchain/rbe.gni:216
+From //build/toolchain/rbe.gni:223
 
 ### cxx_rbe_minimalist_wrapper
 
@@ -2200,7 +2154,7 @@ This flag is only meaningful when `cxx_rbe_enable` is true.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:164
+From //build/toolchain/rbe.gni:168
 
 ### data_filesystem_format
 
@@ -2260,7 +2214,7 @@ These are always a dependency of the main product assembly.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:25
+From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
@@ -2268,7 +2222,7 @@ From //BUILD.gn:86
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:25
+From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
@@ -2276,7 +2230,7 @@ From //BUILD.gn:86
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:25
+From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
@@ -2334,6 +2288,14 @@ These take precedence over `profile_source_files`.
 
 From //build/config/profile/config.gni:18
 
+### dtbo_label
+
+The label for the dtbo target. This is used by boot_tests
+
+**Current value (from the default):** `false`
+
+From //build/board.gni:47
+
 ### dwarf_version
 
 Explicitly specify DWARF version used.
@@ -2349,7 +2311,7 @@ hardware or emulated).
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:21
+From //out/not-default/args.gn:20
 
 **Overridden from the default:** `[]`
 
@@ -2357,7 +2319,7 @@ From //BUILD.gn:75
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:21
+From //out/not-default/args.gn:20
 
 **Overridden from the default:** `[]`
 
@@ -2365,7 +2327,7 @@ From //BUILD.gn:75
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:21
+From //out/not-default/args.gn:20
 
 **Overridden from the default:** `[]`
 
@@ -2455,7 +2417,7 @@ disabled.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:132
+From //zircon/kernel/params.gni:135
 
 ### enable_mdns_trace
 
@@ -2757,6 +2719,14 @@ instead use the `fuchsia_cxx_version` variable.
 
 From //build/config/fuchsia_cxx_version.gni:26
 
+### experimental_ktrace_streaming_enabled
+
+Support streaming ktrace data out of the kernel.
+
+**Current value (from the default):** `false`
+
+From //zircon/kernel/params.gni:127
+
 ### experimental_thread_sampler_enabled
 
 Include a mechanism for the kernel to sample threads and write the results to a buffer
@@ -2806,7 +2776,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1904
+From //build/config/BUILDCONFIG.gn:1900
 
 ### fastboot_product
 
@@ -3086,7 +3056,7 @@ Fully hermetic tests (both by packaging and at runtime)
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:19
+From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
@@ -3094,7 +3064,7 @@ From //BUILD.gn:67
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:19
+From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
@@ -3102,7 +3072,7 @@ From //BUILD.gn:67
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:19
+From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
@@ -3128,7 +3098,7 @@ These will be added to the build using the host toolchain.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:11
+From //out/not-default/args.gn:10
 
 **Overridden from the default:** `[]`
 
@@ -3136,7 +3106,7 @@ From //BUILD.gn:93
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:11
+From //out/not-default/args.gn:10
 
 **Overridden from the default:** `[]`
 
@@ -3144,7 +3114,7 @@ From //BUILD.gn:93
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:11
+From //out/not-default/args.gn:10
 
 **Overridden from the default:** `[]`
 
@@ -3163,7 +3133,7 @@ These will be added to the build using the host toolchain.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:22
+From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
@@ -3171,7 +3141,7 @@ From //BUILD.gn:81
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:22
+From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
@@ -3179,7 +3149,7 @@ From //BUILD.gn:81
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:22
+From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
@@ -3793,7 +3763,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1688
+From //build/config/BUILDCONFIG.gn:1684
 
 ### link_rbe_check
 
@@ -3818,13 +3788,13 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:275
+From //build/toolchain/rbe.gni:285
 
 ### link_rbe_download_unstripped_outputs
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:291
+From //build/toolchain/rbe.gni:301
 
 ### link_rbe_enable
 
@@ -3834,7 +3804,7 @@ linkers like `lld`.
 
 **Current value (from the default):** `false`
 
-From //build/toolchain/rbe.gni:237
+From //build/toolchain/rbe.gni:244
 
 ### link_rbe_exec_strategy
 
@@ -3853,11 +3823,14 @@ One of:
 
   * "racing": Race local vs. remote execution, take the first to finish.
 
+  * "nocache": Force remote execution without using cached results.
+        This can be useful for benchmarking cache-miss scenarios.
+
   (There are other rewrapper options that are not exposed.)
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:255
+From //build/toolchain/rbe.gni:265
 
 ### link_rbe_full_toolchain
 
@@ -3872,7 +3845,7 @@ Use this primarily for debugging and as an emergency workaround.
 
 **Current value (from the default):** `false`
 
-From //build/toolchain/rbe.gni:285
+From //build/toolchain/rbe.gni:295
 
 ### llvm_prefix
 
@@ -4651,14 +4624,11 @@ This is useful for reducing the overall build time of any build that
 includes the IDK/SDK in exchange for reduced coverage of API level support.
 For example, `fx build //sdk:final_fuchsia_idk`.
 
-Note: The in-tree Bazel SDK ignores this variable and the variable it
-overrides unless `bazel_fuchsia_sdk_all_api_levels` is true.
-
 To override the set of target CPUs, see `override_idk_target_cpus`.
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:44
+From //build/config/fuchsia/platform_version.gni:41
 
 ### override_idk_target_cpus
 
@@ -4671,15 +4641,12 @@ This is useful for reducing the overall build time of any build that
 includes the IDK/SDK in exchange for reduced coverage of target CPU
 architecture support. For example, `fx build //sdk:final_fuchsia_idk`.
 
-Note: The in-tree Bazel SDK ignores this variable and the variable it
-overrides unless `bazel_fuchsia_sdk_all_cpus` is true.
-
 To override the set of API levels, see
 `override_idk_buildable_api_levels`.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:63
+From //build/sdk/config.gni:60
 
 ### override_target_api_level
 
@@ -4907,7 +4874,7 @@ Example:
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:27
+From //out/not-default/args.gn:26
 
 **Overridden from the default:** `[]`
 
@@ -4915,7 +4882,7 @@ From //build/assembly/developer_overrides.gni:443
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:27
+From //out/not-default/args.gn:26
 
 **Overridden from the default:** `[]`
 
@@ -4923,7 +4890,7 @@ From //build/assembly/developer_overrides.gni:443
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:27
+From //out/not-default/args.gn:26
 
 **Overridden from the default:** `[]`
 
@@ -5040,7 +5007,7 @@ precedence over those earlier in the list.
 
 **Current value (from the default):** `[]`
 
-From //build/toolchain/rbe.gni:30
+From //build/toolchain/rbe.gni:31
 
 ### rbe_mode
 
@@ -5052,6 +5019,7 @@ The overall mode for RBE to be operating in.  The valid values are:
                        remote services.
  * 'remote_full' => Run as many actions remotely as possible, including
                  cache-misses, which reduces use of local resources.
+ * 'racing' => Race remote against local execution, for some action types.
  * 'cloudtop' => An RBE configuration that's optimized for running on a
                  cloudtop. Suitable for high-bandwidth connections to
                  remote services and downloading remote outputs.
@@ -5066,10 +5034,11 @@ The overall mode for RBE to be operating in.  The valid values are:
  * 'low_bandwidth_remote' => An RBE configuration for low network bandwidth.
                              Saves bandwidth by avoiding downloading some
                              intermediate results.
+ * 'nocache' => Force all cache-misses, and re-execute remotely.
 
 **Current value (from the default):** `"off"`
 
-From //build/toolchain/rbe_modes.gni:42
+From //build/toolchain/rbe_modes.gni:44
 
 ### rbe_settings_overrides
 
@@ -5078,7 +5047,7 @@ variables whose default values are set by the chosen RBE mode (above).
 
 **Current value (from the default):** `{ }`
 
-From //build/toolchain/rbe_modes.gni:46
+From //build/toolchain/rbe_modes.gni:48
 
 ### recovery_board_configuration_label
 
@@ -5090,7 +5059,7 @@ provided value for 'board_configuration_label'
 
 **Current value (from the default):** `"//boards/arm64"`
 
-From //build/board.gni:53
+From //build/board.gni:56
 
 ### recovery_label
 
@@ -5194,7 +5163,7 @@ This is required to support skipping downloads of rlibs.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:147
+From //build/toolchain/rbe.gni:151
 
 ### rust_incremental
 
@@ -5261,7 +5230,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:133
+From //build/toolchain/rbe.gni:137
 
 ### rust_rbe_download_rlibs
 
@@ -5270,13 +5239,13 @@ rlibs from remote Rust build actions.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:151
+From //build/toolchain/rbe.gni:155
 
 ### rust_rbe_download_unstripped_binaries
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:141
+From //build/toolchain/rbe.gni:145
 
 ### rust_rbe_enable
 
@@ -5284,7 +5253,7 @@ Set to true to enable distributed compilation of Rust using RBE.
 
 **Current value (from the default):** `false`
 
-From //build/toolchain/rbe.gni:89
+From //build/toolchain/rbe.gni:90
 
 ### rust_rbe_exec_strategy
 
@@ -5303,11 +5272,14 @@ One of:
 
   * "racing": Race local vs. remote execution, take the first to finish.
 
+  * "nocache": Force remote execution without using cached results.
+        This can be useful for benchmarking cache-miss scenarios.
+
   (There are other rewrapper options that are not exposed.)
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:107
+From //build/toolchain/rbe.gni:111
 
 ### rust_v0_symbol_mangling
 
@@ -5367,7 +5339,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"8mnLlRMzmf2kuuAMl7YmrCJUSdEB_3_8eb0aZq6ON8cC"`
+**Current value (from the default):** `"Z8GPhKzVXPk3UBmsmFTPcl9Mpx0Wz3yjSUzHkKbPMJMC"`
 
 From //build/rust/config.gni:42
 
@@ -5619,7 +5591,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2114
+From //build/config/BUILDCONFIG.gn:2110
 
 ### select_variant_canonical
 
@@ -5629,7 +5601,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2119
+From //build/config/BUILDCONFIG.gn:2115
 
 ### select_variant_shortcuts
 
@@ -5694,7 +5666,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1911
+From //build/config/BUILDCONFIG.gn:1907
 
 ### size_checker_input
 
@@ -5986,19 +5958,19 @@ From //src/sysmem/server/BUILD.gn:29
 
 **Current value for `target_cpu = "arm64"`:** `"arm64"`
 
-From //out/not-default/args.gn:12
+From //out/not-default/args.gn:11
 
 **Overridden from the default:** `""`
 
 **Current value for `target_cpu = "riscv64"`:** `"riscv64"`
 
-From //out/not-default/args.gn:12
+From //out/not-default/args.gn:11
 
 **Overridden from the default:** `""`
 
 **Current value for `target_cpu = "x64"`:** `"x64"`
 
-From //out/not-default/args.gn:12
+From //out/not-default/args.gn:11
 
 **Overridden from the default:** `""`
 
@@ -6076,7 +6048,7 @@ be flagged as an error by the build.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:20
+From //out/not-default/args.gn:19
 
 **Overridden from the default:** `[]`
 
@@ -6084,7 +6056,7 @@ From //BUILD.gn:71
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:20
+From //out/not-default/args.gn:19
 
 **Overridden from the default:** `[]`
 
@@ -6092,7 +6064,7 @@ From //BUILD.gn:71
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:20
+From //out/not-default/args.gn:19
 
 **Overridden from the default:** `[]`
 
@@ -6156,7 +6128,7 @@ for details and documentation for each field.
 }
 ```
 
-From //build/config/BUILDCONFIG.gn:100
+From //build/config/BUILDCONFIG.gn:96
 
 ### truncate_build_info_commit_date
 
@@ -6214,7 +6186,7 @@ the build.
 
 **Current value for `target_cpu = "arm64"`:** `["//bundles/kitchen_sink"]`
 
-From //out/not-default/args.gn:15
+From //out/not-default/args.gn:14
 
 **Overridden from the default:** `[]`
 
@@ -6222,7 +6194,7 @@ From //BUILD.gn:34
 
 **Current value for `target_cpu = "riscv64"`:** `["//bundles/buildbot/minimal"]`
 
-From //out/not-default/args.gn:15
+From //out/not-default/args.gn:14
 
 **Overridden from the default:** `[]`
 
@@ -6230,7 +6202,7 @@ From //BUILD.gn:34
 
 **Current value for `target_cpu = "x64"`:** `["//bundles/kitchen_sink"]`
 
-From //out/not-default/args.gn:15
+From //out/not-default/args.gn:14
 
 **Overridden from the default:** `[]`
 
@@ -6518,7 +6490,7 @@ at worst, or incorrect log attribution at best.
 
 **Current value (from the default):** `false`
 
-From //src/storage/lib/vfs/rust/BUILD.gn:15
+From //src/storage/lib/vfs/rust/BUILD.gn:16
 
 ### vim3_mcu_fan_default_level
 
@@ -6733,7 +6705,7 @@ This allows testing for a Zircon-specific toolchain with:
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:117
+From //build/config/BUILDCONFIG.gn:113
 
 ### zircon_tracelog
 

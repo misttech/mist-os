@@ -28,6 +28,9 @@ Display::Display(fuchsia_hardware_display_types::wire::DisplayId id, uint32_t wi
       maximum_refresh_rate_in_millihertz_(maximum_refresh_rate_in_millihertz) {
   zx::event::create(0, &ownership_event_);
   device_pixel_ratio_.store({1.f, 1.f});
+
+  // Most displays will have a longer interval.  If so, `OnVsync()` will adjust.
+  vsync_timing_->set_vsync_interval(kMinimumVsyncInterval);
 }
 Display::Display(fuchsia_hardware_display_types::wire::DisplayId id, uint32_t width_in_px,
                  uint32_t height_in_px)
@@ -45,18 +48,16 @@ void Display::Unclaim() {
 
 void Display::OnVsync(zx::time timestamp,
                       fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp) {
-  zx::duration time_since_last_vsync = timestamp - vsync_timing_->last_vsync_time();
-
-  if (vsync_timing_->last_vsync_time() != zx::time(0)) {
-    // Estimate current vsync interval. Need to include a maximum to mitigate any
-    // potential issues during long breaks.
-    if (time_since_last_vsync >= kMaximumVsyncInterval) {
-      FX_LOGS(WARNING) << "More than " << kMaximumVsyncInterval.to_msecs()
-                       << "ms observed between vsyncs.";
-    }
-    vsync_timing_->set_vsync_interval(time_since_last_vsync < kMaximumVsyncInterval
-                                          ? time_since_last_vsync
-                                          : vsync_timing_->vsync_interval());
+  // Estimate current vsync interval. Need to include a maximum to mitigate any
+  // potential issues during long breaks.
+  const zx::duration time_since_last_vsync = timestamp - vsync_timing_->last_vsync_time();
+  if (time_since_last_vsync >= kMaximumVsyncInterval) {
+    FX_LOGS(WARNING) << "Display::OnVsync()  computed interval " << time_since_last_vsync.to_msecs()
+                     << "ms exceeds maximum of " << kMaximumVsyncInterval.to_msecs()
+                     << "ms.  Keeping existing interval: "
+                     << vsync_timing_->vsync_interval().to_msecs() << "ms.";
+  } else {
+    vsync_timing_->set_vsync_interval(std::max(kMinimumVsyncInterval, time_since_last_vsync));
   }
 
   vsync_timing_->set_last_vsync_time(timestamp);

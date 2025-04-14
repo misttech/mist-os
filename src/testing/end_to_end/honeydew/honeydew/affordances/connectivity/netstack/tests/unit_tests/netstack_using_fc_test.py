@@ -9,9 +9,9 @@ from ipaddress import IPv4Address, IPv6Address
 from typing import TypeVar
 from unittest import mock
 
-import fidl.fuchsia_net as f_net
-import fidl.fuchsia_net_interfaces as f_net_interfaces
-import fidl.fuchsia_net_root as f_net_root
+import fidl_fuchsia_net as f_net
+import fidl_fuchsia_net_interfaces as f_net_interfaces
+import fidl_fuchsia_net_root as f_net_root
 from fuchsia_controller_py import Channel, ZxStatus
 
 from honeydew import affordances_capable

@@ -280,9 +280,6 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   std::optional<cpp20::span<const fuchsia_driver_framework::wire::NodeProperty2>> GetNodeProperties(
       std::string_view parent_name = "default") const;
 
-  std::optional<std::vector<fuchsia_driver_framework::NodeProperty>> GetDeprecatedNodeProperties(
-      std::string_view parent_name = "default") const;
-
   void SetDictionaryRef(std::optional<uint64_t> dictionary_ref) {
     dictionary_ref_ = dictionary_ref;
   }

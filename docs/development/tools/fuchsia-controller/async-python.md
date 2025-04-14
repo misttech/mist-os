@@ -5,7 +5,7 @@ pitfalls when using async Python.
 
 Before you continue, check out this
 [official documentation][python-async-docs]{:.external} on `asyncio` and
-the [tutorial][getting-started] for Fuchsia Controller.
+the [tutorial][scripting-remote-actions] for Fuchsia Controller.
 
 ## Background
 
@@ -178,7 +178,7 @@ class FidlInstance():
 
     def __init__(self, proxy_channel):
         self._loop = asyncio.new_event_loop()
-        self.echo_proxy = fidl.fuchsia_developer_ffx.Echo.Client(proxy_channel)
+        self.echo_proxy = fidl_fuchsia_developer_ffx.EchoClient(proxy_channel)
 
     def __del__(self):
         self._loop.close()
@@ -283,6 +283,6 @@ loop logic is initialized properly.
 <!-- Reference links -->
 
 [asyncio-wait]: https://docs.python.org/3/library/asyncio-task.html#asyncio.wait
-[getting-started]: /docs/development/tools/fuchsia-controller/getting-started-in-tree.md
+[scripting-remote-actions]: /docs/development/tools/fuchsia-controller/scripting-remote-actions.md
 [python-async-docs]: https://docs.python.org/3/library/asyncio.html
 [python-synchronization-docs]: https://docs.python.org/3/library/asyncio-sync.html

@@ -9,7 +9,6 @@
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/zbi.h>
 
-#include <array>
 #include <cstdint>
 #include <string_view>
 
@@ -158,13 +157,13 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_PL011_UART, zbi_dcfg
   template <typename... Args>
   explicit Driver(Args&&... args) : Base(std::forward<Args>(args)...) {}
 
-  using Base::MaybeCreate;
+  using Base::TryMatch;
 
-  static std::optional<Driver> MaybeCreate(std::string_view string) {
+  static std::optional<Config<Driver>> TryMatch(std::string_view string) {
     if (string == "qemu") {
-      return Driver(kQemuConfig);
+      return Config<Driver>(kQemuConfig);
     }
-    return Base::MaybeCreate(string);
+    return Base::TryMatch(string);
   }
 
   template <class IoProvider>

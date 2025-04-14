@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 use thiserror::Error;
 
-use fidl_fuchsia_netpol_socketproxy as fnp_socketproxy;
+use fidl_fuchsia_net_policy_socketproxy as fnp_socketproxy;
 
 /// Manager for communicating network properties.
 #[derive(Inspect, Default)]

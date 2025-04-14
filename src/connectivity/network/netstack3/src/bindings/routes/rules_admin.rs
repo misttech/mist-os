@@ -10,8 +10,8 @@ use std::pin::pin;
 use assert_matches::assert_matches;
 use fidl::endpoints::{ControlHandle as _, ProtocolMarker as _};
 use fnet_routes_ext::rules::{
-    FidlRuleAdminIpExt, InstalledRule, MarkMatcher, RuleAction, RuleIndex, RuleMatcher,
-    RuleSetPriority, RuleSetRequest, RuleTableRequest,
+    FidlRuleAdminIpExt, InstalledRule, InterfaceMatcher, MarkMatcher, RuleAction, RuleIndex,
+    RuleMatcher, RuleSetPriority, RuleSetRequest, RuleTableRequest,
 };
 use fnet_routes_ext::Responder;
 use futures::channel::{mpsc, oneshot};
@@ -22,9 +22,24 @@ use {
     fidl_fuchsia_net_routes_ext as fnet_routes_ext,
 };
 
-use crate::bindings::util::{TaskWaitGroupSpawner, TryFromFidl, TryIntoCore as _};
+use crate::bindings::util::{IntoCore as _, TaskWaitGroupSpawner, TryFromFidl, TryIntoCore as _};
 use crate::bindings::{routes, Ctx};
 pub(super) use witness::AddableMatcher;
+
+impl TryFromFidl<InterfaceMatcher> for netstack3_core::routes::BoundDeviceMatcher {
+    type Error = std::convert::Infallible;
+
+    fn try_from_fidl(fidl: InterfaceMatcher) -> Result<Self, Self::Error> {
+        match fidl {
+            InterfaceMatcher::DeviceName(name) => {
+                Ok(netstack3_core::routes::BoundDeviceMatcher::DeviceName(
+                    netstack3_core::device::DeviceNameMatcher(name),
+                ))
+            }
+            InterfaceMatcher::Unbound => Ok(netstack3_core::routes::BoundDeviceMatcher::Unbound),
+        }
+    }
+}
 
 impl<I: Ip> TryFromFidl<RuleMatcher<I>> for netstack3_core::routes::RuleMatcher<I> {
     type Error = fnet_routes_admin::RuleSetError;
@@ -33,18 +48,18 @@ impl<I: Ip> TryFromFidl<RuleMatcher<I>> for netstack3_core::routes::RuleMatcher<
         let RuleMatcher { from, locally_generated, bound_device, mark_1, mark_2 } = matcher;
         let traffic_origin_matcher = match (locally_generated, bound_device) {
             (None, None) => None,
-            (None, Some(fnet_routes_ext::rules::InterfaceMatcher::DeviceName(name))) => {
+            (None, Some(bound_device_matcher)) => {
                 Some(netstack3_core::routes::TrafficOriginMatcher::Local {
-                    bound_device_matcher: Some(netstack3_core::device::DeviceNameMatcher(name)),
+                    bound_device_matcher: Some(bound_device_matcher.into_core()),
                 })
             }
             (Some(true), None) => Some(netstack3_core::routes::TrafficOriginMatcher::Local {
                 bound_device_matcher: None,
             }),
             (Some(false), None) => Some(netstack3_core::routes::TrafficOriginMatcher::NonLocal),
-            (Some(true), Some(fnet_routes_ext::rules::InterfaceMatcher::DeviceName(name))) => {
+            (Some(true), Some(bound_device_matcher)) => {
                 Some(netstack3_core::routes::TrafficOriginMatcher::Local {
-                    bound_device_matcher: Some(netstack3_core::device::DeviceNameMatcher(name)),
+                    bound_device_matcher: Some(bound_device_matcher.into_core()),
                 })
             }
             (Some(false), Some(_)) => return Err(fnet_routes_admin::RuleSetError::InvalidMatcher),
@@ -498,7 +513,9 @@ mod witness {
 mod tests {
     use net_types::ip::Ipv4;
     use netstack3_core::device::DeviceNameMatcher;
-    use netstack3_core::routes::{RuleMatcher as CoreRuleMatcher, TrafficOriginMatcher};
+    use netstack3_core::routes::{
+        BoundDeviceMatcher, RuleMatcher as CoreRuleMatcher, TrafficOriginMatcher,
+    };
     use test_case::test_case;
 
     use super::*;
@@ -509,13 +526,17 @@ mod tests {
     }))]
     #[test_case(None, true => Ok(CoreRuleMatcher {
         traffic_origin_matcher: Some(TrafficOriginMatcher::Local {
-            bound_device_matcher: Some(DeviceNameMatcher("lo".into())),
+            bound_device_matcher: Some(
+                BoundDeviceMatcher::DeviceName(DeviceNameMatcher("lo".into()))
+            ),
         }),
         ..CoreRuleMatcher::match_all_packets()
     }))]
     #[test_case(Some(true), true => Ok(CoreRuleMatcher {
         traffic_origin_matcher: Some(TrafficOriginMatcher::Local {
-            bound_device_matcher: Some(DeviceNameMatcher("lo".into())),
+            bound_device_matcher: Some(
+                BoundDeviceMatcher::DeviceName(DeviceNameMatcher("lo".into()))
+            ),
         }),
         ..CoreRuleMatcher::match_all_packets()
     }))]

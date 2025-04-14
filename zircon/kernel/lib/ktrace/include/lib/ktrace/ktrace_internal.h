@@ -30,6 +30,7 @@
 namespace ktrace_internal_tests {
 class TestKTraceState;
 }
+class KTraceTests;
 
 namespace internal {
 
@@ -44,8 +45,8 @@ class KTraceState {
   //
   // During saturating operation, if an attempt is made to write a record to the
   // ktrace buffer, but there is not enough room to write the record, then the
-  // buffer has become "saturated".  The record is dropped, and the group mask
-  // is cleared, preventing new writes from occurring until the trace is
+  // buffer has become "saturated".  The record is dropped, and writes are
+  // disabled, preventing new writes from occurring until the trace is
   // restarted.
   //
   // During circular operation, if an attempt is made to write a record to the
@@ -81,15 +82,12 @@ class KTraceState {
   // |target_bufsize| : The target size (in bytes) of the ktrace buffer to be
   // allocated.  Must be a multiple of 8 bytes.
   //
-  // |initial_groups| : The initial set of enabled trace groups (see
-  // zircon-internal/ktrace.h).  If non-zero, causes Init to attempt to allocate
-  // the trace buffer immediately.  If the allocation fails, or the initial
-  // group mask is zero, allocation is delayed until the first time that start
-  // is called.
-  //
-  void Init(uint32_t target_bufsize, uint32_t initial_groups) TA_EXCL(lock_, write_lock_);
+  // |start_tracing| : Attempt to allocate the trace buffer immediately. If
+  // the allocation fails, allocation is delayed until the first time that
+  // start is called.
+  void Init(uint32_t target_bufsize, bool start_tracing) TA_EXCL(lock_, write_lock_);
 
-  [[nodiscard]] zx_status_t Start(uint32_t groups, StartMode mode) TA_EXCL(lock_, write_lock_);
+  [[nodiscard]] zx_status_t Start(StartMode mode) TA_EXCL(lock_, write_lock_);
   [[nodiscard]] zx_status_t Stop() TA_EXCL(lock_, write_lock_);
   [[nodiscard]] zx_status_t Rewind() TA_EXCL(lock_, write_lock_) {
     Guard<Mutex> guard(&lock_);
@@ -97,17 +95,6 @@ class KTraceState {
   }
 
   ssize_t ReadUser(user_out_ptr<void> ptr, uint32_t off, size_t len) TA_EXCL(lock_, write_lock_);
-
-  uint32_t grpmask() const {
-    return static_cast<uint32_t>(grpmask_.load(ktl::memory_order_acquire));
-  }
-
-  bool IsCategoryEnabled(const fxt::InternedCategory& category) const {
-    const uint32_t bit_number = category.index();
-    const uint32_t bitmask =
-        bit_number != fxt::InternedCategory::kInvalidIndex ? 1u << bit_number : 0;
-    return (bitmask & grpmask()) != 0;
-  }
 
   // Atomically increments in-flight-writes iff writes are enabled and returns true.
   //
@@ -194,7 +181,7 @@ class KTraceState {
     }
     uint64_t* const ptr = ReserveRaw(fxt::RecordFields::RecordSize::Get<uint32_t>(header));
     if (ptr == nullptr) {
-      ClearMaskDisableWrites();
+      DisableWrites();
       DecPendingWrite();
       return zx::error(ZX_ERR_NO_MEMORY);
     }
@@ -203,6 +190,7 @@ class KTraceState {
 
  private:
   friend class ktrace_internal_tests::TestKTraceState;
+  friend class ::KTraceTests;
 
   [[nodiscard]] zx_status_t RewindLocked() TA_REQ(lock_);
 
@@ -212,8 +200,7 @@ class KTraceState {
   virtual void ReportStaticNames() TA_REQ(lock_);
 
   // Add the names of current live threads and processes to the trace buffer.
-  // Called during start operations just before setting the group mask. Declared
-  // as virtual to facilitate testing.
+  // Declared as virtual to facilitate testing.
   virtual void ReportThreadProcessNames() TA_REQ(lock_);
 
   // Copy data from kernel memory to user memory.  Used by Read, and overloaded
@@ -242,17 +229,11 @@ class KTraceState {
   // fails.
   uint64_t* ReserveRaw(uint32_t num_words);
 
-  // Set the group mask, but don't modify the writes-enable state.
-  void SetGroupMask(uint32_t new_mask) { grpmask_.store(new_mask, ktl::memory_order_release); }
-
-  // Enable writes, but don't modify the group mask.
+  // Enable writes.
   void EnableWrites() { write_state_.fetch_or(kWritesEnabledMask, ktl::memory_order_release); }
 
-  // Clear the group mask and disable writes.
-  void ClearMaskDisableWrites() {
-    grpmask_.store(0, ktl::memory_order_release);
-    write_state_.fetch_and(~kWritesEnabledMask, ktl::memory_order_release);
-  }
+  // Disable writes.
+  void DisableWrites() { write_state_.fetch_and(~kWritesEnabledMask, ktl::memory_order_release); }
 
   // Convert an absolute read or write pointer into an offset into the circular
   // region of the buffer.  Note that it is illegal to call this if we are not
@@ -312,8 +293,6 @@ class KTraceState {
   static constexpr uint64_t kWritesInFlightMask = ~kWritesEnabledMask;
 
   ktl::atomic<uint64_t> write_state_{0};
-
-  ktl::atomic<uint32_t> grpmask_{0};
 
   // The target buffer size (in bytes) we would like to use, when we eventually
   // call AllocBuffer.  Set during the call to Init.
@@ -386,8 +365,8 @@ class KTraceState {
   // appropriately.  If, during this observation, the value of the tag is
   // observed to be 0, it means that a writer is attempting to advance the read
   // pointer past a record which has not been fully committed yet.  If this ever
-  // happens, the reservation operation fails, and the group mask will be
-  // cleared, just like if a reservation had failed in saturating mode.
+  // happens, the reservation operation fails, and writes will be disabled, just
+  // like if a reservation had failed in saturating mode.
   //
   // --== Circular mode padding ==--
   //
@@ -409,7 +388,7 @@ class KTraceState {
   // Memory ordering consistency for mutators of these variables are protected
   // via lock_, while observations from trace writers are actually protected by
   // a complicated set of arguments based on the stopped/started state of the
-  // system, and the acq/rel semantics of the grpmask_ variable.
+  // system.
   //
   // Instead of relying on these complicated and difficult to
   // communicate/enforce invariants, however, we just toss these variables into

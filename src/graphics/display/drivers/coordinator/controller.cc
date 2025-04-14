@@ -288,6 +288,9 @@ void Controller::DisplayEngineListenerOnCaptureComplete() {
 void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
                                                      zx_time_t banjo_timestamp,
                                                      const config_stamp_t* banjo_config_stamp_ptr) {
+  ZX_DEBUG_ASSERT(banjo_display_id != INVALID_DISPLAY_ID);
+  ZX_DEBUG_ASSERT(banjo_config_stamp_ptr != nullptr);
+
   // TODO(https://fxbug.dev/402445178): This trace event is load bearing for fps trace processor.
   // Remove it after changing the dependency.
   TRACE_INSTANT("gfx", "VSYNC", TRACE_SCOPE_THREAD, "display_id", banjo_display_id);
@@ -300,10 +303,9 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
 
   const display::DisplayId display_id(banjo_display_id);
 
-  zx::time vsync_timestamp = zx::time(banjo_timestamp);
-  display::DriverConfigStamp vsync_config_stamp =
-      banjo_config_stamp_ptr ? display::ToDriverConfigStamp(*banjo_config_stamp_ptr)
-                             : display::kInvalidDriverConfigStamp;
+  const zx::time vsync_timestamp(banjo_timestamp);
+  const display::DriverConfigStamp vsync_config_stamp =
+      display::ToDriverConfigStamp(*banjo_config_stamp_ptr);
   vsync_monitor_.OnVsync(vsync_timestamp, vsync_config_stamp);
 
   fbl::AutoLock lock(mtx());
@@ -329,10 +331,6 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
       display_info.pending_layer_change = false;
       display_info.pending_layer_change_driver_config_stamp = display::kInvalidDriverConfigStamp;
       display_info.switching_client = false;
-
-      if (client_owning_displays_ && display_info.delayed_apply) {
-        client_owning_displays_->ReapplyConfig();
-      }
     }
   }
 
@@ -438,8 +436,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
 }
 
 void Controller::ApplyConfig(std::span<DisplayConfig*> display_configs,
-                             display::ConfigStamp client_config_stamp, uint32_t layer_stamp,
-                             ClientId client_id) {
+                             display::ConfigStamp client_config_stamp, ClientId client_id) {
   zx_time_t timestamp = zx_clock_get_monotonic();
   last_valid_apply_config_timestamp_ns_property_.Set(timestamp);
   last_valid_apply_config_interval_ns_property_.Set(timestamp - last_valid_apply_config_timestamp_);
@@ -463,40 +460,6 @@ void Controller::ApplyConfig(std::span<DisplayConfig*> display_configs,
     fbl::AutoLock lock(mtx());
     bool switching_client = client_id != applied_client_id_;
 
-    // The fact that there could already be a vsync waiting to be handled when a config
-    // is applied means that a vsync with no handle for a layer could be interpreted as either
-    // nothing in the layer has been presented or everything in the layer can be retired. To
-    // prevent that ambiguity, we don't allow a layer to be disabled until an image from
-    // it has been displayed.
-    //
-    // Since layers can be moved between displays but the implementation only supports
-    // tracking the image in one display's queue, we need to ensure that the old display is
-    // done with a migrated image before the new display is done with it. This means
-    // that the new display can't flip until the configuration change is done. However, we
-    // don't want to completely prohibit flips, as that would add latency if the layer's new
-    // image is being waited for when the configuration is applied.
-    //
-    // To handle both of these cases, we force all layer changes to complete before the client
-    // can apply a new configuration. We allow the client to apply a more complete version of
-    // the configuration, although Client::HandleApplyConfig won't migrate a layer's current
-    // image if there is also a pending image.
-    if (switching_client || applied_layer_stamp_ != layer_stamp) {
-      for (DisplayConfig* display_config : display_configs) {
-        auto displays_it = displays_.find(display_config->id());
-        if (!displays_it.IsValid()) {
-          continue;
-        }
-        DisplayInfo& display_info = *displays_it;
-
-        if (display_info.pending_layer_change) {
-          display_info.delayed_apply = true;
-          return;
-        }
-      }
-    }
-
-    // Now we can guarantee that this configuration will be applied to display
-    // controller. Thus increment the controller ApplyConfiguration() counter.
     ++last_issued_driver_config_stamp_;
     driver_config_stamp = last_issued_driver_config_stamp_;
 
@@ -515,7 +478,6 @@ void Controller::ApplyConfig(std::span<DisplayConfig*> display_configs,
         display_info.pending_layer_change_driver_config_stamp = driver_config_stamp;
       }
       display_info.layer_count = display_config->applied_layer_count();
-      display_info.delayed_apply = false;
 
       if (display_info.layer_count == 0) {
         continue;
@@ -559,7 +521,6 @@ void Controller::ApplyConfig(std::span<DisplayConfig*> display_configs,
       }
     }
 
-    applied_layer_stamp_ = layer_stamp;
     applied_client_id_ = client_id;
 
     if (client_owning_displays_ != nullptr) {
@@ -581,11 +542,6 @@ void Controller::ApplyConfig(std::span<DisplayConfig*> display_configs,
 
   const config_stamp_t banjo_config_stamp = display::ToBanjoDriverConfigStamp(driver_config_stamp);
   engine_driver_client_->ApplyConfiguration(banjo_display_configs, &banjo_config_stamp);
-
-  {
-    fbl::AutoLock<fbl::Mutex> lock(mtx());
-    last_applied_driver_config_stamp_ = driver_config_stamp;
-  }
 }
 
 void Controller::ReleaseImage(display::DriverImageId driver_image_id) {
@@ -645,13 +601,13 @@ void Controller::OnClientDead(ClientProxy* client) {
   }
   if (client == virtcon_client_) {
     virtcon_client_ = nullptr;
-    virtcon_mode_ = fidl_display::wire::VirtconMode::kInactive;
+    virtcon_mode_ = fidl_display::wire::VirtconMode::kFallback;
     virtcon_client_ready_ = false;
   } else if (client == primary_client_) {
     primary_client_ = nullptr;
     primary_client_ready_ = false;
   } else {
-    ZX_DEBUG_ASSERT_MSG(false, "Dead client is neither vc nor primary\n");
+    ZX_DEBUG_ASSERT_MSG(false, "Dead client is neither Virtcon nor Primary\n");
   }
   HandleClientOwnershipChanges();
 
@@ -846,11 +802,6 @@ void Controller::OpenCoordinatorWithListenerForPrimary(
   } else {
     completer.ReplyError(create_status);
   }
-}
-
-display::DriverConfigStamp Controller::last_applied_driver_config_stamp() const {
-  fbl::AutoLock lock(mtx());
-  return last_applied_driver_config_stamp_;
 }
 
 // static

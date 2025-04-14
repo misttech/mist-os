@@ -28,13 +28,15 @@ libc_components = [
   "inttypes",
   "math",
   "pthread",
+  "sanitizers",
   "scudo",
   "setjmp",
   "stdio",
   "stdlib",
+  "zircon",
 ]
 
-libc_testonly_components = []
+libc_testonly_components = [ "threads" ]
 
 if (use_llvm_libc_string_functions) {
   libc_components += [
@@ -58,9 +60,7 @@ group("components") {
 group("legacy-components") {
   visibility = [ ":*" ]
   deps = [
-    "sanitizers",
     "stubs",
-    "zircon",
     "//zircon/system/ulib/zx-panic-libc:as_source",
   ]
 }
@@ -76,13 +76,10 @@ group("unittests") {
   testonly = true
   deps = [
     ":test_utils",
+    ":weak-tests",
     "errno:errno.testonly",
   ]
-  foreach(subdir,
-          libc_components + [
-                "sanitizers",
-                "zircon",
-              ] + libc_testonly_components) {
+  foreach(subdir, libc_components + libc_testonly_components) {
     deps += [ "$subdir:unittests" ]
   }
 }
@@ -321,6 +318,7 @@ if (zircon_toolchain != false) {
       ":components",
       ":legacy-components",
       "ld:musl-glue",
+      "threads:musl-glue",
       "//zircon/third_party/ulib/musl:legacy-impl",
     ]
 
@@ -431,7 +429,12 @@ ifs_shared_library("c") {
 
 group("tests") {
   testonly = true
-  deps = [ "test" ]
+  deps = [ "test:tests" ]
+}
+
+group("bootfs-tests") {
+  testonly = true
+  deps = [ "test:bootfs-tests" ]
 }
 
 group("boot_tests") {

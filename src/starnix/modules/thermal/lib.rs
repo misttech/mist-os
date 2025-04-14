@@ -15,7 +15,7 @@ use starnix_core::vfs::{
     fs_node_impl_dir_readonly, BytesFile, BytesFileOps, DirectoryEntryType, FileOps, FsNode,
     FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, VecDirectory, VecDirectoryEntry,
 };
-use starnix_logging::log_error;
+use starnix_logging::{log_error, log_warn};
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
@@ -168,14 +168,25 @@ pub fn thermal_device_init(
     }
 
     kernel.kthreads.spawn_future(async move {
-        let dir = fuchsia_fs::directory::open_in_namespace(
+        // TODO: Move this to expect once test support is enabled
+        let dir = match fuchsia_fs::directory::open_in_namespace(
             TEMPERATURE_DRIVER_DIR,
             fuchsia_fs::PERM_READABLE,
-        )
-        .expect("Failed to open temperature driver dir");
+        ) {
+            Ok(dir) => dir,
+            Err(e) => {
+                log_warn!("Failed to open temperature driver directory: {:}", e);
+                return;
+            }
+        };
 
-        let mut watcher =
-            fuchsia_fs::directory::Watcher::new(&dir).await.expect("Failed to create watcher");
+        let mut watcher = match fuchsia_fs::directory::Watcher::new(&dir).await {
+            Ok(watcher) => watcher,
+            Err(e) => {
+                log_warn!("Failed to create directory watcher for temperature device: {:}", e);
+                return;
+            }
+        };
 
         while !sensor_proxies.is_empty() {
             if let Ok(Some(watch_msg)) = watcher

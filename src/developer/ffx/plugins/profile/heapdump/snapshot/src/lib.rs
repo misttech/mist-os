@@ -91,6 +91,7 @@ async fn snapshot(remote_control: RemoteControlProxyHolder, cmd: SnapshotCommand
             ffx_error!("Failed to create output file: {}: {}", cmd.output_file, err)
         })?,
         with_tags,
+        cmd.symbolize,
     )?;
 
     Ok(())

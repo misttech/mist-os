@@ -28,10 +28,7 @@ ZxioConnectedSocket& connected_socket(zxio_t* io) {
 constexpr zxio_ops_t kZxioConnectedSocketOps = []() {
   zxio_ops_t ops = zxio_default_ops;
 
-  ops.close = [](zxio_t* io, const bool should_wait) {
-    connected_socket(io).~ZxioConnectedSocket();
-    return ZX_OK;
-  };
+  ops.destroy = [](zxio_t* io) { connected_socket(io).~ZxioConnectedSocket(); };
 
   // Mostly copied from zxio/pipe.cc
   ops.wait_begin = [](zxio_t* io, zxio_signals_t zxio_signals, zx_handle_t* out_handle,

@@ -172,7 +172,6 @@ template("rustc_artifact") {
 
     # These do not have aux targets (yet).
     _should_define_rust_aux = invoker.rust_crate_type != "cdylib" &&
-                              invoker.rust_crate_type != "dylib" &&
                               (invoker.rust_crate_type != "proc-macro" ||
                                current_toolchain == toolchain_variant.base)
 
@@ -191,7 +190,6 @@ template("rustc_artifact") {
                                  "actual_name",
                                  "aliased_deps",
                                  "configs",
-                                 "crate_name",
                                  "crate_root",
                                  "crate_type",
                                  "define_rustdoc_test_override",
@@ -213,6 +211,7 @@ template("rustc_artifact") {
                                  "zip_rustdoc_to",
                                ])
 
+        crate_name = string_replace(invoker.crate_name, "-", "_")
         if (!defined(actual_name)) {
           actual_name = _group_name
         }

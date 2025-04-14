@@ -11,7 +11,7 @@
 namespace zxio {
 
 // Initialize a zxio object into |storage| that holds on to |handle|.  This
-// object support closing the handle via zxio_close and releasing the contained
+// object support closing the handle via zxio_destroy and releasing the contained
 // handle via zxio_release.
 void handle_holder_init(zxio_storage_t* storage, zx::handle handle);
 

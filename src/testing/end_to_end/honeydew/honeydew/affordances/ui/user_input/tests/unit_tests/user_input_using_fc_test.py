@@ -6,8 +6,8 @@
 import unittest
 from unittest import mock
 
-import fidl.fuchsia_math as f_math
-import fidl.fuchsia_ui_test_input as f_test_input
+import fidl_fuchsia_math as f_math
+import fidl_fuchsia_ui_test_input as f_test_input
 
 from honeydew import errors
 from honeydew.affordances.ui.user_input import types as ui_custom_types
@@ -70,6 +70,8 @@ class UserInputFCTests(unittest.TestCase):
     @mock.patch.object(
         f_test_input.RegistryClient,
         "register_touch_screen",
+        new_callable=mock.AsyncMock,
+        return_value=None,
     )
     def test_create_touch_device(self, register_touch_screen) -> None:  # type: ignore[no-untyped-def]
         """Test for UserInput.create_touch_device() method."""
@@ -86,32 +88,47 @@ class UserInputFCTests(unittest.TestCase):
 
         self.assertIsNotNone(touch_device._touch_screen_proxy)  # type: ignore[attr-defined]
 
-    def test_tap_only_required(self) -> None:
+    @mock.patch.object(
+        f_test_input.TouchScreenClient,
+        "simulate_tap",
+        new_callable=mock.AsyncMock,
+    )
+    @mock.patch.object(
+        f_test_input.RegistryClient,
+        "register_touch_screen",
+        new_callable=mock.AsyncMock,
+        return_value=None,
+    )
+    def test_tap_only_required(self, register_touch_screen, simulate_tap) -> None:  # type: ignore[no-untyped-def]
         """Test for UserInput.tap() method with only required params."""
 
         touch_device = self.user_input().create_touch_device()
-        touch_device._touch_screen_proxy = mock.MagicMock()  # type: ignore[attr-defined]
-
         touch_device.tap(location=ui_custom_types.Coordinate(x=1, y=2))
-        touch_device._touch_screen_proxy.simulate_tap.assert_called_once_with(  # type: ignore[attr-defined]
-            tap_location=f_math.Vec(x=1, y=2)
-        )
+        simulate_tap.assert_called_once_with(tap_location=f_math.Vec(x=1, y=2))
 
-    def test_tap_all_params(self) -> None:
+    @mock.patch.object(
+        f_test_input.TouchScreenClient,
+        "simulate_tap",
+        new_callable=mock.AsyncMock,
+    )
+    @mock.patch.object(
+        f_test_input.RegistryClient,
+        "register_touch_screen",
+        new_callable=mock.AsyncMock,
+        return_value=None,
+    )
+    def test_tap_all_params(self, register_touch_screen, simulate_tap) -> None:  # type: ignore[no-untyped-def]
         """Test for UserInput.tap() method with all params."""
 
         touch_device = self.user_input().create_touch_device(
             touch_screen_size=ui_custom_types.Size(width=3, height=4),
         )
-        touch_device._touch_screen_proxy = mock.MagicMock()  # type: ignore[attr-defined]
-
         touch_device.tap(
             location=ui_custom_types.Coordinate(x=1, y=2),
             tap_event_count=3,
             duration_ms=6,
         )
-
-        touch_device._touch_screen_proxy.simulate_tap.assert_has_calls(  # type: ignore[attr-defined]
+        simulate_tap.assert_has_calls(
             [
                 mock.call(tap_location=f_math.Vec(x=1, y=2)),
                 mock.call(tap_location=f_math.Vec(x=1, y=2)),
@@ -119,21 +136,29 @@ class UserInputFCTests(unittest.TestCase):
             ]
         )
 
-    def test_swipe(self) -> None:
+    @mock.patch.object(
+        f_test_input.TouchScreenClient,
+        "simulate_swipe",
+        new_callable=mock.AsyncMock,
+    )
+    @mock.patch.object(
+        f_test_input.RegistryClient,
+        "register_touch_screen",
+        new_callable=mock.AsyncMock,
+        return_value=None,
+    )
+    def test_swipe(self, register_touch_screen, simulate_swipe) -> None:  # type: ignore[no-untyped-def]
         """Test for UserInput.swipe() method."""
 
         touch_device = self.user_input().create_touch_device(
             touch_screen_size=ui_custom_types.Size(width=4, height=5),
         )
-        touch_device._touch_screen_proxy = mock.MagicMock()  # type: ignore[attr-defined]
-
         touch_device.swipe(
             start_location=ui_custom_types.Coordinate(x=1, y=2),
             end_location=ui_custom_types.Coordinate(x=3, y=4),
             move_event_count=2,
         )
-
-        touch_device._touch_screen_proxy.simulate_swipe.assert_has_calls(  # type: ignore[attr-defined]
+        simulate_swipe.assert_has_calls(
             [
                 mock.call(
                     start_location=f_math.Vec(x=1, y=2),
@@ -144,22 +169,30 @@ class UserInputFCTests(unittest.TestCase):
             ]
         )
 
-    def test_swipe_with_duration(self) -> None:
+    @mock.patch.object(
+        f_test_input.TouchScreenClient,
+        "simulate_swipe",
+        new_callable=mock.AsyncMock,
+    )
+    @mock.patch.object(
+        f_test_input.RegistryClient,
+        "register_touch_screen",
+        new_callable=mock.AsyncMock,
+        return_value=None,
+    )
+    def test_swipe_with_duration(self, register_touch_screen, simulate_swipe) -> None:  # type: ignore[no-untyped-def]
         """Test for UserInput.swipe() method with duration."""
 
         touch_device = self.user_input().create_touch_device(
             touch_screen_size=ui_custom_types.Size(width=4, height=5),
         )
-        touch_device._touch_screen_proxy = mock.MagicMock()  # type: ignore[attr-defined]
-
         touch_device.swipe(
             start_location=ui_custom_types.Coordinate(x=1, y=2),
             end_location=ui_custom_types.Coordinate(x=3, y=4),
             move_event_count=2,
             duration_ms=100,
         )
-
-        touch_device._touch_screen_proxy.simulate_swipe.assert_has_calls(  # type: ignore[attr-defined]
+        simulate_swipe.assert_has_calls(
             [
                 mock.call(
                     start_location=f_math.Vec(x=1, y=2),
@@ -173,33 +206,41 @@ class UserInputFCTests(unittest.TestCase):
     @mock.patch.object(
         f_test_input.RegistryClient,
         "register_keyboard",
+        new_callable=mock.AsyncMock,
+        return_value=None,
     )
     def test_create_keyboard_device(self, register_keyboard) -> None:  # type: ignore[no-untyped-def]
         """Test for UserInput.create_keyboard_device() method."""
 
         keyboard_device = self.user_input().create_keyboard_device()
-
         self.fc_transport_obj.connect_device_proxy.assert_called_once_with(
             custom_types.FidlEndpoint(
                 "/core/ui", "fuchsia.ui.test.input.Registry"
             )
         )
-
         register_keyboard.assert_called_once()
 
         self.assertIsNotNone(keyboard_device._keyboard_proxy)  # type: ignore[attr-defined]
 
-    def test_key_press(self) -> None:
+    @mock.patch.object(
+        f_test_input.KeyboardClient,
+        "simulate_key_press",
+        new_callable=mock.AsyncMock,
+    )
+    @mock.patch.object(
+        f_test_input.RegistryClient,
+        "register_keyboard",
+        new_callable=mock.AsyncMock,
+        return_value=None,
+    )
+    def test_key_press(self, register_keyboard, simulate_key_press) -> None:  # type: ignore[no-untyped-def]
         """Test for UserInput.key_press() method."""
 
         keyboard_device = self.user_input().create_keyboard_device()
-        keyboard_device._keyboard_proxy = mock.MagicMock()  # type: ignore[attr-defined]
-
         keyboard_device.key_press(
             key_code=0xFFFF0002,  # Power
         )
-
-        keyboard_device._keyboard_proxy.simulate_key_press.assert_has_calls(  # type: ignore[attr-defined]
+        simulate_key_press.assert_has_calls(
             [
                 mock.call(
                     key_code=0xFFFF0002,

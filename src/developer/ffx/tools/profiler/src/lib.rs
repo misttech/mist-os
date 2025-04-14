@@ -132,7 +132,7 @@ pub async fn symbolize(from: &PathBuf, to: &PathBuf) -> Result<()> {
         eprintln!("ensure_symbol_index_registered failed, error was: {:#?}", e);
     }
 
-    let symbolizer_path = ffx_config::get_host_tool(&sdk, "symbolizer").await?;
+    let symbolizer_path = ffx_config::get_host_tool(&sdk, "symbolizer")?;
     let unsymbolized_input = std::fs::File::open(&from)?;
     let symbolized_output = std::fs::File::create(&to)?;
     let mut cmd = Command::new(symbolizer_path)

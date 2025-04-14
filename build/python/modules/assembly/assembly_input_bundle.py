@@ -19,7 +19,7 @@ from typing import Any, Optional, TextIO, Union
 import serialization
 from assembly import package_copier
 from assembly.package_manifest import PackageManifest
-from serialization import json_load, serialize_json
+from serialization import json_load
 
 from .common import FileEntry, FilePath, fast_copy_makedirs
 from .image_assembly_config import KernelInfo
@@ -67,7 +67,6 @@ class PackageManifestParsingException(Exception):
 
 
 @dataclass(order=True)
-@serialize_json
 class DriverDetails:
     """Details for constructing a driver manifest fragment from a driver package"""
 
@@ -76,21 +75,20 @@ class DriverDetails:
 
 
 @dataclass
-@serialization.serialize_json
 class PackageDetails:
     """Details for a package"""
 
     package: FilePath = field()  # Path to the package manifest
     set: str = field()  # Package set that includes the package
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         """
         This intentionally only hashes the package manifest in order to
         deduplicate packages across package sets.
         """
         return hash(self.package)
 
-    def __lt__(self, other):
+    def __lt__(self, other: Any) -> bool:
         return self.package < other.package
 
 
@@ -98,7 +96,6 @@ PackageDetailsList = list[PackageDetails]
 
 
 @dataclass
-@serialize_json
 class CompiledComponentDefinition:
     """
     The definition of component to be compiled by Assembly
@@ -111,7 +108,6 @@ class CompiledComponentDefinition:
 
 
 @dataclass
-@serialize_json
 class CompiledPackageDefinition:
     """Primary definition of a compiled package which is created by Assembly"""
 
@@ -128,7 +124,6 @@ class CompiledPackageDefinition:
 
 
 @dataclass
-@serialize_json
 class CompiledPackageDefinitionFromGN:
     """The CompilePackageDefinition which is written by GN for consuming by this tool.
 
@@ -152,7 +147,6 @@ class CompiledPackageDefinitionFromGN:
 
 
 @dataclass
-@serialize_json
 class AssemblyInputBundle:
     """AssemblyInputBundle wraps a set of artifacts together for use by out-of-tree assembly, both
     the manifest of the artifacts, and the artifacts themselves.
@@ -320,7 +314,7 @@ class AssemblyInputBundle:
         """Serialize to a JSON string"""
         return serialization.json_dumps(self, indent=2)
 
-    def add_packages(self, packages: list[PackageDetails]):
+    def add_packages(self, packages: list[PackageDetails]) -> None:
         for details in sorted(packages):
             # This 'in' check only looks at the package manifest file path and
             # ignores the package set. This is intentional in order to
@@ -536,10 +530,10 @@ class AIBCreator:
         _memory_buckets_entries = [
             FileEntry(src, os.path.basename(src)) for src in self.memory_buckets
         ]
-        (memory_buckets, memory_buckets_deps) = self._copy_file_entries(
+        (memory_buckets_entries, memory_buckets_deps) = self._copy_file_entries(
             _memory_buckets_entries, "memory_buckets"
         )
-        memory_buckets = [entry.source for entry in memory_buckets]
+        memory_buckets = [entry.source for entry in memory_buckets_entries]
         deps.update(memory_buckets_deps)
         result.memory_buckets.update(memory_buckets)
 
@@ -572,7 +566,7 @@ class AIBCreator:
 
         # Rebase the path to the qemu kernel into the out-of-tree layout
         if self.qemu_kernel:
-            kernel_src_path: Any = self.qemu_kernel
+            kernel_src_path = self.qemu_kernel
             kernel_filename = os.path.basename(kernel_src_path)
             kernel_dst_path = os.path.join("kernel", kernel_filename)
             result.qemu_kernel = kernel_dst_path
@@ -649,7 +643,7 @@ class AIBCreator:
                         # generate a new one with all the contents.
                         if blob.path != "meta/":
                             package_contents.append(
-                                FileEntry(blob.source_path, blob.path)
+                                FileEntry(str(blob.source_path), blob.path)
                             )
             contents = package.contents
             contents.update(package_contents)
@@ -686,7 +680,7 @@ class AIBCreator:
         # Write the AIB manifest
         assembly_config_path = os.path.join(self.outdir, "assembly_config.json")
         with open(assembly_config_path, "w") as file:
-            result.json_dump(file, indent=2)
+            serialization.json_dump(result, file, indent=2)
 
         return (result, assembly_config_path, deps)
 

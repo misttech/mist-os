@@ -85,6 +85,7 @@ constexpr CrashServer::UploadStatus kUploadTimeout = CrashServer::UploadStatus::
 constexpr char kProgramName[] = "crashing_program";
 
 constexpr char kBuildVersion[] = "some-version";
+constexpr char kBuildPlatformVersion[] = "some-platform-version";
 constexpr char kBuildBoard[] = "some-board";
 constexpr char kBuildProduct[] = "some-product";
 constexpr char kBuildLatestCommitDate[] = "some-date";
@@ -103,6 +104,7 @@ constexpr zx::duration kResetOffset = zx::min(20);
 const std::map<std::string, std::string> kFeedbackAnnotations = {
     {feedback::kBuildVersionKey, kBuildVersion},
     {feedback::kBuildBoardKey, kBuildBoard},
+    {feedback::kBuildPlatformVersionKey, kBuildPlatformVersion},
     {feedback::kBuildProductKey, kBuildProduct},
     {feedback::kBuildLatestCommitDateKey, kBuildLatestCommitDate},
     {feedback::kDeviceFeedbackIdKey, kDefaultDeviceId},
@@ -171,6 +173,7 @@ class CrashReporterTest : public UnitTestFixture {
         std::set<std::string>{
             feedback::kBuildVersionKey,
             feedback::kBuildBoardKey,
+            feedback::kBuildPlatformVersionKey,
             feedback::kBuildProductKey,
             feedback::kBuildLatestCommitDateKey,
             feedback::kDeviceFeedbackIdKey,
@@ -179,6 +182,7 @@ class CrashReporterTest : public UnitTestFixture {
         feedback::Annotations{
             {feedback::kBuildVersionKey, ErrorOrString(kBuildVersion)},
             {feedback::kBuildBoardKey, ErrorOrString(kBuildBoard)},
+            {feedback::kBuildPlatformVersionKey, ErrorOrString(kBuildPlatformVersion)},
             {feedback::kBuildProductKey, ErrorOrString(kBuildProduct)},
             {feedback::kBuildLatestCommitDateKey, ErrorOrString(kBuildLatestCommitDate)},
             {feedback::kDeviceFeedbackIdKey, ErrorOrString(kDefaultDeviceId)},
@@ -252,10 +256,11 @@ class CrashReporterTest : public UnitTestFixture {
         {"program", testing::StartsWith("crashing_program")},
         {"ptype", testing::StartsWith("crashing_program")},
         {feedback::kOSNameKey, "Fuchsia"},
-        {feedback::kOSVersionKey, kBuildVersion},
+        {feedback::kOSVersionKey, kBuildPlatformVersion},
         {feedback::kOSChannelKey, kDefaultChannel},
         {feedback::kBuildVersionKey, kBuildVersion},
         {feedback::kBuildBoardKey, kBuildBoard},
+        {feedback::kBuildPlatformVersionKey, kBuildPlatformVersion},
         {feedback::kBuildProductKey, kBuildProduct},
         {feedback::kBuildLatestCommitDateKey, kBuildLatestCommitDate},
         {feedback::kDeviceFeedbackIdKey, kDefaultDeviceId},

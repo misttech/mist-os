@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.protocollayoutssamelibrary"]
+_ir_path = get_fidl_ir_map()["test.protocollayoutssamelibrary"]
 add_ir_path(_ir_path)
 
 
@@ -560,14 +561,14 @@ class ComposedProtocolTwoWayAnonComposedWithErrorResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -668,14 +669,14 @@ class ComposedProtocolTwoWayNamedComposedWithErrorResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -989,14 +990,14 @@ class MainProtocolTwoWayAnonWithErrorResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -1097,14 +1098,14 @@ class MainProtocolTwoWayLocalWithErrorResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -1189,12 +1190,20 @@ class UnionPayload:
         return cls(_empty=())
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class ComposedProtocolServer(fidl._server.ServerBase, ABC):
+class ComposedProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocollayoutssamelibrary"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -1252,6 +1261,8 @@ class ComposedProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -1381,7 +1392,7 @@ class ComposedProtocolServer(fidl._server.ServerBase, ABC):
         )
 
 
-class ComposedProtocolClient(fidl._client.FidlClient):
+class ComposedProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocollayoutssamelibrary"
 
@@ -1389,6 +1400,8 @@ class ComposedProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -1423,7 +1436,7 @@ class ComposedProtocolClient(fidl._client.FidlClient):
             8107448265006659060,
             "test.protocollayoutssamelibrary",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedResponse"
             ),
         )
@@ -1444,7 +1457,7 @@ class ComposedProtocolClient(fidl._client.FidlClient):
             5751989932125743144,
             "test.protocollayoutssamelibrary",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocollayoutssamelibrary/ComposedProtocol_TwoWayAnonComposedWithError_Result"
             ),
         )
@@ -1477,7 +1490,7 @@ class ComposedProtocolClient(fidl._client.FidlClient):
             5022872388073111636,
             "test.protocollayoutssamelibrary",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocollayoutssamelibrary/TablePayload"
             ),
         )
@@ -1498,13 +1511,13 @@ class ComposedProtocolClient(fidl._client.FidlClient):
             4973436213756973807,
             "test.protocollayoutssamelibrary",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocollayoutssamelibrary/ComposedProtocol_TwoWayNamedComposedWithError_Result"
             ),
         )
 
 
-class ComposedProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
+class ComposedProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocollayoutssamelibrary"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -1530,6 +1543,8 @@ class ComposedProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -1549,17 +1564,25 @@ class ComposedProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
         ...
 
 
-ComposedProtocolMarker = fidl._library.ProtocolMarker(
+ComposedProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.protocollayoutssamelibrary/ComposedProtocol"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class MainProtocolServer(fidl._server.ServerBase, ABC):
+class MainProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocollayoutssamelibrary"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -1665,6 +1688,8 @@ class MainProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -1902,7 +1927,7 @@ class MainProtocolServer(fidl._server.ServerBase, ABC):
         )
 
 
-class MainProtocolClient(fidl._client.FidlClient):
+class MainProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocollayoutssamelibrary"
 
@@ -1910,6 +1935,8 @@ class MainProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -1944,7 +1971,7 @@ class MainProtocolClient(fidl._client.FidlClient):
             8107448265006659060,
             "test.protocollayoutssamelibrary",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedResponse"
             ),
         )
@@ -1965,7 +1992,7 @@ class MainProtocolClient(fidl._client.FidlClient):
             5751989932125743144,
             "test.protocollayoutssamelibrary",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocollayoutssamelibrary/ComposedProtocol_TwoWayAnonComposedWithError_Result"
             ),
         )
@@ -1998,7 +2025,7 @@ class MainProtocolClient(fidl._client.FidlClient):
             5022872388073111636,
             "test.protocollayoutssamelibrary",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocollayoutssamelibrary/TablePayload"
             ),
         )
@@ -2019,7 +2046,7 @@ class MainProtocolClient(fidl._client.FidlClient):
             4973436213756973807,
             "test.protocollayoutssamelibrary",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocollayoutssamelibrary/ComposedProtocol_TwoWayNamedComposedWithError_Result"
             ),
         )
@@ -2052,7 +2079,7 @@ class MainProtocolClient(fidl._client.FidlClient):
             2781407403924167255,
             "test.protocollayoutssamelibrary",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocollayoutssamelibrary/TablePayload"
             ),
         )
@@ -2071,7 +2098,7 @@ class MainProtocolClient(fidl._client.FidlClient):
             5367158046384127463,
             "test.protocollayoutssamelibrary",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocollayoutssamelibrary/MainProtocol_TwoWayLocalWithError_Result"
             ),
         )
@@ -2106,7 +2133,7 @@ class MainProtocolClient(fidl._client.FidlClient):
             4600336371166510638,
             "test.protocollayoutssamelibrary",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocollayoutssamelibrary/MainProtocolTwoWayAnonResponse"
             ),
         )
@@ -2125,13 +2152,13 @@ class MainProtocolClient(fidl._client.FidlClient):
             2104032160763523653,
             "test.protocollayoutssamelibrary",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.protocollayoutssamelibrary/MainProtocol_TwoWayAnonWithError_Result"
             ),
         )
 
 
-class MainProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
+class MainProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocollayoutssamelibrary"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -2173,6 +2200,8 @@ class MainProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -2206,6 +2235,6 @@ class MainProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
         ...
 
 
-MainProtocolMarker = fidl._library.ProtocolMarker(
+MainProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.protocollayoutssamelibrary/MainProtocol"
 )

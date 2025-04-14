@@ -4,8 +4,13 @@
 
 library test.python.struct;
 
-using test.python.otherstruct as otherstruct;
+using test.python.otherstruct;
+using test.python.enum;
 
 type StructWithExternalStructField = struct {
-    value otherstruct.EmptyStruct;
+    value test.python.otherstruct.EmptyStruct;
+};
+
+type StructWithExternalEnumField = struct {
+    value test.python.enum.AnEnum;
 };

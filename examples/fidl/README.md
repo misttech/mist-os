@@ -2,7 +2,7 @@
 
 This directory contains example code for using FIDL. `fuchsia.examples` contains
 FIDL definitions used in the various bindings-specific example directories for
-hlcpp, cpp, go, and rust.
+cpp, go, and rust.
 
 The `test` directory contains tests to ensure that example code is kept up to
 date. To run tests:

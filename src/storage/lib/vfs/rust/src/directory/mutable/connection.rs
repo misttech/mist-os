@@ -238,6 +238,7 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
             Err(status) => {
                 #[cfg(any(test, feature = "use_log"))]
                 log::error!(status:?; "list extended attributes failed");
+                #[allow(clippy::unnecessary_lazy_evaluations)]
                 iterator.close_with_epitaph(status).unwrap_or_else(|_error| {
                     #[cfg(any(test, feature = "use_log"))]
                     log::error!(_error:?; "failed to send epitaph")

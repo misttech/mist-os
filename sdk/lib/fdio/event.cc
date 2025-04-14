@@ -35,10 +35,9 @@ static_assert(sizeof(fdio_event_t) <= sizeof(zxio_storage_t),
               "fdio_event_t must fit inside zxio_storage_t.");
 
 namespace {
-zx_status_t fdio_event_close(zxio_t* io, const bool should_wait) {
+void fdio_event_destroy(zxio_t* io) {
   fdio_event_t* event = reinterpret_cast<fdio_event_t*>(io);
   event->handle.reset();
-  return ZX_OK;
 }
 
 void fdio_event_update_signals(fdio_event_t* event) __TA_REQUIRES(event->lock) {
@@ -164,7 +163,7 @@ void fdio_event_wait_end(zxio_t* io, zx_signals_t zx_signals, zxio_signals_t* ou
 
 constexpr zxio_ops_t fdio_event_ops = []() {
   zxio_ops_t ops = zxio_default_ops;
-  ops.close = fdio_event_close;
+  ops.destroy = fdio_event_destroy;
   ops.readv = fdio_event_readv;
   ops.writev = fdio_event_writev;
   ops.wait_begin = fdio_event_wait_begin;

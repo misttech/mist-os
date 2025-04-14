@@ -77,11 +77,15 @@ pub type location_callback = ::std::option::Option<
         context: *mut ::std::os::raw::c_void,
     ),
 >;
+pub const ResolveAddressStatus_Ok: ResolveAddressStatus = 0;
+pub const ResolveAddressStatus_SymbolFileUnavailable: ResolveAddressStatus = 1;
+pub const ResolveAddressStatus_NoOverlappingModule: ResolveAddressStatus = 2;
+pub type ResolveAddressStatus = u8;
 unsafe extern "C" {
     pub fn symbolizer_resolve_address(
         symbolizer: *mut symbolizer_SymbolizerImpl,
         address: u64,
         output: location_callback,
         output_context: *mut ::std::os::raw::c_void,
-    );
+    ) -> ResolveAddressStatus;
 }

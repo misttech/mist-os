@@ -7,10 +7,10 @@ use crate::task::CurrentTask;
 use crate::vfs::socket::{
     NetlinkFamily, Socket, SocketAddress, SocketDomain, SocketProtocol, SocketType,
 };
-use crate::vfs::FsNode;
+use crate::vfs::{Anon, FsNode};
 use selinux::permission_check::PermissionCheck;
 use selinux::{
-    CommonSocketPermission, FsNodeClass, InitialSid, Permission, SecurityId, SecurityServer,
+    CommonSocketPermission, FsNodeClass, InitialSid, KernelPermission, SecurityId, SecurityServer,
     SocketClass,
 };
 use starnix_uapi::errors::Errno;
@@ -22,9 +22,14 @@ fn has_socket_permission(
     permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
     socket_node: &FsNode,
-    permission: &Permission,
+    permission: &KernelPermission,
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
+    // Permissions are allowed for kernel sockets.
+    if Anon::is_private(socket_node) {
+        return Ok(());
+    }
+
     let socket_sid = fs_node_effective_sid_and_class(socket_node).sid;
 
     // If the socket is for kernel-internal use we can return success immediately.
@@ -58,11 +63,11 @@ pub(in crate::security) fn socket_post_create(socket: &Socket, socket_node: &FsN
         SocketDomain::Inet | SocketDomain::Inet6 => match socket.socket_type {
             SocketType::Stream => match socket.protocol {
                 SocketProtocol::IP | SocketProtocol::TCP => SocketClass::Tcp,
-                _ => SocketClass::Socket,
+                _ => SocketClass::RawIp,
             },
             SocketType::Datagram => match socket.protocol {
                 SocketProtocol::IP | SocketProtocol::UDP => SocketClass::Udp,
-                _ => SocketClass::Socket,
+                _ => SocketClass::RawIp,
             },
             SocketType::Raw
             | SocketType::Rdm
@@ -173,6 +178,7 @@ mod tests {
                     SocketType::Stream,
                     OpenFlags::RDWR,
                     SocketProtocol::IP,
+                    /* kernel_private=*/ false,
                 )
                 .expect("failed to create socket");
                 assert_eq!(

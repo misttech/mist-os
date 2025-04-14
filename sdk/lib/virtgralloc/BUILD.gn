@@ -16,9 +16,5 @@ sdk_source_set("virtgralloc_headers") {
     "include/lib/virtgralloc/shared_metadata.h",
     "include/lib/virtgralloc/virtgralloc_ioctl.h",
   ]
-  sources = [
-    "include/lib/virtgralloc/shared_metadata.h",
-    "include/lib/virtgralloc/virtgralloc_ioctl.h",
-  ]
   public_configs = [ ":virtgralloc_include" ]
 }

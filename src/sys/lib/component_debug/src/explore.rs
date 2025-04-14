@@ -3,10 +3,12 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Result};
-use fidl_fuchsia_dash as fdash;
 use futures::prelude::*;
 use moniker::Moniker;
 use std::str::FromStr;
+
+use flex_client::Socket;
+use flex_fuchsia_dash as fdash;
 
 #[derive(Debug, PartialEq)]
 pub enum DashNamespaceLayout {
@@ -37,7 +39,7 @@ impl Into<fdash::DashNamespaceLayout> for DashNamespaceLayout {
 
 pub async fn explore_over_socket(
     moniker: Moniker,
-    pty_server: fidl::Socket,
+    pty_server: Socket,
     tools_urls: Vec<String>,
     command: Option<String>,
     ns_layout: DashNamespaceLayout,

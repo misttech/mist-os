@@ -19,10 +19,16 @@ use ffx_stream_util::TryStreamUtilExt;
 use ffx_target::{FastbootInterface, TargetInfoQuery};
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_developer_ffx::{self as ffx, TargetAddrInfo};
+#[cfg(not(target_os = "macos"))]
+use fidl_fuchsia_developer_remotecontrol as fidl_rcs;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
+#[cfg(not(target_os = "macos"))]
+use fuchsia_async::{DurationExt, TimeoutExt};
 #[cfg(test)]
 use futures::channel::oneshot::Sender;
 use futures::TryStreamExt;
+#[cfg(not(target_os = "macos"))]
+use futures::{AsyncReadExt, FutureExt, StreamExt};
 use protocols::prelude::*;
 use std::net::{IpAddr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::path::PathBuf;
@@ -30,6 +36,9 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tasks::TaskManager;
+
+#[cfg(not(target_os = "macos"))]
+use usb_vsock_host::UsbVsockHostEvent;
 
 mod reboot;
 mod target_handle;
@@ -665,6 +674,7 @@ impl FidlProtocol for TargetCollectionProtocol {
 
         let tc2 = cx.get_target_collection().await?;
         let context = self.context.clone();
+        let node_clone = Arc::clone(&node);
         self.tasks.spawn(async move {
             let instance_root: PathBuf = match context.get(emulator_instance::EMU_INSTANCE_ROOT_DIR)
             {
@@ -693,7 +703,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                     match emu_target_action {
                         EmulatorTargetAction::Add(emu_target) => {
                             // Let's always connect to emulators -- otherwise, why would someone start an emulator?
-                            handle_discovered_target(&tc2, emu_target, &node, true);
+                            handle_discovered_target(&tc2, emu_target, &node_clone, true);
                         }
                         EmulatorTargetAction::Remove(emu_target) => {
                             if let Some(id) = emu_target.nodename {
@@ -715,8 +725,101 @@ impl FidlProtocol for TargetCollectionProtocol {
             }
         });
 
+        #[cfg(not(target_os = "macos"))]
+        if let Some(mut usb_events) = Target::init_usb_vsock_host() {
+            let tc = cx.get_target_collection().await?;
+            self.tasks.spawn(async move {
+                while let Some(event) = usb_events.next().await {
+                    match event {
+                        UsbVsockHostEvent::AddedCid(cid) => {
+                            if let Err(error) = handle_usb_target(cid, &tc, &node).await {
+                                tracing::warn!(cid, ?error, "Could not connect to USB target");
+                            }
+                        }
+                        UsbVsockHostEvent::RemovedCid(cid) => {
+                            tc.remove_address(TargetAddr::UsbCtx(cid));
+                        }
+                    }
+                }
+
+                tracing::error!("USB Discovery shut down");
+            });
+        }
+
         Ok(())
     }
+}
+
+#[cfg(not(target_os = "macos"))]
+const VSOCK_IDENTIFY_PORT: u32 = 201;
+
+#[cfg(not(target_os = "macos"))]
+async fn handle_usb_target(
+    cid: u32,
+    tc: &Rc<TargetCollection>,
+    overnet_node: &Arc<overnet_core::Router>,
+) -> Result<()> {
+    let host = Target::get_usb_vsock_host().ok_or_else(|| anyhow!("USB not initialized"))?;
+
+    handle_usb_target_impl(cid, tc, overnet_node, host).await
+}
+
+#[cfg(not(target_os = "macos"))]
+async fn handle_usb_target_impl(
+    cid: u32,
+    tc: &Rc<TargetCollection>,
+    overnet_node: &Arc<overnet_core::Router>,
+    host: Arc<usb_vsock_host::UsbVsockHost>,
+) -> Result<()> {
+    let (socket, other_end) = fuchsia_async::emulated_handle::Socket::create_stream();
+    let other_end = fuchsia_async::Socket::from_socket(other_end);
+    let _state = host
+        .connect(
+            cid.try_into().map_err(|_| anyhow!("Tried to get target info from USB CID 0"))?,
+            VSOCK_IDENTIFY_PORT,
+            other_end,
+        )
+        .await?;
+
+    let mut buf = Vec::new();
+    let mut socket = fuchsia_async::Socket::from_socket(socket);
+    let _buf_len = socket
+        .read_to_end(&mut buf)
+        .map(|x| x.map_err(anyhow::Error::from))
+        .on_timeout(Duration::from_secs(5).after_now(), || {
+            Err(anyhow!("Timed out waiting for USB target info"))
+        })
+        .await?;
+
+    let (header, bytes) = fidl::encoding::decode_transaction_header(&buf)?;
+    let body = fidl_message::decode_response_flexible_result::<
+        fidl_rcs::IdentifyHostResponse,
+        fidl_rcs::IdentifyHostError,
+    >(header, bytes)?;
+
+    let identify = match body {
+        fidl_message::MaybeUnknown::Known(x) => {
+            x.map_err(|e| anyhow!("Could not identify USB host: {e:?}"))?
+        }
+        fidl_message::MaybeUnknown::Unknown => {
+            return Err(anyhow!("Got unknown identify host response"))
+        }
+    };
+
+    let (update, addrs) = TargetUpdateBuilder::from_rcs_identify_no_connection(&identify);
+    let update =
+        update.usb_cid(cid).enable().discovered(TargetProtocol::Vsock, TargetTransport::Usb);
+    let filter = if let Some(ref name) = identify.nodename {
+        &[TargetUpdateFilter::NetAddrs(&addrs), TargetUpdateFilter::LegacyNodeName(name)][..]
+    } else {
+        &[TargetUpdateFilter::NetAddrs(&addrs)][..]
+    };
+
+    tc.update_target(filter, update.build(), true);
+
+    tc.try_to_reconnect_target(filter, overnet_node);
+
+    Ok(())
 }
 
 // USB fastboot
@@ -843,6 +946,7 @@ mod tests {
     use fidl_fuchsia_developer_ffx::TargetQuery;
     use fidl_fuchsia_net::{IpAddress, Ipv6Address};
     use futures::channel::oneshot::channel;
+    use futures::AsyncWriteExt;
     use protocols::testing::FakeDaemonBuilder;
     use serde_json::{json, Map, Value};
     use std::cell::RefCell;
@@ -1107,6 +1211,70 @@ mod tests {
             ffx::FastbootTarget { serial: Some("12345".to_string()), ..Default::default() },
         );
         assert_eq!(tc.targets(None)[0].serial_number.as_deref(), Some("12345"));
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[fuchsia::test]
+    async fn test_handle_usb_target() {
+        use usb_vsock_host as usbv;
+        const NODE_NAME: &str = "Teletechternacon";
+        let tc = Rc::new(TargetCollection::new());
+        let tc_clone = Rc::clone(&tc);
+        let local_node = overnet_core::Router::new(None).unwrap();
+
+        let usbv::TestConnection {
+            cid,
+            host,
+            connection,
+            _control_socket,
+            mut incoming_requests,
+            abort_transfer: _,
+            event_receiver: _,
+            scope,
+        } = usbv::TestConnection::new();
+
+        let handled = scope.compute_local(async move {
+            handle_usb_target_impl(cid, &tc_clone, &local_node, host).await
+        });
+
+        let identify_request = incoming_requests.next().await.unwrap();
+
+        let usb_vsock::Address { device_cid, host_cid, device_port, host_port: _ } =
+            identify_request.address();
+        assert_eq!(cid, *device_cid);
+        assert_eq!(2, *host_cid);
+        assert_eq!(VSOCK_IDENTIFY_PORT, *device_port);
+
+        let (identify_sock, other_end) = fuchsia_async::emulated_handle::Socket::create_stream();
+        let other_end = fuchsia_async::Socket::from_socket(other_end);
+        let _conn_state = connection.accept(identify_request, other_end).await.unwrap();
+
+        let mut identify_sock = fuchsia_async::Socket::from_socket(identify_sock);
+        let header = fidl::encoding::TransactionHeader::new(
+            0,
+            0x6035e1ab368deee1,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        );
+        let identify = fidl_message::encode_response_result::<
+            fidl_rcs::IdentifyHostResponse,
+            fidl_rcs::IdentifyHostError,
+        >(
+            header,
+            Ok(fidl_rcs::IdentifyHostResponse {
+                nodename: Some(NODE_NAME.into()),
+                ..Default::default()
+            }),
+        )
+        .unwrap();
+        identify_sock.write_all(&identify).await.unwrap();
+        std::mem::drop(identify_sock);
+
+        handled.await.unwrap();
+
+        assert!(tc
+            .targets(None)
+            .into_iter()
+            .any(|target| { target.nodename == Some(NODE_NAME.into()) }));
     }
 
     fn make_target_add_fut(

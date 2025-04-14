@@ -4,9 +4,9 @@
 
 use bstr::BStr;
 use selinux::permission_check::{PermissionCheck, PermissionCheckResult};
-use selinux::{ClassPermission, Permission, SecurityId};
+use selinux::{ClassPermission, KernelPermission, SecurityId};
 use starnix_core::task::{CurrentTask, Task};
-use starnix_core::vfs::{FileObject, FileSystem, FsNode};
+use starnix_core::vfs::{FileObject, FileSystem, FsNode, FsStr};
 use starnix_logging::{
     log_warn, BugRef, __track_stub_inner, trace_instant, CATEGORY_STARNIX_SECURITY,
 };
@@ -41,6 +41,7 @@ pub(super) enum Auditable<'a> {
     FileObject(&'a FileObject),
     FileSystem(&'a FileSystem),
     FsNode(&'a FsNode),
+    Name(&'a FsStr),
     Task(&'a Task),
     // keep-sorted end
 }
@@ -102,7 +103,7 @@ pub(super) fn audit_decision(
     result: PermissionCheckResult,
     source_sid: SecurityId,
     target_sid: SecurityId,
-    permission: Permission,
+    permission: KernelPermission,
     audit_data: Auditable<'_>,
 ) {
     trace_instant!(
@@ -165,7 +166,7 @@ pub(super) fn audit_todo_decision(
     mut result: PermissionCheckResult,
     source_sid: SecurityId,
     target_sid: SecurityId,
-    permission: Permission,
+    permission: KernelPermission,
     audit_context: Auditable<'_>,
 ) {
     result.todo_bug = Some(bug.into());
@@ -190,6 +191,9 @@ impl Display for Auditable<'_> {
             }
             Auditable::FileSystem(fs) => {
                 write!(f, " dev=\"{}\"", fs.options.source)
+            }
+            Auditable::Name(name) => {
+                write!(f, " name=\"{}\"", name)
             }
             Auditable::Task(task) => {
                 write!(f, " pid={}, comm={}", task.get_pid(), BStr::new(task.command().as_bytes()))

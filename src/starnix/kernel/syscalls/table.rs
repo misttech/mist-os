@@ -81,8 +81,8 @@ pub fn dispatch_syscall(
     use crate::mm::syscalls::{
         sys_brk, sys_futex, sys_get_robust_list, sys_madvise, sys_membarrier, sys_mincore,
         sys_mlock, sys_mlock2, sys_mlockall, sys_mmap, sys_mprotect, sys_mremap, sys_msync,
-        sys_munlock, sys_munlockall, sys_munmap, sys_process_mrelease, sys_process_vm_readv,
-        sys_process_vm_writev, sys_set_robust_list, sys_userfaultfd,
+        sys_munlock, sys_munlockall, sys_munmap, sys_process_madvise, sys_process_mrelease,
+        sys_process_vm_readv, sys_process_vm_writev, sys_set_robust_list, sys_userfaultfd,
     };
     use crate::signals::syscalls::{
         sys_kill, sys_pidfd_send_signal, sys_restart_syscall, sys_rt_sigaction, sys_rt_sigpending,
@@ -165,6 +165,7 @@ pub fn dispatch_syscall(
             sys_arch32_msync, sys_arch32_munlock, sys_arch32_munlockall, sys_arch32_munmap,
             sys_arch32_process_vm_readv, sys_arch32_set_robust_list, sys_arch32_userfaultfd,
             sys_brk as sys_arch32_brk, sys_mprotect as sys_arch32_mprotect,
+            sys_process_madvise as sys_arch32_process_madvise,
         };
         pub use crate::signals::syscalls::{
             sys_arch32_rt_sigaction, sys_arch32_rt_sigtimedwait, sys_arch32_sigaltstack,
@@ -372,6 +373,7 @@ pub fn dispatch_syscall(
             pread64[6],
             preadv[4],
             prlimit64[4],
+            process_madvise[5],
             process_vm_readv[6],
             pselect6[6],
             ptrace[4],
@@ -638,6 +640,7 @@ pub fn dispatch_syscall(
         preadv2[6],
         preadv[4],
         prlimit64[4],
+        process_madvise[5],
         process_mrelease[2],
         process_vm_readv[6],
         process_vm_writev[6],

@@ -4,6 +4,7 @@
 
 use anyhow::{Context, Error};
 use attribution_data::AttributionDataProviderImpl;
+use attribution_processing::digest::BucketDefinition;
 use attribution_processing::kernel_statistics::KernelStatistics;
 use attribution_processing::AttributionDataProvider;
 use fidl::endpoints::{ControlHandle, RequestStream};
@@ -13,6 +14,7 @@ use fuchsia_sync::Mutex;
 use fuchsia_trace::duration;
 use futures::StreamExt;
 use log::{error, warn};
+use memory_monitor2_config::Config;
 use resources::Job;
 use snapshot::AttributionSnapshot;
 use std::sync::Arc;
@@ -23,6 +25,7 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_kernel as fkernel,
     fidl_fuchsia_memory_attribution as fattribution,
     fidl_fuchsia_memory_attribution_plugin as fattribution_plugin,
+    fidl_fuchsia_memorypressure as fpressure,
 };
 
 mod attribution_client;
@@ -33,7 +36,7 @@ mod snapshot;
 
 /// All FIDL services that are exposed by this component's ServiceFs.
 enum Service {
-    /// The `fuchsia.memory.heapdump.client.Collector` protocol.
+    /// The `fuchsia.memory.attribution.plugin.MemoryMonitor` protocol.
     MemoryMonitor(fattribution_plugin::MemoryMonitorRequestStream),
 }
 
@@ -96,6 +99,10 @@ async fn main() -> Result<(), Error> {
         attribution_data_provider.clone(),
         kernel_stats.clone(),
         stall_provider,
+        Config::take_from_startup_handle(),
+        connect_to_protocol::<fpressure::ProviderMarker>()
+            .context("Failed to connect to the memory pressure provider")?,
+        read_bucket_definitions(),
     )?;
 
     service_fs
@@ -164,4 +171,21 @@ async fn provide_snapshot(
     let attribution_snapshot = AttributionSnapshot::new(attribution_data, kernel_stats);
     attribution_snapshot.serve(snapshot).await;
     Ok(())
+}
+
+/// Looks for a bucket definitions configuration, to perform memory
+/// aggregations for reporting purposes. Returns an empty list if no
+/// such configuration was found.
+fn read_bucket_definitions() -> Vec<BucketDefinition> {
+    std::fs::File::open("/config/data/buckets.json")
+        .inspect_err(|err| warn!(err:%; "Could not access the bucket definitions configuration"))
+        .ok()
+        .and_then(|file| {
+            serde_json::from_reader(file)
+                .inspect_err(
+                    |err| warn!(err:%; "Could not read the bucket definitions configuration"),
+                )
+                .ok()
+        })
+        .unwrap_or_default()
 }

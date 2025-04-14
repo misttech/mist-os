@@ -20,7 +20,12 @@ using UartDriver = uart::all::KernelDriver<uart::BasicIoProvider, uart::Unsynchr
 UartDriver& GetUartDriver();
 
 // Wires up the associated UART to stdout via PhysConsole::set_serial.
-void SetUartConsole(const uart::all::Driver& uart);
+void SetUartConsole(const uart::all::Config<>& uart_config);
+
+// TODO(https://fxbug.dev/409114044): Remove when OOT is migrated.
+inline void SetUartConsole(uart::all::Driver uart) {
+  SetUartConsole(uart::all::GetConfig(uart));
+}
 
 // Obtain a `page_aligned` range for `driver`'s mmio range.
 template <typename Driver>

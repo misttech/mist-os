@@ -148,14 +148,16 @@ zx::result<std::unique_ptr<PartitionClient>> NelsonPartitioner::FindPartition(
     return GetBootloaderPartitionClient(spec);
   }
 
-  std::variant<std::string_view, Uuid> part_info;
+  std::optional<Uuid> type_guid;
+  std::string_view part_name;
+  std::string_view secondary_part_name;
   switch (spec.partition) {
     case Partition::kBootloaderA: {
       if (spec.content_type == "bl2") {
         return GetEmmcBootPartitionClient();
       }
       if (spec.content_type == "tpl") {
-        part_info = "tpl_a";
+        part_name = "tpl_a";
       } else {
         return zx::error(ZX_ERR_INVALID_ARGS);
       }
@@ -163,52 +165,61 @@ zx::result<std::unique_ptr<PartitionClient>> NelsonPartitioner::FindPartition(
     }
     case Partition::kBootloaderB: {
       if (spec.content_type == "tpl") {
-        part_info = "tpl_b";
+        part_name = "tpl_b";
       } else {
         return zx::error(ZX_ERR_INVALID_ARGS);
       }
       break;
     }
     case Partition::kZirconA:
-      part_info = Uuid(GUID_ZIRCON_A_VALUE);
+      type_guid = Uuid(GUID_ZIRCON_A_VALUE);
+      part_name = "boot_a";
       break;
     case Partition::kZirconB:
-      part_info = Uuid(GUID_ZIRCON_B_VALUE);
+      type_guid = Uuid(GUID_ZIRCON_B_VALUE);
+      part_name = "boot_b";
       break;
     case Partition::kZirconR:
-      part_info = Uuid(GUID_ZIRCON_R_VALUE);
+      type_guid = Uuid(GUID_ZIRCON_R_VALUE);
+      part_name = GPT_ZIRCON_R_NAME;
+      secondary_part_name = "cache";
       break;
     case Partition::kVbMetaA:
-      part_info = Uuid(GUID_VBMETA_A_VALUE);
+      type_guid = Uuid(GUID_VBMETA_A_VALUE);
+      part_name = GPT_VBMETA_A_NAME;
       break;
     case Partition::kVbMetaB:
-      part_info = Uuid(GUID_VBMETA_B_VALUE);
+      type_guid = Uuid(GUID_VBMETA_B_VALUE);
+      part_name = GPT_VBMETA_B_NAME;
       break;
     case Partition::kVbMetaR:
-      part_info = Uuid(GUID_VBMETA_R_VALUE);
+      type_guid = Uuid(GUID_VBMETA_R_VALUE);
+      part_name = GPT_VBMETA_R_NAME;
+      secondary_part_name = "reserved_c";
       break;
     case Partition::kAbrMeta:
-      part_info = Uuid(GUID_ABR_META_VALUE);
+      type_guid = Uuid(GUID_ABR_META_VALUE);
+      part_name = "misc";
       break;
     case Partition::kFuchsiaVolumeManager:
-      part_info = Uuid(GUID_FVM_VALUE);
+      type_guid = Uuid(GUID_FVM_VALUE);
+      part_name = GPT_FVM_NAME;
+      secondary_part_name = "data";
       break;
     default:
       ERROR("Partition type is invalid\n");
       return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  if (std::holds_alternative<Uuid>(part_info)) {
-    auto partition =
-        OpenBlockPartition(gpt_->devices(), std::nullopt, std::get<Uuid>(part_info), ZX_SEC(5));
-    if (partition.is_error()) {
-      return partition.take_error();
-    }
-    return BlockPartitionClient::Create(std::move(*partition));
-  }
-  auto status = gpt_->FindPartition([&part_info](const GptPartitionMetadata& part) {
-    return FilterByName(part, std::get<std::string_view>(part_info));
-  }
+  auto status = gpt_->FindPartition(
+      [&type_guid, &part_name, &secondary_part_name](const GptPartitionMetadata& part) {
+        bool type_guid_filter = false;
+        if (type_guid.has_value()) {
+          type_guid_filter = FilterByType(part, *type_guid);
+        }
+        return type_guid_filter || FilterByName(part, part_name) ||
+               FilterByName(part, secondary_part_name);
+      }
 
   );
   if (status.is_error()) {

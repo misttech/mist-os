@@ -18,6 +18,7 @@ mod internal {
 
     pub(super) mod api;
     pub(super) mod base;
+    pub(super) mod counters;
     pub(super) mod device;
     pub(super) mod fragmentation;
     pub(super) mod gmp;
@@ -227,7 +228,7 @@ pub use internal::base::{
     gen_ip_packet_id, receive_ipv4_packet, receive_ipv4_packet_action, receive_ipv6_packet,
     receive_ipv6_packet_action, resolve_output_route_to_destination, AddressStatus,
     BaseTransportIpContext, DeviceIpLayerMetadata, DropReason, FilterHandlerProvider, HopLimits,
-    IpCounters, IpDeviceConfirmReachableContext, IpDeviceContext, IpDeviceEgressStateContext,
+    IpDeviceConfirmReachableContext, IpDeviceContext, IpDeviceEgressStateContext,
     IpDeviceIngressStateContext, IpDeviceMtuContext, IpLayerBindingsContext, IpLayerContext,
     IpLayerEvent, IpLayerHandler, IpLayerIpExt, IpLayerTimerId, IpPacketDestination,
     IpRouteTableContext, IpRouteTablesContext, IpSendFrameError, IpSendFrameErrorReason,
@@ -238,6 +239,7 @@ pub use internal::base::{
     TransportIpContext, TransportReceiveError, DEFAULT_HOP_LIMITS, DEFAULT_TTL,
     IPV6_DEFAULT_SUBNET,
 };
+pub use internal::counters::{IpCounters, Ipv6RxCounters};
 pub use internal::fragmentation::FragmentationCounters;
 pub use internal::local_delivery::{
     IpHeaderInfo, LocalDeliveryPacketInfo, ReceiveIpPacketMeta, TransparentLocalDelivery,
@@ -245,7 +247,8 @@ pub use internal::local_delivery::{
 pub use internal::path_mtu::{PmtuCache, PmtuContext};
 pub use internal::reassembly::{FragmentContext, FragmentTimerId, IpPacketFragmentCache};
 pub use internal::routing::rules::{
-    MarkMatcher, MarkMatchers, Rule, RuleAction, RuleMatcher, RulesTable, TrafficOriginMatcher,
+    BoundDeviceMatcher, MarkMatcher, MarkMatchers, Rule, RuleAction, RuleMatcher, RulesTable,
+    TrafficOriginMatcher,
 };
 pub use internal::routing::{
     request_context_add_route, request_context_del_routes, AddRouteError, IpRoutingDeviceContext,
@@ -261,6 +264,7 @@ pub use internal::types::{
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
     pub use crate::internal::base::testutil::DualStackSendIpPacketMeta;
+    pub use crate::internal::counters::testutil::IpCounterExpectations;
     pub use crate::internal::local_delivery::testutil::FakeIpHeaderInfo;
     pub use crate::internal::routing::testutil::{
         add_route, del_device_routes, del_routes_to_subnet, set_rules,

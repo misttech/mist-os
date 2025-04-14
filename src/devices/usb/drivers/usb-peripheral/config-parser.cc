@@ -38,9 +38,9 @@ zx_status_t PeripheralConfigParser::AddFunctions(const std::vector<std::string>&
       function_configs_.push_back(kADBFunctionDescriptor);
       status = SetCompositeProductDescription(GOOGLE_USB_ADB_PID);
 
-    } else if (function == "overnet") {
-      function_configs_.push_back(kOvernetFunctionDescriptor);
-      status = SetCompositeProductDescription(GOOGLE_USB_OVERNET_PID);
+    } else if (function == "vsock_bridge") {
+      function_configs_.push_back(kFfxFunctionDescriptor);
+      status = SetCompositeProductDescription(GOOGLE_USB_VSOCK_BRIDGE_PID);
 
     } else if (function == "fastboot") {
       function_configs_.push_back(kFastbootFunctionDescriptor);
@@ -79,8 +79,8 @@ zx_status_t PeripheralConfigParser::SetCompositeProductDescription(uint16_t pid)
       case GOOGLE_USB_ADB_PID:
         product_desc_ = kADBProductDescription;
         break;
-      case GOOGLE_USB_OVERNET_PID:
-        product_desc_ = kOvernetProductDescription;
+      case GOOGLE_USB_VSOCK_BRIDGE_PID:
+        product_desc_ = kVsockBridgeProductDescription;
         break;
       case GOOGLE_USB_FASTBOOT_PID:
         product_desc_ = kFastbootProductDescription;
@@ -101,9 +101,9 @@ zx_status_t PeripheralConfigParser::SetCompositeProductDescription(uint16_t pid)
     } else if (pid_ == GOOGLE_USB_CDC_PID && pid == GOOGLE_USB_ADB_PID) {
       pid_ = GOOGLE_USB_CDC_AND_ADB_PID;
       product_desc_ += kADBProductDescription;
-    } else if (pid_ == GOOGLE_USB_CDC_PID && pid == GOOGLE_USB_OVERNET_PID) {
-      pid_ = GOOGLE_USB_CDC_AND_OVERNET_PID;
-      product_desc_ += kOvernetProductDescription;
+    } else if (pid_ == GOOGLE_USB_CDC_PID && pid == GOOGLE_USB_VSOCK_BRIDGE_PID) {
+      pid_ = GOOGLE_USB_CDC_AND_VSOCK_BRIDGE_PID;
+      product_desc_ += kVsockBridgeProductDescription;
     } else if (pid_ == GOOGLE_USB_CDC_PID && pid == GOOGLE_USB_FASTBOOT_PID) {
       pid_ = GOOGLE_USB_CDC_AND_FASTBOOT_PID;
       product_desc_ += kFastbootProductDescription;

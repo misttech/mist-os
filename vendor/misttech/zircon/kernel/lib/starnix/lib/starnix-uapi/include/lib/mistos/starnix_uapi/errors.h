@@ -38,7 +38,7 @@ class ErrnoCode {
 
   static ErrnoCode from_error_code(int16_t code) { return ErrnoCode(static_cast<uint32_t>(code)); }
 
-  uint64_t return_value() const { return -(static_cast<int64_t>(code_)); }
+  uint64_t return_value() const { return static_cast<uint64_t>(-(static_cast<int64_t>(code_))); }
 
   uint32_t error_code() const { return code_; }
 

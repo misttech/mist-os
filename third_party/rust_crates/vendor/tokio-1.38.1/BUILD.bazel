@@ -101,11 +101,11 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [
             "//third_party/rust_crates/ask2patch/memchr",  # x86_64-unknown-linux-gnu
             "//third_party/rust_crates/vendor/bytes-1.10.0:bytes",  # x86_64-unknown-linux-gnu
-            "//third_party/rust_crates/vendor/libc-0.2.169:libc",  # x86_64-unknown-linux-gnu
+            "//third_party/rust_crates/vendor/libc-0.2.171:libc",  # x86_64-unknown-linux-gnu
             "//third_party/rust_crates/vendor/mio-0.8.9:mio",  # x86_64-unknown-linux-gnu
             "//third_party/rust_crates/vendor/num_cpus-1.16.0:num_cpus",  # x86_64-unknown-linux-gnu
             "//third_party/rust_crates/vendor/signal-hook-registry-1.4.1:signal_hook_registry",  # x86_64-unknown-linux-gnu
-            "//third_party/rust_crates/vendor/socket2-0.5.5:socket2",  # x86_64-unknown-linux-gnu
+            "//third_party/rust_crates/vendor/socket2-0.5.9:socket2",  # x86_64-unknown-linux-gnu
         ],
         "//conditions:default": [],
     }),

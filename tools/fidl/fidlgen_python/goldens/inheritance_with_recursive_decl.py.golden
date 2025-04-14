@@ -11,16 +11,15 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.inheritancewithrecursivedecl"]
+_ir_path = get_fidl_ir_map()["test.inheritancewithrecursivedecl"]
 add_ir_path(_ir_path)
 
 
 @dataclass
 class ChildSecondRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    request: int | None
+    request: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ChildSecondRequest"
@@ -41,20 +40,20 @@ class ChildSecondRequest:
             "test.inheritancewithrecursivedecl/ChildSecondRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "request": None,
+                "request": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class ParentFirstRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    request: int | None
+    request: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ParentFirstRequest"
@@ -75,21 +74,31 @@ class ParentFirstRequest:
             "test.inheritancewithrecursivedecl/ParentFirstRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "request": None,
+                "request": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class ChildServer(fidl._server.ServerBase, ABC):
+class ChildServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.inheritancewithrecursivedecl"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -115,6 +124,8 @@ class ChildServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -144,7 +155,7 @@ class ChildServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class ChildClient(fidl._client.FidlClient):
+class ChildClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.inheritancewithrecursivedecl"
 
@@ -152,6 +163,8 @@ class ChildClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -189,7 +202,7 @@ class ChildClient(fidl._client.FidlClient):
         )
 
 
-class ChildEventHandler(fidl._client.EventHandlerBase, ABC):
+class ChildEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.inheritancewithrecursivedecl"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -198,22 +211,32 @@ class ChildEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-ChildMarker = fidl._library.ProtocolMarker(
+ChildMarker = FidlProtocolMarker(
     "(nondiscoverable) test.inheritancewithrecursivedecl/Child"
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class ParentServer(fidl._server.ServerBase, ABC):
+class ParentServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.inheritancewithrecursivedecl"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -231,6 +254,8 @@ class ParentServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -248,7 +273,7 @@ class ParentServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class ParentClient(fidl._client.FidlClient):
+class ParentClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.inheritancewithrecursivedecl"
 
@@ -256,6 +281,8 @@ class ParentClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -277,7 +304,7 @@ class ParentClient(fidl._client.FidlClient):
         )
 
 
-class ParentEventHandler(fidl._client.EventHandlerBase, ABC):
+class ParentEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.inheritancewithrecursivedecl"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -286,11 +313,13 @@ class ParentEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-ParentMarker = fidl._library.ProtocolMarker(
+ParentMarker = FidlProtocolMarker(
     "(nondiscoverable) test.inheritancewithrecursivedecl/Parent"
 )

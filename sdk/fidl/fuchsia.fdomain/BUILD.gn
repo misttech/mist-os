@@ -6,6 +6,8 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.fdomain") {
   sdk_area = "Developer"
+  sdk_category = "host_tool"
+  stable = true
   sources = [
     "channel.fidl",
     "event.fidl",

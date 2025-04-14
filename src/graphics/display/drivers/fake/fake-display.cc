@@ -961,6 +961,21 @@ void FakeDisplay::SendCaptureComplete() {
   engine_listener_client_.OnCaptureComplete();
 }
 
+void FakeDisplay::TriggerVsync() {
+  ZX_ASSERT_MSG(!device_config_.periodic_vsync,
+                "TriggerVsync() called on a device with periodic VSync enabled");
+
+  {
+    std::lock_guard lock(mutex_);
+    ZX_ASSERT_MSG(applied_config_stamp_ != display::kInvalidDriverConfigStamp,
+                  "TriggerVsync() called before the driver received a display configuration");
+  }
+  // The check above may appear vulnerable to TOCTOU, but it is not. Once the predicate
+  // becomes true, it will never be false again.
+
+  SendVsync();
+}
+
 void FakeDisplay::VSyncThread() {
   while (!vsync_thread_shutdown_requested_.load(std::memory_order_relaxed)) {
     SendVsync();

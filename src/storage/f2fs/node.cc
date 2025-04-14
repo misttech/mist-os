@@ -96,9 +96,13 @@ void NodeManager::SetToNextNat(nid_t start_nid) {
     nat_bitmap_.SetOne(ToMsbFirst(block_off));
 }
 
-void NodeManager::GetCurrentNatPage(nid_t nid, LockedPage *out) {
+zx::result<LockedPage> NodeManager::GetCurrentNatPage(nid_t nid) {
+  LockedPage out;
   pgoff_t index = CurrentNatAddr(nid);
-  fs_->GetMetaPage(index, out);
+  if (zx_status_t ret = fs_->GetMetaPage(index, &out); ret != ZX_OK) {
+    return zx::error(ret);
+  }
+  return zx::ok(std::move(out));
 }
 
 zx::result<LockedPage> NodeManager::GetNextNatPage(nid_t nid) {
@@ -266,7 +270,7 @@ int NodeManager::TryToFreeNats(int nr_shrink) {
 }
 
 // This function returns always success
-void NodeManager::GetNodeInfo(nid_t nid, NodeInfo &out) {
+zx_status_t NodeManager::GetNodeInfo(nid_t nid, NodeInfo &out) {
   nid_t start_nid = StartNid(nid);
   RawNatEntry ne;
   int i;
@@ -279,7 +283,7 @@ void NodeManager::GetNodeInfo(nid_t nid, NodeInfo &out) {
       out.ino = entry->GetIno();
       out.blk_addr = entry->GetBlockAddress();
       out.version = entry->GetVersion();
-      return;
+      return ZX_OK;
     }
   }
 
@@ -293,20 +297,23 @@ void NodeManager::GetNodeInfo(nid_t nid, NodeInfo &out) {
     return ZX_OK;
   });
   if (i < 0) {
-    LockedPage page;
     // Fill NodeInfo from nat page
-    GetCurrentNatPage(start_nid, &page);
-    NatBlock *nat_blk = page->GetAddress<NatBlock>();
+    zx::result page_or = GetCurrentNatPage(start_nid);
+    if (page_or.is_error()) {
+      return page_or.error_value();
+    }
+    NatBlock *nat_blk = page_or->GetAddress<NatBlock>();
     ne = nat_blk->entries[nid - start_nid];
 
     NodeInfoFromRawNat(out, ne);
   }
   CacheNatEntry(nid, ne);
+  return ZX_OK;
 }
 
 zx::result<LockedPage> NodeManager::FindLockedDnodePage(NodePath &path) {
   const size_t level = path.depth;
-  const size_t(&offset)[kMaxNodeBlockLevel] = path.offset_in_node;
+  const size_t (&offset)[kMaxNodeBlockLevel] = path.offset_in_node;
   LockedPage node_page;
   if (zx_status_t err = GetNodePage(path.ino, &node_page); err != ZX_OK) {
     return zx::error(err);
@@ -324,8 +331,8 @@ zx::result<LockedPage> NodeManager::FindLockedDnodePage(NodePath &path) {
 
 zx::result<LockedPage> NodeManager::GetLockedDnodePage(NodePath &node_path, bool is_dir) {
   size_t level = node_path.depth;
-  const size_t(&offset)[kMaxNodeBlockLevel] = node_path.offset_in_node;
-  const size_t(&noffset)[kMaxNodeBlockLevel] = node_path.node_offset;
+  const size_t (&offset)[kMaxNodeBlockLevel] = node_path.offset_in_node;
+  const size_t (&noffset)[kMaxNodeBlockLevel] = node_path.node_offset;
 
   LockedPage node_page;
   if (zx_status_t err = GetNodePage(node_path.ino, &node_page); err != ZX_OK) {
@@ -624,11 +631,9 @@ void NodeManager::BuildFreeNids() {
 
     RaNatPages(nid);
     while (true) {
-      {
-        LockedPage page;
-        GetCurrentNatPage(nid, &page);
-        free_nids += ScanNatPage(*page, nid);
-      }
+      zx::result page_or = GetCurrentNatPage(nid);
+      ZX_ASSERT(page_or.is_ok());
+      free_nids += ScanNatPage(**page_or, nid);
 
       nid += (kNatEntryPerBlock - (nid % kNatEntryPerBlock));
       if (nid >= max_nid_) {

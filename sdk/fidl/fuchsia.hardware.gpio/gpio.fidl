@@ -16,7 +16,12 @@ type BufferMode = strict enum {
     OUTPUT_HIGH = 2;
 };
 
-type InterruptOptions = flexible bits {};
+type InterruptOptions = flexible bits {
+    /// The interrupt wakes up the system if the system is suspended.
+    /// Must not be set if system suspend / resume is disabled.
+    @available(added=NEXT)
+    WAKEABLE = 0x01;
+};
 
 type InterruptMode = strict enum {
     EDGE_LOW = 0;

@@ -50,7 +50,7 @@ template("fuchsia_package_with_test") {
     lacewing_fidl_wrapper(host_test_target_name) {
       device_test_target_name = "$device_test_target_name($default_toolchain)"
       device_test_url = _package_url
-      deps = [ ":${main_target_name}_package" ]
+      package_deps = [ ":${main_target_name}_package($target_toolchain)" ]
       forward_variables_from(invoker,
                              [
                                "device_test_realm",

@@ -1045,7 +1045,8 @@ mod tests {
         let dir = std::fs::File::open(dir_path.clone()).unwrap();
         let (ret, arg_vec) = add_encryption_key(&root_dir);
         assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
-        let (arg_struct_bytes, _) = arg_vec.split_at(std::mem::size_of::<fscrypt_add_key_arg>());
+        let (arg_struct_bytes, arg_struct_raw_key) =
+            arg_vec.split_at(std::mem::size_of::<fscrypt_add_key_arg>());
         let arg_struct = fscrypt_add_key_arg::read_from_bytes(arg_struct_bytes).unwrap();
         let ret = unsafe { set_encryption_policy(&dir, arg_struct.key_spec.u.identifier.value) };
         assert!(
@@ -1061,6 +1062,7 @@ mod tests {
                 .open(dir_path.clone().join("foo.txt"))
                 .unwrap();
         }
+        drop(dir);
 
         let ret =
             unsafe { remove_encryption_key(&root_dir, arg_struct.key_spec.u.identifier.value) };
@@ -1069,7 +1071,26 @@ mod tests {
             "remove encryption key ioctl failed: {:?}",
             std::io::Error::last_os_error()
         );
-        let _ = std::fs::metadata(dir_path.clone().join("foo.txt")).expect("metadata failed");
+
+        let entries = std::fs::read_dir(dir_path.clone()).expect("readdir failed");
+        let mut encrypted_file_name = None;
+        for entry in entries {
+            let entry = entry.expect("invalid entry");
+            if entry.file_type().unwrap().is_file() {
+                eprintln!("file name is {:?}", entry.file_name());
+                encrypted_file_name = Some(entry.file_name());
+                break;
+            }
+        }
+
+        let _ = std::fs::metadata(dir_path.clone().join(encrypted_file_name.clone().unwrap()))
+            .expect("metadata failed");
+
+        let (ret, _) = add_encryption_key_with_key_bytes(&root_dir, arg_struct_raw_key);
+        assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
+
+        std::fs::metadata(dir_path.clone().join(encrypted_file_name.unwrap()))
+            .expect_err("metadata should fail on an encrypted path for an unlocked directory");
         std::fs::remove_dir_all(dir_path).expect("failed to remove my_dir");
     }
 

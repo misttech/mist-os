@@ -59,9 +59,9 @@ void InitAcpi(LegacyBoot& boot_info) {
   boot_info.acpi_rsdp = acpi_parser->rsdp_pa();
 
   if (auto debug_port = acpi_lite::GetDebugPort(*acpi_parser); debug_port.is_ok()) {
-    if (UartDriver driver; driver.Match(*debug_port)) {
-      boot_info.uart = ktl::move(driver).TakeUart();
-      SetUartConsole(boot_info.uart);
+    if (ktl::optional config = uart::all::Config<>::Match(*debug_port)) {
+      boot_info.uart_config = *config;
+      SetUartConsole(boot_info.uart_config);
     }
   }
 }
@@ -86,7 +86,9 @@ void InitSmbios(LegacyBoot& boot_info) {
 
 // A default, weak definition that may be overrode to perform other relevant
 // initialization.
-[[gnu::weak]] void LegacyBootSetUartConsole(const uart::all::Driver& uart) { SetUartConsole(uart); }
+[[gnu::weak]] void LegacyBootSetUartConsole(const uart::all::Config<>& uart_config) {
+  SetUartConsole(uart_config);
+}
 
 void LegacyBootInitMemory(AddressSpace* aspace) {
   // Note that these are done before paging is enabled (at all for 32-bit) with
@@ -96,7 +98,7 @@ void LegacyBootInitMemory(AddressSpace* aspace) {
   InitSmbios(gLegacyBoot);
 
   constexpr auto as_memrange =
-      [](auto obj, memalloc::Type type = memalloc::Type::kLegacyBootData) -> memalloc::Range {
+      [](const auto& obj, memalloc::Type type = memalloc::Type::kLegacyBootData) -> memalloc::Range {
     auto bytes = AsBytes(obj);
     return {
         .addr = reinterpret_cast<uint64_t>(bytes.data()),
@@ -110,7 +112,7 @@ void LegacyBootInitMemory(AddressSpace* aspace) {
                                                 : reinterpret_cast<uint64_t>(PHYS_LOAD_ADDRESS);
   uint64_t phys_end = reinterpret_cast<uint64_t>(_end);
 
-  auto in_load_image = [phys_start, phys_end](auto obj) -> bool {
+  auto in_load_image = [phys_start, phys_end](const auto& obj) -> bool {
     auto bytes = AsBytes(obj);
     uint64_t start = reinterpret_cast<uint64_t>(bytes.data());
     uint64_t end = start + bytes.size();

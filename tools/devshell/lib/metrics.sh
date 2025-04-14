@@ -178,7 +178,9 @@ _METRICS_TRACK_UNKNOWN_OPS=( "shell" )
 readonly _METRICS_GA_PROPERTY_ID _METRICS_ALLOWS_CUSTOM_REPORTING _METRICS_TRACK_REGEX _METRICS_TRACK_COMMAND_OPS _METRICS_TRACK_UNKNOWN_OPS
 
 # To properly enable unit testing, METRICS_CONFIG is not read-only
-METRICS_CONFIG="${FUCHSIA_DIR}/.fx-metrics-config"
+METRICS_CONFIG="${FUCHSIA_DIR}/.fx/config/metrics"
+# Old location of this file.  Will move to new location automatically.
+readonly METRICS_CONFIG_OLD="${FUCHSIA_DIR}/.fx-metrics-config"
 
 _METRICS_DEBUG=0
 _METRICS_DEBUG_LOG_FILE=""
@@ -475,6 +477,10 @@ function metrics-migrate-internal-users {
 }
 
 function metrics-read-and-validate {
+  if [[ -f "${METRICS_CONFIG_OLD}" ]]; then
+    fx-info "Moving ${METRICS_CONFIG_OLD} to new location ${METRICS_CONFIG}.  No further action is needed."
+    mv "${METRICS_CONFIG_OLD}" "${METRICS_CONFIG}"
+  fi
   if metrics-is-internal-user; then
     metrics-migrate-internal-users "$1"
     metrics-read-config-internal
@@ -782,7 +788,7 @@ function track-build-event {
     args_gn="$(grep -E 'build_info_board|build_info_product|rbe_mode|is_debug|optimize|select_variant|compilation_mode' "${build_dir}"/args.gn | paste -sd ';' -)"
     args_gn="${args_gn//[[:blank:]]/}" # remove blanks
 
-    args_json=$(fx-command-run jq -c '{ b: .build_info_board, p: .build_info_product, r: .rbe_mode, c: .compilation_mode, o:.optimize, sv: .select_variant }' "${build_dir}"/args.json)
+    args_json=$(fx-command-run jq -c '{ b: .build_info_board, p: .build_info_product, r: .rbe_mode, c: .compilation_mode, o: .optimize, sv: .select_variant, tc: .target_cpu, ri: .rust_incremental }' "${build_dir}"/args.json)
   else
     switches=""
     ninja_switches=""
@@ -818,6 +824,8 @@ function track-build-event {
     env_flags="${env_flags}-multi"
   fi
 
+  local -i args_json_size=$(wc -c < "${build_dir}"/args.json)
+
   event_params=$(fx-command-run jq -c -n \
     --arg args_gn1 "${args_gn1}" \
     --arg args_gn2 "${args_gn2}" \
@@ -832,6 +840,7 @@ function track-build-event {
     --argjson target_count "${target_count}" \
     --argjson is_clean_build "${is_clean_build}" \
     --arg env_flags "${env_flags}" \
+    --argjson args_json_size "${args_json_size}" \
     '$ARGS.named')
 
   _add-to-analytics-batch "build" "${event_params}"

@@ -54,6 +54,14 @@
       "short": null,
       "description": "output protobuf file",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--symbolize",
+      "short": null,
+      "description": "symbolize the generated profile",
+      "hidden": false
     }
   ],
   "notes": [],

@@ -534,7 +534,7 @@ impl ZombiePtraces {
             let Some(task) = task_ref.upgrade() else {
                 continue;
             };
-            task.thread_group.write().zombie_ptracees.set_parent_of(*tracee, None, new_parent);
+            task.thread_group().write().zombie_ptracees.set_parent_of(*tracee, None, new_parent);
         }
         let mut new_state = new_parent.write();
         new_state.deferred_zombie_ptracers.append(&mut lockless_list);
@@ -688,7 +688,7 @@ fn ptrace_cont(tracee: &Task, data: &UserAddress, detach: bool) -> Result<(), Er
     } else {
         state.set_stopped(StopState::Waking, None, None, None);
         drop(state);
-        tracee.thread_group.set_stopped(StopState::Waking, None, false);
+        tracee.thread_group().set_stopped(StopState::Waking, None, false);
     }
     if detach {
         tracee.write().set_ptrace(None)?;
@@ -800,7 +800,7 @@ pub fn ptrace_dispatch(
             return Ok(starnix_syscalls::SUCCESS);
         }
         PTRACE_DETACH => {
-            ptrace_detach(&current_task.thread_group, tracee.as_ref(), &data)?;
+            ptrace_detach(current_task.thread_group(), tracee.as_ref(), &data)?;
             return Ok(starnix_syscalls::SUCCESS);
         }
         _ => {}
@@ -1019,7 +1019,7 @@ fn do_attach(
     if let Some(task_ref) = task.upgrade() {
         thread_group.ptracees.lock().insert(task_ref.get_tid(), (&task_ref).into());
         {
-            let process_state = &mut task_ref.thread_group.write();
+            let process_state = &mut task_ref.thread_group().write();
             let mut state = task_ref.write();
             state.set_ptrace(Some(PtraceState::new(thread_group.leader, attach_type, options)))?;
             // If the tracee is already stopped, make sure that the tracer can
@@ -1060,10 +1060,10 @@ pub fn ptrace_attach_from_state(
     ptrace_state: PtraceCoreState,
 ) -> Result<(), Errno> {
     {
-        let weak_init = tracee_task.thread_group.kernel.pids.read().get_task(ptrace_state.pid);
+        let weak_init = tracee_task.thread_group().kernel.pids.read().get_task(ptrace_state.pid);
         let tracer_task = weak_init.upgrade().ok_or_else(|| errno!(ESRCH))?;
         do_attach(
-            &tracer_task.thread_group,
+            tracer_task.thread_group(),
             WeakRef::from(tracee_task),
             ptrace_state.attach_type,
             ptrace_state.options,
@@ -1092,7 +1092,7 @@ pub fn ptrace_traceme(current_task: &mut CurrentTask) -> Result<SyscallResult, E
     let ptrace_scope = current_task.kernel().ptrace_scope.load(Ordering::Relaxed);
     check_caps_for_attach(ptrace_scope, current_task)?;
 
-    let parent = current_task.thread_group.read().parent.clone();
+    let parent = current_task.thread_group().read().parent.clone();
     if let Some(parent) = parent {
         let parent = parent.upgrade();
         // TODO: Move this check into `do_attach()` so that there is a single `ptrace_access_check(tracer, tracee)`?
@@ -1141,9 +1141,9 @@ where
     if ptrace_scope == RESTRICTED_SCOPE {
         // This only allows us to attach to descendants and tasks that have
         // explicitly allowlisted us with PR_SET_PTRACER.
-        let mut ttg = tracee.thread_group.read().parent.clone();
+        let mut ttg = tracee.thread_group().read().parent.clone();
         let mut is_parent = false;
-        let my_pid = current_task.thread_group.leader;
+        let my_pid = current_task.thread_group().leader;
         while let Some(target) = ttg {
             let target = target.upgrade();
             if target.as_ref().leader == my_pid {
@@ -1153,7 +1153,7 @@ where
             ttg = target.read().parent.clone();
         }
         if !is_parent {
-            match tracee.thread_group.read().allowed_ptracers {
+            match tracee.thread_group().read().allowed_ptracers {
                 PtraceAllowedPtracers::None => return error!(EPERM),
                 PtraceAllowedPtracers::Some(pid) => {
                     if my_pid != pid {
@@ -1166,7 +1166,7 @@ where
     }
 
     current_task.check_ptrace_access_mode(locked, PTRACE_MODE_ATTACH_REALCREDS, &tracee)?;
-    do_attach(&current_task.thread_group, weak_task.clone(), attach_type, PtraceOptions::empty())?;
+    do_attach(current_task.thread_group(), weak_task.clone(), attach_type, PtraceOptions::empty())?;
     if attach_type == PtraceAttachType::Attach {
         send_standard_signal(&tracee, SignalInfo::default(SIGSTOP));
     } else if attach_type == PtraceAttachType::Seize {
@@ -1373,7 +1373,7 @@ mod tests {
             &mut locked,
             &mut tracee,
             PR_SET_PTRACER,
-            tracer.thread_group.leader as u64,
+            tracer.thread_group().leader as u64,
             0,
             0,
             0

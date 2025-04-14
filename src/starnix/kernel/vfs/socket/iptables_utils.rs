@@ -6,7 +6,7 @@
 // iptables structures.
 
 use itertools::Itertools;
-use starnix_logging::log_warn;
+use starnix_logging::log_debug;
 use starnix_uapi::iptables_flags::{
     IptIpFlags, IptIpFlagsV4, IptIpFlagsV6, IptIpInverseFlags, NfIpHooks, NfNatRangeFlags,
     XtTcpInverseFlags, XtUdpInverseFlags,
@@ -772,7 +772,7 @@ impl IptReplaceParser {
             }
 
             matcher_name => {
-                log_warn!("IpTables: ignored {matcher_name} matcher of size {match_size}");
+                log_debug!("IpTables: ignored {matcher_name} matcher of size {match_size}");
                 Matcher::Unknown
             }
         };
@@ -828,7 +828,7 @@ impl IptReplaceParser {
             }
 
             (target_name, revision) => {
-                log_warn!(
+                log_debug!(
                     "IpTables: ignored {target_name} target (revision={revision}) of size \
                     {target_size}"
                 );
@@ -1521,7 +1521,7 @@ impl Entry {
 
         if let Some(ref interface) = ip_info.in_interface {
             if ip_info.inverse_flags.contains(IptIpInverseFlags::INPUT_INTERFACE) {
-                log_warn!("IpTables: ignored rule-specification with inversed input interface");
+                log_debug!("IpTables: ignored rule-specification with inversed input interface");
                 return Ok(None);
             }
             matchers.in_interface = Some(fnet_filter_ext::InterfaceMatcher::Name(interface.clone()))
@@ -1529,7 +1529,7 @@ impl Entry {
 
         if let Some(ref interface) = ip_info.out_interface {
             if ip_info.inverse_flags.contains(IptIpInverseFlags::OUTPUT_INTERFACE) {
-                log_warn!("IpTables: ignored rule-specification with inversed output interface");
+                log_debug!("IpTables: ignored rule-specification with inversed output interface");
                 return Ok(None);
             }
             matchers.out_interface =
@@ -1570,7 +1570,7 @@ impl Entry {
                 }
 
                 protocol => {
-                    log_warn!("IpTables: ignored rule-specification with protocol {protocol}");
+                    log_debug!("IpTables: ignored rule-specification with protocol {protocol}");
                     return Ok(None);
                 }
             };
@@ -1687,7 +1687,7 @@ impl Entry {
             VERDICT_ACCEPT => Ok(Some(fnet_filter_ext::Action::Accept)),
 
             VERDICT_QUEUE => {
-                log_warn!("IpTables: ignored unsupported QUEUE target");
+                log_debug!("IpTables: ignored unsupported QUEUE target");
                 Ok(None)
             }
 

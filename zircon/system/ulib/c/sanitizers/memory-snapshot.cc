@@ -17,43 +17,54 @@
 
 #include <runtime/thread.h>
 
+#include "../threads/thread-list.h"
+#include "../weak.h"
 #include "dynlink.h"
 #include "threads_impl.h"
 
+namespace LIBC_NAMESPACE_DECL {
 namespace {
 
-// TODO(https://fxbug.dev/42175677): ThreadSuspender synchronizes using _dl_wrlock.  If a
-// vDSO entry point used during the snapshot code is interpoosed by a version
-// that calls dlsym, this can deadlock since dlsym takes the write lock too for
-// its own arcane reasons.  The known interposer implementations such as
-// //src/devices/testing/fake-object only call dlsym on first entry to each
-// system call (following standard dlsym-interposer practice).  So just make an
-// early call to each system call entry point used in this file, before taking
-// any locks.  That way any interposers will have done their initialization
-// before we call into them.  If the interposers do other synchronization this
-// could still cause deadlock in other ways.  So probably we'll need to change
-// things eventually so that this uses only real vDSO entry points that can't
-// be interposed upon.
-void PrimeSyscallsBeforeTakingLocks() {
-  static once_flag flag = ONCE_FLAG_INIT;
-  call_once(
-      &flag, +[]() {
-        zx_handle_t invalid;
-        uintptr_t ignored;
-        (void)zx_system_get_page_size();
-        zx_object_get_child(_zx_process_self(), ZX_KOID_INVALID, 0, &invalid);
-        zx_object_get_info(_zx_process_self(), 0, nullptr, 0, nullptr, nullptr);
-        zx_object_wait_one(_zx_process_self(), 0, 0, nullptr);
-        zx_task_suspend_token(_zx_process_self(), &invalid);
-        zx_thread_read_state(zxr_thread_get_handle(&__pthread_self()->zxr_thread), 0, nullptr, 0);
-        zx_handle_t vmo = ZX_HANDLE_INVALID;
-        zx_vmo_create(0, 0, &vmo);
-        zx_vmo_set_size(vmo, 0);
-        zx_vmar_map(_zx_vmar_root_self(), 0, 0, vmo, 0, 0, &ignored);
-        zx_vmar_unmap(_zx_vmar_root_self(), 0, 0);
-        zx_handle_close(vmo);
-      });
-}
+// TODO(https://fxbug.dev/42175677): ThreadSuspender synchronizes using
+// _dl_wrlock.  If a vDSO entry point used during the snapshot code is
+// interpoosed by a version that calls dlsym, this can deadlock since dlsym
+// takes the write lock too for its own arcane reasons.  The known interposer
+// implementations such as //src/devices/testing/fake-object only call dlsym on
+// first entry to each system call (following standard dlsym-interposer
+// practice).  So just make an early call to each system call entry point used
+// in this file, before taking any locks.  That way any interposers will have
+// done their initialization before we call into them.  If the interposers do
+// other synchronization this could still cause deadlock in other ways.  So
+// probably we'll need to change things eventually so that this uses only real
+// vDSO entry points that can't be interposed upon.
+class PrimeSyscallsBeforeTakingLocks {
+ public:
+  PrimeSyscallsBeforeTakingLocks() {
+    static once_flag flag;
+    call_once(&flag, Prime);
+  }
+
+ private:
+  static void Prime() {
+    zx_handle_t invalid;
+    uintptr_t ignored;
+    (void)zx_system_get_page_size();
+    zx_object_get_child(_zx_process_self(), ZX_KOID_INVALID, 0, &invalid);
+    zx_object_get_info(_zx_process_self(), 0, nullptr, 0, nullptr, nullptr);
+    zx_object_wait_one(_zx_process_self(), 0, 0, nullptr);
+    zx_task_suspend_token(_zx_process_self(), &invalid);
+    zx_thread_read_state(zxr_thread_get_handle(&__pthread_self()->zxr_thread), 0, nullptr, 0);
+    zx_handle_t vmo = ZX_HANDLE_INVALID;
+    zx_vmo_create(0, 0, &vmo);
+    zx_vmo_set_size(vmo, 0);
+    zx_vmar_map(_zx_vmar_root_self(), 0, 0, vmo, 0, 0, &ignored);
+    zx_vmar_unmap(_zx_vmar_root_self(), 0, 0);
+    zx_handle_close(vmo);
+  }
+};
+
+constexpr WeakLock<_dl_rdlock, _dl_unlock> kDlLock;
+constexpr WeakLock<__thread_allocation_inhibit, __thread_allocation_release> kAllocationLock;
 
 // This is a simple container similar to std::vector but using only whole-page
 // allocations in a private VMO to avoid interactions with any normal memory
@@ -167,52 +178,20 @@ class RelocatingPageAllocatedVector {
 
 // Just keeping the suspend_token handle alive is what keeps the thread
 // suspended.  So destruction of the Thread object implicitly resumes it.
-struct Thread {
-  zx_koid_t koid;
+struct SuspendedThread {
+  zx_koid_t koid = ZX_KOID_INVALID;
   zx::thread thread;
   zx::suspend_token token;
 };
 
-class ThreadSuspender {
+using SuspendedThreadVector = RelocatingPageAllocatedVector<SuspendedThread>;
+
+class __TA_SCOPED_CAPABILITY ThreadSuspender {
  public:
-  ThreadSuspender() {
-    // Avoid reentrancy issues with the system calls used with locks held.
-    PrimeSyscallsBeforeTakingLocks();
+  ThreadSuspender() __TA_ACQUIRE(gAllThreadsLock) = default;
+  ~ThreadSuspender() __TA_RELEASE() = default;
 
-    // Take important locks before suspending any threads.  These protect data
-    // structures that MemorySnapshot needs to scan.  Once all threads are
-    // suspended, the locks are released since any potential contenders should
-    // be quiescent for the remainder of the snapshot, and it's inadvisable to
-    // call user callbacks with internal locks held.
-    //
-    // N.B. The lock order here matches dlopen_internal to avoid A/B deadlock.
-
-    // The dynamic linker data structures are used to find all the global
-    // ranges, so they must be in a consistent state.
-    _dl_rdlock();
-
-    // This approximately prevents thread creation.  It doesn't affirmatively
-    // prevent thread creation per se.  Rather, it prevents thrd_create or
-    // pthread_create from allocating new thread data structures.  The lock is
-    // not held while actually creating the thread, however, so there is
-    // always a race with actual thread creation that has to be addressed by
-    // the looping logic in Collect, below.  Also, nothing prevents racing
-    // with other direct zx_thread_create calls in the process that don't use
-    // the libc facilities.
-    __thread_allocation_inhibit();
-
-    // Importantly, this lock protects consistency of the global list of
-    // all threads so that it can be traversed safely below.
-    __thread_list_acquire();
-  }
-
-  ~ThreadSuspender() {
-    __thread_list_release();
-    __thread_allocation_release();
-    _dl_unlock();
-  }
-
-  zx_status_t Collect(RelocatingPageAllocatedVector<Thread>* threads) {
+  zx_status_t Collect(SuspendedThreadVector& threads) {
     zx_status_t status = Init();
     if (status != ZX_OK) {
       return status;
@@ -249,7 +228,7 @@ class ThreadSuspender {
     } while (any_new || filled < count);
 
     // Now wait for all the threads to have finished suspending.
-    for (auto& t : *threads) {
+    for (auto& t : threads) {
       zx_signals_t pending;
       status = t.thread.wait_one(ZX_THREAD_SUSPENDED | ZX_THREAD_TERMINATED, zx::time::infinite(),
                                  &pending);
@@ -268,9 +247,6 @@ class ThreadSuspender {
   }
 
  private:
-  RelocatingPageAllocatedVector<zx_koid_t> koids_;
-  zx_koid_t this_thread_koid_ = ZX_KOID_INVALID;
-
   zx::unowned_process process() { return zx::unowned_process{_zx_process_self()}; }
 
   zx_status_t Init() {
@@ -320,13 +296,12 @@ class ThreadSuspender {
   // straightforwardly use internal synchronization to implement a one-pass
   // solution that's O(n) in the number of threads with no need to mitigate
   // race conditions.
-  zx_status_t SuspendNewThreads(RelocatingPageAllocatedVector<Thread>* threads, bool* any) {
+  zx_status_t SuspendNewThreads(SuspendedThreadVector& threads, bool* any) {
     *any = false;
     for (const zx_koid_t koid : koids_) {
-      if (koid != this_thread_koid_ &&
-          std::none_of(threads->begin(), threads->end(),
-                       [koid](const Thread& t) { return t.koid == koid; })) {
-        Thread t{koid, {}, {}};
+      auto match = [koid](const SuspendedThread& t) { return t.koid == koid; };
+      if (koid != this_thread_koid_ && std::ranges::none_of(threads, match)) {
+        SuspendedThread t = {.koid = koid};
         zx_status_t status =
             process()->get_child(koid, ZX_RIGHT_READ | ZX_RIGHT_WRITE | ZX_RIGHT_WAIT, &t.thread);
         if (status == ZX_ERR_NOT_FOUND) {
@@ -341,17 +316,48 @@ class ThreadSuspender {
           }
         }
         if (status == ZX_OK) {
-          status = threads->reserve_some_more();
+          status = threads.reserve_some_more();
         }
         if (status != ZX_OK) {
           return status;
         }
-        threads->push_back(std::move(t));
+        threads.push_back(std::move(t));
         *any = true;
       }
     }
     return ZX_OK;
   }
+
+  // Take important locks before suspending any threads.  These protect data
+  // structures that MemorySnapshot needs to scan.  Once all threads are
+  // suspended, the locks are released since any potential contenders should
+  // be quiescent for the remainder of the snapshot, and it's inadvisable to
+  // call user callbacks with internal locks held.
+  //
+  // N.B. The lock order here matches dlopen_internal to avoid A/B deadlock.
+  // Avoid reentrancy issues with the system calls used with locks held.
+  [[no_unique_address]] PrimeSyscallsBeforeTakingLocks prime_syscalls_;
+
+  // The dynamic linker data structures are used to find all the global
+  // ranges, so they must be in a consistent state.
+  std::lock_guard<decltype(kDlLock)> lock_dl_{kDlLock};
+
+  // This approximately prevents thread creation.  It doesn't affirmatively
+  // prevent thread creation per se.  Rather, it prevents thrd_create or
+  // pthread_create from allocating new thread data structures.  The lock is
+  // not held while actually creating the thread, however, so there is
+  // always a race with actual thread creation that has to be addressed by
+  // the looping logic in Collect, below.  Also, nothing prevents racing
+  // with other direct zx_thread_create calls in the process that don't use
+  // the libc facilities.
+  std::lock_guard<decltype(kAllocationLock)> lock_allocation_{kAllocationLock};
+
+  // Importantly, this lock protects consistency of the global list of
+  // all threads so that it can be traversed safely below.
+  std::lock_guard<Mutex> lock_all_threads_{gAllThreadsLock};
+
+  RelocatingPageAllocatedVector<zx_koid_t> koids_;
+  zx_koid_t this_thread_koid_ = ZX_KOID_INVALID;
 };
 
 class MemorySnapshot {
@@ -368,7 +374,7 @@ class MemorySnapshot {
 
   bool Ok() const { return status_ == ZX_OK; }
 
-  void SuspendThreads() { status_ = ThreadSuspender().Collect(&threads_); }
+  void SuspendThreads() { status_ = ThreadSuspender().Collect(threads_); }
 
   void ReportGlobals(sanitizer_memory_snapshot_callback_t* callback) {
     _dl_locked_report_globals(callback, callback_arg_);
@@ -402,7 +408,7 @@ class MemorySnapshot {
   }
 
  private:
-  RelocatingPageAllocatedVector<Thread> threads_;
+  SuspendedThreadVector threads_;
   void (*done_callback_)(zx_status_t, void*);
   void* callback_arg_;
   zx_status_t status_ = ZX_OK;
@@ -420,7 +426,7 @@ class MemorySnapshot {
 #error "what machine?"
 #endif
 
-  void ReportThread(const Thread& t, sanitizer_memory_snapshot_callback_t* stacks_callback,
+  void ReportThread(const SuspendedThread& t, sanitizer_memory_snapshot_callback_t* stacks_callback,
                     sanitizer_memory_snapshot_callback_t* regs_callback,
                     sanitizer_memory_snapshot_callback_t* tls_callback) {
     // Collect register data, which is needed to find stack and TLS locations.
@@ -436,8 +442,15 @@ class MemorySnapshot {
     }
 
     if (stacks_callback || tls_callback) {
-      // Find the TCB to determine the TLS and stack regions.
-      if (auto tcb = FindValidTcb(regs.*kThreadReg)) {
+      // Find the TCB to determine the TLS and stack regions.  But first verify
+      // that it's one of the live threads.  If it's not there this could be a
+      // thread not created by libc, or a detached thread that got suspended
+      // while exiting (so its TCB has already been unmapped, but the thread
+      // pointer wasn't cleared).  In either case we can't safely use the
+      // pointer since it might be bogus or point to a data structure we don't
+      // grok.  So no TCB-based information (TLS, stack bounds) can be
+      // discovered and reported.
+      if (auto tcb = AllThreads().FindTp(regs.*kThreadReg)) {
         ReportTcb(tcb, regs.*kSpReg, stacks_callback, tls_callback);
       }
     }
@@ -468,9 +481,9 @@ class MemorySnapshot {
     }
 
     // Report the handful of particular pointers stashed in the TCB itself.
-    // These are literal cached malloc allocations. Members like `start_arg` or `result` might be
-    // set up before the thread register is set up, so they can hold values that no ReportTls call
-    // will reach.
+    // These are literal cached malloc allocations. Members like `start_arg` or
+    // `result` might be set up before the thread register is set up, so they
+    // can hold values that no ReportTls call will reach.
     void* ptrs[] = {
         tcb->locale,
         tcb->dlerror_buf,
@@ -486,44 +499,26 @@ class MemorySnapshot {
     }
   }
 
-  // Report internal thread objects whose threads are either not fully setup or have finished.
-  // Rather than a costly check for whether the TCB was found with a live thread,
-  // just report all threads' join values here and not in ReportTls (above).
+  // Report internal thread objects whose threads are either not fully setup or
+  // have finished.  Rather than a costly check for whether the TCB was found
+  // with a live thread, just report all threads' join values here and not in
+  // ReportTls (above).
   void ReportInvalidTcbs(sanitizer_memory_snapshot_callback_t* callback) {
     // Don't hold the lock during callbacks.  It should be safe to pretend
     // it's locked assuming the callback doesn't create or join threads.
-    // ScopedThreadList's destructor releases the lock after the copy.
-    LockedThreadList all_threads = ScopedThreadList();
-    for (auto tcb : all_threads) {
+    constexpr auto unlocked_all_threads = []() -> ThreadList {
+      std::lock_guard lock(gAllThreadsLock);
+      return AllThreadsLocked();
+    };
+    for (auto tcb : unlocked_all_threads()) {
       void* ptrs[] = {
           // Report the thread's starting argument which may only be available in the internal
-          // pthread, or the thread's result join value which may be set once the thread completes.
+          // pthread, or the thread's result join value which may be set once the thread
+          // completes.
           tcb->start_arg_or_result,
       };
       callback(ptrs, sizeof(ptrs), callback_arg_);
     }
-  }
-
-  pthread* FindValidTcb(uintptr_t tp) {
-    // In a race with a freshly-created thread setting up its thread
-    // pointer, it might still be zero.
-    if (tp == 0) {
-      return nullptr;
-    }
-
-    // Compute the TCB pointer from the thread pointer.
-    const auto tcb = tp_to_pthread(reinterpret_cast<void*>(tp));
-
-    // Verify that it's one of the live threads.  If it's not there this
-    // could be a thread not created by libc, or a detached thread that got
-    // suspended while exiting (so its TCB has already been unmapped, but
-    // the thread pointer wasn't cleared).  In either case we can't safely
-    // use the pointer since it might be bogus or point to a data structure
-    // we don't grok.  So no TCB-based information (TLS, stack bounds) can
-    // be discovered and reported.
-    ScopedThreadList all_threads;
-    auto it = std::find(all_threads.begin(), all_threads.end(), tcb);
-    return it == all_threads.end() ? nullptr : *it;
   }
 };
 
@@ -617,8 +612,9 @@ auto CurrentThreadRegs() {
 }
 
 }  // namespace
+}  // namespace LIBC_NAMESPACE_DECL
 
-__EXPORT
+__EXPORT [[gnu::noinline]]
 void __sanitizer_memory_snapshot(sanitizer_memory_snapshot_callback_t* globals,
                                  sanitizer_memory_snapshot_callback_t* stacks,
                                  sanitizer_memory_snapshot_callback_t* regs,
@@ -628,9 +624,9 @@ void __sanitizer_memory_snapshot(sanitizer_memory_snapshot_callback_t* globals,
   // test case that tries to use a register it hopes won't be touched.
   // This is the first thing after the test sets that register, and the
   // volatile on the asms should prevent hoisting down into the if below.
-  auto regdata = CurrentThreadRegs();
+  auto regdata = LIBC_NAMESPACE::CurrentThreadRegs();
 
-  MemorySnapshot snapshot(done, arg);
+  LIBC_NAMESPACE::MemorySnapshot snapshot(done, arg);
   snapshot.SuspendThreads();
   if (snapshot.Ok() && globals) {
     snapshot.ReportGlobals(globals);

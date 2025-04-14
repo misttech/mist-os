@@ -311,9 +311,9 @@ class DevicetreeChosenNodeMatcherBase
   constexpr std::optional<devicetree::ResolvedPath> stdout_path() const { return resolved_stdout_; }
 
  protected:
-  auto& uart_matcher() { return uart_matcher_; }
+  auto& uart_selector() { return uart_selector_; }
 
-  auto& uart_emplacer() { return uart_emplacer_; }
+  void set_uart_config(zbi_dcfg_simple_t* uart_config) { uart_config_ = uart_config; }
 
  private:
   devicetree::ScanState HandleBootstrapStdout(const devicetree::NodePath& path,
@@ -328,14 +328,10 @@ class DevicetreeChosenNodeMatcherBase
                                   const std::optional<devicetree::PropertyValue>& interrupts);
 
   // May only be called after |uart_irq_.ResolveIrqController| returns |fit::ok(true)|.
-  void UpdateUart() {
-    if (uart_emplacer_) {
-      auto irq_config = uart_irq_.GetIrqConfig(0);
-      uart_dcfg_.irq = irq_config.irq;
-      uart_dcfg_.flags = irq_config.flags;
-
-      uart_emplacer_(uart_dcfg_);
-    }
+  void SetUartIrq() {
+    auto irq_config = uart_irq_.GetIrqConfig(0);
+    uart_config_->irq = irq_config.irq;
+    uart_config_->flags = irq_config.flags;
   }
 
   // Path to device node containing the stdout device (uart).
@@ -344,7 +340,6 @@ class DevicetreeChosenNodeMatcherBase
   std::optional<Tty> tty_;
   std::optional<size_t> tty_index_;
   std::optional<devicetree::ResolvedPath> resolved_stdout_;
-  zbi_dcfg_simple_t uart_dcfg_ = {};
 
   DevicetreeIrqResolver uart_irq_;
 
@@ -354,34 +349,37 @@ class DevicetreeChosenNodeMatcherBase
   zbitl::ByteView zbi_;
 
   // Type erased match.
-  fit::inline_function<bool(const devicetree::PropertyDecoder&)> uart_matcher_ = nullptr;
-  fit::inline_function<void(const zbi_dcfg_simple_t&)> uart_emplacer_ = nullptr;
+  fit::inline_function<bool(const devicetree::PropertyDecoder&)> uart_selector_ = nullptr;
+  zbi_dcfg_simple_t* uart_config_ = nullptr;
 };
 
 template <typename AllUartDrivers = uart::all::Driver>
 class DevicetreeChosenNodeMatcher : public DevicetreeChosenNodeMatcherBase {
  public:
-  DevicetreeChosenNodeMatcher(const char* shim_name, FILE* log = stdout)
+  explicit DevicetreeChosenNodeMatcher(const char* shim_name, FILE* log = stdout)
       : DevicetreeChosenNodeMatcherBase(shim_name, log) {
-    uart_matcher() = [this](const auto& decoder) -> bool {
-      uart_emplacer() = uart_.MatchDevicetree(decoder);
-      return uart_emplacer() != nullptr;
+    uart_selector() = [this](const devicetree::PropertyDecoder& decoder) -> bool {
+      std::optional cfg = uart::all::Config<AllUartDrivers>::Select(decoder);
+      if (cfg) {
+        uart_config_ = *cfg;
+        uart_config_->Visit([this]<typename UartType>(uart::Config<UartType>& cfg) {
+          if constexpr (std::is_same_v<typename UartType::config_type, zbi_dcfg_simple_t>) {
+            set_uart_config(&(*cfg));
+          }
+        });
+      }
+      return cfg.has_value();
     };
   }
 
-  // We use std::nullopt over the null driver as a clearer indication that no
-  // UART was matched.
-  constexpr std::optional<AllUartDrivers> TakeUart() {
-    if (uart_.template holds_alternative<uart::null::Driver>()) {
-      return std::nullopt;
-    }
-    return std::move(uart_).TakeUart();
+  // Resolved configuration for the uart described by `stdout_path` or best effort cmdline
+  // interpretation.
+  constexpr std::optional<uart::all::Config<AllUartDrivers>> uart_config() const {
+    return uart_config_;
   }
 
  private:
-  // We use KernelDriver just for the MatchDevicetree() interface; the choice
-  // of I/O provider or synchronization policy is not actually material.
-  uart::all::KernelDriver<uart::BasicIoProvider, uart::UnsynchronizedPolicy, AllUartDrivers> uart_;
+  std::optional<uart::all::Config<AllUartDrivers>> uart_config_;
 };
 
 // This matcher parses 'memory' and 'reserved_memory' device nodes and 'memranges' from the

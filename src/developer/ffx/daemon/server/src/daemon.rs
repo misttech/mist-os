@@ -67,9 +67,6 @@ use notify::PollWatcher as RecommendedWatcher;
 /// Determines if targets discovered should expire. Defaults to "true"
 const DISCOVERY_EXPIRE_TARGETS: &str = "discovery.expire_targets";
 
-/// Whether we should discover targets over USB. Defaults to "false"
-const OVERNET_ENABLE_USB: &str = "overnet.enable_usb";
-
 pub struct DaemonEventHandler {
     node: Arc<overnet_core::Router>,
     target_collection: Rc<TargetCollection>,
@@ -503,7 +500,6 @@ impl Daemon {
             ascendd::Opt {
                 sockpath: self.socket_path.clone(),
                 client_routing,
-                usb: ffx_config::get(OVERNET_ENABLE_USB).unwrap_or(false),
                 ..Default::default()
             },
             node,

@@ -32,6 +32,25 @@ const char* StripFile(const char* file, FuchsiaLogSeverity severity) {
   return severity > FUCHSIA_LOG_INFO ? StripDots(file) : StripPath(file);
 }
 
+const char* SeverityToString(FuchsiaLogSeverity severity) {
+  switch (severity) {
+    case FUCHSIA_LOG_TRACE:
+      return "TRACE";
+    case FUCHSIA_LOG_DEBUG:
+      return "DEBUG";
+    case FUCHSIA_LOG_INFO:
+      return "INFO";
+    case FUCHSIA_LOG_WARNING:
+      return "WARN";
+    case FUCHSIA_LOG_ERROR:
+      return "ERROR";
+    case FUCHSIA_LOG_FATAL:
+      return "FATAL";
+    default:
+      return "";
+  }
+}
+
 }  // namespace
 
 namespace driver_logger {
@@ -56,6 +75,16 @@ void log_with_source(Logger& logger, FuchsiaLogSeverity severity, const char* ta
 
 void Logger::VLogWrite(FuchsiaLogSeverity severity, const char* tag, const char* msg, va_list args,
                        const char* file, uint32_t line) const {
+  if (severity < severity_) {
+    return;
+  }
+  if (use_stdout_) {
+    // We rely on line buffering to ensure this is a single syscall.
+    printf("[driver_manager.cm]: %s: ", SeverityToString(severity));
+    vprintf(msg, args);
+    fputc('\n', stdout);
+    return;
+  }
   fuchsia_syslog::LogBuffer buffer;
   constexpr size_t kFormatStringLength = 1024;
   char fmt_string[kFormatStringLength];
@@ -93,9 +122,6 @@ void Logger::BeginRecord(fuchsia_syslog::LogBuffer& buffer, FuchsiaLogSeverity s
 }
 
 void Logger::FlushRecord(fuchsia_syslog::LogBuffer& buffer, FuchsiaLogSeverity severity) const {
-  if (severity < severity_) {
-    return;
-  }
   buffer.FlushRecord();
 }
 

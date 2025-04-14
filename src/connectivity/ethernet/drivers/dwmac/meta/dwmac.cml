@@ -18,5 +18,6 @@
     use: [
         { service: "fuchsia.hardware.platform.device.Service" },
         { service: "fuchsia.hardware.ethernet.board.Service" },
+        { service: "fuchsia.boot.metadata.MacAddressMetadata" },
     ],
 }

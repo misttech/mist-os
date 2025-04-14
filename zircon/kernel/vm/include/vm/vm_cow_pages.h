@@ -73,6 +73,10 @@ struct VmCowRange {
   uint64_t end() const { return offset + len; }
   bool is_empty() const { return len == 0; }
   bool is_page_aligned() const { return IS_PAGE_ALIGNED(offset) && IS_PAGE_ALIGNED(len); }
+  VmCowRange ExpandTillPageAligned() const {
+    const uint64_t start = ROUNDDOWN(offset, PAGE_SIZE);
+    return VmCowRange(start, ROUNDUP(end(), PAGE_SIZE) - start);
+  }
 
   VmCowRange OffsetBy(uint64_t delta) const { return VmCowRange(offset + delta, len); }
   VmCowRange TrimedFromStart(uint64_t amount) const {
@@ -546,7 +550,7 @@ class VmCowPages final : public VmHierarchyBase,
   // For consistency if there is a parent or a backing page source, such that the range would not
   // explicitly copy-on-write the zero page then this will fail. Use ZeroPagesLocked for an
   // operation that is guaranteed to succeed, but may not release memory.
-  zx_status_t DecommitRangeLocked(VmCowRange range) TA_REQ(lock());
+  zx_status_t DecommitRange(VmCowRange range);
 
   // After successful completion the range of pages will all read as zeros. The mechanism used to
   // achieve this is not guaranteed to decommit, but it will try to.
@@ -562,8 +566,9 @@ class VmCowPages final : public VmHierarchyBase,
   //  operation. |zeroed_len_out| will contain the range that was partially zeroed, so the caller
   //  can advance the start offset before retrying.
   //  Any other error code indicates a failure to zero a part of the range or the whole range.
-  zx_status_t ZeroPagesLocked(VmCowRange range, bool dirty_track, MultiPageRequest* page_request,
-                              uint64_t* zeroed_len_out) TA_REQ(lock());
+  zx_status_t ZeroPagesLocked(VmCowRange range, bool dirty_track, DeferredOps& deferred,
+                              MultiPageRequest* page_request, uint64_t* zeroed_len_out)
+      TA_REQ(lock());
 
   // Attempts to commit a range of pages. This has three kinds of return status
   //  ZX_OK => The whole range was successfully committed and |len| will be written to
@@ -574,7 +579,7 @@ class VmCowPages final : public VmHierarchyBase,
   //                        not need to retried.
   //  * => Any other error, the number of pages committed is undefined.
   // The |offset| and |len| are assumed to be page aligned and within the range of |size_|.
-  zx_status_t CommitRangeLocked(VmCowRange range, uint64_t* committed_len,
+  zx_status_t CommitRangeLocked(VmCowRange range, DeferredOps& deferred, uint64_t* committed_len,
                                 MultiPageRequest* page_request) TA_REQ(lock());
 
   // Increases the pin count of the range of pages given by |offset| and |len|. The full range must
@@ -586,7 +591,11 @@ class VmCowPages final : public VmHierarchyBase,
   zx_status_t PinRangeLocked(VmCowRange range) TA_REQ(lock());
 
   // See VmObject::Unpin
-  void UnpinLocked(VmCowRange range) TA_REQ(lock());
+  // An optional |DeferredOps| can be provided for the purposes of performing extra debugging
+  // checks, but otherwise has no functional requirement. The debug checks are optional as call
+  // sites may not be able to satisfy the locking requirements to construct a DeferredOps, and may
+  // know (due to be undoing a pin they themselves had started), that no checks need to be done.
+  void UnpinLocked(VmCowRange range, DeferredOps* deferred) TA_REQ(lock());
 
   // See VmObject::DebugIsRangePinned
   bool DebugIsRangePinnedLocked(VmCowRange range) TA_REQ(lock());
@@ -647,7 +656,8 @@ class VmCowPages final : public VmHierarchyBase,
   // allocation, returns ZX_ERR_SHOULD_WAIT, and the caller should wait on the |page_request|.
   // |non_loaned_len| is set to the length (starting at |offset|) that contains only non-loaned
   // pages. |offset| and |len| must be page-aligned.
-  zx_status_t ReplacePagesWithNonLoanedLocked(VmCowRange range, AnonymousPageRequest* page_request,
+  zx_status_t ReplacePagesWithNonLoanedLocked(VmCowRange range, DeferredOps& deferred,
+                                              AnonymousPageRequest* page_request,
                                               uint64_t* non_loaned_len) TA_REQ(lock());
 
   // If page is still at offset, replace it with a loaned page.
@@ -749,24 +759,21 @@ class VmCowPages final : public VmHierarchyBase,
   // rounded down to the page boundary, and |len| will be rounded up to the page boundary.
   // Currently used only for pager-backed VMOs to move their pages to the end of the
   // pager-backed queue, so that they can be evicted first.
-  void PromoteRangeForReclamationLocked(VmCowRange range) TA_REQ(lock());
+  zx_status_t PromoteRangeForReclamation(VmCowRange range);
 
   // Protect pages in the specified range from reclamation under memory pressure. |offset| will be
   // rounded down to the page boundary, and |len| will be rounded up to the page boundary. Any
-  // absent pages in the range will first be committed, and the call will block on the fulfillment
-  // of the page request(s), dropping |guard| while waiting (multiple times if multiple pages need
-  // to be supplied), and then, if |set_always_need| is true, the |always_need| flag in the pages
-  // will be set.
+  // absent pages in the range will first be committed and then, if |set_always_need| is true, the
+  // |always_need| flag in the pages will be set.
   // If the |ignore_errors| flag is set then any per page errors will be ignored and future pages in
   // the range will still be operated on. If this flag is not set then any kind of error causes an
   // immediate abort.
-  zx_status_t ProtectRangeFromReclamationLocked(VmCowRange range, bool set_always_need,
-                                                bool ignore_errors, Guard<VmoLockType>* guard)
-      TA_REQ(lock());
+  zx_status_t ProtectRangeFromReclamation(VmCowRange range, bool set_always_need,
+                                          bool ignore_errors);
 
   // Ensures any pages in the specified range are not compressed, but does not otherwise commit any
-  // pages. In order to handle delayed memory allocations, |guard| may be dropped one or more times.
-  zx_status_t DecompressInRangeLocked(VmCowRange range, Guard<VmoLockType>* guard) TA_REQ(lock());
+  // pages.
+  zx_status_t DecompressInRange(VmCowRange range);
 
   // See VmObject::ChangeHighPriorityCountLocked
   void ChangeHighPriorityCountLocked(int64_t delta) TA_REQ(lock());
@@ -809,11 +816,7 @@ class VmCowPages final : public VmHierarchyBase,
   // loans with.
   zx_status_t ReplacePage(vm_page_t* before_page, uint64_t offset, bool with_loaned,
                           vm_page_t** after_page, AnonymousPageRequest* page_request)
-      TA_EXCL(lock()) {
-    Guard<VmoLockType> guard{lock()};
-    return ReplacePageLocked(before_page, offset, with_loaned, after_page, page_request);
-  }
-
+      TA_EXCL(lock());
   // Eviction wrapper, unlike ReclaimPage this wrapper can assume it just needs to evict, and has no
   // requirements on updating any reclamation lists. Exposed for the physical page provider to
   // reclaim loaned pages.
@@ -1235,13 +1238,15 @@ class VmCowPages final : public VmHierarchyBase,
       TA_REQ(lock());
 
   // Unmaps and frees all the committed pages in the specified range.
-  // Upon success the removed pages are freed and the number of pages freed is returned.
+  // Upon success the removed pages are placed in the DeferredOps freed list, and the number of such
+  // pages is returned.
   //
   // Unlike DecommitRangeLocked(), this function only operates on |this| node, which must have no
   // parent.
   // |offset| must be page aligned. |len| must be less than or equal to |size_ - offset|. If |len|
   // is less than |size_ - offset| it must be page aligned.
-  zx::result<uint64_t> UnmapAndFreePagesLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
+  zx::result<uint64_t> UnmapAndFreePagesLocked(uint64_t offset, uint64_t len, DeferredOps& deferred)
+      TA_REQ(lock());
 
   // internal check if any pages in a range are pinned
   bool AnyPagesPinnedLocked(uint64_t offset, size_t len) TA_REQ(lock());
@@ -1280,8 +1285,8 @@ class VmCowPages final : public VmHierarchyBase,
     uint64_t owner_offset = 0;
     uint64_t visible_end = 0;
   };
-  template <typename T>
-  void FindPageContentLocked(uint64_t offset, uint64_t max_owner_length, T* out) TA_REQ(lock());
+  void FindPageContentLocked(uint64_t offset, uint64_t max_owner_length, PageLookup* out)
+      TA_REQ(lock());
 
   // Searches for the initial content, i.e. the content that would be used to initially populate the
   // page, of |this| at |offset|. Whether there is presently any content populated in |this| is
@@ -1311,7 +1316,7 @@ class VmCowPages final : public VmHierarchyBase,
   // |page| must not be the zero-page, as there is no need to do the complex page fork logic to
   // reduce memory consumption in that case.
   zx_status_t CloneCowPageLocked(uint64_t offset, list_node_t* alloc_list, VmCowPages* page_owner,
-                                 vm_page_t* page, uint64_t owner_offset,
+                                 vm_page_t* page, uint64_t owner_offset, DeferredOps& deferred,
                                  AnonymousPageRequest* page_request, vm_page_t** out_page)
       TA_REQ(lock()) TA_REQ(page_owner->lock());
 
@@ -1504,19 +1509,12 @@ class VmCowPages final : public VmHierarchyBase,
     return is_source_supplying_specific_physical_pages();
   }
 
-  // Swap an old page for a new page in the page list. The old page must be at offset. The new page
-  // must be in ALLOC state. On return, the old_page is owned by the caller. Typically the caller
-  // will remove the old_page from pmm_page_queues() and free the old_page. The contents of new page
-  // is not modified, and the caller is responsible for filling in the contents.
-  void SwapPageInListLocked(uint64_t offset, vm_page_t* old_page, vm_page_t* new_page)
-      TA_REQ(lock());
-
   // If page is still at offset, replace it with a different page.  If with_loaned is true, replace
   // with a loaned page.  If with_loaned is false, replace with a non-loaned page and a page_request
   // is required to be provided.
   zx_status_t ReplacePageLocked(vm_page_t* before_page, uint64_t offset, bool with_loaned,
-                                vm_page_t** after_page, AnonymousPageRequest* page_request)
-      TA_REQ(lock());
+                                vm_page_t** after_page, DeferredOps& deferred,
+                                AnonymousPageRequest* page_request) TA_REQ(lock());
 
   // Copies the metadata information (dirty state, split bit information etc) from src_page to
   // dst_page in preparation for replacing src with dst. This copies the metadata information only
@@ -1544,7 +1542,7 @@ class VmCowPages final : public VmHierarchyBase,
   zx::result<uint64_t> ReclaimDiscardable(vm_page_t* page, uint64_t offset);
 
   // Internal helper for discarding a VMO. Will discard if VMO is unlocked returning the count.
-  zx::result<uint64_t> DiscardPagesLocked() TA_REQ(lock());
+  zx::result<uint64_t> DiscardPagesLocked(DeferredOps& deferred) TA_REQ(lock());
 
   // Internal helper for modifying just this value of high_priority_count_ without performing any
   // propagating.
@@ -1556,7 +1554,7 @@ class VmCowPages final : public VmHierarchyBase,
   // |is_source_preserving_page_content| is true. |dirty_track| can be set to |true| if any zeroes
   // inserted are to be treated as Dirty, otherwise they are not dirty tracked.
   zx_status_t ZeroPagesPreservingContentLocked(uint64_t page_start_base, uint64_t page_end_base,
-                                               bool dirty_track, list_node_t* freed_list,
+                                               bool dirty_track, DeferredOps& deferred,
                                                MultiPageRequest* page_request,
                                                uint64_t* processed_len_out) TA_REQ(lock());
 
@@ -1738,7 +1736,10 @@ class VmCowPages final : public VmHierarchyBase,
 // usage of this object.
 class VmCowPages::LookupCursor {
  public:
-  ~LookupCursor() { DEBUG_ASSERT(!alloc_list_); }
+  ~LookupCursor() {
+    InvalidateCursor();
+    DEBUG_ASSERT(!alloc_list_);
+  }
 
   // Convenience struct holding the return result of the Require* methods.
   struct RequireResult {
@@ -1762,20 +1763,26 @@ class VmCowPages::LookupCursor {
   // reference to the zero page. |will_write| indicates if this page needs to be writable or not,
   // which for an owned and allocated page just involves a potential dirty request / transition.
   zx::result<RequireResult> RequireOwnedPage(bool will_write, uint max_request_pages,
-                                             MultiPageRequest* page_request) TA_REQ(lock());
+                                             DeferredOps& deferred, MultiPageRequest* page_request)
+      TA_REQ(lock());
 
   // Returned page will only be read from. This can return zero pages or pages from a parent VMO.
-  zx::result<RequireResult> RequireReadPage(uint max_request_pages, MultiPageRequest* page_request)
-      TA_REQ(lock());
+  // A DeferredOps is required to be passed in, even though a Read does not ever directly generate
+  // any deferred actions, to enforce the requirement that all operations on a pager backed VMO are
+  // serialized with the paged_vmo_lock. Having to present a DeferredOps here is a simple way to
+  // ensure this lock is held.
+  zx::result<RequireResult> RequireReadPage(uint max_request_pages, DeferredOps& deferred,
+                                            MultiPageRequest* page_request) TA_REQ(lock());
 
   // Returned page will be readable or writable based on the |will_write| flag.
   zx::result<RequireResult> RequirePage(bool will_write, uint max_request_pages,
-                                        MultiPageRequest* page_request) TA_REQ(lock()) {
+                                        DeferredOps& deferred, MultiPageRequest* page_request)
+      TA_REQ(lock()) {
     // Being writable implies owning the page, so forward to the correct operation.
     if (will_write) {
-      return RequireOwnedPage(true, max_request_pages, page_request);
+      return RequireOwnedPage(true, max_request_pages, deferred, page_request);
     }
-    return RequireReadPage(max_request_pages, page_request);
+    return RequireReadPage(max_request_pages, deferred, page_request);
   }
 
   // The IfExistPages methods is intended to be cheaper than the Require* methods and to allow for
@@ -1848,19 +1855,19 @@ class VmCowPages::LookupCursor {
   // recalculating.
   __ALWAYS_INLINE void IncrementCursor() TA_REQ(lock()) {
     offset_ += PAGE_SIZE;
-    if (offset_ == owner_info_.visible_end_) {
+    if (offset_ == owner_info_.visible_end) {
       // Have reached either the end of the valid iteration range, or the end of the visible portion
       // of the owner. In the latter case we set owner_ to null as we need to walk up the hierarchy
       // again to find the next owner that applies to this slot.
       // In the case where we have reached the end of the range, i.e. offset_ is also equal to
       // end_offset_, there is nothing we need to do, but to ensure that an error is generated if
-      // the user incorrectly attempts to get another page we also set the owner to the nullptr.
-      owner_info_.owner_ = nullptr;
+      // the user incorrectly attempts to get another page we also invalidate the owner.
+      InvalidateCursor();
     } else {
       // Increment the owner offset and step the page list cursor to the next slot.
-      owner_info_.owner_offset_ += PAGE_SIZE;
-      owner_info_.owner_pl_cursor_.step();
-      owner_cursor_ = owner_info_.owner_pl_cursor_.current();
+      owner_info_.owner_offset += PAGE_SIZE;
+      owner_info_.cursor.step();
+      owner_cursor_ = owner_info_.cursor.current();
 
       // When iterating, it's possible that we need to find a new owner even before we hit the
       // visible_end_. This happens since even if we have no content at our cursor, we might have a
@@ -1873,9 +1880,9 @@ class VmCowPages::LookupCursor {
       // page. In this case we would ideally walk up to the parent, if there is one, and check for
       // content, or if no parent keep returning empty slots. Unfortunately once the cursor returns
       // a nullptr we cannot know where the next content might be. To make things simpler we just
-      // invalidate owner_ if we hit this case and re-walk from the bottom again.
+      // invalidate owner if we hit this case and re-walk from the bottom again.
       if (!owner_cursor_ || (owner_cursor_->IsEmpty() && owner()->parent_)) {
-        owner_info_.owner_ = nullptr;
+        InvalidateCursor();
       }
     }
   }
@@ -1885,15 +1892,18 @@ class VmCowPages::LookupCursor {
   void IncrementOffsetAndInvalidateCursor(uint64_t delta);
 
   // Returns whether the cursor is currently valid or needs to be re-calculated.
-  bool IsCursorValid() const {
-    // The owner being set is used to indicate whether the cursor is valid or not. Any operations
-    // that would invalidate the cursor will always clear owner_.
-    return owner_info_.owner_;
-  }
+  bool IsCursorValid() const { return is_valid_; }
 
   // Calculates the current cursor, finding the correct owner, owner offset etc. There is always an
   // owner and this process can never fail.
   void EstablishCursor() TA_REQ(lock());
+
+  // Returns true if target_ is the owner.
+  bool TargetIsOwner() const { return owner_info_.owner == target_; }
+
+  // Invalidates the owner, so that the next page will have to perform the lookup again, walking up
+  // the hierarchy if needed.
+  void InvalidateCursor() { is_valid_ = false; }
 
   // Helpers for querying the state of the cursor.
   bool CursorIsPage() const { return owner_cursor_ && owner_cursor_->IsPage(); }
@@ -1907,7 +1917,7 @@ class VmCowPages::LookupCursor {
   // zero interval.
   bool CursorIsInIntervalZero() const TA_REQ(lock()) {
     return CursorIsIntervalZero() ||
-           owner()->page_list_.IsOffsetInZeroInterval(owner_info_.owner_offset_);
+           owner()->page_list_.IsOffsetInZeroInterval(owner_info_.owner_offset);
   }
 
   // The cursor can be considered to have content of zero if either it points at a zero marker, or
@@ -1922,7 +1932,7 @@ class VmCowPages::LookupCursor {
   // A usable page is either just any page, if not writing, or if writing, a page that is owned by
   // the target and doesn't need any dirty transitions. i.e., a page that is ready to use right now.
   bool CursorIsUsablePage(bool writing) {
-    return CursorIsPage() && (!writing || (owner_info_.owner_ == target_ && !TargetDirtyTracked()));
+    return CursorIsPage() && (!writing || (TargetIsOwner() && !TargetDirtyTracked()));
   }
 
   // Determines whether the zero content at the current cursor should be supplied as dirty or not.
@@ -1948,8 +1958,7 @@ class VmCowPages::LookupCursor {
     }
     // Inform PageAsResult whether the owner_ is the target_, but otherwise let it calculate the
     // actual writability of the page.
-    RequireResult result =
-        PageAsResultNoIncrement(owner_cursor_->Page(), owner_info_.owner_ == target_);
+    RequireResult result = PageAsResultNoIncrement(owner_cursor_->Page(), TargetIsOwner());
     IncrementCursor();
     return result;
   }
@@ -1958,6 +1967,7 @@ class VmCowPages::LookupCursor {
   // page is inserted into target at the current offset_ and the cursor is incremented.
   zx::result<RequireResult> TargetAllocateCopyPageAsResult(vm_page_t* source,
                                                            DirtyState dirty_state,
+                                                           VmCowPages::DeferredOps& deferred,
                                                            AnonymousPageRequest* page_request)
       TA_REQ(lock());
 
@@ -1970,7 +1980,7 @@ class VmCowPages::LookupCursor {
 
   // If we held lock(), then since owner_ is from the same hierarchy as the target then we must also
   // hold its lock.
-  VmCowPages* owner() const TA_REQ(lock()) TA_ASSERT(owner()->lock()) { return owner_info_.owner_; }
+  VmCowPages* owner() const TA_REQ(lock()) TA_ASSERT(owner()->lock()) { return owner_info_.owner; }
 
   // Target always exists. This is provided in the constructor and will always be non-null.
   VmCowPages* const target_;
@@ -1984,32 +1994,33 @@ class VmCowPages::LookupCursor {
   // overflow.
   const uint64_t end_offset_;
 
-  // This struct exists to define a layout that is identical to |PageLookup| that is returned by
-  // FindPageContentLocked. Using this custom struct instead of PageLookup here allows for more
-  // meaningful names and comments.
-  struct OwnerInfo {
-    // Cursor in the page list of the current owner_ and is invalid if owner_ is nullptr. This is
-    // used to efficiently pull contiguous pages in an owner_ and the current() value of it is
-    // cached in cursor_.
-    VMPLCursor owner_pl_cursor_;
-
-    // owner_ represent the current owner of cursor_/pl_cursor_. owner_ can be non-null while
-    // cursor_ is null to indicate a lack of content, although in this case the owner_ can also be
-    // assumed to be the root. owner_ being null is used to indicate that the cursor is invalid and
-    // the owner for any content in the current slot needs to be looked up.
-    VmCowPages* owner_ = nullptr;
-
-    // The offset_ normalized to the current owner_. This is equal to offset_ when owner_ ==
-    // target_.
-    uint64_t owner_offset_ = 0;
-
-    // Tracks the offset in target_ at which the current pl_cursor_ becomes invalid. This range
-    // essentially means that no VMO between target_ and owner_ had any content, and so the cursor
-    // in owner is free to walk contiguous pages up to this point. This does not mean that there is
-    // no content in the parent_ of owner_, and so even if visible_end_ is not reached, if an empty
-    // slot is found the parent_ must then be checked. See IncrementCursor for more details.
-    uint64_t visible_end_ = 0;
-  } owner_info_;
+  // Captures information about the cursor owner. The different fields can be interpreted as
+  // follows.
+  //
+  // owner_info_.cursor:
+  // Cursor in the page list of the current owner_info_.owner and is invalid if owner_info_.owner is
+  // nullptr. This is used to efficiently pull contiguous pages in the owner and the current() value
+  // of it is cached in owner_cursor_.
+  //
+  // owner_info_.owner:
+  // Represents the current owner of owner_cursor_/owner_info_.cursor. Can be non-null while
+  // owner_info_.cursor is null to indicate a lack of content, although in this case the
+  // owner_info_.owner can also be assumed to be the root. owner_info_.owner being null is used to
+  // indicate that the cursor is invalid and the owner for any content in the current slot needs to
+  // be looked up.
+  //
+  // owner_info_.owner_offset:
+  // The offset_ normalized to the current owner_info_.owner. This is equal to offset_ when
+  // TargetIsOwner().
+  //
+  // owner_info_.visible_end:
+  // Tracks the offset in target_ at which the current owner_info_.cursor becomes invalid. This
+  // range essentially means that no VMO between target_ and owner_info_.owner had any content, and
+  // so the cursor in owner is free to walk contiguous pages up to this point. This does not mean
+  // that there is no content in the parent_ of owner_info_.owner, and so even if
+  // owner_info_.visible_end is not reached, if an empty slot is found the parent_ must then be
+  // checked. See IncrementCursor for more details.
+  PageLookup owner_info_;
 
   // This is a cache of owner_pl_cursor_.current()
   VmPageOrMarkerRef owner_cursor_;
@@ -2026,6 +2037,10 @@ class VmCowPages::LookupCursor {
 
   // Whether existing pages should be have their access time updated when they are returned.
   bool mark_accessed_ = true;
+
+  // Whether the cursor is valid. The owner_info_ can only be used if is_valid_ is true, otherwise
+  // it needs to be computed with EstablishCursor().
+  bool is_valid_ = false;
 
   // Optional allocation list that will be used for any page allocations.
   list_node_t* alloc_list_ = nullptr;

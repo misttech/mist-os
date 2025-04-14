@@ -27,10 +27,11 @@ use packet_formats::ip::DscpAndEcn;
 use thiserror::Error;
 
 use crate::internal::base::{
-    FilterHandlerProvider, IpCounters, IpDeviceMtuContext, IpLayerIpExt, IpLayerPacketMetadata,
+    FilterHandlerProvider, IpDeviceMtuContext, IpLayerIpExt, IpLayerPacketMetadata,
     IpPacketDestination, IpSendFrameError, IpSendFrameErrorReason, ResolveRouteError,
     SendIpPacketMeta,
 };
+use crate::internal::counters::IpCounters;
 use crate::internal::device::state::IpDeviceStateIpExt;
 use crate::internal::routing::rules::RuleInput;
 use crate::internal::routing::PacketOrigin;
@@ -483,9 +484,6 @@ where
         S::Buffer: BufferMut,
         O: SendOptions<I> + RouteResolutionOptions<I>,
     {
-        // TODO(joshlf): Call `trace!` with relevant fields from the socket.
-        self.counters().send_ip_packet.increment();
-
         send_ip_packet(self, bindings_ctx, ip_sock, body, options, tx_metadata)
     }
 

@@ -18,4 +18,5 @@ def rustc_library(name, with_unit_tests = False, test_deps = [], **kwargs):
             name = "{}_test".format(name),
             crate = ":{}".format(name),
             deps = test_deps,
+            crate_features = kwargs.get("crate_features", []),
         )

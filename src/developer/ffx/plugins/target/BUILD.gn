@@ -5,6 +5,8 @@
 import("//src/developer/ffx/build/ffx_plugin.gni")
 import("//src/developer/ffx/build/ffx_tool.gni")
 
+assert(is_host, "ffx_target is only allowed with the host toolchain")
+
 ffx_plugin("ffx_target") {
   sdk_category = "not-yet-specified"
   version = "0.1.0"
@@ -47,6 +49,11 @@ ffx_tool("ffx_target_tool") {
     "//src/lib/fuchsia-async",
   ]
   sources = [ "src/main.rs" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ "default:tests" ]
 }
 
 if (is_host) {

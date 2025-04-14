@@ -16,7 +16,6 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{error, ino_t, statfs, ANON_INODE_FS_MAGIC};
 use std::sync::Arc;
 
-#[derive(Default)]
 pub struct Anon {
     /// If this instance represents an `anon_inode` then `name` holds the type-name of the node,
     /// e.g. "inotify", "sync_file", "[usereventfd]", etc.
@@ -44,7 +43,17 @@ impl FsNodeOps for Anon {
 }
 
 impl Anon {
-    /// Returns a new anonymous node with the specified properties, and a unique `FsNode`.
+    /// Returns a new `Anon` instance for use in a binder device FD.
+    pub fn new_for_binder_device() -> Self {
+        Self { name: None, is_private: false }
+    }
+
+    /// Returns a new `Anon` instance for use as the `FsNodeOps` of a socket.
+    pub fn new_for_socket(kernel_private: bool) -> Self {
+        Self { name: None, is_private: kernel_private }
+    }
+
+    /// Returns a new anonymous file with the specified properties, and a unique `FsNode`.
     pub fn new_file_extended(
         current_task: &CurrentTask,
         ops: Box<dyn FileOps>,
@@ -58,7 +67,7 @@ impl Anon {
         FileObject::new_anonymous(current_task, ops, node, flags)
     }
 
-    /// Returns a new anonymous node with the specified properties, and a unique `FsNode`.
+    /// Returns a new anonymous file with the specified properties, and a unique `FsNode`.
     pub fn new_file(
         current_task: &CurrentTask,
         ops: Box<dyn FileOps>,
@@ -91,7 +100,7 @@ impl Anon {
         )
     }
 
-    /// Returns a new private anonymous node, applying caller-supplied `info`.
+    /// Returns a new private anonymous file, applying caller-supplied `info`.
     pub fn new_private_file_extended(
         current_task: &CurrentTask,
         ops: Box<dyn FileOps>,

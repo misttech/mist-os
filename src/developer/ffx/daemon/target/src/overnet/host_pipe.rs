@@ -11,7 +11,8 @@ use ffx_config::EnvironmentContext;
 use ffx_daemon_core::events;
 use ffx_daemon_events::TargetEvent;
 use ffx_ssh::parse::{
-    parse_ssh_output, read_ssh_line, write_ssh_log, HostAddr, ParseSshConnectionError, PipeError,
+    parse_ssh_output, read_ssh_line, read_ssh_line_with_timeouts, write_ssh_log, HostAddr,
+    ParseSshConnectionError, PipeError,
 };
 use ffx_ssh::ssh::{build_ssh_command_with_env, SshError};
 use fuchsia_async::{unblock, Task, TimeoutExt, Timer};
@@ -79,6 +80,8 @@ pub(crate) trait HostPipeChildBuilder {
     where
         Self: Sized;
 
+    async fn get_host_addr(&self, addr: SocketAddr) -> Result<String, PipeError>;
+
     fn ssh_path(&self) -> &str;
 }
 
@@ -115,6 +118,36 @@ impl HostPipeChildBuilder for HostPipeChildDefaultBuilder {
             ctx,
         )
         .await
+    }
+
+    async fn get_host_addr(&self, addr: SocketAddr) -> Result<String, PipeError> {
+        let ctx = ffx_config::global_env_context().expect("Global env context uninitialized");
+        let args = vec!["echo", "$SSH_CONNECTION"];
+        let mut ssh = tokio::process::Command::from(
+            build_ssh_command_with_env(&self.ssh_path, addr, &ctx, args)
+                .await
+                .map_err(|e| PipeError::Error(e.to_string()))?,
+        );
+
+        let ssh_cmd = ssh.stdout(Stdio::piped()).stdin(Stdio::null()).stderr(Stdio::null());
+
+        let mut ssh = ssh_cmd.spawn().map_err(|e| PipeError::SpawnError(e.to_string()))?;
+
+        let stdout = ssh
+            .stdout
+            .take()
+            .ok_or_else(|| PipeError::Error("unable to get stdout from target pipe".into()))?;
+
+        let mut stdout = BufReader::with_capacity(BUFFER_SIZE, stdout);
+        let line = read_ssh_line_with_timeouts(&mut stdout)
+            .await
+            .map_err(|e| PipeError::Error(format!("{e:?}")))?;
+
+        line.split(" ")
+            .next()
+            .filter(|x| !x.is_empty())
+            .map(|x| x.to_owned())
+            .ok_or_else(|| PipeError::Error(format!("Could not parse {line:?}")))
     }
 
     fn ssh_path(&self) -> &str {
@@ -727,6 +760,15 @@ mod test {
                 ChildOperationType::WithOvernetId => {
                     start_child_with_overnet_id(addr, id, stderr_buf, event_queue).await
                 }
+            }
+        }
+
+        async fn get_host_addr(&self, _addr: SocketAddr) -> Result<String, PipeError> {
+            match self.operation_type {
+                ChildOperationType::Normal | ChildOperationType::WithOvernetId => {
+                    Ok("127.0.0.1".into())
+                }
+                _ => Err(PipeError::Error("Get host addr failed for test".into())),
             }
         }
 

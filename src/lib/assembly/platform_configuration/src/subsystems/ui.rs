@@ -97,6 +97,10 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             ),
         )?;
         builder.set_config_capability(
+            "fuchsia.scenic.FramePredictionMarginInUs",
+            Config::new(ConfigValueType::Uint64, ui_config.frame_prediction_margin_in_us.into()),
+        )?;
+        builder.set_config_capability(
             "fuchsia.scenic.PointerAutoFocus",
             Config::new(ConfigValueType::Bool, ui_config.pointer_auto_focus.into()),
         )?;

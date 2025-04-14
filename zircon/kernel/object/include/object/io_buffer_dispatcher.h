@@ -26,6 +26,7 @@
 #include <ktl/variant.h>
 #include <object/dispatcher.h>
 #include <object/handle.h>
+#include <object/io_buffer_shared_region_dispatcher.h>
 #include <vm/pinned_vm_object.h>
 #include <vm/vm_address_region.h>
 #include <vm/vm_object.h>
@@ -62,6 +63,9 @@ class IoBufferDispatcher : public PeeredDispatcher<IoBufferDispatcher, ZX_DEFAUL
   zx::result<uint32_t> AllocateId(size_t region_index, user_in_ptr<const ktl::byte> blob_ptr,
                                   size_t blob_size);
 
+  // Performs a mediated write to a region.
+  zx::result<> Write(size_t region_index, user_in_iovec_t message);
+
   // PeeredDispatcher implementation
   void on_zero_handles_locked() TA_REQ(get_lock());
   virtual void OnPeerZeroHandlesLocked() TA_REQ(get_lock());
@@ -72,6 +76,8 @@ class IoBufferDispatcher : public PeeredDispatcher<IoBufferDispatcher, ZX_DEFAUL
   void OnZeroChild() override;
 
  protected:
+  friend class IoBufferWriterDispatcher;
+
   // The base IOB region type, presenting discipline-agnostic region interfaces
   // to the dispatcher. Discipline-specific interfaces are expected to be
   // defined by subclasses of this type (one per discipline type).
@@ -89,7 +95,10 @@ class IoBufferDispatcher : public PeeredDispatcher<IoBufferDispatcher, ZX_DEFAUL
           mapping_(ktl::move(mapping)),                      //
           base_(base),                                       //
           region_(region),                                   //
-          koid_(koid) {}                                     //
+          koid_(koid) {
+      ZX_DEBUG_ASSERT(ep_vmos_[0]);
+      ZX_DEBUG_ASSERT(ep_vmos_[1]);
+    }
 
     zx_iob_region_t region() const { return region_; }
 
@@ -218,13 +227,34 @@ class IoBufferDispatcher : public PeeredDispatcher<IoBufferDispatcher, ZX_DEFAUL
     PinnedVmObject pin_;
   };
 
-  using IobRegionVariant = ktl::variant<IobRegionNone, IobRegionIdAllocator>;
+  class IobRegionMediatedWriteRingBuffer : public IobRegion {
+   public:
+    IobRegionMediatedWriteRingBuffer(fbl::RefPtr<VmObject> ep0_vmo, fbl::RefPtr<VmObject> ep1_vmo,
+                                     const zx_iob_region_t& region, zx_koid_t koid,
+                                     fbl::RefPtr<IoBufferSharedRegionDispatcher> shared_region,
+                                     uint64_t tag)
+        : IobRegion(ep0_vmo, ep1_vmo, nullptr, 0, region, koid),
+          shared_region_(std::move(shared_region)),
+          tag_(tag) {}
 
-  static zx::result<IobRegionVariant> CreateIobRegionVariant(fbl::RefPtr<VmObject> ep0_vmo,     //
-                                                             fbl::RefPtr<VmObject> ep1_vmo,     //
-                                                             fbl::RefPtr<VmObject> kernel_vmo,  //
-                                                             const zx_iob_region_t& region,     //
-                                                             zx_koid_t koid);
+    // Performs a mediated write to the region.
+    zx::result<> Write(IobEndpointId id, user_in_iovec_t message);
+
+   private:
+    fbl::RefPtr<IoBufferSharedRegionDispatcher> shared_region_;
+    uint64_t tag_;
+  };
+
+  using IobRegionVariant =
+      ktl::variant<IobRegionNone, IobRegionIdAllocator, IobRegionMediatedWriteRingBuffer>;
+
+  static zx::result<IobRegionVariant> CreateIobRegionVariant(
+      fbl::RefPtr<VmObject> ep0_vmo,     //
+      fbl::RefPtr<VmObject> ep1_vmo,     //
+      fbl::RefPtr<VmObject> kernel_vmo,  //
+      const zx_iob_region_t& region,     //
+      zx_koid_t koid,                    //
+      fbl::RefPtr<IoBufferSharedRegionDispatcher> shared_region);
 
   // Wrapper struct to allow both peers to hold a reference to the regions.
   struct SharedIobState : public fbl::RefCounted<SharedIobState> {

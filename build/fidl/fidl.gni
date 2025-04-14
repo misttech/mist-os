@@ -60,22 +60,6 @@ import("//build/testing/host_test_data.gni")
 #     A scope giving private, backend-specific parameters.
 #     Currently supported backends: zither
 #
-#   fuzzers (optional)
-#     Protocol/methods for which to generate LibFuzzer fuzz targets. Example:
-#       [
-#         {
-#           # Required:
-#           protocol = "fully.qualified.FIDLProtocolName"
-#           # Optional. Default: All methods in protocol.
-#           methods = [ "MethodName1", "MethodName2", ... ]
-#         },
-#         ...
-#       ]
-#
-#   golden_fuzzer (optional)
-#     Boolean flag to generate a LibFuzzer fuzz target for all protocols, used
-#     to ensure fuzzers for golden libraries compile successfully.
-#
 #   versioned (optional)
 #     A string of the form PLATFORM or PLATFORM:VERSION. If provided, fidlc
 #     will validate that the library is versioned under PLATFORM and added at
@@ -441,8 +425,6 @@ template("fidl") {
     not_needed(invoker,
                [
                  "contains_drivers",
-                 "fuzzers",
-                 "golden_fuzzer",
                  "sdk_category",
                ])
   }
@@ -467,8 +449,6 @@ template("fidl") {
                                  "visibility",
                                  "public_deps",
                                  "contains_drivers",
-                                 "fuzzers",
-                                 "golden_fuzzer",
                                ])
         forward_variables_from(common_parameters, "*")
         fidl_target = _fidl_target_name
@@ -558,6 +538,67 @@ template("fidl") {
           use_common = common_crate_name
           fidl_gen_dir += "/rust"
         }
+      }
+
+      _lib_name = string_replace(common_parameters.library_name, ".", "_")
+
+      generated_file("${target_name}_fdomain_flex_src") {
+        contents = "pub use fdomain_${_lib_name}::*;"
+        outputs = [ "${target_gen_dir}/${_lib_name}_fdomain_flex.rs" ]
+      }
+
+      generated_file("${target_name}_fidl_flex_src") {
+        contents = "pub use fidl_${_lib_name}::*;"
+        outputs = [ "${target_gen_dir}/${_lib_name}_fidl_flex.rs" ]
+      }
+
+      _fdomain_flex_src =
+          get_label_info(":${target_name}_fdomain_flex_src", "target_gen_dir") +
+          "/${_lib_name}_fdomain_flex.rs"
+      _fidl_flex_src =
+          get_label_info(":${target_name}_fidl_flex_src", "target_gen_dir") +
+          "/${_lib_name}_fidl_flex.rs"
+
+      rustc_library("${target_name}_fdomain_flex") {
+        name = "flex_${_lib_name}"
+        sources = [ _fdomain_flex_src ]
+        source_root = _fdomain_flex_src
+        edition = "2024"
+        disable_rustdoc = true
+
+        forward_variables_from(invoker,
+                               [
+                                 "applicable_licenses",
+                                 "testonly",
+                                 "visibility",
+                               ])
+
+        deps = [
+          ":${invoker.target_name}_fdomain",
+          ":${target_name}_src",
+        ]
+        configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+      }
+
+      rustc_library("${target_name}_fidl_flex") {
+        name = "flex_${_lib_name}"
+        sources = [ _fidl_flex_src ]
+        source_root = _fidl_flex_src
+        edition = "2024"
+        disable_rustdoc = true
+
+        forward_variables_from(invoker,
+                               [
+                                 "applicable_licenses",
+                                 "testonly",
+                                 "visibility",
+                               ])
+
+        deps = [
+          ":${invoker.target_name}_rust",
+          ":${target_name}_src",
+        ]
+        configs -= [ "//build/config/rust/lints:allow_unused_results" ]
       }
     }
 

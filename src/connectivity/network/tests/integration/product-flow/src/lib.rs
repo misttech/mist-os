@@ -17,7 +17,7 @@ use fidl_fuchsia_net_routes_ext::rules::{
 use fidl_fuchsia_net_routes_ext::{FidlRouteIpExt, TableId};
 use fuchsia_async::{self as fasync};
 use futures::{AsyncReadExt as _, AsyncWriteExt as _, FutureExt as _, StreamExt as _};
-use net_declare::fidl_subnet;
+use net_declare::{fidl_subnet, std_ip};
 use net_types::ip::IpVersion;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcp as fnet_dhcp, fidl_fuchsia_net_ext as fnet_ext,
@@ -624,4 +624,72 @@ async fn mark_on_incoming_syn<
     };
 
     let ((), ()) = futures::future::join(client_fut, server_fut).await;
+}
+
+#[netstack_test]
+#[variant(I, Ip)]
+async fn bind_to_device_skips_unreachable_rule<
+    I: FidlRuleAdminIpExt + FidlRuleIpExt + FidlRouteAdminIpExt + FidlRouteIpExt,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let client = sandbox
+        .create_netstack_realm::<Netstack3, _>(format!("{name}_client"))
+        .expect("create netstack");
+    let network = sandbox.create_network("net").await.expect("create network");
+    let client_ep = client.join_network(&network, "client_ep").await.expect("join network");
+
+    let (subnet, connect_to) = match I::VERSION {
+        IpVersion::V4 => (fidl_subnet!("192.168.0.1/24"), std_ip!("192.168.0.2")),
+        IpVersion::V6 => (
+            fidl_subnet!("2001:0db8:85a3::8a2e:0370:7334/64"),
+            std_ip!("2001:0db8:85a3::8a2e:0370:7335"),
+        ),
+    };
+
+    client_ep.add_address_and_subnet_route(subnet).await.expect("set ip");
+
+    let rule_table =
+        client.connect_to_protocol::<I::RuleTableMarker>().expect("connect to rule table");
+    let priority = RuleSetPriority::from(0);
+    let rule_set =
+        fnet_routes_ext::rules::new_rule_set::<I>(&rule_table, priority).expect("fidl error");
+
+    const RULE_INDEX_0: RuleIndex = RuleIndex::new(0);
+
+    fnet_routes_ext::rules::add_rule::<I>(
+        &rule_set,
+        RULE_INDEX_0,
+        RuleMatcher {
+            bound_device: Some(fnet_routes_ext::rules::InterfaceMatcher::Unbound),
+            ..Default::default()
+        },
+        RuleAction::Unreachable,
+    )
+    .await
+    .expect("fidl error")
+    .expect("failed to add a new rule");
+
+    let fnet_ext::IpAddress(client_addr) = subnet.addr.into();
+    let client_addr = std::net::SocketAddr::new(client_addr, 1234);
+
+    let connect_addr = std::net::SocketAddr::new(connect_to, 4321);
+
+    let udp_connector = socket2::Socket::from(
+        std::net::UdpSocket::bind_in_realm(&client, client_addr)
+            .await
+            .expect("failed to create a udp socket"),
+    );
+
+    assert_matches!(
+        udp_connector.connect(&connect_addr.into()), Err(io_err)
+            => assert_eq!(io_err.kind(), std::io::ErrorKind::NetworkUnreachable)
+    );
+    udp_connector
+        .bind_device(Some(
+            client_ep.get_interface_name().await.expect("failed to get interface name").as_bytes(),
+        ))
+        .expect("SO_BINDTODEVICE");
+    assert_matches!(udp_connector.connect(&connect_addr.into()), Ok(()));
 }

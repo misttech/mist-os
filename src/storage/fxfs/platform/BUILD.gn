@@ -43,7 +43,7 @@ platform_deps = [
   "//src/lib/diagnostics/inspect/rust",
   "//src/lib/fidl/rust/fidl",
   "//src/lib/fuchsia-async",
-  "//src/lib/fuchsia-component",
+  "//src/lib/fuchsia-component/client",
   "//src/lib/fuchsia-sync",
   "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
   "//src/storage/fxfs:fxfs_macros",
@@ -55,7 +55,7 @@ platform_deps = [
   "//src/storage/lib/delivery_blob",
   "//src/storage/lib/fs_inspect",
   "//src/storage/lib/storage_device",
-  "//src/storage/lib/vfs/rust:vfs",
+  "//src/storage/lib/vfs/rust:vfs_static",
   "//src/sys/pkg/lib/fuchsia-hash",
   "//src/sys/pkg/lib/fuchsia-merkle",
   "//third_party/rust_crates:anyhow",
@@ -90,7 +90,6 @@ rustc_library("platform") {
     test_deps += [
       "//src/lib/fdio/rust:fdio",
       "//src/lib/fuchsia",
-      "//src/lib/fuchsia-component",
       "//src/lib/fuchsia-fs",
       "//src/lib/test_util",
       "//src/storage/blobfs/bin:blobfs-component",
@@ -124,7 +123,7 @@ rustc_library("fxfs-testing") {
            "//src/storage/fxfs/crypto",
            "//src/storage/fxfs/crypto/insecure",
            "//src/storage/lib/storage_device",
-           "//src/storage/lib/vfs/rust:vfs",
+           "//src/storage/lib/vfs/rust:vfs_static",
            "//third_party/rust_crates:anyhow",
          ]
   visibility = [

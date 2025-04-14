@@ -123,7 +123,7 @@ struct Flags {
   }
 
   /// The bitwise negation (`~`) of the bits in a flags value, truncating the result.
-  [[nodiscard]] Flags complement() const { return from_bits_truncate(~bits()); }
+  [[nodiscard]] Flags complement() const { return from_bits_truncate(static_cast<Bits>(~bits())); }
 
   // C++ operators ----------
   bool operator==(const Flags& other) const { return bits_ == other.bits_; }

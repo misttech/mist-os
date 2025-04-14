@@ -239,7 +239,7 @@ impl ZxioBackedSocket {
 
         let program = convert_and_verify_cbpf(
             &code,
-            ebpf_api::SK_BUF_TYPE.clone(),
+            ebpf_api::SOCKET_FILTER_SK_BUF_TYPE.clone(),
             &SOCKET_FILTER_CBPF_CONFIG,
         )
         .map_err(|_| errno!(EINVAL))?;

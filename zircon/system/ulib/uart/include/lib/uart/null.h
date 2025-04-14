@@ -32,29 +32,34 @@ struct Driver {
   static constexpr uint32_t kType = 0;
   static constexpr uint32_t kExtra = 0;
 
-  Driver() = default;
+  static std::optional<uart::Config<Driver>> TryMatch(const zbi_header_t& header, const void*) {
+    return std::nullopt;
+  }
 
+  static std::optional<uart::Config<Driver>> TryMatch(
+      const acpi_lite::AcpiDebugPortDescriptor& debug_port) {
+    return std::nullopt;
+  }
+
+  static std::optional<uart::Config<Driver>> TryMatch(std::string_view str) {
+    if (str == kConfigName) {
+      return Config<Driver>{};
+    }
+    return std::nullopt;
+  }
+
+  static bool TrySelect(const devicetree::PropertyDecoder& decoder) { return false; }
+
+  Driver() = default;
   explicit Driver(const config_type& config) {}
+
+  template <std::derived_from<Driver> T>
+  explicit Driver(const Config<T>& tagged_config) {}
 
   constexpr bool operator==(const Driver& other) const { return true; }
   constexpr bool operator!=(const Driver& other) const { return false; }
 
   void FillItem(void*) const { ZX_PANIC("should never be called"); }
-
-  // API to (not) match a ZBI item describing this UART.
-  static std::optional<Driver> MaybeCreate(const zbi_header_t&, const void*) { return {}; }
-
-  // API to match and reproduce configuration strings.
-  static std::optional<Driver> MaybeCreate(std::string_view string) {
-    if (string == kConfigName) {
-      return Driver{};
-    }
-    return {};
-  }
-
-  static std::optional<Driver> MaybeCreate(const acpi_lite::AcpiDebugPortDescriptor& debug_port) {
-    return {};
-  }
 
   // API to match devicetree node compatible list.
   static bool MatchDevicetree(const devicetree::PropertyDecoder&) { return false; }

@@ -91,13 +91,13 @@ class UnionTestSuite(unittest.TestCase):
         ).unwrap()
 
     def test_union_unwrap_framework_err(self) -> None:
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(AssertionError):
             test_python_protocol.OpenProtocolFlexibleMethodEmptyResponseWithErrorResult(
                 framework_err=FrameworkError.UNKNOWN_METHOD
             ).unwrap()
 
     def test_union_unwrap__err(self) -> None:
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(AssertionError):
             test_python_protocol.OpenProtocolFlexibleMethodEmptyResponseWithErrorResult(
                 err=3
             ).unwrap()

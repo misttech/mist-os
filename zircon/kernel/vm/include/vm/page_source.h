@@ -461,8 +461,11 @@ class PageRequest : public fbl::WAVLTreeContainable<PageRequest*>,
   // request with any other PageSource or for any other range without first doing CancelRequest.
   zx_status_t Wait(bool suspendable);
 
-  // If initialized, asks the underlying PageRequestInterface to abort this request, by calling
-  // PageRequestInterface::CancelRequest.
+  // Asks the underlying PageRequestInterface to abort this request, by calling
+  // PageRequestInterface::CancelRequest. As this can be called from non PageSource paths, and hence
+  // without the PageSource lock held, the PageRequestInterface must always be invoked to
+  // synchronize with this request being completed by another thread.
+  // This method is not thread safe and cannot be called in parallel with Init.
   void CancelRequest();
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(PageRequest);
@@ -477,7 +480,12 @@ class PageRequest : public fbl::WAVLTreeContainable<PageRequest*>,
   friend fbl::DefaultKeyedObjectTraits<uint64_t, PageRequest>;
 
   // PageRequests are initialized separately to being constructed to facilitate any PageSource
-  // specific logic.
+  // specific logic. This method makes three assumptions on how it is called:
+  //  1. If previously initialized it has been separately uninitialized via `CancelRequest` or
+  //     similar.
+  //  2. It is invoked under the src lock.
+  //  3. It is called on the thread that owns the PageRequest and is not thread safe with parallel
+  //     invocations of CancelRequest.
   void Init(fbl::RefPtr<PageRequestInterface> src, uint64_t offset, page_request_type type,
             VmoDebugInfo vmo_debug_info);
 
@@ -533,7 +541,9 @@ class PageRequest : public fbl::WAVLTreeContainable<PageRequest*>,
   // that any partially provided pages can be processed.
   zx_status_t complete_status_ = ZX_OK;
 
-  // The page source this request is currently associated with.
+  // The page source this request is currently associated with. This may only be modified by Init
+  // and must otherwise be constant, allowing the PageRequest to safely inspect this value without
+  // races.
   fbl::RefPtr<PageRequestInterface> src_;
   // Event signaled when the request is fulfilled.
   AutounsignalEvent event_;

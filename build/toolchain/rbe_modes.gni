@@ -25,6 +25,7 @@ declare_args() {
   #                        remote services.
   #  * 'remote_full' => Run as many actions remotely as possible, including
   #                  cache-misses, which reduces use of local resources.
+  #  * 'racing' => Race remote against local execution, for some action types.
   #  * 'cloudtop' => An RBE configuration that's optimized for running on a
   #                  cloudtop. Suitable for high-bandwidth connections to
   #                  remote services and downloading remote outputs.
@@ -39,6 +40,7 @@ declare_args() {
   #  * 'low_bandwidth_remote' => An RBE configuration for low network bandwidth.
   #                              Saves bandwidth by avoiding downloading some
   #                              intermediate results.
+  #  * 'nocache' => Force all cache-misses, and re-execute remotely.
   rbe_mode = "off"
 
   # Overridden settings for the RBE mode.  This is a set of override values for
@@ -119,6 +121,45 @@ _default_rbe_settings = {
 
     bazel_enable = true
     bazel_exec_strategy = "remote"
+  }
+
+  # The "racing" mode runs both locally and remotely, taking the results
+  # of the first to succeed.  This will self-warm the remote caches.
+  # This is a good option when you expect a high number of cache-misses.
+  racing = {
+    forward_variables_from(_all_modes_defaults, "*")
+
+    # Racing is less beneficial for small actions, so leave C++ as-is.
+    cxx_enable = true
+
+    link_enable = true
+    rust_exec_strategy = "racing"
+
+    rust_enable = true
+    rust_exec_strategy = "racing"
+
+    # TODO: bazel does support "dynamic" execution strategies for racing,
+    # but it would be a good idea to spell out strategies per mnemonic (action type).
+    bazel_enable = true
+    bazel_exec_strategy = "remote"
+  }
+
+  # The "nocache" mode forces remote re-execution without using the cache.
+  # This mode is mostly intended for benchmarking remote execution,
+  # and is not intended for most users.
+  nocache = {
+    forward_variables_from(_all_modes_defaults, "*")
+    cxx_enable = true
+    cxx_exec_strategy = "nocache"
+
+    link_enable = true
+    link_exec_strategy = "nocache"
+
+    rust_enable = true
+    rust_exec_strategy = "nocache"
+
+    bazel_enable = true
+    bazel_exec_strategy = "nocache"
   }
 
   # The "cloudtop" development environment has very high
@@ -221,7 +262,7 @@ _default_rbe_settings = {
 # Validate that the chosen RBE mode is one of the valid modes
 assert(
     defined(_default_rbe_settings[rbe_mode]),
-    "The specified RBE mode (${rbe_mode}) is not a valid option. They are: 'off', 'legacy_default', 'cloudtop', 'infra', 'remote_cache_only', and 'low_bandwidth_remote' (*).  (*) denotes an experimental mode.")
+    "The specified RBE mode (${rbe_mode}) is not a valid option. They are: 'off', 'legacy_default', 'cloudtop', 'infra', 'remote_cache_only', 'nocache', and 'low_bandwidth_remote' (*).  (*) denotes an experimental mode.")
 
 # Set the RBE settings to use based on the chosen RBE mode
 _settings_defaults = _default_rbe_settings[rbe_mode]

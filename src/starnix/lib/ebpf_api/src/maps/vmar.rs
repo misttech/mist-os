@@ -9,6 +9,7 @@ use std::ops::Deref;
 #[derive(Debug)]
 pub struct AllocatedVmar {
     vmar: zx::Vmar,
+    base: usize,
 }
 
 impl AllocatedVmar {
@@ -24,8 +25,12 @@ impl AllocatedVmar {
         offset: usize,
         size: usize,
         flags: zx::VmarFlags,
-    ) -> Result<(Self, usize), zx::Status> {
-        parent.allocate(offset, size, flags).map(|(vmar, base)| (Self { vmar }, base))
+    ) -> Result<Self, zx::Status> {
+        parent.allocate(offset, size, flags).map(|(vmar, base)| (Self { vmar, base }))
+    }
+
+    pub fn base(&self) -> usize {
+        self.base
     }
 }
 

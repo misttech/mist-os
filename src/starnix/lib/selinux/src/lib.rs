@@ -33,19 +33,12 @@ impl SecurityId {
 
 /// A class that may appear in SELinux policy or an access vector cache query.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum AbstractObjectClass {
-    Unspecified,
+pub enum ObjectClass {
     /// A well-known class used in the SELinux system, such as `process` or `file`.
-    System(ObjectClass),
+    System(KernelClass),
     /// A custom class that only has meaning in policies that define class with the given string
     /// name.
     Custom(String),
-}
-
-impl Default for AbstractObjectClass {
-    fn default() -> Self {
-        Self::Unspecified
-    }
 }
 
 /// Declares an `enum` and implements an `all_variants()` API for it.
@@ -73,7 +66,7 @@ enumerable_enum! {
     /// A well-known class in SELinux policy that has a particular meaning in policy enforcement
     /// hooks.
     #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-    ObjectClass {
+    KernelClass {
         // keep-sorted start
         /// The SELinux "anon_inode" object class.
         AnonFsNode,
@@ -165,7 +158,7 @@ enumerable_enum! {
     }
 }
 
-impl ObjectClass {
+impl KernelClass {
     /// Returns the name used to refer to this object class in the SELinux binary policy.
     pub fn name(&self) -> &'static str {
         match self {
@@ -218,13 +211,13 @@ impl ObjectClass {
     }
 }
 
-impl From<ObjectClass> for AbstractObjectClass {
-    fn from(object_class: ObjectClass) -> Self {
+impl From<KernelClass> for ObjectClass {
+    fn from(object_class: KernelClass) -> Self {
         Self::System(object_class)
     }
 }
 
-impl From<String> for AbstractObjectClass {
+impl From<String> for ObjectClass {
     fn from(name: String) -> Self {
         Self::Custom(name)
     }
@@ -242,7 +235,7 @@ enumerable_enum! {
     }
 }
 
-impl From<CapClass> for ObjectClass {
+impl From<CapClass> for KernelClass {
     fn from(cap_class: CapClass) -> Self {
         match cap_class {
             // keep-sorted start
@@ -264,7 +257,7 @@ enumerable_enum! {
     }
 }
 
-impl From<Cap2Class> for ObjectClass {
+impl From<Cap2Class> for KernelClass {
     fn from(cap2_class: Cap2Class) -> Self {
         match cap2_class {
             // keep-sorted start
@@ -300,7 +293,7 @@ enumerable_enum! {
     }
 }
 
-impl From<FileClass> for ObjectClass {
+impl From<FileClass> for KernelClass {
     fn from(file_class: FileClass) -> Self {
         match file_class {
             // keep-sorted start
@@ -356,7 +349,7 @@ enumerable_enum! {
     }
 }
 
-impl From<SocketClass> for ObjectClass {
+impl From<SocketClass> for KernelClass {
     fn from(socket_class: SocketClass) -> Self {
         match socket_class {
             // keep-sorted start
@@ -401,7 +394,7 @@ pub enum FsNodeClass {
     Socket(SocketClass),
 }
 
-impl From<FsNodeClass> for ObjectClass {
+impl From<FsNodeClass> for KernelClass {
     fn from(class: FsNodeClass) -> Self {
         match class {
             FsNodeClass::File(file_class) => file_class.into(),
@@ -422,30 +415,8 @@ impl From<SocketClass> for FsNodeClass {
     }
 }
 
-/// A permission that may appear in SELinux policy or an access vector cache query.
-#[derive(Clone, Debug, PartialEq)]
-pub enum AbstractPermission {
-    /// A permission that is interpreted directly by the system. These are kernel objects such as
-    /// a "process", "file", etc.
-    System(Permission),
-    /// A permission with an arbitrary string identifier.
-    Custom { class: AbstractObjectClass, permission: String },
-}
-
-impl AbstractPermission {
-    pub fn new_custom(class: AbstractObjectClass, permission: String) -> Self {
-        Self::Custom { class, permission }
-    }
-}
-
-impl From<Permission> for AbstractPermission {
-    fn from(permission: Permission) -> Self {
-        Self::System(permission)
-    }
-}
-
 pub trait ClassPermission {
-    fn class(&self) -> ObjectClass;
+    fn class(&self) -> KernelClass;
 }
 
 macro_rules! permission_enum {
@@ -464,9 +435,9 @@ macro_rules! permission_enum {
         })*
 
         impl ClassPermission for $name {
-            fn class(&self) -> ObjectClass {
+            fn class(&self) -> KernelClass {
                 match self {
-                    $($name::$variant(_) => ObjectClass::$variant),*
+                    $($name::$variant(_) => KernelClass::$variant),*
                 }
             }
         }
@@ -491,7 +462,7 @@ permission_enum! {
     /// A well-known `(class, permission)` pair in SELinux policy that has a particular meaning in
     /// policy enforcement hooks.
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-    Permission {
+    KernelPermission {
         // keep-sorted start
         /// Permissions for the well-known SELinux "anon_inode" file-like object class.
         AnonFsNode(AnonFsNodePermission),
@@ -609,7 +580,7 @@ macro_rules! common_permission_enum {
 
 /// Helper used to declare the set of named permissions associated with an SELinux class.
 /// The `ClassType` trait is implemented on the declared `enum`, enabling values to be wrapped into
-/// the generic `Permission` container.
+/// the generic `KernelPermission` container.
 /// If an "extends" type is specified then a `Common` enum case is added, encapsulating the values
 /// of that underlying permission type. This is used to represent e.g. SELinux "dir" class deriving
 /// a basic set of permissions from the common "file" symbol.
@@ -624,8 +595,8 @@ macro_rules! class_permission_enum {
         }
 
         impl ClassPermission for $name {
-            fn class(&self) -> ObjectClass {
-                Permission::from(self.clone()).class()
+            fn class(&self) -> KernelClass {
+                KernelPermission::from(self.clone()).class()
             }
         }
     }
@@ -685,10 +656,10 @@ class_permission_enum! {
 }
 
 impl CommonCapPermission {
-    /// Returns the `class`-affine `Permission` value corresponding to this common permission.
+    /// Returns the `class`-affine `KernelPermission` value corresponding to this common permission.
     /// This is used to allow hooks to resolve e.g. common "sys_nice" permission access based on the
     /// "allow" rules for the correct target object class.
-    pub fn for_class(&self, class: CapClass) -> Permission {
+    pub fn for_class(&self, class: CapClass) -> KernelPermission {
         match class {
             CapClass::Capability => CapabilityPermission::Common(self.clone()).into(),
         }
@@ -724,10 +695,10 @@ class_permission_enum! {
 }
 
 impl CommonCap2Permission {
-    /// Returns the `class`-affine `Permission` value corresponding to this common permission.
+    /// Returns the `class`-affine `KernelPermission` value corresponding to this common permission.
     /// This is used to allow hooks to resolve e.g. common "mac_admin" permission access based on
     /// the "allow" rules for the correct target object class.
-    pub fn for_class(&self, class: Cap2Class) -> Permission {
+    pub fn for_class(&self, class: Cap2Class) -> KernelPermission {
         match class {
             Cap2Class::Capability2 => Capability2Permission::Common(self.clone()).into(),
         }
@@ -771,10 +742,10 @@ common_permission_enum! {
 }
 
 impl CommonFsNodePermission {
-    /// Returns the `class`-affine `Permission` value corresponding to this common permission.
+    /// Returns the `class`-affine `KernelPermission` value corresponding to this common permission.
     /// This is used to allow hooks to resolve e.g. common "read" permission access based on the
     /// "allow" rules for the correct target object class.
-    pub fn for_class(&self, class: impl Into<FsNodeClass>) -> Permission {
+    pub fn for_class(&self, class: impl Into<FsNodeClass>) -> KernelPermission {
         match class.into() {
             FsNodeClass::File(file_class) => {
                 CommonFilePermission::Common(self.clone()).for_class(file_class)
@@ -800,10 +771,10 @@ common_permission_enum! {
 }
 
 impl CommonSocketPermission {
-    /// Returns the `class`-affine `Permission` value corresponding to this common permission.
+    /// Returns the `class`-affine `KernelPermission` value corresponding to this common permission.
     /// This is used to allow hooks to resolve e.g. common "read" permission access based on the
     /// "allow" rules for the correct target object class.
-    pub fn for_class(&self, class: SocketClass) -> Permission {
+    pub fn for_class(&self, class: SocketClass) -> KernelPermission {
         match class {
             SocketClass::Key => KeySocketPermission::Common(self.clone()).into(),
             SocketClass::Netlink => NetlinkSocketPermission::Common(self.clone()).into(),
@@ -1104,10 +1075,10 @@ common_permission_enum! {
 }
 
 impl CommonFilePermission {
-    /// Returns the `class`-affine `Permission` value corresponding to this common permission.
+    /// Returns the `class`-affine `KernelPermission` value corresponding to this common permission.
     /// This is used to allow hooks to resolve e.g. common "read" permission access based on the
     /// "allow" rules for the correct target object class.
-    pub fn for_class(&self, class: FileClass) -> Permission {
+    pub fn for_class(&self, class: FileClass) -> KernelPermission {
         match class {
             FileClass::AnonFsNode => AnonFsNodePermission::Common(self.clone()).into(),
             FileClass::Block => BlockFilePermission::Common(self.clone()).into(),
@@ -1499,21 +1470,13 @@ mod tests {
 
     #[test]
     fn object_class_permissions() {
-        assert_eq!(AbstractObjectClass::Unspecified, AbstractObjectClass::default());
-        assert_eq!(
-            AbstractObjectClass::Custom(String::from("my_class")),
-            String::from("my_class").into()
-        );
+        assert_eq!(ObjectClass::Custom(String::from("my_class")), String::from("my_class").into());
         for variant in ProcessPermission::all_variants().into_iter() {
-            assert_eq!(ObjectClass::Process, variant.class());
+            assert_eq!(KernelClass::Process, variant.class());
             assert_eq!("process", variant.class().name());
-            let permission: Permission = variant.clone().into();
-            assert_eq!(Permission::Process(variant.clone()), permission);
-            assert_eq!(
-                AbstractPermission::System(Permission::Process(variant.clone())),
-                permission.into()
-            );
-            assert_eq!(AbstractObjectClass::System(ObjectClass::Process), variant.class().into());
+            let permission: KernelPermission = variant.clone().into();
+            assert_eq!(KernelPermission::Process(variant.clone()), permission);
+            assert_eq!(ObjectClass::System(KernelClass::Process), variant.class().into());
         }
     }
 

@@ -78,7 +78,18 @@ class ShareableProcessState : public fbl::RefCounted<ShareableProcessState> {
     DEBUG_ASSERT(process_count_.load(ktl::memory_order_relaxed) == 1);
     aspace_ =
         VmAspace::Create(aspace_base, aspace_size, VmAspace::Type::User, aspace_name, share_opt);
-    return aspace_ != nullptr;
+    if (aspace_ == nullptr) {
+      return false;
+    }
+
+    DEBUG_ASSERT_MSG(
+        share_opt == VmAspace::ShareOpt::None || share_opt == VmAspace::ShareOpt::Shared,
+        "unknown share_opt %u", static_cast<uint32_t>(share_opt));
+    const FutexContext::ProcessType type = share_opt == VmAspace::ShareOpt::None
+                                               ? FutexContext::ProcessType::Regular
+                                               : FutexContext::ProcessType::Shared;
+    zx_status_t status = futex_context_.Init(type);
+    return status == ZX_OK;
   }
 
   uint64_t share_count() const { return process_count_.load(ktl::memory_order_relaxed); }

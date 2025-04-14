@@ -19,7 +19,9 @@ use fuchsia_async::TimeoutExt as _;
 use futures::future::FutureExt as _;
 use futures::StreamExt;
 use itertools::Itertools as _;
-use net_declare::{fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix};
+use net_declare::{
+    fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix, fidl_subnet,
+};
 use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6, Subnet};
 use netstack_testing_common::realms::{Netstack, Netstack2, Netstack3, TestSandboxExt};
 use netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT;
@@ -1898,4 +1900,99 @@ async fn concurrent_route_table_and_route_set_removal<I: FidlRouteAdminIpExt + F
         // panics, we need to make the test run longer than 5 seconds (100ms * 55 = 5.5s).
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
+}
+
+#[netstack_test]
+#[variant(N, Netstack)]
+async fn del_forwarding_entry_matches_device<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox
+        .create_netstack_realm::<N, _>(format!("routes-admin-{name}"))
+        .expect("create realm");
+    let network =
+        sandbox.create_network(format!("routes-admin-{name}")).await.expect("create network");
+    let if_1 = realm.join_network(&network, "ep1").await.expect("join network");
+    let if_2 = realm.join_network(&network, "ep2").await.expect("join network");
+
+    let state =
+        realm.connect_to_protocol::<fnet_routes::StateV6Marker>().expect("connect to routes State");
+
+    let routes_stream =
+        fnet_routes_ext::event_stream_from_state::<Ipv6>(&state).expect("should succeed");
+    let mut routes_stream = pin!(routes_stream);
+
+    let routes = fnet_routes_ext::collect_routes_until_idle::<Ipv6, HashSet<_>>(&mut routes_stream)
+        .await
+        .expect("collect routes should succeed");
+
+    let ll_route_actions = routes
+        .iter()
+        .filter_map(
+            |fnet_routes_ext::InstalledRoute {
+                 route: fnet_routes_ext::Route { destination, action, properties: _ },
+                 effective_properties: _,
+                 table_id: _,
+             }| {
+                (*destination == net_declare::net_subnet_v6!("fe80::/64")).then_some(*action)
+            },
+        )
+        .collect::<HashSet<_>>();
+
+    assert_eq!(
+        ll_route_actions,
+        [if_1.id(), if_2.id()]
+            .into_iter()
+            .map(|device| {
+                fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
+                    outbound_interface: device,
+                    next_hop: None,
+                })
+            })
+            .collect::<HashSet<_>>()
+    );
+
+    let stack = realm
+        .connect_to_protocol::<fnet_stack::StackMarker>()
+        .expect("connect to fuchsia.net.stack.Stack");
+    stack
+        .del_forwarding_entry(&fnet_stack::ForwardingEntry {
+            subnet: fidl_subnet!("fe80::/64"),
+            device_id: if_1.id(),
+            next_hop: None,
+            metric: 0,
+        })
+        .await
+        .expect("should not have FIDL error")
+        .expect("should succeed");
+
+    let routes_stream =
+        fnet_routes_ext::event_stream_from_state::<Ipv6>(&state).expect("should succeed");
+    let mut routes_stream = pin!(routes_stream);
+
+    let routes = fnet_routes_ext::collect_routes_until_idle::<Ipv6, HashSet<_>>(&mut routes_stream)
+        .await
+        .expect("collect routes should succeed");
+
+    let ll_route_action = routes
+        .iter()
+        .filter_map(
+            |fnet_routes_ext::InstalledRoute {
+                 route: fnet_routes_ext::Route { destination, action, properties: _ },
+                 effective_properties: _,
+                 table_id: _,
+             }| {
+                (*destination == net_declare::net_subnet_v6!("fe80::/64")).then_some(*action)
+            },
+        )
+        .exactly_one()
+        .expect("there should only be one LL addr");
+
+    // The ll route for if_1 should be removed but the one for if_2 should still exist.
+    assert_eq!(
+        ll_route_action,
+        fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
+            outbound_interface: if_2.id(),
+            next_hop: None,
+        })
+    );
 }

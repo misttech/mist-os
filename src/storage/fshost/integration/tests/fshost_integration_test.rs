@@ -1516,3 +1516,33 @@ async fn expose_unmanaged_block_devices() {
 
     fixture.tear_down().await;
 }
+
+// Regression test for https://fxbug.dev/408423972.
+#[cfg(feature = "storage_host")]
+#[fuchsia::test]
+async fn fuse_gpt_once_container_found() {
+    let mut builder = new_builder();
+    builder.with_disk().format_volumes(volumes_spec());
+    let fixture = builder.build().await;
+
+    let partitions = fixture.dir(
+        fidl_fuchsia_storage_partitions::PartitionServiceMarker::SERVICE_NAME,
+        fuchsia_fs::PERM_READABLE,
+    );
+    let task = fasync::Task::spawn(async move {
+        // This call will block until fshost finds the system container, and at that point it will
+        // fuse shut PartitionService, failing all callers.  See logic in mount_fxblob in
+        // FshostEnvironment.
+        fuchsia_fs::directory::readdir(&partitions)
+            .await
+            .expect_err("readdir should (eventually) fail")
+    });
+
+    // Once the filesystems are enumerated, the above task should be unblocked.
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    task.join().await;
+
+    fixture.tear_down().await;
+}

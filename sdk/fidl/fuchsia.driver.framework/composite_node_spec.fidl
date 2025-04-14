@@ -25,6 +25,22 @@ type BindRule = struct {
     values vector<NodePropertyValue>:MAX_PROPERTY_COUNT;
 };
 
+/// Represents a bind rule in a parent specification.
+@available(added=NEXT)
+type BindRule2 = struct {
+    /// Property key.
+    key NodePropertyKeyString;
+
+    /// Condition for evaluating the property values in
+    /// the matching process. The values must be ACCEPT
+    /// or REJECT.
+    condition Condition;
+
+    /// A list of property values. Must not be empty. The property
+    /// values must be the same type.
+    values vector<NodePropertyValue>:MAX_PROPERTY_COUNT;
+};
+
 /// Specification for a node that parents the composite node created from the
 /// composite node specification.
 type ParentSpec = struct {
@@ -36,6 +52,18 @@ type ParentSpec = struct {
     properties vector<NodeProperty>:MAX_PROPERTY_COUNT;
 };
 
+/// Specification for a node that parents the composite node created from the
+/// composite node specification.
+@available(added=NEXT)
+type ParentSpec2 = struct {
+    /// Parent's bind rules. Property keys must be unique. Must not be empty.
+    bind_rules vector<BindRule2>:MAX_PROPERTY_COUNT;
+
+    /// Properties for matching against a composite driver's bind rules.
+    /// Keys must be unique and string-based.
+    properties vector<NodeProperty2>:MAX_PROPERTY_COUNT;
+};
+
 /// Struct that represents a composite node specification.
 type CompositeNodeSpec = table {
     /// The composite node spec's name.
@@ -44,6 +72,11 @@ type CompositeNodeSpec = table {
     /// The nodes in the composite node spec. Must not be empty. The first node is
     /// the primary node.
     2: parents vector<ParentSpec>:MAX;
+
+    /// The nodes in the composite node spec. Must not be empty. The first node is
+    /// the primary node.
+    @available(added=NEXT)
+    3: parents2 vector<ParentSpec2>:MAX;
 };
 
 /// Error codes for the CompositeNodeManager protocol.
@@ -58,6 +91,9 @@ type CompositeNodeSpecError = flexible enum {
     /// The spec failed to be added to the driver index.
     @available(added=20)
     DRIVER_INDEX_FAILURE = 4;
+    /// The `parents` and `parents2` fields were both specified.
+    @available(added=NEXT)
+    DUPLICATE_PARENTS = 5;
 };
 
 /// Protocol through which board drivers can create composite node specs.

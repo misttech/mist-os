@@ -14,6 +14,9 @@ __BEGIN_CDECLS
 //   socket(AF_VSOCK, SOCK_STREAM, 0);
 zx_status_t create_virtio_stream_socket(int* out_fd);
 
+// This returns the local cid of the system.
+zx_status_t get_local_cid(uint32_t* out_local_cid);
+
 __END_CDECLS
 
 #endif  // SRC_PARAVIRTUALIZATION_LIB_VSOCK_SOCKET_H_

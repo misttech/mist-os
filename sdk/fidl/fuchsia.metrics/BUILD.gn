@@ -9,13 +9,7 @@ fidl("fuchsia.metrics") {
   stable = true
   sdk_area = "Metrics"
   api = "fuchsia.metrics.api"
-  fuzzers = [
-    {
-      protocol = "fuchsia.metrics.MetricEventLoggerFactory"
-    },
-    {
-      protocol = "fuchsia.metrics.MetricEventLogger"
-    },
-  ]
   sources = [ "metric_event_logger.fidl" ]
+
+  enable_hlcpp = true
 }

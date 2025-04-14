@@ -1106,7 +1106,7 @@ func (f *FFXInstance) Log(ctx context.Context, output *io.Writer, args ...string
 		return fmt.Errorf("no target is set")
 	}
 	args = append([]string{"log"}, args...)
-	i := f.invoker(args).setTarget(f.target).setMachineFormat(MachineRaw).setStrict()
+	i := f.invoker(args).setTarget(f.target).setTimeout(0).setMachineFormat(MachineRaw).setStrict()
 	if output != nil {
 		i.setStdout(*output)
 	}

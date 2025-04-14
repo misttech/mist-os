@@ -16,16 +16,6 @@
             url: "fuchsia-pkg://fuchsia.com/vulkan_loader_tests#meta/vulkan_loader_test_lib_provider.cm",
         },
     ],
-    offer: [
-        {
-            protocol: [ "fuchsia.logger.Log" ],
-            from: "parent",
-            to: [
-                "#test_driver",
-                "#test_lib_provider",
-            ],
-        },
-    ],
     expose: [
         {
             protocol: "fuchsia.test.Suite",

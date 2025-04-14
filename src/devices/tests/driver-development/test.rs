@@ -17,25 +17,13 @@ const SAMPLE_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/sample-driver.cm";
 const PARENT_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/test-parent-sys.cm";
 const FAKE_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/driver-test-realm-fake-driver.cm";
 
-fn get_no_protocol_property_list() -> Option<[fdf::NodeProperty; 3]> {
-    Some([
-        fdf::NodeProperty {
-            key: fdf::NodePropertyKey::StringValue("fuchsia.BIND_PROTOCOL".to_string()),
-            value: fdf::NodePropertyValue::IntValue(28), // ZX_PROTOCOL_MISC
-        },
-        fdf::NodeProperty {
-            key: fdf::NodePropertyKey::StringValue("fuchsia.driver.compat.Service".to_string()),
-            value: fdf::NodePropertyValue::StringValue(
-                "fuchsia.driver.compat.Service.ZirconTransport".to_string(),
-            ),
-        },
-        fdf::NodeProperty {
-            key: fdf::NodePropertyKey::StringValue(String::from(
-                bind_fuchsia_platform::DRIVER_FRAMEWORK_VERSION,
-            )),
-            value: fdf::NodePropertyValue::IntValue(2),
-        },
-    ])
+fn get_no_protocol_property_list() -> Option<[fdf::NodeProperty; 1]> {
+    Some([fdf::NodeProperty {
+        key: fdf::NodePropertyKey::StringValue(String::from(
+            bind_fuchsia_platform::DRIVER_FRAMEWORK_VERSION,
+        )),
+        value: fdf::NodePropertyValue::IntValue(2),
+    }])
 }
 
 fn get_test_parent_property_list() -> Option<[fdf::NodeProperty; 3]> {

@@ -7,6 +7,18 @@ import("//build/bazel/assembly/bazel_product_bundle.gni")
 # A GN target to perform system assembly in Bazel exclusively, using
 # Ninja-generated inputs.
 
+group("workbench") {
+  testonly = true
+  if (current_cpu == "x64") {
+    deps = [ ":workbench_eng.x64" ]
+  } else if (current_cpu == "arm64") {
+    deps = [
+      ":workbench_eng.arm64",
+      ":workbench_eng.vim3",
+    ]
+  }
+}
+
 if (current_cpu == "x64") {
   bazel_product_bundle("workbench_eng.x64") {
     testonly = true

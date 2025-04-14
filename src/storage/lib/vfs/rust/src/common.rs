@@ -132,6 +132,7 @@ pub async fn extended_attributes_sender(
             Some(chunk) => (chunk, chunks.peek().is_none()),
             None => (&[][..], true),
         };
+        #[allow(clippy::unnecessary_lazy_evaluations)]
         responder.send(Ok((chunk, last))).unwrap_or_else(|_error| {
             #[cfg(any(test, feature = "use_log"))]
             log::error!(_error:?; "list extended attributes failed to send a chunk");

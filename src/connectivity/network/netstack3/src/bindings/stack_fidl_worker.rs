@@ -2,17 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::util::{ResultExt as _, TryFromFidlWithContext as _, TryIntoCore as _};
-use super::{routes, Ctx};
-
-use fidl_fuchsia_net as fidl_net;
 use fidl_fuchsia_net_stack::{
     self as fidl_net_stack, ForwardingEntry, StackRequest, StackRequestStream,
 };
 use futures::{TryFutureExt as _, TryStreamExt as _};
 use log::{debug, error};
-use net_types::ip::{Ip, Ipv4, Ipv6};
+use net_types::ip::{Ip, IpAddr, Ipv4, Ipv6};
+use net_types::SpecifiedAddr;
+use netstack3_core::device::DeviceId;
 use netstack3_core::routes::{AddableEntry, AddableEntryEither};
+
+use super::util::{IntoCore as _, ResultExt as _, TryFromFidlWithContext as _, TryIntoCore as _};
+use super::{routes, BindingId, Ctx};
 
 pub(crate) struct StackFidlWorker {
     netstack: crate::bindings::Netstack,
@@ -31,18 +32,9 @@ impl StackFidlWorker {
                             .send(worker.fidl_add_forwarding_entry(entry).await)
                             .unwrap_or_log("failed to respond");
                     }
-                    StackRequest::DelForwardingEntry {
-                        entry:
-                            fidl_net_stack::ForwardingEntry {
-                                subnet,
-                                device_id: _,
-                                next_hop: _,
-                                metric: _,
-                            },
-                        responder,
-                    } => {
+                    StackRequest::DelForwardingEntry { entry, responder } => {
                         responder
-                            .send(worker.fidl_del_forwarding_entry(subnet).await)
+                            .send(worker.fidl_del_forwarding_entry(entry).await)
                             .unwrap_or_log("failed to respond");
                     }
                     StackRequest::SetDhcpClientEnabled { responder, id: _, enable } => {
@@ -133,39 +125,69 @@ impl StackFidlWorker {
 
     async fn fidl_del_forwarding_entry(
         &mut self,
-        subnet: fidl_net::Subnet,
+        fidl_net_stack::ForwardingEntry {
+            subnet,
+            device_id,
+            next_hop,
+            metric: _,
+        }: fidl_net_stack::ForwardingEntry,
     ) -> Result<(), fidl_net_stack::Error> {
         let bindings_ctx = self.netstack.ctx.bindings_ctx();
-        if let Ok(subnet) = subnet.try_into_core() {
-            bindings_ctx
-                .apply_route_change_either(match subnet {
-                    net_types::ip::SubnetEither::V4(subnet) => routes::Change::<Ipv4>::RouteOp(
-                        routes::RouteOp::RemoveToSubnet(subnet),
-                        routes::SetMembership::Global,
-                    )
-                    .into(),
-                    net_types::ip::SubnetEither::V6(subnet) => routes::Change::<Ipv6>::RouteOp(
-                        routes::RouteOp::RemoveToSubnet(subnet),
-                        routes::SetMembership::Global,
-                    )
-                    .into(),
-                })
-                .await
-                .map_err(|err| match err {
-                    routes::ChangeError::DeviceRemoved => fidl_net_stack::Error::InvalidArgs,
-                    routes::ChangeError::TableRemoved => panic!(
-                        "can't apply route change because route change runner has been shut down"
-                    ),
-                    super::routes::ChangeError::SetRemoved => {
-                        unreachable!("fuchsia.net.stack only uses the global route set")
-                    }
-                })
-                .and_then(|outcome| match outcome {
-                    routes::ChangeOutcome::NoChange => Err(fidl_net_stack::Error::NotFound),
-                    routes::ChangeOutcome::Changed => Ok(()),
-                })
-        } else {
-            Err(fidl_net_stack::Error::InvalidArgs)
-        }
+        // There are no routes that have a device ID of 0. Instead of returning an error,
+        // return success because no routes will be removed similar to netstack2.
+        let Ok(binding_id) = BindingId::try_from(device_id) else {
+            return Ok(());
+        };
+        let device = DeviceId::try_from_fidl_with_ctx(bindings_ctx, binding_id)
+            .map_err(|_| fidl_net_stack::Error::InvalidArgs)?;
+        let subnet = subnet.try_into_core().map_err(|_| fidl_net_stack::Error::InvalidArgs)?;
+        let next_hop = next_hop.map(|nh| (*nh).into_core());
+        // This API ignores metric for matching.
+        let metric = routes::Matcher::Any;
+
+        let route_change = match subnet {
+            net_types::ip::SubnetEither::V4(subnet) => {
+                let gateway = match next_hop {
+                    Some(IpAddr::V4(addr)) => routes::Matcher::Exact(SpecifiedAddr::new(addr)),
+                    Some(IpAddr::V6(_)) => return Err(fidl_net_stack::Error::InvalidArgs),
+                    None => routes::Matcher::Any,
+                };
+                let device = device.downgrade();
+                routes::Change::<Ipv4>::RouteOp(
+                    routes::RouteOp::RemoveMatching { subnet, device, gateway, metric },
+                    routes::SetMembership::Global,
+                )
+                .into()
+            }
+            net_types::ip::SubnetEither::V6(subnet) => {
+                let gateway = match next_hop {
+                    Some(IpAddr::V4(_)) => return Err(fidl_net_stack::Error::InvalidArgs),
+                    Some(IpAddr::V6(addr)) => routes::Matcher::Exact(SpecifiedAddr::new(addr)),
+                    None => routes::Matcher::Any,
+                };
+                let device = device.downgrade();
+                routes::Change::<Ipv6>::RouteOp(
+                    routes::RouteOp::RemoveMatching { subnet, device, gateway, metric },
+                    routes::SetMembership::Global,
+                )
+                .into()
+            }
+        };
+        bindings_ctx
+            .apply_route_change_either(route_change)
+            .await
+            .map_err(|err| match err {
+                routes::ChangeError::DeviceRemoved => fidl_net_stack::Error::InvalidArgs,
+                routes::ChangeError::TableRemoved => panic!(
+                    "can't apply route change because route change runner has been shut down"
+                ),
+                super::routes::ChangeError::SetRemoved => {
+                    unreachable!("fuchsia.net.stack only uses the global route set")
+                }
+            })
+            .and_then(|outcome| match outcome {
+                routes::ChangeOutcome::NoChange => Err(fidl_net_stack::Error::NotFound),
+                routes::ChangeOutcome::Changed => Ok(()),
+            })
     }
 }

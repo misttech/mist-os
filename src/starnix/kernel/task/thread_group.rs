@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::device::terminal::{Terminal, TerminalController};
+use crate::memory_attribution::MemoryAttributionLifecycleEvent;
 use crate::mutable_state::{state_accessor, state_implementation};
 use crate::security;
 use crate::signals::syscalls::{read_siginfo, WaitingOptions};
@@ -132,6 +133,9 @@ pub struct ThreadGroupMutableState {
 
     /// True if the `ThreadGroup` shares any state with a parent or child process (via `clone()`).
     pub is_sharing: bool,
+
+    /// Notifier for name changes.
+    pub notifier: Option<std::sync::mpsc::Sender<MemoryAttributionLifecycleEvent>>,
 }
 
 /// A collection of `Task` objects that roughly correspond to a "process".
@@ -233,17 +237,16 @@ impl PartialEq for ThreadGroup {
 }
 
 impl Releasable for ThreadGroup {
-    type Context<'a: 'b, 'b> = ();
+    type Context<'a: 'b, 'b> = &'b mut PidTable;
 
-    fn release<'a: 'b, 'b>(mut self, _context: Self::Context<'a, 'b>) {
-        let mut pids = self.kernel.pids.write();
+    fn release<'a: 'b, 'b>(mut self, pids: Self::Context<'a, 'b>) {
         let state = self.mutable_state.get_mut();
 
         for zombie in state.zombie_children.drain(..) {
-            zombie.release(&mut pids);
+            zombie.release(pids);
         }
 
-        state.zombie_ptracees.release(&mut pids);
+        state.zombie_ptracees.release(pids);
     }
 }
 
@@ -253,6 +256,15 @@ impl Drop for ThreadGroup {
         let state = self.mutable_state.get_mut();
         assert!(state.tasks.is_empty());
         assert!(state.children.is_empty());
+        assert!(state
+            .parent
+            .as_ref()
+            .and_then(|p| p.0.upgrade().as_ref().map(|p| p
+                .read()
+                .children
+                .get(&self.leader)
+                .is_none()))
+            .unwrap_or(true));
     }
 }
 
@@ -303,7 +315,7 @@ impl ProcessSelector {
             ProcessSelector::Pgid(pgid) => {
                 if let Some(task_ref) = pid_table.get_task(pid).upgrade() {
                     pid_table.get_process_group(pgid).as_ref()
-                        == Some(&task_ref.thread_group.read().process_group)
+                        == Some(&task_ref.thread_group().read().process_group)
                 } else {
                     false
                 }
@@ -492,6 +504,7 @@ impl ThreadGroup {
                     allowed_ptracers: PtraceAllowedPtracers::None,
                     exit_notifier: None,
                     is_sharing: false,
+                    notifier: None,
                 }),
             };
 
@@ -575,15 +588,26 @@ impl ThreadGroup {
             return error!(EINVAL);
         }
         state.tasks.insert(task.id, task.into());
+
+        if state.tasks_count() == 1 {
+            // It is only at this point that we have a started ThreadGroup with a running leader
+            // task. If we notify the memory attribution module before, we may fail to observe the
+            // leader task and its memory manager.
+            if let Some(notifier) = &state.notifier {
+                let _ = notifier.send(MemoryAttributionLifecycleEvent::creation(self.leader));
+            }
+        }
         Ok(())
     }
 
-    pub fn remove<L>(&self, locked: &mut Locked<'_, L>, task: &OwnedRef<Task>)
+    /// Remove the task from the children of this ThreadGroup.
+    ///
+    /// It is important that the task is taken as an `OwnedRef`. It ensures the tasks of the
+    /// ThreadGroup are always valid as they are still valid when removed.
+    pub fn remove<L>(&self, locked: &mut Locked<'_, L>, pids: &mut PidTable, task: &OwnedRef<Task>)
     where
         L: LockBefore<ProcessGroupState>,
     {
-        let mut pids = self.kernel.pids.write();
-
         task.set_ptrace_zombie(&pids);
         pids.remove_task(task.id);
 
@@ -620,7 +644,7 @@ impl ThreadGroup {
                 ZombieProcess::new(state.as_ref(), persistent_info.lock().creds(), exit_info);
             pids.kill_process(self.leader, OwnedRef::downgrade(&zombie));
 
-            state.leave_process_group(locked, &mut pids);
+            state.leave_process_group(locked, pids);
 
             // I have no idea if dropping the lock here is correct, and I don't want to think about
             // it. If problems do turn up with another thread observing an intermediate state of
@@ -659,7 +683,7 @@ impl ThreadGroup {
                     // If we don't have a reaper then just drop the zombies.
                     let mut state = self.write();
                     for zombie in state.zombie_children.drain(..) {
-                        zombie.release(&mut pids);
+                        zombie.release(pids);
                     }
                 }
             }
@@ -674,9 +698,9 @@ impl ThreadGroup {
                 let mut maybe_zombie = Some(zombie);
                 if let Some(tracer_pid) = tracer_pid {
                     if let Some(ref tracer) = pids.get_task(tracer_pid).upgrade() {
-                        maybe_zombie = tracer.thread_group.maybe_notify_tracer(
+                        maybe_zombie = tracer.thread_group().maybe_notify_tracer(
                             task,
-                            &mut pids,
+                            pids,
                             &parent,
                             maybe_zombie.unwrap(),
                         );
@@ -686,7 +710,7 @@ impl ThreadGroup {
                     parent.do_zombie_notifications(zombie);
                 }
             } else {
-                zombie.release(&mut pids);
+                zombie.release(pids);
             }
 
             // TODO: Set the error_code on the Zircon process object. Currently missing a way
@@ -744,7 +768,7 @@ impl ThreadGroup {
                     // Tell the parent to expect a notification later.
                     let mut parent_state = parent.write();
                     parent_state.deferred_zombie_ptracers.push((self.leader, tracee.id));
-                    parent_state.children.remove(&tracee.thread_group.leader);
+                    parent_state.children.remove(&tracee.thread_group().leader);
                 }
                 // Tell the tracer that there is a notification pending.
                 let mut state = self.write();
@@ -816,7 +840,7 @@ impl ThreadGroup {
             let current_process_group = Arc::clone(&self.read().process_group);
 
             // The target process must be either the current process of a child of the current process
-            let mut target_thread_group = target.thread_group.write();
+            let mut target_thread_group = target.thread_group().write();
             let is_target_current_process_child =
                 target_thread_group.parent.as_ref().map(|tg| tg.upgrade().leader)
                     == Some(self.leader);
@@ -868,7 +892,7 @@ impl ThreadGroup {
 
             target_thread_group.set_process_group(locked, new_process_group, &mut pids);
         }
-        target.thread_group.check_orphans(locked);
+        target.thread_group().check_orphans(locked);
 
         Ok(())
     }
@@ -1169,7 +1193,7 @@ impl ThreadGroup {
         resource: Resource,
         maybe_new_limit: Option<rlimit>,
     ) -> Result<rlimit, Errno> {
-        let thread_group = &target_task.thread_group;
+        let thread_group = target_task.thread_group();
         let can_increase_rlimit = security::is_task_capable_noaudit(current_task, CAP_SYS_RESOURCE);
         let mut limit_state = thread_group.limits.lock();
         let old_limit = limit_state.get(resource);
@@ -1274,7 +1298,7 @@ impl ThreadGroup {
                 continue;
             };
 
-            let process_state = &mut task_ref.thread_group.write();
+            let process_state = &mut task_ref.thread_group().write();
             let mut task_state = task_ref.write();
             if task_state
                 .ptrace
@@ -1329,7 +1353,7 @@ impl ThreadGroup {
                             process_state.last_signal.take()
                         };
                         if let Some(mut siginfo) = siginfo {
-                            if task_ref.thread_group.load_stopped() == StopState::GroupStopped
+                            if task_ref.thread_group().load_stopped() == StopState::GroupStopped
                                 && ptrace.as_ref().is_some_and(|ptrace| ptrace.is_seized())
                             {
                                 if event == PtraceEvent::None {
@@ -1423,7 +1447,7 @@ impl ThreadGroup {
             let signal_info = SignalInfo {
                 code: SI_USER as i32,
                 detail: SignalDetail::Kill {
-                    pid: current_task.thread_group.leader,
+                    pid: current_task.thread_group().leader,
                     uid: current_task.creds().uid,
                 },
                 ..SignalInfo::default(signal)
@@ -1975,34 +1999,34 @@ mod test {
     #[::fuchsia::test]
     async fn test_setsid() {
         fn get_process_group(task: &Task) -> Arc<ProcessGroup> {
-            Arc::clone(&task.thread_group.read().process_group)
+            Arc::clone(&task.thread_group().read().process_group)
         }
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        assert_eq!(current_task.thread_group.setsid(&mut locked), error!(EPERM));
+        assert_eq!(current_task.thread_group().setsid(&mut locked), error!(EPERM));
 
         let child_task = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         assert_eq!(get_process_group(&current_task), get_process_group(&child_task));
 
-        let old_process_group = child_task.thread_group.read().process_group.clone();
-        assert_eq!(child_task.thread_group.setsid(&mut locked), Ok(()));
+        let old_process_group = child_task.thread_group().read().process_group.clone();
+        assert_eq!(child_task.thread_group().setsid(&mut locked), Ok(()));
         assert_eq!(
-            child_task.thread_group.read().process_group.session.leader,
+            child_task.thread_group().read().process_group.session.leader,
             child_task.get_pid()
         );
         assert!(!old_process_group
             .read(&mut locked)
             .thread_groups()
-            .contains(&OwnedRef::temp(&child_task.thread_group)));
+            .contains(&OwnedRef::temp(child_task.thread_group())));
     }
 
     #[::fuchsia::test]
     async fn test_exit_status() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let child = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        child.thread_group.exit(&mut locked, ExitStatus::Exit(42), None);
+        child.thread_group().exit(&mut locked, ExitStatus::Exit(42), None);
         std::mem::drop(child);
         assert_eq!(
-            current_task.thread_group.read().zombie_children[0].exit_info.status,
+            current_task.thread_group().read().zombie_children[0].exit_info.status,
             ExitStatus::Exit(42)
         );
     }
@@ -2010,36 +2034,42 @@ mod test {
     #[::fuchsia::test]
     async fn test_setgpid() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        assert_eq!(current_task.thread_group.setsid(&mut locked), error!(EPERM));
+        assert_eq!(current_task.thread_group().setsid(&mut locked), error!(EPERM));
 
         let child_task1 = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         let child_task2 = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         let execd_child_task = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        execd_child_task.thread_group.write().did_exec = true;
+        execd_child_task.thread_group().write().did_exec = true;
         let other_session_child_task =
             current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        assert_eq!(other_session_child_task.thread_group.setsid(&mut locked), Ok(()));
+        assert_eq!(other_session_child_task.thread_group().setsid(&mut locked), Ok(()));
 
-        assert_eq!(child_task1.thread_group.setpgid(&mut locked, &current_task, 0), error!(ESRCH));
         assert_eq!(
-            current_task.thread_group.setpgid(&mut locked, &execd_child_task, 0),
+            child_task1.thread_group().setpgid(&mut locked, &current_task, 0),
+            error!(ESRCH)
+        );
+        assert_eq!(
+            current_task.thread_group().setpgid(&mut locked, &execd_child_task, 0),
             error!(EACCES)
         );
-        assert_eq!(current_task.thread_group.setpgid(&mut locked, &current_task, 0), error!(EPERM));
         assert_eq!(
-            current_task.thread_group.setpgid(&mut locked, &other_session_child_task, 0),
+            current_task.thread_group().setpgid(&mut locked, &current_task, 0),
             error!(EPERM)
         );
         assert_eq!(
-            current_task.thread_group.setpgid(&mut locked, &child_task1, -1),
+            current_task.thread_group().setpgid(&mut locked, &other_session_child_task, 0),
+            error!(EPERM)
+        );
+        assert_eq!(
+            current_task.thread_group().setpgid(&mut locked, &child_task1, -1),
             error!(EINVAL)
         );
         assert_eq!(
-            current_task.thread_group.setpgid(&mut locked, &child_task1, 255),
+            current_task.thread_group().setpgid(&mut locked, &child_task1, 255),
             error!(EPERM)
         );
         assert_eq!(
-            current_task.thread_group.setpgid(
+            current_task.thread_group().setpgid(
                 &mut locked,
                 &child_task1,
                 other_session_child_task.id
@@ -2047,20 +2077,20 @@ mod test {
             error!(EPERM)
         );
 
-        assert_eq!(child_task1.thread_group.setpgid(&mut locked, &child_task1, 0), Ok(()));
-        assert_eq!(child_task1.thread_group.read().process_group.session.leader, current_task.id);
-        assert_eq!(child_task1.thread_group.read().process_group.leader, child_task1.id);
+        assert_eq!(child_task1.thread_group().setpgid(&mut locked, &child_task1, 0), Ok(()));
+        assert_eq!(child_task1.thread_group().read().process_group.session.leader, current_task.id);
+        assert_eq!(child_task1.thread_group().read().process_group.leader, child_task1.id);
 
-        let old_process_group = child_task2.thread_group.read().process_group.clone();
+        let old_process_group = child_task2.thread_group().read().process_group.clone();
         assert_eq!(
-            current_task.thread_group.setpgid(&mut locked, &child_task2, child_task1.id),
+            current_task.thread_group().setpgid(&mut locked, &child_task2, child_task1.id),
             Ok(())
         );
-        assert_eq!(child_task2.thread_group.read().process_group.leader, child_task1.id);
+        assert_eq!(child_task2.thread_group().read().process_group.leader, child_task1.id);
         assert!(!old_process_group
             .read(&mut locked)
             .thread_groups()
-            .contains(&OwnedRef::temp(&child_task2.thread_group)));
+            .contains(&OwnedRef::temp(child_task2.thread_group())));
     }
 
     #[::fuchsia::test]
@@ -2070,12 +2100,12 @@ mod test {
         let task2 = task1.clone_task_for_test(&mut locked, 0, None);
         let task3 = task2.clone_task_for_test(&mut locked, 0, None);
 
-        assert_eq!(task3.thread_group.read().get_ppid(), task2.id);
+        assert_eq!(task3.thread_group().read().get_ppid(), task2.id);
 
-        task2.thread_group.exit(&mut locked, ExitStatus::Exit(0), None);
+        task2.thread_group().exit(&mut locked, ExitStatus::Exit(0), None);
         std::mem::drop(task2);
 
         // Task3 parent should be current_task.
-        assert_eq!(task3.thread_group.read().get_ppid(), current_task.id);
+        assert_eq!(task3.thread_group().read().get_ppid(), current_task.id);
     }
 }

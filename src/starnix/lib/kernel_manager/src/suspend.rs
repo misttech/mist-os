@@ -134,7 +134,11 @@ pub async fn suspend_container(
         if wait_item.pending.contains(zx::Signals::COUNTER_POSITIVE) {
             let koid = wait_item.handle.get_koid().unwrap();
             if let Some(event) = wake_sources.get(&koid) {
-                log::info!("Woke container from sleep for: {}", event.name);
+                log::info!(
+                    "Woke container from sleep for: {}, count: {:?}",
+                    event.name,
+                    event.counter.read()
+                );
                 resume_reason = Some(event.name.clone());
             }
         }

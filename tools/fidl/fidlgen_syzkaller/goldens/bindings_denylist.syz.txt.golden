@@ -34,15 +34,6 @@ test_bindingsdenylist_DenyEachBindingOnlyDenyGoRequestOutOfLine {
 test_bindingsdenylist_DenyEachBindingOnlyDenyGoRequestHandles {
     void void
 } [packed]
-test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequestInLine {
-    a int8
-} [packed]
-test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequestOutOfLine {
-    void void
-} [packed]
-test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequestHandles {
-    void void
-} [packed]
 test_bindingsdenylist_DenyEachBindingOnlyDenyPythonRequestInLine {
     a int8
 } [packed]
@@ -86,15 +77,6 @@ test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResponseOutOfLine {
     void void
 } [packed]
 test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResponseHandles {
-    void void
-} [packed]
-test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResponseInLine {
-    b int32
-} [packed]
-test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResponseOutOfLine {
-    void void
-} [packed]
-test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResponseHandles {
     void void
 } [packed]
 test_bindingsdenylist_DenyEachBinding_OnlyDenyPython_ResponseInLine {
@@ -162,16 +144,6 @@ test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResultOutOfLine [
 ][varlen]
 test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResultHandles [
     response test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResponseHandles
-][varlen]
-test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResultInLine [
-    responseInLine fidl_union_member[1, test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResponseInLine]
-    err fidl_union_member[2, int32]
-]
-test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResultOutOfLine [
-    responseOutOfLine test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResponseOutOfLine
-][varlen]
-test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResultHandles [
-    response test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResponseHandles
 ][varlen]
 test_bindingsdenylist_DenyEachBinding_OnlyDenyPython_ResultInLine [
     responseInLine fidl_union_member[1, test_bindingsdenylist_DenyEachBinding_OnlyDenyPython_ResponseInLine]
@@ -242,19 +214,6 @@ test_bindingsdenylist_DenyEachBindingOnlyDenyGoResponse {
 test_bindingsdenylist_DenyEachBindingOnlyDenyGoResponseHandles {
     void void
 } [packed]
-test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequest {
-    hdr fidl_message_header[2184115815603862302]
-    a int8
-} [packed]
-test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequestHandles {
-    void void
-} [packed]
-test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerResponse {
-    hdr fidl_message_header[2184115815603862302]
-} [packed]
-test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerResponseHandles {
-    void void
-} [packed]
 test_bindingsdenylist_DenyEachBindingOnlyDenyPythonRequest {
     hdr fidl_message_header[3010747198252652930]
     a int8
@@ -290,7 +249,6 @@ fdio_service_connect$test_bindingsdenylist_DenyEachBinding(path ptr[in, string["
 zx_channel_call$test_bindingsdenylist_DenyEachBindingOnlyDenyCpp(handle zx_chan_test_bindingsdenylist_DenyEachBinding_client, options const[0], deadline zx_time, args ptr[in, fidl_call_args[test_bindingsdenylist_DenyEachBindingOnlyDenyCppRequest, test_bindingsdenylist_DenyEachBindingOnlyDenyCppRequestHandles, array[int8, ZX_CHANNEL_MAX_MSG_BYTES], test_bindingsdenylist_DenyEachBindingOnlyDenyCppResponseHandles]], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
 zx_channel_call$test_bindingsdenylist_DenyEachBindingOnlyDenyDart(handle zx_chan_test_bindingsdenylist_DenyEachBinding_client, options const[0], deadline zx_time, args ptr[in, fidl_call_args[test_bindingsdenylist_DenyEachBindingOnlyDenyDartRequest, test_bindingsdenylist_DenyEachBindingOnlyDenyDartRequestHandles, array[int8, ZX_CHANNEL_MAX_MSG_BYTES], test_bindingsdenylist_DenyEachBindingOnlyDenyDartResponseHandles]], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
 zx_channel_call$test_bindingsdenylist_DenyEachBindingOnlyDenyGo(handle zx_chan_test_bindingsdenylist_DenyEachBinding_client, options const[0], deadline zx_time, args ptr[in, fidl_call_args[test_bindingsdenylist_DenyEachBindingOnlyDenyGoRequest, test_bindingsdenylist_DenyEachBindingOnlyDenyGoRequestHandles, array[int8, ZX_CHANNEL_MAX_MSG_BYTES], test_bindingsdenylist_DenyEachBindingOnlyDenyGoResponseHandles]], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
-zx_channel_call$test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzer(handle zx_chan_test_bindingsdenylist_DenyEachBinding_client, options const[0], deadline zx_time, args ptr[in, fidl_call_args[test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequest, test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequestHandles, array[int8, ZX_CHANNEL_MAX_MSG_BYTES], test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerResponseHandles]], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
 zx_channel_call$test_bindingsdenylist_DenyEachBindingOnlyDenyPython(handle zx_chan_test_bindingsdenylist_DenyEachBinding_client, options const[0], deadline zx_time, args ptr[in, fidl_call_args[test_bindingsdenylist_DenyEachBindingOnlyDenyPythonRequest, test_bindingsdenylist_DenyEachBindingOnlyDenyPythonRequestHandles, array[int8, ZX_CHANNEL_MAX_MSG_BYTES], test_bindingsdenylist_DenyEachBindingOnlyDenyPythonResponseHandles]], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
 zx_channel_call$test_bindingsdenylist_DenyEachBindingOnlyDenyRust(handle zx_chan_test_bindingsdenylist_DenyEachBinding_client, options const[0], deadline zx_time, args ptr[in, fidl_call_args[test_bindingsdenylist_DenyEachBindingOnlyDenyRustRequest, test_bindingsdenylist_DenyEachBindingOnlyDenyRustRequestHandles, array[int8, ZX_CHANNEL_MAX_MSG_BYTES], test_bindingsdenylist_DenyEachBindingOnlyDenyRustResponseHandles]], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
 

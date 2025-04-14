@@ -116,7 +116,7 @@ void gic_redistributor_sleep(bool sleep) {
     waker &= ~WAKER_PROCESSOR_SLEEP;
   }
   arm_gicv3_write32(GICR_WAKER(cpu), waker);
-  uint64_t val = sleep ? 1 : 0;
+  uint64_t val = sleep ? WAKER_CHILDREN_ASLEEP : 0;
   gic_wait_for_mask(GICR_WAKER(cpu), WAKER_CHILDREN_ASLEEP, val);
 }
 
@@ -128,6 +128,7 @@ void gic_init_percpu_early() {
 
   // redistributer config: configure sgi/ppi as non-secure group 1.
   arm_gicv3_write32(GICR_IGROUPR0(cpu), ~0);
+  arm_gicv3_write32(GICR_IGRPMOD0(cpu), 0);
   gic_wait_for_rwp(GICR_CTLR(cpu));
 
   // redistributer config: clear and mask sgi/ppi.

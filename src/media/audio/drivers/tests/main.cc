@@ -14,15 +14,18 @@
 
 namespace {
 
-constexpr std::string kHelpOption = "help";
-constexpr std::string kNoBluetoothOption = "no-bluetooth";
-constexpr std::string kNoVirtualAudioOption = "no-virtual";
-constexpr std::string kRunAdminTestsOption = "admin";
-constexpr std::string kRunPositionTestsOption = "position";
+inline constexpr std::string kHelpOption = "help";
+inline constexpr std::string kHelpOption2 = "?";
+inline constexpr std::string kNoBluetoothOption = "no-bluetooth";
+inline constexpr std::string kNoVirtualAudioOption = "no-virtual";
+inline constexpr std::string kRunBasicTestsOption = "basic";
+inline constexpr std::string kRunAdminTestsOption = "admin";
+inline constexpr std::string kRunPositionTestsOption = "position";
+inline constexpr std::string kRunAllTestsOption = "all";
 
 void usage(const std::string& prog_name) {
   printf("\n");
-  printf("Usage: %s [--option] [--option] [...]\n\n", prog_name.c_str());
+  printf("Usage: %s -- [--option] [--option] [...]\n\n", prog_name.c_str());
 
   printf("Test audio drivers via direct FIDL calls\n\n");
 
@@ -34,25 +37,27 @@ void usage(const std::string& prog_name) {
   printf("to audio drivers. For this reason, for devfs drivers it does not execute test cases\n");
   printf("that require exclusive (or 'admin') access -- unless explicitly directed to do so.\n\n");
 
-  printf("One subset of 'admin' tests is 'position' tests. The user should only execute these\n");
-  printf("test cases on systems with guaranteed real-time response, such as a non-emulated\n");
-  printf("environment running a release build with standard optimizations.\n\n");
+  printf("An additional set of privileged tests, not executed automatically with the other\n");
+  printf("'admin' test cases, is the 'position' tests. The user should only execute these cases\n");
+  printf("on a system with guaranteed real-time response, such as a non-emulated environment\n");
+  printf("running a release build with standard optimizations.\n\n");
 
   printf("Valid options:\n\n");
 
-  printf(
-      "  --%s\t\t   Do not test the Bluetooth helper library; only test drivers found in devfs\n",
-      kNoBluetoothOption.c_str());
+  printf("  --%s\t   Do not test the Bluetooth helper library; only test drivers found in devfs\n",
+         kNoBluetoothOption.c_str());
   printf("  --%s\t\t   Do not instantiate+test 'virtual_audio' instances\n",
          kNoVirtualAudioOption.c_str());
   printf("  \t\t\t   Note: this switch allows any ALREADY-RUNNING 'virtual_audio' instances to\n");
   printf("  \t\t\t   be detected in devfs and tested, like drivers for real physical devices\n");
-  printf("  --%s\t\t   For devfs drivers, also run tests that require exclusive driver access\n",
+  printf("  --%s\t\t   Run tests that can execute while an audio service (AudioCore or \n",
+         kRunBasicTestsOption.c_str());
+  printf("  \t\t\t    AudioDeviceRegistry) is running.\n");
+  printf("  --%s\t\t   Run admin tests (requires exclusive access - no audio service running)\n",
          kRunAdminTestsOption.c_str());
-  printf("  \t\t\t   (requires that neither AudioCore nor AudioDeviceRegistry are running)\n");
-  printf("  --%s\t   Also run position tests (assumes '--%s')\n", kRunPositionTestsOption.c_str(),
-         kRunAdminTestsOption.c_str());
-  printf("\n");
+  printf("  --%s\t\t   Run position tests (assumes 'release' with standard optimizations)\n",
+         kRunPositionTestsOption.c_str());
+  printf("  --%s, --%s\t\t   Show this message\n\n", kHelpOption.c_str(), kHelpOption2.c_str());
 }
 
 }  // namespace
@@ -63,7 +68,7 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  if (command_line.HasOption(kHelpOption)) {
+  if (command_line.HasOption(kHelpOption) || command_line.HasOption(kHelpOption2)) {
     std::string app_name, sub_str;
     std::stringstream ss(command_line.argv0());
     while (std::getline(ss, sub_str, '/')) {
@@ -74,7 +79,7 @@ int main(int argc, char** argv) {
   }
 
   fuchsia_logging::LogSettingsBuilder builder;
-  builder.WithTags({"audio_driver_tests"}).BuildAndInitialize();
+  builder.WithTags({command_line.argv0()}).BuildAndInitialize();
   testing::InitGoogleTest(&argc, argv);
 
   // --no-bluetooth: Only detect+test devices in devfs; don't add+test the Bluetooth audio library.
@@ -85,19 +90,26 @@ int main(int argc, char** argv) {
   //   virtual_audio instances are allowed and detected+tested like any other devfs device.
   bool no_virtual_audio = command_line.HasOption(kNoVirtualAudioOption);
 
-  // --admin: Validate commands that require exclusive access, such as SetFormat.
-  //   Otherwise, omit AdminTest cases if a device/driver is exposed in the device tree.
-  //   TODO(https://fxbug.dev/42175212): Enable AdminTests if no service is already connected to
-  //   the driver.
-  bool expect_audio_svcs_not_connected = command_line.HasOption(kRunAdminTestsOption);
+  // --basic: Validate commands that do not require exclusive access, such as SetFormat.
+  bool enable_basic_tests = command_line.HasOption(kRunBasicTestsOption);
+
+  // --admin: Run tests that require exclusive access to the driver (AdminTest cases).
+  //   TODO(https://fxbug.dev/42175212): Auto-detect whether a service is already connected to the
+  //   driver, and eliminate the 'basic ' and 'admin' flags.
+  bool enable_admin_tests = command_line.HasOption(kRunAdminTestsOption);
 
   // --position: Include audio position test cases (requires realtime capable system).
   bool enable_position_tests = command_line.HasOption(kRunPositionTestsOption);
 
+  // Currently, only used for local eng testing.
+  if (command_line.HasOption(kRunAllTestsOption)) {
+    enable_basic_tests = enable_admin_tests = enable_position_tests = true;
+  }
+
   media::audio::drivers::test::DeviceHost device_host;
-  // The default configuration for each of these four booleans is FALSE.
+  // The default configuration for each of these booleans is FALSE.
   device_host.AddDevices(no_bluetooth, no_virtual_audio);
-  device_host.RegisterTests(expect_audio_svcs_not_connected, enable_position_tests);
+  device_host.RegisterTests(enable_basic_tests, enable_admin_tests, enable_position_tests);
 
   auto ret = RUN_ALL_TESTS();
 

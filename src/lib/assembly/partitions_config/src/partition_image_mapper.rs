@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{Partition, PartitionsConfig, Slot};
+use crate::{Partition, PartitionsConfig, RecoveryStyle, Slot};
 use anyhow::{bail, Context, Result};
 use assembly_manifest::Image;
 use assembly_util::write_json_file;
@@ -79,37 +79,10 @@ pub struct PartitionImageMapper {
     recovery_style: RecoveryStyle,
 }
 
-#[derive(Debug, PartialEq)]
-enum RecoveryStyle {
-    /// No recovery images are present.
-    NoRecovery,
-    /// Recovery lives in a separate R slot.
-    R,
-    /// Recovery is updated alongside the "main" images in AB slots.
-    AB,
-}
-
 impl PartitionImageMapper {
     /// Construct a new mapper that targets the `partitions`.
     pub fn new(partitions: PartitionsConfig) -> Result<Self> {
-        // Determine which recovery style we will be using, and throw an error
-        // if we find both AB and R style recoveries.
-        let mut recovery_style = RecoveryStyle::NoRecovery;
-        for partition in &partitions.partitions {
-            if partition.slot() == Some(&Slot::R) {
-                if recovery_style == RecoveryStyle::AB {
-                    bail!("Partitions config cannot contain both AB and R slotted recoveries.");
-                }
-                recovery_style = RecoveryStyle::R;
-            }
-
-            if matches!(partition, Partition::RecoveryZBI { .. }) {
-                if recovery_style == RecoveryStyle::R {
-                    bail!("Partitions config cannot contain both AB and R slotted recoveries.");
-                }
-                recovery_style = RecoveryStyle::AB;
-            }
-        }
+        let recovery_style = partitions.recovery_style()?;
         Ok(Self { partitions, images: BTreeMap::new(), recovery_style })
     }
 

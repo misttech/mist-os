@@ -10,6 +10,7 @@
 {% if context.config.emit_debug_impls %}
     Debug,
 {% endif %}
+Default,
 )]
 pub struct {{ name }} {
     {% for member in table.members %}

@@ -87,9 +87,18 @@ if (current_toolchain == default_toolchain) {
             }
           }
 
-          # SDK root
+          # Some prebuilt tools in the IDK need to be specified in-tree
           sdk = {
-            root = "!!BUILD_DIR"
+            overrides = {
+              aemu_internal = rebase_path(
+                      "//prebuilt/third_party/android/aemu/release/linux-x64/emulator")
+              qemu_internal = rebase_path(
+                      "//prebuilt/third_party/qemu/linux-x64/bin/qemu-system-x86_64")
+              uefi_internal_x64 = rebase_path(
+                      "//prebuilt/third_party/edk2/qemu-x64/OVMF_CODE.fd")
+              uefi_internal_arm64 = rebase_path(
+                      "//prebuilt/third_party/edk2/qemu-arm64/QEMU_EFI.fd")
+            }
           }
 
           pbms = {
@@ -209,7 +218,6 @@ if (is_host) {
       "//sdk/ctf/tests/examples/host_tool:*",
       "//src/devices/bin/driver_tools/tests:*",
       "//src/tests/end_to_end/*",
-      "//third_party/antlion/*",
     ]
   }
 
@@ -277,6 +285,7 @@ if (is_host) {
 # NOTE: this group is included in `//src/developer:tests` and `//src:tests` which get added as
 # dependencies of the system image in infra builds. Tests which need to depend on a system image
 # should be added to `host_tests` below.
+# TODO(https://fxbug.dev/409023538): Rename this group and all group deps.
 group("tests") {
   testonly = true
   deps = [
@@ -294,6 +303,7 @@ group("tests") {
     "lib:tests($host_toolchain)",
     "playground:tests($host_toolchain)",
     "plugins/package:tests($host_toolchain)",
+    "plugins/target:tests($host_toolchain)",
     "plugins/trace:tests($host_toolchain)",
     "tests($host_toolchain)",
   ]
@@ -302,6 +312,7 @@ group("tests") {
 # NOTE: this group is for tests which need to transitively depend on a Fuchsia system image for
 # "e2e" testing of ffx behavior. These are included in `//bundles/buildbot/host` in order to prevent
 # dep cycles.
+# TODO(https://fxbug.dev/409023538): Rename this group and all group deps.
 if (is_host) {
   group("host_tests") {
     testonly = true

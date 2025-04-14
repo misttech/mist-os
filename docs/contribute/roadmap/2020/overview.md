@@ -11,7 +11,7 @@ The FIDL team is actively exploring the following projects:
 ### Unifying FIDL C++ bindings {#unifying-fidl-cpp-bindings}
 
 Currently, there are two FIDL binding implementations,
-[high-level C++ bindings (HLCPP)](/docs/reference/fidl/bindings/hlcpp-bindings.md)
+high-level C++ bindings (HLCPP)
 and
 [low-level C++ bindings (LLCPP)](/docs/reference/fidl/bindings/cpp-bindings.md).
 The FIDL team is exploring a solution that augments the LLCPP API surface to

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use tempfile::{NamedTempFile, TempDir};
 use tracing::level_filters::LevelFilter;
 
-use super::ExecutableKind;
+use super::{EnvVars, EnvironmentKind, ExecutableKind};
 
 /// A structure that holds information about the test config environment for the duration
 /// of a test. This object must continue to exist for the duration of the test, or the test
@@ -23,20 +23,21 @@ pub struct TestEnv {
     pub context: EnvironmentContext,
     pub isolate_root: TempDir,
     pub user_file: NamedTempFile,
+    pub build_file: Option<NamedTempFile>,
     pub global_file: NamedTempFile,
     pub log_subscriber: Arc<dyn tracing::Subscriber + Send + Sync>,
     _guard: async_lock::MutexGuardArc<()>,
 }
 
 impl TestEnv {
-    async fn new(guard: async_lock::MutexGuardArc<()>) -> Result<Self> {
+    async fn new(guard: async_lock::MutexGuardArc<()>, env_vars: EnvVars) -> Result<Self> {
         let env_file = NamedTempFile::new().context("tmp access failed")?;
         let isolate_root = tempfile::tempdir()?;
 
         let context = EnvironmentContext::isolated(
             ExecutableKind::Test,
             isolate_root.path().to_owned(),
-            HashMap::from_iter(std::env::vars()),
+            env_vars,
             ConfigMap::default(),
             Some(env_file.path().to_owned()),
             None,
@@ -45,14 +46,21 @@ impl TestEnv {
         Self::build_test_env(context, env_file, isolate_root, guard).await
     }
 
-    async fn new_intree(build_dir: &Path, guard: async_lock::MutexGuardArc<()>) -> Result<Self> {
+    async fn new_intree(
+        build_dir: &Path,
+        guard: async_lock::MutexGuardArc<()>,
+        env_vars: Option<EnvVars>,
+    ) -> Result<Self> {
         let env_file = NamedTempFile::new().context("tmp access failed")?;
         let isolate_root = tempfile::tempdir()?;
 
-        let context = EnvironmentContext::in_tree(
+        let context = EnvironmentContext::new(
+            EnvironmentKind::InTree {
+                tree_root: isolate_root.path().to_owned(),
+                build_dir: Some(PathBuf::from(build_dir)),
+            },
             ExecutableKind::Test,
-            isolate_root.path().to_owned(),
-            Some(PathBuf::from(build_dir)),
+            env_vars,
             ConfigMap::default(),
             Some(env_file.path().to_owned()),
             false,
@@ -70,6 +78,8 @@ impl TestEnv {
         let global_file_path = global_file.path().to_owned();
         let user_file = NamedTempFile::new().context("tmp access failed")?;
         let user_file_path = user_file.path().to_owned();
+        let build_file =
+            context.build_dir().and(Some(NamedTempFile::new().context("tmp access failed")?));
 
         let log_subscriber: Arc<dyn tracing::Subscriber + Send + Sync> =
             Arc::new(crate::logging::configure_subscribers(
@@ -95,6 +105,7 @@ impl TestEnv {
             env_file,
             context,
             user_file,
+            build_file,
             global_file,
             isolate_root,
             log_subscriber,
@@ -104,6 +115,10 @@ impl TestEnv {
         let mut env = Environment::new_empty(test_env.context.clone());
 
         env.set_user(Some(&user_file_path));
+        if let Some(ref build_file) = test_env.build_file {
+            let build_file_path = build_file.path().to_owned();
+            env.set_build(&build_file_path)?;
+        }
         env.set_global(Some(&global_file_path));
         env.save().await.context("saving env file")?;
 
@@ -144,7 +159,8 @@ lazy_static::lazy_static! {
 /// use this for tests. You must hold the returned object object for the duration of the test, not doing so
 /// will result in strange behaviour.
 pub async fn test_init() -> Result<TestEnv> {
-    let env = TestEnv::new(TEST_LOCK.lock_arc().await).await?;
+    let env =
+        TestEnv::new(TEST_LOCK.lock_arc().await, HashMap::from_iter(std::env::vars())).await?;
 
     // force an overwrite of the configuration setup
     crate::init(&env.context)?;
@@ -157,7 +173,26 @@ pub async fn test_init() -> Result<TestEnv> {
 /// You must hold the returned object object for the duration of the test, not doing so
 /// will result in strange behaviour.
 pub async fn test_init_in_tree(build_dir: &Path) -> Result<TestEnv> {
-    let env = TestEnv::new_intree(build_dir, TEST_LOCK.lock_arc().await).await?;
+    let env = TestEnv::new_intree(build_dir, TEST_LOCK.lock_arc().await, None).await?;
+
+    // force an overwrite of the configuration setup
+    crate::init(&env.context)?;
+
+    Ok(env)
+}
+
+/// Creates a test environment with custom environment variables which is either
+/// `EnvironmentKind::InTree` if `build_dir.is_some()`, otherwise
+/// `EnvironmentKind::Isolated`.
+/// You must hold the returned object object for the duration of the test, not doing so
+/// will result in strange behaviour.
+pub async fn test_init_with_env(env_vars: EnvVars, build_dir: Option<&Path>) -> Result<TestEnv> {
+    let env = match build_dir {
+        Some(build_dir) => {
+            TestEnv::new_intree(build_dir, TEST_LOCK.lock_arc().await, Some(env_vars)).await
+        }
+        None => TestEnv::new(TEST_LOCK.lock_arc().await, env_vars).await,
+    }?;
 
     // force an overwrite of the configuration setup
     crate::init(&env.context)?;

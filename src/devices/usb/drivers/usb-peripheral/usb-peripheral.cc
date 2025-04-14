@@ -190,8 +190,12 @@ zx_status_t UsbPeripheral::Init() {
     return status;
   }
 
-  auto serial = GetSerialNumber();
-  status = AllocStringDesc(serial, &device_desc_.i_serial_number);
+  zx::result serial = GetSerialNumber();
+  if (serial.is_error()) {
+    zxlogf(ERROR, "Failed to get serial number: %s", serial.status_string());
+    return serial.status_value();
+  }
+  status = AllocStringDesc(std::move(serial.value()), &device_desc_.i_serial_number);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to add serial number descriptor - %d", status);
     return status;
@@ -224,30 +228,37 @@ zx_status_t UsbPeripheral::Init() {
   return ZX_OK;
 }
 
-std::string UsbPeripheral::GetSerialNumber() {
+zx::result<std::string> UsbPeripheral::GetSerialNumber() {
   char buffer[256];
   size_t actual = 0;
   // Return serial number from metadata if present.
   auto status =
       device_get_metadata(parent(), DEVICE_METADATA_SERIAL_NUMBER, buffer, sizeof(buffer), &actual);
   if (status == ZX_OK) {
-    return {buffer, actual};
+    return zx::ok(std::string{buffer, actual});
   }
 
   // Use MAC address as the next option.
-  uint8_t raw_mac_addr[6];
-  status = device_get_metadata(parent(), DEVICE_METADATA_MAC_ADDRESS, &raw_mac_addr,
-                               sizeof(raw_mac_addr), &actual);
-
-  if (status == ZX_OK && actual == sizeof(raw_mac_addr)) {
-    snprintf(buffer, sizeof(buffer), "%02X%02X%02X%02X%02X%02X", raw_mac_addr[0], raw_mac_addr[1],
-             raw_mac_addr[2], raw_mac_addr[3], raw_mac_addr[4], raw_mac_addr[5]);
-    return {buffer};
+  zx::result result = ddk::GetMetadataIfExists<fuchsia_boot_metadata::MacAddressMetadata>(parent());
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to get MAC address metadata: %s", result.status_string());
+    return result.take_error();
+  }
+  if (result.value().has_value()) {
+    const auto& metadata = result.value().value();
+    if (!metadata.mac_address().has_value()) {
+      zxlogf(ERROR, "MAC address metadata missing mac_address field");
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    const auto& octets = metadata.mac_address().value().octets();
+    snprintf(buffer, sizeof(buffer), "%02X%02X%02X%02X%02X%02X", octets[0], octets[1], octets[2],
+             octets[3], octets[4], octets[5]);
+    return zx::ok(std::string{buffer});
   }
 
   zxlogf(INFO, "Serial number/MAC address not found. Using generic (non-unique) serial number.\n");
 
-  return std::string(kDefaultSerialNumber);
+  return zx::ok(std::string{kDefaultSerialNumber});
 }
 
 zx_status_t UsbPeripheral::AllocStringDesc(std::string desc, uint8_t* out_index) {

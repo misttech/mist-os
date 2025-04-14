@@ -8,13 +8,12 @@ mod fuchsia;
 #[cfg(target_os = "fuchsia")]
 pub use fuchsia::*;
 
-#[cfg(all(not(target_os = "fuchsia"), not(target_arch = "wasm32")))]
+#[cfg(not(target_os = "fuchsia"))]
 mod portable;
 
-#[cfg(all(not(target_os = "fuchsia"), not(target_arch = "wasm32")))]
+#[cfg(not(target_os = "fuchsia"))]
 pub use portable::*;
 
-#[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod udp_tests {
     use super::UdpSocket;

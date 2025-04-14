@@ -216,11 +216,14 @@ impl DriverHost {
         self.scope.spawn_local(async move {
             let driver = shutdown_event.await.unwrap();
             if let Some(this) = this.upgrade() {
-                let mut drivers = this.drivers.borrow_mut();
-                drivers.remove(&WeakDriver(driver));
+                let is_empty = {
+                    let mut drivers = this.drivers.borrow_mut();
+                    drivers.remove(&WeakDriver(driver));
+                    drivers.is_empty()
+                };
 
                 // If this is the last driver instance running, we should exit.
-                if drivers.is_empty() {
+                if is_empty {
                     // We only exit if we're not shutting down in order to match DFv1 behavior.
                     // TODO(https://fxbug.dev/42075187): We should always exit driver hosts when we
                     // get down to 0 drivers.
@@ -262,11 +265,14 @@ impl DriverHost {
         self.scope.spawn_local(async move {
             let driver = shutdown_event.await.unwrap();
             if let Some(this) = this.upgrade() {
-                let mut drivers = this.drivers.borrow_mut();
-                drivers.remove(&WeakDriver(driver));
+                let is_empty = {
+                    let mut drivers = this.drivers.borrow_mut();
+                    drivers.remove(&WeakDriver(driver));
+                    drivers.is_empty()
+                };
 
                 // If this is the last driver instance running, we should exit.
-                if drivers.is_empty() {
+                if is_empty {
                     if let Some(signaler) = this.no_more_drivers_signaler.borrow_mut().take() {
                         signaler.send(()).unwrap();
                     }
@@ -313,7 +319,11 @@ impl DriverHost {
                 });
                 log::error!("Driver exception in driver host: Driver url: {}", found.get_url());
             } else {
-                log::error!("Failed to validate driver with the driver host.");
+                log::warn!(
+                    "{} {}",
+                    "Failed to validate driver with the driver host.",
+                    "This might indicate exceptions in the driver's Stop() or destructor."
+                );
             }
         }
     }

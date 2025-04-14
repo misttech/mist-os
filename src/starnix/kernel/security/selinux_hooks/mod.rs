@@ -24,7 +24,7 @@ use selinux::policy::FsUseType;
 use selinux::{
     ClassPermission, CommonFilePermission, CommonFsNodePermission, DirPermission, FdPermission,
     FileClass, FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions, FsNodeClass,
-    InitialSid, Permission, ProcessPermission, SecurityId, SecurityServer,
+    InitialSid, KernelPermission, ProcessPermission, SecurityId, SecurityServer,
 };
 use starnix_logging::{track_stub, BugRef};
 use starnix_sync::Mutex;
@@ -37,7 +37,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, OnceLock};
 
 /// Returns the set of `Permissions` on `class`, corresponding to the specified `flags`.
-fn permissions_from_flags(flags: PermissionFlags, class: FsNodeClass) -> Vec<Permission> {
+fn permissions_from_flags(flags: PermissionFlags, class: FsNodeClass) -> Vec<KernelPermission> {
     let mut result = Vec::new();
     if flags.contains(PermissionFlags::READ) {
         result.push(CommonFsNodePermission::Read.for_class(class));
@@ -68,7 +68,7 @@ fn has_file_permissions(
     permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
     file: &FileObject,
-    permissions: &[Permission],
+    permissions: &[KernelPermission],
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
     // Validate that the `subject` has the "fd { use }" permission to the `file`.
@@ -109,7 +109,7 @@ fn todo_has_file_permissions(
     permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
     file: &FileObject,
-    permissions: &[Permission],
+    permissions: &[KernelPermission],
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
     // Validate that the `subject` has the "fd { use }" permission to the `file`.
@@ -151,7 +151,7 @@ fn has_fs_node_permissions(
     permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
     fs_node: &FsNode,
-    permissions: &[Permission],
+    permissions: &[KernelPermission],
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
     if Anon::is_private(fs_node) {
@@ -181,7 +181,7 @@ fn todo_has_fs_node_permissions(
     permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
     fs_node: &FsNode,
-    permissions: &[Permission],
+    permissions: &[KernelPermission],
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
     if Anon::is_private(fs_node) {
@@ -257,7 +257,7 @@ fn fs_node_effective_sid_and_class(fs_node: &FsNode) -> FsNodeSidAndClass {
 
 /// Perform the specified check as would `check_permission()`, but report denials as "todo_deny" in
 /// the audit output, without actually denying access.
-fn todo_check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
+fn todo_check_permission<P: ClassPermission + Into<KernelPermission> + Clone + 'static>(
     bug: BugRef,
     kernel: &Kernel,
     permission_check: &PermissionCheck<'_>,
@@ -288,7 +288,7 @@ fn todo_check_permission<P: ClassPermission + Into<Permission> + Clone + 'static
 }
 
 /// Checks whether `source_sid` is allowed the specified `permission` on `target_sid`.
-fn check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
+fn check_permission<P: ClassPermission + Into<KernelPermission> + Clone + 'static>(
     permission_check: &PermissionCheck<'_>,
     source_sid: SecurityId,
     target_sid: SecurityId,
@@ -312,7 +312,7 @@ fn check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
 }
 
 /// Checks that `subject_sid` has the specified process `permission` on `self`.
-fn check_self_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
+fn check_self_permission<P: ClassPermission + Into<KernelPermission> + Clone + 'static>(
     permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
     permission: P,

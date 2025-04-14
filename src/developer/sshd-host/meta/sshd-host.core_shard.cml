@@ -113,7 +113,6 @@
                 "fuchsia.kernel.Stats",
                 "fuchsia.kernel.TracingResource",
                 "fuchsia.kernel.VmexResource",
-                "fuchsia.logger.Log",
                 "fuchsia.paver.Paver",
                 "fuchsia.pkg.PackageCache",
                 "fuchsia.power.clientlevel.Connector",

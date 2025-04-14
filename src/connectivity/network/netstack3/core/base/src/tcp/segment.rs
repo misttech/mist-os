@@ -28,12 +28,12 @@ use super::seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize};
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Segment<P> {
     /// The non-payload information of the segment.
-    pub header: SegmentHeader,
+    header: SegmentHeader,
     /// The data carried by the segment.
     ///
     /// It is guaranteed that data.len() plus the length of the control flag
     /// (SYN or FIN) is <= MAX_PAYLOAD_AND_CONTROL_LEN
-    pub data: P,
+    data: P,
 }
 
 /// All non-data portions of a TCP segment.
@@ -47,6 +47,8 @@ pub struct SegmentHeader {
     pub wnd: UnscaledWindowSize,
     /// The control flag of the segment.
     pub control: Option<Control>,
+    /// Indicates whether the PSH bit is set.
+    pub push: bool,
     /// Options carried by this segment.
     pub options: Options,
 }
@@ -100,6 +102,13 @@ impl Options {
         match self {
             Self::Handshake(h) => Some(h),
             Self::Segment(_) => None,
+        }
+    }
+
+    fn as_segment(&self) -> Option<&SegmentOptions> {
+        match self {
+            Self::Handshake(_) => None,
+            Self::Segment(s) => Some(s),
         }
     }
 
@@ -181,6 +190,14 @@ impl Options {
     pub fn sack_permitted(&self) -> bool {
         self.as_handshake().is_some_and(|o| o.sack_permitted)
     }
+
+    /// Returns the segment's selective ack blocks.
+    ///
+    /// Returns a reference to empty blocks if this is not [`Options::Segment`].
+    pub fn sack_blocks(&self) -> &SackBlocks {
+        const EMPTY_REF: &'static SackBlocks = &SackBlocks::EMPTY;
+        self.as_segment().map(|s| &s.sack_blocks).unwrap_or(EMPTY_REF)
+    }
 }
 
 /// Segment options only set on handshake.
@@ -228,6 +245,9 @@ const MAX_SACK_BLOCKS: usize = 4;
 pub struct SackBlocks(ArrayVec<TcpSackBlock, MAX_SACK_BLOCKS>);
 
 impl SackBlocks {
+    /// A constant empty instance of SACK blocks.
+    pub const EMPTY: Self = SackBlocks(ArrayVec::new_const());
+
     /// The maximum number of selective ack blocks that can be in a TCP segment.
     ///
     /// See [RFC 2018 section 3].
@@ -271,22 +291,25 @@ impl SackBlocks {
         Self(blocks.iter().take(Self::MAX_BLOCKS).copied().collect())
     }
 
-    /// Creates a new [`SackBlocks`] option from an iterator of [`SackBlock`].
-    ///
-    /// Ignores any blocks past [`SackBlocks::MAX_BLOCKS`].
-    pub fn from_iter(iter: impl IntoIterator<Item = SackBlock>) -> Self {
-        Self(
-            iter.into_iter()
-                .take(Self::MAX_BLOCKS)
-                .map(|block| TcpSackBlock::from(block))
-                .collect(),
-        )
+    /// Returns `true` if there are no blocks present.
+    pub fn is_empty(&self) -> bool {
+        let Self(inner) = self;
+        inner.is_empty()
     }
 
     /// Drops all blocks.
     pub fn clear(&mut self) {
         let Self(inner) = self;
         inner.clear()
+    }
+}
+
+/// Creates a new [`SackBlocks`] option from an iterator of [`SackBlock`].
+///
+/// Ignores any blocks past [`SackBlocks::MAX_BLOCKS`].
+impl FromIterator<SackBlock> for SackBlocks {
+    fn from_iter<T: IntoIterator<Item = SackBlock>>(iter: T) -> Self {
+        Self(iter.into_iter().take(Self::MAX_BLOCKS).map(|b| b.into()).collect())
     }
 }
 
@@ -314,6 +337,16 @@ mod sack_block {
             } else {
                 Err(InvalidSackBlockError(left, right))
             }
+        }
+
+        /// Creates a new [`SackBlock`] without checking that `right` is
+        /// strictly after `left`.
+        ///
+        /// # Safety
+        ///
+        /// Caller must guarantee that `right.after(left)`.
+        pub unsafe fn new_unchecked(left: SeqNum, right: SeqNum) -> Self {
+            Self { left, right }
         }
 
         /// Consumes this [`SackBlock`] returning a [`Range`] representation.
@@ -390,22 +423,20 @@ pub const MAX_PAYLOAD_AND_CONTROL_LEN: usize = 1 << 31;
 const MAX_PAYLOAD_AND_CONTROL_LEN_U32: u32 = MAX_PAYLOAD_AND_CONTROL_LEN as u32;
 
 impl<P: Payload> Segment<P> {
-    /// Creates a new segment with data and options.
+    /// Creates a new segment with the provided header and data.
     ///
     /// Returns the segment along with how many bytes were removed to make sure
     /// sequence numbers don't wrap around, i.e., `seq.before(seq + seg.len())`.
-    pub fn with_data_options(
-        seq: SeqNum,
-        ack: Option<SeqNum>,
-        control: Option<Control>,
-        wnd: UnscaledWindowSize,
-        data: P,
-        options: Options,
-    ) -> (Self, usize) {
+    pub fn new(header: SegmentHeader, data: P) -> (Self, usize) {
+        let SegmentHeader { seq, ack, wnd, control, push, options } = header;
         let has_control_len = control.map(Control::has_sequence_no).unwrap_or(false);
 
+        let data_len = data.len();
         let discarded_len =
-            data.len().saturating_sub(MAX_PAYLOAD_AND_CONTROL_LEN - usize::from(has_control_len));
+            data_len.saturating_sub(MAX_PAYLOAD_AND_CONTROL_LEN - usize::from(has_control_len));
+
+        // Only keep the PSH bit if data is not empty.
+        let push = push && data_len != 0;
 
         let (control, data) = if discarded_len > 0 {
             // If we have to truncate the segment, the FIN flag must be removed
@@ -423,23 +454,26 @@ impl<P: Payload> Segment<P> {
         };
 
         (
-            Segment { header: SegmentHeader { seq, ack, wnd, control, options }, data: data },
+            Segment { header: SegmentHeader { seq, ack, wnd, control, push, options }, data: data },
             discarded_len,
         )
     }
 
-    /// Creates a new segment with data.
-    ///
-    /// Returns the segment along with how many bytes were removed to make sure
-    /// sequence numbers don't wrap around, i.e., `seq.before(seq + seg.len())`.
-    pub fn with_data(
-        seq: SeqNum,
-        ack: Option<SeqNum>,
-        control: Option<Control>,
-        wnd: UnscaledWindowSize,
-        data: P,
-    ) -> (Self, usize) {
-        Self::with_data_options(seq, ack, control, wnd, data, Options::default())
+    /// Returns a borrow of the segment's header.
+    pub fn header(&self) -> &SegmentHeader {
+        &self.header
+    }
+
+    /// Returns a borrow of the data payload in this segment.
+    pub fn data(&self) -> &P {
+        &self.data
+    }
+
+    /// Destructures self into its inner parts: The segment header and the data
+    /// payload.
+    pub fn into_parts(self) -> (SegmentHeader, P) {
+        let Self { header, data } = self;
+        (header, data)
     }
 
     /// Maps the payload in the segment with `f`.
@@ -460,7 +494,8 @@ impl<P: Payload> Segment<P> {
     /// Returns the part of the incoming segment within the receive window.
     pub fn overlap(self, rnxt: SeqNum, rwnd: WindowSize) -> Option<Segment<P>> {
         let len = self.len();
-        let Segment { header: SegmentHeader { seq, ack, wnd, control, options }, data } = self;
+        let Segment { header: SegmentHeader { seq, ack, wnd, control, options, push }, data } =
+            self;
 
         // RFC 793 (https://tools.ietf.org/html/rfc793#page-69):
         //   There are four cases for the acceptability test for an incoming
@@ -536,34 +571,24 @@ impl<P: Payload> Segment<P> {
                 }
             };
             Segment {
-                header: SegmentHeader { seq: new_seq, ack, wnd, control: new_control, options },
+                header: SegmentHeader {
+                    seq: new_seq,
+                    ack,
+                    wnd,
+                    control: new_control,
+                    options,
+                    push,
+                },
                 data: new_data,
             }
         })
     }
 
     /// Creates a segment with no data.
-    pub fn new(
-        seq: SeqNum,
-        ack: Option<SeqNum>,
-        control: Option<Control>,
-        wnd: UnscaledWindowSize,
-    ) -> Self {
-        Self::with_options(seq, ack, control, wnd, Options::default())
-    }
-
-    /// Creates a new segment with options but no data.
-    pub fn with_options(
-        seq: SeqNum,
-        ack: Option<SeqNum>,
-        control: Option<Control>,
-        wnd: UnscaledWindowSize,
-        options: Options,
-    ) -> Self {
+    pub fn new_empty(header: SegmentHeader) -> Self {
         // All of the checks on lengths are optimized out:
         // https://godbolt.org/z/KPd537G6Y
-        let (seg, truncated) =
-            Segment::with_data_options(seq, ack, control, wnd, P::new_empty(), options);
+        let (seg, truncated) = Self::new(header, P::new_empty());
         debug_assert_eq!(truncated, 0);
         seg
     }
@@ -580,27 +605,62 @@ impl<P: Payload> Segment<P> {
         wnd: UnscaledWindowSize,
         options: Options,
     ) -> Self {
-        Segment::with_options(seq, Some(ack), None, wnd, options)
+        Segment::new_empty(SegmentHeader {
+            seq,
+            ack: Some(ack),
+            wnd,
+            control: None,
+            push: false,
+            options,
+        })
     }
 
     /// Creates a SYN segment.
     pub fn syn(seq: SeqNum, wnd: UnscaledWindowSize, options: Options) -> Self {
-        Segment::with_options(seq, None, Some(Control::SYN), wnd, options)
+        Segment::new_empty(SegmentHeader {
+            seq,
+            ack: None,
+            wnd,
+            control: Some(Control::SYN),
+            push: false,
+            options,
+        })
     }
 
     /// Creates a SYN-ACK segment.
     pub fn syn_ack(seq: SeqNum, ack: SeqNum, wnd: UnscaledWindowSize, options: Options) -> Self {
-        Segment::with_options(seq, Some(ack), Some(Control::SYN), wnd, options)
+        Segment::new_empty(SegmentHeader {
+            seq,
+            ack: Some(ack),
+            wnd,
+            control: Some(Control::SYN),
+            push: false,
+            options,
+        })
     }
 
     /// Creates a RST segment.
     pub fn rst(seq: SeqNum) -> Self {
-        Segment::new(seq, None, Some(Control::RST), UnscaledWindowSize::from(0))
+        Segment::new_empty(SegmentHeader {
+            seq,
+            ack: None,
+            wnd: UnscaledWindowSize::from(0),
+            control: Some(Control::RST),
+            push: false,
+            options: Options::default(),
+        })
     }
 
     /// Creates a RST-ACK segment.
     pub fn rst_ack(seq: SeqNum, ack: SeqNum) -> Self {
-        Segment::new(seq, Some(ack), Some(Control::RST), UnscaledWindowSize::from(0))
+        Segment::new_empty(SegmentHeader {
+            seq,
+            ack: Some(ack),
+            wnd: UnscaledWindowSize::from(0),
+            control: Some(Control::RST),
+            push: false,
+            options: Options::default(),
+        })
     }
 }
 
@@ -649,6 +709,7 @@ impl SegmentHeader {
             }
             .control()?,
             wnd: UnscaledWindowSize::from(builder.window_size()),
+            push: builder.psh_set(),
             options: options,
         })
     }
@@ -811,13 +872,16 @@ impl<'a> TryFrom<TcpSegment<&'a [u8]>> for Segment<&'a [u8]> {
     fn try_from(from: TcpSegment<&'a [u8]>) -> Result<Self, Self::Error> {
         let syn = from.syn();
         let options = Options::from_iter(syn, from.iter_options());
-        let (to, discarded) = Segment::with_data_options(
-            from.seq_num().into(),
-            from.ack_num().map(Into::into),
-            Flags { syn, fin: from.fin(), rst: from.rst() }.control()?,
-            UnscaledWindowSize::from(from.window_size()),
+        let (to, discarded) = Segment::new(
+            SegmentHeader {
+                seq: from.seq_num().into(),
+                ack: from.ack_num().map(Into::into),
+                wnd: UnscaledWindowSize::from(from.window_size()),
+                control: Flags { syn, fin: from.fin(), rst: from.rst() }.control()?,
+                push: from.psh(),
+                options,
+            },
             from.into_body(),
-            options,
         );
         debug_assert_eq!(discarded, 0);
         Ok(to)
@@ -859,26 +923,66 @@ where
     }
 }
 
-#[cfg(feature = "testutils")]
+#[cfg(any(test, feature = "testutils"))]
 mod testutils {
     use super::*;
+
+    /// Provide a handy default implementation for tests only.
+    impl Default for SegmentHeader {
+        fn default() -> Self {
+            Self {
+                seq: SeqNum::new(0),
+                ack: None,
+                control: None,
+                wnd: UnscaledWindowSize::from(0),
+                options: Options::default(),
+                push: false,
+            }
+        }
+    }
+
+    impl<P: Payload> Segment<P> {
+        /// Like [`Segment::new`] but asserts that no bytes were discarded from
+        /// `data`.
+        #[track_caller]
+        pub fn new_assert_no_discard(header: SegmentHeader, data: P) -> Self {
+            let (seg, discard) = Self::new(header, data);
+            assert_eq!(discard, 0);
+            seg
+        }
+    }
 
     impl<'a> Segment<&'a [u8]> {
         /// Create a new segment with the given seq, ack, and data.
         pub fn with_fake_data(seq: SeqNum, ack: SeqNum, data: &'a [u8]) -> Self {
-            let (segment, discarded) =
-                Self::with_data(seq, Some(ack), None, UnscaledWindowSize::from(u16::MAX), data);
-            assert_eq!(discarded, 0);
-            segment
+            Self::new_assert_no_discard(
+                SegmentHeader {
+                    seq,
+                    ack: Some(ack),
+                    control: None,
+                    wnd: UnscaledWindowSize::from(u16::MAX),
+                    options: Options::default(),
+                    push: false,
+                },
+                data,
+            )
         }
     }
 
     impl<P: Payload> Segment<P> {
         /// Creates a new segment with the provided data.
-        pub fn data(seq: SeqNum, ack: SeqNum, wnd: UnscaledWindowSize, data: P) -> Segment<P> {
-            let (seg, truncated) = Segment::with_data(seq, Some(ack), None, wnd, data);
-            assert_eq!(truncated, 0);
-            seg
+        pub fn with_data(seq: SeqNum, ack: SeqNum, wnd: UnscaledWindowSize, data: P) -> Segment<P> {
+            Segment::new_assert_no_discard(
+                SegmentHeader {
+                    seq,
+                    ack: Some(ack),
+                    control: None,
+                    wnd,
+                    push: false,
+                    options: Options::default(),
+                },
+                data,
+            )
         }
 
         /// Creates a new FIN segment with the provided data.
@@ -888,15 +992,29 @@ mod testutils {
             wnd: UnscaledWindowSize,
             data: P,
         ) -> Segment<P> {
-            let (seg, truncated) =
-                Segment::with_data(seq, Some(ack), Some(Control::FIN), wnd, data);
-            assert_eq!(truncated, 0);
-            seg
+            Segment::new_assert_no_discard(
+                SegmentHeader {
+                    seq,
+                    ack: Some(ack),
+                    control: Some(Control::FIN),
+                    wnd,
+                    push: false,
+                    options: Options::default(),
+                },
+                data,
+            )
         }
 
         /// Creates a new FIN segment.
         pub fn fin(seq: SeqNum, ack: SeqNum, wnd: UnscaledWindowSize) -> Self {
-            Segment::new(seq, Some(ack), Some(Control::FIN), wnd)
+            Segment::new_empty(SegmentHeader {
+                seq,
+                ack: Some(ack),
+                control: Some(Control::FIN),
+                wnd,
+                push: false,
+                options: Options::default(),
+            })
         }
     }
 }
@@ -921,11 +1039,15 @@ mod test {
     #[test_case(Some(Control::RST), &[][..] => (0, &[][..]); "empty slice with rst")]
     #[test_case(Some(Control::RST), &[1][..] => (1, &[1][..]); "non-empty slice with rst")]
     fn segment_len(control: Option<Control>, data: &[u8]) -> (u32, &[u8]) {
-        let (seg, truncated) = Segment::with_data(
-            SeqNum::new(1),
-            Some(SeqNum::new(1)),
-            control,
-            UnscaledWindowSize::from(0),
+        let (seg, truncated) = Segment::new(
+            SegmentHeader {
+                seq: SeqNum::new(1),
+                ack: Some(SeqNum::new(1)),
+                wnd: UnscaledWindowSize::from(0),
+                control,
+                push: false,
+                options: Options::default(),
+            },
             data,
         );
         assert_eq!(truncated, 0);
@@ -1007,11 +1129,15 @@ mod test {
     #[test_case(u32::MAX as usize, Some(Control::SYN)
     => (MAX_PAYLOAD_AND_CONTROL_LEN - 1, Some(Control::SYN), 1 << 31))]
     fn segment_truncate(len: usize, control: Option<Control>) -> (usize, Option<Control>, usize) {
-        let (seg, truncated) = Segment::with_data(
-            SeqNum::new(0),
-            None,
-            control,
-            UnscaledWindowSize::from(0),
+        let (seg, truncated) = Segment::new(
+            SegmentHeader {
+                seq: SeqNum::new(0),
+                ack: None,
+                wnd: UnscaledWindowSize::from(0),
+                control,
+                push: false,
+                options: Options::default(),
+            },
             TestPayload::new(len),
         );
         (seg.data.len(), seg.header.control, truncated)
@@ -1209,11 +1335,15 @@ mod test {
     fn segment_overlap(
         OverlapTestArgs { seg_seq, control, data_len, rcv_nxt, rcv_wnd }: OverlapTestArgs,
     ) -> Option<(SeqNum, Option<Control>, Range<u32>)> {
-        let (seg, discarded) = Segment::with_data(
-            SeqNum::new(seg_seq),
-            None,
-            control,
-            UnscaledWindowSize::from(0),
+        let (seg, discarded) = Segment::new(
+            SegmentHeader {
+                seq: SeqNum::new(seg_seq),
+                ack: None,
+                control,
+                wnd: UnscaledWindowSize::from(0),
+                push: false,
+                options: Options::default(),
+            },
             TestPayload(0..data_len),
         );
         assert_eq!(discarded, 0);
@@ -1257,6 +1387,7 @@ mod test {
             wnd: UnscaledWindowSize::from(3u16),
             control: Some(Control::SYN),
             options: HandshakeOptions::default().into(),
+            push: false,
         };
 
         assert_eq!(converted_header, expected_header);
@@ -1295,6 +1426,7 @@ mod test {
             ack: Some(SeqNum::new(2)),
             wnd: UnscaledWindowSize::from(3u16),
             control: Some(Control::SYN),
+            push: false,
             options: HandshakeOptions {
                 mss: Some(Mss(NonZeroU16::new(1024).unwrap())),
                 window_scale: Some(WindowScale::new(10).unwrap()),
@@ -1308,8 +1440,9 @@ mod test {
 
     #[ip_test(I)]
     fn from_segment_builder_with_options_segment<I: TestIpExt>() {
-        let builder =
+        let mut builder =
             TcpSegmentBuilder::new(I::SRC_IP, I::DST_IP, SRC_PORT, DST_PORT, 1, Some(2), 3);
+        builder.psh(true);
 
         let sack_blocks = [TcpSackBlock::new(1, 2), TcpSackBlock::new(4, 6)];
         let builder =
@@ -1324,6 +1457,7 @@ mod test {
             ack: Some(SeqNum::new(2)),
             wnd: UnscaledWindowSize::from(3u16),
             control: None,
+            push: true,
             options: SegmentOptions {
                 sack_blocks: SackBlocks::from_iter([
                     SackBlock::try_new(SeqNum::new(1), SeqNum::new(2)).unwrap(),
@@ -1434,5 +1568,17 @@ mod test {
             SackBlock::try_new(SeqNum::new(0), SeqNum::new(0u32.wrapping_sub(1))),
             Err(InvalidSackBlockError(SeqNum::new(0), SeqNum::new(0u32.wrapping_sub(1))))
         );
+    }
+
+    #[test]
+    fn psh_bit_cleared_if_no_data() {
+        let seg =
+            Segment::new_assert_no_discard(SegmentHeader { push: true, ..Default::default() }, ());
+        assert_eq!(seg.header().push, false);
+        let seg = Segment::new_assert_no_discard(
+            SegmentHeader { push: true, ..Default::default() },
+            &[1u8, 2, 3, 4][..],
+        );
+        assert_eq!(seg.header().push, true);
     }
 }

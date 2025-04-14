@@ -24,6 +24,7 @@ rustc_library("ebpf") {
     "src/memio/${current_cpu}.rs",
     "src/memio/mod.rs",
     "src/program.rs",
+    "src/scalar_value.rs",
     "src/verifier.rs",
     "src/visitor.rs",
   ]
@@ -32,6 +33,7 @@ rustc_library("ebpf") {
     "//src/starnix/lib/linux_uapi",
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:derivative",
+    "//third_party/rust_crates:paste",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:zerocopy",
@@ -53,6 +55,7 @@ rustc_library("ebpf") {
 
   inputs = [
     "src/test_grammar.pest",
+    "src/tests/access_with_check.data",
     "src/tests/err_offset_overflow.data",
     "src/tests/err_read_only_helper.data",
     "src/tests/err_write_r10.data",
@@ -60,6 +63,7 @@ rustc_library("ebpf") {
     "src/tests/forget_release.data",
     "src/tests/malloc_double_free.data",
     "src/tests/malloc_use_free.data",
+    "src/tests/null_checks_multiple.data",
     "src/tests/null_checks_propagated.data",
     "src/tests/packet_access.data",
     "src/tests/read_only_helper.data",

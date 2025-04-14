@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.aliases"]
+_ir_path = get_fidl_ir_map()["test.aliases"]
 add_ir_path(_ir_path)
 
 import fidl_test_someotherlibrary
@@ -20,18 +21,16 @@ import fidl_test_someotherlibrary
 
 @dataclass
 class ExampleOfUseOfAliases:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    field_of_u32: int | None
-    field_of_vec_of_strings: typing.Sequence[str] | None
-    field_of_vec_of_strings_at_most_nine: typing.Sequence[str] | None
-    field_of_vec_of_strings_at_most_5: typing.Sequence[str] | None
+    field_of_u32: int
+    field_of_vec_of_strings: typing.Sequence[str]
+    field_of_vec_of_strings_at_most_nine: typing.Sequence[str]
+    field_of_vec_of_strings_at_most_5: typing.Sequence[str]
     field_of_vec_of_ref_me_at_most_5: typing.Sequence[
         fidl_test_someotherlibrary.ReferenceMe
-    ] | None
-    field_of_channel: int | None
-    field_of_client_end: int | None
-    field_of_nullable_client_end: typing.Optional[int] | None
+    ]
+    field_of_channel: int
+    field_of_client_end: int
+    field_of_nullable_client_end: typing.Optional[int]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ExampleOfUseOfAliases"
@@ -50,18 +49,20 @@ class ExampleOfUseOfAliases:
             self, "test.aliases", "test.aliases/ExampleOfUseOfAliases"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "field_of_u32": None,
-                "field_of_vec_of_strings": None,
-                "field_of_vec_of_strings_at_most_nine": None,
-                "field_of_vec_of_strings_at_most_5": None,
-                "field_of_vec_of_ref_me_at_most_5": None,
-                "field_of_channel": None,
-                "field_of_client_end": None,
-                "field_of_nullable_client_end": None,
+                "field_of_u32": None,  # type: ignore[arg-type,unused-ignore]
+                "field_of_vec_of_strings": None,  # type: ignore[arg-type,unused-ignore]
+                "field_of_vec_of_strings_at_most_nine": None,  # type: ignore[arg-type,unused-ignore]
+                "field_of_vec_of_strings_at_most_5": None,  # type: ignore[arg-type,unused-ignore]
+                "field_of_vec_of_ref_me_at_most_5": None,  # type: ignore[arg-type,unused-ignore]
+                "field_of_channel": None,  # type: ignore[arg-type,unused-ignore]
+                "field_of_client_end": None,  # type: ignore[arg-type,unused-ignore]
+                "field_of_nullable_client_end": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 

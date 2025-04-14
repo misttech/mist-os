@@ -624,37 +624,47 @@ using fxt::Scope;
 using fxt::operator""_category;
 using fxt::operator""_intern;
 
-class KTrace {
+enum class BufferMode {
+  kSingle,
+  kPerCpu,
+};
+
+template <BufferMode Mode>
+class KTraceImpl {
  public:
   // Initializes the KTrace instance. Calling any other function on KTrace before calling Init
   // should be a no-op.
-  void Init(uint32_t bufsize, uint32_t initial_grpmask) {
-    cpu_context_map_.Init();
-    internal_state_.Init(bufsize, initial_grpmask);
-  }
+  void Init(uint32_t bufsize, uint32_t initial_grpmask);
 
-  // Control is responsible for probing, starting, stopping, or rewinding the ktrace buffer.
+  // Control is responsible for starting, stopping, or rewinding the ktrace buffer.
   //
   // The meaning of the options changes based on the action. If the action is to start tracing,
   // then the options field functions as the group mask.
-  zx_status_t Control(uint32_t action, uint32_t options);
+  zx_status_t Control(uint32_t action, uint32_t options) {
+    switch (action) {
+      case KTRACE_ACTION_START:
+      case KTRACE_ACTION_START_CIRCULAR:
+        return Start(action, options ? options : KTRACE_GRP_ALL);
+      case KTRACE_ACTION_STOP:
+        return Stop();
+      case KTRACE_ACTION_REWIND:
+        return Rewind();
+      default:
+        return ZX_ERR_INVALID_ARGS;
+    }
+  }
 
   // ReadUser reads len bytes from the ktrace buffer starting at offset off into the given user
   // buffer.
   //
   // On success, this function returns the number of bytes that were read into the buffer.
   // On failure, a zx_status_t error code is returned.
-  zx::result<size_t> ReadUser(user_out_ptr<void> ptr, uint32_t off, size_t len) {
-    const ssize_t ret = internal_state_.ReadUser(ptr, off, len);
-    if (ret < 0) {
-      return zx::error(static_cast<zx_status_t>(ret));
-    }
-    return zx::ok(ret);
-  }
+  zx::result<size_t> ReadUser(user_out_ptr<void> ptr, uint32_t off, size_t len);
 
   // Reserve reserves a slot in the ring buffer to write a record into.
-  using PendingCommit = internal::KTraceState::PendingCommit;
-  zx::result<PendingCommit> Reserve(uint64_t header) { return internal_state_.Reserve(header); }
+  using PendingCommit =
+      std::conditional_t<Mode == BufferMode::kSingle, internal::KTraceState::PendingCommit, void>;
+  zx::result<PendingCommit> Reserve(uint64_t header);
 
   // Sentinel type for unused arguments.
   struct Unused {};
@@ -674,7 +684,7 @@ class KTrace {
   static zx_instant_boot_ticks_t Timestamp() { return current_boot_ticks(); }
 
   static bool CategoryEnabled(const fxt::InternedCategory& category) {
-    return GetInstance().internal_state_.IsCategoryEnabled(category);
+    return GetInstance().IsCategoryEnabled(category);
   }
 
   // Generates an instant event record that contains the given arguments if the kernel:probe
@@ -683,7 +693,7 @@ class KTrace {
     if (CategoryEnabled("kernel:probe"_category)) {
       const fxt::StringRef name_ref = fxt::StringRef{label};
       fxt::WriteInstantEventRecord(
-          &GetInstance(), KTrace::Timestamp(), ThreadRefFromContext(context),
+          &GetInstance(), KTraceImpl::Timestamp(), ThreadRefFromContext(context),
           fxt::StringRef{"kernel:probe"_category.label()}, name_ref,
           fxt::Argument{"arg0"_intern, a}, fxt::Argument{"arg1"_intern, b});
     }
@@ -835,7 +845,7 @@ class KTrace {
   }
 
   // Retrieves a reference to the global KTrace instance.
-  static KTrace& GetInstance() { return instance_; }
+  static KTraceImpl& GetInstance() { return instance_; }
 
   // Retrieves the pseudo-KOID generated for the given CPU number.
   static zx_koid_t GetCpuKoid(cpu_num_t cpu_num) {
@@ -846,15 +856,18 @@ class KTrace {
   constexpr static fxt::Koid kNoProcess{0u};
 
  private:
+  friend class KTraceTests;
+
   // Set this class up as a singleton by:
   // * Making the constructor and destructor private
   // * Preventing copies and moves
-  constexpr KTrace() = default;
-  ~KTrace() = default;
-  KTrace(const KTrace&) = delete;
-  KTrace& operator=(const KTrace&) = delete;
-  KTrace(KTrace&&) = delete;
-  KTrace& operator=(KTrace&&) = delete;
+  constexpr explicit KTraceImpl(bool disable_diagnostic_logs = false)
+      : disable_diagnostic_logs_(disable_diagnostic_logs) {}
+  ~KTraceImpl() = default;
+  KTraceImpl(const KTraceImpl&) = delete;
+  KTraceImpl& operator=(const KTraceImpl&) = delete;
+  KTraceImpl(KTraceImpl&&) = delete;
+  KTraceImpl& operator=(KTraceImpl&&) = delete;
 
   // Maintains the mapping from CPU numbers to pre-allocated KOIDs.
   class CpuContextMap {
@@ -897,13 +910,97 @@ class KTrace {
   }
 
   // The global KTrace singleton.
-  static KTrace instance_;
+  static inline KTraceImpl instance_;
 
-  // The internal ring buffer implementation. It also currently Stops, Starts, and Rewinds tracing.
-  internal::KTraceState internal_state_;
+  // A small printf stand-in which gives tests the ability to disable diagnostic
+  // printing during testing.
+  int DiagsPrintf(int level, const char* fmt, ...) const __PRINTFLIKE(3, 4) {
+    if (!disable_diagnostic_logs_ && DPRINTF_ENABLED_FOR_LEVEL(level)) {
+      va_list args;
+      va_start(args, fmt);
+      int result = vprintf(fmt, args);
+      va_end(args);
+      return result;
+    }
+    return 0;
+  }
+
+  // Start collecting trace data.
+  // `action` must be one of KTRACE_ACTION_START or KTRACE_ACTION_START_CIRCULAR.
+  // `categories` is the set of categories to trace. Cannot be zero.
+  // TODO(https://fxbug.dev/404539312): The `action` argument is unnecessary once we switch to
+  // the per-CPU streaming implementation by default.
+  zx_status_t Start(uint32_t action, uint32_t categories);
+  // Stop collecting trace data.
+  zx_status_t Stop();
+  // Rewinds the buffer, meaning that all contained trace data is dropped and the buffer is reset
+  // to its initial state.
+  zx_status_t Rewind();
+
+  // Returns true if the given category is enabled for tracing.
+  bool IsCategoryEnabled(const fxt::InternedCategory& category) const {
+    const uint32_t bit_number = category.index();
+    if (bit_number == fxt::InternedCategory::kInvalidIndex) {
+      return false;
+    }
+    const uint32_t bitmask = 1u << bit_number;
+    return (bitmask & categories_bitmask()) != 0;
+  }
+
+  // Getter and setter for the categories bitmask.
+  // These use acquire-release semantics because the order in which we set the bitmask matters.
+  // Specifically, when starting a trace, we want to ensure that all of the trace metadata that we
+  // emit (such as thread and process names, among other things) happens-before we allow trace
+  // records from arbitrary categories to enter the trace buffer. Without this affordance, it is
+  // possible for trace records from other categories to fill up the buffer and cause the metadata
+  // to be dropped, which would make the trace hard to understand.
+  uint32_t categories_bitmask() const {
+    return categories_bitmask_.load(ktl::memory_order_acquire);
+  }
+  void set_categories_bitmask(uint32_t new_mask) {
+    categories_bitmask_.store(new_mask, ktl::memory_order_release);
+  }
+
+  // Enables writes to the ktrace buffer.
+  // This uses release semantics to synchronize with writers when they check if writes are enabled,
+  // which in turn ensures that operations to initialize the buffer during Init are not reordered
+  // after the call to EnableWrites. Without this synchronization, it would be possible for a writer
+  // to begin a write before the backing buffer has been allocated.
+  void EnableWrites() { writes_enabled_.store(true, ktl::memory_order_release); }
+
+  // Disables writes to the ktrace buffer and wait for any ongoing writes to complete.
+  void DisableWrites();
+
+  // Returns true if writes are currently enabled.
+  // This uses acquire semantics to ensure that it synchronizes with EnableWrites as described in
+  // that method comment.
+  bool WritesEnabled() const { return writes_enabled_.load(ktl::memory_order_acquire); }
+
   // A mapping of KOIDs to CPUs, used to annotate trace records.
   CpuContextMap cpu_context_map_;
+  // A bitmask of categories to trace. Bits set to 1 indicate a category that should be traced.
+  ktl::atomic<uint32_t> categories_bitmask_{0};
+  // True if diagnostic log messages should not be printed. Set to true in tests to avoid logspam.
+  const bool disable_diagnostic_logs_{false};
+
+  // The internal ring buffer implementation when using BufferMode::kSingle.
+  internal::KTraceState internal_state_;
+
+  //
+  // The following fields are only used when using BufferMode::kPerCpu.
+  //
+
+  // Stores whether writes are currently enabled.
+  ktl::atomic<bool> writes_enabled_{false};
 };
+
+// Utilize the per-CPU implementation of ktrace if streaming has been enabled.
+// Otherwise, default to using the single buffer version.
+#if EXPERIMENTAL_KTRACE_STREAMING_ENABLED
+using KTrace = KTraceImpl<BufferMode::kPerCpu>;
+#else
+using KTrace = KTraceImpl<BufferMode::kSingle>;
+#endif
 
 void ktrace_report_live_threads();
 void ktrace_report_live_processes();

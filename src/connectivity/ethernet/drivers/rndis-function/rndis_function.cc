@@ -5,9 +5,9 @@
 #include "src/connectivity/ethernet/drivers/rndis-function/rndis_function.h"
 
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/compat/cpp/metadata.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <zircon/status.h>
 
 #include <algorithm>
@@ -29,7 +29,7 @@ void RndisFunction::UsbFunctionInterfaceGetDescriptors(uint8_t* out_descriptors_
 
 std::optional<std::vector<uint8_t>> RndisFunction::QueryOid(uint32_t oid, void* input,
                                                             size_t length) {
-  zxlogf(INFO, "Query OID %x", oid);
+  fdf::info("Query OID {}", oid);
   std::optional<std::vector<uint8_t>> response;
   switch (oid) {
     case OID_GEN_SUPPORTED_LIST: {
@@ -204,7 +204,7 @@ std::optional<std::vector<uint8_t>> RndisFunction::QueryOid(uint32_t oid, void* 
       break;
   }
   if (!response.has_value()) {
-    zxlogf(WARNING, "Did not generate a response to OID query %x.", oid);
+    fdf::warn("Did not generate a response to OID query {}.", oid);
   }
   return response;
 }
@@ -231,26 +231,26 @@ zx_status_t RndisFunction::SetOid(uint32_t oid, const uint8_t* buffer, size_t le
       }
 
       if (indicate_status) {
-        zxlogf(ERROR, "IndidcateStatus from SetOid");
+        fdf::error("IndidcateStatus from SetOid");
         IndicateConnectionStatus(true);
       } else {
-        zxlogf(ERROR, "No IndidcateStatus from SetOid");
+        fdf::error("No IndidcateStatus from SetOid");
       }
       return ZX_OK;
     }
     case OID_802_3_MULTICAST_LIST: {
       // Ignore
-      zxlogf(WARNING, "Host set multicast list (buffer len %zd).", length);
+      fdf::warn("Host set multicast list (buffer len {}).", length);
       return ZX_OK;
     }
     default:
-      zxlogf(WARNING, "Unhandled OID: %x", oid);
+      fdf::warn("Unhandled OID: {}", oid);
       return ZX_ERR_NOT_SUPPORTED;
   }
 }
 
 std::vector<uint8_t> InvalidMessageResponse(const void* invalid_data, size_t size) {
-  zxlogf(WARNING, "Host sent an invalid message.");
+  fdf::warn("Host sent an invalid message.");
 
   std::vector<uint8_t> buffer(sizeof(rndis_indicate_status) + sizeof(rndis_diagnostic_info) + size);
 
@@ -387,12 +387,12 @@ zx_status_t RndisFunction::HandleCommand(const void* buffer, size_t size) {
 
       auto init = static_cast<const rndis_init*>(buffer);
       if (init->major_version != RNDIS_MAJOR_VERSION) {
-        zxlogf(WARNING, "Invalid RNDIS major version. Expected %x, got %x.", RNDIS_MAJOR_VERSION,
-               init->major_version);
+        fdf::warn("Invalid RNDIS major version. Expected {}, got {}.", RNDIS_MAJOR_VERSION,
+                  init->major_version);
         response.emplace(InitResponse(init->request_id, RNDIS_STATUS_NOT_SUPPORTED));
       } else if (init->minor_version != RNDIS_MINOR_VERSION) {
-        zxlogf(WARNING, "Invalid RNDIS minor version. Expected %x, got %x.", RNDIS_MINOR_VERSION,
-               init->minor_version);
+        fdf::warn("Invalid RNDIS minor version. Expected {}, got {}.", RNDIS_MINOR_VERSION,
+                  init->minor_version);
         response.emplace(InitResponse(init->request_id, RNDIS_STATUS_NOT_SUPPORTED));
       }
 
@@ -446,7 +446,7 @@ zx_status_t RndisFunction::HandleCommand(const void* buffer, size_t size) {
     case RNDIS_HALT_MSG: {
       zx_status_t status = Halt();
       if (status != ZX_OK) {
-        zxlogf(WARNING, "Failed to handle HALT command: %s", zx_status_get_string(status));
+        fdf::warn("Failed to handle HALT command: {}", zx_status_get_string(status));
       }
       break;
     }
@@ -457,10 +457,10 @@ zx_status_t RndisFunction::HandleCommand(const void* buffer, size_t size) {
     case RNDIS_PACKET_MSG:
       // The should only send packets on the data channel.
       // TODO: How should we respond to this?
-      zxlogf(WARNING, "Host sent a data packet on the control channel.");
+      fdf::warn("Host sent a data packet on the control channel.");
       break;
     default:
-      zxlogf(WARNING, "Host sent an unrecognised message: %x.", header->msg_type);
+      fdf::warn("Host sent an unrecognised message: {}.", header->msg_type);
       response.emplace(InvalidMessageResponse(buffer, size));
       break;
   }
@@ -492,15 +492,15 @@ zx_status_t ErrorResponse(void* buffer, size_t size, size_t* actual) {
 zx_status_t RndisFunction::HandleResponse(void* buffer, size_t size, size_t* actual) {
   fbl::AutoLock lock(&lock_);
   if (control_responses_.empty()) {
-    zxlogf(WARNING, "Host tried to read a control response when none was available.");
+    fdf::warn("Host tried to read a control response when none was available.");
     return ErrorResponse(buffer, size, actual);
   }
 
   auto packet = control_responses_.front();
   if (size < packet.size()) {
-    zxlogf(WARNING,
-           "Buffer too small to read a control response. Packet size is %zd but the buffer is %zd.",
-           packet.size(), size);
+    fdf::warn(
+        "Buffer too small to read a control response. Packet size is {} but the buffer is {}.",
+        packet.size(), size);
     return ErrorResponse(buffer, size, actual);
   }
 
@@ -517,17 +517,17 @@ zx_status_t RndisFunction::Halt() {
   fbl::AutoLock lock(&lock_);
   zx_status_t status = function_.DisableEp(NotificationAddress());
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to disable control endpoint: %s", zx_status_get_string(status));
+    fdf::error("Failed to disable control endpoint: {}", zx_status_get_string(status));
     return status;
   }
   status = function_.DisableEp(BulkInAddress());
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to disable data in endpoint: %s", zx_status_get_string(status));
+    fdf::error("Failed to disable data in endpoint: {}", zx_status_get_string(status));
     return status;
   }
   status = function_.DisableEp(BulkOutAddress());
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to disable data out endpoint: %s", zx_status_get_string(status));
+    fdf::error("Failed to disable data out endpoint: {}", zx_status_get_string(status));
     return status;
   }
   return ZX_OK;
@@ -562,7 +562,7 @@ zx_status_t RndisFunction::UsbFunctionInterfaceControl(const usb_setup_t* setup,
     }
     zx_status_t status = HandleCommand(write_buffer, write_size);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Error handling command: %s", zx_status_get_string(status));
+      fdf::error("Error handling command: {}", zx_status_get_string(status));
       return status;
     }
     return ZX_OK;
@@ -576,8 +576,8 @@ zx_status_t RndisFunction::UsbFunctionInterfaceControl(const usb_setup_t* setup,
     return status;
   }
 
-  zxlogf(WARNING, "Unrecognised control interface transfer: bm_request_type %x b_request %x",
-         setup->bm_request_type, setup->b_request);
+  fdf::warn("Unrecognised control interface transfer: bm_request_type {} b_request {}",
+            setup->bm_request_type, setup->b_request);
   return ZX_ERR_NOT_SUPPORTED;
 }
 
@@ -588,18 +588,18 @@ zx_status_t RndisFunction::UsbFunctionInterfaceSetConfigured(bool configured, us
 
   zx_status_t status = function_.ConfigEp(&descriptors_.notification_ep, nullptr);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to configure control endpoint: %s", zx_status_get_string(status));
+    fdf::error("Failed to configure control endpoint: {}", zx_status_get_string(status));
     return status;
   }
 
   status = function_.ConfigEp(&descriptors_.in_ep, nullptr);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to configure bulk in endpoint: %s", zx_status_get_string(status));
+    fdf::error("Failed to configure bulk in endpoint: {}", zx_status_get_string(status));
     return status;
   }
   status = function_.ConfigEp(&descriptors_.out_ep, nullptr);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to configure bulk out endpoint: %s", zx_status_get_string(status));
+    fdf::error("Failed to configure bulk out endpoint: {}", zx_status_get_string(status));
     return status;
   }
 
@@ -687,7 +687,7 @@ void RndisFunction::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* net
   std::optional<usb::Request<>> request;
   request = free_write_pool_.Get(usb::Request<>::RequestSize(usb_request_size_));
   if (!request) {
-    zxlogf(DEBUG, "No available TX requests");
+    fdf::debug("No available TX requests");
     op.Complete(ZX_ERR_SHOULD_WAIT);
     transmit_no_buffer_ += 1;
     return;
@@ -703,7 +703,7 @@ void RndisFunction::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* net
   size_t offset = 0;
   ssize_t copied = request->CopyTo(&header, sizeof(header), 0);
   if (copied < 0) {
-    zxlogf(ERROR, "Failed to copy TX header: %zd", copied);
+    fdf::error("Failed to copy TX header: {}", copied);
     op.Complete(ZX_ERR_INTERNAL);
     transmit_errors_ += 1;
     free_write_pool_.Add(*std::move(request));
@@ -715,7 +715,7 @@ void RndisFunction::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* net
   size_t result = request->CopyTo(op.operation()->data_buffer, length, offset);
   ZX_ASSERT(result == length);
   if (copied < 0) {
-    zxlogf(ERROR, "Failed to copy TX data: %zd", copied);
+    fdf::error("Failed to copy TX data: {}", copied);
     op.Complete(ZX_ERR_INTERNAL);
     transmit_errors_ += 1;
     free_write_pool_.Add(*std::move(request));
@@ -740,7 +740,7 @@ void RndisFunction::ReceiveLocked(usb::Request<>& request) {
   uint8_t* data;
   zx_status_t status = request.Mmap(reinterpret_cast<void**>(&data));
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map RX data: %s", zx_status_get_string(status));
+    fdf::error("Failed to map RX data: {}", zx_status_get_string(status));
     receive_errors_ += 1;
     return;
   }
@@ -749,30 +749,30 @@ void RndisFunction::ReceiveLocked(usb::Request<>& request) {
   while (remaining >= sizeof(rndis_packet_header)) {
     const auto* header = reinterpret_cast<const rndis_packet_header*>(data);
     if (header->msg_type != RNDIS_PACKET_MSG) {
-      zxlogf(WARNING, "Received invalid packet type %x.", header->msg_type);
-      zxlogf(WARNING, "header length %lu.", request.request()->header.length);
-      zxlogf(WARNING, "actual size %lu.", response.actual);
-      zxlogf(WARNING, "header->msg_length %u.", header->msg_length);
-      zxlogf(WARNING, "header->data_offset %x.", header->data_offset);
+      fdf::warn("Received invalid packet type {}.", header->msg_type);
+      fdf::warn("header length {}.", request.request()->header.length);
+      fdf::warn("actual size {}.", response.actual);
+      fdf::warn("header->msg_length {}.", header->msg_length);
+      fdf::warn("header->data_offset {}.", header->data_offset);
       receive_errors_ += 1;
       return;
     }
     if (header->msg_length > remaining) {
-      zxlogf(WARNING, "Received packet with invalid length %u: only %zd bytes left in frame.",
-             header->msg_length, remaining);
+      fdf::warn("Received packet with invalid length {}: only {} bytes left in frame.",
+                header->msg_length, remaining);
       receive_errors_ += 1;
       return;
     }
     if (header->msg_length < sizeof(rndis_packet_header)) {
-      zxlogf(WARNING, "Received packet with invalid length %u: less than header length.",
-             header->msg_length);
+      fdf::warn("Received packet with invalid length {}: less than header length.",
+                header->msg_length);
       receive_errors_ += 1;
       return;
     }
     if (header->data_offset > header->msg_length - offsetof(rndis_packet_header, data_offset) ||
         header->data_length >
             header->msg_length - offsetof(rndis_packet_header, data_offset) - header->data_offset) {
-      zxlogf(WARNING, "Received packet with invalid data.");
+      fdf::warn("Received packet with invalid data.");
       receive_errors_ += 1;
       return;
     }
@@ -782,10 +782,10 @@ void RndisFunction::ReceiveLocked(usb::Request<>& request) {
     receive_ok_ += 1;
 
     if (header->oob_data_offset != 0) {
-      zxlogf(WARNING, "Packet contained unsupported out of band data.");
+      fdf::warn("Packet contained unsupported out of band data.");
     }
     if (header->per_packet_info_offset != 0) {
-      zxlogf(WARNING, "Packet contained unsupported per packet information.");
+      fdf::warn("Packet contained unsupported per packet information.");
     }
 
     data = data + header->msg_length;
@@ -811,9 +811,9 @@ void RndisFunction::ReadComplete(usb_request_t* usb_request) {
   }
 
   if (usb_request->response.status == ZX_ERR_IO_REFUSED) {
-    zxlogf(ERROR, "ReadComplete refused");
+    fdf::error("ReadComplete refused");
   } else if (usb_request->response.status != ZX_OK) {
-    zxlogf(ERROR, "ReadComplete not ok");
+    fdf::error("ReadComplete not ok");
   } else if (ifc_.is_valid()) {
     ReceiveLocked(request);
   }
@@ -838,7 +838,7 @@ void RndisFunction::NotifyLocked() {
   std::optional<usb::Request<>> request;
   request = free_notify_pool_.Get(usb::Request<>::RequestSize(usb_request_size_));
   if (!request) {
-    zxlogf(ERROR, "No notify request available");
+    fdf::error("No notify request available");
     return;
   }
   pending_requests_++;
@@ -850,7 +850,7 @@ void RndisFunction::NotifyLocked() {
 
   ssize_t copied = request->CopyTo(&notification, sizeof(notification), 0);
   if (copied < 0) {
-    zxlogf(ERROR, "Failed to copy notification");
+    fdf::error("Failed to copy notification");
     pending_requests_--;
     free_notify_pool_.Add(*std::move(request));
     return;
@@ -913,7 +913,27 @@ void RndisFunction::NotificationComplete(usb_request_t* usb_request) {
   free_notify_pool_.Add(std::move(request));
 }
 
-zx_status_t RndisFunction::Bind() {
+zx::result<> RndisFunction::Start() {
+  zx::result<ddk::UsbFunctionProtocolClient> function =
+      compat::ConnectBanjo<ddk::UsbFunctionProtocolClient>(incoming());
+  if (function.is_error()) {
+    fdf::error("Failed to connect to usb function protocol: {}", function);
+    return function.take_error();
+  }
+  function_ = std::move(function.value());
+
+  compat::DeviceServer::BanjoConfig config{.default_proto_id = ZX_PROTOCOL_ETHERNET_IMPL};
+  config.callbacks[ZX_PROTOCOL_ETHERNET_IMPL] = ethernet_impl_banjo_server_.callback();
+  config.callbacks[ZX_PROTOCOL_USB_FUNCTION] = usb_function_interface_banjo_server_.callback();
+
+  zx::result<> result =
+      compat_server_.Initialize(incoming(), outgoing(), node_name(), kChildNodeName,
+                                compat::ForwardMetadata::None(), std::move(config));
+  if (result.is_error()) {
+    fdf::error("Failed to initialize compat server: {}", result);
+    return result.take_error();
+  }
+
   descriptors_.assoc = usb_interface_assoc_descriptor_t{
       .b_length = sizeof(usb_interface_assoc_descriptor_t),
       .b_descriptor_type = USB_DT_INTERFACE_ASSOCIATION,
@@ -1003,33 +1023,33 @@ zx_status_t RndisFunction::Bind() {
   zx_status_t status = function_.AllocStringDesc("RNDIS Communications Control",
                                                  &descriptors_.communication_interface.i_interface);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate string descriptor: %s", zx_status_get_string(status));
-    return status;
+    fdf::error("Failed to allocate string descriptor: {}", zx_status_get_string(status));
+    return zx::error(status);
   }
 
   status =
       function_.AllocStringDesc("RNDIS Ethernet Data", &descriptors_.data_interface.i_interface);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate string descriptor: %s", zx_status_get_string(status));
-    return status;
+    fdf::error("Failed to allocate string descriptor: {}", zx_status_get_string(status));
+    return zx::error(status);
   }
 
   status = function_.AllocStringDesc("RNDIS", &descriptors_.assoc.i_function);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate string descriptor: %s", zx_status_get_string(status));
-    return status;
+    fdf::error("Failed to allocate string descriptor: {}", zx_status_get_string(status));
+    return zx::error(status);
   }
 
   status = function_.AllocInterface(&descriptors_.communication_interface.b_interface_number);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate communication interface: %s", zx_status_get_string(status));
-    return status;
+    fdf::error("Failed to allocate communication interface: {}", zx_status_get_string(status));
+    return zx::error(status);
   }
 
   status = function_.AllocInterface(&descriptors_.data_interface.b_interface_number);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate data interface: %s", zx_status_get_string(status));
-    return status;
+    fdf::error("Failed to allocate data interface: {}", zx_status_get_string(status));
+    return zx::error(status);
   }
   descriptors_.assoc.b_first_interface = descriptors_.communication_interface.b_interface_number;
   descriptors_.cdc_union.bControlInterface =
@@ -1038,33 +1058,35 @@ zx_status_t RndisFunction::Bind() {
 
   status = function_.AllocEp(USB_DIR_OUT, &descriptors_.out_ep.b_endpoint_address);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate bulk out interface: %s", zx_status_get_string(status));
-    return status;
+    fdf::error("Failed to allocate bulk out interface: {}", zx_status_get_string(status));
+    return zx::error(status);
   }
 
   status = function_.AllocEp(USB_DIR_IN, &descriptors_.in_ep.b_endpoint_address);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate bulk in interface: %s", zx_status_get_string(status));
-    return status;
+    fdf::error("Failed to allocate bulk in interface: {}", zx_status_get_string(status));
+    return zx::error(status);
   }
 
   status = function_.AllocEp(USB_DIR_IN, &descriptors_.notification_ep.b_endpoint_address);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate notification interface: %s", zx_status_get_string(status));
-    return status;
+    fdf::error("Failed to allocate notification interface: {}", zx_status_get_string(status));
+    return zx::error(status);
   }
 
-  size_t actual;
-  status = DdkGetMetadata(DEVICE_METADATA_MAC_ADDRESS, mac_addr_.data(), mac_addr_.size(), &actual);
-  if (status != ZX_OK || actual != mac_addr_.size()) {
-    zxlogf(WARNING, "CDC: MAC address metadata not found. Generating random address");
+  zx::result metadata = compat::GetMetadata<std::array<uint8_t, ETH_MAC_SIZE>>(
+      incoming(), DEVICE_METADATA_MAC_ADDRESS);
+  if (metadata.is_ok()) {
+    mac_addr_ = *std::move(metadata.value());
+  } else {
+    fdf::warn("Generating random address: Failed to get MAC address: {}", metadata);
 
     zx_cprng_draw(mac_addr_.data(), mac_addr_.size());
     mac_addr_[0] = 0x02;
   }
 
-  zxlogf(INFO, "MAC address: %02x:%02x:%02x:%02x:%02x:%02x", mac_addr_[0], mac_addr_[1],
-         mac_addr_[2], mac_addr_[3], mac_addr_[4], mac_addr_[5]);
+  fdf::info("MAC address: {:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}", mac_addr_[0], mac_addr_[1],
+            mac_addr_[2], mac_addr_[3], mac_addr_[4], mac_addr_[5]);
 
   usb_request_size_ = function_.GetRequestSize();
 
@@ -1074,8 +1096,8 @@ zx_status_t RndisFunction::Bind() {
     status = usb::Request<>::Alloc(&request, kNotificationMaxPacketSize, NotificationAddress(),
                                    usb_request_size_);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Allocating notify request failed %d", status);
-      return status;
+      fdf::error("Allocating notify request failed: {}", status);
+      return zx::error(status);
     }
     free_notify_pool_.Add(*std::move(request));
   }
@@ -1085,8 +1107,8 @@ zx_status_t RndisFunction::Bind() {
     status =
         usb::Request<>::Alloc(&request, RNDIS_MAX_XFER_SIZE, BulkOutAddress(), usb_request_size_);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Allocating reads failed %d", status);
-      return status;
+      fdf::error("Allocating reads failed: {}", status);
+      return zx::error(status);
     }
     free_read_pool_.Add(*std::move(request));
   }
@@ -1096,26 +1118,30 @@ zx_status_t RndisFunction::Bind() {
     status =
         usb::Request<>::Alloc(&request, RNDIS_MAX_XFER_SIZE, BulkInAddress(), usb_request_size_);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Allocating writes failed %d", status);
-      return status;
+      fdf::error("Allocating writes failed: {}", status);
+      return zx::error(status);
     }
     free_write_pool_.Add(*std::move(request));
   }
 
   status = loop_.StartThread("rndis-function");
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to start thread: %s", zx_status_get_string(status));
-    return status;
+    fdf::error("Failed to start thread: {}", zx_status_get_string(status));
+    return zx::error(status);
   }
 
-  status = DdkAdd("rndis-function");
-  if (status != ZX_OK) {
-    return status;
+  std::vector offers = compat_server_.CreateOffers2();
+  zx::result child =
+      AddChild(kChildNodeName, std::vector<fuchsia_driver_framework::NodeProperty2>{}, offers);
+  if (child.is_error()) {
+    fdf::error("Failed to add child: {}", child);
+    return child.take_error();
   }
+  child_ = std::move(child.value());
 
   function_.SetInterface(this, &usb_function_interface_protocol_ops_);
 
-  return ZX_OK;
+  return zx::ok();
 }
 
 void RndisFunction::Shutdown() {
@@ -1135,50 +1161,21 @@ void RndisFunction::Shutdown() {
     lock.release();
     ShutdownComplete();
   } else {
-    zxlogf(ERROR, "Shutdown with %zd pending", pending_requests_);
+    fdf::error("Shutdown with {} pending", pending_requests_);
   }
 }
 
 void RndisFunction::ShutdownComplete() {
-  if (shutdown_callback_.has_value()) {
-    (*shutdown_callback_)();
+  if (prepare_stop_completer_.has_value()) {
+    std::move(prepare_stop_completer_).value()(zx::ok());
   } else {
-    zxlogf(WARNING, "ShutdownComplete called but there was no shutdown callback");
+    fdf::warn("ShutdownComplete called but there was no shutdown callback");
   }
 }
 
-void RndisFunction::DdkUnbind(ddk::UnbindTxn txn) {
-  if (shutdown_callback_.has_value()) {
-    txn.Reply();
-    return;
-  }
-  shutdown_callback_.emplace([unbind_txn = std::move(txn)]() mutable { unbind_txn.Reply(); });
+void RndisFunction::PrepareStop(fdf::PrepareStopCompleter completer) {
+  prepare_stop_completer_.emplace(std::move(completer));
   Shutdown();
 }
 
-void RndisFunction::DdkSuspend(ddk::SuspendTxn txn) {
-  shutdown_callback_.emplace(
-      [suspend_txn = std::move(txn)]() mutable { suspend_txn.Reply(ZX_OK, 0); });
-  Shutdown();
-}
-
-void RndisFunction::DdkRelease() { delete this; }
-
-zx_status_t RndisFunction::Create(void* ctx, zx_device_t* parent) {
-  auto device = std::make_unique<RndisFunction>(parent);
-
-  device->Bind();
-
-  // Intentionally leak this device because it's owned by the driver framework.
-  [[maybe_unused]] auto unused = device.release();
-  return ZX_OK;
-}
-
-static zx_driver_ops_t rndis_function_driver_ops = []() -> zx_driver_ops_t {
-  zx_driver_ops_t ops{};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = RndisFunction::Create;
-  return ops;
-}();
-
-ZIRCON_DRIVER(rndis_function, rndis_function_driver_ops, "fuchsia", "0.1");
+FUCHSIA_DRIVER_EXPORT(RndisFunction);

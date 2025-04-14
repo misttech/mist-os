@@ -154,8 +154,7 @@ void PhysMain(void* ptr, arch::EarlyTicks ticks) {
   InitStdout();
 
   constexpr dcfg_simple_t kXyzConfig = {.mmio_phys=0x1234000};
-  static uart::xyz::KernelDriver<> uart(kXyzConfig);
-  SetUartConsole(uart.uart());
+  SetUartConsole(uart::Config<MyDriver>{kXyzConfig});
 
   printf("hello world!\n");
 

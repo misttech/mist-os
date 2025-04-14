@@ -10,6 +10,20 @@ assert(
     is_fuchsia,
     "Product definitions and assemblies should only be defined in the fuchsia toolchain")
 
+group("minimal") {
+  testonly = true
+  if (current_cpu == "x64") {
+    deps = [ ":product_bundle.x64" ]
+  } else if (current_cpu == "arm64") {
+    deps = [
+      ":product_bundle.arm64",
+      ":product_bundle.vim3",
+    ]
+  } else if (current_cpu == "riscv64") {
+    deps = [ ":product_bundle.riscv64" ]
+  }
+}
+
 if (current_cpu == "x64") {
   bazel_product_bundle("product_bundle.x64") {
     testonly = true

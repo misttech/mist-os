@@ -525,9 +525,11 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     }
     if (layer.image_metadata.dimensions.width != display_width ||
         layer.image_metadata.dimensions.height != display_height) {
-      fdf::warn("CheckConfig failure: image metadata dimensions {}x{} do not match {}x{} display",
-                layer.image_metadata.dimensions.width, layer.image_metadata.dimensions.height,
-                display_width, display_height);
+      // TODO(https://fxbug.dev/409473403): Restore to `warn` level once the infrastructure issue
+      // is resolved.
+      fdf::debug("CheckConfig failure: image metadata dimensions {}x{} do not match {}x{} display",
+                 layer.image_metadata.dimensions.width, layer.image_metadata.dimensions.height,
+                 display_width, display_height);
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
     if (memcmp(&layer.display_destination, &display_area, sizeof(rect_u_t)) != 0) {

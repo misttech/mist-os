@@ -186,14 +186,14 @@ impl EmulatorEngine for QemuEngine {
     /// Currently this is done by getting the default CLI which is for x64 images, and then
     /// replacing it if the guest OS is arm64.
     /// TODO(http://fxdev.bug/98862): Improve the SDK metadata to have multiple binaries per tool.
-    async fn load_emulator_binary(&mut self) -> Result<()> {
+    fn load_emulator_binary(&mut self) -> Result<()> {
         let cli_name = match self.data.get_emulator_configuration().device.cpu.architecture {
             CpuArchitecture::Arm64 => Some("qemu-system-aarch64"),
             CpuArchitecture::Riscv64 => Some("qemu-system-riscv64"),
             _ => None,
         };
 
-        let qemu_x64_path = match get_host_tool(QEMU_TOOL).await {
+        let qemu_x64_path = match get_host_tool(QEMU_TOOL) {
             Ok(qemu_path) => qemu_path.canonicalize().map_err(|e| {
                 bug!("Failed to canonicalize the path to the emulator binary: {qemu_path:?}: {e}")
             })?,

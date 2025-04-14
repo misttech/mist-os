@@ -14,7 +14,7 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any
 
-import fidl.fuchsia_wlan_sme as fidl_sme
+import fidl_fuchsia_wlan_sme as fidl_sme
 from fuchsia_controller_py import Channel
 
 

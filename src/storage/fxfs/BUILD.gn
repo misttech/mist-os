@@ -199,7 +199,6 @@ rustc_binary("fxfs") {
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fuchsia",
-    "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-runtime",
     "//src/lib/trace/rust:trace-provider",
     "//src/storage/fxfs/platform",
@@ -223,6 +222,11 @@ rustc_binary("fxfs") {
   _concurrent_jobs = concurrent_jobs.link_highmem
   configs += _concurrent_jobs.configs
   forward_variables_from(_concurrent_jobs.vars, "*")
+
+  # Fxfs depends on the vfs rlib instead of the dylib for performance. If any dependency of fxfs
+  # depends on the vfs dylib then all of the vfs' dependencies will be dynamically linked in fxfs
+  # which degrades performance.
+  assert_no_deps = [ "//src/storage/lib/vfs/rust:vfs" ]
 }
 
 fuchsia_component("fxfs_component") {

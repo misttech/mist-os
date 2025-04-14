@@ -390,12 +390,10 @@ open protocol Directory {
     });
 
     /// DEPRECATED - Use `fuchsia.io/Directory.Open` instead.
-    // TODO(https://fxbug.dev/324080864): Remove when we no longer have clients that depend on it.
-    // We may need to transition this to a flexible method to facilitate graceful removal, but this
-    // requires we fully drop io1 support in Go first (Go bindings do not support flexible methods).
+    // TODO(https://fxbug.dev/324080864): Mark this as removed at NEXT when we ship API level 27.
     @available(added=NEXT)
     @selector("fuchsia.io1/Directory.Open")
-    strict DeprecatedOpen(resource struct {
+    flexible DeprecatedOpen(resource struct {
         flags OpenFlags;
         mode ModeType;
         path Path;

@@ -364,10 +364,10 @@ class PaverServiceSkipBlockTest : public PaverServiceTest {
 
   void WaitForDevices() {
     ASSERT_OK(RecursiveWaitForFile(device_->devfs_root().get(),
-                                   "sys/platform/00:00:2e/nand-ctl/ram-nand-0/sysconfig/skip-block")
+                                   "sys/platform/ram-nand/nand-ctl/ram-nand-0/sysconfig/skip-block")
                   .status_value());
     zx::result fvm_result = RecursiveWaitForFile(
-        device_->devfs_root().get(), "sys/platform/00:00:2e/nand-ctl/ram-nand-0/fvm/ftl/block");
+        device_->devfs_root().get(), "sys/platform/ram-nand/nand-ctl/ram-nand-0/fvm/ftl/block");
     ASSERT_OK(fvm_result.status_value());
     fvm_client_ = fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(fvm_result.value()));
   }

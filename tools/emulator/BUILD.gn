@@ -71,7 +71,7 @@ if (is_linux) {
       args = [
         "--src",
         rebase_path(
-            "//prebuilt/third_party/android/aemu/release/${host_platform}",
+            "//prebuilt/third_party/android/aemu/release-gfxstream/${host_platform}",
             root_build_dir),
         "--dst",
         rebase_path(archive_path, root_build_dir),

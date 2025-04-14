@@ -3,8 +3,9 @@
 # found in the LICENSE file.
 """Contains errors raised by WLAN affordances."""
 
+import fidl_fuchsia_wlan_common as f_wlan_common
+
 from honeydew import errors
-from honeydew.affordances.connectivity.wlan.utils.types import RequestStatus
 
 
 class HoneydewWlanError(errors.HoneydewError):
@@ -18,14 +19,16 @@ class HoneydewWlanRequestRejectedError(HoneydewWlanError):
     rejected by the WLAN stack.
     """
 
-    def __init__(self, method: str, reason: RequestStatus) -> None:
+    def __init__(
+        self, method: str, reason: f_wlan_common.RequestStatus
+    ) -> None:
         """Initialize a HoneydewWlanRequestRejectedError.
 
         Args:
             name: name of the request that failed
             reason: additional information about the failed request.
         """
-        super().__init__(f"{method} rejected with RequestStatus {reason}")
+        super().__init__(f"{method} rejected with RequestStatus {reason.name}")
         self.reason = reason
 
 

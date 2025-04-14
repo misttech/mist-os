@@ -435,6 +435,8 @@ impl From<u32> for RuleIndex {
 pub enum InterfaceMatcher {
     /// Match on the name of the device.
     DeviceName(String),
+    /// There is no bound device.
+    Unbound,
 }
 
 impl TryFrom<fnet_routes::InterfaceMatcher> for InterfaceMatcher {
@@ -442,6 +444,7 @@ impl TryFrom<fnet_routes::InterfaceMatcher> for InterfaceMatcher {
     fn try_from(matcher: fnet_routes::InterfaceMatcher) -> Result<Self, Self::Error> {
         match matcher {
             fnet_routes::InterfaceMatcher::DeviceName(name) => Ok(Self::DeviceName(name)),
+            fnet_routes::InterfaceMatcher::Unbound(fnet_routes::Unbound) => Ok(Self::Unbound),
             fnet_routes::InterfaceMatcher::__SourceBreaking { unknown_ordinal } => {
                 Err(RuleFidlConversionError::UnknownOrdinal {
                     name: "InterfaceMatcher",
@@ -456,6 +459,9 @@ impl From<InterfaceMatcher> for fnet_routes::InterfaceMatcher {
     fn from(matcher: InterfaceMatcher) -> Self {
         match matcher {
             InterfaceMatcher::DeviceName(name) => fnet_routes::InterfaceMatcher::DeviceName(name),
+            InterfaceMatcher::Unbound => {
+                fnet_routes::InterfaceMatcher::Unbound(fnet_routes::Unbound)
+            }
         }
     }
 }

@@ -4,7 +4,7 @@
 
 //! fuchsia.IO UTIL-ity library
 
-use fidl_fuchsia_io as fio;
+use flex_fuchsia_io as fio;
 
 pub mod directory;
 pub mod file;

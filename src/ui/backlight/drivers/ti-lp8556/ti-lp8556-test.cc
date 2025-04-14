@@ -12,7 +12,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
-#include <lib/driver/mock-mmio/cpp/mock-mmio-reg.h>
+#include <lib/driver/mock-mmio/cpp/region.h>
 #include <lib/inspect/cpp/reader.h>
 #include <lib/mock-i2c/mock-i2c.h>
 #include <lib/stdcompat/span.h>
@@ -39,7 +39,7 @@ constexpr uint32_t kMmioRegCount = (kAOBrightnessStickyReg + kMmioRegSize) / kMm
 class Lp8556DeviceTest : public zxtest::Test, public inspect::InspectTestHelper {
  public:
   Lp8556DeviceTest()
-      : mock_regs_(mock_mmio::MockMmioRegRegion(kMmioRegSize, kMmioRegCount)),
+      : mock_regs_(mock_mmio::Region(kMmioRegSize, kMmioRegCount)),
         fake_parent_(MockDevice::FakeRootParent()),
         loop_(&kAsyncLoopConfigNeverAttachToThread),
         i2c_loop_(&kAsyncLoopConfigNeverAttachToThread) {}
@@ -119,7 +119,7 @@ class Lp8556DeviceTest : public zxtest::Test, public inspect::InspectTestHelper 
 
   mock_i2c::MockI2c mock_i2c_;
   std::unique_ptr<Lp8556Device> dev_;
-  mock_mmio::MockMmioRegRegion mock_regs_;
+  mock_mmio::Region mock_regs_;
   std::shared_ptr<MockDevice> fake_parent_;
 
  private:

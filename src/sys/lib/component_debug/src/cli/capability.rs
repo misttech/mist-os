@@ -4,7 +4,7 @@
 
 use crate::capability::*;
 use anyhow::Result;
-use fidl_fuchsia_sys2 as fsys;
+use flex_fuchsia_sys2 as fsys;
 
 pub async fn capability_cmd<W: std::io::Write>(
     query: String,

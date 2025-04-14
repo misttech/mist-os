@@ -29,7 +29,7 @@ FUCHSIA_DEBUG_SYMBOLS_ATTRS = {
     ),
 }
 
-def strip_resources(ctx, resources, build_id_path = None, source_dir = None):
+def strip_resources(ctx, resources, build_id_path = None, source_search_root = "BUILD_WORKSPACE_DIRECTORY"):
     """Generate an action to strip resources.
 
     The generated action will output a single .build-id directory which will contain
@@ -45,14 +45,14 @@ def strip_resources(ctx, resources, build_id_path = None, source_dir = None):
       resources: A list of unstripped input resource_struct() values.
       build_id_path: (optional) A string which will be used when declaring
         the build id directory. Defaults to `ctx.label.name + "/.build-id"`.
-      source_dir: (optional) Either a File value that points to a directory (or file),
-        used by the debugger to locate source files, or a string naming an environment
-        variable (see FuchsiaDebugSymbolInfo documentation).
+      source_search_root: (optional) Either a string or File value, see
+        FuchsiaDebugSymbolInfo documentation.
 
     Returns:
       a pair whose first item is a list of stripped resource_struct() instances,
       and the second item is a FuchsiaDebugSymbolInfo provider for the
-      corresponding .build-id directory.
+      corresponding .build-id directory that contains a single
+      (source_search_root, build_dirs_depset) pair.
     """
 
     build_id_path = build_id_path or (ctx.label.name + "/.build-id")
@@ -85,13 +85,11 @@ def strip_resources(ctx, resources, build_id_path = None, source_dir = None):
         progress_message = "Generate dir with debug symbols for %s" % ctx.label,
     )
 
-    if source_dir == None:
-        source_dir = "BUILD_WORKSPACE_DIRECTORY"
-    elif type(source_dir) not in ("File", "string"):
-        fail("The 'source_dir' argument should be a string or a File value, got: %s" % repr(source_dir))
+    if type(source_search_root) not in ("File", "string"):
+        fail("The 'source_search_root' argument should be a string or a File value, got: %s" % repr(source_search_root))
 
-    return stripped_resources, FuchsiaDebugSymbolInfo(build_id_dirs = {
-        source_dir: depset([build_id_dir]),
+    return stripped_resources, FuchsiaDebugSymbolInfo(build_id_dirs_mapping = {
+        source_search_root: depset([build_id_dir]),
     })
 
 def _maybe_process_elf(ctx, r, ids_txt):
@@ -120,8 +118,8 @@ def _maybe_process_elf(ctx, r, ids_txt):
 
 def _fuchsia_debug_symbols_impl(ctx):
     return [
-        FuchsiaDebugSymbolInfo(build_id_dirs = {
-            ctx.file.build_dir: depset(transitive = [
+        FuchsiaDebugSymbolInfo(build_id_dirs_mapping = {
+            ctx.file.source_search_root: depset(transitive = [
                 target[DefaultInfo].files
                 for target in ctx.attr.build_id_dirs
             ]),
@@ -132,8 +130,8 @@ fuchsia_debug_symbols = rule(
     doc = """Rule-based constructor for FuchsiaDebugSymbolInfo.""",
     implementation = _fuchsia_debug_symbols_impl,
     attrs = {
-        "build_dir": attr.label(
-            doc = "A direct file child within a build directory used by zxdb to locate code.",
+        "source_search_root": attr.label(
+            doc = "A search root file or directory, used by zxdb to locate source files.",
             mandatory = True,
             allow_single_file = True,
         ),
@@ -145,37 +143,46 @@ fuchsia_debug_symbols = rule(
     },
 )
 
-def collect_debug_symbols(*targets_or_providers):
-    build_id_dirs = [
-        (target_or_provider if (
-            hasattr(target_or_provider, "build_id_dirs")
-        ) else target_or_provider[FuchsiaDebugSymbolInfo]).build_id_dirs
-        for target_or_provider in flatten(targets_or_providers)
-        if hasattr(target_or_provider, "build_id_dirs") or FuchsiaDebugSymbolInfo in target_or_provider
-    ]
-    return FuchsiaDebugSymbolInfo(build_id_dirs = {
-        build_dir: depset(transitive = [
-            build_dir_mapping[build_dir]
-            for build_dir_mapping in build_id_dirs
-            if build_dir in build_dir_mapping
-        ])
-        for build_dir in depset([
-            file
-            for file in flatten([build_id_dir.keys() for build_id_dir in build_id_dirs])
-            if type(file) == "File"
-        ]).to_list() + depset([
-            string
-            for string in flatten([build_id_dir.keys() for build_id_dir in build_id_dirs])
-            if type(string) == "string"
-        ]).to_list()
-    })
+def merge_debug_symbol_infos(*targets_or_providers):
+    """Merge the FuchsiaDebugSymbolInfo values from a list of targets or providers.
+
+    Args:
+        targets_or_providers: a list whose flattened elements must be provider
+           or target values.
+    Returns:
+        A new FuchsiaSymbolDebugSymbolInfo resulting from merging the input
+        FuchsiaDebugSymbolInfo values together.
+    """
+
+    # { source_search_root -> list[depset[build_id_dir]]}
+    source_search_root_map = {}
+
+    for target_or_provider in flatten(targets_or_providers):
+        if hasattr(target_or_provider, "build_id_dirs_mapping"):
+            build_id_dirs_map = target_or_provider.build_id_dirs_mapping
+        elif FuchsiaDebugSymbolInfo in target_or_provider:
+            build_id_dirs_map = target_or_provider[FuchsiaDebugSymbolInfo].build_id_dirs_mapping
+        else:
+            continue
+
+        for source_search_root, build_id_dirs_depset in build_id_dirs_map.items():
+            if source_search_root not in source_search_root_map:
+                source_search_root_map[source_search_root] = []
+            source_search_root_map[source_search_root].append(build_id_dirs_depset)
+
+    return FuchsiaDebugSymbolInfo(
+        build_id_dirs_mapping = {
+            source_search_root: depset(transitive = build_id_dirs_depsets)
+            for source_search_root, build_id_dirs_depsets in source_search_root_map.items()
+        },
+    )
 
 def _fuchsia_unstripped_binary_impl(ctx):
     return FuchsiaUnstrippedBinaryInfo(
         dest = ctx.attr.dest,
         unstripped_file = ctx.file.unstripped_file,
         stripped_file = ctx.file.stripped_file if ctx.attr.stripped_file else None,
-        source_dir = ctx.file.stripped_file if ctx.attr.source_dir else None,
+        source_search_root = ctx.attr.source_search_root,
     )
 
 fuchsia_unstripped_binary = rule(
@@ -196,7 +203,7 @@ fuchsia_unstripped_binary = rule(
             mandatory = False,
             allow_single_file = True,
         ),
-        "source_dir": attr.label(
+        "source_search_root": attr.label(
             doc = "Optional label to source directory or file inside source directory.",
             mandatory = False,
             allow_single_file = True,
@@ -205,21 +212,29 @@ fuchsia_unstripped_binary = rule(
 )
 
 def _convert_unstripped_binary_info(binary_info):
-    """Convert a FuchsiaUnstrippedBinaryInfo into an equivalent FuchsiaCollectedUnstrippedBinariesInfo mapping value."""
-    source_dir = binary_info.source_dir
-    if source_dir == None:
-        source_dir = "BUILD_WORKSPACE_DIRECTORY"
-    return {
-        source_dir: depset([
-            struct(
-                dest = binary_info.dest,
-                unstripped_file = binary_info.unstripped_file,
-                stripped_file = binary_info.stripped_file,
-            ),
-        ]),
-    }
+    """Convert a FuchsiaUnstrippedBinaryInfo into an equivalent FuchsiaCollectedUnstrippedBinariesInfo value.
 
-def _collect_unstripped_binaries_info(*targets_or_providers):
+    Args:
+        binary_info: A FuchsiaUnstrippedBinaryInfo value,
+    Returns:
+        A corresponding FuchsiaCollectedUnstrippedBinariesInfo.
+    """
+    source_search_root = binary_info.source_search_root
+    if source_search_root == None:
+        source_search_root = "BUILD_WORKSPACE_DIRECTORY"
+    return FuchsiaCollectedUnstrippedBinariesInfo(
+        source_search_root_to_unstripped_binary = {
+            source_search_root: depset([
+                struct(
+                    dest = binary_info.dest,
+                    unstripped_file = binary_info.unstripped_file,
+                    stripped_file = binary_info.stripped_file,
+                ),
+            ]),
+        },
+    )
+
+def _merge_unstripped_binaries_infos(*targets_or_providers):
     """Merge any number of unstripped binary info providers or targets.
 
     Args:
@@ -233,33 +248,40 @@ def _collect_unstripped_binaries_info(*targets_or_providers):
         A new FuchsiaCollectedUnstrippedBinariesInfo value, merging the content of
         the input arguments.
     """
-    mappings = []
+
+    # Map { source_search_root -> list[depset[struct(dest, unstripped_file, stripped_file)]] }
+    # will be turned into a source_search_root_to_unstripped_binary dict.
+    source_search_root_map = {}
+
+    # list[depset[File]] for unstripped_files
+    unstripped_files_depsets = []
+
     for t in flatten(targets_or_providers):
-        if hasattr(t, "source_dir_to_unstripped_binary"):
-            mappings.append(t.source_dir_to_unstripped_binary)
+        if hasattr(t, "source_search_root_to_unstripped_binary"):
+            collected_info = t
         elif hasattr(t, "unstripped_binary") and hasattr(t, "dest"):
-            mappings.append(_convert_unstripped_binary_info(t))
+            collected_info = _convert_unstripped_binary_info(t)
         elif type(t) == "Target":
             if FuchsiaCollectedUnstrippedBinariesInfo in t:
-                mappings.append(t[FuchsiaCollectedUnstrippedBinariesInfo].source_dir_to_unstripped_binary)
+                collected_info = t[FuchsiaCollectedUnstrippedBinariesInfo]
             elif FuchsiaUnstrippedBinaryInfo in t:
-                mappings.append(_convert_unstripped_binary_info(t[FuchsiaUnstrippedBinaryInfo]))
+                collected_info = _convert_unstripped_binary_info(t[FuchsiaUnstrippedBinaryInfo])
+            else:
+                continue
         else:
             fail("Invalid type {} of provider/target value {}".format(type(t), repr(t)))
 
-    all_source_dirs = {
-        source_dir: True
-        for mapping in mappings
-        for source_dir in mapping.keys()
-    }
-    return FuchsiaCollectedUnstrippedBinariesInfo(source_dir_to_unstripped_binary = {
-        source_dir: depset(transitive = [
-            mapping[source_dir]
-            for mapping in mappings
-            if source_dir in mapping
-        ])
-        for source_dir in all_source_dirs.keys()
-    })
+        for source_search_root, binary_info_depset in collected_info.source_search_root_to_unstripped_binary.items():
+            if source_search_root not in source_search_root_map:
+                source_search_root_map[source_search_root] = []
+            source_search_root_map[source_search_root].append(binary_info_depset)
+
+    return FuchsiaCollectedUnstrippedBinariesInfo(
+        source_search_root_to_unstripped_binary = {
+            source_search_root: depset(transitive = binary_info_depsets)
+            for source_search_root, binary_info_depsets in source_search_root_map.items()
+        },
+    )
 
 # A map of rule kind strings to tuples of attribute names for possible dependencies.
 # Used by _get_target_deps_from_attributes() below.
@@ -277,7 +299,7 @@ def _get_target_deps_from_attributes(rule_attr, rule_kind = None):
     return get_target_deps_from_attributes(rule_attr, rule_kind, known_rule_kinds = _KNOWN_RULE_KINDS_TO_DEP_ATTR_NAMES)
 
 def _fuchsia_collect_unstripped_binaries_aspect_impl(target, aspect_ctx):
-    return _collect_unstripped_binaries_info(
+    return _merge_unstripped_binaries_infos(
         target,
         _get_target_deps_from_attributes(aspect_ctx.rule.attr, aspect_ctx.rule.kind),
     )
@@ -291,13 +313,17 @@ _fuchsia_collect_unstripped_binaries_aspect = aspect(
 )
 
 def _find_and_process_unstripped_binaries_impl(ctx):
-    collected_infos = _collect_unstripped_binaries_info(ctx.attr.deps)
+    all_collected_unstripped_binaries_info = _merge_unstripped_binaries_infos(ctx.attr.deps)
 
     prebuilt_resources = []
-    generated_resources = []
-    debug_infos = []
 
-    for source_dir, unstripped_depset in collected_infos.source_dir_to_unstripped_binary.items():
+    # list[resource_struct]
+    generated_resources = []
+
+    # list[FuchsiaDebugSymbolInfo] covering the symbols of all stripped binaries.
+    stripped_debug_symbol_infos = []
+
+    for source_search_root, unstripped_depset in all_collected_unstripped_binaries_info.source_search_root_to_unstripped_binary.items():
         resources_to_strip = []
 
         for unstripped in unstripped_depset.to_list():
@@ -313,34 +339,40 @@ def _find_and_process_unstripped_binaries_impl(ctx):
         if not resources_to_strip:
             continue
 
-        stripped_resources, debug_info = strip_resources(ctx, resources_to_strip, source_dir = source_dir)
+        stripped_resources, debug_symbol_info = strip_resources(ctx, resources_to_strip, source_search_root = source_search_root)
         generated_resources.extend(stripped_resources)
-        debug_infos.append(debug_info)
+        stripped_debug_symbol_infos.append(debug_symbol_info)
 
     outputs = depset(
         direct = [r.src for r in generated_resources],
-        transitive = [debug_info.build_id_dirs.values()[0] for debug_info in debug_infos],
+        # strip_resources creates a FuchsiaDebugSymbol mapping with a single (key, value) pair.
+        # the value is a depset() covering the generated .build-id directories.
+        transitive = [debug_symbol_info.build_id_dirs_mapping.values()[0] for debug_symbol_info in stripped_debug_symbol_infos],
     )
 
     result = [
         DefaultInfo(files = outputs),
         FuchsiaPackageResourcesInfo(resources = prebuilt_resources + generated_resources),
-        collect_debug_symbols(debug_infos),
+        merge_debug_symbol_infos(stripped_debug_symbol_infos),
+        all_collected_unstripped_binaries_info,  # A FuchsiaCollectedUnstrippedBinaryInfo value.
     ]
     return result
 
 find_and_process_unstripped_binaries = rule(
     doc = """Find all fuchsia_unstripped_binary() targets from a DAG of dependencies.
 
-        Then generate actions to strip those that need it, plus another action to
+        Then generate actions to strip those that need it, plus other actions to
         generate a .build-id/  directory populated with symlinks to the original
         unstripped files.
 
         Returns a FuchsiaPackageResourcesInfo provider to list all stripped binaries
         and their installation path (as used by fuchsia_package()).
 
-        Returns a FuchsiaDebugSymbolInfo provider to list the .build-id directory
-        and the corresponding source directory.
+        Returns a FuchsiaDebugSymbolInfo provider to list the .build-id directories
+        and the corresponding source search roots.
+
+        Returns a FuchsiaCollectedUnstrippedBinariesInfo provider to list all the
+        collected files.
         """,
     implementation = _find_and_process_unstripped_binaries_impl,
     toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
@@ -379,7 +411,7 @@ def transform_collected_debug_symbols_infos(*targets):
             if t and _FuchsiaCollectedDebugSymbolsInfo in t:
                 valid_targets.append(t)
 
-    return collect_debug_symbols(
+    return merge_debug_symbol_infos(
         flatten([
             t[_FuchsiaCollectedDebugSymbolsInfo].collected_symbols.to_list()
             for t in valid_targets

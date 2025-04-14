@@ -39,20 +39,29 @@ todo_deny https://fxbug.dev/385121365 kernel adbd fd
 // https://fxbug.dev/407739795 - "adbd" reciprocates, using FDs created by the kernel.
 todo_deny https://fxbug.dev/407739795 adbd kernel fd
 
-// https://fxbug.dev/408136119 - Missing policy configuration breaks one of the system daemons.
-todo_deny https://fxbug.dev/408136119 init device chr_file
+// https://fxbug.dev/408336449 - Dumpstate encounters "share" and some "getattr"
+// "use" and "read" failures.
+todo_deny https://fxbug.dev/408336449 dumpstate device dir
+todo_deny https://fxbug.dev/408336449 dumpstate fuse_device chr_file
+todo_deny https://fxbug.dev/408336449 dumpstate usermodehelper file
+todo_deny https://fxbug.dev/408336449 dumpstate su process
+todo_deny https://fxbug.dev/408336449 kernel dumpstate fifo_file
+todo_deny https://fxbug.dev/408336449 apexd dumpstate fd
 
-//
-// Exceptions required for the SELinux Test Suite container.
-//
+// https://fxbug.dev/408339748 - nmfs is not correctly labeled.
+todo_deny https://fxbug.dev/408339748 dumpstate unlabeled filesystem
 
-// https://fxbug.dev/390739936 - SEStarnix tests mis-label some files.
-todo_deny https://fxbug.dev/390739936 test_ioctl_t user_tmp_t file
-todo_deny https://fxbug.dev/390739936 test_noioctl_t user_tmp_t file
+// https://fxbug.dev/408318516 - Stats test does not run as root.
+todo_deny https://fxbug.dev/408318516 shell sysfs_suspend_stats file
+
+// https://fxbug.dev/408251799 - Exceptions yet to be investigated.
+todo_deny https://fxbug.dev/408251799 vdc vdc capability2
+todo_deny https://fxbug.dev/408251799 surfaceflinger rootfs dir
+todo_deny https://fxbug.dev/408251799 bootanim rootfs dir
+todo_deny https://fxbug.dev/408251799 artd system_file dir
+todo_deny https://fxbug.dev/408251799 mediaswcodec tmpfs file
+todo_deny https://fxbug.dev/408251799 nfc system_data_file dir
 
 // https://fxbug.dev/398246622 - Test apks interacting poorly with fuse.
 todo_deny https://fxbug.dev/390739936 platform_app fuse file
 todo_deny https://fxbug.dev/390739936 platform_app fuse dir
-
-// https://fxbug.dev/404739824 - Fuchsia-space resources are mis-classed and/or mis-labeled.
-todo_deny https://fxbug.dev/404739824 unconfined_t unconfined_t anon_inode

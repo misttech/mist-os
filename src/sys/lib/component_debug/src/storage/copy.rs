@@ -8,10 +8,11 @@ use crate::path::{
     REMOTE_COMPONENT_STORAGE_PATH_HELP,
 };
 use anyhow::{anyhow, bail, Result};
-use fidl::endpoints::create_proxy;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_sys2::StorageAdminProxy;
 use std::path::PathBuf;
+
+use flex_client::ProxyHasDomain;
+use flex_fuchsia_io as fio;
+use flex_fuchsia_sys2::StorageAdminProxy;
 
 /// Transfer a file between the host machine and the Fuchsia device.
 /// Can be used to upload a file to or from the Fuchsia device.
@@ -25,7 +26,7 @@ pub async fn copy(
     source_path: String,
     destination_path: String,
 ) -> Result<()> {
-    let (dir_proxy, server) = create_proxy::<fio::DirectoryMarker>();
+    let (dir_proxy, server) = storage_admin.domain().create_proxy::<fio::DirectoryMarker>();
     let server = server.into_channel();
     let storage_dir = RemoteDirectory::from_proxy(dir_proxy);
 
@@ -91,7 +92,7 @@ mod test {
     use crate::storage::test::{
         node_to_file, setup_fake_storage_admin, setup_fake_storage_admin_with_tmp,
     };
-    use fidl_fuchsia_io as fio;
+    use flex_fuchsia_io as fio;
     use futures::TryStreamExt;
     use std::collections::HashMap;
     use std::fs::{read, write};

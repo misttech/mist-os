@@ -1,4 +1,4 @@
-# Copyright 2019 The Fuchsia Authors. All rights reserved.
+# Copyright 2019 The Fuchsia Authors. All rights reserved
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -85,12 +85,6 @@ fuchsia_fuzzer_component("out-of-memory-fuzzer-component") {
   deps = [ "cpp:out_of_memory_fuzzer" ]
 }
 
-fuchsia_fuzzer_component("echo-fuzzer-component") {
-  component_name = "echo-fuzzer"
-  manifest = "fidl/meta/echo-fuzzer.cml"
-  deps = [ "fidl:echo-fuzzer" ]
-}
-
 fuchsia_fuzzer_component("toy-example-arbitrary-component") {
   component_name = "toy_example_arbitrary"
   manifest = "rust/meta/toy_example_arbitrary.cml"
@@ -124,7 +118,6 @@ fuchsia_fuzzer_package("fuzzing-examples") {
     ":fuzzed-data-provider-fuzzer-component",
     ":noop-fuzzer-component",
     ":out-of-memory-fuzzer-component",
-    ":echo-fuzzer-component",
   ]
 
   # A fuzzers package can have fuzzers for multiple languages.

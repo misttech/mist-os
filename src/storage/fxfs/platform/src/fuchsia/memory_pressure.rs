@@ -9,7 +9,7 @@ use fidl_fuchsia_memorypressure::{
     WatcherRequestStream,
 };
 use fuchsia_async as fasync;
-use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component_client::connect_to_protocol;
 use futures::stream::{FusedStream, Stream};
 use futures::task::{self, Poll};
 use futures::{FutureExt, StreamExt};

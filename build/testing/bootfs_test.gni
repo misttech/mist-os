@@ -55,5 +55,6 @@ template("bootfs_test") {
                            ])
     build_rule = "bootfs_test"
     expects_ssh = false
+    disable_fastboot = true
   }
 }

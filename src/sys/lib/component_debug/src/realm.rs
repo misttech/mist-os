@@ -5,12 +5,17 @@
 use crate::io::{Directory, RemoteDirectory};
 use anyhow::Context;
 use cm_rust::{ComponentDecl, FidlIntoNative};
-use fidl::endpoints::{create_proxy, ServerEnd};
+use flex_client::fidl::ServerEnd;
+use flex_client::ProxyHasDomain;
 use fuchsia_async::TimeoutExt;
 use futures::TryFutureExt;
 use moniker::{Moniker, MonikerError};
+use std::convert::Infallible;
 use thiserror::Error;
-use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
+use {flex_fuchsia_component_decl as fcdecl, flex_fuchsia_io as fio, flex_fuchsia_sys2 as fsys};
+
+#[cfg(feature = "fdomain")]
+use fuchsia_fs_fdomain as fuchsia_fs;
 
 /// This value is somewhat arbitrarily chosen based on how long we expect a component to take to
 /// respond to a directory request. There is no clear answer for how long it should take a
@@ -85,6 +90,12 @@ pub enum GetRuntimeError {
     ParseError(#[source] anyhow::Error),
 }
 
+impl From<Infallible> for GetRuntimeError {
+    fn from(_value: Infallible) -> Self {
+        unreachable!()
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum GetOutgoingCapabilitiesError {
     #[error(transparent)]
@@ -100,6 +111,12 @@ pub enum GetOutgoingCapabilitiesError {
     ParseError(#[source] anyhow::Error),
 }
 
+impl From<Infallible> for GetOutgoingCapabilitiesError {
+    fn from(_value: Infallible) -> Self {
+        unreachable!()
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum GetMerkleRootError {
     #[error(transparent)]
@@ -110,6 +127,12 @@ pub enum GetMerkleRootError {
 
     #[error("error reading meta file: {0}")]
     ReadError(#[from] fuchsia_fs::file::ReadError),
+}
+
+impl From<Infallible> for GetMerkleRootError {
+    fn from(_value: Infallible) -> Self {
+        unreachable!()
+    }
 }
 
 #[derive(Debug, Error)]
@@ -447,7 +470,7 @@ pub async fn get_runtime(
 ) -> Result<Runtime, GetRuntimeError> {
     // Parse the runtime directory and add it into the State object
     let moniker_str = moniker.to_string();
-    let (runtime_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
+    let (runtime_dir, server_end) = realm_query.domain().create_proxy::<fio::DirectoryMarker>();
     let runtime_dir = RemoteDirectory::from_proxy(runtime_dir);
     let server_end = ServerEnd::new(server_end.into_channel());
     realm_query
@@ -523,7 +546,7 @@ pub async fn get_outgoing_capabilities(
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<Vec<String>, GetOutgoingCapabilitiesError> {
     let moniker_str = moniker.to_string();
-    let (out_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
+    let (out_dir, server_end) = realm_query.domain().create_proxy::<fio::DirectoryMarker>();
     let out_dir = RemoteDirectory::from_proxy(out_dir);
     let server_end = ServerEnd::new(server_end.into_channel());
     realm_query
@@ -548,7 +571,7 @@ pub async fn get_merkle_root(
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<String, GetMerkleRootError> {
     let moniker_str = moniker.to_string();
-    let (meta_file, server_end) = create_proxy::<fio::FileMarker>();
+    let (meta_file, server_end) = realm_query.domain().create_proxy::<fio::FileMarker>();
     let server_end = ServerEnd::new(server_end.into_channel());
     realm_query
         .deprecated_open(

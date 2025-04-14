@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.errorsyntax"]
+_ir_path = get_fidl_ir_map()["test.errorsyntax"]
 add_ir_path(_ir_path)
 
 import fidl_test_errorsyntax_parent
@@ -20,9 +21,7 @@ import fidl_test_errorsyntax_parent
 
 @dataclass
 class ExampleUseOfErrorSyntaxCallWhichMayFailRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    s: str | None
+    s: str
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ExampleUseOfErrorSyntaxCallWhichMayFailRequest"
@@ -45,20 +44,20 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailRequest:
             "test.errorsyntax/ExampleUseOfErrorSyntaxCallWhichMayFailRequest",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "s": None,
+                "s": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class ExampleUseOfErrorSyntaxCallWhichMayFailResponse:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    value: int | None
+    value: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ExampleUseOfErrorSyntaxCallWhichMayFailResponse"
@@ -81,11 +80,13 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailResponse:
             "test.errorsyntax/ExampleUseOfErrorSyntax_CallWhichMayFail_Response",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "value": None,
+                "value": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
@@ -181,14 +182,14 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -204,12 +205,20 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailResult:
         return cls(_empty=())
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class ExampleUseOfErrorSyntaxServer(fidl._server.ServerBase, ABC):
+class ExampleUseOfErrorSyntaxServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.errorsyntax"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -235,6 +244,8 @@ class ExampleUseOfErrorSyntaxServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -274,7 +285,7 @@ class ExampleUseOfErrorSyntaxServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class ExampleUseOfErrorSyntaxClient(fidl._client.FidlClient):
+class ExampleUseOfErrorSyntaxClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.errorsyntax"
 
@@ -282,6 +293,8 @@ class ExampleUseOfErrorSyntaxClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -302,7 +315,7 @@ class ExampleUseOfErrorSyntaxClient(fidl._client.FidlClient):
             3565108794310607393,
             "test.errorsyntax",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.errorsyntax.parent/ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result"
             ),
         )
@@ -321,13 +334,13 @@ class ExampleUseOfErrorSyntaxClient(fidl._client.FidlClient):
             3757408930698888354,
             "test.errorsyntax",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.errorsyntax/ExampleUseOfErrorSyntax_CallWhichMayFail_Result"
             ),
         )
 
 
-class ExampleUseOfErrorSyntaxEventHandler(fidl._client.EventHandlerBase, ABC):
+class ExampleUseOfErrorSyntaxEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.errorsyntax"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -336,11 +349,13 @@ class ExampleUseOfErrorSyntaxEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-ExampleUseOfErrorSyntaxMarker = fidl._library.ProtocolMarker(
+ExampleUseOfErrorSyntaxMarker = FidlProtocolMarker(
     "(nondiscoverable) test.errorsyntax/ExampleUseOfErrorSyntax"
 )

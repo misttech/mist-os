@@ -50,14 +50,7 @@ void BootupTracker::NotifyStartComplete(std::string node_moniker) {
 void BootupTracker::NotifyBindingChanged() { UpdateTrackerAndResetTimer(); }
 
 void BootupTracker::CheckBootupDone() {
-  bool deadline_exceeded = IsUpdateDeadlineExceeded();
-  if (!deadline_exceeded &&
-      (!outstanding_start_requests_.empty() || bind_manager_->HasOngoingBind())) {
-    ResetBootupTimer();
-    return;
-  }
-
-  if (deadline_exceeded) {
+  if (IsUpdateDeadlineExceeded()) {
     LOGF(WARNING, "Deadline exceeded in the bootup tracker with:");
     LOGF(WARNING, "    %u unfinished start requests:", outstanding_start_requests_.size());
     for (const auto& [moniker, url] : outstanding_start_requests_) {
@@ -66,11 +59,16 @@ void BootupTracker::CheckBootupDone() {
     if (bind_manager_->HasOngoingBind()) {
       LOGF(WARNING, "    a hanging bind process in the bind manager");
     }
-  } else {
-    // LINT.IfChange
-    LOGF(INFO, "Bootup completed.");
-    // LINT.ThenChange(//tools/testing/testrunner/tester.go)
   }
+
+  if (!outstanding_start_requests_.empty() || bind_manager_->HasOngoingBind()) {
+    ResetBootupTimer();
+    return;
+  }
+
+  // LINT.IfChange
+  LOGF(INFO, "Bootup completed.");
+  // LINT.ThenChange(//tools/testing/testrunner/tester.go)
 
   for (auto& callback : callbacks_) {
     callback();

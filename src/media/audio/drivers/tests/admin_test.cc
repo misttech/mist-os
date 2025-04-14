@@ -19,10 +19,52 @@
 
 #include <gtest/gtest.h>
 
+namespace fhasp = fuchsia::hardware::audio::signalprocessing;
+
 namespace media::audio::drivers::test {
 
-constexpr bool kDumpElementsAndTopologies = false;
-constexpr bool kIgnoreNoncompliantDaiEndpoints = true;
+inline constexpr bool kTolerateNonTerminalDaiEndpoints = true;
+inline constexpr bool kDisplayElementsAndTopologies = false;
+
+namespace {
+
+void DisplayElements(
+    const std::vector<fuchsia::hardware::audio::signalprocessing::Element>& elements) {
+  std::stringstream ss;
+  ss << "Elements[" << elements.size() << "]:" << '\n';
+  auto element_idx = 0u;
+  for (const auto& element : elements) {
+    ss << "        [" << element_idx++ << "] id " << element.id() << ", type " << element.type()
+       << (element.type() ==
+                   fuchsia::hardware::audio::signalprocessing::ElementType::DAI_INTERCONNECT
+               ? " (DAI)"
+               : "")
+       << (element.type() == fuchsia::hardware::audio::signalprocessing::ElementType::RING_BUFFER
+               ? " (RING_BUFFER)"
+               : "")
+       << '\n';
+  }
+  printf("%s", ss.str().c_str());
+}
+
+void DisplayTopologies(
+    const std::vector<fuchsia::hardware::audio::signalprocessing::Topology>& topologies) {
+  std::stringstream ss;
+  ss << "Topologies[" << topologies.size() << "]:" << '\n';
+  auto topology_idx = 0u;
+  for (const auto& topology : topologies) {
+    ss << "          [" << topology_idx++ << "] id " << topology.id() << ", edges["
+       << topology.processing_elements_edge_pairs().size() << "]:" << '\n';
+    auto edge_idx = 0u;
+    for (const auto& edge_pair : topology.processing_elements_edge_pairs()) {
+      ss << "              [" << edge_idx++ << "] " << edge_pair.processing_element_id_from
+         << " -> " << edge_pair.processing_element_id_to << '\n';
+    }
+  }
+  printf("%s", ss.str().c_str());
+}
+
+}  // namespace
 
 void AdminTest::TearDown() {
   DropRingBuffer();
@@ -97,7 +139,7 @@ void AdminTest::RequestRingBufferChannel() {
     // If a ring_buffer_id exists, request it - but don't fail if the driver has no ring buffer.
     if (ring_buffer_id().has_value()) {
       composite()->CreateRingBuffer(
-          ring_buffer_id().value(), std::move(rb_format), ring_buffer_handle.NewRequest(),
+          *ring_buffer_id(), std::move(rb_format), ring_buffer_handle.NewRequest(),
           AddCallback("CreateRingBuffer",
                       [](fuchsia::hardware::audio::Composite_CreateRingBuffer_Result result) {
                         EXPECT_FALSE(result.is_err());
@@ -372,6 +414,7 @@ void AdminTest::WatchDelayAndExpectNoUpdate() {
 // We've already validated that we received an overall response.
 // Internal delay must be present and non-negative.
 void AdminTest::ValidateInternalDelay() {
+  ASSERT_TRUE(delay_info_.has_value());
   ASSERT_TRUE(delay_info_->has_internal_delay());
   EXPECT_GE(delay_info_->internal_delay(), 0ll)
       << "WatchDelayInfo `internal_delay` (" << delay_info_->internal_delay()
@@ -381,6 +424,7 @@ void AdminTest::ValidateInternalDelay() {
 // We've already validated that we received an overall response.
 // External delay (if present) simply must be non-negative.
 void AdminTest::ValidateExternalDelay() {
+  ASSERT_TRUE(delay_info_.has_value());
   if (delay_info_->has_external_delay()) {
     EXPECT_GE(delay_info_->external_delay(), 0ll)
         << "WatchDelayInfo `external_delay` (" << delay_info_->external_delay()
@@ -409,40 +453,17 @@ void AdminTest::DropRingBuffer() {
 
 // Validate that the collection of element IDs found in the topology list are complete and correct.
 void AdminTest::ValidateElementTopologyClosure() {
-  if constexpr (kDumpElementsAndTopologies) {
-    std::stringstream ss;
-    ss << "Elements[" << elements().size() << "]:\n";
-    auto element_idx = 0u;
-    for (const auto& element : elements()) {
-      ss << "        [" << element_idx++ << "] id " << element.id() << ", type " << element.type()
-         << '\n';
-    }
-    ss << "Topologies[" << topologies().size() << "]:\n";
-    auto topology_idx = 0u;
-    for (const auto& topology : topologies()) {
-      ss << "        [" << topology_idx++ << "] id " << topology.id() << ", edges["
-         << topology.processing_elements_edge_pairs().size() << "]:\n";
-      auto edge_idx = 0u;
-      for (const auto& edge_pair : topology.processing_elements_edge_pairs()) {
-        ss << "            [" << edge_idx++ << "] " << edge_pair.processing_element_id_from << "->"
-           << edge_pair.processing_element_id_to << '\n';
-      }
-    }
-    printf("%s", ss.str().c_str());
-  }
-
   ASSERT_FALSE(elements().empty());
-  std::unordered_set<fuchsia::hardware::audio::signalprocessing::ElementId> unused_element_ids;
+  std::unordered_set<fhasp::ElementId> unused_element_ids;
   for (const auto& element : elements()) {
     unused_element_ids.insert(element.id());
   }
-  const std::unordered_set<fuchsia::hardware::audio::signalprocessing::ElementId> all_element_ids =
-      unused_element_ids;
+  const std::unordered_set<fhasp::ElementId> all_element_ids = unused_element_ids;
 
   ASSERT_FALSE(topologies().empty());
   for (const auto& topology : topologies()) {
-    std::unordered_set<fuchsia::hardware::audio::signalprocessing::ElementId> edge_source_ids;
-    std::unordered_set<fuchsia::hardware::audio::signalprocessing::ElementId> edge_dest_ids;
+    std::unordered_set<fhasp::ElementId> edge_source_ids;
+    std::unordered_set<fhasp::ElementId> edge_dest_ids;
     for (const auto& edge_pair : topology.processing_elements_edge_pairs()) {
       ASSERT_TRUE(all_element_ids.contains(edge_pair.processing_element_id_from))
           << "Topology " << topology.id() << " contains unknown element "
@@ -456,44 +477,38 @@ void AdminTest::ValidateElementTopologyClosure() {
       edge_dest_ids.insert(edge_pair.processing_element_id_to);
     }
     for (const auto& source_id : edge_source_ids) {
-      fuchsia::hardware::audio::signalprocessing::ElementType source_element_type;
+      fhasp::ElementType source_element_type;
       for (const auto& element : elements()) {
         if (element.id() == source_id) {
           source_element_type = element.type();
         }
       }
       if (edge_dest_ids.contains(source_id)) {
-        if constexpr (!kIgnoreNoncompliantDaiEndpoints) {
-          ASSERT_NE(source_element_type,
-                    fuchsia::hardware::audio::signalprocessing::ElementType::DAI_INTERCONNECT)
+        if constexpr (!kTolerateNonTerminalDaiEndpoints) {
+          ASSERT_NE(source_element_type, fhasp::ElementType::DAI_INTERCONNECT)
               << "Element " << source_id << " is not an endpoint in topology " << topology.id()
               << ", but is DAI_INTERCONNECT";
         }
-        ASSERT_NE(source_element_type,
-                  fuchsia::hardware::audio::signalprocessing::ElementType::RING_BUFFER)
+        ASSERT_NE(source_element_type, fhasp::ElementType::RING_BUFFER)
             << "Element " << source_id << " is not an endpoint in topology " << topology.id()
             << ", but is RING_BUFFER";
         edge_dest_ids.erase(source_id);
       } else {
-        ASSERT_TRUE(source_element_type ==
-                        fuchsia::hardware::audio::signalprocessing::ElementType::DAI_INTERCONNECT ||
-                    source_element_type ==
-                        fuchsia::hardware::audio::signalprocessing::ElementType::RING_BUFFER)
+        ASSERT_TRUE(source_element_type == fhasp::ElementType::DAI_INTERCONNECT ||
+                    source_element_type == fhasp::ElementType::RING_BUFFER)
             << "Element " << source_id << " is a terminal (source) endpoint in topology "
             << topology.id() << ", but is neither DAI_INTERCONNECT nor RING_BUFFER";
       }
     }
     for (const auto& dest_id : edge_dest_ids) {
-      fuchsia::hardware::audio::signalprocessing::ElementType dest_element_type;
+      fhasp::ElementType dest_element_type;
       for (const auto& element : elements()) {
         if (element.id() == dest_id) {
           dest_element_type = element.type();
         }
       }
-      ASSERT_TRUE(dest_element_type ==
-                      fuchsia::hardware::audio::signalprocessing::ElementType::DAI_INTERCONNECT ||
-                  dest_element_type ==
-                      fuchsia::hardware::audio::signalprocessing::ElementType::RING_BUFFER)
+      ASSERT_TRUE(dest_element_type == fhasp::ElementType::DAI_INTERCONNECT ||
+                  dest_element_type == fhasp::ElementType::RING_BUFFER)
           << "Element " << dest_id << " is a terminal (destination) endpoint in topology "
           << topology.id() << ", but is neither DAI_INTERCONNECT nor RING_BUFFER";
     }
@@ -525,10 +540,20 @@ DEFINE_ADMIN_TEST_CLASS(CompositeProperties, {
 });
 
 // Verify that a valid element list is successfully received.
-DEFINE_ADMIN_TEST_CLASS(GetElements, { RequestElements(); });
+DEFINE_ADMIN_TEST_CLASS(GetElements, {
+  RequestElements();
+  if (kDisplayElementsAndTopologies) {
+    DisplayElements(elements());
+  }
+});
 
 // Verify that a valid topology list is successfully received.
-DEFINE_ADMIN_TEST_CLASS(GetTopologies, { RequestTopologies(); });
+DEFINE_ADMIN_TEST_CLASS(GetTopologies, {
+  RequestTopologies();
+  if (kDisplayElementsAndTopologies) {
+    DisplayTopologies(topologies());
+  }
+});
 
 // Verify that a valid topology is successfully received.
 DEFINE_ADMIN_TEST_CLASS(GetTopology, {
@@ -563,14 +588,16 @@ DEFINE_ADMIN_TEST_CLASS(Reset, { ResetAndExpectResponse(); });
 
 // Start-while-started should always succeed, so we test this twice.
 DEFINE_ADMIN_TEST_CLASS(CodecStart, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RequestCodecStartAndExpectResponse());
 
   RequestCodecStartAndExpectResponse();
   WaitForError();
 });
 
-// Stop-while-stopped should always succeed, so we test this twice.
+// Stop-while-stopped should always succeed, so we call Stop twice.
 DEFINE_ADMIN_TEST_CLASS(CodecStop, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RequestCodecStopAndExpectResponse());
 
   RequestCodecStopAndExpectResponse();
@@ -579,6 +606,7 @@ DEFINE_ADMIN_TEST_CLASS(CodecStop, {
 
 // Verify valid responses: ring buffer properties
 DEFINE_ADMIN_TEST_CLASS(GetRingBufferProperties, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
 
@@ -588,6 +616,7 @@ DEFINE_ADMIN_TEST_CLASS(GetRingBufferProperties, {
 
 // Verify valid responses: get ring buffer VMO.
 DEFINE_ADMIN_TEST_CLASS(GetBuffer, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
@@ -605,6 +634,7 @@ DEFINE_ADMIN_TEST_CLASS(GetBuffer, {
 // needed for proper DMA. To factor this out, here the client requests enough frames to exactly fill
 // an integral number of memory pages. The driver should nonetheless return a larger buffer.
 DEFINE_ADMIN_TEST_CLASS(DriverReservesRingBufferSpace, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
@@ -622,6 +652,7 @@ DEFINE_ADMIN_TEST_CLASS(DriverReservesRingBufferSpace, {
 
 // Verify valid responses: set active channels returns a set_time after the call is made.
 DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsChange, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
@@ -638,6 +669,7 @@ DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsChange, {
 
 // If no change, the previous set-time should be returned.
 DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsNoChange, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
@@ -657,6 +689,7 @@ DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsNoChange, {
 
 // Verify an invalid input (out of range) for SetActiveChannels.
 DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsTooHigh, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
 
@@ -666,6 +699,7 @@ DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsTooHigh, {
 
 // Verify that valid start responses are received.
 DEFINE_ADMIN_TEST_CLASS(RingBufferStart, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
@@ -677,6 +711,7 @@ DEFINE_ADMIN_TEST_CLASS(RingBufferStart, {
 
 // ring-buffer FIDL channel should disconnect, with ZX_ERR_BAD_STATE
 DEFINE_ADMIN_TEST_CLASS(RingBufferStartBeforeGetVmoShouldDisconnect, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
 
@@ -685,6 +720,7 @@ DEFINE_ADMIN_TEST_CLASS(RingBufferStartBeforeGetVmoShouldDisconnect, {
 
 // ring-buffer FIDL channel should disconnect, with ZX_ERR_BAD_STATE
 DEFINE_ADMIN_TEST_CLASS(RingBufferStartWhileStartedShouldDisconnect, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
@@ -696,6 +732,7 @@ DEFINE_ADMIN_TEST_CLASS(RingBufferStartWhileStartedShouldDisconnect, {
 
 // Verify that valid stop responses are received.
 DEFINE_ADMIN_TEST_CLASS(RingBufferStop, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
@@ -708,6 +745,7 @@ DEFINE_ADMIN_TEST_CLASS(RingBufferStop, {
 
 // ring-buffer FIDL channel should disconnect, with ZX_ERR_BAD_STATE
 DEFINE_ADMIN_TEST_CLASS(RingBufferStopBeforeGetVmoShouldDisconnect, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
 
@@ -715,6 +753,7 @@ DEFINE_ADMIN_TEST_CLASS(RingBufferStopBeforeGetVmoShouldDisconnect, {
 });
 
 DEFINE_ADMIN_TEST_CLASS(RingBufferStopWhileStoppedIsPermitted, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
@@ -727,6 +766,7 @@ DEFINE_ADMIN_TEST_CLASS(RingBufferStopWhileStoppedIsPermitted, {
 
 // Verify valid WatchDelayInfo internal_delay responses.
 DEFINE_ADMIN_TEST_CLASS(InternalDelayIsValid, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
 
@@ -737,6 +777,7 @@ DEFINE_ADMIN_TEST_CLASS(InternalDelayIsValid, {
 
 // Verify valid WatchDelayInfo external_delay response.
 DEFINE_ADMIN_TEST_CLASS(ExternalDelayIsValid, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
 
@@ -747,6 +788,7 @@ DEFINE_ADMIN_TEST_CLASS(ExternalDelayIsValid, {
 
 // Verify valid responses: WatchDelayInfo does NOT respond a second time.
 DEFINE_ADMIN_TEST_CLASS(GetDelayInfoSecondTimeNoResponse, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
@@ -763,6 +805,7 @@ DEFINE_ADMIN_TEST_CLASS(GetDelayInfoSecondTimeNoResponse, {
 
 // Verify that valid WatchDelayInfo responses are received, even after RingBufferStart().
 DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterStart, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
@@ -775,6 +818,7 @@ DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterStart, {
 
 // Create a RingBuffer, drop it, recreate it, then interact with it in any way (e.g. GetProperties).
 DEFINE_ADMIN_TEST_CLASS(GetRingBufferPropertiesAfterDroppingFirstRingBuffer, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(DropRingBuffer());
@@ -788,6 +832,7 @@ DEFINE_ADMIN_TEST_CLASS(GetRingBufferPropertiesAfterDroppingFirstRingBuffer, {
 
 // Create RingBuffer, fully exercise it, drop it, recreate it, then validate GetDelayInfo.
 DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterDroppingFirstRingBuffer, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
@@ -810,6 +855,7 @@ DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterDroppingFirstRingBuffer, {
 
 // Create RingBuffer, fully exercise it, drop it, recreate it, then validate SetActiveChannels.
 DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsAfterDroppingFirstRingBuffer, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
@@ -847,15 +893,7 @@ DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsAfterDroppingFirstRingBuffer, {
       nullptr, DevNameForEntry(DEVICE).c_str(), __FILE__, __LINE__,                            \
       [&]() -> AdminTest* { return new CLASS_NAME(DEVICE); })
 
-void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
-                                 bool expect_audio_svcs_not_connected) {
-  // If audio_core or audio_device_registry is connected to the audio driver, admin tests will fail.
-  // We test a hermetic instance of the A2DP driver, so audio services are never connected to it --
-  // thus we can always run the admin tests on it.
-  if (!(device_entry.isA2DP() || expect_audio_svcs_not_connected)) {
-    return;
-  }
-
+void RegisterAdminTestsForDevice(const DeviceEntry& device_entry) {
   if (device_entry.isCodec()) {
     REGISTER_ADMIN_TEST(Reset, device_entry);
 

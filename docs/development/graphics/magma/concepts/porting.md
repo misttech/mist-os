@@ -199,7 +199,7 @@ against all their dependencies. They may only reference these shared libraries:
 This limits what dependencies ICDs can use. For example, here are some disallowed
 libraries and potential replacements:
 
-* [HLCPP][HLCPP]: Can be replaced with the [New C++ bindings][new-cpp-fidl].
+* HLCPP: Must be replaced with the [New C++ bindings][new-cpp-fidl].
 * [syslog][syslog]: Can be replaced with
   [syslog/structured_backend][syslog-structured-backend].
 * [async-default][async-default]: async dispatchers must always be specified
@@ -373,7 +373,6 @@ the system driver using the Zircon DDK.
 [sdk-get-started]: /docs/development/sdk/index.md
 [bazel]: https://bazel.build/
 [rules_foreign_cc]: https://github.com/bazelbuild/rules_foreign_cc
-[HLCPP]: /docs/reference/fidl/bindings/hlcpp-bindings.md
 [new-cpp-fidl]: /docs/development/languages/fidl/tutorials/cpp/README.md
 [syslog]: /zircon/system/ulib/syslog/
 [syslog-structured-backend]: /sdk/lib/syslog/structured_backend/

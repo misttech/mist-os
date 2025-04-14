@@ -52,6 +52,7 @@ async fn download(remote_control: RemoteControlProxyHolder, cmd: DownloadCommand
             ffx_error!("Failed to create output file: {}: {}", cmd.output_file, err)
         })?,
         cmd.with_tags,
+        cmd.symbolize,
     )?;
 
     Ok(())

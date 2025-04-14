@@ -7,12 +7,14 @@ package(default_visibility = ["//visibility:public"])
 cc_library(
     name = "cpp",
     srcs = [
-        "mock-mmio-range.cc",
-        "mock-mmio-reg.cc",
+        "globally-ordered-region.cc",
+        "region.cc",
+        "register.cc",
     ],
     hdrs = [
-        "mock-mmio-range.h",
-        "mock-mmio-reg.h",
+        "globally-ordered-region.h",
+        "region.h",
+        "register.h",
     ],
     include_prefix = "lib/driver/mock-mmio/cpp",
     target_compatible_with = ["@platforms//os:fuchsia"],

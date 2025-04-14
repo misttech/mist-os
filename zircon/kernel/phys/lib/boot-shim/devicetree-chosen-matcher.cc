@@ -41,7 +41,7 @@ devicetree::ScanState DevicetreeChosenNodeMatcherBase::HandleTtyNode(
         return entry.starts_with(tty_->vendor);
       });
 
-  if (!possible_tty || !uart_matcher_(decoder)) {
+  if (!possible_tty || !uart_selector_(decoder)) {
     return devicetree::ScanState::kActive;
   }
 
@@ -64,16 +64,16 @@ devicetree::ScanState DevicetreeChosenNodeMatcherBase::SetUpUart(
       return devicetree::ScanState::kDone;
     }
 
-    if (!uart_matcher_(decoder)) {
+    if (!uart_selector_(decoder)) {
       return devicetree::ScanState::kDone;
     }
 
-    uart_dcfg_.mmio_phys = *translated_addr;
-    uart_dcfg_.irq = 0;
+    uart_config_->mmio_phys = *translated_addr;
+    uart_config_->irq = 0;
 
     if (reg_offset) {
       if (auto offset = reg_offset->AsUint32()) {
-        uart_dcfg_.mmio_phys += *offset;
+        uart_config_->mmio_phys += *offset;
       } else {
         OnError("Failed to parse 'reg-offset' property from UART node.");
       }
@@ -89,7 +89,7 @@ devicetree::ScanState DevicetreeChosenNodeMatcherBase::SetUpUart(
       if (!*result) {
         return devicetree::ScanState::kActive;
       }
-      UpdateUart();
+      SetUartIrq();
     }
   }
   return devicetree::ScanState::kDone;
@@ -147,7 +147,7 @@ devicetree::ScanState DevicetreeChosenNodeMatcherBase::OnNode(
         if (!*result) {
           return devicetree::ScanState::kActive;
         }
-        UpdateUart();
+        SetUartIrq();
       }
       return devicetree::ScanState::kDone;
     }

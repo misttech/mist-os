@@ -9,6 +9,7 @@
 #include <lib/magma/util/utils.h>
 #include <lib/zx/time.h>
 
+#include "zircon_counter_semaphore.h"
 #include "zircon_platform_port.h"
 #include "zircon_vmo_semaphore.h"
 
@@ -102,6 +103,12 @@ std::unique_ptr<PlatformSemaphore> PlatformSemaphore::Import(zx::handle handle, 
                                                        flags);
     case ZX_OBJ_TYPE_VMO:
       return std::make_unique<ZirconVmoSemaphore>(zx::vmo(std::move(handle)), info.koid, flags);
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+    case ZX_OBJ_TYPE_COUNTER:
+      return std::make_unique<ZirconCounterSemaphore>(zx::counter(std::move(handle)), info.koid,
+                                                      flags);
+#endif
 
     default:
       return DRETP(nullptr, "unexpected object type: %d", info.type);

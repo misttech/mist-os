@@ -7,6 +7,7 @@ use ffx_e2e_emu::IsolatedEmulator;
 use fuchsia_async::Timer;
 use prost::Message;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::path::Path;
 use std::time::Duration;
 use tempfile::tempdir;
@@ -155,5 +156,75 @@ async fn test_ffx_profile_heapdump() {
         });
         assert!(known_block_found);
     }
+
+    // Take another live snapshot, this time with symbolization enabled, and verify the names of the
+    // functions on the stack match the expectations.
+    info!("Taking a symbolized snapshot...");
+    {
+        let profile_path = scratch_dir.path().join("symbolized-snapshot.pb");
+        emu.ffx(&[
+            "profile",
+            "heapdump",
+            "snapshot",
+            "--symbolize",
+            "--by-name",
+            "heapdump-example.cm",
+            "--output-file",
+            profile_path.to_str().unwrap(),
+        ])
+        .await
+        .expect("Failed to take a live snapshot");
+
+        let profile =
+            load_profile_file(&profile_path).expect("Failed to load the generated profile");
+        let mapping_by_id: HashMap<u64, &pprof::Mapping> =
+            profile.mapping.iter().map(|mapping| (mapping.id, mapping)).collect();
+        let location_by_id: HashMap<u64, &pprof::Location> =
+            profile.location.iter().map(|location| (location.id, location)).collect();
+        let function_by_id: HashMap<u64, &pprof::Function> =
+            profile.function.iter().map(|function| (function.id, function)).collect();
+
+        // For each sample, count the number of "fibonacci" occurrences in its call stack.
+        let mut distrib = HashMap::<usize, usize>::new(); // distribution of the counters
+        for sample in &profile.sample {
+            let mut counter = 0;
+
+            for location_id in &sample.location_id {
+                let location = location_by_id.get(location_id).unwrap();
+
+                // Validate that the mapping is marked as resolved.
+                let mapping = mapping_by_id.get(&location.mapping_id).unwrap();
+                assert!(mapping.has_functions);
+                assert!(mapping.has_filenames);
+                assert!(mapping.has_line_numbers);
+                assert!(mapping.has_inline_frames);
+
+                for line in &location.line {
+                    let function = function_by_id.get(&line.function_id).unwrap();
+
+                    let name = profile.string_table.get(function.name as usize).unwrap();
+                    let filename = profile.string_table.get(function.filename as usize).unwrap();
+
+                    if name.contains("fibonacci(")
+                        && filename.ends_with("src/performance/memory/heapdump/example/main.c")
+                    {
+                        counter += 1;
+                    }
+                }
+            }
+
+            *distrib.entry(counter).or_default() += 1;
+        }
+
+        // Validate some simple properties on the distribution to check that it's sound.
+        assert!(distrib.get(&7).is_none());
+        assert!(distrib.get(&6).is_some());
+        assert!(distrib.get(&5).is_some());
+        assert!(distrib.get(&4).is_some());
+        assert!(distrib.get(&3).is_some());
+        assert!(distrib.get(&2).is_some());
+        assert!(distrib.get(&1).is_some());
+    }
+
     emu.stop().await;
 }

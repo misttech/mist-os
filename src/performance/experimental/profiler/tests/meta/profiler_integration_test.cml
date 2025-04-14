@@ -45,7 +45,6 @@
             protocol: [
                 "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.RootJob",
-                "fuchsia.logger.Log",
             ],
             from: "parent",
             to: [ "#profiler" ],

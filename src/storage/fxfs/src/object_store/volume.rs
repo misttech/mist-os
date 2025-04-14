@@ -102,7 +102,7 @@ impl RootVolume {
     ) -> Result<Arc<ObjectStore>, Error> {
         self.volume_from_id(
             match self.volume_directory().lookup(volume_name).await?.ok_or(FxfsError::NotFound)? {
-                (object_id, ObjectDescriptor::Volume) => object_id,
+                (object_id, ObjectDescriptor::Volume, _) => object_id,
                 _ => bail!(anyhow!(FxfsError::Inconsistent).context("Expected volume")),
             },
             owner,
@@ -138,7 +138,7 @@ impl RootVolume {
     ) -> Result<(), Error> {
         let object_id =
             match self.volume_directory().lookup(volume_name).await?.ok_or(FxfsError::NotFound)? {
-                (object_id, ObjectDescriptor::Volume) => object_id,
+                (object_id, ObjectDescriptor::Volume, _) => object_id,
                 _ => bail!(anyhow!(FxfsError::Inconsistent).context("Expected volume")),
             };
         let root_store = self.filesystem.root_store();

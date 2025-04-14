@@ -52,6 +52,7 @@ _gigaboot_bootloader = {
 
 generated_partitions_config("default") {
   hw_revision = ""
+  forward_variables_from(_standard_names, "*")
 }
 
 if (target_cpu == "x64") {

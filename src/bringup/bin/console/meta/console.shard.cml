@@ -322,10 +322,7 @@
             to: "#console-launcher",
         },
         {
-            protocol: [
-                "fuchsia.diagnostics.LogSettings",
-                "fuchsia.logger.Log",
-            ],
+            protocol: [ "fuchsia.diagnostics.LogSettings" ],
             from: "#archivist",
             to: [
                 "#console",

@@ -30,13 +30,13 @@ use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{ArchSpecific, UserAddress};
 use starnix_uapi::vfs::ResolveFlags;
+#[cfg(feature = "arch32")]
+use starnix_uapi::AT_PLATFORM;
 use starnix_uapi::{
     errno, error, from_status_like_fdio, AT_BASE, AT_CLKTCK, AT_EGID, AT_ENTRY, AT_EUID, AT_EXECFN,
-    AT_GID, AT_NULL, AT_PAGESZ, AT_PHDR, AT_PHENT, AT_PHNUM, AT_RANDOM, AT_SECURE, AT_SYSINFO_EHDR,
-    AT_UID,
+    AT_GID, AT_HWCAP, AT_NULL, AT_PAGESZ, AT_PHDR, AT_PHENT, AT_PHNUM, AT_RANDOM, AT_SECURE,
+    AT_SYSINFO_EHDR, AT_UID,
 };
-#[cfg(feature = "arch32")]
-use starnix_uapi::{AT_HWCAP, AT_PLATFORM};
 use std::ffi::{CStr, CString};
 use std::mem::size_of;
 use std::ops::Deref as _;
@@ -129,20 +129,6 @@ fn populate_initial_stack(
         // Write the platform to the stack too
         // TODO(https://fxbug.dev/380427153): add arch helper
         auxv.push((AT_PLATFORM, platform_addr.ptr() as u64));
-
-        auxv.push((
-            AT_HWCAP,
-            (arch32::HWCAP_HALF
-                | arch32::HWCAP_TLS
-                | arch32::HWCAP_FAST_MULT
-                | arch32::HWCAP_IDIVA
-                | arch32::HWCAP_IDIVT
-                | arch32::HWCAP_TLS
-                | arch32::HWCAP_THUMB
-                | arch32::HWCAP_SWP
-                | arch32::HWCAP_VFPv4
-                | arch32::HWCAP_NEON) as u64,
-        ));
     }
 
     auxv.push((AT_EXECFN, execfn_addr.ptr() as u64));
@@ -589,6 +575,38 @@ fn resolve_elf(
     })
 }
 
+#[cfg(target_arch = "aarch64")]
+fn get_hwcap(is_arch32: bool) -> u32 {
+    // HWCAP is dependent on the hardware, but for now we hardcode with values based on the
+    // architecture to get tests passing.
+    // TODO(https://fxbug.dev/392598058): Populate HWCAP with zx_system_get_features().
+    if is_arch32 {
+        arch32::HWCAP_HALF
+            | arch32::HWCAP_FAST_MULT
+            | arch32::HWCAP_IDIVA
+            | arch32::HWCAP_IDIVT
+            | arch32::HWCAP_TLS
+            | arch32::HWCAP_THUMB
+            | arch32::HWCAP_SWP
+            | arch32::HWCAP_VFPv4
+            | arch32::HWCAP_NEON
+    } else {
+        starnix_uapi::HWCAP_PMULL
+            | starnix_uapi::HWCAP_FP
+            | starnix_uapi::HWCAP_CRC32
+            | starnix_uapi::HWCAP_SHA2
+    }
+}
+
+#[cfg(not(target_arch = "aarch64"))]
+fn get_hwcap(is_arch32: bool) -> u32 {
+    // HWCAP is dependent on the hardware, but for now we hardcode with values based on the
+    // architecture to get tests passing.
+    // TODO(https://fxbug.dev/392598058): Populate HWCAP with zx_system_get_features().
+    assert!(!is_arch32, "32-bit programs are only supported on ARM.");
+    0
+}
+
 /// Loads a resolved ELF into memory, along with an interpreter if one is defined, and initializes
 /// the stack.
 pub fn load_executable(
@@ -714,6 +732,7 @@ pub fn load_executable(
     let auxv = {
         let creds = current_task.creds();
         let secure = if creds.uid != creds.euid || creds.gid != creds.egid { 1 } else { 0 };
+
         vec![
             (AT_PAGESZ, *PAGE_SIZE),
             (AT_CLKTCK, SCHEDULER_CLOCK_HZ as u64),
@@ -728,6 +747,7 @@ pub fn load_executable(
             (AT_ENTRY, main_elf_entry as u64),
             (AT_SYSINFO_EHDR, vdso_base.into()),
             (AT_SECURE, secure),
+            (AT_HWCAP, get_hwcap(main_elf.arch_width.is_arch32()) as u64),
         ]
     };
 

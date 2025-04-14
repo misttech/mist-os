@@ -5,7 +5,7 @@
 #include "src/graphics/display/drivers/intel-display/ddi-physical-layer.h"
 
 #include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
-#include <lib/driver/mock-mmio/cpp/mock-mmio-range.h>
+#include <lib/driver/mock-mmio/cpp/globally-ordered-region.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio/mmio-buffer.h>
 
@@ -56,7 +56,8 @@ class TypeCDdiTigerLakeTest : public ::testing::Test {
  protected:
   constexpr static int kMmioRangeSize = 0x200000;
   fdf_testing::ScopedGlobalLogger logger_;
-  mock_mmio::MockMmioRange mmio_range_{kMmioRangeSize, mock_mmio::MockMmioRange::Size::k32};
+  mock_mmio::GloballyOrderedRegion mmio_range_{kMmioRangeSize,
+                                               mock_mmio::GloballyOrderedRegion::Size::k32};
   fdf::MmioBuffer mmio_buffer_{mmio_range_.GetMmioBuffer()};
   TestPower power_{nullptr};
 };
@@ -68,7 +69,7 @@ constexpr uint32_t kMailboxData1Offset = 0x13812c;
 TEST_F(TypeCDdiTigerLakeTest, EnableFsm_TypeCColdBlock_Success) {
   constexpr DdiId kTargetDdiId = DdiId::DDI_TC_1;
 
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -109,7 +110,7 @@ TEST_F(TypeCDdiTigerLakeTest, EnableFsm_TypeCColdBlock_Failure) {
 TEST_F(TypeCDdiTigerLakeTest, EnableFsm_SafeModeSet_Success) {
   constexpr DdiId kTargetDdiId = DdiId::DDI_TC_1;
 
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       // DynamicFlexIoDisplayPortPhyModeStatus
       // Type-C PHY is ready on DDI_TC_1.
       {.address = 0x163890, .value = 0x0000'0001},
@@ -136,7 +137,7 @@ TEST_F(TypeCDdiTigerLakeTest, EnableFsm_SafeModeSet_Success) {
 TEST_F(TypeCDdiTigerLakeTest, EnableFsm_SafeModeSet_Failure) {
   constexpr DdiId kTargetDdiId = DdiId::DDI_TC_1;
 
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       // DynamicFlexIoDisplayPortPhyModeStatus
       // Type-C PHY is not ready on DDI_TC_1.
       {.address = 0x163890, .value = 0x0000'0002},
@@ -153,7 +154,7 @@ TEST_F(TypeCDdiTigerLakeTest, EnableFsm_SafeModeSet_Failure) {
 TEST_F(TypeCDdiTigerLakeTest, EnableFsm_AuxPowerOn_Success) {
   constexpr DdiId kTargetDdiId = DdiId::DDI_TC_1;
 
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       // HipIndexReg0
       {.address = 0x1010a0, .value = 0x0000'0000},
       {.address = 0x1010a0, .value = 0x0000'0002, .write = true},
@@ -266,7 +267,7 @@ TEST_F(TypeCDdiTigerLakeTest, DisableFsm_AuxPoweredOn_AlwaysSuccess) {
 TEST_F(TypeCDdiTigerLakeTest, EnableFsm_SafeModeSet_AlwaysSuccess) {
   constexpr DdiId kTargetDdiId = DdiId::DDI_TC_1;
 
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       // DynamicFlexIoDisplayPortControllerSafeStateSettings
       // Enable safe mode.
       {.address = 0x163894, .value = 0x0000'0001},
@@ -285,7 +286,7 @@ TEST_F(TypeCDdiTigerLakeTest, EnableFsm_SafeModeSet_AlwaysSuccess) {
 TEST_F(TypeCDdiTigerLakeTest, DisableFsm_TypeCColdUnblock_Success) {
   constexpr DdiId kTargetDdiId = DdiId::DDI_TC_1;
 
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0001, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -304,7 +305,7 @@ TEST_F(TypeCDdiTigerLakeTest, DisableFsm_TypeCColdUnblock_Success) {
               TypeCDdiTigerLake::InitializationPhase::kUninitialized);
   }
 
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0001, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -453,7 +454,7 @@ TEST_F(TypeCDdiTigerLakeTest, Enable_Success) {
   constexpr DdiId kTargetDdiId = DdiId::DDI_TC_2;
 
   // Unblock TCCOLD state.
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -465,7 +466,7 @@ TEST_F(TypeCDdiTigerLakeTest, Enable_Success) {
   }));
 
   // Set Type-C safe mode.
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       // DynamicFlexIoDisplayPortPhyModeStatus
       // Type-C PHY is ready on DDI_TC_2.
       {.address = 0x163890, .value = 0x0000'0002},
@@ -482,7 +483,7 @@ TEST_F(TypeCDdiTigerLakeTest, Enable_Success) {
   }));
 
   // AUX power on
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       // HipIndexReg0
       {.address = 0x1010a0, .value = 0x0000'0001},
       {.address = 0x1010a0, .value = 0x0000'0201, .write = true},
@@ -566,7 +567,7 @@ TEST_F(TypeCDdiTigerLakeTest, Enable_Failure_SafeModePhyNotAvailable) {
   constexpr DdiId kTargetDdiId = DdiId::DDI_TC_2;
 
   // Unblock TCCOLD state.
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -578,14 +579,14 @@ TEST_F(TypeCDdiTigerLakeTest, Enable_Failure_SafeModePhyNotAvailable) {
   }));
 
   // Set Type-C safe mode.
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       // DynamicFlexIoDisplayPortPhyModeStatus
       // Type-C PHY is not ready on DDI_TC_2.
       {.address = 0x163890, .value = 0x0000'0000},
   }));
 
   // Revert "Set Type-C safe mode".
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       // DynamicFlexIoDisplayPortControllerSafeStateSettings
       // Enable safe mode.
       {.address = 0x163894, .value = 0x0000'0002},
@@ -594,7 +595,7 @@ TEST_F(TypeCDdiTigerLakeTest, Enable_Failure_SafeModePhyNotAvailable) {
   }));
 
   // Revert "Unblock TCCOLD state".
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0001, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -641,7 +642,7 @@ TEST_F(TypeCDdiTigerLakeTest, Enable_Failure_CannotEnableAux) {
   TestPowerCannotEnableAux power_cannot_enable_aux(nullptr);
 
   // Unblock TCCOLD state.
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -653,7 +654,7 @@ TEST_F(TypeCDdiTigerLakeTest, Enable_Failure_CannotEnableAux) {
   }));
 
   // Set Type-C safe mode.
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       // DynamicFlexIoDisplayPortPhyModeStatus
       // Type-C PHY is ready on DDI_TC_2.
       {.address = 0x163890, .value = 0x0000'0002},
@@ -670,10 +671,10 @@ TEST_F(TypeCDdiTigerLakeTest, Enable_Failure_CannotEnableAux) {
   }));
 
   // AUX power on fails; AUX IO is powered off through `Power`.
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList{});
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList{});
 
   // Revert "Set Type-C safe mode".
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       // DynamicFlexIoDisplayPortControllerSafeStateSettings
       // Enable safe mode.
       {.address = 0x163894, .value = 0x0000'0002},
@@ -682,7 +683,7 @@ TEST_F(TypeCDdiTigerLakeTest, Enable_Failure_CannotEnableAux) {
   }));
 
   // Revert "Unblock TCCOLD state".
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0001, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -770,10 +771,10 @@ TEST_F(TypeCDdiTigerLakeTest, Disable_Success) {
   TestPowerTrackingAux power(nullptr);
 
   // AUX IO is powered off through `Power`.
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList{});
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList{});
 
   // Revert "Set Type-C safe mode".
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       // DynamicFlexIoDisplayPortControllerSafeStateSettings
       // Enable safe mode.
       {.address = 0x163894, .value = 0x0000'0002},
@@ -782,7 +783,7 @@ TEST_F(TypeCDdiTigerLakeTest, Disable_Success) {
   }));
 
   // Revert "Unblock TCCOLD state".
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0001, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -874,7 +875,7 @@ TEST_F(TypeCDdiTigerLakeTest, ReadPhysicalLayerInfo_StaticPort) {
           registers::DynamicFlexIoScratchPad::TypeCLiveState::kNoHotplugDisplay));
     }
 
-    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
         {.address = scratch_pad.reg_addr(), .value = scratch_pad.reg_value()},
     }));
 
@@ -907,7 +908,7 @@ TEST_F(TypeCDdiTigerLakeTest, ReadPhysicalLayerInfo_NoTypeC) {
           registers::DynamicFlexIoScratchPad::TypeCLiveState::kNoHotplugDisplay));
     }
 
-    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
         {.address = scratch_pad.reg_addr(), .value = scratch_pad.reg_value()},
     }));
 
@@ -942,7 +943,7 @@ TEST_F(TypeCDdiTigerLakeTest, ReadPhysicalLayerInfo_TypeCDisplayPortAlt) {
       scratch_pad.set_display_port_tx_lane_assignment_bits_connector_1(0b0011);
     }
 
-    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
         {.address = scratch_pad.reg_addr(), .value = scratch_pad.reg_value()},
     }));
 
@@ -976,7 +977,7 @@ TEST_F(TypeCDdiTigerLakeTest, ReadPhysicalLayerInfo_Thunderbolt) {
           registers::DynamicFlexIoScratchPad::TypeCLiveState::kThunderboltHotplugDisplay));
     }
 
-    mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+    mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
         {.address = scratch_pad.reg_addr(), .value = scratch_pad.reg_value()},
     }));
 
@@ -1001,7 +1002,8 @@ class ComboDdiTigerLakeTest : public ::testing::Test {
  protected:
   constexpr static int kMmioRangeSize = 0x200000;
   fdf_testing::ScopedGlobalLogger logger_;
-  mock_mmio::MockMmioRange mmio_range_{kMmioRangeSize, mock_mmio::MockMmioRange::Size::k32};
+  mock_mmio::GloballyOrderedRegion mmio_range_{kMmioRangeSize,
+                                               mock_mmio::GloballyOrderedRegion::Size::k32};
   fdf::MmioBuffer mmio_buffer_{mmio_range_.GetMmioBuffer()};
 };
 
@@ -1045,7 +1047,7 @@ constexpr int kPortPcsDw1Ln3AOffset = 0x162b04;
 constexpr int kPortTxDw8Ln3AOffset = 0x162ba0;
 
 TEST_F(ComboDdiTigerLakeTest, InitializeDdiADell5420) {
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kPortCompDw3AOffset, .value = 0xc0606b25},
       {.address = kPortCompDw1AOffset, .value = 0x81000400},
       {.address = kPortCompDw9AOffset, .value = 0x62ab67bb},
@@ -1071,7 +1073,7 @@ TEST_F(ComboDdiTigerLakeTest, InitializeDdiADell5420) {
 }
 
 TEST_F(ComboDdiTigerLakeTest, InitializeDdiBDell5420) {
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kPortCompDw3BOffset, .value = 0xc0606b25},
       {.address = kPortCompDw1BOffset, .value = 0x81000400},
       {.address = kPortCompDw9BOffset, .value = 0x62ab67bb},
@@ -1097,7 +1099,7 @@ TEST_F(ComboDdiTigerLakeTest, InitializeDdiBDell5420) {
 }
 
 TEST_F(ComboDdiTigerLakeTest, InitializeDdiBNuc11) {
-  mmio_range_.Expect(mock_mmio::MockMmioRange::AccessList({
+  mmio_range_.Expect(mock_mmio::GloballyOrderedRegion::AccessList({
       {.address = kPortCompDw3BOffset, .value = 0xc0608025},
       {.address = kPortCompDw1BOffset, .value = 0x81000400},
       {.address = kPortCompDw9BOffset, .value = 0x62ab67bb},

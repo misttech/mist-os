@@ -7,7 +7,7 @@
         runner: "elf",
         binary: "bin/intl_property_manager",
         args: [
-            "--set_initial_profile",
+            "--set-initial-profile",
             "--locale_ids=en-US,nl-NL",
             "--timezone_ids=und-u-tz-uslax",
         ],

@@ -644,7 +644,7 @@ class VmPageListNode final : public fbl::WAVLTreeContainable<ktl::unique_ptr<VmP
       if (!self->pages_[i].IsEmpty()) {
         zx_status_t status =
             func(PTR_TYPE{&self->pages_[i]}, self->obj_offset_ + i * PAGE_SIZE - skew);
-        if (unlikely(status != ZX_ERR_NEXT)) {
+        if (status != ZX_ERR_NEXT) {
           return status;
         }
       }
@@ -1361,7 +1361,7 @@ class VmPageList final {
   static zx_status_t ForEveryPage(S self, F per_page_func) {
     for (auto& pl : self->list_) {
       zx_status_t status = pl.template ForEveryPage<PTR_TYPE, F>(per_page_func, self->list_skew_);
-      if (unlikely(status != ZX_ERR_NEXT)) {
+      if (status != ZX_ERR_NEXT) {
         if (status == ZX_ERR_STOP) {
           break;
         }

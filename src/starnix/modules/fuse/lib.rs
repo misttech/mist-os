@@ -1671,10 +1671,10 @@ impl FsNodeOps for FuseNode {
     }
 
     fn forget(
-        &self,
+        self: Box<Self>,
         locked: &mut Locked<'_, FileOpsCore>,
-        _node: &FsNode,
         current_task: &CurrentTask,
+        _info: FsNodeInfo,
     ) -> Result<(), Errno> {
         let nlookup = self.state.lock().nlookup;
         let mut state = self.connection.lock();
@@ -1685,7 +1685,7 @@ impl FsNodeOps for FuseNode {
             state.execute_operation(
                 locked,
                 current_task,
-                self,
+                self.as_ref(),
                 FuseOperation::Forget(uapi::fuse_forget_in { nlookup }),
             )?;
         };

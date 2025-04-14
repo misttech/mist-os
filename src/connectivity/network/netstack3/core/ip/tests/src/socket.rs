@@ -20,7 +20,7 @@ use test_case::test_case;
 
 use netstack3_base::socket::SocketIpAddr;
 use netstack3_base::testutil::{set_logger_for_test, TestAddrs, TestIpExt};
-use netstack3_base::{EitherDeviceId, IpDeviceAddr, Mms};
+use netstack3_base::{CounterContext, EitherDeviceId, IpDeviceAddr, Mms, ResourceCounterContext};
 use netstack3_core::device::{DeviceId, EthernetLinkDevice};
 use netstack3_core::testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder};
 use netstack3_core::{IpExt, TxMetadata};
@@ -31,9 +31,10 @@ use netstack3_ip::socket::{
     DeviceIpSocketHandler, IpSockCreationError, IpSockDefinition, IpSockSendError, IpSocketHandler,
     MmsError, RouteResolutionOptions, SendOptions,
 };
+use netstack3_ip::testutil::IpCounterExpectations;
 use netstack3_ip::{
-    self as ip, device, AddableEntryEither, AddableMetric, IpDeviceMtuContext, RawMetric,
-    ResolveRouteError,
+    self as ip, device, AddableEntryEither, AddableMetric, IpCounters, IpDeviceMtuContext,
+    RawMetric, ResolveRouteError,
 };
 
 enum AddressType {
@@ -365,12 +366,12 @@ fn test_send_local<I: IpSocketIpExt + IpExt>(
     ctx.test_api()
         .add_route(AddableEntryEither::without_gateway(
             subnet.into(),
-            device_id,
+            device_id.clone(),
             AddableMetric::ExplicitMetric(RawMetric(0)),
         ))
         .unwrap();
 
-    let _loopback_device_id = ctx.test_api().add_loopback();
+    let loopback_device_id: DeviceId<FakeBindingsCtx> = ctx.test_api().add_loopback().into();
     let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
 
     let (expected_from_ip, from_ip) = match from_addr_type {
@@ -428,7 +429,31 @@ fn test_send_local<I: IpSocketIpExt + IpExt>(
 
     assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
-    assert_eq!(ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet.get(), 1);
+    // Verify the stack-wide IP counters
+    assert_eq!(
+        IpCounterExpectations::<I> {
+            receive_ip_packet: 1,
+            dispatch_receive_ip_packet: 1,
+            deliver_unicast: 1,
+            send_ip_packet: 1,
+            ..Default::default()
+        },
+        CounterContext::<IpCounters<I>>::counters(&ctx.core_ctx()).into(),
+    );
+    // Verify the per-device counters for each device.
+    assert_eq!(
+        IpCounterExpectations::<I> {
+            receive_ip_packet: 1,
+            dispatch_receive_ip_packet: 1,
+            deliver_unicast: 1,
+            ..Default::default()
+        },
+        ctx.core_ctx().per_resource_counters(&device_id).into()
+    );
+    assert_eq!(
+        IpCounterExpectations::<I> { send_ip_packet: 1, ..Default::default() },
+        ctx.core_ctx().per_resource_counters(&loopback_device_id).into()
+    );
 }
 
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]

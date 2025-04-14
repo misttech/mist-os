@@ -413,7 +413,13 @@ mod tests {
         let remote =
             create_fuchsia_pipe(&current_task, fs2, OpenFlags::RDWR | OpenFlags::NONBLOCK).unwrap();
         downcast_socket_to_vsock(&socket).lock().state = VsockSocketState::Connected(remote);
-        let socket_file = Socket::new_file(&mut locked, &current_task, socket, OpenFlags::RDWR);
+        let socket_file = Socket::new_file(
+            &mut locked,
+            &current_task,
+            socket,
+            OpenFlags::RDWR,
+            /* kernel_private=*/ false,
+        );
 
         const XFER_SIZE: usize = 42;
 
@@ -454,7 +460,13 @@ mod tests {
         )
         .expect("Failed to create socket.");
         downcast_socket_to_vsock(&socket_object).lock().state = VsockSocketState::Connected(pipe);
-        let socket = Socket::new_file(&mut locked, &current_task, socket_object, OpenFlags::RDWR);
+        let socket = Socket::new_file(
+            &mut locked,
+            &current_task,
+            socket_object,
+            OpenFlags::RDWR,
+            /* kernel_private=*/ false,
+        );
 
         assert_eq!(
             socket.query_events(&mut locked, &current_task),

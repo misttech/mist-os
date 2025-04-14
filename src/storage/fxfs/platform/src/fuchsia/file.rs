@@ -1676,9 +1676,9 @@ mod tests {
             .expect("Failed to get VMO");
         let err = vmo.set_size(10).expect_err("VMO should not be resizable");
         assert_eq!(err, Status::ACCESS_DENIED);
-        vmo.set_content_size(&20).expect("content is still growable");
         // This zeroes pages, which can't be done on a read-only VMO.
         vmo.set_stream_size(20).expect_err("stream size is not modifiable");
+        vmo.set_content_size(&20).expect_err("content is not modifiable");
 
         close_file_checked(file).await;
         fixture.close().await;

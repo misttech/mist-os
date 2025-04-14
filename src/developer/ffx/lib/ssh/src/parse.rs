@@ -83,7 +83,7 @@ pub async fn read_ssh_line<R: AsyncRead + Unpin>(
 }
 
 #[tracing::instrument(skip(rdr))]
-async fn read_ssh_line_with_timeouts<R: AsyncBufRead + Unpin>(
+pub async fn read_ssh_line_with_timeouts<R: AsyncBufRead + Unpin>(
     rdr: &mut R,
 ) -> Result<String, ParseSshConnectionError> {
     let mut time = 0;

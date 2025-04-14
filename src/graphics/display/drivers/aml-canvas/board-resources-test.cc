@@ -6,10 +6,10 @@
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/fake-bti/cpp/fake-bti.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
-#include <lib/fake-bti/bti.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/result.h>
@@ -19,7 +19,6 @@
 
 #include <gtest/gtest.h>
 
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace aml_canvas {
@@ -40,7 +39,7 @@ class FakePdevTest : public ::testing::Test, public loop_fixture::RealLoop {
 
  protected:
   fdf_testing::ScopedGlobalLogger logger_;
-  fake_pdev::FakePDevFidl fake_pdev_server_;
+  fdf_fake::FakePDev fake_pdev_server_;
 };
 
 TEST_F(FakePdevTest, MapMmioSuccess) {
@@ -48,11 +47,11 @@ TEST_F(FakePdevTest, MapMmioSuccess) {
   const uint64_t vmo_size = 0x2000;
   ASSERT_OK(zx::vmo::create(vmo_size, /*options=*/0, &vmo));
 
-  fake_pdev::FakePDevFidl::Config config;
-  config.mmios[0] = fake_pdev::MmioInfo{
-      .vmo = std::move(vmo),
+  fdf_fake::FakePDev::Config config;
+  config.mmios[0] = fdf::PDev::MmioInfo{
       .offset = 0,
       .size = vmo_size,
+      .vmo = std::move(vmo),
   };
   fake_pdev_server_.SetConfig(std::move(config));
 
@@ -64,7 +63,7 @@ TEST_F(FakePdevTest, MapMmioSuccess) {
 }
 
 TEST_F(FakePdevTest, MapMmioPdevFailure) {
-  fake_pdev::FakePDevFidl::Config config;
+  fdf_fake::FakePDev::Config config;
   fake_pdev_server_.SetConfig(std::move(config));
 
   fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev = ConnectToFakePdev();
@@ -75,12 +74,11 @@ TEST_F(FakePdevTest, MapMmioPdevFailure) {
 }
 
 TEST_F(FakePdevTest, GetBtiSuccess) {
-  zx_handle_t fake_bti;
-  zx_status_t status = fake_bti_create(&fake_bti);
-  ASSERT_OK(status);
+  zx::result fake_bti = fake_bti::CreateFakeBti();
+  ASSERT_OK(fake_bti);
 
-  fake_pdev::FakePDevFidl::Config config;
-  config.btis[0] = zx::bti(fake_bti);
+  fdf_fake::FakePDev::Config config;
+  config.btis[0] = std::move(fake_bti.value());
   fake_pdev_server_.SetConfig(std::move(config));
 
   fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev = ConnectToFakePdev();
@@ -91,7 +89,7 @@ TEST_F(FakePdevTest, GetBtiSuccess) {
 }
 
 TEST_F(FakePdevTest, GetBtiPdevFailure) {
-  fake_pdev::FakePDevFidl::Config config;
+  fdf_fake::FakePDev::Config config;
   config.use_fake_bti = false;
   fake_pdev_server_.SetConfig(std::move(config));
 

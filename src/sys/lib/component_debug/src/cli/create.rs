@@ -11,7 +11,7 @@ use fuchsia_url::AbsoluteComponentUrl;
 #[cfg(mistos)]
 use fuchsia_url::boot_url::BootUrl;
 use moniker::Moniker;
-use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
+use {flex_fuchsia_component_decl as fdecl, flex_fuchsia_sys2 as fsys};
 
 pub async fn create_cmd<W: std::io::Write>(
     #[cfg(not(mistos))]

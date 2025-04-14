@@ -11,16 +11,15 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.nullable"]
+_ir_path = get_fidl_ir_map()["test.nullable"]
 add_ir_path(_ir_path)
 
 
 @dataclass
 class Int32Wrapper:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    val: int | None
+    val: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Int32Wrapper"
@@ -39,21 +38,21 @@ class Int32Wrapper:
             self, "test.nullable", "test.nullable/Int32Wrapper"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "val": None,
+                "val": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class SimpleProtocolAddRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    a: int | None
-    b: int | None
+    a: int
+    b: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "SimpleProtocolAddRequest"
@@ -72,21 +71,21 @@ class SimpleProtocolAddRequest:
             self, "test.nullable", "test.nullable/SimpleProtocolAddRequest"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,
-                "b": None,
+                "a": None,  # type: ignore[arg-type,unused-ignore]
+                "b": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class SimpleProtocolAddResponse:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    sum_: int | None
+    sum_: int
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "SimpleProtocolAddResponse"
@@ -105,20 +104,20 @@ class SimpleProtocolAddResponse:
             self, "test.nullable", "test.nullable/SimpleProtocolAddResponse"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "sum_": None,
+                "sum_": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class StructWithNullableHandle:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    val: typing.Optional[int] | None
+    val: typing.Optional[int]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "StructWithNullableHandle"
@@ -137,20 +136,20 @@ class StructWithNullableHandle:
             self, "test.nullable", "test.nullable/StructWithNullableHandle"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "val": None,
+                "val": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class StructWithNullableProtocol:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    val: typing.Optional[int] | None
+    val: typing.Optional[int]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "StructWithNullableProtocol"
@@ -169,20 +168,20 @@ class StructWithNullableProtocol:
             self, "test.nullable", "test.nullable/StructWithNullableProtocol"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "val": None,
+                "val": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class StructWithNullableRequest:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    val: typing.Optional[int] | None
+    val: typing.Optional[int]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "StructWithNullableRequest"
@@ -201,20 +200,20 @@ class StructWithNullableRequest:
             self, "test.nullable", "test.nullable/StructWithNullableRequest"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "val": None,
+                "val": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class StructWithNullableString:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    val: typing.Optional[str] | None
+    val: typing.Optional[str]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "StructWithNullableString"
@@ -233,20 +232,20 @@ class StructWithNullableString:
             self, "test.nullable", "test.nullable/StructWithNullableString"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "val": None,
+                "val": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class StructWithNullableStruct:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    val: typing.Optional[Int32Wrapper] | None
+    val: typing.Optional[Int32Wrapper]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "StructWithNullableStruct"
@@ -265,20 +264,20 @@ class StructWithNullableStruct:
             self, "test.nullable", "test.nullable/StructWithNullableStruct"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "val": None,
+                "val": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class StructWithNullableUnion:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    val: typing.Optional[SimpleUnion] | None
+    val: typing.Optional[SimpleUnion]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "StructWithNullableUnion"
@@ -297,20 +296,20 @@ class StructWithNullableUnion:
             self, "test.nullable", "test.nullable/StructWithNullableUnion"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "val": None,
+                "val": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class StructWithNullableVector:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    val: typing.Optional[typing.Sequence[int]] | None
+    val: typing.Optional[typing.Sequence[int]]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "StructWithNullableVector"
@@ -329,11 +328,13 @@ class StructWithNullableVector:
             self, "test.nullable", "test.nullable/StructWithNullableVector"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "val": None,
+                "val": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
@@ -419,12 +420,20 @@ class SimpleUnion:
         return cls(_empty=())
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class SimpleProtocolServer(fidl._server.ServerBase, ABC):
+class SimpleProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.nullable"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -442,6 +451,8 @@ class SimpleProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -459,7 +470,7 @@ class SimpleProtocolServer(fidl._server.ServerBase, ABC):
         ...
 
 
-class SimpleProtocolClient(fidl._client.FidlClient):
+class SimpleProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.nullable"
 
@@ -467,6 +478,8 @@ class SimpleProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -485,13 +498,11 @@ class SimpleProtocolClient(fidl._client.FidlClient):
             9142761280038437494,
             "test.nullable",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.nullable/SimpleProtocolAddResponse"
-            ),
+            normalize_identifier("test.nullable/SimpleProtocolAddResponse"),
         )
 
 
-class SimpleProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
+class SimpleProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.nullable"
     method_map: typing.Dict[int, MethodInfo] = {}
@@ -500,11 +511,13 @@ class SimpleProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
 
 
-SimpleProtocolMarker = fidl._library.ProtocolMarker(
+SimpleProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.nullable/SimpleProtocol"
 )

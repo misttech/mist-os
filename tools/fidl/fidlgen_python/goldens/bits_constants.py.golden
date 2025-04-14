@@ -11,8 +11,9 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.bitsconstants"]
+_ir_path = get_fidl_ir_map()["test.bitsconstants"]
 add_ir_path(_ir_path)
 
 
@@ -32,7 +33,7 @@ BitsType = enum.IntFlag(
 
 
 # Generated constants
-CONST0: int = 0
-CONST1: int = 1
-CONST2: int = 129
-CONST3: int = 131
+CONST0: int | BitsType = 0
+CONST1: int | BitsType = 1
+CONST2: int | BitsType = 129
+CONST3: int | BitsType = 131

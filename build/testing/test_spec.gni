@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import("//build/board.gni")
+import("//build/group_with_inputs.gni")
 import("//build/testing/environments.gni")
 import("//build/testing/platforms.gni")
 
@@ -152,14 +153,12 @@ if (allowed_device_types == []) {
 #     [list of strings] In the case of a fuchsia test, this contains a set of
 #     paths to package manifests that describe the blobs needed by this test.
 #
-#   package_manifest_deps (optional)
-#     [string] The path to a file that contains the paths to package manifests
-#     of target tests that are included in the deps of this test. This is used
-#     by host tests that depend on target tests to know what blobs are needed
-#     by their target test dependencies. See the `package_manifest_deps_file`
-#     in //build/testing/host_test.gni. Target test dependencies should be
-#     passed in as deps to the host_test() template. If not set correctly,
-#     this can result in test resolution errors.
+#   package_deps (optional)
+#     [list of labels] List of package labels that the test depends on which it
+#     will try to resolve at runtime. This will be used to generate a file that
+#     contains the package manifests of these package deps which can be used to
+#     know the blobs required by the test. If not set correctly, this can result
+#     in test resolution errors.
 #
 #   component_label (optional)
 #     [string] In case of test component, this describes the Gn label (with
@@ -272,6 +271,11 @@ if (allowed_device_types == []) {
 #     [bool] Indicates that test_manager should create no exception channels as it would
 #     otherwise do to detect panics. Some tests that create exception channels at the job
 #     level will fail if test_manager creates its customary exception channels.
+#   disable_fastboot (optional)
+#     [bool] Indicates that the test is associated with bringup builders and
+#     should be run on zedboot devices. This allows us to identify which bringup tests should and
+#     should not run on NUCs in fastboot.
+#     TODO (betramlalusha): Remove once b/406524915 is fixed.
 #
 template("test_spec") {
   testonly = true
@@ -288,8 +292,6 @@ template("test_spec") {
     if (!defined(environments)) {
       environments = [ host_env ]
     }
-  } else if (current_os == "unknown" && current_cpu == "wasm32") {
-    environments = []
   } else {
     assert(false, "$current_os not supported")
   }
@@ -371,6 +373,19 @@ template("test_spec") {
       assert(
           !defined(dim.dimensions),
           "found nested dimensions environment field. Did you set `dimensions = some_env`? It should be `dimensions = some_env.dimensions`")
+
+      # The General Bootloader on fastboot devices does not support fastboot boot.
+      # This causes boot tests to fail on NUCs in fastboot TCP.
+      # For now, boot tests should only run on NUCs in zedboot.
+      # TODO (betramlalusha): Remove once b/406524915 is fixed.
+      if (defined(dim.device_type) &&
+          dim.device_type == "Intel NUC Kit NUC11TNHv5" &&
+          defined(invoker.disable_fastboot) && invoker.disable_fastboot) {
+        dim.fastboot_enabled = "0"
+        env.dimensions = {
+        }
+        env.dimensions = dim
+      }
       foreach(key, all_dimension_keys) {
         dims += [
           {
@@ -440,6 +455,43 @@ template("test_spec") {
     target_name_deps += [ ":$runtime_deps_target_name" ]
   }
 
+  # Some tests depend on other packages so get the paths to the
+  # package_manifests of those package dependencies to attach to
+  # the test_spec of the test so we know what blobs it depends on.
+  pkg_manifest_deps_file = ""
+  if (defined(invoker.package_deps) && invoker.package_deps != []) {
+    pkg_manifest_deps_file = "$target_gen_dir/${target_name}.pkg_manifests.json"
+    pkg_manifest_deps_target_name = "${target_name}_pkg_manifest_deps"
+
+    _manifest_entries = []
+    _manifest_inputs = []
+    foreach(package_target, invoker.package_deps) {
+      _package_out_dir = get_label_info(package_target, "target_out_dir")
+      _package_name = get_label_info(package_target, "name")
+      _manifest_path =
+          "${_package_out_dir}/${_package_name}/package_manifest.json"
+      _manifest_path_rebased = rebase_path(_manifest_path, root_build_dir)
+      _manifest_entries += [ _manifest_path_rebased ]
+      _manifest_inputs += [ _manifest_path ]
+    }
+    generated_file(pkg_manifest_deps_target_name) {
+      forward_variables_from(invoker, [ "testonly" ])
+      deps = invoker.package_deps
+      outputs = [ pkg_manifest_deps_file ]
+      output_conversion = "json"
+      contents = _manifest_entries
+    }
+    pkg_manifest_deps_inputs_name = "${target_name}.pkg_manifest_deps.inputs"
+    group_with_inputs(pkg_manifest_deps_inputs_name) {
+      deps = invoker.package_deps
+      inputs = _manifest_inputs
+    }
+    target_name_deps += [
+      ":${pkg_manifest_deps_inputs_name}",
+      ":${pkg_manifest_deps_target_name}",
+    ]
+  }
+
   _environments = []
 
   foreach(env, target_envs) {
@@ -480,6 +532,7 @@ template("test_spec") {
                              "expects_ssh",
                              "is_boot_test",
                            ])
+    not_needed(invoker, [ "disable_fastboot" ])
     if (!defined(expects_ssh)) {
       expects_ssh = true
     }
@@ -503,7 +556,6 @@ template("test_spec") {
                                "package_label",
                                "component_label",
                                "package_manifests",
-                               "package_manifest_deps",
                                "timeout_secs",
                                "build_rule",
                                "has_generated_manifest",
@@ -555,9 +607,9 @@ template("test_spec") {
       if (runtime_deps_file != "") {
         runtime_deps = rebase_path(runtime_deps_file, root_build_dir)
       }
-      if (defined(package_manifest_deps)) {
+      if (pkg_manifest_deps_file != "") {
         package_manifest_deps =
-            rebase_path(package_manifest_deps, root_build_dir)
+            rebase_path(pkg_manifest_deps_file, root_build_dir)
       }
     }
     environments = []  # Clear from previous iteration.
@@ -575,9 +627,6 @@ template("test_spec") {
         forward_variables_from(invoker.metadata, "*")
       }
       tests = [ test_spec ]
-      if (defined(invoker.package_manifests)) {
-        package_manifests = invoker.package_manifests
-      }
     }
     deps = target_name_deps
     if (defined(invoker.isolated) && invoker.isolated &&

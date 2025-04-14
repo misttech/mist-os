@@ -52,11 +52,11 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   static BootOptions boot_options;
   gBootOptions = &boot_options;
 
-  if (auto uart = chosen.TakeUart()) {
-    boot_options.serial = uart::all::GetConfig(*uart);
+  if (auto uart_config = chosen.uart_config()) {
+    boot_options.serial = *uart_config;
   }
   SetBootOptions(boot_options, chosen.zbi(), chosen.cmdline().value_or(""));
-  SetUartConsole(uart::all::MakeDriver(boot_options.serial));
+  SetUartConsole(boot_options.serial);
 
   ArchSetUp(nullptr);
 

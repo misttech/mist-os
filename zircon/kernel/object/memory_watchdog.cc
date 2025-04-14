@@ -442,6 +442,9 @@ void MemoryWatchdog::Dump() {
   printf("current bounds: [%s, %s]\n", FormattedBytes(lower).c_str(),
          FormattedBytes(upper).c_str());
   printf("free memory: %s\n", FormattedBytes(pmm_count_free_pages() * PAGE_SIZE).c_str());
+  StallAggregator::Stats stats = StallAggregator::GetStallAggregator()->ReadStats();
+  printf("memory stall time: some %ld, full %ld\n", stats.stalled_time_some,
+         stats.stalled_time_full);
 }
 
 void MemoryWatchdog::Init(Executor* executor) {

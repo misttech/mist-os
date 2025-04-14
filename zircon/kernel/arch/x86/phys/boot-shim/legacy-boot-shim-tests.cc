@@ -96,7 +96,7 @@ TEST(X86LegacyBootShimTests, AcpiAndUartItems) {
   constexpr uint64_t kRsdp = 0x7fa2'9000;
   constexpr zbi_dcfg_simple_pio_t kUart = {.base = 0x3f8};
   info.acpi_rsdp = kRsdp;
-  info.uart = uart::ns8250::PioDriver(kUart);
+  info.uart_config = uart::Config<uart::ns8250::PioDriver>(kUart);
 
   boot_shim::testing::TestHelper test;
   LegacyBootShim shim("X86LegacyBootShimTests", info, test.log());

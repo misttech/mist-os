@@ -38,11 +38,17 @@ struct Connection<'a> {
     /// Addresses to update the target with.
     net_address: &'a [SocketAddr],
     vsock_cid: Option<u32>,
+    usb_cid: Option<u32>,
 }
 
 impl<'a> Default for Connection<'a> {
     fn default() -> Self {
-        Self { kind: ConnectionKind::Disconnected, net_address: &[], vsock_cid: None }
+        Self {
+            kind: ConnectionKind::Disconnected,
+            net_address: &[],
+            vsock_cid: None,
+            usb_cid: None,
+        }
     }
 }
 
@@ -94,6 +100,9 @@ impl<'a> TargetUpdate<'a> {
                 TargetAddrStatus::fastboot(transport)
             }
             Found { protocol: TargetProtocol::Ssh, .. } => TargetAddrStatus::ssh(),
+            Found { protocol: TargetProtocol::Vsock, transport: TargetTransport::Usb } => {
+                TargetAddrStatus::usb()
+            }
             Found { protocol: TargetProtocol::Vsock, .. } => TargetAddrStatus::vsock(),
             Found { protocol: TargetProtocol::Netsvc, .. } => TargetAddrStatus::netsvc(),
         };
@@ -132,8 +141,7 @@ impl<'a> TargetUpdateBuilder<'a> {
         Self(Default::default())
     }
 
-    pub fn from_rcs_identify(
-        rcs: rcs::RcsConnection,
+    pub fn from_rcs_identify_no_connection(
         identify: &'a super::IdentifyHostResponse,
     ) -> (Self, Vec<SocketAddr>) {
         // NOTE: Addresses from Overnet may not be routable so we only use them as a filter.
@@ -165,7 +173,7 @@ impl<'a> TargetUpdateBuilder<'a> {
             })
             .collect::<Vec<_>>();
 
-        let mut update = Self::new().rcs(rcs).ids(identify.ids.as_deref().unwrap_or(&[]));
+        let mut update = Self::new().ids(identify.ids.as_deref().unwrap_or(&[]));
 
         let identity = Identity::try_from_name_serial(
             identify.nodename.clone(),
@@ -187,6 +195,14 @@ impl<'a> TargetUpdateBuilder<'a> {
         });
 
         (update, addrs)
+    }
+
+    pub fn from_rcs_identify(
+        rcs: rcs::RcsConnection,
+        identify: &'a super::IdentifyHostResponse,
+    ) -> (Self, Vec<SocketAddr>) {
+        let (ret, addrs) = Self::from_rcs_identify_no_connection(identify);
+        (ret.rcs(rcs), addrs)
     }
 
     pub fn manual_target(mut self, expiry: Option<SystemTime>) -> Self {
@@ -231,6 +247,11 @@ impl<'a> TargetUpdateBuilder<'a> {
 
     pub fn vsock_cid(mut self, cid: u32) -> Self {
         self.connection_mut().vsock_cid = Some(cid);
+        self
+    }
+
+    pub fn usb_cid(mut self, cid: u32) -> Self {
+        self.connection_mut().usb_cid = Some(cid);
         self
     }
 
@@ -318,6 +339,9 @@ impl super::Target {
                         .map(|addr| TargetAddrEntry::new((*addr).into(), now, status))
                         .chain(connection.vsock_cid.iter().map(|cid| {
                             TargetAddrEntry::new(TargetAddr::VSockCtx(*cid), now, status)
+                        }))
+                        .chain(connection.usb_cid.iter().map(|cid| {
+                            TargetAddrEntry::new(TargetAddr::UsbCtx(*cid), now, status)
                         })),
                 );
             }

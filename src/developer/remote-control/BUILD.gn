@@ -87,7 +87,6 @@ rustc_binary("bin") {
     ":lib",
     ":remote_control_config",
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
-    "//sdk/fidl/fuchsia.hardware.overnet:fuchsia.hardware.overnet_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.vsock:fuchsia.vsock_rust",
     "//src/connectivity/overnet/lib/circuit",
@@ -95,6 +94,7 @@ rustc_binary("bin") {
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fdomain/container",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fidl/rust/fidl_message",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//third_party/rust_crates:anyhow",
@@ -105,7 +105,6 @@ rustc_binary("bin") {
   sources = [
     "src/fdomain.rs",
     "src/main.rs",
-    "src/usb.rs",
     "src/vsock.rs",
   ]
 }

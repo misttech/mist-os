@@ -21,7 +21,7 @@ class SpscBufferTests {
 
     struct TestCase {
       uint64_t combined_pointers;
-      SpscBuffer::RingPointers expected;
+      SpscBuffer<HeapAllocator>::RingPointers expected;
     };
     constexpr ktl::array kTestCases = ktl::to_array<TestCase>({
         // Basic case.
@@ -47,8 +47,8 @@ class SpscBufferTests {
     });
 
     for (const TestCase& tc : kTestCases) {
-      const SpscBuffer::RingPointers actual =
-          SpscBuffer::SplitCombinedPointers(tc.combined_pointers);
+      const SpscBuffer<HeapAllocator>::RingPointers actual =
+          SpscBuffer<HeapAllocator>::SplitCombinedPointers(tc.combined_pointers);
       EXPECT_EQ(tc.expected.read, actual.read);
       EXPECT_EQ(tc.expected.write, actual.write);
     }
@@ -61,7 +61,7 @@ class SpscBufferTests {
     BEGIN_TEST;
 
     struct TestCase {
-      SpscBuffer::RingPointers pointers;
+      SpscBuffer<HeapAllocator>::RingPointers pointers;
       uint64_t combined;
     };
     constexpr ktl::array kTestCases = ktl::to_array<TestCase>({
@@ -88,7 +88,7 @@ class SpscBufferTests {
     });
 
     for (const TestCase& tc : kTestCases) {
-      const uint64_t actual = SpscBuffer::CombinePointers(tc.pointers);
+      const uint64_t actual = SpscBuffer<HeapAllocator>::CombinePointers(tc.pointers);
       EXPECT_EQ(tc.combined, actual);
     }
 
@@ -100,8 +100,8 @@ class SpscBufferTests {
     BEGIN_TEST;
 
     struct TestCase {
-      SpscBuffer::RingPointers pointers;
-      size_t buffer_size;
+      SpscBuffer<HeapAllocator>::RingPointers pointers;
+      uint32_t buffer_size;
       uint32_t expected;
     };
     constexpr ktl::array kTestCases = ktl::to_array<TestCase>({
@@ -146,13 +146,9 @@ class SpscBufferTests {
     });
 
     for (const TestCase& tc : kTestCases) {
-      // Create a buffer to test with. The buffer's backing storage is initialized using a null span
-      // in all of these tests. This would be invalid if we were reading from or writing to the
-      // buffer, but all we're doing is using the provided size to compute the amount of available
-      // space.
-      SpscBuffer buffer;
-      ktl::span<ktl::byte> null_span(static_cast<ktl::byte*>(nullptr), tc.buffer_size);
-      buffer.Init(null_span);
+      // Create a buffer to test with.
+      SpscBuffer<HeapAllocator> buffer;
+      buffer.Init(tc.buffer_size);
 
       const uint32_t actual = buffer.AvailableSpace(tc.pointers);
       EXPECT_EQ(tc.expected, actual);
@@ -166,7 +162,7 @@ class SpscBufferTests {
     BEGIN_TEST;
 
     struct TestCase {
-      SpscBuffer::RingPointers pointers;
+      SpscBuffer<HeapAllocator>::RingPointers pointers;
       size_t buffer_size;
       uint32_t expected;
     };
@@ -212,7 +208,7 @@ class SpscBufferTests {
     });
 
     for (const TestCase& tc : kTestCases) {
-      const uint32_t actual = SpscBuffer::AvailableData(tc.pointers);
+      const uint32_t actual = SpscBuffer<HeapAllocator>::AvailableData(tc.pointers);
       EXPECT_EQ(tc.expected, actual);
     }
 
@@ -224,8 +220,8 @@ class SpscBufferTests {
     BEGIN_TEST;
 
     struct TestCase {
-      SpscBuffer::RingPointers initial_pointers;
-      uint64_t buffer_size;
+      SpscBuffer<HeapAllocator>::RingPointers initial_pointers;
+      uint32_t buffer_size;
       uint32_t delta;
       uint64_t expected;
     };
@@ -255,15 +251,12 @@ class SpscBufferTests {
     });
 
     for (const TestCase& tc : kTestCases) {
-      // Create a buffer to test with. The buffer's backing storage is initialized using a null span
-      // in all of these tests. This would be invalid if we were reading from or writing to the
-      // buffer, but all we're doing is advancing the read pointer and making sure it's valid.
-      SpscBuffer buffer;
-      ktl::span<ktl::byte> null_span(static_cast<ktl::byte*>(nullptr), tc.buffer_size);
-      buffer.Init(null_span);
+      // Create a buffer to test with.
+      SpscBuffer<HeapAllocator> buffer;
+      buffer.Init(tc.buffer_size);
 
       // Set the initial value of the combined pointers.
-      const uint64_t initial = SpscBuffer::CombinePointers(tc.initial_pointers);
+      const uint64_t initial = SpscBuffer<HeapAllocator>::CombinePointers(tc.initial_pointers);
       buffer.combined_pointers_.store(initial, ktl::memory_order_release);
 
       // Advance the read pointer and ensure that combined_pointers_ is correct.
@@ -280,8 +273,8 @@ class SpscBufferTests {
     BEGIN_TEST;
 
     struct TestCase {
-      SpscBuffer::RingPointers initial_pointers;
-      uint64_t buffer_size;
+      SpscBuffer<HeapAllocator>::RingPointers initial_pointers;
+      uint32_t buffer_size;
       uint32_t delta;
       uint64_t expected;
     };
@@ -311,21 +304,56 @@ class SpscBufferTests {
     });
 
     for (const TestCase& tc : kTestCases) {
-      // Create a buffer to test with. The buffer's backing storage is initialized using a null span
-      // in all of these tests. This would be invalid if we were reading from or writing to the
-      // buffer, but all we're doing is advancing the write pointer and making sure it's valid.
-      SpscBuffer buffer;
-      ktl::span<ktl::byte> null_span(static_cast<ktl::byte*>(nullptr), tc.buffer_size);
-      buffer.Init(null_span);
+      // Create a buffer to test with.
+      SpscBuffer<HeapAllocator> buffer;
+      buffer.Init(tc.buffer_size);
 
       // Set the initial value of the combined pointers.
-      const uint64_t initial = SpscBuffer::CombinePointers(tc.initial_pointers);
+      const uint64_t initial = SpscBuffer<HeapAllocator>::CombinePointers(tc.initial_pointers);
       buffer.combined_pointers_.store(initial, ktl::memory_order_release);
 
       // Advance the write pointer and ensure that combined_pointers_ is correct.
       buffer.AdvanceWritePointer(tc.initial_pointers, tc.delta);
       const uint64_t actual = buffer.combined_pointers_.load(ktl::memory_order_acquire);
       EXPECT_EQ(tc.expected, actual);
+    }
+
+    END_TEST;
+  }
+
+  // Test that initialization of the SpscBuffer works correctly.
+  static bool TestInit() {
+    BEGIN_TEST;
+
+    // Happy case.
+    {
+      SpscBuffer<HeapAllocator> spsc;
+      ASSERT_OK(spsc.Init(256));
+    }
+
+    // Calling Init with too big of a size should fail.
+    {
+      SpscBuffer<HeapAllocator> spsc;
+      ASSERT_EQ(ZX_ERR_INVALID_ARGS, spsc.Init(UINT32_MAX));
+    }
+
+    // Calling Init with a size that is not a power of two should fail.
+    {
+      SpscBuffer<HeapAllocator> spsc;
+      ASSERT_EQ(ZX_ERR_INVALID_ARGS, spsc.Init(100));
+    }
+
+    // Calling Init on an already initialized buffer should fail.
+    {
+      SpscBuffer<HeapAllocator> spsc;
+      ASSERT_OK(spsc.Init(256));
+      ASSERT_EQ(ZX_ERR_BAD_STATE, spsc.Init(256));
+    }
+
+    // Init should propagate allocation failures.
+    {
+      SpscBuffer<ErrorAllocator> spsc;
+      ASSERT_EQ(ZX_ERR_NO_MEMORY, spsc.Init(256));
     }
 
     END_TEST;
@@ -340,17 +368,12 @@ class SpscBufferTests {
     // * Src buffer, which will be filled with random data that will be written to the ring buffer.
     // * Dst buffer, which will be used to read data out of the ring buffer.
     constexpr size_t kStorageSize = 256;
-    ktl::array<ktl::byte, kStorageSize> storage;
     ktl::array<ktl::byte, kStorageSize> src;
     srand(4);
     for (ktl::byte& byte : src) {
       byte = static_cast<ktl::byte>(rand());
     }
     ktl::array<ktl::byte, kStorageSize> dst;
-
-    // Initialize a SpscBuffer to run tests with.
-    SpscBuffer spsc;
-    spsc.Init(ktl::span<ktl::byte>(storage.data(), kStorageSize));
 
     // Set up the lambda that the read method will use to copy data into the destination buffer.
     auto copy_out_fn = [&dst](uint32_t offset, ktl::span<ktl::byte> src) {
@@ -372,7 +395,7 @@ class SpscBufferTests {
       uint32_t expected_read_size;
       zx_status_t expected_reserve_status;
       zx_status_t expected_read_status;
-      SpscBuffer::RingPointers initial_pointers;
+      SpscBuffer<HeapAllocator>::RingPointers initial_pointers;
       bool use_copy_out_err_fn;
     };
     constexpr ktl::array kTestCases = ktl::to_array<TestCase>({
@@ -453,18 +476,21 @@ class SpscBufferTests {
     });
 
     for (const TestCase& tc : kTestCases) {
-      // Zero out the spsc buffer storage and destination buffer to remove any stale data from
-      // previous test cases.
+      // Zero out the destination buffer to remove any stale data from previous test cases.
       memset(dst.data(), 0, kStorageSize);
-      memset(storage.data(), 0, kStorageSize);
+
+      // Initialize a SpscBuffer to run tests with.
+      SpscBuffer<HeapAllocator> spsc;
+      ASSERT_OK(spsc.Init(kStorageSize));
 
       // Set the initial value of the starting pointers.
-      const uint64_t starting_pointers = SpscBuffer::CombinePointers(tc.initial_pointers);
+      const uint64_t starting_pointers =
+          SpscBuffer<HeapAllocator>::CombinePointers(tc.initial_pointers);
       spsc.combined_pointers_.store(starting_pointers, ktl::memory_order_release);
 
       // Reserve a slot of the requested size in the ring buffer and validate that we get the
       // expected return code.
-      zx::result<SpscBuffer::Reservation> reservation = spsc.Reserve(tc.write_size);
+      zx::result<SpscBuffer<HeapAllocator>::Reservation> reservation = spsc.Reserve(tc.write_size);
       ASSERT_EQ(tc.expected_reserve_status, reservation.status_value());
       if (tc.expected_reserve_status != ZX_OK) {
         continue;
@@ -498,6 +524,56 @@ class SpscBufferTests {
 
     END_TEST;
   }
+
+  // Test that draining the buffer works.
+  static bool TestDrain() {
+    BEGIN_TEST;
+
+    // Initialize the backing storage for the SPSC buffer.
+    constexpr uint32_t kStorageSize = 256;
+    ktl::array<ktl::byte, kStorageSize> storage;
+
+    // Initialize the SPSC buffer and write some data into it.
+    // This write is done by setting bytes in the storage buffer directly and then modifying the
+    // read and write pointers for simplicity.
+    SpscBuffer<HeapAllocator> spsc;
+    ASSERT_OK(spsc.Init(kStorageSize));
+    memset(storage.data(), 'f', kStorageSize / 2);
+    const uint64_t starting_pointers = SpscBuffer<HeapAllocator>::CombinePointers({
+        .read = 0,
+        .write = kStorageSize / 2,
+    });
+    spsc.combined_pointers_.store(starting_pointers, ktl::memory_order_release);
+
+    // Drain the buffer, then verify that it is empty.
+    spsc.Drain();
+    ASSERT_EQ(0u, spsc.AvailableData(spsc.LoadPointers()));
+
+    END_TEST;
+  }
+
+ private:
+  // Allocator used by the TestInit function to validate proper error behavior when a nullptr
+  // is returned by Allocate.
+  class ErrorAllocator {
+   public:
+    static ktl::byte* Allocate(uint32_t size) { return nullptr; }
+    static void Free(ktl::byte* ptr) { DEBUG_ASSERT(ptr == nullptr); }
+  };
+
+  // Traditional HeapAllocator to use in the rest of the tests.
+  class HeapAllocator {
+   public:
+    static ktl::byte* Allocate(uint32_t size) {
+      fbl::AllocChecker ac;
+      ktl::byte* ptr = new (&ac) ktl::byte[size];
+      if (!ac.check()) {
+        return nullptr;
+      }
+      return ptr;
+    }
+    static void Free(ktl::byte* ptr) { delete[] ptr; }
+  };
 };
 
 UNITTEST_START_TESTCASE(spsc_buffer_tests)
@@ -507,6 +583,8 @@ UNITTEST("available_space", SpscBufferTests::TestAvailableSpace)
 UNITTEST("available_data", SpscBufferTests::TestAvailableData)
 UNITTEST("advance_read_pointer", SpscBufferTests::TestAdvanceReadPointer)
 UNITTEST("advance_write_pointer", SpscBufferTests::TestAdvanceWritePointer)
+UNITTEST("init", SpscBufferTests::TestInit)
 UNITTEST("read_write_single_threaded", SpscBufferTests::TestReadWriteSingleThreaded)
+UNITTEST("drain", SpscBufferTests::TestDrain)
 UNITTEST_END_TESTCASE(spsc_buffer_tests, "spsc_buffer",
                       "Test the single-producer, single-consumer ring buffer implementation.")

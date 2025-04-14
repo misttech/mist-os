@@ -5,10 +5,12 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
+use super::bpf::{check_bpf_map_access, check_bpf_prog_access};
 use super::{
     fs_node_effective_sid_and_class, has_file_permissions, permissions_from_flags,
     todo_has_fs_node_permissions, FileObjectState, FsNodeSidAndClass, PermissionFlags,
 };
+use crate::bpf::fs::BpfHandle;
 use crate::mm::{MappingOptions, ProtectionFlags};
 use crate::security::selinux_hooks::{
     todo_check_permission, todo_has_file_permissions, CommonFilePermission, ProcessPermission,
@@ -16,7 +18,7 @@ use crate::security::selinux_hooks::{
 use crate::task::CurrentTask;
 use crate::vfs::{FileHandle, FileObject};
 use crate::TODO_DENY;
-use selinux::{CommonFsNodePermission, FsNodeClass, Permission, SecurityServer};
+use selinux::{CommonFsNodePermission, FsNodeClass, KernelPermission, SecurityServer};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{
@@ -73,6 +75,24 @@ pub(in crate::security) fn file_receive(
     let subject_sid = current_task.security_state.lock().current_sid;
     let fs_node_class = file.node().security_state.lock().class;
     let permission_flags = file.flags().into();
+
+    // BPF resources are wrapped into file descriptors for interaction with userspace,
+    // but have a distinct set of permissions associated with the underlying objects rather
+    // than on the `FsNode`.
+    if let Some(bpf_handle) = file.downcast_file::<BpfHandle>() {
+        has_file_permissions(&permission_check, subject_sid, file, &[], current_task.into())?;
+        match bpf_handle {
+            BpfHandle::Map(ref map) => {
+                check_bpf_map_access(security_server, current_task, map, permission_flags)?
+            }
+            BpfHandle::Program(ref prog) => {
+                check_bpf_prog_access(security_server, current_task, prog)?
+            }
+            _ => {}
+        }
+        return Ok(());
+    }
+
     todo_has_file_permissions(
         TODO_DENY!("https://fxbug.dev/399894966", "Check file receive permission."),
         &current_task.kernel(),
@@ -95,7 +115,7 @@ pub(in crate::security) fn check_file_ioctl_access(
     let subject_sid = current_task.security_state.lock().current_sid;
 
     let file_class = file.node().security_state.lock().class;
-    let permissions: &[Permission] = match request {
+    let permissions: &[KernelPermission] = match request {
         FIBMAP | FIONREAD | FIGETBSZ | FS_IOC_GETFLAGS | FS_IOC_GETVERSION => {
             &[CommonFsNodePermission::GetAttr.for_class(file_class)]
         }
@@ -233,7 +253,7 @@ pub fn mmap_file(
 
     if let Some(file) = file {
         let node_class = file.node().security_state.lock().class;
-        let mut permissions: Vec<Permission> = vec![
+        let mut permissions: Vec<KernelPermission> = vec![
             CommonFsNodePermission::Read.for_class(node_class),
             CommonFsNodePermission::Map.for_class(node_class),
         ];

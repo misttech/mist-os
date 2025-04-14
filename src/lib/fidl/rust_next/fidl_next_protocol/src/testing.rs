@@ -2,12 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_next_codec::{DecoderExt, WireString};
+use fidl_next_codec::{Chunk, Decode, DecoderExt as _, Encode, EncoderExt as _, Owned, WireString};
 use fuchsia_async::{Scope, Task};
 
 use crate::{
     Client, ClientHandler, ClientSender, Responder, Server, ServerHandler, ServerSender, Transport,
 };
+
+pub fn assert_encoded<T: Encode<Vec<Chunk>>>(mut value: T, chunks: &[Chunk]) {
+    let mut encoded_chunks = Vec::new();
+    encoded_chunks.encode_next(&mut value).unwrap();
+    assert_eq!(encoded_chunks, chunks, "encoded chunks did not match");
+}
+
+pub fn assert_decoded<T: for<'a> Decode<&'a mut [Chunk]>>(
+    mut chunks: &mut [Chunk],
+    f: impl FnOnce(Owned<'_, T>),
+) {
+    let value = (&mut chunks).decode_next::<T>().expect("failed to decode");
+    f(value)
+}
 
 pub async fn test_close_on_drop<T: Transport + 'static>(client_end: T, server_end: T) {
     struct TestServer {

@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/driver/test/cpp/fidl.h>
-#include <fuchsia/io/cpp/fidl.h>
+#include <fidl/fuchsia.driver.test/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/driver_test_realm/realm_builder/cpp/lib.h>
@@ -25,13 +24,10 @@ TEST(DriverTransportTest, ParentChildExists) {
   auto realm = realm_builder.Build(loop.dispatcher());
 
   // Start DriverTestRealm.
-  fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
-  ASSERT_EQ(ZX_OK, realm.component().Connect(driver_test_realm.NewRequest()));
-
-  fuchsia::driver::test::Realm_Start_Result realm_result;
-  fuchsia::driver::test::RealmArgs args;
-  ASSERT_EQ(ZX_OK, driver_test_realm->Start(std::move(args), &realm_result));
-  ASSERT_FALSE(realm_result.is_err());
+  zx::result dtr_client = realm.component().Connect<fuchsia_driver_test::Realm>();
+  ASSERT_OK(dtr_client.status_value());
+  fidl::Result realm_result = fidl::Call(*dtr_client)->Start({});
+  ASSERT_TRUE(realm_result.is_ok());
 
   fbl::unique_fd fd;
   auto exposed = realm.component().CloneExposedDir();

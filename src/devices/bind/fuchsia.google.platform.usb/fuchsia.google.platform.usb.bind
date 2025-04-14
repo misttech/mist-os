@@ -16,12 +16,12 @@ extend uint fuchsia.BIND_USB_PID {
 extend uint fuchsia.BIND_USB_SUBCLASS {
   ADB = 0x42,
   FASTBOOT = 0x42,
-  OVERNET = 0x43,
+  VSOCK_BRIDGE = 0x43,
 };
 
 extend uint fuchsia.BIND_USB_PROTOCOL {
   XHCI_COMPLIANCE_TESTER = 0x00,
   ADB = 0x01,
   FASTBOOT = 0x03,
-  OVERNET = 0x0,
+  VSOCK_BRIDGE = 0x0,
 };

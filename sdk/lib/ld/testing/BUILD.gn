@@ -13,7 +13,10 @@ library_headers("headers") {
   testonly = true
 
   headers = [ "lib/ld/testing/test-elf-object.h" ]
-  public_deps = [ "//src/lib/elfldltl" ]
+  public_deps = [
+    ":abi-headers",
+    "//src/lib/elfldltl",
+  ]
   if (is_fuchsia) {
     headers += [
       "lib/ld/testing/mock-debugdata.h",
@@ -37,10 +40,13 @@ library_headers("headers") {
 static_library("ld-testing") {
   testonly = true
 
-  public_deps = [ ":headers" ]
+  public_deps = [
+    ":headers",
+    ":ld-abi-testing",
+  ]
 
   sources = [ "test-elf-object.cc" ]
-  deps = []
+  deps = [ "//src/lib/elfldltl/testing" ]
   if (is_fuchsia) {
     sources += [
       "mock-debugdata.cc",
@@ -55,10 +61,25 @@ static_library("ld-testing") {
       "//sdk/lib/async-loop:async-loop-cpp",
       "//sdk/lib/async-loop:async-loop-default",
       "//sdk/lib/fdio",
-      "//src/lib/elfldltl/testing",
       "//src/storage/lib/vfs/cpp",
       "//third_party/googletest:gtest",
       "//zircon/system/ulib/zx",
     ]
   }
+}
+
+# This is implicit in :headers and :ld-testing, but it's separate for use in
+# contexts that don't want all the rest of the deps :ld-testing brings in.
+library_headers("abi-headers") {
+  headers = [ "lib/ld/testing/startup-ld-abi.h" ]
+  public_deps = [ "..:abi-headers" ]
+}
+
+static_library("ld-abi-testing") {
+  testonly = true
+
+  public_deps = [ ":abi-headers" ]
+
+  sources = [ "startup-ld-abi.cc" ]
+  deps = [ "..:headers" ]
 }

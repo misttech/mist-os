@@ -23,6 +23,7 @@
 #include <utility>
 
 #include "src/devices/bin/driver_manager/composite_node_spec_impl.h"
+#include "src/devices/bin/driver_manager/node_property_conversion.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/fxl/strings/join_strings.h"
 
@@ -348,20 +349,54 @@ DriverRunner::DriverRunner(
 void DriverRunner::BindNodesForCompositeNodeSpec() { TryBindAllAvailable(); }
 
 void DriverRunner::AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& completer) {
-  if (!request->has_name() || !request->has_parents()) {
+  if (!request->has_name() || (!request->has_parents() && !request->has_parents2())) {
     completer.Reply(fit::error(fdf::CompositeNodeSpecError::kMissingArgs));
     return;
   }
 
-  if (request->parents().empty()) {
-    completer.Reply(fit::error(fdf::CompositeNodeSpecError::kEmptyNodes));
+  if (!request->has_parents() && !request->has_parents2()) {
+    completer.Reply(fit::error(fdf::CompositeNodeSpecError::kDuplicateParents));
     return;
+  }
+
+  std::vector<fuchsia_driver_framework::ParentSpec2> parents;
+  if (request->has_parents()) {
+    if (request->parents().empty()) {
+      completer.Reply(fit::error(fdf::CompositeNodeSpecError::kEmptyNodes));
+      return;
+    }
+    auto to_parent_spec2 = [](const auto& parent) {
+      auto parent_spec = fidl::ToNatural(parent);
+      std::vector<fuchsia_driver_framework::BindRule2> bind_rules;
+      std::transform(parent_spec.bind_rules().begin(), parent_spec.bind_rules().end(),
+                     std::back_inserter(bind_rules), ToBindRule2);
+
+      std::vector<fuchsia_driver_framework::NodeProperty2> properties;
+      std::transform(parent_spec.properties().begin(), parent_spec.properties().end(),
+                     std::back_inserter(properties),
+                     [](const auto& prop) { return ToProperty2(prop); });
+      return fuchsia_driver_framework::ParentSpec2{{
+          .bind_rules = std::move(bind_rules),
+          .properties = std::move(properties),
+      }};
+    };
+
+    std::transform(request->parents().cbegin(), request->parents().cend(),
+                   std::back_inserter(parents), to_parent_spec2);
+  }
+
+  if (request->has_parents2()) {
+    if (request->parents2().empty()) {
+      completer.Reply(fit::error(fdf::CompositeNodeSpecError::kEmptyNodes));
+      return;
+    }
+    parents = fidl::ToNatural(request->parents2()).value();
   }
 
   auto spec = std::make_unique<CompositeNodeSpecImpl>(
       CompositeNodeSpecCreateInfo{
           .name = std::string(request->name().get()),
-          .parents = fidl::ToNatural(request->parents()).value(),
+          .parents = std::move(parents),
       },
       dispatcher_, this);
   composite_node_spec_manager_.AddSpec(

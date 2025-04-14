@@ -1200,6 +1200,8 @@ TEST_F(MoonflowerPartitionerTests, FindPartition) {
                             {"reserved_c", Uuid(kVbMetaRType), 0xe0400, 0x10000},
                             {"cache", Uuid(kZirconRType), 0xf0400, 0x10000},
                             {"super", Uuid(kFvmType), 0x100400, 0x10000},
+                            {"vendor_boot_a", Uuid(kDummyType), 0x110400, 0x10000},
+                            {"vendor_boot_b", Uuid(kDummyType), 0x120400, 0x10000},
                         }));
 
   zx::result status = CreatePartitioner(gpt_dev.get());
@@ -1209,9 +1211,16 @@ TEST_F(MoonflowerPartitionerTests, FindPartition) {
   // Make sure we can find the important partitions.
   EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kBootloaderA, "dtbo")));
   EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kBootloaderB, "dtbo")));
+  EXPECT_OK(
+      partitioner->FindPartition(PartitionSpec(paver::Partition::kBootloaderA, "recovery_zbi")));
+  EXPECT_OK(
+      partitioner->FindPartition(PartitionSpec(paver::Partition::kBootloaderB, "recovery_zbi")));
   EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconA)));
   EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconB)));
   EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kFuchsiaVolumeManager)));
+
+  EXPECT_NOT_OK(
+      partitioner->FindPartition(PartitionSpec(paver::Partition::kBootloaderA, "foo_type")));
 }
 
 TEST_F(MoonflowerPartitionerTests, SupportsPartition) {
@@ -1226,6 +1235,10 @@ TEST_F(MoonflowerPartitionerTests, SupportsPartition) {
       partitioner->SupportsPartition(PartitionSpec(paver::Partition::kBootloaderA, "dtbo")));
   EXPECT_TRUE(
       partitioner->SupportsPartition(PartitionSpec(paver::Partition::kBootloaderB, "dtbo")));
+  EXPECT_TRUE(partitioner->SupportsPartition(
+      PartitionSpec(paver::Partition::kBootloaderA, "recovery_zbi")));
+  EXPECT_TRUE(partitioner->SupportsPartition(
+      PartitionSpec(paver::Partition::kBootloaderB, "recovery_zbi")));
   EXPECT_TRUE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kZirconA)));
   EXPECT_TRUE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kZirconB)));
   EXPECT_TRUE(
@@ -1236,6 +1249,8 @@ TEST_F(MoonflowerPartitionerTests, SupportsPartition) {
   // Unsupported content type.
   EXPECT_FALSE(
       partitioner->SupportsPartition(PartitionSpec(paver::Partition::kAbrMeta, "foo_type")));
+  EXPECT_FALSE(
+      partitioner->SupportsPartition(PartitionSpec(paver::Partition::kBootloaderA, "foo_type")));
 }
 
 class LuisPartitionerTests : public GptDevicePartitionerTests {

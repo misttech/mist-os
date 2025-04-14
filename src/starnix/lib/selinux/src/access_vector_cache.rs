@@ -5,7 +5,7 @@
 use crate::fifo_cache::FifoCache;
 use crate::policy::{AccessDecision, IoctlAccessDecision};
 use crate::sync::Mutex;
-use crate::{AbstractObjectClass, FsNodeClass, NullessByteStr, ObjectClass, SecurityId};
+use crate::{FsNodeClass, KernelClass, NullessByteStr, ObjectClass, SecurityId};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 
@@ -24,7 +24,7 @@ pub(super) trait Query {
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
     ) -> AccessDecision;
 
     /// Returns the security identifier (SID) with which to label a new `fs_node_class` instance
@@ -56,7 +56,7 @@ pub(super) trait Query {
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
         ioctl_prefix: u8,
     ) -> IoctlAccessDecision;
 }
@@ -70,7 +70,7 @@ pub trait QueryMut {
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
     ) -> AccessDecision;
 
     /// Returns the security identifier (SID) with which to label a new `fs_node_class` instance
@@ -102,7 +102,7 @@ pub trait QueryMut {
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
         ioctl_prefix: u8,
     ) -> IoctlAccessDecision;
 }
@@ -112,7 +112,7 @@ impl<Q: Query> QueryMut for Q {
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
     ) -> AccessDecision {
         (self as &dyn Query).compute_access_decision(source_sid, target_sid, target_class)
     }
@@ -145,7 +145,7 @@ impl<Q: Query> QueryMut for Q {
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
         ioctl_prefix: u8,
     ) -> IoctlAccessDecision {
         (self as &dyn Query).compute_ioctl_access_decision(
@@ -191,7 +191,7 @@ impl Query for DenyAll {
         &self,
         _source_sid: SecurityId,
         _target_sid: SecurityId,
-        _target_class: AbstractObjectClass,
+        _target_class: ObjectClass,
     ) -> AccessDecision {
         AccessDecision::default()
     }
@@ -219,7 +219,7 @@ impl Query for DenyAll {
         &self,
         _source_sid: SecurityId,
         _target_sid: SecurityId,
-        _target_class: AbstractObjectClass,
+        _target_class: ObjectClass,
         _ioctl_prefix: u8,
     ) -> IoctlAccessDecision {
         IoctlAccessDecision::DENY_ALL
@@ -238,7 +238,7 @@ impl Reset for DenyAll {
 struct AccessQueryArgs {
     source_sid: SecurityId,
     target_sid: SecurityId,
-    target_class: AbstractObjectClass,
+    target_class: ObjectClass,
 }
 
 #[derive(Clone)]
@@ -251,7 +251,7 @@ struct AccessQueryResult {
 struct IoctlAccessQueryArgs {
     source_sid: SecurityId,
     target_sid: SecurityId,
-    target_class: AbstractObjectClass,
+    target_class: ObjectClass,
     ioctl_prefix: u8,
 }
 
@@ -276,7 +276,7 @@ impl<D: QueryMut> QueryMut for Empty<D> {
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
     ) -> AccessDecision {
         self.delegate.compute_access_decision(source_sid, target_sid, target_class)
     }
@@ -304,7 +304,7 @@ impl<D: QueryMut> QueryMut for Empty<D> {
         &mut self,
         _source_sid: SecurityId,
         _target_sid: SecurityId,
-        _target_class: AbstractObjectClass,
+        _target_class: ObjectClass,
         _ioctl_prefix: u8,
     ) -> IoctlAccessDecision {
         todo!()
@@ -369,7 +369,7 @@ impl<D: QueryMut> QueryMut for FifoQueryCache<D> {
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
     ) -> AccessDecision {
         let query_args =
             AccessQueryArgs { source_sid, target_sid, target_class: target_class.clone() };
@@ -394,7 +394,7 @@ impl<D: QueryMut> QueryMut for FifoQueryCache<D> {
         target_sid: SecurityId,
         fs_node_class: FsNodeClass,
     ) -> Result<SecurityId, anyhow::Error> {
-        let target_class = AbstractObjectClass::System(ObjectClass::from(fs_node_class));
+        let target_class = ObjectClass::System(KernelClass::from(fs_node_class));
 
         let query_args =
             AccessQueryArgs { source_sid, target_sid, target_class: target_class.clone() };
@@ -438,7 +438,7 @@ impl<D: QueryMut> QueryMut for FifoQueryCache<D> {
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
         ioctl_prefix: u8,
     ) -> IoctlAccessDecision {
         let query_args = IoctlAccessQueryArgs {
@@ -508,7 +508,7 @@ impl<D: QueryMut> Query for Locked<D> {
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
     ) -> AccessDecision {
         self.delegate.lock().compute_access_decision(source_sid, target_sid, target_class)
     }
@@ -541,7 +541,7 @@ impl<D: QueryMut> Query for Locked<D> {
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
         ioctl_prefix: u8,
     ) -> IoctlAccessDecision {
         self.delegate.lock().compute_ioctl_access_decision(
@@ -603,7 +603,7 @@ impl<Q: Query> Query for Arc<Q> {
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
     ) -> AccessDecision {
         self.as_ref().compute_access_decision(source_sid, target_sid, target_class)
     }
@@ -636,7 +636,7 @@ impl<Q: Query> Query for Arc<Q> {
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
         ioctl_prefix: u8,
     ) -> IoctlAccessDecision {
         self.as_ref().compute_ioctl_access_decision(
@@ -659,7 +659,7 @@ impl<Q: Query> Query for Weak<Q> {
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
     ) -> AccessDecision {
         self.upgrade()
             .map(|q| q.compute_access_decision(source_sid, target_sid, target_class))
@@ -697,7 +697,7 @@ impl<Q: Query> Query for Weak<Q> {
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
         ioctl_prefix: u8,
     ) -> IoctlAccessDecision {
         self.upgrade()
@@ -740,7 +740,7 @@ impl<D: QueryMut + ResetMut> QueryMut for ThreadLocalQuery<D> {
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
     ) -> AccessDecision {
         let version = self.active_version.as_ref().version();
         if self.current_version != version {
@@ -788,7 +788,7 @@ impl<D: QueryMut + ResetMut> QueryMut for ThreadLocalQuery<D> {
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
         ioctl_prefix: u8,
     ) -> IoctlAccessDecision {
         self.delegate.compute_ioctl_access_decision(
@@ -897,7 +897,7 @@ mod tests {
     use super::testing::*;
     use super::*;
     use crate::policy::{AccessVector, XpermsBitmap};
-    use crate::ObjectClass;
+    use crate::KernelClass;
 
     use std::sync::atomic::AtomicUsize;
 
@@ -923,7 +923,7 @@ mod tests {
             &self,
             source_sid: SecurityId,
             target_sid: SecurityId,
-            target_class: AbstractObjectClass,
+            target_class: ObjectClass,
         ) -> AccessDecision {
             self.query_count.fetch_add(1, Ordering::Relaxed);
             self.delegate.compute_access_decision(source_sid, target_sid, target_class)
@@ -952,7 +952,7 @@ mod tests {
             &self,
             source_sid: SecurityId,
             target_sid: SecurityId,
-            target_class: AbstractObjectClass,
+            target_class: ObjectClass,
             ioctl_prefix: u8,
         ) -> IoctlAccessDecision {
             self.query_count.fetch_add(1, Ordering::Relaxed);
@@ -981,7 +981,7 @@ mod tests {
             avc.compute_access_decision(
                 A_TEST_SID.clone(),
                 A_TEST_SID.clone(),
-                ObjectClass::Process.into()
+                KernelClass::Process.into()
             )
             .allow
         );
@@ -996,7 +996,7 @@ mod tests {
             avc.compute_access_decision(
                 A_TEST_SID.clone(),
                 A_TEST_SID.clone(),
-                ObjectClass::Process.into()
+                KernelClass::Process.into()
             )
             .allow
         );
@@ -1006,7 +1006,7 @@ mod tests {
             avc.compute_access_decision(
                 A_TEST_SID.clone(),
                 A_TEST_SID.clone(),
-                ObjectClass::Process.into()
+                KernelClass::Process.into()
             )
             .allow
         );
@@ -1027,7 +1027,7 @@ mod tests {
             avc.compute_access_decision(
                 A_TEST_SID.clone(),
                 A_TEST_SID.clone(),
-                ObjectClass::Process.into()
+                KernelClass::Process.into()
             )
             .allow
         );
@@ -1043,7 +1043,7 @@ mod tests {
         let mut avc = FifoQueryCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
 
         for sid in unique_sids(avc.access_cache.capacity()) {
-            avc.compute_access_decision(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
+            avc.compute_access_decision(sid, A_TEST_SID.clone(), KernelClass::Process.into());
         }
         assert_eq!(true, avc.access_cache_is_full());
 
@@ -1051,7 +1051,7 @@ mod tests {
         assert_eq!(false, avc.access_cache_is_full());
 
         for sid in unique_sids(avc.access_cache.capacity()) {
-            avc.compute_access_decision(A_TEST_SID.clone(), sid, ObjectClass::Process.into());
+            avc.compute_access_decision(A_TEST_SID.clone(), sid, KernelClass::Process.into());
         }
         assert_eq!(true, avc.access_cache_is_full());
 
@@ -1067,13 +1067,13 @@ mod tests {
         avc.compute_access_decision(
             A_TEST_SID.clone(),
             A_TEST_SID.clone(),
-            ObjectClass::Process.into(),
+            KernelClass::Process.into(),
         );
         assert!(!avc.access_cache_is_full());
 
         // Fill the cache with new queries, which should evict the test query.
         for sid in unique_sids(avc.access_cache.capacity()) {
-            avc.compute_access_decision(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
+            avc.compute_access_decision(sid, A_TEST_SID.clone(), KernelClass::Process.into());
         }
         assert!(avc.access_cache_is_full());
 
@@ -1082,7 +1082,7 @@ mod tests {
         avc.compute_access_decision(
             A_TEST_SID.clone(),
             A_TEST_SID.clone(),
-            ObjectClass::Process.into(),
+            KernelClass::Process.into(),
         );
         assert_eq!(delegate_query_count + 1, avc.delegate.query_count());
 
@@ -1094,9 +1094,9 @@ mod tests {
             avc.compute_access_decision(
                 A_TEST_SID.clone(),
                 A_TEST_SID.clone(),
-                ObjectClass::Process.into(),
+                KernelClass::Process.into(),
             );
-            avc.compute_access_decision(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
+            avc.compute_access_decision(sid, A_TEST_SID.clone(), KernelClass::Process.into());
         }
 
         // The test query should now miss.
@@ -1104,7 +1104,7 @@ mod tests {
         avc.compute_access_decision(
             A_TEST_SID.clone(),
             A_TEST_SID.clone(),
-            ObjectClass::Process.into(),
+            KernelClass::Process.into(),
         );
         assert_eq!(delegate_query_count + 1, avc.delegate.query_count());
     }
@@ -1121,7 +1121,7 @@ mod tests {
         avc.compute_access_decision(
             A_TEST_SID.clone(),
             A_TEST_SID.clone(),
-            ObjectClass::Process.into(),
+            KernelClass::Process.into(),
         );
         assert_eq!(1, avc.delegate.reset_count());
     }
@@ -1135,7 +1135,7 @@ mod tests {
             avc.compute_ioctl_access_decision(
                 A_TEST_SID.clone(),
                 A_TEST_SID.clone(),
-                ObjectClass::Process.into(),
+                KernelClass::Process.into(),
                 0x0,
             )
             .allow
@@ -1147,7 +1147,7 @@ mod tests {
             avc.compute_ioctl_access_decision(
                 A_TEST_SID.clone(),
                 A_TEST_SID.clone(),
-                ObjectClass::Process.into(),
+                KernelClass::Process.into(),
                 0x0
             )
             .allow
@@ -1163,7 +1163,7 @@ mod tests {
         avc.compute_ioctl_access_decision(
             A_TEST_SID.clone(),
             A_TEST_SID.clone(),
-            ObjectClass::Process.into(),
+            KernelClass::Process.into(),
             0x0,
         );
 
@@ -1175,7 +1175,7 @@ mod tests {
             avc.compute_ioctl_access_decision(
                 A_TEST_SID.clone(),
                 A_TEST_SID.clone(),
-                ObjectClass::Process.into(),
+                KernelClass::Process.into(),
                 ioctl_prefix,
             );
         }
@@ -1189,7 +1189,7 @@ mod tests {
         avc.compute_ioctl_access_decision(
             A_TEST_SID.clone(),
             A_TEST_SID.clone(),
-            ObjectClass::Process.into(),
+            KernelClass::Process.into(),
             0x0,
         );
         assert_eq!(delegate_query_count + 1, avc.delegate.query_count());
@@ -1204,7 +1204,7 @@ mod starnix_tests {
     use super::*;
     use crate::policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
     use crate::policy::AccessVector;
-    use crate::ObjectClass;
+    use crate::KernelClass;
 
     use rand::distributions::Uniform;
     use rand::{thread_rng, Rng as _};
@@ -1237,7 +1237,7 @@ mod starnix_tests {
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _target_class: AbstractObjectClass,
+            _target_class: ObjectClass,
         ) -> AccessDecision {
             let policy = self.policy.as_ref().load(Ordering::Relaxed);
             if policy == NO_RIGHTS {
@@ -1274,7 +1274,7 @@ mod starnix_tests {
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _target_class: AbstractObjectClass,
+            _target_class: ObjectClass,
             _ioctl_prefix: u8,
         ) -> IoctlAccessDecision {
             todo!()
@@ -1314,7 +1314,7 @@ mod starnix_tests {
                 trace.push(query_avc.compute_access_decision(
                     A_TEST_SID.clone(),
                     A_TEST_SID.clone(),
-                    ObjectClass::Process.into(),
+                    KernelClass::Process.into(),
                 ))
             }
 
@@ -1406,7 +1406,7 @@ mod starnix_tests {
                     avc_for_query_1.compute_access_decision(
                         sids[i].clone(),
                         A_TEST_SID.clone(),
-                        ObjectClass::Process.into(),
+                        KernelClass::Process.into(),
                     ),
                 ))
             }
@@ -1419,7 +1419,7 @@ mod starnix_tests {
                     avc_for_query_1.compute_access_decision(
                         sids[i].clone(),
                         A_TEST_SID.clone(),
-                        ObjectClass::Process.into(),
+                        KernelClass::Process.into(),
                     ),
                 ))
             }
@@ -1452,7 +1452,7 @@ mod starnix_tests {
                     avc_for_query_2.compute_access_decision(
                         sids[i].clone(),
                         A_TEST_SID.clone(),
-                        ObjectClass::Process.into(),
+                        KernelClass::Process.into(),
                     ),
                 ))
             }
@@ -1465,7 +1465,7 @@ mod starnix_tests {
                     avc_for_query_2.compute_access_decision(
                         sids[i].clone(),
                         A_TEST_SID.clone(),
-                        ObjectClass::Process.into(),
+                        KernelClass::Process.into(),
                     ),
                 ))
             }
@@ -1576,7 +1576,7 @@ mod starnix_tests {
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _target_class: AbstractObjectClass,
+            _target_class: ObjectClass,
         ) -> AccessDecision {
             let policy = self.policy.as_ref().load(Ordering::Relaxed);
             if policy == NO_RIGHTS {
@@ -1613,7 +1613,7 @@ mod starnix_tests {
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _target_class: AbstractObjectClass,
+            _target_class: ObjectClass,
             _ioctl_prefix: u8,
         ) -> IoctlAccessDecision {
             todo!()
@@ -1701,7 +1701,7 @@ mod starnix_tests {
                     avc_for_query_1.compute_access_decision(
                         sids[i].clone(),
                         A_TEST_SID.clone(),
-                        ObjectClass::Process.into(),
+                        KernelClass::Process.into(),
                     ),
                 ))
             }
@@ -1714,7 +1714,7 @@ mod starnix_tests {
                     avc_for_query_1.compute_access_decision(
                         sids[i].clone(),
                         A_TEST_SID.clone(),
-                        ObjectClass::Process.into(),
+                        KernelClass::Process.into(),
                     ),
                 ))
             }
@@ -1747,7 +1747,7 @@ mod starnix_tests {
                     avc_for_query_2.compute_access_decision(
                         sids[i].clone(),
                         A_TEST_SID.clone(),
-                        ObjectClass::Process.into(),
+                        KernelClass::Process.into(),
                     ),
                 ))
             }
@@ -1760,7 +1760,7 @@ mod starnix_tests {
                     avc_for_query_2.compute_access_decision(
                         sids[i].clone(),
                         A_TEST_SID.clone(),
-                        ObjectClass::Process.into(),
+                        KernelClass::Process.into(),
                     ),
                 ))
             }

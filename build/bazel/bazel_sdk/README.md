@@ -83,6 +83,19 @@ architecture, and the `HEAD` API level (also from the `PLATFORM` build)).
 
 Nothing in the GN graph should depend on this.
 
+### IDK and SDK subsets
+As previously mentioned, building the Fuchsia IDK and Fuchsia Bazel SDK can take
+a long time. As a mitigation for platform developers working with these targets
+or needing to locally build an SDK to test with a specific target, there are a
+small number of GN targets that generate the IDK or SDK with support for
+targeting a subset of API levels and/or CPU architectures. These can be used
+like the publishable IDK and SDK, respectively.
+
+The following subsets are currently supported:
+* API level `HEAD` and default target CPU architecture:
+  * `//sdk:final_fuchsia_idk_head_only`
+  * `//sdk:final_fuchsia_sdk_head_only`
+
 ## The Bazel external repositories
 
 The platform build's internal Bazel workspace also uses a number
@@ -104,7 +117,7 @@ for example, `pkg/fdio/meta.json` looks like:
     "x64": {
       "debug": "@fuchsia_in_tree_idk//.build-id:15/646fc64e58e6bc964d5781afec10233689ab08.debug",
       "dist": "@fuchsia_in_tree_idk//arch/x64:dist/libfdio.so",
-      "dist_path": "lib/libfdio.so",                             # <-- configuration string
+      "dist_path": "lib/libfdio.so",                            # <-- configuration string
       "link": "@fuchsia_in_tree_idk//arch/x64:lib/libfdio.so"   # <-- ninja artifact
     }
   },
@@ -268,6 +281,22 @@ GN Build Graph                                       |  Bazel Workspace
                                                      |                   |
                                                      |                   v
                                                      |             @internal_sdk
+                                                     |
+```
+
+The IDK and SDK subsets are entirely within GN:
+```
+GN Build Graph                                       |  Bazel Workspace
+                                                     |
+                                                     |
+  Fuchsia HEAD-only IDK                              |
+     |   //sdk:final_fuchsia_idk_head_only           |
+     |                                               |
+  [fuchsia_sdk_repository() in Python]               |
+     |                                               |
+     v                                               |
+  Fuchsia HEAD-only Bazel SDK                        |
+        //sdk:final_fuchsia_sdk_head_only            |
                                                      |
 ```
 

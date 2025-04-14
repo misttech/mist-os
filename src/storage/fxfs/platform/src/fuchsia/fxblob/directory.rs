@@ -157,7 +157,9 @@ impl BlobDirectory {
         {
             Some(node) => Some(node),
             None => {
-                if let Some((object_id, _)) = self.directory.directory().lookup(&id.string).await? {
+                if let Some((object_id, _, _)) =
+                    self.directory.directory().lookup(&id.string).await?
+                {
                     let node = self.get_or_load_node(object_id, &id).await?;
                     self.directory.directory().owner().dirent_cache().insert(
                         self.directory.object_id(),
@@ -479,7 +481,7 @@ mod tests {
     use delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob};
     use fidl_fuchsia_fxfs::BlobReaderMarker;
     use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _};
-    use fuchsia_component::client::connect_to_protocol_at_dir_svc;
+    use fuchsia_component_client::connect_to_protocol_at_dir_svc;
     use fuchsia_fs::directory::{
         readdir_inclusive, DirEntry, DirentKind, WatchEvent, WatchMessage, Watcher,
     };

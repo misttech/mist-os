@@ -23,7 +23,7 @@ namespace fidl {
 }  // namespace fidl
 
 template <>
-class ::fidl::internal::NaturalClientImpl<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> final : public ::fidl::internal::NaturalClientBase {
+class ::fidl::internal::NaturalClientImpl<::test_bindingsdenylist::OnlyCppAndDeps> final : public ::fidl::internal::NaturalClientBase {
  public:
   using NaturalClientBase::NaturalClientBase;
 };
@@ -32,133 +32,6 @@ namespace fidl {
 #endif  // __Fuchsia__
 
 }  // namespace fidl
-
-#ifdef __Fuchsia__
-
-template <>
-class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> final
-    : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>> {
- public:
- private:
-  ::fidl::UnownedClientEnd<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-template <>
-class ::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> : public ::fidl::internal::BaseEventHandlerInterface {
- public:
-  NaturalEventHandlerInterface() = default;
-  virtual ~NaturalEventHandlerInterface() = default;
-};
-
-template <>
-class ::fidl::AsyncEventHandler<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>
-    : public ::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>, public ::fidl::internal::AsyncEventHandler {
- public:
-  AsyncEventHandler() = default;
-};
-
-template <>
-class ::fidl::SyncEventHandler<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>
-    : public ::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>, public ::fidl::internal::SyncEventHandler {
- public:
-  SyncEventHandler() = default;
-
-  // Handle all possible events defined in this protocol.
-  // Blocks to consume exactly one message from the channel, then call the corresponding virtual
-  // method.
-  ::fidl::Status HandleOneEvent(
-      ::fidl::UnownedClientEnd<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> client_end);
-};
-
-template <>
-class ::fidl::internal::NaturalEventDispatcher<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>> {
- public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-template <>
-class ::fidl::internal::NaturalWeakEventSender<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> : public ::fidl::internal::WeakEventSenderBase {
- public:
-  using WeakEventSenderBase::WeakEventSenderBase;
-};
-
-template <>
-class ::fidl::internal::NaturalEventSender<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>
-    : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalEventSender<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>> {
- public:
-  using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
-};
-
-#endif  // __Fuchsia__
-
-template <>
-class ::fidl::Server<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> : public ::fidl::internal::IncomingMessageDispatcher {
- public:
-  Server() = default;
-  virtual ~Server() = default;
-
-  // The FIDL protocol type that is implemented by this server.
-  using _EnclosingProtocol = ::test_bindingsdenylist::OnlyLibfuzzerAndDeps;
-
-  using Handler = fidl::ProtocolHandler<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>;
-
-  // |bind_handler| returns a handler that binds incoming connections to this
-  // server implementation.
-  //
-  // The returned handler borrows the server instance.
-  // The server must outlive the provided |dispatcher|. Only after
-  // the dispatcher is shutdown will it be safe to destroy the servers.
-  // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
-
- private:
-  void dispatch_message(
-      ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
-      ::fidl::internal::MessageStorageViewBase* storage_view) final;
-};
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> final {
-  NaturalServerDispatcher() = delete;
-  static void Dispatch(::fidl::Server<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>* impl, ::fidl::IncomingHeaderAndMessage&& msg,
-                       internal::MessageStorageViewBase* storage_view,
-                       ::fidl::Transaction* txn);
-
- private:
-  static const ::fidl::internal::MethodEntry entries_[];
-  static const ::fidl::internal::MethodEntry* entries_end_;
-  static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
-      ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-template <>
-class ::fidl::internal::NaturalClientImpl<::test_bindingsdenylist::OnlyCppAndDeps> final : public ::fidl::internal::NaturalClientBase {
- public:
-  using NaturalClientBase::NaturalClientBase;
-};
-
-#endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
 
@@ -302,18 +175,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_bindingsdenylist::DenyEachBin
 };
 
 template <>
-struct ::fidl::internal::NaturalMethodTypes<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer> {
-  using Request = ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest;
-
-  using Response = ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult;
-
-  using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer>>;
-  using ResultCallback =
-      ::fit::callback<void(::fidl::Result<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer>&)>;
-  using DomainError = uint32_t;
-};
-
-template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> {
   using Request = ::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonRequest;
 
@@ -406,36 +267,6 @@ template <>
 class ::fidl::Result<::test_bindingsdenylist::DenyEachBinding::OnlyDenyGo> final : public ::fit::result<::fidl::ErrorsIn<::test_bindingsdenylist::DenyEachBinding::OnlyDenyGo>, ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse> {
  public:
   using ::fit::result<::fidl::ErrorsIn<::test_bindingsdenylist::DenyEachBinding::OnlyDenyGo>, ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse>::result;
-
- protected:
-  Result() = default;
-};
-
-template <>
-class ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer> final : public ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse> {
- public:
-  using ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse>::result;
-  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse> v) : result(std::move(v)) {}
-  Response() = delete;
-};
-template <>
-class ::fidl::internal::ResponseMessageConverter<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer> {
-  using DomainObject = ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult;
-
- public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
-};
-
-template <>
-class ::fidl::Result<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer> final : public ::fit::result<::fidl::ErrorsIn<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer>, ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse> {
- public:
-  using ::fit::result<::fidl::ErrorsIn<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer>, ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse>::result;
 
  protected:
   Result() = default;
@@ -539,8 +370,6 @@ class ::fidl::internal::NaturalClientImpl<::test_bindingsdenylist::DenyEachBindi
 
   ::fidl::internal::NaturalThenable<::test_bindingsdenylist::DenyEachBinding::OnlyDenyGo> OnlyDenyGo(const ::fidl::Request<::test_bindingsdenylist::DenyEachBinding::OnlyDenyGo>& request) const;
 
-  ::fidl::internal::NaturalThenable<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer> OnlyDenyLibfuzzer(const ::fidl::Request<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer>& request) const;
-
   ::fidl::internal::NaturalThenable<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> OnlyDenyPython(const ::fidl::Request<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>& request) const;
 
   ::fidl::internal::NaturalThenable<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust> OnlyDenyRust(const ::fidl::Request<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust>& request) const;
@@ -559,8 +388,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::DenyEachB
   ::fidl::Result<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart> OnlyDenyDart(const ::fidl::Request<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart>& request);
 
   ::fidl::Result<::test_bindingsdenylist::DenyEachBinding::OnlyDenyGo> OnlyDenyGo(const ::fidl::Request<::test_bindingsdenylist::DenyEachBinding::OnlyDenyGo>& request);
-
-  ::fidl::Result<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer> OnlyDenyLibfuzzer(const ::fidl::Request<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer>& request);
 
   ::fidl::Result<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> OnlyDenyPython(const ::fidl::Request<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>& request);
 
@@ -650,15 +477,6 @@ class ::fidl::internal::NaturalCompleterBase<::test_bindingsdenylist::DenyEachBi
 };
 
 template <>
-class ::fidl::internal::NaturalCompleterBase<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer> : public ::fidl::CompleterBase {
- public:
-  void Reply(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer>& response);
-
- protected:
-  using ::fidl::CompleterBase::CompleterBase;
-};
-
-template <>
 class ::fidl::internal::NaturalCompleterBase<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> : public ::fidl::CompleterBase {
  public:
   void Reply(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>& response);
@@ -707,12 +525,6 @@ class ::fidl::Server<::test_bindingsdenylist::DenyEachBinding> : public ::fidl::
 
   virtual void OnlyDenyGo(OnlyDenyGoRequest& request,
                           OnlyDenyGoCompleter::Sync& completer) = 0;
-
-  using OnlyDenyLibfuzzerRequest = ::fidl::Request<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer>;
-  using OnlyDenyLibfuzzerCompleter = ::fidl::internal::NaturalCompleter<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer>;
-
-  virtual void OnlyDenyLibfuzzer(OnlyDenyLibfuzzerRequest& request,
-                                 OnlyDenyLibfuzzerCompleter::Sync& completer) = 0;
 
   using OnlyDenyPythonRequest = ::fidl::Request<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>;
   using OnlyDenyPythonCompleter = ::fidl::internal::NaturalCompleter<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>;

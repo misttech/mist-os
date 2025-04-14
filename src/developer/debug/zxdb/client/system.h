@@ -12,6 +12,7 @@
 #include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/zxdb/client/client_object.h"
 #include "src/developer/debug/zxdb/client/download_manager.h"
+#include "src/developer/debug/zxdb/client/download_observer.h"
 #include "src/developer/debug/zxdb/client/map_setting_store.h"
 #include "src/developer/debug/zxdb/client/session_observer.h"
 #include "src/developer/debug/zxdb/client/setting_store_observer.h"
@@ -35,7 +36,10 @@ class TargetImpl;
 
 // Represents the client's view of the system-wide state on the debugged
 // computer.
-class System : public ClientObject, public SessionObserver, public SettingStoreObserver {
+class System : public ClientObject,
+               public DownloadObserver,
+               public SessionObserver,
+               public SettingStoreObserver {
  public:
   enum class Where {
     kNone,    // No connection.
@@ -190,6 +194,10 @@ class System : public ClientObject, public SessionObserver, public SettingStoreO
   // commands (e.g. "detach *", or "quit" when in embedded mode).
   void DetachFromAllTargets(fit::callback<void(int)> cb);
 
+  // Adds a task to be run once any pending downloads are completed. If no downloads are currently
+  // in progress, the callback is issued immediately.
+  void AddPostDownloadTask(fit::callback<void()> cb);
+
  private:
   void AddNewTarget(std::unique_ptr<TargetImpl> target);
   void AddSymbolServer(std::unique_ptr<SymbolServer> server);
@@ -200,6 +208,11 @@ class System : public ClientObject, public SessionObserver, public SettingStoreO
   // SessionObserver implementation.
   void HandlePreviousConnectedProcesses(
       const std::vector<debug_ipc::ProcessRecord>& procs) override;
+
+  // DownloadObserver implementation.
+  void OnDownloadsStopped(size_t num_succeeded, size_t num_failed) override;
+
+  std::vector<fit::callback<void()>> post_download_tasks_;
 
   Where where_ = Where::kNone;
 

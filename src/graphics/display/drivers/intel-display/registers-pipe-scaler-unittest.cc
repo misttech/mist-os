@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-display/registers-pipe-scaler.h"
 
-#include <lib/driver/mock-mmio/cpp/mock-mmio-range.h>
+#include <lib/driver/mock-mmio/cpp/globally-ordered-region.h>
 #include <lib/mmio/mmio-buffer.h>
 
 #include <cmath>
@@ -491,7 +491,7 @@ TEST(PipeScalerCoefficients, Write) {
     coefficients[i].set_is_negative(0).set_mantissa(i).set_exponent(0);
   }
 
-  std::vector<mock_mmio::MockMmioRange::Access> expected_access_list = {
+  std::vector<mock_mmio::GloballyOrderedRegion::Access> expected_access_list = {
       {.address = 0x68198, .value = 0x00000400, .write = true},
   };
   for (size_t i = 0; i < kNumCoefficients; i += 2) {
@@ -504,7 +504,8 @@ TEST(PipeScalerCoefficients, Write) {
   }
 
   constexpr static int kMmioRangeSize = 0x140000;
-  mock_mmio::MockMmioRange mmio_range{kMmioRangeSize, mock_mmio::MockMmioRange::Size::k32};
+  mock_mmio::GloballyOrderedRegion mmio_range{kMmioRangeSize,
+                                              mock_mmio::GloballyOrderedRegion::Size::k32};
   mmio_range.Expect(expected_access_list);
   fdf::MmioBuffer mmio_buffer(mmio_range.GetMmioBuffer());
 
@@ -521,7 +522,7 @@ TEST(PipeScalerCoefficients, Read) {
     expected_coefficients[i].set_is_negative(0).set_mantissa(i).set_exponent(0);
   }
 
-  std::vector<mock_mmio::MockMmioRange::Access> expected_access_list = {
+  std::vector<mock_mmio::GloballyOrderedRegion::Access> expected_access_list = {
       {.address = 0x68198, .value = 0x00000400, .write = true},
   };
   for (size_t i = 0; i < kNumCoefficients; i += 2) {
@@ -534,7 +535,8 @@ TEST(PipeScalerCoefficients, Read) {
   }
 
   constexpr static int kMmioRangeSize = 0x140000;
-  mock_mmio::MockMmioRange mmio_range{kMmioRangeSize, mock_mmio::MockMmioRange::Size::k32};
+  mock_mmio::GloballyOrderedRegion mmio_range{kMmioRangeSize,
+                                              mock_mmio::GloballyOrderedRegion::Size::k32};
   mmio_range.Expect(expected_access_list);
   fdf::MmioBuffer mmio_buffer(mmio_range.GetMmioBuffer());
 

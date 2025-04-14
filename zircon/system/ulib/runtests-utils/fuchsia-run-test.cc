@@ -220,7 +220,7 @@ std::unique_ptr<Result> RunTest(const char* argv[], const char* output_dir, cons
 
     std::tuple<const char*, fuchsia_io::Flags> map[] = {
         {"/boot", fuchsia_io::kPermReadable},
-        {"/svc", {}},
+        {"/svc", fuchsia_io::kPermReadable},
         {"/tmp", fuchsia_io::kPermReadable | fuchsia_io::kPermWritable},
     };
     for (auto [path, flags] : map) {

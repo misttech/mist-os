@@ -48,3 +48,26 @@ class ExternalLibraryTestsuite(unittest.TestCase):
                 value=test_python_otherstruct.EmptyStruct()
             ),
         )
+
+    def test_encode_external_non_imported_enum_in_struct(self) -> None:
+        value = test_python_struct.StructWithExternalEnumField(value=0)
+        encoded_bytes, hdls = value.encode()
+        # fmt: off
+        self.assertEqual(encoded_bytes, bytearray([0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00]))
+        # fmt: on
+        self.assertEqual(hdls, [])
+
+    def test_decode_external_non_imported_enum_in_struct(self) -> None:
+        handles: list[int] = []
+        # fmt: off
+        encoded_bytes = bytearray([0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00])
+        # fmt: on
+        type_name = "test.python.struct/StructWithExternalEnumField"
+        value = decode_standalone(
+            type_name=type_name, bytes=encoded_bytes, handles=handles
+        )
+        value = construct_response_object(type_name, value)
+        self.assertEqual(
+            value,
+            test_python_struct.StructWithExternalEnumField(value=0),
+        )

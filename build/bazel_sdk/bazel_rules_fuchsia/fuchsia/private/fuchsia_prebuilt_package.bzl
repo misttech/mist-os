@@ -173,7 +173,7 @@ def _unpack_prebuilt_package_impl(ctx):
             build_id_dirs = [],
         ),
         # TODO(https://fxbug.dev/338180287): Add debug symbols support.
-        FuchsiaDebugSymbolInfo(build_id_dirs = {}),
+        FuchsiaDebugSymbolInfo(build_id_dirs_mapping = {}),
     ]
 
 _unpack_prebuilt_package = rule(
@@ -250,7 +250,7 @@ def _pack_prebuilt_package_impl(ctx):
             build_id_dirs = [],
         ),
         # TODO(https://fxbug.dev/338180287): Add debug symbols support.
-        FuchsiaDebugSymbolInfo(build_id_dirs = {}),
+        FuchsiaDebugSymbolInfo(build_id_dirs_mapping = {}),
     ]
 
 _pack_prebuilt_package = rule(

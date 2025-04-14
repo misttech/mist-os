@@ -132,6 +132,12 @@ libc_namespace = "__fuchsia_libc"
 #     - Type: list(config)
 #     - Default: []
 #
+#   * libc_deps
+#     - Optional: Used for deps on other libc_source_set() targets; as if each
+#     label were in $non_test_deps, and "$label.testonly" in $testonly_deps.
+#     - Type: list(label)
+#     - Default: []
+#
 #   * non_test_deps
 #     - Optional: Extra deps to append for the main target but
 #     not the testonly target.
@@ -192,6 +198,7 @@ template("libc_source_set") {
                              "configs",
                              "dir",
                              "global_symbols",
+                             "libc_deps",
                              "local_sources",
                              "non_test_deps",
                              "non_test_vars",
@@ -313,6 +320,9 @@ template("libc_source_set") {
         if (defined(invoker.non_test_vars)) {
           forward_variables_from(invoker.non_test_vars, "*")
         }
+        if (defined(invoker.libc_deps)) {
+          deps += invoker.libc_deps
+        }
         if (defined(invoker.non_test_deps)) {
           deps += invoker.non_test_deps
         }
@@ -349,6 +359,11 @@ template("libc_source_set") {
     configs += libc_testonly_configs + set_configs
     deps = []
     forward_variables_from(set_vars, "*")
+    if (defined(invoker.libc_deps)) {
+      foreach(label, invoker.libc_deps) {
+        deps += [ "$label.testonly" ]
+      }
+    }
     if (defined(invoker.testonly_deps)) {
       deps += invoker.testonly_deps
     }

@@ -9,8 +9,8 @@ import enum
 from dataclasses import dataclass
 from ipaddress import IPv4Address, IPv6Address
 
-import fidl.fuchsia_net as f_net
-import fidl.fuchsia_net_interfaces as f_net_interfaces
+import fidl_fuchsia_net as f_net
+import fidl_fuchsia_net_interfaces as f_net_interfaces
 
 from honeydew.affordances.connectivity.wlan.utils.types import MacAddress
 
@@ -55,7 +55,13 @@ class InterfaceProperties:
         ipv4_addresses: list[IPv4Address] = []
         ipv6_addresses: list[IPv6Address] = []
 
+        assert fidl.addresses is not None, f"{fidl!r} missing addresses"
+        assert fidl.port_class is not None, f"{fidl!r} missing port_class"
+        assert fidl.id_ is not None, f"{fidl!r} missing id"
+        assert fidl.name is not None, f"{fidl!r} missing name"
+
         for address in fidl.addresses:
+            assert address.addr is not None, f"{address!r} missing addr"
             subnet = address.addr
             ip = subnet.addr
             if ip.ipv4:

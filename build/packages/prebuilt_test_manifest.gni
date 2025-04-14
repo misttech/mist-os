@@ -94,6 +94,7 @@ template("prebuilt_test_manifest") {
                                [
                                  "deps",
                                  "environments",
+                                 "package_deps",
                                ])
         if (defined(test.log_settings)) {
           log_settings = test.log_settings

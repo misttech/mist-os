@@ -19,10 +19,10 @@ group("hermetic_tests") {
   public_deps = []
   data_deps = []
 
-  # Ensure that no tests are added to the non-hermetic tests group
+  # Ensure that no tests are added to the hermetic_tests group
   assert(
       deps + public_deps + data_deps == [],
-      "The workbench product does not support the running of non-hermetic tests in infra.")
+      "The workbench product does not support running the `hermetic_tests` group in infra.")
 }
 
 # For use with the 'test_package_labels' GN build argument.
@@ -33,10 +33,10 @@ group("non_hermetic_tests") {
   public_deps = []
   data_deps = []
 
-  # Ensure that no tests are added to the non-hermetic tests group
+  # Ensure that no tests are added to the non-hermetic_tests group
   assert(
       deps + public_deps + data_deps == [],
-      "The workbench product does not support the running of non-hermetic tests in infra.")
+      "The workbench product does not support running the `non-hermetic_tests` group in infra.")
 }
 
 # For use with the 'e2e_test_labels' GN build argument.
@@ -47,8 +47,8 @@ group("e2e_tests") {
   public_deps = []
   data_deps = []
 
-  # Ensure that no tests are added to the e2e_tests tests group
+  # Ensure that no tests are added to the e2e_tests group
   assert(
       deps + public_deps + data_deps == [],
-      "The workbench product does not support the running of end-to-end tests in infra.")
+      "The workbench product does not support running the `e2e_tests` group in infra.")
 }

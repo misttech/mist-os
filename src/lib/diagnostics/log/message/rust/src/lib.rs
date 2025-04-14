@@ -14,6 +14,7 @@ use moniker::Moniker;
 use std::{mem, str};
 mod constants;
 pub mod error;
+pub mod ffi;
 pub use constants::*;
 
 #[cfg(test)]

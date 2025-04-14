@@ -45,7 +45,7 @@ impl UnhandledInputHandler for KeymapHandler {
                 device_event: input_device::InputDeviceEvent::Keyboard(event),
                 device_descriptor,
                 event_time,
-                trace_id: _,
+                trace_id,
             } => {
                 self.inspect_status
                     .count_received_event(input_device::InputEvent::from(input_event));
@@ -53,6 +53,7 @@ impl UnhandledInputHandler for KeymapHandler {
                     event,
                     device_descriptor,
                     event_time,
+                    trace_id,
                 ))]
             }
             // Pass other events unchanged.
@@ -90,7 +91,13 @@ impl KeymapHandler {
         event: keyboard_binding::KeyboardEvent,
         device_descriptor: input_device::InputDeviceDescriptor,
         event_time: zx::MonotonicInstant,
+        trace_id: Option<fuchsia_trace::Id>,
     ) -> input_device::UnhandledInputEvent {
+        fuchsia_trace::duration!(c"input", c"keymap_handler");
+        if let Some(trace_id) = trace_id {
+            fuchsia_trace::flow_step!(c"input", c"event_in_input_pipeline", trace_id.into());
+        }
+
         let (key, event_type) = (event.get_key(), event.get_event_type());
         log::debug!(
             concat!(
@@ -116,7 +123,7 @@ impl KeymapHandler {
             ),
             device_descriptor,
             event_time,
-            trace_id: None,
+            trace_id,
         }
     }
 }

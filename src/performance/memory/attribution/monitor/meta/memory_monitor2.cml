@@ -35,7 +35,40 @@
                 // Provides access to memory attribution information. This Provider should be the
                 // root memory attribution provider of the system (typically, ELF runner).
                 "fuchsia.memory.attribution.Provider",
+
+                // Provides access to memory pressure level change notifications.
+                "fuchsia.memorypressure.Provider",
             ],
+        },
+        {
+            config: "fuchsia.memory.CaptureOnPressureChange",
+            key: "capture_on_pressure_change",
+            availability: "optional",
+            type: "bool",
+        },
+        {
+            config: "fuchsia.memory.ImminentOomCaptureDelay",
+            key: "imminent_oom_capture_delay_s",
+            availability: "optional",
+            type: "uint32",
+        },
+        {
+            config: "fuchsia.memory.CriticalCaptureDelay",
+            key: "critical_capture_delay_s",
+            availability: "optional",
+            type: "uint32",
+        },
+        {
+            config: "fuchsia.memory.WarningCaptureDelay",
+            key: "warning_capture_delay_s",
+            availability: "optional",
+            type: "uint32",
+        },
+        {
+            config: "fuchsia.memory.NormalCaptureDelay",
+            key: "normal_capture_delay_s",
+            availability: "optional",
+            type: "uint32",
         },
     ],
     expose: [
@@ -44,4 +77,11 @@
             from: "self",
         },
     ],
+    config: {
+        capture_on_pressure_change: { type: "bool" },
+        imminent_oom_capture_delay_s: { type: "uint32" },
+        critical_capture_delay_s: { type: "uint32" },
+        warning_capture_delay_s: { type: "uint32" },
+        normal_capture_delay_s: { type: "uint32" },
+    },
 }

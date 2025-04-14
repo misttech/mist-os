@@ -60,26 +60,6 @@ static const std::vector<fpbus::Bti> emmc_btis{
     }},
 };
 
-static const struct {
-  const fidl::StringView name;
-  const fuchsia_hardware_block_partition::wire::Guid guid;
-} guid_map[] = {
-    {"misc", GUID_ABR_META_VALUE},
-    {"boot_a", GUID_ZIRCON_A_VALUE},
-    {"boot_b", GUID_ZIRCON_B_VALUE},
-    {"cache", GUID_ZIRCON_R_VALUE},
-    {"zircon_r", GUID_ZIRCON_R_VALUE},
-    {"vbmeta_a", GUID_VBMETA_A_VALUE},
-    {"vbmeta_b", GUID_VBMETA_B_VALUE},
-    {"vbmeta_r", GUID_VBMETA_R_VALUE},
-    {"reserved_c", GUID_VBMETA_R_VALUE},
-    {"data", GUID_FVM_VALUE},
-    {"fvm", GUID_FVM_VALUE},
-};
-
-static_assert(sizeof(guid_map) / sizeof(guid_map[0]) <=
-              fuchsia_hardware_gpt_metadata::wire::kMaxPartitions);
-
 static const std::vector<fpbus::BootMetadata> emmc_boot_metadata{
     {{
         .zbi_type = DEVICE_METADATA_PARTITION_MAP,
@@ -126,27 +106,6 @@ zx_status_t Nelson::EmmcInit() {
 
   fidl::Arena<> fidl_arena;
 
-  fidl::VectorView<fuchsia_hardware_gpt_metadata::wire::PartitionInfo> partition_info(
-      fidl_arena, std::size(guid_map));
-
-  for (size_t i = 0; i < std::size(guid_map); i++) {
-    partition_info[i].name = guid_map[i].name;
-    partition_info[i].options =
-        fuchsia_hardware_gpt_metadata::wire::PartitionOptions::Builder(fidl_arena)
-            .type_guid_override(guid_map[i].guid)
-            .Build();
-  }
-
-  fit::result encoded =
-      fidl::Persist(fuchsia_hardware_gpt_metadata::wire::GptInfo::Builder(fidl_arena)
-                        .partition_info(partition_info)
-                        .Build());
-  if (!encoded.is_ok()) {
-    zxlogf(ERROR, "Failed to encode GPT metadata: %s",
-           encoded.error_value().FormatDescription().c_str());
-    return encoded.error_value().status();
-  }
-
   fit::result sdmmc_metadata = fidl::Persist(
       fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
           .max_frequency(166'666'667)
@@ -166,10 +125,6 @@ zx_status_t Nelson::EmmcInit() {
   }
 
   static const std::vector<fpbus::Metadata> emmc_metadata{
-      {{
-          .id = std::to_string(DEVICE_METADATA_GPT_INFO),
-          .data = std::move(encoded.value()),
-      }},
       {{
           .id = fuchsia_hardware_sdmmc::wire::SdmmcMetadata::kSerializableName,
           .data = std::move(sdmmc_metadata.value()),

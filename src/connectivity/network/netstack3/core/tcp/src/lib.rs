@@ -18,9 +18,12 @@ mod internal {
     pub(super) mod congestion;
     pub(super) mod counters;
     pub(super) mod rtt;
+    pub(super) mod sack_scoreboard;
     pub(super) mod seq_ranges;
     pub(super) mod socket;
     pub(super) mod state;
+    #[cfg(test)]
+    pub(super) mod testutil;
     pub(super) mod uninstantiable;
 }
 
@@ -46,6 +49,7 @@ pub use internal::socket::{
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
     pub use crate::internal::buffer::testutil::{
-        ClientBuffers, ProvidedBuffers, RingBuffer, TestSendBuffer, WriteBackClientBuffers,
+        ClientBuffers, InfiniteSendBuffer, ProvidedBuffers, RepeatingSendBuffer, RingBuffer,
+        TestSendBuffer, WriteBackClientBuffers,
     };
 }

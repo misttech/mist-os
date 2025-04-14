@@ -1,0 +1,17 @@
+[package]
+name = "bt-pacs"
+description = "Client and server library for the Published Audio Capabilities Service"
+version = "0.0.1"
+edition = "2021"
+license = "BSD-2-Clause"
+
+[dependencies]
+### In-tree dependencies
+bt-gatt = { path = "../bt-gatt" }
+bt-common = { path = "../bt-common" }
+
+### Others
+futures = "=0.3.30"
+
+[dev-dependencies]
+pretty_assertions = "1.2.1"

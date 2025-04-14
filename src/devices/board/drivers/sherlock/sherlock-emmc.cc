@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.hardware.gpt.metadata/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.sdmmc/cpp/wire.h>
@@ -16,7 +15,6 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/handle.h>
-#include <zircon/hw/gpt.h>
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
@@ -58,19 +56,6 @@ static const std::vector<fpbus::Bti> emmc_btis{
         .bti_id = BTI_EMMC,
     }},
 };
-
-static const struct {
-  const fidl::StringView name;
-  const fuchsia_hardware_block_partition::wire::Guid guid;
-} guid_map[] = {
-    {"boot", GUID_ZIRCON_A_VALUE},
-    {"system", GUID_ZIRCON_B_VALUE},
-    {"recovery", GUID_ZIRCON_R_VALUE},
-    {"cache", GUID_FVM_VALUE},
-};
-
-static_assert(sizeof(guid_map) / sizeof(guid_map[0]) <=
-              fuchsia_hardware_gpt_metadata::wire::kMaxPartitions);
 
 static const std::vector<fpbus::BootMetadata> emmc_boot_metadata{
     {{
@@ -131,27 +116,6 @@ zx_status_t Sherlock::EmmcInit() {
 
   fidl::Arena<> fidl_arena;
 
-  fidl::VectorView<fuchsia_hardware_gpt_metadata::wire::PartitionInfo> partition_info(
-      fidl_arena, std::size(guid_map));
-
-  for (size_t i = 0; i < std::size(guid_map); i++) {
-    partition_info[i].name = guid_map[i].name;
-    partition_info[i].options =
-        fuchsia_hardware_gpt_metadata::wire::PartitionOptions::Builder(fidl_arena)
-            .type_guid_override(guid_map[i].guid)
-            .Build();
-  }
-
-  fit::result encoded =
-      fidl::Persist(fuchsia_hardware_gpt_metadata::wire::GptInfo::Builder(fidl_arena)
-                        .partition_info(partition_info)
-                        .Build());
-  if (!encoded.is_ok()) {
-    zxlogf(ERROR, "Failed to encode GPT metadata: %s",
-           encoded.error_value().FormatDescription().c_str());
-    return encoded.error_value().status();
-  }
-
   fit::result sdmmc_metadata = fidl::Persist(
       fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
           .max_frequency(166'666'667)
@@ -172,10 +136,6 @@ zx_status_t Sherlock::EmmcInit() {
   }
 
   static const std::vector<fpbus::Metadata> sherlock_emmc_metadata{
-      {{
-          .id = std::to_string(DEVICE_METADATA_GPT_INFO),
-          .data = std::move(encoded.value()),
-      }},
       {{
           .id = fuchsia_hardware_sdmmc::wire::SdmmcMetadata::kSerializableName,
           .data = std::move(sdmmc_metadata.value()),

@@ -305,10 +305,7 @@ static Socket& to_socket(zxio_t* io) { return reinterpret_cast<ZxioSocket*>(io)-
 
 static constexpr zxio_ops_t kListenSocketOps = []() {
   zxio_ops_t ops = zxio_default_ops;
-  ops.close = [](zxio_t* io, const bool should_wait) {
-    reinterpret_cast<ZxioSocket*>(io)->~ZxioSocket();
-    return ZX_OK;
-  };
+  ops.destroy = [](zxio_t* io) { reinterpret_cast<ZxioSocket*>(io)->~ZxioSocket(); };
   ops.bind = [](zxio_t* io, const struct sockaddr* addr, socklen_t addrlen, int16_t* out_code) {
     return to_socket(io).Bind(addr, addrlen, out_code);
   };
@@ -363,6 +360,21 @@ zx::result<fbl::unique_fd> CreateVirtioStreamSocket() {
   return zx::ok(fbl::unique_fd(fdio_bind_to_fd(listen_socket_fdio, -1, 0)));
 }
 
+zx::result<uint32_t> GetLocalCid() {
+  zx::result client_end = component::Connect<fuchsia_vsock::Connector>();
+
+  if (!client_end.is_ok()) {
+    return client_end.take_error();
+  }
+
+  fidl::Result result = fidl::Call(client_end.value())->GetCid();
+  if (result.is_error()) {
+    return zx::error(result.error_value().status());
+  }
+
+  return zx::ok(result->local_cid());
+}
+
 }  // namespace vsock
 
 zx_status_t create_virtio_stream_socket(int* out_fd) {
@@ -371,5 +383,14 @@ zx_status_t create_virtio_stream_socket(int* out_fd) {
     return result.status_value();
   }
   *out_fd = result->release();
+  return ZX_OK;
+}
+
+zx_status_t get_local_cid(uint32_t* out_local_cid) {
+  auto result = vsock::GetLocalCid();
+  if (result.is_error()) {
+    return result.status_value();
+  }
+  *out_local_cid = result.value();
   return ZX_OK;
 }

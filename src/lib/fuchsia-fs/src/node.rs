@@ -4,14 +4,16 @@
 
 //! Utility functions for fuchsia.io nodes.
 
+use flex_fuchsia_io as fio;
 use futures::prelude::*;
 use thiserror::Error;
-use {fidl_fuchsia_io as fio, zx_status};
 
 #[cfg(target_os = "fuchsia")]
+#[cfg(not(feature = "fdomain"))]
 pub use fuchsia::*;
 
 #[cfg(target_os = "fuchsia")]
+#[cfg(not(feature = "fdomain"))]
 mod fuchsia {
     use super::*;
 
@@ -56,7 +58,7 @@ mod fuchsia {
 #[allow(missing_docs)]
 pub enum OpenError {
     #[error("while making a fidl proxy: {0}")]
-    CreateProxy(#[source] fidl::Error),
+    CreateProxy(#[source] flex_client::Error),
 
     #[error("while opening from namespace: {0}")]
     Namespace(#[source] zx_status::Status),

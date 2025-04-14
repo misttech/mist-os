@@ -3,10 +3,11 @@
 # found in the LICENSE file.
 """UserInput affordance implementation using FuchsiaController."""
 
+import asyncio
 import time
 
-import fidl.fuchsia_math as f_math
-import fidl.fuchsia_ui_test_input as f_test_input
+import fidl_fuchsia_math as f_math
+import fidl_fuchsia_ui_test_input as f_test_input
 import fuchsia_controller_py as fcp
 
 from honeydew import errors
@@ -53,8 +54,10 @@ class TouchDevice(user_input.TouchDevice):
                     _FcProxies.INPUT_REGISTRY
                 )
             )
-            input_registry_proxy.register_touch_screen(
-                device=channel_server.take(),
+            asyncio.run(
+                input_registry_proxy.register_touch_screen(
+                    device=channel_server.take(),
+                )
             )
         except fcp.ZxStatus as status:
             raise user_input_errors.UserInputError(
@@ -91,8 +94,10 @@ class TouchDevice(user_input.TouchDevice):
             interval: float = duration_ms / tap_event_count
 
             for _ in range(tap_event_count):
-                self._touch_screen_proxy.simulate_tap(
-                    tap_location=f_math.Vec(x=location.x, y=location.y)
+                asyncio.run(
+                    self._touch_screen_proxy.simulate_tap(
+                        tap_location=f_math.Vec(x=location.x, y=location.y)
+                    )
                 )
                 time.sleep(interval / 1000)  # Sleep in seconds
 
@@ -127,13 +132,16 @@ class TouchDevice(user_input.TouchDevice):
         """
 
         try:
-            self._touch_screen_proxy.simulate_swipe(
-                start_location=f_math.Vec(
-                    x=start_location.x, y=start_location.y
-                ),
-                end_location=f_math.Vec(x=end_location.x, y=end_location.y),
-                move_event_count=move_event_count,
-                duration=duration_ms * 1000000,  # milliseconds to nanoseconds
+            asyncio.run(
+                self._touch_screen_proxy.simulate_swipe(
+                    start_location=f_math.Vec(
+                        x=start_location.x, y=start_location.y
+                    ),
+                    end_location=f_math.Vec(x=end_location.x, y=end_location.y),
+                    move_event_count=move_event_count,
+                    duration=duration_ms
+                    * 1000000,  # milliseconds to nanoseconds
+                )
             )
         except fcp.ZxStatus as status:
             raise user_input_errors.UserInputError(
@@ -166,8 +174,10 @@ class KeyboardDevice(user_input.KeyboardDevice):
                     _FcProxies.INPUT_REGISTRY
                 )
             )
-            input_registry_proxy.register_keyboard(
-                device=channel_server.take(),
+            asyncio.run(
+                input_registry_proxy.register_keyboard(
+                    device=channel_server.take(),
+                )
             )
         except fcp.ZxStatus as status:
             raise user_input_errors.UserInputError(
@@ -189,7 +199,9 @@ class KeyboardDevice(user_input.KeyboardDevice):
             UserInputError: if failed key press operation.
         """
         try:
-            self._keyboard_proxy.simulate_key_press(key_code=key_code)
+            asyncio.run(
+                self._keyboard_proxy.simulate_key_press(key_code=key_code)
+            )
         except fcp.ZxStatus as status:
             raise user_input_errors.UserInputError(
                 f"key press operation failed on {self._device_name}"

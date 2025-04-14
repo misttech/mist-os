@@ -1136,20 +1136,20 @@ TEST_P(DriverRunnerTest, CreateAndBindCompositeNodeSpec) {
 
   const fuchsia_driver_framework::CompositeNodeSpec fidl_spec(
       {.name = name,
-       .parents = std::vector<fuchsia_driver_framework::ParentSpec>{
-           fuchsia_driver_framework::ParentSpec({
-               .bind_rules = std::vector<fuchsia_driver_framework::BindRule>(),
-               .properties = std::vector<fuchsia_driver_framework::NodeProperty>(),
+       .parents2 = std::vector<fuchsia_driver_framework::ParentSpec2>{
+           fuchsia_driver_framework::ParentSpec2({
+               .bind_rules = std::vector<fuchsia_driver_framework::BindRule2>(),
+               .properties = std::vector<fuchsia_driver_framework::NodeProperty2>(),
            }),
-           fuchsia_driver_framework::ParentSpec({
-               .bind_rules = std::vector<fuchsia_driver_framework::BindRule>(),
-               .properties = std::vector<fuchsia_driver_framework::NodeProperty>(),
+           fuchsia_driver_framework::ParentSpec2({
+               .bind_rules = std::vector<fuchsia_driver_framework::BindRule2>(),
+               .properties = std::vector<fuchsia_driver_framework::NodeProperty2>(),
            })}});
 
   auto spec = std::make_unique<driver_manager::CompositeNodeSpecImpl>(
       driver_manager::CompositeNodeSpecCreateInfo{
           .name = name,
-          .parents = fidl_spec.parents().value(),
+          .parents = fidl_spec.parents2().value(),
       },
       dispatcher(), &driver_runner());
   fidl::Arena<> arena;

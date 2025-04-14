@@ -83,7 +83,7 @@ rust_library(
     }),
     version = "0.8.4",
     deps = [
-        "//third_party/rust_crates/vendor/libc-0.2.169:libc",
+        "//third_party/rust_crates/vendor/libc-0.2.171:libc",
         "//third_party/rust_crates/vendor/rand_chacha-0.3.1:rand_chacha",
         "//third_party/rust_crates/vendor/rand_core-0.6.4:rand_core",
     ],

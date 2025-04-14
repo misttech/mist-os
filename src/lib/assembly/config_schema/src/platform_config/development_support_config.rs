@@ -52,6 +52,10 @@ pub struct DevelopmentSupportConfig {
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub include_netsvc: bool,
 
+    /// Override tracing inclusion on the target.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub include_tracing: bool,
+
     /// Enable the netboot feature of the netsvc
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enable_netsvc_netboot: bool,

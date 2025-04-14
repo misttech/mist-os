@@ -16,7 +16,6 @@ rustc_test("bin") {
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.diagnostics.host:fuchsia.diagnostics.host_rust",
     "//sdk/fidl/fuchsia.diagnostics.types:fuchsia.diagnostics.types_rust",
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
     "//sdk/rust/zx",
     "//src/lib/diagnostics/data/rust",
@@ -27,7 +26,6 @@ rustc_test("bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//src/lib/syslog/rust:syslog-listener",
     "//src/testing/realm_proxy/client",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
@@ -58,7 +56,6 @@ rustc_test("bin") {
     "src/logs/mod.rs",
     "src/logs/selectors.rs",
     "src/logs/sorting.rs",
-    "src/logs/utils.rs",
     "src/puppet.rs",
     "src/test_topology.rs",
     "src/utils.rs",
@@ -66,9 +63,15 @@ rustc_test("bin") {
 
   if (current_build_target_api_level == "PLATFORM" ||
       current_build_target_api_level == "HEAD") {
-    sources += [ "src/inspect/escrow.rs" ]
+    sources += [
+      "src/inspect/escrow.rs",
+      "src/logs/utils.rs",
+    ]
 
-    deps += [ "//src/lib/diagnostics/log/encoding/rust" ]
+    deps += [
+      "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
+      "//src/lib/diagnostics/log/encoding/rust",
+    ]
   }
 
   inputs = [

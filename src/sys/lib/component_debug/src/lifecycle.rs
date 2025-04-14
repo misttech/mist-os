@@ -4,6 +4,7 @@
 // found in the LICENSE file.
 
 use cm_types::{LongName, Name};
+use flex_client::ProxyHasDomain;
 #[cfg(not(mistos))]
 use fuchsia_url::AbsoluteComponentUrl;
 #[cfg(mistos)]
@@ -13,8 +14,8 @@ use futures::{FutureExt, StreamExt};
 use moniker::Moniker;
 use thiserror::Error;
 use {
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_sys2 as fsys,
+    flex_fuchsia_component as fcomponent, flex_fuchsia_component_decl as fdecl,
+    flex_fuchsia_sys2 as fsys,
 };
 
 /// Errors that apply to all lifecycle actions.
@@ -158,7 +159,7 @@ pub async fn start_instance(
     lifecycle_controller: &fsys::LifecycleControllerProxy,
     moniker: &Moniker,
 ) -> Result<StopFuture, StartError> {
-    let (client, server) = fidl::endpoints::create_proxy::<fcomponent::BinderMarker>();
+    let (client, server) = lifecycle_controller.domain().create_proxy::<fcomponent::BinderMarker>();
     lifecycle_controller
         .start_instance(&moniker.to_string(), server)
         .await
@@ -191,7 +192,7 @@ pub async fn start_instance_with_args(
     moniker: &Moniker,
     arguments: fcomponent::StartChildArgs,
 ) -> Result<StopFuture, StartError> {
-    let (client, server) = fidl::endpoints::create_proxy::<fcomponent::BinderMarker>();
+    let (client, server) = lifecycle_controller.domain().create_proxy::<fcomponent::BinderMarker>();
     lifecycle_controller
         .start_instance_with_args(&moniker.to_string(), server, arguments)
         .await
@@ -280,7 +281,7 @@ mod test {
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl::HandleBased;
-    use fidl_fuchsia_process as fprocess;
+    use flex_fuchsia_process as fprocess;
     use futures::TryStreamExt;
 
     fn lifecycle_create_instance(

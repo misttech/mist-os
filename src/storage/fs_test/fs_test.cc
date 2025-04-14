@@ -162,9 +162,9 @@ zx::result<std::pair<ramdevice_client::RamNand, std::string>> CreateRamNand(
   }
 
   if (zx::result channel = device_watcher::RecursiveWaitForFile(
-          "/dev/sys/platform/00:00:2e/nand-ctl", kDeviceWaitTime);
+          "/dev/sys/platform/ram-nand/nand-ctl", kDeviceWaitTime);
       channel.is_error()) {
-    std::cout << "Failed waiting for /dev/sys/platform/00:00:2e/nand-ctl to appear: "
+    std::cout << "Failed waiting for /dev/sys/platform/ram-nand/nand-ctl to appear: "
               << channel.status_string() << std::endl;
     return channel.take_error();
   }

@@ -52,6 +52,10 @@
             directory: "fs_root",
             from: "#debian_container",
         },
+        {
+            protocol: "fuchsia.component.Realm",
+            from: "framework",
+        },
     ],
     environments: [
         {
@@ -61,6 +65,16 @@
                 {
                     runner: "starnix",
                     from: "#kernel",
+                },
+            ],
+        },
+        {
+            name: "debian_container_env",
+            extends: "realm",
+            runners: [
+                {
+                    runner: "starnix_container",
+                    from: "#debian_container",
                 },
             ],
         },

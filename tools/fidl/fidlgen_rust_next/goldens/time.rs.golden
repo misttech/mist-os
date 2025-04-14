@@ -157,7 +157,7 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ComplexInstants {
     pub monotonic: Option<[i64; 10]>,
 

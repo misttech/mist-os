@@ -522,7 +522,7 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Table {}
 
 impl Table {
@@ -2257,7 +2257,7 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ResourceTable {}
 
 impl ResourceTable {

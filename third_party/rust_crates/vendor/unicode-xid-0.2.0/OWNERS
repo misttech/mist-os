@@ -3,4 +3,4 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /src/connectivity/network/dns/OWNERS
-include /third_party/rust_crates/vendor/synstructure-0.12.1/OWNERS
+include /third_party/rust_crates/vendor/synstructure-0.13.1/OWNERS

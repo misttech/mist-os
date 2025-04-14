@@ -42,10 +42,22 @@ def main():
     config_items = json.load(open(args.data))
     # merge the array of data items into a since dictionary.
     config_data = {}
+    # Hack in some variables
+
     for o in config_items:
         for k, v in o.items():
             config_data[k] = v
+    if "ffx" in config_data:
+        ffx_data = config_data["ffx"]
+    else:
+        ffx_data = {}
+        config_data["ffx"] = ffx_data
 
+    if "subtool-search-paths" not in ffx_data:
+        ffx_data["subtool-search-paths"] = [f"{args.build_dir}/host-tools"]
+
+    if "subtool-manifest" not in ffx_data:
+        ffx_data["subtool-manifest"] = f"{args.build_dir}/ffx_tools.json"
     # Always replace build dir. GN always writes "$BUILD_DIR" as "\$BUILD_DIR" so use python.
     replace_placeholder(config_data, args.dollar_placeholder, "$")
     replace_placeholder(

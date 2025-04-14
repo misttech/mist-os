@@ -723,7 +723,7 @@ mod test {
 
         let process = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         cgroup
-            .add_process(process.get_pid(), &OwnedRef::temp(&process.thread_group))
+            .add_process(process.get_pid(), &OwnedRef::temp(process.thread_group()))
             .expect("add process to cgroup");
         cgroup.freeze();
         assert_eq!(cgroup.get_pids().first(), Some(process.get_pid()).as_ref());

@@ -367,6 +367,30 @@ alias(
 )
 
 alias(
+    name = "bt-common-0.0.1",
+    actual = "//third_party/rust_crates/vendor/bt-common-0.0.1:bt_common",
+    tags = ["manual"],
+)
+
+alias(
+    name = "bt-common",
+    actual = "//third_party/rust_crates/vendor/bt-common-0.0.1:bt_common",
+    tags = ["manual"],
+)
+
+alias(
+    name = "bt-gatt-0.0.1",
+    actual = "//third_party/rust_crates/vendor/bt-gatt-0.0.1:bt_gatt",
+    tags = ["manual"],
+)
+
+alias(
+    name = "bt-gatt",
+    actual = "//third_party/rust_crates/vendor/bt-gatt-0.0.1:bt_gatt",
+    tags = ["manual"],
+)
+
+alias(
     name = "bumpalo-3.2.1",
     actual = "//third_party/rust_crates/vendor/bumpalo-3.2.1:bumpalo",
     tags = ["manual"],
@@ -1123,6 +1147,18 @@ alias(
 )
 
 alias(
+    name = "hashlink-0.10.0",
+    actual = "//third_party/rust_crates/vendor/hashlink-0.10.0:hashlink",
+    tags = ["manual"],
+)
+
+alias(
+    name = "hashlink",
+    actual = "//third_party/rust_crates/vendor/hashlink-0.10.0:hashlink",
+    tags = ["manual"],
+)
+
+alias(
     name = "heck-0.4.1",
     actual = "//third_party/rust_crates/vendor/heck-0.4.1:heck",
     tags = ["manual"],
@@ -1327,14 +1363,14 @@ alias(
 )
 
 alias(
-    name = "libc-0.2.169",
-    actual = "//third_party/rust_crates/vendor/libc-0.2.169:libc",
+    name = "libc-0.2.171",
+    actual = "//third_party/rust_crates/vendor/libc-0.2.171:libc",
     tags = ["manual"],
 )
 
 alias(
     name = "libc",
-    actual = "//third_party/rust_crates/vendor/libc-0.2.169:libc",
+    actual = "//third_party/rust_crates/vendor/libc-0.2.171:libc",
     tags = ["manual"],
 )
 
@@ -1483,14 +1519,14 @@ alias(
 )
 
 alias(
-    name = "memoffset-0.7.1",
-    actual = "//third_party/rust_crates/vendor/memoffset-0.7.1:memoffset",
+    name = "memoffset-0.9.1",
+    actual = "//third_party/rust_crates/vendor/memoffset-0.9.1:memoffset",
     tags = ["manual"],
 )
 
 alias(
     name = "memoffset",
-    actual = "//third_party/rust_crates/vendor/memoffset-0.7.1:memoffset",
+    actual = "//third_party/rust_crates/vendor/memoffset-0.9.1:memoffset",
     tags = ["manual"],
 )
 
@@ -2611,14 +2647,14 @@ alias(
 )
 
 alias(
-    name = "socket2-0.5.5",
-    actual = "//third_party/rust_crates/vendor/socket2-0.5.5:socket2",
+    name = "socket2-0.5.9",
+    actual = "//third_party/rust_crates/vendor/socket2-0.5.9:socket2",
     tags = ["manual"],
 )
 
 alias(
     name = "socket2",
-    actual = "//third_party/rust_crates/vendor/socket2-0.5.5:socket2",
+    actual = "//third_party/rust_crates/vendor/socket2-0.5.9:socket2",
     tags = ["manual"],
 )
 
@@ -2707,26 +2743,26 @@ alias(
 )
 
 alias(
-    name = "syn-2.0.87",
-    actual = "//third_party/rust_crates/vendor/syn-2.0.87:syn",
+    name = "syn-2.0.100",
+    actual = "//third_party/rust_crates/vendor/syn-2.0.100:syn",
     tags = ["manual"],
 )
 
 alias(
     name = "syn",
-    actual = "//third_party/rust_crates/vendor/syn-2.0.87:syn",
+    actual = "//third_party/rust_crates/vendor/syn-2.0.100:syn",
     tags = ["manual"],
 )
 
 alias(
-    name = "synstructure-0.12.1",
-    actual = "//third_party/rust_crates/vendor/synstructure-0.12.1:synstructure",
+    name = "synstructure-0.13.1",
+    actual = "//third_party/rust_crates/vendor/synstructure-0.13.1:synstructure",
     tags = ["manual"],
 )
 
 alias(
     name = "synstructure",
-    actual = "//third_party/rust_crates/vendor/synstructure-0.12.1:synstructure",
+    actual = "//third_party/rust_crates/vendor/synstructure-0.13.1:synstructure",
     tags = ["manual"],
 )
 
@@ -2839,14 +2875,14 @@ alias(
 )
 
 alias(
-    name = "tinyjson-2.5.0",
-    actual = "//third_party/rust_crates/vendor/tinyjson-2.5.0:tinyjson",
+    name = "tinyjson-2.5.1",
+    actual = "//third_party/rust_crates/vendor/tinyjson-2.5.1:tinyjson",
     tags = ["manual"],
 )
 
 alias(
     name = "tinyjson",
-    actual = "//third_party/rust_crates/vendor/tinyjson-2.5.0:tinyjson",
+    actual = "//third_party/rust_crates/vendor/tinyjson-2.5.1:tinyjson",
     tags = ["manual"],
 )
 
@@ -3271,14 +3307,14 @@ alias(
 )
 
 alias(
-    name = "zerocopy-0.8.25-alpha",
-    actual = "//third_party/rust_crates/vendor/zerocopy-0.8.25-alpha:zerocopy",
+    name = "zerocopy-0.8.25-alpha.2",
+    actual = "//third_party/rust_crates/vendor/zerocopy-0.8.25-alpha.2:zerocopy",
     tags = ["manual"],
 )
 
 alias(
     name = "zerocopy",
-    actual = "//third_party/rust_crates/vendor/zerocopy-0.8.25-alpha:zerocopy",
+    actual = "//third_party/rust_crates/vendor/zerocopy-0.8.25-alpha.2:zerocopy",
     tags = ["manual"],
 )
 

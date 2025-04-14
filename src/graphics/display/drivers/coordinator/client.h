@@ -151,6 +151,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
                            display::VsyncAckCookie vsync_ack_cookie);
 
   void ApplyConfig();
+  void ReapplyConfig();
 
   void OnFenceFired(FenceReference* fence);
 
@@ -290,7 +291,6 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   // A counter for the number of times the client has successfully applied
   // a configuration. This does not account for changes due to waiting images.
-  uint32_t client_apply_count_ = 0;
   display::ConfigStamp latest_config_stamp_ = display::kInvalidConfigStamp;
 
   // This is the client's clamped RGB value.

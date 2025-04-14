@@ -802,7 +802,7 @@ Additionally, there have been a few projects that combine AFL with qemu:
 [216]: /docs/development/languages
 [217]: /docs/development/testing/fuzzing/overview.md
 [218]: /docs/development/testing/fuzzing/build-a-fuzzer.md
-[219]: /docs/development/testing/fuzzing/fidl-fuzzing.md
+[219]: https://cs.opensource.google/fuchsia/fuchsia/+/705c14ba2d447dbfe2b64c1ee5f48aaf7a88658b:docs/development/testing/fuzzing/fidl-fuzzing.md
 [220]: /docs/development/testing/fuzzing/run-a-fuzzer.md
 [221]: /docs/development/testing/fuzzing/write-a-fuzzer.md
 [222]: /docs/development/tools/ffx/development/subtools/getting-started.md

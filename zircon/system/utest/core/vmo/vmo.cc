@@ -900,6 +900,16 @@ TEST(VmoTestCase, ContentSize) {
   status = vmo.get_property(ZX_PROP_VMO_CONTENT_SIZE, &content_size, sizeof(content_size));
   EXPECT_OK(status, "get_property");
   EXPECT_EQ(target_size, content_size);
+
+  zx::vmo read_write_vmo;
+  ASSERT_OK(vmo.duplicate(ZX_RIGHT_READ | ZX_RIGHT_WRITE | ZX_RIGHT_SET_PROPERTY, &read_write_vmo));
+  EXPECT_OK(
+      read_write_vmo.set_property(ZX_PROP_VMO_CONTENT_SIZE, &content_size, sizeof(content_size)));
+
+  zx::vmo read_only_vmo;
+  ASSERT_OK(vmo.duplicate(ZX_RIGHT_READ | ZX_RIGHT_SET_PROPERTY, &read_only_vmo));
+  EXPECT_EQ(ZX_ERR_ACCESS_DENIED, read_only_vmo.set_property(ZX_PROP_VMO_CONTENT_SIZE,
+                                                             &content_size, sizeof(content_size)));
 }
 
 TEST(VmoTestCase, StreamSize) {

@@ -529,6 +529,78 @@ TEST_F(RebootLogStrTest, Succeed_InferFDR) {
             "GRACEFUL REBOOT REASONS: (NONE)\n\nFINAL REBOOT REASON (FACTORY DATA RESET)");
 }
 
+TEST_F(RebootLogStrTest, Succeed_SetDlog) {
+  constexpr std::string_view kContents =
+      R"(ZIRCON REBOOT REASON (USERSPACE ROOT JOB TERMINATION)
+
+UPTIME (ms)
+1234
+RUNTIME (ms)
+1098
+
+--- BEGIN DLOG DUMP ---
+test dlog dump line1
+test dlog dump line2
+
+--- END DLOG DUMP ---
+
+GRACEFUL REBOOT REASONS: (NONE)
+
+FINAL REBOOT REASON (ROOT JOB TERMINATION))";
+
+  WriteZirconRebootLogContents(std::string(kContents));
+  WriteGracefulRebootLogContents(NewRebootOptions({RebootReason2::CRITICAL_COMPONENT_FAILURE}));
+
+  const RebootLog reboot_log(RebootLog::ParseRebootLog(
+      zircon_reboot_log_path_, graceful_reboot_log_path_, /*not_a_fdr=*/true));
+  EXPECT_EQ(reboot_log.Dlog(), "test dlog dump line1\ntest dlog dump line2");
+}
+
+TEST_F(RebootLogStrTest, Succeed_EmptyDlog) {
+  constexpr std::string_view kContents =
+      R"(ZIRCON REBOOT REASON (USERSPACE ROOT JOB TERMINATION)
+
+  UPTIME (ms)
+  1234
+  RUNTIME (ms)
+  1098
+
+  --- BEGIN DLOG DUMP ---
+  --- END DLOG DUMP ---
+
+  GRACEFUL REBOOT REASONS: (NONE)
+
+  FINAL REBOOT REASON (ROOT JOB TERMINATION))";
+
+  WriteZirconRebootLogContents(std::string(kContents));
+  WriteGracefulRebootLogContents(NewRebootOptions({RebootReason2::CRITICAL_COMPONENT_FAILURE}));
+
+  const RebootLog reboot_log(RebootLog::ParseRebootLog(
+      zircon_reboot_log_path_, graceful_reboot_log_path_, /*not_a_fdr=*/true));
+  EXPECT_EQ(reboot_log.Dlog(), "");
+}
+
+TEST_F(RebootLogStrTest, Succeed_NoDlog) {
+  constexpr std::string_view kContents =
+      R"(ZIRCON REBOOT REASON (USERSPACE ROOT JOB TERMINATION)
+
+  UPTIME (ms)
+  1234
+  RUNTIME (ms)
+  1098
+
+  GRACEFUL REBOOT REASONS: (NONE)
+
+  FINAL REBOOT REASON (ROOT JOB TERMINATION))";
+
+  WriteZirconRebootLogContents(std::string(kContents));
+  WriteGracefulRebootLogContents(NewRebootOptions({RebootReason2::CRITICAL_COMPONENT_FAILURE}));
+
+  const RebootLog reboot_log(RebootLog::ParseRebootLog(
+      zircon_reboot_log_path_, graceful_reboot_log_path_, /*not_a_fdr=*/true));
+  EXPECT_EQ(reboot_log.Dlog(), std::nullopt);
+}
+
 }  // namespace
 }  // namespace feedback
 }  // namespace forensics

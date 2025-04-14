@@ -545,6 +545,14 @@ pub fn build_sparse_files(
             let raw = Chunk::Raw { start: total_read as u64, size: buf.len().try_into().unwrap() };
             log::trace!("Sparsing file: {}. Created: {}", file_to_upload, raw);
             chunks.push(raw);
+            if read < buf.len() {
+                // We've reached the end of the file add a DontCare chunk to
+                // skip the last bit of the file which is zeroed out from the previous
+                // raw buffer
+                let skip_end =
+                    Chunk::DontCare { start: (total_read + read) as u64, size: BLK_SIZE };
+                chunks.push(skip_end);
+            }
         }
         total_read += read;
     }

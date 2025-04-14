@@ -21,6 +21,7 @@ declare_args() {
   # Supported options:
   #   "remote": on cache-miss, build remotely (default)
   #   "local": on cache-miss, build locally
+  #   "nocache": force execution, as if cache-miss.
   bazel_rbe_exec_strategy = rbe_settings.bazel_exec_strategy
 
   # Control what bazel remote-built outputs are downloaded.

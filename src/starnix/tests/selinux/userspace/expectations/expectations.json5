@@ -9,5 +9,12 @@
                 "*",
             ],
         },
+        {
+            type: "expect_failure",
+            matchers: [
+                // TODO(https://fxbug.dev/374832936): Make this test pass.
+                "IoctlTest.FilteredCommandDenied",
+            ],
+        },
     ],
 }

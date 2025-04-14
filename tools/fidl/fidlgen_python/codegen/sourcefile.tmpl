@@ -20,7 +20,8 @@ import typing
 import enum
 
 import fidl
-_ir_path = fidl._library.get_fidl_ir_map()["{{ .Name }}"]
+from fidl._ir import get_fidl_ir_map
+_ir_path = get_fidl_ir_map()["{{ .Name }}"]
 add_ir_path(_ir_path)
 
 {{ range .PythonExternalModules -}}

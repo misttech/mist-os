@@ -224,7 +224,7 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct T {
     pub zircon_handle: Option<::fidl_next::fuchsia::zx::Handle>,
 

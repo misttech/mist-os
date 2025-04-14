@@ -70,6 +70,9 @@ impl FlatlandEnvironment {
                     .capability(Capability::configuration(
                         "fuchsia.scenic.FrameSchedulerMinPredictedFrameDurationInUs",
                     ))
+                    .capability(Capability::configuration(
+                        "fuchsia.scenic.FramePredictionMarginInUs",
+                    ))
                     .capability(Capability::configuration("fuchsia.scenic.PointerAutoFocus"))
                     .capability(Capability::configuration("fuchsia.scenic.DisplayComposition"))
                     .capability(Capability::configuration("fuchsia.scenic.ICanHazDisplayId"))

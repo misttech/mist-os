@@ -462,7 +462,7 @@ syscall_test_suite(loopback_test_label) {
   # other suites. To compensate for this, use additional shards.
   # The loopback test suite takes longer on riscv builders, break the suite
   # into more shards. This is done for all builders to avoid confusion.
-  num_shards = 15
+  num_shards = 20
 
   # These tests are generating too much logging.  https://fxbug.dev/328822330
   debug_netstack2 = false

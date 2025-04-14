@@ -208,6 +208,7 @@ class TestBase : public media::audio::test::TestFixture {
     std::optional<float> gain_step_db;  // ...r
   };
   std::optional<BaseProperties>& properties() { return properties_; }
+  const std::optional<BaseProperties>& properties() const { return properties_; }
 
   const std::vector<fuchsia::hardware::audio::signalprocessing::Topology>& topologies() const {
     return topologies_;

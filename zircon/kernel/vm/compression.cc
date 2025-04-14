@@ -18,6 +18,8 @@
 
 namespace {
 
+KCOUNTER(pages_decompressed, "vm.reclamation.pages_decompressed")
+
 // We always add zx_instant_mono_ticks_t to any data that we store, so ensure that the maximum size
 // of the compressed data combined with that would not require us to store more than a page.
 constexpr size_t ensure_threshold(size_t threshold) {
@@ -139,6 +141,7 @@ void VmCompression::Decompress(CompressedRef ref, void* page_dest, uint32_t* met
     return;
   }
 
+  pages_decompressed.Add(1);
   decompressions_.fetch_add(1);
 
   // Lookup the data so we can decompress out.

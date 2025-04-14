@@ -41,9 +41,10 @@ MappingStatus symbolizer_add_mapping(symbolizer::SymbolizerImpl* symbolizer, uin
   };
 }
 
-void symbolizer_resolve_address(symbolizer::SymbolizerImpl* symbolizer, uint64_t address,
-                                location_callback output, void* output_context) {
-  symbolizer->Backtrace(
+ResolveAddressStatus symbolizer_resolve_address(symbolizer::SymbolizerImpl* symbolizer,
+                                                uint64_t address, location_callback output,
+                                                void* output_context) {
+  symbolizer::SymbolizerImpl::BacktraceStatus status = symbolizer->Backtrace(
       address, symbolizer::Symbolizer::AddressType::kUnknown,
       [address, output, output_context](auto inline_index, auto& location, auto& module) {
         symbolizer_location_t output_location;
@@ -80,5 +81,13 @@ void symbolizer_resolve_address(symbolizer::SymbolizerImpl* symbolizer, uint64_t
 
         output(&output_location, output_context);
       });
+  switch (status) {
+    case symbolizer::SymbolizerImpl::BacktraceStatus::kOk:
+      return ResolveAddressStatus::Ok;
+    case symbolizer::SymbolizerImpl::BacktraceStatus::kSymbolFileUnavailable:
+      return ResolveAddressStatus::SymbolFileUnavailable;
+    case symbolizer::SymbolizerImpl::BacktraceStatus::kNoOverlappingModule:
+      return ResolveAddressStatus::NoOverlappingModule;
+  }
 }
 }

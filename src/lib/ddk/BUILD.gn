@@ -409,6 +409,7 @@ library_headers("ddk-metadata-headers") {
     "//src/devices/board/drivers/sherlock:*",
     "//src/devices/board/drivers/sherlock/post-init:*",
     "//src/devices/board/drivers/vim3:*",
+    "//src/devices/bus/drivers/platform:*",
     "//src/devices/bus/drivers/platform/test:*",
     "//src/devices/clock/drivers/clock:*",
     "//src/devices/gpio/drivers/gpio:*",

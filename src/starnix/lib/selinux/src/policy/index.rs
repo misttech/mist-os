@@ -25,16 +25,16 @@ pub struct FsUseLabelAndType {
 /// index stores the offset of the data in the binary policy to avoid scanning a collection to find
 /// an element that contains a matching string. For example, the policy contains a collection of
 /// classes that are identified by string names included in each collection entry. However,
-/// `policy_index.classes(ObjectClass::Process).unwrap()` yields the offset in the policy's
+/// `policy_index.classes(KernelClass::Process).unwrap()` yields the offset in the policy's
 /// collection of classes where the "process" class resides.
 #[derive(Debug)]
 pub(super) struct PolicyIndex<PS: ParseStrategy> {
     /// Map from well-known classes to their offsets in the associate policy's
     /// [`crate::symbols::Classes`] collection.
-    classes: HashMap<crate::ObjectClass, usize>,
+    classes: HashMap<crate::KernelClass, usize>,
     /// Map from well-known permissions to their class's associated [`crate::symbols::Permissions`]
     /// collection.
-    permissions: HashMap<crate::Permission, PermissionIndex>,
+    permissions: HashMap<crate::KernelPermission, PermissionIndex>,
     /// The parsed binary policy.
     parsed_policy: ParsedPolicy<PS>,
     /// The "object_r" role used as a fallback for new file context transitions.
@@ -52,10 +52,10 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         let policy_classes = parsed_policy.classes();
         let common_symbols = parsed_policy.common_symbols();
 
-        // Accumulate classes indexed by `crate::ObjectClass`. If the policy defines that unknown
+        // Accumulate classes indexed by `crate::KernelClass`. If the policy defines that unknown
         // classes should cause rejection then return an error describing the missing element.
         let mut classes = HashMap::new();
-        for known_class in crate::ObjectClass::all_variants().into_iter() {
+        for known_class in crate::KernelClass::all_variants().into_iter() {
             match get_class_index_by_name(policy_classes, known_class.name()) {
                 Some(class_index) => {
                     classes.insert(known_class, class_index);
@@ -71,7 +71,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         // Accumulate permissions indexed by `crate::Permission`. If the policy defines that unknown
         // classes should cause rejection then return an error describing the missing element.
         let mut permissions = HashMap::new();
-        for known_permission in crate::Permission::all_variants().into_iter() {
+        for known_permission in crate::KernelPermission::all_variants().into_iter() {
             let object_class = known_permission.class();
             if let Some(class_index) = classes.get(&object_class) {
                 let class = &policy_classes[*class_index];
@@ -110,11 +110,14 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         Ok(index)
     }
 
-    pub fn class<'a>(&'a self, object_class: &crate::ObjectClass) -> Option<&'a Class<PS>> {
+    pub fn class<'a>(&'a self, object_class: &crate::KernelClass) -> Option<&'a Class<PS>> {
         self.classes.get(object_class).map(|offset| &self.parsed_policy.classes()[*offset])
     }
 
-    pub fn permission<'a>(&'a self, permission: &crate::Permission) -> Option<&'a Permission<PS>> {
+    pub fn permission<'a>(
+        &'a self,
+        permission: &crate::KernelPermission,
+    ) -> Option<&'a Permission<PS>> {
         let target_class = self.class(&permission.class())?;
         self.permissions.get(permission).map(|p| match p {
             PermissionIndex::Class { permission_index } => {
@@ -137,7 +140,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         target: &SecurityContext,
         class: &crate::FsNodeClass,
     ) -> SecurityContext {
-        let object_class = crate::ObjectClass::from(class.clone());
+        let object_class = crate::KernelClass::from(class.clone());
         let default_role = match class {
             // Sockets and pipes use the source role as default role, as observed in SELinux.
             FsNodeClass::Socket(_) => source.role(),
@@ -173,7 +176,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         class: &crate::FsNodeClass,
         name: NullessByteStr<'_>,
     ) -> Option<SecurityContext> {
-        let object_class = crate::ObjectClass::from(class.clone());
+        let object_class = crate::KernelClass::from(class.clone());
         let policy_class = self.class(&object_class)?;
         let type_id = self.type_transition_new_type_with_name(
             source.type_(),
@@ -222,7 +225,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         &self,
         source: &SecurityContext,
         target: &SecurityContext,
-        class: &crate::ObjectClass,
+        class: &crate::KernelClass,
         default_role: RoleId,
         default_type: TypeId,
         default_low_level: &SecurityLevel,
@@ -249,7 +252,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         &self,
         source: &SecurityContext,
         target: &SecurityContext,
-        class: &crate::ObjectClass,
+        class: &crate::KernelClass,
         default_role: RoleId,
         default_type: TypeId,
         default_low_level: &SecurityLevel,

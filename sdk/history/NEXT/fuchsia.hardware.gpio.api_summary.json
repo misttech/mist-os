@@ -167,6 +167,11 @@
         "type": "uint32"
     },
     {
+        "kind": "bits/member",
+        "name": "fuchsia.hardware.gpio/InterruptOptions.WAKEABLE",
+        "value": "1"
+    },
+    {
         "kind": "bits",
         "name": "fuchsia.hardware.gpio/InterruptOptions",
         "strictness": "flexible",

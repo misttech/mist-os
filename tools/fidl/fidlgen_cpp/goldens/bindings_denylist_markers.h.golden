@@ -9,15 +9,6 @@
 
 namespace test_bindingsdenylist {
 
-class OnlyLibfuzzerAndDeps final {
-  OnlyLibfuzzerAndDeps() = delete;
-
- public:
-  using Transport = ::fidl::internal::ChannelTransport;
-
-  static constexpr ::fidl::internal::Openness kOpenness = ::fidl::internal::Openness::kClosed;
-};
-
 class OnlyCppAndDeps final {
   OnlyCppAndDeps() = delete;
 
@@ -66,22 +57,6 @@ class DenyEachBinding final {
     static constexpr bool kHasFrameworkError = false;
 
     static constexpr uint64_t kOrdinal = 7311125300308839833;
-  };
-  class OnlyDenyLibfuzzer final {
-    OnlyDenyLibfuzzer() = delete;
-
-   public:
-    using Protocol = ::test_bindingsdenylist::DenyEachBinding;
-    static constexpr bool kHasClientToServer = true;
-    static constexpr bool kHasClientToServerBody = true;
-    static constexpr bool kHasServerToClient = true;
-    static constexpr bool kHasServerToClientBody = true;
-
-    static constexpr bool kHasNonEmptyUserFacingResponse = true;
-    static constexpr bool kHasDomainError = true;
-    static constexpr bool kHasFrameworkError = false;
-
-    static constexpr uint64_t kOrdinal = 2184115815603862302;
   };
   class OnlyDenyPython final {
     OnlyDenyPython() = delete;
@@ -186,9 +161,6 @@ class ImportsSameNameContext final {
 
 }  // namespace test_bindingsdenylist
 namespace fidl {
-
-template <>
-struct IsProtocol<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> : public std::true_type {};
 
 template <>
 struct IsProtocol<::test_bindingsdenylist::OnlyCppAndDeps> : public std::true_type {};

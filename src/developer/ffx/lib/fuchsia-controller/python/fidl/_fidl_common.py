@@ -68,6 +68,13 @@ class FidlMeta(ABCMeta):
         return super().__new__(meta_cls, name, bases, classdict)
 
 
+class FidlProtocolMarker(
+    str,
+    metaclass=FidlMeta,
+):
+    ...
+
+
 @dataclass
 class MethodInfo:
     name: str

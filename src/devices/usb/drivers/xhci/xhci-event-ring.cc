@@ -156,7 +156,7 @@ zx_status_t EventRing::AddSegment(bool initialization) {
     std::unique_ptr<dma_buffer::ContiguousBuffer> buffer_tmp;
     zx_status_t status = hci_->buffer_factory().CreateContiguous(
         *bti_, page_size_,
-        static_cast<uint32_t>(page_size_ == zx_system_get_page_size() ? 0 : page_size_ >> 12),
+        static_cast<uint32_t>(page_size_ == zx_system_get_page_size() ? 0 : page_size_ >> 12), true,
         &buffer_tmp);
     if (status != ZX_OK) {
       return status;

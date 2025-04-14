@@ -381,6 +381,19 @@ pub fn create_proxy_for_wake_events_counter(
     (proxy, counter)
 }
 
+/// Marks a message handled by decrementing `counter`.
+///
+/// This should be called when a proxied channel message has been handled, and the caller would
+/// be ok letting the container suspend.
+pub fn mark_proxy_message_handled(counter: &zx::Counter) {
+    counter.add(-1).expect("Failed to decrement counter");
+}
+
+/// Marks all messages tracked by `counter` as handled.
+pub fn mark_all_proxy_messages_handled(counter: &zx::Counter) {
+    counter.write(0).expect("Failed to decrement counter");
+}
+
 /// Creates a watcher between clients and the Starnix runner.
 ///
 /// Changes in the power state of the container are relayed by the event pair.

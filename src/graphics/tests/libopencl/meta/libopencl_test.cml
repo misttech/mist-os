@@ -18,14 +18,6 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.Log" ],
-            from: "parent",
-            to: [
-                "#fake_opencl_loader",
-                "#test_driver",
-            ],
-        },
-        {
             protocol: "fuchsia.opencl.loader.Loader",
             from: "#fake_opencl_loader",
             to: [ "#test_driver" ],

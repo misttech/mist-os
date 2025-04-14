@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Result};
-use fidl_fuchsia_sys2 as fsys;
+use flex_fuchsia_sys2 as fsys;
 use moniker::Moniker;
 use prettytable::format::consts::FORMAT_CLEAN;
 use prettytable::{cell, row, Row, Table};

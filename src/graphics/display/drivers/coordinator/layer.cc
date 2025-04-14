@@ -112,6 +112,13 @@ void Layer::ApplyChanges() {
   applied_layer_config_ = draft_layer_config_;
   draft_layer_config_differs_from_applied_ = false;
 
+  const rect_u& image_source = applied_layer_config_.image_source;
+  const bool is_solid_color_fill = image_source.width == 0 && image_source.height == 0;
+  if (is_solid_color_fill) {
+    applied_image_ = nullptr;
+    waiting_images_.RemoveAllImages();
+  }
+
   if (applied_image_ != nullptr) {
     applied_layer_config_.image_handle = ToBanjoDriverImageId(applied_image_->driver_id());
   } else {

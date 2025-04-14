@@ -76,8 +76,13 @@ impl UnhandledInputHandler for ImeHandler {
                 device_descriptor:
                     input_device::InputDeviceDescriptor::Keyboard(ref keyboard_description),
                 event_time,
-                trace_id: _,
+                trace_id,
             } => {
+                fuchsia_trace::duration!(c"input", c"ime_handler");
+                if let Some(trace_id) = trace_id {
+                    fuchsia_trace::flow_end!(c"input", c"event_in_input_pipeline", trace_id.into());
+                }
+
                 self.inspect_status.count_received_event(input_device::InputEvent::from(
                     unhandled_input_event.clone(),
                 ));

@@ -516,8 +516,8 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
   std::atomic<bool>& run_threads() { return run_threads_; }
 
   // Returns a RemoteBlockDevice for the BlockServer interface.
-  zx::result<std::unique_ptr<block_client::RemoteBlockDevice>>
-  GetRemoteBlockDeviceForBlockServer() {
+  zx::result<std::unique_ptr<block_client::RemoteBlockDevice>> GetRemoteBlockDeviceForBlockServer(
+      const char* instance_name) {
     auto [service_client, service_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
     std::string path = std::string(component::kServiceDirectory) + "/" +
                        fuchsia_hardware_block_volume::Service::Name;
@@ -536,25 +536,10 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
       return zx::error(status);
     }
 
-    std::string instance_name;
-
-    if (zx_status_t status = fdio_watch_directory(
-            service_dir.get(),
-            [](int fd, int event, const char* name, void* cookie) {
-              if (strcmp(name, ".") == 0)
-                return ZX_OK;
-              *reinterpret_cast<std::string*>(cookie) = name;
-              return ZX_ERR_STOP;
-            },
-            ZX_TIME_INFINITE, &instance_name);
-        status != ZX_ERR_STOP) {
-      return zx::error(status);
-    }
-
     fdio_cpp::FdioCaller service_dir_caller(std::move(service_dir));
     auto [volume_client, volume_server] =
         fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
-    std::string volume_path = instance_name + "/volume";
+    std::string volume_path = std::string(instance_name) + "/volume";
     if (zx_status_t status = fdio_open3_at(service_dir_caller.borrow_channel(), volume_path.c_str(),
                                            0, volume_server.TakeChannel().release());
         status != ZX_OK) {
@@ -2344,8 +2329,9 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
 TEST_P(SdmmcBlockDeviceTest, BlockServer) {
   ASSERT_OK(StartDriverForMmc(/*speed_capabilities=*/{}, /*supply_power_framework=*/false));
 
-  runtime_.PerformBlockingWork([&] {
-    auto client = GetRemoteBlockDeviceForBlockServer();
+  const char* instance_name = "user";
+  auto test_fn = [&] {
+    auto client = GetRemoteBlockDeviceForBlockServer(instance_name);
     ASSERT_OK(client);
 
     fuchsia_hardware_block::wire::BlockInfo info;
@@ -2408,20 +2394,41 @@ TEST_P(SdmmcBlockDeviceTest, BlockServer) {
         },
     };
 
-    EXPECT_OK(client->FifoTransaction(requests, 2));
+    EXPECT_OK(client->FifoTransaction(requests, 4));
 
     requests[0].command.opcode = BLOCK_OPCODE_READ;
     requests[0].vmo_offset += 2;
     requests[1].command.opcode = BLOCK_OPCODE_READ;
     requests[1].vmo_offset += 2;
 
-    EXPECT_OK(client->FifoTransaction(requests, 2));
+    EXPECT_OK(client->FifoTransaction(requests, 4));
 
     auto read_buffer = std::make_unique<uint8_t[]>(len);
     EXPECT_OK(vmo.read(read_buffer.get(), len, len));
 
     EXPECT_BYTES_EQ(read_buffer.get(), buffer.get(), len);
-  });
+
+    block_fifo_request_t bad_request{
+        .command =
+            {
+                .opcode = BLOCK_OPCODE_WRITE,
+            },
+        .vmoid = vmoid,
+        .length = 1,
+        .vmo_offset = 1,
+        .dev_offset = info.block_count,
+    };
+    EXPECT_STATUS(client->FifoTransaction(&bad_request, 1), ZX_ERR_OUT_OF_RANGE);
+    bad_request.command.opcode = BLOCK_OPCODE_READ;
+    EXPECT_STATUS(client->FifoTransaction(&bad_request, 1), ZX_ERR_OUT_OF_RANGE);
+    bad_request.command.opcode = BLOCK_OPCODE_TRIM;
+    EXPECT_STATUS(client->FifoTransaction(&bad_request, 1), ZX_ERR_OUT_OF_RANGE);
+  };
+  runtime_.PerformBlockingWork(test_fn);
+  instance_name = "boot1";
+  runtime_.PerformBlockingWork(test_fn);
+  instance_name = "boot2";
+  runtime_.PerformBlockingWork(test_fn);
 }
 
 // TODO(https://fxbug.dev/376147833): The fake driver doesn't support packed transfers
@@ -2436,7 +2443,7 @@ TEST_P(SdmmcBlockDeviceTest, DISABLED_BlockServerMaxTransferSize) {
         .max_transfer_size = kMaxTransferSize,
     });
 
-    auto client = GetRemoteBlockDeviceForBlockServer();
+    auto client = GetRemoteBlockDeviceForBlockServer("user");
     ASSERT_OK(client);
 
     fuchsia_hardware_block::wire::BlockInfo info;

@@ -26,7 +26,6 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifdef OPENTHREAD_250225
 #include "spinel_manager.h"
 
 #include <platform/exit_code.h>
@@ -196,4 +195,3 @@ void platformSpinelManagerUpdateFdSet(otSysMainloopContext *aContext) {
     aContext->m_timeout.tv_usec = 0;
   }
 }
-#endif  // OPENTHREAD_250225

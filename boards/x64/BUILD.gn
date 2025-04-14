@@ -319,7 +319,6 @@ board_input_bundle("paver") {
 
 board_input_bundle_set("x64_bibs") {
   board_input_bundles = [
-    ":paver",
     ":x64_common",
     ":main_bundle",
     "//boards/emulation/virtio",

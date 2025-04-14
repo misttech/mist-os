@@ -161,6 +161,56 @@ type AddExecutionStateDependencyError = flexible enum {
     BAD_STATE = 2;
 };
 
+/// Error codes for responses from `RegisterSuspendBlocker` in
+/// [`fuchsia.power.system/ActivityGovernor`].
+@available(added=NEXT)
+type RegisterSuspendBlockerError = flexible enum {
+    /// The service encountered an error while attempting to issue a wake lease.
+    INTERNAL = 1;
+    /// Required arguments are either not given or are not valid.
+    INVALID_ARGS = 2;
+};
+
+/// An entity that blocks suspend until it handles transitions across hardware
+/// platform suspend and resume.
+@available(added=NEXT)
+open protocol SuspendBlocker {
+    /// Called after system activity governor begins operations to suspend the
+    /// hardware platform.
+    ///
+    /// The server is expected to respond once it has performed the operations
+    /// it needs to prepare itself for suspend, if any. All dependencies of
+    /// `ExecutionStateLevel::SUSPENDING` are guaranteed to be satisified for
+    /// the duration of this call and may be revoked once the server replies.
+    ///
+    /// Operations to suspend the hardware platform may vary between different
+    /// hardware platforms and product configurations. At a minimum, the client
+    /// and server MUST assume that general code execution continues
+    /// until a reply to this call is received by the client. If the
+    /// SuspendBlocker wants to preempt suspend operations, it MUST call
+    /// `ActivityGovernor.AcquireWakeLease` before replying to this call.
+    ///
+    /// SuspendBlocker MUST NOT call
+    /// `ActivityGovernor.TakeApplicationActivityLease` nor perform any action
+    /// that blocks on raising Execution State above its Inactive level.
+    /// (However, AcquireWakeLease does _not_ block in this way and is safe to
+    /// call.) Doing so will currently result in a deadlock. This constraint
+    /// will eventually be removed; see https://fxbug.dev/391429689.
+    flexible BeforeSuspend() -> ();
+
+    /// Called after system activity governor is aware that the hardware
+    /// platform has resumed.
+    ///
+    /// All dependencies of `ExecutionStateLevel::SUSPENDING` are guaranteed to
+    /// be satisified when this call is issued, and the `BeforeSuspend` method
+    /// will be invoked before that guarantee is removed.
+    ///
+    /// SAG does not block on the response to this method, so the SuspendBlocker
+    /// may safely take actions that block on raising Execution State's power
+    /// level. In particular, it is not affected by https://fxbug.dev/391429689.
+    flexible AfterResume() -> ();
+};
+
 /// A listener for activity governor events.
 @available(added=HEAD)
 open protocol ActivityGovernorListener {
@@ -224,8 +274,7 @@ open protocol ActivityGovernor {
     /// If an error occurs while creating a token for the wake lease, then the
     /// channel to `ActivityGovernor` will be closed by the server and no
     /// response will be returned.
-    @deprecated("Use AcquireWakeLease instead")
-    @available(added=HEAD)
+    @available(added=HEAD, deprecated=HEAD, note="Use AcquireWakeLease instead")
     flexible TakeWakeLease(struct {
         /// The name of the lease.
         ///
@@ -280,7 +329,7 @@ open protocol ActivityGovernor {
     /// is sent.
     ///
     /// To unregister, close the `ActivityGovernorListener` channel.
-    @available(added=HEAD)
+    @available(added=HEAD, deprecated=HEAD, note="Use RegisterSuspendBlocker instead")
     flexible RegisterListener(resource table {
         /// The client end of the service that receives activity governor events.
         ///
@@ -288,6 +337,38 @@ open protocol ActivityGovernor {
         1: listener client_end:ActivityGovernorListener;
         // TODO(b/315994974): Handle filtering by wakeup reason.
     }) -> ();
+
+    /// Registers a suspend blocker.
+    ///
+    /// On successful registration, a wake lease token is returned. This token
+    /// prevents hardware platform suspension while it exists. Clients are
+    /// expected to perform any initialization of the given `suspend_blocker`
+    /// server while holding this token. Additionally, this means the first call
+    /// `suspend_blocker` will get is `BeforeSuspend`.
+    ///
+    /// To unregister, close the `SuspendBlocker` channel.
+    ///
+    /// If any required field of the table is missing, the error
+    /// [`RegisterSuspendBlockerError.INVALID_ARGS`] is returned.
+    ///
+    /// If an error occurs while registering `suspend_blocker`, it will be
+    /// dropped, closing the channel.
+    @available(added=NEXT)
+    flexible RegisterSuspendBlocker(resource table {
+        /// The client end of the SuspendBlocker service.
+        ///
+        /// Required.
+        1: suspend_blocker client_end:SuspendBlocker;
+        /// The name of the suspend blocker.
+        ///
+        /// Required.
+        ///
+        /// The name cannot be empty but is not required to be globally unique.
+        2: name string:MAX_ELEMENT_NAME_LEN;
+    }) -> (resource struct {
+        /// The token that blocks hardware platform suspension.
+        token LeaseToken;
+    }) error RegisterSuspendBlockerError;
 };
 
 /// A service that processes notification about the system boot state.

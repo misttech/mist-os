@@ -44,14 +44,14 @@ enum class State : uint8_t {
   // Once SetConfigured(true) has been called, we:
   // - Send USB "receive" requests to the endpoint,
   // - Tell any connected UsbAdbImpl clients that the device is online, and
-  // - Move to kConnected.
+  // - Move to kOnline.
   //
   // If a fadb::Device client requests shutdown by calling StopAdb() or closing
   // a UsbAdbImpl connection, we call function_.SetInterface(nullptr), and move
   // to kStoppingUsb. Likewise if PrepareStop is called.
   kAwaitingUsbConnection,
 
-  // In kConnected, the USB connection is live, and we respond to any
+  // In kOnline, the USB connection is live, and we respond to any
   // QueueTx/Receive requests from UsbAdbImpl clients.
   //
   // If any of the following happen:
@@ -62,7 +62,7 @@ enum class State : uint8_t {
   //
   // ... we call function_.SetInterface(nullptr) and move to kStoppingUsb. (We
   // hold onto the responder for any calls to StopAdb()).
-  kConnected,
+  kOnline,
 
   // In kStoppingUsb, we wait for all outstanding USB requests to be completed.
   // Once they have been, we:

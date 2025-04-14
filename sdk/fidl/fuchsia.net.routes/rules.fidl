@@ -65,6 +65,8 @@ type InterfaceMatcher = flexible union {
     /// The name is not a pattern or regex, it needs to be an exact match for
     /// the rule to be chosen.
     1: device_name fuchsia.net.interfaces.Name;
+    /// Matches iff the outgoing traffic is not bound to a device.
+    2: unbound struct {};
     // TODO(https://fxbug.dev/351015513): Introduce a variant that matches on the ID.
 };
 

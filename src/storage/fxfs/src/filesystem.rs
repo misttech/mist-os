@@ -1572,7 +1572,7 @@ mod tests {
         let root_directory = Directory::open(&root_store, root_store.root_directory_object_id())
             .await
             .expect("open failed");
-        let (object_id, descriptor) =
+        let (object_id, descriptor, _) =
             root_directory.lookup("test").await.expect("lookup failed").unwrap();
         assert_eq!(descriptor, ObjectDescriptor::File);
         let test_file =

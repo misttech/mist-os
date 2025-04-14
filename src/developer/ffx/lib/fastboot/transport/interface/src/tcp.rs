@@ -114,7 +114,7 @@ where
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
         if self.write_header_task.is_none() && !self.wrote_header {
-            tracing::debug!("About to start header task");
+            tracing::trace!("About to start header task");
             let mut stream = self.stream.clone();
             let mut data = vec![];
             data.extend(TryInto::<u64>::try_into(buf.len()).unwrap().to_be_bytes());
@@ -122,7 +122,7 @@ where
         }
 
         if self.write_header_task.is_some() {
-            tracing::debug!("Checking header task status");
+            tracing::trace!("Checking header task status");
             let task = self.write_header_task.as_mut().unwrap();
             let res = match task.as_mut().poll(cx) {
                 Poll::Ready(Ok(())) => {
@@ -138,7 +138,7 @@ where
                 }
                 Poll::Pending => Poll::Pending,
             };
-            tracing::debug!("Header Check: returning: {:#?}", res);
+            tracing::trace!("Header Check: returning: {:#?}", res);
             return res;
         }
 

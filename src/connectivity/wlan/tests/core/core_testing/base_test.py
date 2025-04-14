@@ -10,9 +10,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-import fidl.fuchsia_wlan_common as fidl_common
-import fidl.fuchsia_wlan_device_service as fidl_svc
-import fidl.fuchsia_wlan_sme as fidl_sme
+import fidl_fuchsia_wlan_common as fidl_common
+import fidl_fuchsia_wlan_device_service as fidl_svc
+import fidl_fuchsia_wlan_sme as fidl_sme
 from antlion import controllers
 from antlion.controllers import fuchsia_device
 from antlion.controllers.access_point import AccessPoint
@@ -20,11 +20,13 @@ from fuchsia_controller_py import Channel, ZxStatus
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 from honeydew.typing.custom_types import FidlEndpoint
 from mobly import base_test, signals
-from mobly.asserts import abort_class_if, assert_equal, assert_is_not, fail
+from mobly.asserts import abort_class_if, assert_equal, fail
 from mobly.records import TestResultRecord
 
 
 class ConnectionBaseTestClass(AsyncAdapter, base_test.BaseTestClass):
+    iface_id: int | None
+
     @asyncmethod
     async def setup_class(self) -> None:
         super().setup_class()
@@ -64,37 +66,39 @@ class ConnectionBaseTestClass(AsyncAdapter, base_test.BaseTestClass):
                 )
             )
         )
-        response = await self.device_monitor_proxy.list_phys()
-        assert_is_not(
-            response.phy_list,
-            None,
-            "DeviceMonitor.ListPhys() response is missing a phy_list value",
-        )
+        list_phys_response = await self.device_monitor_proxy.list_phys()
+        assert (
+            list_phys_response.phy_list is not None
+        ), "DeviceMonitor.ListPhys() response is missing a phy_list value"
         assert_equal(
-            len(response.phy_list),
+            len(list_phys_response.phy_list),
             1,
             "DeviceMonitor.ListPhys() should return exactly one phy_id.",
         )
 
-        self.phy_id = response.phy_list[0]
+        self.phy_id = list_phys_response.phy_list[0]
         logger.info(f"Using phy_id {self.phy_id}")
 
-        response = await self.device_monitor_proxy.list_ifaces()
-        if len(response.iface_list) > 0:
+        list_ifaces_response = await self.device_monitor_proxy.list_ifaces()
+        assert (
+            list_ifaces_response.iface_list is not None
+        ), "DeviceMonitor.ListIfaces() response is missing iface_list"
+        if len(list_ifaces_response.iface_list) > 0:
             fail(
-                f"Found existing ifaces: {response.iface_list}. Every test suite should start with no ifaces."
+                f"Found existing ifaces: {list_ifaces_response.iface_list}. Every test suite should start with no ifaces."
             )
 
-        response = (
+        create_iface_response = (
             await self.device_monitor_proxy.create_iface(
                 phy_id=self.phy_id,
                 role=fidl_common.WlanMacRole.CLIENT,
                 sta_address=[0, 0, 0, 0, 0, 0],
             )
         ).unwrap()
-        if response.iface_id is None:
-            fail("DeviceMonitor.CreateIface() response is missing a iface_id")
-        self.iface_id = response.iface_id
+        assert (
+            create_iface_response.iface_id is not None
+        ), "DeviceMonitor.CreateIface() response is missing a iface_id"
+        self.iface_id = create_iface_response.iface_id
 
         proxy, server = Channel.create()
         (
@@ -115,14 +119,15 @@ class ConnectionBaseTestClass(AsyncAdapter, base_test.BaseTestClass):
 
     @asyncmethod
     async def teardown_class(self) -> None:
-        logger.info(f"Destroying iface_id {self.iface_id}")
-        req = fidl_svc.DestroyIfaceRequest(iface_id=self.iface_id)
-        response = await self.device_monitor_proxy.destroy_iface(req=req)
-        assert_equal(
-            response.status,
-            ZxStatus.ZX_OK,
-            "DeviceMonitor.DestroyIface() failed",
-        )
+        if self.iface_id is not None:
+            logger.info(f"Destroying iface_id {self.iface_id}")
+            req = fidl_svc.DestroyIfaceRequest(iface_id=self.iface_id)
+            response = await self.device_monitor_proxy.destroy_iface(req=req)
+            assert_equal(
+                response.status,
+                ZxStatus.ZX_OK,
+                "DeviceMonitor.DestroyIface() failed",
+            )
         self.iface_id = None
 
         # Save a snapshot after the entire test suite completes. This will be the only snapshot

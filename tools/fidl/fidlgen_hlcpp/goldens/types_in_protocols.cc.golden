@@ -1000,6 +1000,7 @@ void VectorOptional::Encode(::fidl::Encoder* _encoder, size_t _offset,
     memcpy(_encoder->template GetPtr<VectorOptional>(_offset), this, sizeof(VectorOptional));
   } else {::fidl::Encode(_encoder, &opt_vector_uint8, _offset + 0);
     ::fidl::Encode(_encoder, &opt_vector_string, _offset + 16);
+    ::fidl::Encode(_encoder, &opt_vector_struct, _offset + 32);
     ::fidl::Encode(_encoder, &opt_vector_opt_struct, _offset + 48);
     
   }
@@ -1011,6 +1012,7 @@ void VectorOptional::Decode(::fidl::Decoder* _decoder, VectorOptional* _value, s
   } else {
     ::fidl::Decode(_decoder, &_value->opt_vector_uint8, _offset + 0);
     ::fidl::Decode(_decoder, &_value->opt_vector_string, _offset + 16);
+    ::fidl::Decode(_decoder, &_value->opt_vector_struct, _offset + 32);
     ::fidl::Decode(_decoder, &_value->opt_vector_opt_struct, _offset + 48);
   }
 }
@@ -1020,6 +1022,9 @@ zx_status_t VectorOptional::Clone(VectorOptional* _result) const {
   if (_status != ZX_OK)
     return _status;
   _status = ::fidl::Clone(opt_vector_string, &_result->opt_vector_string);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(opt_vector_struct, &_result->opt_vector_struct);
   if (_status != ZX_OK)
     return _status;
   _status = ::fidl::Clone(opt_vector_opt_struct, &_result->opt_vector_opt_struct);
@@ -3597,7 +3602,7 @@ zx_status_t Protocol_Proxy::Dispatch_(::fidl::HLCPPIncomingMessage message) {
         break;
       }
       ::fidl::Decoder decoder(std::move(message));
-      EventVectorOptional(::fidl::DecodeAs<::fidl::VectorPtr<uint8_t>>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::std::string>>(&decoder, 16 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>(&decoder, 48 + sizeof(fidl_message_header_t)));
+      EventVectorOptional(::fidl::DecodeAs<::fidl::VectorPtr<uint8_t>>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::std::string>>(&decoder, 16 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::test::typesinprotocols::Struct>>(&decoder, 32 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>(&decoder, 48 + sizeof(fidl_message_header_t)));
       break;
     }
     case ::test::typesinprotocols::internal::kProtocol_EventArrayVectorNested_Ordinal: {
@@ -3909,10 +3914,10 @@ void Protocol_Proxy::ErrorVectorCompound(ErrorVectorCompoundCallback callback) {
   const fidl_type_t* req_type =nullptr;
   controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::ErrorVectorCompound(&_encoder), Protocol_ErrorVectorCompound_ResponseHandler(std::move(callback)));
 }
-void Protocol_Proxy::OneWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) {
+void Protocol_Proxy::OneWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) {
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_OneWayVectorOptional_Ordinal, ::test::typesinprotocols::internal::kProtocol_OneWayVectorOptional_DynamicFlags);
   const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_VectorOptionalTable;
-  controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::OneWayVectorOptional(&_encoder, &opt_vector_uint8, &opt_vector_string, &opt_vector_opt_struct), nullptr);
+  controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::OneWayVectorOptional(&_encoder, &opt_vector_uint8, &opt_vector_string, &opt_vector_struct, &opt_vector_opt_struct), nullptr);
 }
 namespace {
 
@@ -3923,16 +3928,16 @@ Protocol_TwoWayVectorOptional_ResponseHandler(Protocol::TwoWayVectorOptionalCall
   return ::std::make_unique<::fidl::internal::SingleUseMessageHandler>(
       [callback_ = std::move(callback)](::fidl::HLCPPIncomingMessage&& message) {
         ::fidl::Decoder decoder(std::move(message));
-        callback_(::fidl::DecodeAs<::fidl::VectorPtr<uint8_t>>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::std::string>>(&decoder, 16 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>(&decoder, 48 + sizeof(fidl_message_header_t)));
+        callback_(::fidl::DecodeAs<::fidl::VectorPtr<uint8_t>>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::std::string>>(&decoder, 16 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::test::typesinprotocols::Struct>>(&decoder, 32 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>(&decoder, 48 + sizeof(fidl_message_header_t)));
         return ZX_OK;
       }, &::test::typesinprotocols::_internal::test_typesinprotocols_VectorOptionalTable);
 }
 
 }  // namespace
-void Protocol_Proxy::TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct, TwoWayVectorOptionalCallback callback) {
+void Protocol_Proxy::TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct, TwoWayVectorOptionalCallback callback) {
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_TwoWayVectorOptional_Ordinal, ::test::typesinprotocols::internal::kProtocol_TwoWayVectorOptional_DynamicFlags);
   const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_VectorOptionalTable;
-  controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::TwoWayVectorOptional(&_encoder, &opt_vector_uint8, &opt_vector_string, &opt_vector_opt_struct), Protocol_TwoWayVectorOptional_ResponseHandler(std::move(callback)));
+  controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::TwoWayVectorOptional(&_encoder, &opt_vector_uint8, &opt_vector_string, &opt_vector_struct, &opt_vector_opt_struct), Protocol_TwoWayVectorOptional_ResponseHandler(std::move(callback)));
 }
 namespace {
 
@@ -4238,10 +4243,10 @@ class Protocol_TwoWayVectorOptional_Responder final {
   Protocol_TwoWayVectorOptional_Responder(::fidl::internal::PendingResponse response)
       : response_(std::move(response)) {}
 
-  void operator()(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) {
+  void operator()(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) {
     ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_TwoWayVectorOptional_Ordinal, ::test::typesinprotocols::internal::kProtocol_TwoWayVectorOptional_DynamicFlags);
     const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_VectorOptionalTable;
-    response_.Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::TwoWayVectorOptional(&_encoder, &opt_vector_uint8, &opt_vector_string, &opt_vector_opt_struct));
+    response_.Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::TwoWayVectorOptional(&_encoder, &opt_vector_uint8, &opt_vector_string, &opt_vector_struct, &opt_vector_opt_struct));
   }
 
  private:
@@ -4464,13 +4469,13 @@ zx_status_t Protocol_Stub::Dispatch_(
     case ::test::typesinprotocols::internal::kProtocol_OneWayVectorOptional_Ordinal:
     {
       ::fidl::Decoder decoder(std::move(message));
-      impl_->OneWayVectorOptional(::fidl::DecodeAs<::fidl::VectorPtr<uint8_t>>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::std::string>>(&decoder, 16 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>(&decoder, 48 + sizeof(fidl_message_header_t)));
+      impl_->OneWayVectorOptional(::fidl::DecodeAs<::fidl::VectorPtr<uint8_t>>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::std::string>>(&decoder, 16 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::test::typesinprotocols::Struct>>(&decoder, 32 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>(&decoder, 48 + sizeof(fidl_message_header_t)));
       break;
     }
     case ::test::typesinprotocols::internal::kProtocol_TwoWayVectorOptional_Ordinal:
     {
       ::fidl::Decoder decoder(std::move(message));
-      impl_->TwoWayVectorOptional(::fidl::DecodeAs<::fidl::VectorPtr<uint8_t>>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::std::string>>(&decoder, 16 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>(&decoder, 48 + sizeof(fidl_message_header_t)), Protocol_TwoWayVectorOptional_Responder(std::move(response)));
+      impl_->TwoWayVectorOptional(::fidl::DecodeAs<::fidl::VectorPtr<uint8_t>>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::std::string>>(&decoder, 16 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::test::typesinprotocols::Struct>>(&decoder, 32 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>(&decoder, 48 + sizeof(fidl_message_header_t)), Protocol_TwoWayVectorOptional_Responder(std::move(response)));
       break;
     }
     case ::test::typesinprotocols::internal::kProtocol_ErrorVectorOptional_Ordinal:
@@ -4544,9 +4549,9 @@ void Protocol_Stub::EventVectorCompound(::std::vector<::test::typesinprotocols::
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_EventVectorCompound_Ordinal, ::test::typesinprotocols::internal::kProtocol_EventVectorCompound_DynamicFlags);
   const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_VectorCompoundTable;sender_()->Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::EventVectorCompound(&_encoder, &vector_bits, &vector_enum, &vector_struct, &vector_table, &vector_union, &vector_opt_struct, &vector_opt_union));
 }
-void Protocol_Stub::EventVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) {
+void Protocol_Stub::EventVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) {
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_EventVectorOptional_Ordinal, ::test::typesinprotocols::internal::kProtocol_EventVectorOptional_DynamicFlags);
-  const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_VectorOptionalTable;sender_()->Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::EventVectorOptional(&_encoder, &opt_vector_uint8, &opt_vector_string, &opt_vector_opt_struct));
+  const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_VectorOptionalTable;sender_()->Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::EventVectorOptional(&_encoder, &opt_vector_uint8, &opt_vector_string, &opt_vector_struct, &opt_vector_opt_struct));
 }
 void Protocol_Stub::EventArrayVectorNested(::std::array<::std::array<uint8_t, 5>, 5> array_array_uint8, ::std::array<::std::vector<uint8_t>, 5> array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>> vector_array_uint8, ::std::vector<::std::vector<uint8_t>> vector_vector_uint8) {
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_EventArrayVectorNested_Ordinal, ::test::typesinprotocols::internal::kProtocol_EventArrayVectorNested_DynamicFlags);
@@ -4817,24 +4822,25 @@ zx_status_t Protocol_SyncProxy::ErrorVectorCompound(::test::typesinprotocols::Pr
   return ZX_OK;
 }
 
-zx_status_t Protocol_SyncProxy::OneWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) {
+zx_status_t Protocol_SyncProxy::OneWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) {
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_OneWayVectorOptional_Ordinal, ::test::typesinprotocols::internal::kProtocol_OneWayVectorOptional_DynamicFlags);
     const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_VectorOptionalTable;
-  return proxy_.Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::OneWayVectorOptional(&_encoder, &opt_vector_uint8, &opt_vector_string, &opt_vector_opt_struct));
+  return proxy_.Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::OneWayVectorOptional(&_encoder, &opt_vector_uint8, &opt_vector_string, &opt_vector_struct, &opt_vector_opt_struct));
 }
 
-zx_status_t Protocol_SyncProxy::TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct, ::fidl::VectorPtr<uint8_t>* out_opt_vector_uint8, ::fidl::VectorPtr<::std::string>* out_opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>* out_opt_vector_opt_struct) {
+zx_status_t Protocol_SyncProxy::TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct, ::fidl::VectorPtr<uint8_t>* out_opt_vector_uint8, ::fidl::VectorPtr<::std::string>* out_opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct>* out_opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>* out_opt_vector_opt_struct) {
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_TwoWayVectorOptional_Ordinal, ::test::typesinprotocols::internal::kProtocol_TwoWayVectorOptional_DynamicFlags);
   ::fidl::IncomingMessageBuffer buffer_;
   ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
   const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_VectorOptionalTable;
   const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_VectorOptionalTable;
-  zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::typesinprotocols::Protocol_RequestEncoder::TwoWayVectorOptional(&_encoder, &opt_vector_uint8, &opt_vector_string, &opt_vector_opt_struct), &response_);
+  zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::typesinprotocols::Protocol_RequestEncoder::TwoWayVectorOptional(&_encoder, &opt_vector_uint8, &opt_vector_string, &opt_vector_struct, &opt_vector_opt_struct), &response_);
   if (status_ != ZX_OK)
     return status_;
   ::fidl::Decoder decoder_(std::move(response_));
   *out_opt_vector_uint8 = ::fidl::DecodeAs<::fidl::VectorPtr<uint8_t>>(&decoder_, 0 + sizeof(fidl_message_header_t));
   *out_opt_vector_string = ::fidl::DecodeAs<::fidl::VectorPtr<::std::string>>(&decoder_, 16 + sizeof(fidl_message_header_t));
+  *out_opt_vector_struct = ::fidl::DecodeAs<::fidl::VectorPtr<::test::typesinprotocols::Struct>>(&decoder_, 32 + sizeof(fidl_message_header_t));
   *out_opt_vector_opt_struct = ::fidl::DecodeAs<::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>(&decoder_, 48 + sizeof(fidl_message_header_t));
   return ZX_OK;
 }

@@ -4,15 +4,15 @@
 
 use crate::security::selinux_hooks::{
     check_permission, check_self_permission, fs_node_effective_sid_and_class, fs_node_ensure_class,
-    fs_node_set_label_with_task, has_file_permissions, Permission, PermissionCheck,
+    fs_node_set_label_with_task, has_file_permissions, KernelPermission, PermissionCheck,
     ProcessPermission, TaskAttrs,
 };
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityId, SecurityServer};
 use crate::task::{CurrentTask, Task};
 use crate::vfs::FsNode;
 use selinux::{
-    Cap2Class, CapClass, CommonCap2Permission, CommonCapPermission, FilePermission, NullessByteStr,
-    ObjectClass,
+    Cap2Class, CapClass, CommonCap2Permission, CommonCapPermission, FilePermission, KernelClass,
+    NullessByteStr,
 };
 use starnix_types::ownership::TempRef;
 use starnix_uapi::errors::Errno;
@@ -113,8 +113,8 @@ fn maybe_reset_rlimits(
     // and the initial task's soft limit.
     let weak_init = current_task.kernel().pids.read().get_task(1);
     let init_task = weak_init.upgrade().expect("get the initial task");
-    let init_rlimits = { init_task.thread_group.limits.lock().clone() };
-    let mut current_rlimits = current_task.thread_group.limits.lock();
+    let init_rlimits = { init_task.thread_group().limits.lock().clone() };
+    let mut current_rlimits = current_task.thread_group().limits.lock();
     (Resource::ALL).iter().for_each(|resource| {
         let current = current_rlimits.get(*resource);
         let init = init_rlimits.get(*resource);
@@ -162,7 +162,7 @@ pub(in crate::security) fn check_exec_access(
         exec_sid
     } else {
         security_server
-            .compute_new_sid(current_sid, executable_sid, ObjectClass::Process)
+            .compute_new_sid(current_sid, executable_sid, KernelClass::Process)
             .map_err(|_| errno!(EACCES))?
     };
 
@@ -211,7 +211,7 @@ pub(in crate::security) fn check_exec_access(
 
         // Check that the share permission is allowed, if the process shares any resources (i.e. if
         // it was created with e.g. `CLONE_FILES`, etc).
-        if current_task.thread_group.read().is_sharing {
+        if current_task.thread_group().read().is_sharing {
             check_permission(
                 &permission_check,
                 current_sid,
@@ -377,7 +377,7 @@ pub(in crate::security) fn task_get_context(
     Ok(security_server.sid_to_security_context(sid).unwrap_or_default())
 }
 
-fn permission_from_capability(capabilities: starnix_uapi::auth::Capabilities) -> Permission {
+fn permission_from_capability(capabilities: starnix_uapi::auth::Capabilities) -> KernelPermission {
     // TODO: https://fxbug.dev/297313673 - CapClass::CapUserns will play a role here if-and-after
     // user namespaces are implemented in Starnix.
     match capabilities {
@@ -650,7 +650,7 @@ pub(in crate::security) fn set_procattr(
                 audit_context,
             )?;
 
-            if current_task.thread_group.read().tasks_count() > 1 {
+            if current_task.thread_group().read().tasks_count() > 1 {
                 // In multi-threaded programs dynamic transitions may only be used to down-scope
                 // the capabilities available to the task. This is verified by requiring an explicit
                 // "typebounds" relationship between the current and target domains, indicating that
@@ -1037,7 +1037,7 @@ mod tests {
                 // Set its rlimits to some known values.
                 assert_eq!(current_task.id, 1);
                 {
-                    let mut initial_limits = current_task.thread_group.limits.lock();
+                    let mut initial_limits = current_task.thread_group().limits.lock();
                     (Resource::ALL).iter().for_each(|resource| {
                         initial_limits.set(*resource, rlimit { rlim_cur: 10, rlim_max: 20 });
                     })
@@ -1045,7 +1045,7 @@ mod tests {
                 // Clone the initial task, then set the child task's rlimits to some new values.
                 let child_task = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
                 {
-                    let mut child_limits = child_task.thread_group.limits.lock();
+                    let mut child_limits = child_task.thread_group().limits.lock();
                     (Resource::ALL).iter().for_each(|resource| {
                         child_limits.set(*resource, rlimit { rlim_cur: 30, rlim_max: 40 });
                     })
@@ -1054,8 +1054,8 @@ mod tests {
                 // Clone the child task. Before exec, the grandchild task's rlimits should be equal
                 // to its parent's.
                 let grandchild_task = child_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-                let parent_limits = { child_task.thread_group.limits.lock().clone() };
-                let pre_exec_limits = { grandchild_task.thread_group.limits.lock().clone() };
+                let parent_limits = { child_task.thread_group().limits.lock().clone() };
+                let pre_exec_limits = { grandchild_task.thread_group().limits.lock().clone() };
                 {
                     (Resource::ALL).iter().for_each(|resource| {
                         let parent = parent_limits.get(*resource);
@@ -1073,7 +1073,7 @@ mod tests {
                 assert_ne!(old_sid, new_sid);
                 update_state_on_exec(&grandchild_task, &ResolvedElfState { sid: Some(new_sid) });
 
-                let post_exec_limits = { grandchild_task.thread_group.limits.lock().clone() };
+                let post_exec_limits = { grandchild_task.thread_group().limits.lock().clone() };
                 {
                     (Resource::ALL).iter().for_each(|resource| {
                         let pre_exec = pre_exec_limits.get(*resource);
@@ -1090,9 +1090,9 @@ mod tests {
                 let same_domain_task =
                     child_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
                 update_state_on_exec(&same_domain_task, &ResolvedElfState { sid: Some(old_sid) });
-                let same_domain_limits = { same_domain_task.thread_group.limits.lock().clone() };
+                let same_domain_limits = { same_domain_task.thread_group().limits.lock().clone() };
                 {
-                    let parent_limits = { child_task.thread_group.limits.lock().clone() };
+                    let parent_limits = { child_task.thread_group().limits.lock().clone() };
                     (Resource::ALL).iter().for_each(|resource| {
                         let parent = parent_limits.get(*resource);
                         let same_domain = same_domain_limits.get(*resource);

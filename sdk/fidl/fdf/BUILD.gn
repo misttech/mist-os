@@ -6,6 +6,5 @@ import("//build/fidl/fidl.gni")
 
 fidl("fdf") {
   sources = [ "handle.fidl" ]
-
-  golden_fuzzer = true
+  enable_hlcpp = true
 }

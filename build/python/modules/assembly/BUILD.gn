@@ -7,8 +7,6 @@ import("//build/python/python_library.gni")
 # The assembly python library, for use with `python_binary()` and
 # `python_host_test()` templates.
 python_library("assembly") {
-  # TODO(b/366268742): Enable MyPy type checking
-  enable_mypy = false
   sources = [
     "__init__.py",
     "assembly_input_bundle.py",

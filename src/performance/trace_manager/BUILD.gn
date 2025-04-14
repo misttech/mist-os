@@ -82,7 +82,6 @@ fuchsia_package("package_hermetic") {
 }
 
 fuchsia_package_with_single_component("trace_manager") {
-  testonly = true
   manifest = "meta/trace_manager.cml"
   component_name = "trace_manager"
   package_name = "trace_manager"

@@ -11,27 +11,26 @@ import typing
 import enum
 
 import fidl
+from fidl._ir import get_fidl_ir_map
 
-_ir_path = fidl._library.get_fidl_ir_map()["test.typesinprotocols"]
+_ir_path = get_fidl_ir_map()["test.typesinprotocols"]
 add_ir_path(_ir_path)
 
 
 @dataclass
 class ArrayBasic:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    array_uint8: typing.Sequence[int] | None
-    array_uint16: typing.Sequence[int] | None
-    array_uint32: typing.Sequence[int] | None
-    array_uint64: typing.Sequence[int] | None
-    array_int8: typing.Sequence[int] | None
-    array_int16: typing.Sequence[int] | None
-    array_int32: typing.Sequence[int] | None
-    array_int64: typing.Sequence[int] | None
-    array_float32: typing.Sequence[float] | None
-    array_float64: typing.Sequence[float] | None
-    array_string: typing.Sequence[str] | None
-    array_opt_string: typing.Sequence[typing.Optional[str]] | None
+    array_uint8: typing.Sequence[int]
+    array_uint16: typing.Sequence[int]
+    array_uint32: typing.Sequence[int]
+    array_uint64: typing.Sequence[int]
+    array_int8: typing.Sequence[int]
+    array_int16: typing.Sequence[int]
+    array_int32: typing.Sequence[int]
+    array_int64: typing.Sequence[int]
+    array_float32: typing.Sequence[float]
+    array_float64: typing.Sequence[float]
+    array_string: typing.Sequence[str]
+    array_opt_string: typing.Sequence[typing.Optional[str]]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ArrayBasic"
@@ -50,37 +49,37 @@ class ArrayBasic:
             self, "test.typesinprotocols", "test.typesinprotocols/ArrayBasic"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "array_uint8": None,
-                "array_uint16": None,
-                "array_uint32": None,
-                "array_uint64": None,
-                "array_int8": None,
-                "array_int16": None,
-                "array_int32": None,
-                "array_int64": None,
-                "array_float32": None,
-                "array_float64": None,
-                "array_string": None,
-                "array_opt_string": None,
+                "array_uint8": None,  # type: ignore[arg-type,unused-ignore]
+                "array_uint16": None,  # type: ignore[arg-type,unused-ignore]
+                "array_uint32": None,  # type: ignore[arg-type,unused-ignore]
+                "array_uint64": None,  # type: ignore[arg-type,unused-ignore]
+                "array_int8": None,  # type: ignore[arg-type,unused-ignore]
+                "array_int16": None,  # type: ignore[arg-type,unused-ignore]
+                "array_int32": None,  # type: ignore[arg-type,unused-ignore]
+                "array_int64": None,  # type: ignore[arg-type,unused-ignore]
+                "array_float32": None,  # type: ignore[arg-type,unused-ignore]
+                "array_float64": None,  # type: ignore[arg-type,unused-ignore]
+                "array_string": None,  # type: ignore[arg-type,unused-ignore]
+                "array_opt_string": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class ArrayCompound:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    array_bits: typing.Sequence[int] | None
-    array_enum: typing.Sequence[int] | None
-    array_struct: typing.Sequence[Struct] | None
-    array_table: typing.Sequence[Table] | None
-    array_union: typing.Sequence[Union] | None
-    array_opt_struct: typing.Sequence[typing.Optional[Struct]] | None
-    array_opt_union: typing.Sequence[typing.Optional[Union]] | None
+    array_bits: typing.Sequence[int | Bits]
+    array_enum: typing.Sequence[int | Enum]
+    array_struct: typing.Sequence[Struct]
+    array_table: typing.Sequence[Table]
+    array_union: typing.Sequence[Union]
+    array_opt_struct: typing.Sequence[typing.Optional[Struct]]
+    array_opt_union: typing.Sequence[typing.Optional[Union]]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ArrayCompound"
@@ -99,29 +98,29 @@ class ArrayCompound:
             self, "test.typesinprotocols", "test.typesinprotocols/ArrayCompound"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "array_bits": None,
-                "array_enum": None,
-                "array_struct": None,
-                "array_table": None,
-                "array_union": None,
-                "array_opt_struct": None,
-                "array_opt_union": None,
+                "array_bits": None,  # type: ignore[arg-type,unused-ignore]
+                "array_enum": None,  # type: ignore[arg-type,unused-ignore]
+                "array_struct": None,  # type: ignore[arg-type,unused-ignore]
+                "array_table": None,  # type: ignore[arg-type,unused-ignore]
+                "array_union": None,  # type: ignore[arg-type,unused-ignore]
+                "array_opt_struct": None,  # type: ignore[arg-type,unused-ignore]
+                "array_opt_union": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class ArrayVectorNested:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    array_array_uint8: typing.Sequence[typing.Sequence[int]] | None
-    array_vector_uint8: typing.Sequence[typing.Sequence[int]] | None
-    vector_array_uint8: typing.Sequence[typing.Sequence[int]] | None
-    vector_vector_uint8: typing.Sequence[typing.Sequence[int]] | None
+    array_array_uint8: typing.Sequence[typing.Sequence[int]]
+    array_vector_uint8: typing.Sequence[typing.Sequence[int]]
+    vector_array_uint8: typing.Sequence[typing.Sequence[int]]
+    vector_vector_uint8: typing.Sequence[typing.Sequence[int]]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ArrayVectorNested"
@@ -142,34 +141,34 @@ class ArrayVectorNested:
             "test.typesinprotocols/ArrayVectorNested",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "array_array_uint8": None,
-                "array_vector_uint8": None,
-                "vector_array_uint8": None,
-                "vector_vector_uint8": None,
+                "array_array_uint8": None,  # type: ignore[arg-type,unused-ignore]
+                "array_vector_uint8": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_array_uint8": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_vector_uint8": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class Basic:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    uint8: int | None
-    uint16: int | None
-    uint32: int | None
-    uint64: int | None
-    int8: int | None
-    int16: int | None
-    int32: int | None
-    int64: int | None
-    float32: float | None
-    float64: float | None
-    string: str | None
-    opt_string: typing.Optional[str] | None
+    uint8: int
+    uint16: int
+    uint32: int
+    uint64: int
+    int8: int
+    int16: int
+    int32: int
+    int64: int
+    float32: float
+    float64: float
+    string: str
+    opt_string: typing.Optional[str]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Basic"
@@ -188,37 +187,37 @@ class Basic:
             self, "test.typesinprotocols", "test.typesinprotocols/Basic"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "uint8": None,
-                "uint16": None,
-                "uint32": None,
-                "uint64": None,
-                "int8": None,
-                "int16": None,
-                "int32": None,
-                "int64": None,
-                "float32": None,
-                "float64": None,
-                "string": None,
-                "opt_string": None,
+                "uint8": None,  # type: ignore[arg-type,unused-ignore]
+                "uint16": None,  # type: ignore[arg-type,unused-ignore]
+                "uint32": None,  # type: ignore[arg-type,unused-ignore]
+                "uint64": None,  # type: ignore[arg-type,unused-ignore]
+                "int8": None,  # type: ignore[arg-type,unused-ignore]
+                "int16": None,  # type: ignore[arg-type,unused-ignore]
+                "int32": None,  # type: ignore[arg-type,unused-ignore]
+                "int64": None,  # type: ignore[arg-type,unused-ignore]
+                "float32": None,  # type: ignore[arg-type,unused-ignore]
+                "float64": None,  # type: ignore[arg-type,unused-ignore]
+                "string": None,  # type: ignore[arg-type,unused-ignore]
+                "opt_string": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class Compound:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    bits: int | None
-    enum: int | None
-    struct: Struct | None
-    table: Table | None
-    union: Union | None
-    opt_struct: typing.Optional[Struct] | None
-    opt_union: typing.Optional[Union] | None
+    bits: int | Bits
+    enum: int | Enum
+    struct: Struct
+    table: Table
+    union: Union
+    opt_struct: typing.Optional[Struct]
+    opt_union: typing.Optional[Union]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Compound"
@@ -237,52 +236,52 @@ class Compound:
             self, "test.typesinprotocols", "test.typesinprotocols/Compound"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "bits": None,
-                "enum": None,
-                "struct": None,
-                "table": None,
-                "union": None,
-                "opt_struct": None,
-                "opt_union": None,
+                "bits": None,  # type: ignore[arg-type,unused-ignore]
+                "enum": None,  # type: ignore[arg-type,unused-ignore]
+                "struct": None,  # type: ignore[arg-type,unused-ignore]
+                "table": None,  # type: ignore[arg-type,unused-ignore]
+                "union": None,  # type: ignore[arg-type,unused-ignore]
+                "opt_struct": None,  # type: ignore[arg-type,unused-ignore]
+                "opt_union": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class Resource:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    handle: int | None
-    vmo: int | None
-    client_end: int | None
-    server_end: int | None
-    struct: ResourceStruct | None
-    table: ResourceTable | None
-    union: ResourceUnion | None
-    opt_handle: typing.Optional[int] | None
-    opt_vmo: typing.Optional[int] | None
-    opt_client_end: typing.Optional[int] | None
-    opt_server_end: typing.Optional[int] | None
-    opt_struct: typing.Optional[ResourceStruct] | None
-    opt_union: typing.Optional[ResourceUnion] | None
-    array_handle: typing.Sequence[int] | None
-    array_vmo: typing.Sequence[int] | None
-    array_client_end: typing.Sequence[int] | None
-    array_server_end: typing.Sequence[int] | None
-    array_struct: typing.Sequence[ResourceStruct] | None
-    array_table: typing.Sequence[ResourceTable] | None
-    array_union: typing.Sequence[ResourceUnion] | None
-    vector_handle: typing.Sequence[int] | None
-    vector_vmo: typing.Sequence[int] | None
-    vector_client_end: typing.Sequence[int] | None
-    vector_server_end: typing.Sequence[int] | None
-    vector_struct: typing.Sequence[ResourceStruct] | None
-    vector_table: typing.Sequence[ResourceTable] | None
-    vector_union: typing.Sequence[ResourceUnion] | None
+    handle: int
+    vmo: int
+    client_end: int
+    server_end: int
+    struct: ResourceStruct
+    table: ResourceTable
+    union: ResourceUnion
+    opt_handle: typing.Optional[int]
+    opt_vmo: typing.Optional[int]
+    opt_client_end: typing.Optional[int]
+    opt_server_end: typing.Optional[int]
+    opt_struct: typing.Optional[ResourceStruct]
+    opt_union: typing.Optional[ResourceUnion]
+    array_handle: typing.Sequence[int]
+    array_vmo: typing.Sequence[int]
+    array_client_end: typing.Sequence[int]
+    array_server_end: typing.Sequence[int]
+    array_struct: typing.Sequence[ResourceStruct]
+    array_table: typing.Sequence[ResourceTable]
+    array_union: typing.Sequence[ResourceUnion]
+    vector_handle: typing.Sequence[int]
+    vector_vmo: typing.Sequence[int]
+    vector_client_end: typing.Sequence[int]
+    vector_server_end: typing.Sequence[int]
+    vector_struct: typing.Sequence[ResourceStruct]
+    vector_table: typing.Sequence[ResourceTable]
+    vector_union: typing.Sequence[ResourceUnion]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Resource"
@@ -301,46 +300,45 @@ class Resource:
             self, "test.typesinprotocols", "test.typesinprotocols/Resource"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "handle": None,
-                "vmo": None,
-                "client_end": None,
-                "server_end": None,
-                "struct": None,
-                "table": None,
-                "union": None,
-                "opt_handle": None,
-                "opt_vmo": None,
-                "opt_client_end": None,
-                "opt_server_end": None,
-                "opt_struct": None,
-                "opt_union": None,
-                "array_handle": None,
-                "array_vmo": None,
-                "array_client_end": None,
-                "array_server_end": None,
-                "array_struct": None,
-                "array_table": None,
-                "array_union": None,
-                "vector_handle": None,
-                "vector_vmo": None,
-                "vector_client_end": None,
-                "vector_server_end": None,
-                "vector_struct": None,
-                "vector_table": None,
-                "vector_union": None,
+                "handle": None,  # type: ignore[arg-type,unused-ignore]
+                "vmo": None,  # type: ignore[arg-type,unused-ignore]
+                "client_end": None,  # type: ignore[arg-type,unused-ignore]
+                "server_end": None,  # type: ignore[arg-type,unused-ignore]
+                "struct": None,  # type: ignore[arg-type,unused-ignore]
+                "table": None,  # type: ignore[arg-type,unused-ignore]
+                "union": None,  # type: ignore[arg-type,unused-ignore]
+                "opt_handle": None,  # type: ignore[arg-type,unused-ignore]
+                "opt_vmo": None,  # type: ignore[arg-type,unused-ignore]
+                "opt_client_end": None,  # type: ignore[arg-type,unused-ignore]
+                "opt_server_end": None,  # type: ignore[arg-type,unused-ignore]
+                "opt_struct": None,  # type: ignore[arg-type,unused-ignore]
+                "opt_union": None,  # type: ignore[arg-type,unused-ignore]
+                "array_handle": None,  # type: ignore[arg-type,unused-ignore]
+                "array_vmo": None,  # type: ignore[arg-type,unused-ignore]
+                "array_client_end": None,  # type: ignore[arg-type,unused-ignore]
+                "array_server_end": None,  # type: ignore[arg-type,unused-ignore]
+                "array_struct": None,  # type: ignore[arg-type,unused-ignore]
+                "array_table": None,  # type: ignore[arg-type,unused-ignore]
+                "array_union": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_handle": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_vmo": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_client_end": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_server_end": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_struct": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_table": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_union": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class ResourceStruct:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-
     __fidl_kind__ = "struct"
     __fidl_type__ = "ResourceStruct"
     __fidl_raw_type__ = "test.typesinprotocols/ResourceStruct"
@@ -360,6 +358,8 @@ class ResourceStruct:
             "test.typesinprotocols/ResourceStruct",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{})
@@ -367,9 +367,6 @@ class ResourceStruct:
 
 @dataclass
 class Struct:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-
     __fidl_kind__ = "struct"
     __fidl_type__ = "Struct"
     __fidl_raw_type__ = "test.typesinprotocols/Struct"
@@ -387,6 +384,8 @@ class Struct:
             self, "test.typesinprotocols", "test.typesinprotocols/Struct"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{})
@@ -394,20 +393,18 @@ class Struct:
 
 @dataclass
 class VectorBasic:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    vector_uint8: typing.Sequence[int] | None
-    vector_uint16: typing.Sequence[int] | None
-    vector_uint32: typing.Sequence[int] | None
-    vector_uint64: typing.Sequence[int] | None
-    vector_int8: typing.Sequence[int] | None
-    vector_int16: typing.Sequence[int] | None
-    vector_int32: typing.Sequence[int] | None
-    vector_int64: typing.Sequence[int] | None
-    vector_float32: typing.Sequence[float] | None
-    vector_float64: typing.Sequence[float] | None
-    vector_string: typing.Sequence[str] | None
-    vector_opt_string: typing.Sequence[typing.Optional[str]] | None
+    vector_uint8: typing.Sequence[int]
+    vector_uint16: typing.Sequence[int]
+    vector_uint32: typing.Sequence[int]
+    vector_uint64: typing.Sequence[int]
+    vector_int8: typing.Sequence[int]
+    vector_int16: typing.Sequence[int]
+    vector_int32: typing.Sequence[int]
+    vector_int64: typing.Sequence[int]
+    vector_float32: typing.Sequence[float]
+    vector_float64: typing.Sequence[float]
+    vector_string: typing.Sequence[str]
+    vector_opt_string: typing.Sequence[typing.Optional[str]]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "VectorBasic"
@@ -426,37 +423,37 @@ class VectorBasic:
             self, "test.typesinprotocols", "test.typesinprotocols/VectorBasic"
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "vector_uint8": None,
-                "vector_uint16": None,
-                "vector_uint32": None,
-                "vector_uint64": None,
-                "vector_int8": None,
-                "vector_int16": None,
-                "vector_int32": None,
-                "vector_int64": None,
-                "vector_float32": None,
-                "vector_float64": None,
-                "vector_string": None,
-                "vector_opt_string": None,
+                "vector_uint8": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_uint16": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_uint32": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_uint64": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_int8": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_int16": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_int32": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_int64": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_float32": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_float64": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_string": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_opt_string": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class VectorCompound:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    vector_bits: typing.Sequence[int] | None
-    vector_enum: typing.Sequence[int] | None
-    vector_struct: typing.Sequence[Struct] | None
-    vector_table: typing.Sequence[Table] | None
-    vector_union: typing.Sequence[Union] | None
-    vector_opt_struct: typing.Sequence[typing.Optional[Struct]] | None
-    vector_opt_union: typing.Sequence[typing.Optional[Union]] | None
+    vector_bits: typing.Sequence[int | Bits]
+    vector_enum: typing.Sequence[int | Enum]
+    vector_struct: typing.Sequence[Struct]
+    vector_table: typing.Sequence[Table]
+    vector_union: typing.Sequence[Union]
+    vector_opt_struct: typing.Sequence[typing.Optional[Struct]]
+    vector_opt_union: typing.Sequence[typing.Optional[Union]]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "VectorCompound"
@@ -477,31 +474,31 @@ class VectorCompound:
             "test.typesinprotocols/VectorCompound",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "vector_bits": None,
-                "vector_enum": None,
-                "vector_struct": None,
-                "vector_table": None,
-                "vector_union": None,
-                "vector_opt_struct": None,
-                "vector_opt_union": None,
+                "vector_bits": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_enum": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_struct": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_table": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_union": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_opt_struct": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_opt_union": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
 
 @dataclass
 class VectorOptional:
-    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
-    opt_vector_uint8: typing.Optional[typing.Sequence[int]] | None
-    opt_vector_string: typing.Optional[typing.Sequence[str]] | None
-    opt_vector_struct: typing.Optional[typing.Sequence[Struct]] | None
+    opt_vector_uint8: typing.Optional[typing.Sequence[int]]
+    opt_vector_string: typing.Optional[typing.Sequence[str]]
+    opt_vector_struct: typing.Optional[typing.Sequence[Struct]]
     opt_vector_opt_struct: typing.Optional[
         typing.Sequence[typing.Optional[Struct]]
-    ] | None
+    ]
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "VectorOptional"
@@ -522,14 +519,16 @@ class VectorOptional:
             "test.typesinprotocols/VectorOptional",
         )
 
+    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "opt_vector_uint8": None,
-                "opt_vector_string": None,
-                "opt_vector_struct": None,
-                "opt_vector_opt_struct": None,
+                "opt_vector_uint8": None,  # type: ignore[arg-type,unused-ignore]
+                "opt_vector_string": None,  # type: ignore[arg-type,unused-ignore]
+                "opt_vector_struct": None,  # type: ignore[arg-type,unused-ignore]
+                "opt_vector_opt_struct": None,  # type: ignore[arg-type,unused-ignore]
             }
         )
 
@@ -667,14 +666,14 @@ class ProtocolErrorArrayBasicResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -777,14 +776,14 @@ class ProtocolErrorArrayCompoundResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -887,14 +886,14 @@ class ProtocolErrorArrayVectorNestedResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -995,14 +994,14 @@ class ProtocolErrorBasicResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -1103,14 +1102,14 @@ class ProtocolErrorCompoundResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -1211,14 +1210,14 @@ class ProtocolErrorResourceResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -1319,14 +1318,14 @@ class ProtocolErrorVectorBasicResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -1429,14 +1428,14 @@ class ProtocolErrorVectorCompoundResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -1539,14 +1538,14 @@ class ProtocolErrorVectorOptionalResult:
                 hasattr(self, "_framework_err")
                 and self._framework_err is not None
             ):
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} framework error {self._framework_err}"
                 )
         except AttributeError:
             pass
         try:
             if hasattr(self, "_err") and self._err is not None:
-                raise RuntimeError(
+                raise AssertionError(
                     f"{self.__fidl_raw_type__} error {self._err}"
                 )
         except AttributeError:
@@ -1723,12 +1722,20 @@ Bits = enum.IntFlag(
 )
 
 
-import fidl._construct
-from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from fidl._client import EventHandlerBase, FidlClient
+from fidl._server import ServerBase
+from fidl._fidl_common import (
+    DomainError,
+    FrameworkError,
+    MethodInfo,
+    FidlProtocolMarker,
+    normalize_identifier,
+)
+
 from abc import abstractmethod, ABC
 
 
-class ProtocolServer(fidl._server.ServerBase, ABC):
+class ProtocolServer(ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.typesinprotocols"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -1954,6 +1961,8 @@ class ProtocolServer(fidl._server.ServerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -2073,8 +2082,8 @@ class ProtocolServer(fidl._server.ServerBase, ABC):
     def event_compound(
         self,
         *,
-        bits: int,
-        enum: int,
+        bits: int | Bits,
+        enum: int | Enum,
         struct: Struct,
         table: Table,
         union: Union,
@@ -2215,8 +2224,8 @@ class ProtocolServer(fidl._server.ServerBase, ABC):
     def event_array_compound(
         self,
         *,
-        array_bits: typing.Sequence[int],
-        array_enum: typing.Sequence[int],
+        array_bits: typing.Sequence[int | Bits],
+        array_enum: typing.Sequence[int | Enum],
         array_struct: typing.Sequence[Struct],
         array_table: typing.Sequence[Table],
         array_union: typing.Sequence[Union],
@@ -2357,8 +2366,8 @@ class ProtocolServer(fidl._server.ServerBase, ABC):
     def event_vector_compound(
         self,
         *,
-        vector_bits: typing.Sequence[int],
-        vector_enum: typing.Sequence[int],
+        vector_bits: typing.Sequence[int | Bits],
+        vector_enum: typing.Sequence[int | Enum],
         vector_struct: typing.Sequence[Struct],
         vector_table: typing.Sequence[Table],
         vector_union: typing.Sequence[Union],
@@ -2605,7 +2614,7 @@ class ProtocolServer(fidl._server.ServerBase, ABC):
         self._send_event(5745997765922613643, "test.typesinprotocols", msg)
 
 
-class ProtocolClient(fidl._client.FidlClient):
+class ProtocolClient(FidlClient):
     __fidl_kind__ = "client"
     library = "test.typesinprotocols"
 
@@ -2613,6 +2622,8 @@ class ProtocolClient(fidl._client.FidlClient):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -2689,9 +2700,7 @@ class ProtocolClient(fidl._client.FidlClient):
             2331618702752598159,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.typesinprotocols/Basic"
-            ),
+            normalize_identifier("test.typesinprotocols/Basic"),
         )
 
     def error_basic(
@@ -2702,7 +2711,7 @@ class ProtocolClient(fidl._client.FidlClient):
             5016634351643393939,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.typesinprotocols/Protocol_ErrorBasic_Result"
             ),
         )
@@ -2710,8 +2719,8 @@ class ProtocolClient(fidl._client.FidlClient):
     def one_way_compound(
         self,
         *,
-        bits: int,
-        enum: int,
+        bits: int | Bits,
+        enum: int | Enum,
         struct: Struct,
         table: Table,
         union: Union,
@@ -2738,8 +2747,8 @@ class ProtocolClient(fidl._client.FidlClient):
     def two_way_compound(
         self,
         *,
-        bits: int,
-        enum: int,
+        bits: int | Bits,
+        enum: int | Enum,
         struct: Struct,
         table: Table,
         union: Union,
@@ -2759,9 +2768,7 @@ class ProtocolClient(fidl._client.FidlClient):
             8787219719097524529,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.typesinprotocols/Compound"
-            ),
+            normalize_identifier("test.typesinprotocols/Compound"),
         )
 
     def error_compound(
@@ -2772,7 +2779,7 @@ class ProtocolClient(fidl._client.FidlClient):
             2990809657626249085,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.typesinprotocols/Protocol_ErrorCompound_Result"
             ),
         )
@@ -2849,9 +2856,7 @@ class ProtocolClient(fidl._client.FidlClient):
             5309034178175279380,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.typesinprotocols/ArrayBasic"
-            ),
+            normalize_identifier("test.typesinprotocols/ArrayBasic"),
         )
 
     def error_array_basic(
@@ -2864,7 +2869,7 @@ class ProtocolClient(fidl._client.FidlClient):
             1084731895342694265,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.typesinprotocols/Protocol_ErrorArrayBasic_Result"
             ),
         )
@@ -2872,8 +2877,8 @@ class ProtocolClient(fidl._client.FidlClient):
     def one_way_array_compound(
         self,
         *,
-        array_bits: typing.Sequence[int],
-        array_enum: typing.Sequence[int],
+        array_bits: typing.Sequence[int | Bits],
+        array_enum: typing.Sequence[int | Enum],
         array_struct: typing.Sequence[Struct],
         array_table: typing.Sequence[Table],
         array_union: typing.Sequence[Union],
@@ -2900,8 +2905,8 @@ class ProtocolClient(fidl._client.FidlClient):
     def two_way_array_compound(
         self,
         *,
-        array_bits: typing.Sequence[int],
-        array_enum: typing.Sequence[int],
+        array_bits: typing.Sequence[int | Bits],
+        array_enum: typing.Sequence[int | Enum],
         array_struct: typing.Sequence[Struct],
         array_table: typing.Sequence[Table],
         array_union: typing.Sequence[Union],
@@ -2921,9 +2926,7 @@ class ProtocolClient(fidl._client.FidlClient):
             849744466051983995,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.typesinprotocols/ArrayCompound"
-            ),
+            normalize_identifier("test.typesinprotocols/ArrayCompound"),
         )
 
     def error_array_compound(
@@ -2936,7 +2939,7 @@ class ProtocolClient(fidl._client.FidlClient):
             5919277476782807556,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.typesinprotocols/Protocol_ErrorArrayCompound_Result"
             ),
         )
@@ -3013,9 +3016,7 @@ class ProtocolClient(fidl._client.FidlClient):
             8674156353091415668,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.typesinprotocols/VectorBasic"
-            ),
+            normalize_identifier("test.typesinprotocols/VectorBasic"),
         )
 
     def error_vector_basic(
@@ -3028,7 +3029,7 @@ class ProtocolClient(fidl._client.FidlClient):
             875941614196965234,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.typesinprotocols/Protocol_ErrorVectorBasic_Result"
             ),
         )
@@ -3036,8 +3037,8 @@ class ProtocolClient(fidl._client.FidlClient):
     def one_way_vector_compound(
         self,
         *,
-        vector_bits: typing.Sequence[int],
-        vector_enum: typing.Sequence[int],
+        vector_bits: typing.Sequence[int | Bits],
+        vector_enum: typing.Sequence[int | Enum],
         vector_struct: typing.Sequence[Struct],
         vector_table: typing.Sequence[Table],
         vector_union: typing.Sequence[Union],
@@ -3064,8 +3065,8 @@ class ProtocolClient(fidl._client.FidlClient):
     def two_way_vector_compound(
         self,
         *,
-        vector_bits: typing.Sequence[int],
-        vector_enum: typing.Sequence[int],
+        vector_bits: typing.Sequence[int | Bits],
+        vector_enum: typing.Sequence[int | Enum],
         vector_struct: typing.Sequence[Struct],
         vector_table: typing.Sequence[Table],
         vector_union: typing.Sequence[Union],
@@ -3085,9 +3086,7 @@ class ProtocolClient(fidl._client.FidlClient):
             3968024057912959924,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.typesinprotocols/VectorCompound"
-            ),
+            normalize_identifier("test.typesinprotocols/VectorCompound"),
         )
 
     def error_vector_compound(
@@ -3100,7 +3099,7 @@ class ProtocolClient(fidl._client.FidlClient):
             8506780203315865989,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.typesinprotocols/Protocol_ErrorVectorCompound_Result"
             ),
         )
@@ -3149,9 +3148,7 @@ class ProtocolClient(fidl._client.FidlClient):
             1030024737742222323,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.typesinprotocols/VectorOptional"
-            ),
+            normalize_identifier("test.typesinprotocols/VectorOptional"),
         )
 
     def error_vector_optional(
@@ -3164,7 +3161,7 @@ class ProtocolClient(fidl._client.FidlClient):
             6406191217027936606,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.typesinprotocols/Protocol_ErrorVectorOptional_Result"
             ),
         )
@@ -3209,9 +3206,7 @@ class ProtocolClient(fidl._client.FidlClient):
             5351275678438791132,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.typesinprotocols/ArrayVectorNested"
-            ),
+            normalize_identifier("test.typesinprotocols/ArrayVectorNested"),
         )
 
     def error_array_vector_nested(
@@ -3224,7 +3219,7 @@ class ProtocolClient(fidl._client.FidlClient):
             9085604921605802151,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.typesinprotocols/Protocol_ErrorArrayVectorNested_Result"
             ),
         )
@@ -3361,9 +3356,7 @@ class ProtocolClient(fidl._client.FidlClient):
             1802709005492464987,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
-                "test.typesinprotocols/Resource"
-            ),
+            normalize_identifier("test.typesinprotocols/Resource"),
         )
 
     def error_resource(
@@ -3374,13 +3367,13 @@ class ProtocolClient(fidl._client.FidlClient):
             6568609240497354166,
             "test.typesinprotocols",
             msg,
-            fidl._fidl_common.normalize_identifier(
+            normalize_identifier(
                 "test.typesinprotocols/Protocol_ErrorResource_Result"
             ),
         )
 
 
-class ProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
+class ProtocolEventHandler(EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.typesinprotocols"
     method_map: typing.Dict[int, MethodInfo] = {
@@ -3462,6 +3455,8 @@ class ProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     def construct_response_object(
         response_ident: str, response_obj: typing.Any
     ) -> typing.Any:
+        import fidl._construct
+
         return fidl._construct.construct_response_object(
             response_ident, response_obj
         )
@@ -3530,6 +3525,6 @@ class ProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
         ...
 
 
-ProtocolMarker = fidl._library.ProtocolMarker(
+ProtocolMarker = FidlProtocolMarker(
     "(nondiscoverable) test.typesinprotocols/Protocol"
 )

@@ -26,6 +26,14 @@
       "short": null,
       "description": "outputs the unprocessed memory information from the device as json.",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--csv",
+      "short": null,
+      "description": "outputs data in csv format.",
+      "hidden": false
     }
   ],
   "notes": [],

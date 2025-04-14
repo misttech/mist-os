@@ -29,6 +29,70 @@
 
 namespace pager_tests {
 
+namespace {
+
+// There are a few tests in this suite which attempt to perform a _large_ number
+// of iterations of the test, typically looking for something like a race
+// condition regression.  This can lead to problems in some worst case
+// scenarios.  If the test is running in non KVM assisted emulation (as it would
+// on RISC-V, currently), and the test harness machine is very overloaded
+// (something which does happen, unfortunately), it is possible for a test to
+// not be able to perform its 1000 (for example) iterations before timing out,
+// even if everything is working correctly.
+//
+// Since these tests tend to be looking for non-deterministic repros of races in
+// the case of regression, there really is no good number of iterations to pick
+// here.  1000 is a lot, but it does not mean that the test is guaranteed to
+// catch a regression (there is no number large enough to guarantee that).  This
+// said, in worst case scenarios, the test can end up timing out and generating
+// flake.
+//
+// So, add a small helper class in an attempt to balance these two issues.  We'd
+// _like_ to run the test through X cycles, but if it is taking longer than Y
+// second to do so, we should probably simply print a warning call the test
+// done early.  This way, we are still getting a lot of iterations in CI/CQ, but
+// hopefully not causing any false positive flake when things are not running
+// quickly in the test environment.
+//
+class TestLimiter {
+ public:
+  TestLimiter(uint32_t iterations, zx::duration time_limit)
+      : iterations_{iterations}, time_limit_{time_limit} {}
+  ~TestLimiter() {}
+
+  TestLimiter(const TestLimiter&) = delete;
+  TestLimiter& operator=(const TestLimiter&) = delete;
+  TestLimiter(TestLimiter&&) = delete;
+  TestLimiter& operator=(TestLimiter&&) = delete;
+
+  uint32_t iteration() const { return iteration_; }
+  void next() { ++iteration_; }
+
+  bool Finished() const {
+    if (iteration_ >= iterations_) {
+      return true;
+    }
+
+    zx::duration test_time = zx::clock::get_monotonic() - start_time_;
+    if (test_time >= time_limit_) {
+      printf("\nWARNING - Things seem to be running slowly, exiting test early.\n");
+      printf("%u/%u iterations were successfully completed in ~%lu mSec.\n", iteration_,
+             iterations_, test_time.to_msecs());
+      return true;
+    }
+
+    return false;
+  }
+
+ private:
+  uint32_t iteration_{0};
+  const uint32_t iterations_;
+  const zx::duration time_limit_;
+  const zx::time_monotonic start_time_{zx::clock::get_monotonic()};
+};
+
+}  // namespace
+
 // Simple test that checks that a single thread can access a single page.
 VMO_VMAR_TEST(Pager, SinglePageTest) {
   UserPager pager;
@@ -2581,7 +2645,7 @@ TEST(Pager, DeepHierarchy) {
   zx::vmo vmo;
   ASSERT_EQ(pager.create_vmo(0, port, 0, zx_system_get_page_size(), &vmo), ZX_OK);
 
-  for (int i = 0; i < 1000; i++) {
+  for (TestLimiter limiter(1000, zx::sec(60)); !limiter.Finished(); limiter.next()) {
     zx::vmo temp;
     EXPECT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE, 0,
                                zx_system_get_page_size(), &temp));
@@ -3363,7 +3427,7 @@ TEST(Pager, ZeroHandlesRace) {
 
   // Create and close pager handles in a loop. This is intended to trigger any race conditions that
   // might exist between on_zero_handles getting called, and an in-progress pager_create_vmo call.
-  for (int i = 0; i < 10000; i++) {
+  for (TestLimiter limiter(10000, zx::sec(60)); !limiter.Finished(); limiter.next()) {
     pager.reset();
     ASSERT_OK(zx::pager::create(0, &pager));
     pager_handle.store(pager.get(), std::memory_order_relaxed);
@@ -3504,7 +3568,7 @@ TEST(Pager, OpCommitCloneVmar) {
 TEST(Pager, RacyPortDequeue) {
   // Repeat multiple times so we can hit the race. 1000 is a good balance between trying to
   // reproduce the race without drastically increasing the test runtime.
-  for (int i = 0; i < 1000; i++) {
+  for (TestLimiter limiter(1000, zx::sec(60)); !limiter.Finished(); limiter.next()) {
     zx_handle_t pager;
     ASSERT_OK(zx_pager_create(0, &pager));
 

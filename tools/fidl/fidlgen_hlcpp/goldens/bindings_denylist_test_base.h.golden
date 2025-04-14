@@ -10,12 +10,6 @@ namespace test {
 namespace bindingsdenylist {
 namespace testing {
 
-class OnlyLibfuzzerAndDeps_TestBase : public ::test::bindingsdenylist::OnlyLibfuzzerAndDeps {
- public:
-  virtual ~OnlyLibfuzzerAndDeps_TestBase() {}
-  virtual void NotImplemented_(const std::string& name) = 0;
-};
-
 class OnlyCppAndDeps_TestBase : public ::test::bindingsdenylist::OnlyCppAndDeps {
  public:
   virtual ~OnlyCppAndDeps_TestBase() {}
@@ -31,9 +25,6 @@ class DenyEachBinding_TestBase : public ::test::bindingsdenylist::DenyEachBindin
   }
   void OnlyDenyGo(bool a, OnlyDenyGoCallback callback) override {
     NotImplemented_("OnlyDenyGo");
-  }
-  void OnlyDenyLibfuzzer(bool a, OnlyDenyLibfuzzerCallback callback) override {
-    NotImplemented_("OnlyDenyLibfuzzer");
   }
   void OnlyDenyPython(bool a, OnlyDenyPythonCallback callback) override {
     NotImplemented_("OnlyDenyPython");

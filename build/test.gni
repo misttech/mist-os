@@ -63,6 +63,7 @@ template("test") {
       forward_variables_from(invoker,
                              [
                                "environments",
+                               "package_deps",
                                "visibility",
                              ])
     }

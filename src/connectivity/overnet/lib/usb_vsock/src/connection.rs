@@ -120,6 +120,17 @@ impl<B: PacketBuffer> Connection<B> {
         }
     }
 
+    /// Sends an echo packet to the remote end that you don't care about the reply, so it doesn't
+    /// have a distinct target address or payload.
+    pub async fn send_empty_echo(&self) {
+        debug!("Sending empty echo packet");
+        let header = &mut Header::new(PacketType::Echo);
+        self.packet_filler
+            .write_vsock_packet(&Packet { header, payload: &[] })
+            .await
+            .expect("empty echo packet should never be too large to fit in a usb packet");
+    }
+
     /// Starts a connection attempt to the other end of the USB connection, and provides a socket
     /// to read and write from. The function will complete when the other end has accepted or
     /// rejected the connection, and the returned [`ConnectionState`] handle can be used to wait
@@ -269,6 +280,27 @@ impl<B: PacketBuffer> Connection<B> {
         }
     }
 
+    async fn handle_echo_packet(&self, address: Address, payload: &[u8]) -> Result<(), Error> {
+        debug!("received echo for {address:?} with payload {payload:?}");
+        let header = &mut Header::new(PacketType::EchoReply);
+        header.payload_len.set(payload.len() as u32);
+        header.set_address(&address);
+        self.packet_filler
+            .write_vsock_packet(&Packet { header, payload })
+            .await
+            .map_err(|_| Error::other("Echo packet was too large to be sent back"))
+    }
+
+    async fn handle_echo_reply_packet(
+        &self,
+        address: Address,
+        payload: &[u8],
+    ) -> Result<(), Error> {
+        // ignore but log replies
+        debug!("received echo reply for {address:?} with payload {payload:?}");
+        Ok(())
+    }
+
     async fn handle_accept_packet(&self, address: Address) -> Result<(), Error> {
         if let Some(conn) = self.connections.lock().unwrap().get_mut(&address) {
             let state = std::mem::replace(&mut conn.state, VsockConnectionState::Invalid);
@@ -380,6 +412,8 @@ impl<B: PacketBuffer> Connection<B> {
             PacketType::Connect => self.handle_connect_packet(address).await,
             PacketType::Finish => self.handle_finish_packet(address).await,
             PacketType::Reset => self.handle_reset_packet(address).await,
+            PacketType::Echo => self.handle_echo_packet(address, payload).await,
+            PacketType::EchoReply => self.handle_echo_reply_packet(address, payload).await,
         }
     }
 

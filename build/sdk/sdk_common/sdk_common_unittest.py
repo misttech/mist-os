@@ -24,6 +24,7 @@ def _atom(name: str, category: str, area: str | None = None) -> Atom:
             "files": [],
             "tags": [],
             "type": "schema.json",
+            "stable": True,
         }
     )
 

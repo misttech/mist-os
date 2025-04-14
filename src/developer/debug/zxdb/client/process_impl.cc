@@ -69,6 +69,23 @@ ThreadImpl* ProcessImpl::GetThreadImplFromKoid(uint64_t koid) {
 
 bool ProcessImpl::HasLoadedSymbols() const { return !symbols_.GetStatus().empty(); }
 
+Process::SymbolStatus ProcessImpl::GetSymbolStatus() {
+  auto process_symbol_status = GetSymbols()->GetStatus();
+
+  // Callers don't care about how many symbols are being loaded, just that some are.
+  if (std::any_of(process_symbol_status.begin(), process_symbol_status.end(),
+                  [this](const auto& status) {
+                    return session()->system().HasDownload(status.build_id);
+                  })) {
+    return SymbolStatus::kInProgress;
+  }
+
+  bool any_failed = std::any_of(process_symbol_status.begin(), process_symbol_status.end(),
+                                [](const auto& status) { return !status.symbols_loaded; });
+
+  return any_failed ? SymbolStatus::kNotLoaded : SymbolStatus::kLoaded;
+}
+
 void ProcessImpl::GetModules(
     bool force_reload_symbols,
     fit::callback<void(const Err&, std::vector<debug_ipc::Module>)> callback) {

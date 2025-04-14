@@ -7,7 +7,7 @@ import sys
 import typing
 from enum import Enum
 from types import NoneType, UnionType
-from typing import Any, Dict, ForwardRef, Optional, TypeVar, Union
+from typing import Any, ForwardRef, TypeVar, Union
 
 from ._client import EventHandlerBase, FidlClient
 from ._fidl_common import camel_case_to_snake_case
@@ -75,24 +75,21 @@ def make_default_obj_from_ident(ident: str) -> Any:
     # If there is not identifier then this is for a two way method that returns ().
     if not ident:
         return None
-    split = ident.split("/")
-    library = "fidl." + split[0].replace(".", "_")
-    ty = split[1]
+    library_identifier, member_identifier = ident.split("/")
     try:
+        # Use static FIDL bindings if their available.
+        library = "fidl_" + library_identifier.replace(".", "_")
         mod = sys.modules[library]
     except KeyError:
-        # Try using fidl_ as the prefix because static FIDL bindings may
-        # be available.
-        library = "fidl_" + split[0].replace(".", "_")
+        # Fallback to dynamic FIDL bindings.
+        library = "fidl." + library_identifier.replace(".", "_")
         mod = sys.modules[library]
-    obj_ty = getattr(mod, ty)
+    obj_ty = getattr(mod, member_identifier)
     return obj_ty.make_default()
 
 
 def unwrap_innermost_type(
     ty: Any,
-    globalns: Optional[Dict[str, Any]] = None,
-    localns: Optional[Dict[str, Any]] = None,
     _original_ty: Any = None,
 ) -> type:
     """Takes a type `ty`, then removes the meta-typing surrounding it.
@@ -132,9 +129,7 @@ def unwrap_innermost_type(
 
         try:
             return unwrap_innermost_type(
-                typing.get_type_hints(_f, globalns=globalns, localns=localns)[
-                    "return"
-                ],
+                typing.get_type_hints(_f)["return"],
                 _original_ty=_original_ty,
             )
         except NameError as e:
@@ -151,35 +146,50 @@ def unwrap_innermost_type(
     if len(ty_args) == 1:
         return unwrap_innermost_type(ty_args[0], _original_ty=_original_ty)
 
-    # Meta-typing layer that's effectively an Optional. The Optional type technically has two
-    # arguments, but unwrap_innermost_type discards the type(None).
-    if (
-        len(ty_args) == 2
-        and NoneType in ty_args
-        and typing.get_origin(ty) in (Union, UnionType)
+    if not typing.get_origin(ty) in (
+        Union,
+        UnionType,
     ):
-        ty_args_mut = list(ty_args)
-        ty_args_mut.remove(type(None))
-        return unwrap_innermost_type(ty_args_mut[0], _original_ty=_original_ty)
+        raise TypeError(
+            f"Failed to unwrap non-union type with multiple type arguments: {_original_ty}"
+        )
+    return unwrap_innermost_type_from_union(ty, _original_ty=_original_ty)
 
-    # Meta-typing layer that allows unions of IntEnum, IntFlag, and int because IntEnum and IntFlag
-    # are subclasses of int. This special case is an affordance made to support decode into static
-    # FIDL binding types.
-    if (
-        len(ty_args) == 2
-        and typing.get_origin(ty) in (Union, UnionType)
-        and all(issubclass(x, int) for x in ty_args)
-    ):
-        assert ty_args[0].__module__.startswith(
+
+def unwrap_innermost_type_from_union(
+    ty: Any,
+    _original_ty: Any = None,
+) -> type:
+    assert typing.get_origin(ty) in (Union, UnionType)
+
+    ty_args_list = list(typing.get_args(ty))
+
+    # Remove None from list of type arguments since that just makes the overall type effectively an
+    # Optional.
+    if NoneType in ty_args_list:
+        assert (
+            len(ty_args_list) > 0
+        ), f"Failed to unwrap type. None was the only type argument: {_original_ty}"
+        ty_args_list.remove(type(None))
+
+    # Simple optional that could only have been None or a single other type.
+    if len(ty_args_list) == 1:
+        return unwrap_innermost_type(ty_args_list[0], _original_ty=_original_ty)
+
+    # TODO(https://fxbug.dev/394421154: For more complex optionals that can be multiple
+    # different types in addition to None, only allow unions of IntEnum, IntFlag, and int
+    # because IntEnum and IntFlag are subclasses of int. This special case is an affordance
+    # made to support decode into static FIDL binding types.
+    if len(ty_args_list) == 2 and all(issubclass(x, int) for x in ty_args_list):
+        ty_args_list.remove(int)  # Retain the static FIDL binding type.
+        assert ty_args_list[0].__module__.startswith(
             "fidl_"
         ), f"Encountered union of int with non-static FIDL binding type: {_original_ty}"
-        ty_args_mut = list(ty_args)
-        ty_args_mut.remove(int)  # Retain the static FIDL binding type.
-        return unwrap_innermost_type(ty_args_mut[0], _original_ty=_original_ty)
+        return unwrap_innermost_type(ty_args_list[0], _original_ty=_original_ty)
 
     # The meta-typing layer is not an Optional, not an instance of ForwardRef, and has multiple
-    # arguments.
-    raise RuntimeError(
+    # arguments that can't be resolved into one.
+    raise TypeError(
         f"Failed to remove meta-typing with multiple type arguments: {_original_ty}"
     )
 

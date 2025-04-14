@@ -864,9 +864,6 @@ void Client::ApplyConfig3(ApplyConfig3RequestView request,
       applied_layer_node.layer->ApplyChanges();
     }
   }
-  // Overflow doesn't matter, since stamps only need to be unique until
-  // the configuration is applied with vsync.
-  client_apply_count_++;
 
   ApplyConfig();
 
@@ -1240,6 +1237,12 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
   return false;
 }
 
+void Client::ReapplyConfig() {
+  if (latest_config_stamp_ != display::kInvalidConfigStamp) {
+    ApplyConfig();
+  }
+}
+
 void Client::ApplyConfig() {
   ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
   TRACE_DURATION("gfx", "Display::Client::ApplyConfig internal");
@@ -1324,7 +1327,7 @@ void Client::ApplyConfig() {
 
     controller_.ApplyConfig(
         std::span<DisplayConfig*>(display_config_ptrs, display_config_ptrs_index),
-        applied_config_stamp, client_apply_count_, id_);
+        applied_config_stamp, id_);
   }
 }
 
@@ -1338,9 +1341,7 @@ void Client::SetOwnership(bool is_owner) {
   }
 
   // Only apply the current config if the client has previously applied a config.
-  if (client_apply_count_) {
-    ApplyConfig();
-  }
+  ReapplyConfig();
 }
 
 fidl::Status Client::NotifyDisplayChanges(
@@ -1821,7 +1822,7 @@ void ClientProxy::ReapplyConfig() {
   task->set_handler([this, client_handler = &handler_](async_dispatcher_t* /*dispatcher*/,
                                                        async::Task* task, zx_status_t status) {
     if (status == ZX_OK && client_handler->IsValid()) {
-      client_handler->ApplyConfig();
+      client_handler->ReapplyConfig();
     }
     // Update `client_scheduled_tasks_`.
     fbl::AutoLock task_lock(&task_mtx_);

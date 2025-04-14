@@ -5,19 +5,20 @@
 use fdf_component::{driver_register, Driver, DriverContext, Node};
 use fidl::endpoints::create_endpoints;
 use fuchsia_async::scope::ScopeStream;
-use fuchsia_async::{Scope, Socket};
+use fuchsia_async::{Scope, Socket, TimeoutExt};
 use fuchsia_component::server::ServiceFs;
-use futures::channel::mpsc;
+use futures::channel::{mpsc, oneshot};
 use futures::future::{select, Either};
 use futures::io::{ReadHalf, WriteHalf};
 use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, StreamExt, TryStreamExt};
 use log::{debug, error, info, warn};
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 use std::pin::pin;
 use std::sync::Arc;
+use std::time::Duration;
 use usb_vsock::{
     Connection, ConnectionRequest, Header, Packet, PacketType, UsbPacketBuilder,
-    VsockPacketIterator,
+    VsockPacketIterator, CID_HOST, VSOCK_MAGIC,
 };
 use zx::{SocketOpts, Status};
 use {fidl_fuchsia_hardware_overnet as overnet, fidl_fuchsia_hardware_vsock as vsock};
@@ -62,9 +63,70 @@ impl UsbConnection {
         Self { vsock_service, usb_socket_reader, usb_socket_writer, connection_tx }
     }
 
-    /// Waits for an [`PacketType::Sync`] packet and sends the reply back, and then returns a
-    /// fresh control socket for the new connection
-    async fn next_socket(&mut self, mut found_magic: Option<Vec<u8>>) -> Option<Socket> {
+    // TODO(406262417): this is only here because the host side has trouble with hanging
+    // gets and sending some data immediately after will help it clear and re-establish its state.
+    async fn clear_host_requests(&mut self, found_magic: &[u8]) -> Option<()> {
+        let mut data = [0; MTU];
+        for _ in 0..10 {
+            let header = &mut Header::new(PacketType::Echo);
+            header.payload_len.set(found_magic.len() as u32);
+            let packet = Packet { header, payload: &found_magic };
+            packet.write_to_unchecked(&mut data);
+            if let Err(err) = self.usb_socket_writer.write(&data[..packet.size()]).await {
+                error!("Error writing echo to the usb socket: {err:?}");
+                return None;
+            }
+            let next_packet = read_packet_stream(&mut self.usb_socket_reader, &mut data)
+                .on_timeout(Duration::from_millis(100), || Err(ErrorKind::TimedOut.into()))
+                .await;
+            let mut packets = match next_packet {
+                Ok(None) => {
+                    debug!("Usb socket closed");
+                    return None;
+                }
+                Err(err) if err.kind() == ErrorKind::TimedOut => {
+                    error!("Timed out waiting for matching packet, trying again");
+                    continue;
+                }
+                Err(err) => {
+                    error!("Unexpected error on usb socket: {err}");
+                    return None;
+                }
+                Ok(Some(packets)) => packets,
+            };
+
+            while let Some(packet) = packets.next() {
+                // note: we will deliberately warn and ignore for any vsock packets in the same
+                // usb packet as a sync packet, regardless of whether they were before or after.
+                match packet {
+                    Ok(Packet {
+                        header: Header { packet_type: PacketType::EchoReply, .. },
+                        payload,
+                    }) => {
+                        if payload == found_magic {
+                            debug!("host replied to echo packet and it was received, continuing synchronization");
+                            return Some(());
+                        } else {
+                            warn!("Got echo reply with incorrect payload, ignoring.")
+                        }
+                    }
+                    Ok(packet) => {
+                        warn!("Got unexpected packet of type {:?} and length {} while waiting for sync packet. Ignoring.", packet.header.packet_type, packet.header.payload_len);
+                    }
+                    Err(err) => {
+                        warn!("Got invalid vsock packet while waiting for sync packet: {err:?}");
+                    }
+                }
+            }
+        }
+        // try and finish the connection anyways
+        warn!("Failed to receive echo response in time, giving up but still trying to connect");
+        Some(())
+    }
+
+    /// Waits for an [`PacketType::Sync`] packet and sends the reply back, and then returns the
+    /// negotiated device CID for the connection.
+    async fn next_socket(&mut self, mut found_magic: Option<Vec<u8>>) -> Option<u32> {
         let mut data = [0; MTU];
         while found_magic.is_none() {
             let mut packets = match read_packet_stream(&mut self.usb_socket_reader, &mut data).await
@@ -102,37 +164,86 @@ impl UsbConnection {
         let found_magic =
             found_magic.expect("read loop should not terminate until sync packet is read");
 
+        // send echo packets until we get back an expected reply
+        // TODO(406262417): this is only here because the host side has trouble with hanging
+        // gets and sending some data immediately after will help it clear and re-establish its state.
+        self.clear_host_requests(&found_magic).await?;
+
         debug!("Read sync packet, sending it back and setting up a new link");
         let mut header = Header::new(PacketType::Sync);
         header.payload_len = (found_magic.len() as u32).into();
-        let packet = Packet { header: &header, payload: &found_magic };
+        header.device_cid.set(self.vsock_service.current_cid());
+        header.host_cid.set(CID_HOST);
+        let packet = Packet { header: &header, payload: VSOCK_MAGIC };
         packet.write_to_unchecked(&mut data);
         if let Err(err) = self.usb_socket_writer.write(&data[..packet.size()]).await {
             error!("Error writing overnet magic string to the usb socket: {err:?}");
             return None;
         }
-        let (next_control_socket, other_end) = zx::Socket::create_stream();
-        // TODO(406262417): this is only here because the host side has trouble with hanging
-        // gets and sending some data immediately after will help it clear and re-establish its state.
-        Socket::from_socket(other_end).write_all(b"hello").await.ok();
-        // after writing to the 'other_end' we drop this socket end because we don't expect any
-        // further data on the control socket, as it's currently unused. In the future if we want
-        // to have side channel data flow between the host and driver, this is the socket it would
-        // go in.
-        return Some(Socket::from_socket(next_control_socket));
+        // Now wait for confirmation packet with cid in it
+        loop {
+            let mut packets = match read_packet_stream(&mut self.usb_socket_reader, &mut data).await
+            {
+                Ok(None) => {
+                    debug!("Usb socket closed");
+                    return None;
+                }
+                Err(err) => {
+                    error!("Unexpected error on usb socket: {err}");
+                    return None;
+                }
+                Ok(Some(packets)) => packets,
+            };
+
+            while let Some(packet) = packets.next() {
+                // note: we will deliberately warn and ignore for any vsock packets in the same
+                // usb packet as a sync packet, regardless of whether they were before or after.
+                match packet {
+                    Ok(Packet {
+                        header: Header { packet_type: PacketType::Sync, device_cid, .. },
+                        payload,
+                    }) => {
+                        if payload != VSOCK_MAGIC {
+                            error!("Host gave unsupported protocol version string {payload:?}. Giving up.");
+                            return None;
+                        }
+                        return Some(device_cid.get());
+                    }
+                    Ok(packet) => {
+                        warn!("Got unexpected packet of type {:?} and length {} while waiting for sync packet. Ignoring.", packet.header.packet_type, packet.header.payload_len);
+                    }
+                    Err(err) => {
+                        warn!("Got invalid vsock packet while waiting for sync packet: {err:?}");
+                    }
+                }
+            }
+        }
     }
 
-    async fn run(mut self) {
+    async fn run(mut self, mut synchronized: Option<oneshot::Sender<()>>) {
         let mut found_magic = None;
         loop {
-            let Some(control_socket) = self.next_socket(found_magic).await else {
+            let Some(cid) = self.next_socket(found_magic).await else {
                 info!("USB socket closed or failed");
                 return;
             };
             // reset whether we found the magic string last time around or not.
             found_magic = None;
-            let connection = Arc::new(Connection::new(control_socket, self.connection_tx.clone()));
-            self.vsock_service.set_connection(connection.clone()).await;
+            info!("Bridge established with CID {cid}");
+            // we allow `_other_end` to drop because we don't expect any further data on the control
+            // socket, as it's currently unused. In the future if we want to have side channel data flow
+            // between the host and driver, this is the socket it would go in.
+            let (control_socket, _other_end) = zx::Socket::create_stream();
+            let connection = Arc::new(Connection::new(
+                Socket::from_socket(control_socket),
+                self.connection_tx.clone(),
+            ));
+            self.vsock_service.set_connection(connection.clone(), cid).await;
+            log::trace!("vsock connection set");
+            if let Some(synchronized) = synchronized.take() {
+                // we only use this for testing really so ignore the result.
+                synchronized.send(()).ok();
+            }
             let usb_socket_writer =
                 usb_socket_writer::<MTU>(&connection, &mut self.usb_socket_writer);
             let usb_socket_reader = usb_socket_reader::<MTU>(
@@ -224,7 +335,11 @@ struct UsbCallbackHandler {
 }
 
 impl UsbCallbackHandler {
-    async fn run(mut self, vsock_service: Arc<VsockService<Vec<u8>>>) -> Result<(), fidl::Error> {
+    async fn run(
+        mut self,
+        vsock_service: Arc<VsockService<Vec<u8>>>,
+        mut synchronized: Option<oneshot::Sender<()>>,
+    ) -> Result<(), fidl::Error> {
         use overnet::CallbackRequest::*;
         while let Some(req) = self.usb_callback_server.try_next().await? {
             let NewLink { socket, responder } = req;
@@ -232,7 +347,7 @@ impl UsbCallbackHandler {
 
             debug!("Received new socket from usb driver");
             UsbConnection::new(vsock_service.clone(), socket, self.connection_tx.clone())
-                .run()
+                .run(synchronized.take())
                 .await;
         }
         Ok(())
@@ -262,7 +377,7 @@ impl Driver for UsbVsockServiceDriver {
                 let (usb_callback, usb_callback_server) = create_endpoints();
                 usb_device.set_callback(usb_callback).await.expect("usb device service went away");
 
-                run_connection(usb_callback_server.into_stream(), request_stream).await
+                run_connection(usb_callback_server.into_stream(), request_stream, None).await
             }
         });
 
@@ -275,6 +390,7 @@ impl Driver for UsbVsockServiceDriver {
 async fn run_connection(
     usb_callback_server: overnet::CallbackRequestStream,
     mut request_stream: vsock::DeviceRequestStream,
+    synchronized: Option<oneshot::Sender<()>>,
 ) {
     debug!("Waiting for start message on vsock implementation service");
     let (connection_tx, incoming_connections) = mpsc::channel(1);
@@ -296,7 +412,7 @@ async fn run_connection(
         UsbCallbackHandler { usb_callback_server, connection_tx: connection_tx.clone() };
     let usb_svc = svc.clone();
     scopes.push(async move {
-        if let Err(err) = usb_callback_handler.run(usb_svc).await {
+        if let Err(err) = usb_callback_handler.run(usb_svc, synchronized).await {
             error!("Error while waiting for usb device callbacks: {err:?}");
         }
     });
@@ -322,23 +438,25 @@ fn get_usb_device(context: &DriverContext) -> Result<overnet::UsbProxy, Status> 
 mod tests {
     use fidl::endpoints::create_endpoints;
     use fidl_fuchsia_vsock as vsock_api;
-    use futures::channel::oneshot;
     use futures::future::join;
     use log::trace;
+    use usb_vsock::CID_ANY;
 
     use super::*;
 
     async fn end_to_end_test(
         device_side: impl AsyncFn(vsock_api::ConnectorProxy),
-        host_side: impl AsyncFn(Arc<Connection<Vec<u8>>>, mpsc::Receiver<ConnectionRequest>),
+        host_side: impl AsyncFn(Arc<Connection<Vec<u8>>>, u32, mpsc::Receiver<ConnectionRequest>),
     ) {
         let scope = Scope::new();
         let (vsock_impl_client, vsock_impl_server) = create_endpoints::<vsock::DeviceMarker>();
         let (usb_callback_client, usb_callback_server) =
             create_endpoints::<overnet::CallbackMarker>();
+        let (started_tx, started_rx) = oneshot::channel();
         scope.spawn(run_connection(
             usb_callback_server.into_stream(),
             vsock_impl_server.into_stream(),
+            Some(started_tx),
         ));
         let usb_callback_client = usb_callback_client.into_proxy();
 
@@ -364,8 +482,11 @@ mod tests {
         let host_connection =
             Arc::new(Connection::new(Socket::from_socket(other_end), incoming_tx));
 
+        // send the initial sync packet with
         let header = &mut Header::new(PacketType::Sync);
-        let payload = b"hello!";
+        let payload = VSOCK_MAGIC;
+        header.host_cid.set(CID_HOST);
+        header.device_cid.set(CID_ANY);
         header.payload_len.set(payload.len() as u32);
         let sync_packet = Packet { header, payload };
         let mut buf = [0; 1024];
@@ -374,6 +495,57 @@ mod tests {
             sync_packet.size(),
             usb_packet_writer.write(&buf[..sync_packet.size()]).await.unwrap()
         );
+
+        // bounce back echoes until we receive a sync reply
+        let mut buf = vec![0; 4096];
+        loop {
+            let packet = read_packet_stream(&mut usb_packet_reader, &mut buf)
+                .await
+                .unwrap()
+                .unwrap()
+                .next()
+                .unwrap()
+                .unwrap();
+            trace!("received packet {packet:?}");
+            match packet.header.packet_type {
+                PacketType::Sync => {
+                    assert_eq!(packet.payload, VSOCK_MAGIC);
+                    assert_eq!(packet.header.device_cid.get(), 3);
+                    assert_eq!(packet.header.host_cid.get(), CID_HOST);
+                    break;
+                }
+                PacketType::Echo => {
+                    let header = &mut Header::new(PacketType::EchoReply);
+                    let payload = packet.payload;
+                    header.payload_len.set(payload.len() as u32);
+                    let sync_packet = Packet { header, payload };
+                    let mut buf = [0; 1024];
+                    sync_packet.write_to_unchecked(&mut buf);
+                    assert_eq!(
+                        sync_packet.size(),
+                        usb_packet_writer.write(&buf[..sync_packet.size()]).await.unwrap()
+                    );
+                }
+                other => panic!("Unexpected packet type while syncing {other:?}"),
+            }
+        }
+
+        // send back a different cid just to make sure that works
+        let device_cid = 300;
+        let header = &mut Header::new(PacketType::Sync);
+        let payload = VSOCK_MAGIC;
+        header.host_cid.set(CID_HOST);
+        header.device_cid.set(device_cid);
+        header.payload_len.set(payload.len() as u32);
+        let sync_packet = Packet { header, payload };
+        let mut buf = [0; 1024];
+        sync_packet.write_to_unchecked(&mut buf);
+        assert_eq!(
+            sync_packet.size(),
+            usb_packet_writer.write(&buf[..sync_packet.size()]).await.unwrap()
+        );
+
+        started_rx.await.unwrap();
 
         let writer_connection = host_connection.clone();
         scope.spawn(async move {
@@ -390,28 +562,19 @@ mod tests {
         });
 
         let reader_connection = host_connection.clone();
-        let (synchronized_tx, synchronized) = oneshot::channel();
-        let mut synchronized_tx = Some(synchronized_tx);
         scope.spawn(async move {
             let mut buf = vec![0; 4096];
             while let Ok(bytes) = usb_packet_reader.read(&mut buf).await {
                 for packet in VsockPacketIterator::new(&buf[..bytes]) {
                     let packet = packet.unwrap();
                     trace!("received packet {packet:?}");
-                    if packet.header.packet_type == PacketType::Sync {
-                        assert_eq!(packet.payload, b"hello!");
-                        synchronized_tx.take().unwrap().send(()).unwrap();
-                        continue;
-                    }
                     reader_connection.handle_vsock_packet(packet).await.unwrap();
                 }
             }
         });
 
-        synchronized.await.unwrap();
-
         let device = device_side(vsock_api_client);
-        let host = host_side(host_connection, incoming_rx);
+        let host = host_side(host_connection, device_cid, incoming_rx);
         join(device, host).await;
     }
 
@@ -423,9 +586,10 @@ mod tests {
                 let mut socket = Socket::from_socket(socket);
                 let (_con, con) = create_endpoints();
                 vsock_api_client
-                    .connect(2, 200, vsock_api::ConnectionTransport { data, con })
+                    .connect(CID_HOST, 200, vsock_api::ConnectionTransport { data, con })
                     .await
                     .unwrap()
+                    .map_err(Status::from_raw)
                     .unwrap();
                 let mut buf = [0; 4];
                 socket.read_exact(&mut buf).await.unwrap();
@@ -434,7 +598,7 @@ mod tests {
                 assert_eq!(0, socket.read(&mut buf).await.unwrap());
                 trace!("vsock api fin");
             },
-            async move |host_connection, mut incoming_rx| {
+            async move |host_connection, _device_cid, mut incoming_rx| {
                 let incoming = incoming_rx.next().await.unwrap();
                 trace!("{incoming:?}");
                 let (socket, other_end) = zx::Socket::create_stream();
@@ -460,7 +624,10 @@ mod tests {
                 vsock_api_client.listen(200, other_end).await.unwrap().unwrap();
                 let vsock_api::AcceptorRequest::Accept { addr, responder } =
                     acceptor.next().await.unwrap().unwrap();
-                assert_eq!(addr, vsock::Addr { local_port: 200, remote_cid: 2, remote_port: 9000 });
+                assert_eq!(
+                    addr,
+                    vsock::Addr { local_port: 200, remote_cid: CID_HOST, remote_port: 9000 }
+                );
 
                 let (socket, data) = zx::Socket::create_stream();
                 let mut socket = Socket::from_socket(socket);
@@ -474,15 +641,15 @@ mod tests {
                 assert_eq!(0, socket.read(&mut buf).await.unwrap());
                 trace!("vsock api fin");
             },
-            async move |host_connection, _incoming_rx| {
+            async move |host_connection, device_cid, _incoming_rx| {
                 let (socket, other_end) = zx::Socket::create_stream();
                 let mut socket = Socket::from_socket(socket);
                 let _state = host_connection
                     .connect(
                         usb_vsock::Address {
-                            host_cid: 2,
+                            host_cid: CID_HOST,
                             host_port: 9000,
-                            device_cid: 3,
+                            device_cid,
                             device_port: 200,
                         },
                         Socket::from_socket(other_end),

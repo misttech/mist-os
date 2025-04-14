@@ -18,14 +18,15 @@ __BEGIN_CDECLS
 // return |ZX_ERR_WRONG_TYPE| or I/O operations (e.g., read, read_at, write,
 // write_at, seek) and |ZX_ERR_NOT_SUPPORTED| for other operations.
 //
-// * |zxio_default_close| does succeed, but does nothing.
+// * |zxio_default_destroy| does succeed, but does nothing.
 // * |zxio_default_wait_begin| returns an invalid handle and no signals.
 // * |zxio_default_wait_end| returns no signals.
 
 zx_status_t zxio_default_release(zxio_t* io, zx_handle_t* out_handle);
 zx_status_t zxio_default_borrow(zxio_t* io, zx_handle_t* out_handle);
-zx_status_t zxio_default_close(zxio_t* io, bool should_wait);
+void zxio_default_destroy(zxio_t* io);
 zx_status_t zxio_default_clone(zxio_t* io, zx_handle_t* out_handle);
+zx_status_t zxio_default_close(zxio_t* io);
 void zxio_default_wait_begin(zxio_t* io, zxio_signals_t zxio_signals, zx_handle_t* out_handle,
                              zx_signals_t* out_zx_signals);
 void zxio_default_wait_end(zxio_t* io, zx_signals_t zx_signals, zxio_signals_t* out_zxio_signals);
@@ -118,7 +119,9 @@ zx_status_t zxio_default_open(zxio_t* directory, const char* path, size_t path_l
 // the default implementations of unimplemented operations is consistent across
 // ops tables.
 static __CONSTEXPR const zxio_ops_t zxio_default_ops = {
-    .close = zxio_default_close,
+    .destroy = zxio_default_destroy,
+    // close is for OOT users that haven't migrated yet.
+    .close2 = zxio_default_close,
     .release = zxio_default_release,
     .borrow = zxio_default_borrow,
     .clone = zxio_default_clone,
@@ -188,7 +191,7 @@ zx_status_t zxio_default_init(zxio_t* io);
 // you might get from /dev/null) behaves.
 //
 // The null implementation is similar to the default implementation, except the
-// read, write, and close operations succeed with null effects.
+// read, write, and destroy operations succeed with null effects.
 
 // Initializes a |zxio_t| object with a null ops table.
 zx_status_t zxio_null_init(zxio_t* io);
