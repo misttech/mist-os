@@ -45,6 +45,7 @@ static ACPI_STATUS thrd_status_to_acpi_status(Thread* status) {
 ACPI_STATUS AcpiTaskThreadStart() {
   os_execute_state.thread =
       Thread::Create("acpi_os_task", AcpiOsExecuteTask, nullptr, DEFAULT_PRIORITY);
+  os_execute_state.thread->Resume();
   return thrd_status_to_acpi_status(os_execute_state.thread);
 }
 
