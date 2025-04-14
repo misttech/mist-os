@@ -129,9 +129,9 @@ class VirtualAudioComposite
   uint32_t frame_size_ = 4;
   zx::vmo ring_buffer_vmo_;
 
-  bool watch_delay_info_needs_reply_ = true;
+  bool should_reply_to_delay_request_ = true;
   std::optional<WatchDelayInfoCompleter::Async> delay_info_completer_;
-  bool watch_position_info_needs_reply_ = true;
+  bool should_reply_to_position_request_ = true;
   std::optional<WatchClockRecoveryPositionInfoCompleter::Async> position_info_completer_;
 
   bool watch_element_state_needs_reply_[kNumberOfElements] = {true, true};

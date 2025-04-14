@@ -438,9 +438,9 @@ void VirtualAudioComposite::ResetRingBuffer() {
   ring_buffer_vmo_fetched_ = false;
   ring_buffer_started_ = false;
   notifications_per_ring_ = 0;
-  watch_position_info_needs_reply_ = true;
+  should_reply_to_position_request_ = true;
   position_info_completer_.reset();
-  watch_delay_info_needs_reply_ = true;
+  should_reply_to_delay_request_ = true;
   delay_info_completer_.reset();
   // We don't reset ring_buffer_format_ and dai_format_ to allow for retrieval for
   // observability.
@@ -535,8 +535,8 @@ void VirtualAudioComposite::Start(StartCompleter::Sync& completer) {
     FDF_LOG(WARNING, "Failed to send OnStart event: %s", result.status_string());
   }
 
-  completer.Reply(now);
   ring_buffer_started_ = true;
+  completer.Reply(now);
 }
 
 void VirtualAudioComposite::Stop(StopCompleter::Sync& completer) {
@@ -557,48 +557,52 @@ void VirtualAudioComposite::Stop(StopCompleter::Sync& completer) {
     FDF_LOG(WARNING, "Failed to send OnStop event: %s", result.status_string());
   }
 
-  completer.Reply();
   ring_buffer_started_ = false;
+  completer.Reply();
 }
 
 void VirtualAudioComposite::WatchClockRecoveryPositionInfo(
     WatchClockRecoveryPositionInfoCompleter::Sync& completer) {
-  if (watch_position_info_needs_reply_) {
+  if (should_reply_to_position_request_ && ring_buffer_started_ && notifications_per_ring_ > 0) {
     fuchsia_hardware_audio::RingBufferPositionInfo position_info;
     position_info.timestamp(zx::clock::get_monotonic().get());
     // TODO(https://fxbug.dev/42075676): Add support for current position; now we always report 0.
     position_info.position(0);
-    watch_position_info_needs_reply_ = false;
+    should_reply_to_position_request_ = false;
     completer.Reply(std::move(position_info));
-  } else if (!position_info_completer_) {
-    position_info_completer_.emplace(completer.ToAsync());
-  } else {
+    return;
+  }
+
+  if (position_info_completer_.has_value()) {
     // The client called WatchClockRecoveryPositionInfo when another hanging get was pending.
     // This is an error condition and hence we unbind the channel.
     FDF_LOG(
         ERROR,
         "WatchClockRecoveryPositionInfo called when another hanging get was pending, unbinding");
-    watch_position_info_needs_reply_ = true;
+    should_reply_to_position_request_ = true;
     position_info_completer_.reset();
     completer.Close(ZX_ERR_BAD_STATE);
+    return;
   }
+
+  position_info_completer_.emplace(completer.ToAsync());
 }
 
 void VirtualAudioComposite::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
-  if (watch_delay_info_needs_reply_) {
+  if (should_reply_to_delay_request_) {
     auto& ring_buffer = GetRingBuffer(kRingBufferId);
     fuchsia_hardware_audio::DelayInfo delay_info;
     delay_info.internal_delay(ring_buffer.internal_delay());
     delay_info.external_delay(ring_buffer.external_delay());
-    watch_delay_info_needs_reply_ = false;
+    should_reply_to_delay_request_ = false;
     completer.Reply(std::move(delay_info));
-  } else if (!delay_info_completer_) {
+  } else if (!delay_info_completer_.has_value()) {
     delay_info_completer_.emplace(completer.ToAsync());
   } else {
     // The client called WatchDelayInfo when another hanging get was pending.
     // This is an error condition and hence we unbind the channel.
     FDF_LOG(ERROR, "WatchDelayInfo called when another hanging get was pending, unbinding");
-    watch_delay_info_needs_reply_ = true;
+    should_reply_to_delay_request_ = true;
     delay_info_completer_.reset();
     completer.Close(ZX_ERR_BAD_STATE);
   }
@@ -762,7 +766,7 @@ void VirtualAudioComposite::WatchTopology(WatchTopologyCompleter::Sync& complete
   if (watch_topology_needs_reply_) {
     watch_topology_needs_reply_ = false;
     completer.Reply(kTopologyId);
-  } else if (watch_topology_completer_) {
+  } else if (watch_topology_completer_.has_value()) {
     // The client called WatchTopology when another hanging get was pending.
     // This is an error condition and hence we unbind the channel.
     FDF_LOG(ERROR, "WatchTopology was re-called while the previous call was still pending");
