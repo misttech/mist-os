@@ -38,6 +38,11 @@
 
 #include "platform.h"
 
+// Initialized by UartInitLate, provides buffered output of the uart,
+// which helps readers catch up.
+// Also provides synchronization mechanisms for character availability.
+Cbuf rx_queue;
+
 namespace {
 
 // No locks will be acquired.
@@ -112,11 +117,6 @@ struct UartSyncPolicy {
 };
 
 uart::all::KernelDriver<PlatformUartIoProvider, UartSyncPolicy> gUart;
-
-// Initialized by UartInitLate, provides buffered output of the uart,
-// which helps readers catch up.
-// Also provides synchronization mechanisms for character availability.
-Cbuf rx_queue;
 
 // Size of the rx queue. The bigger the buffer, the bigger the window for
 // the reader to catch up. Useful when the incoming data is bursty.

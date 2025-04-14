@@ -5,6 +5,7 @@
 
 #include "zircon/system/ulib/acpica/oszircon.h"
 
+#include <lib/affine/ratio.h>
 #include <zircon/assert.h>
 #include <zircon/process.h>
 #include <zircon/syscalls.h>
@@ -12,6 +13,7 @@
 
 #include <acpica/acpi.h>
 #include <kernel/thread.h>
+#include <kernel/timer.h>
 
 #if !defined(__x86_64__) && !defined(__aarch64__) && !defined(__riscv)
 #error "Unsupported architecture"
@@ -265,7 +267,9 @@ void AcpiOsVprintf(const char* Format, va_list Args) {
  *
  * @return The current value of the system timer in 100-ns units.
  */
-UINT64 AcpiOsGetTimer() { return current_mono_time() / 100; }
+UINT64 AcpiOsGetTimer() {
+  return timer_get_ticks_to_time_ratio().Scale(current_mono_ticks()) / 100;
+}
 
 /**
  * @brief Break to the debugger or display a breakpoint message.

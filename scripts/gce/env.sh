@@ -4,7 +4,7 @@
 # found in the LICENSE file.
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../../tools/devshell/lib/vars.sh || exit $?
-fx-config-read
+#fx-config-read
 
 get-gcloud-config() {
   gcloud -q config get-value "$@" 2>/dev/null
@@ -30,7 +30,7 @@ makefile() {
 FUCHSIA_GCE_PROJECT=${FUCHSIA_GCE_PROJECT:-$(get-gcloud-config project)}
 FUCHSIA_GCE_ZONE=${FUCHSIA_GCE_ZONE:-$(get-gcloud-config compute/zone)}
 FUCHSIA_GCE_USER=${FUCHSIA_GCE_USER:-"$USER"}
-FUCHSIA_GCE_INSTANCE=${FUCHSIA_GCE_INSTANCE:-"$FUCHSIA_GCE_USER-fuchsia"}
+FUCHSIA_GCE_INSTANCE=${FUCHSIA_GCE_INSTANCE:-"$FUCHSIA_GCE_USER-mistos"}
 FUCHSIA_GCE_IMAGE=${FUCHSIA_GCE_IMAGE:-"$FUCHSIA_GCE_INSTANCE-img"}
 FUCHSIA_GCE_DISK=${FUCHSIA_GCE_DISK:-"$FUCHSIA_GCE_INSTANCE-disk"}
 

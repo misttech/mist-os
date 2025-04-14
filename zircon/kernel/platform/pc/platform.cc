@@ -396,11 +396,13 @@ zx_status_t platform_mp_cpu_unplug(cpu_num_t cpu_id) { return arch_mp_cpu_unplug
 const char* manufacturer = "unknown";
 const char* product = "unknown";
 
+extern Cbuf rx_queue;
+
 void platform_init(void) {
   platform_init_crashlog();
 
 #if NO_USER_KEYBOARD
-  platform_init_keyboard(&console_input_buf);
+  platform_init_keyboard(&rx_queue);
 #endif
 
   // Initialize all PvEoi instances prior to starting secondary CPUs.
@@ -408,6 +410,8 @@ void platform_init(void) {
 
   platform_init_smp();
 
+#ifndef MISTOS_LEGACY_PC
+  // TODO (Herrera): Some old pcs are crashing when parsing the SMBIOS tables.
   pc_init_smbios();
 
   SmbiosWalkStructs([](smbios::SpecVersion version, const smbios::Header* h,
@@ -419,6 +423,7 @@ void platform_init(void) {
     }
     return ZX_OK;
   });
+#endif
   printf("smbios: manufacturer=\"%s\" product=\"%s\"\n", manufacturer, product);
 }
 

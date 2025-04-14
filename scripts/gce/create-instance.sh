@@ -27,6 +27,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 gcloud -q compute instances create "$FUCHSIA_GCE_INSTANCE" \
+  --zone=$FUCHSIA_GCE_ZONE \
   --enable-nested-virtualization \
   --metadata=serial-port-enable=1 --image "${FUCHSIA_GCE_IMAGE}" \
   --machine-type=${MACHINE_TYPE} || exit $?

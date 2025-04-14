@@ -4,19 +4,11 @@
 
 import("//build/fidl/fidl.gni")
 
-if (is_mistos) {
-  fidl("fuchsia.hardware.block.driver") {
-    sources = [ "block-mistos.fidl" ]
-    public_deps = [ "//zircon/vdso/zx" ]
-    enable_banjo = true
-  }
-} else {
-  fidl("fuchsia.hardware.block.driver") {
-    sources = [ "block.fidl" ]
-    public_deps = [
-      "//sdk/fidl/fuchsia.hardware.block",
-      "//zircon/vdso/zx",
-    ]
-    enable_banjo = true
-  }
+fidl("fuchsia.hardware.block.driver") {
+  sources = [ "block.fidl" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.block",
+    "//zircon/vdso/zx",
+  ]
+  enable_banjo = true
 }

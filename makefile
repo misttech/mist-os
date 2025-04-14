@@ -71,8 +71,8 @@ gdb: args ## Set debug arguments
 .PHONY: gdb
 
 release: args ## Set release arguments
-	$(NOECHO)echo "is_debug = false" >> $(OUTPUT)/args.gn
-.PHONY: debug
+	$(NOECHO)echo "compilation_mode = \"release\"" >> $(OUTPUT)/args.gn
+.PHONY: release
 
 kasan: args ## Compile with Kernel Address Sanitazier enabled
 	$(NOECHO)echo "select_variant = [ \"kasan\" ]" >> $(OUTPUT)/args.gn
@@ -138,6 +138,16 @@ starnix_lite_kernel: gen info
 	-c "kernel.bypass-debuglog=false kernel.vdso.always_use_next=true" \
 	-- -no-reboot || ([ $$? -eq 31 ] && echo "Success!")
 .PHONY: starnix_lite_kernel
+
+iso:
+	$(NOECHO)$(NINJA) -C $(OUTPUT) kernel.phys32/multiboot-shim.bin
+	$(NOECHO)$(NINJA) -C $(OUTPUT) kernel_x64/kernel.zbi
+	$(MISTOSROOT)/zircon/scripts/make-zircon-x64-grub
+.PHONY: iso
+
+img: iso
+	$(NOECHO)$(MISTOSROOT)/prebuilt/third_party/qemu/$(HOST_OS)-$(HOST_ARCH)/bin/qemu-img convert -O raw out/default/mistos.iso out/default/mistos.img
+.PHONY: img
 
 %: ## Make any ninja target
 	$(NOECHO)$(NINJA) -C $(OUTPUT) $@

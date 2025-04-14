@@ -7,7 +7,7 @@ source_set("block_lib") {
   configs += [ "//build/config:all_source" ]
   sources = [ "block.cc" ]
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
+    "//sdk/fidl/mistos.hardware.block.driver:mistos.hardware.block.driver_banjo_cpp",
     "//src/devices/bus/lib/virtio",
     "//third_party/lk/lib/bio",
   ]

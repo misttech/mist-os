@@ -6,6 +6,7 @@
 
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/zircon/zx_library.gni")
+import("//zircon/kernel/params.gni")
 
 # These set the ABI contract between C++ and assembly code.
 # This is kept consistent between the kernel proper and phys
@@ -47,6 +48,10 @@ config("abi") {
     ":retpoline",
     ":skylake_jcc",
   ]
+
+  if (enable_legacy_pc) {
+    configs += [ ":legacy_pc" ]
+  }
 }
 
 config("retpoline") {
@@ -65,6 +70,15 @@ config("retpoline") {
     }
   }
   defines = [ "KERNEL_RETPOLINE=1" ]
+}
+
+config("legacy_pc") {
+  cflags = [
+    # Disable popcnt instruction (not supported by old processors)
+    "-mno-popcnt",
+  ]
+  visibility = [ ":*" ]
+  defines = [ "MISTOS_LEGACY_PC=1" ]
 }
 
 # Mitigate errata in Intel Skylake family of CPUs that cause control transfer instructions to

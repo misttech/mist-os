@@ -27,7 +27,7 @@ struct AcpiIrqThread {
 
 static int acpi_irq_thread(void* arg) {
   auto real_arg = static_cast<AcpiIrqThread*>(arg);
-  while (1) {
+  while (true) {
     zx_time_t timestamp;
     zx_status_t status = real_arg->irq_handle.dispatcher()->WaitForInterrupt(&timestamp);
     if (status != ZX_OK) {
@@ -78,13 +78,14 @@ ACPI_STATUS AcpiOsInstallInterruptHandler(UINT32 InterruptLevel, ACPI_OSD_HANDLE
     return AE_NO_MEMORY;
   }
 
-  zx_rights_t rights;
   KernelHandle<InterruptDispatcher> handle;
+  zx_rights_t rights;
   zx_status_t status =
       InterruptEventDispatcher::Create(&handle, &rights, InterruptLevel, ZX_INTERRUPT_REMAP_IRQ);
   if (status != ZX_OK) {
     return AE_ERROR;
   }
+
   arg->handler = Handler;
   arg->context = Context;
   arg->irq_handle = ktl::move(handle);
@@ -96,6 +97,7 @@ ACPI_STATUS AcpiOsInstallInterruptHandler(UINT32 InterruptLevel, ACPI_OSD_HANDLE
   if (arg->thread == nullptr) {
     return AE_ERROR;
   }
+  arg->thread->Resume();
 
   sci_irq = std::move(arg);
   return AE_OK;

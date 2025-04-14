@@ -1,0 +1,31 @@
+# Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)
+
+# Ignore all files in the build directory
+/boards/
+/bundles/
+/build/bazel/*
+/build/rbe/*
+/build/fidl/*
+/infra/
+/docs/
+/examples/
+/out/
+/prebuilt/
+/products/
+/tests/
+/third_party/*
+/tools/
+/vendor/*
+!/vendor/misttech/
+
+**/bazel_sdk
+
+/jiri/
+/.jiri_root/
+
+/src/*
+!/src/connectivity/
+!/src/devices/
+!/src/lib/
+/sdk/*
+!/sdk/lib/

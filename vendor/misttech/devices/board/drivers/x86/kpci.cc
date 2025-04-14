@@ -40,11 +40,11 @@ static ACPI_STATUS handle_prt(ACPI_HANDLE object, zx_pci_init_arg_t* arg, uint8_
   ACPI_BUFFER buffer = {
       // Request that the ACPI subsystem allocate the buffer
       .Length = ACPI_ALLOCATE_BUFFER,
-      .Pointer = NULL,
+      .Pointer = nullptr,
   };
   ACPI_BUFFER crs_buffer = {
       .Length = ACPI_ALLOCATE_BUFFER,
-      .Pointer = NULL,
+      .Pointer = nullptr,
   };
 
   ACPI_STATUS status = AcpiGetIrqRoutingTable(object, &buffer);
@@ -62,52 +62,31 @@ static ACPI_STATUS handle_prt(ACPI_HANDLE object, zx_pci_init_arg_t* arg, uint8_
       return AE_ERROR;
     }
     if (entry->Pin >= PCI_MAX_LEGACY_IRQ_PINS) {
-      printf("PRT entry contains an invalid pin: %#x\n", entry->Pin);
       return AE_ERROR;
     }
-
-    LTRACEF(
-        "_PRT Entry RootPort %02x.%1x: .Address = 0x%05llx, .Pin = %u, .SourceIndex = %u, "
-        ".Source = \"%s\"\n",
-        (port_dev_id != UINT8_MAX) ? port_dev_id : 0,
-        (port_func_id != UINT8_MAX) ? port_func_id : 0, entry->Address, entry->Pin,
-        entry->SourceIndex, entry->u.Source);
-
-    // Per ACPI Spec 6.2.13, all _PRT entries must have a function address of
-    // 0xFFFF representing all functions in the device. In effect, this means we
-    // only care about the entry's dev id.
     uint8_t dev_id = (entry->Address >> 16) & (PCI_MAX_DEVICES_PER_BUS - 1);
     // Either we're handling the root complex (port_dev_id == UINT8_MAX), or
     // we're handling a root port, and if it's a root port, dev_id should
     // be 0. If not, the entry is strange and we'll warn / skip it.
     if (port_dev_id != UINT8_MAX && dev_id != 0) {
       // this is a weird entry, skip it
-      LTRACEF("PRT entry for root unexpected contains device address: %#x\n", dev_id);
       continue;
     }
 
-    // By default, SourceIndex refers to a global IRQ number that the pin is
-    // connected to and we assume the legacy defaults of Level-triggered / Active Low.
-    // PCI Local Bus Specification 3.0 section 2.2.6
-    uint32_t global_irq = entry->SourceIndex;
+    uint32_t global_irq = ZX_PCI_NO_IRQ_MAPPING;
     bool level_triggered = true;
     bool active_high = false;
-
-#if 0
-    // If the PRT contains a Source entry than we can attempt to find an Extended
-    // IRQ Resource describing it.
     if (entry->u.Source[0]) {
       // If the Source is not just a NULL byte, then it refers to a
       // PCI Interrupt Link Device
       ACPI_HANDLE ild;
       status = AcpiGetHandle(object, entry->u.Source, &ild);
       if (status != AE_OK) {
-        printf("Failed to get handle for PCI interrupt link device %s: %d\n", entry->u.Source,
-               status);
+        goto cleanup;
       }
       status = AcpiGetCurrentResources(ild, &crs_buffer);
       if (status != AE_OK) {
-        printf("Failed to get current resources for interrupt link device: %d\n", status);
+        goto cleanup;
       }
 
       uintptr_t crs_entry_addr = (uintptr_t)crs_buffer.Pointer;
@@ -143,9 +122,12 @@ static ACPI_STATUS handle_prt(ACPI_HANDLE object, zx_pci_init_arg_t* arg, uint8_
       }
       AcpiOsFree(crs_buffer.Pointer);
       crs_buffer.Length = ACPI_ALLOCATE_BUFFER;
-      crs_buffer.Pointer = NULL;
+      crs_buffer.Pointer = nullptr;
+    } else {
+      // Otherwise, SourceIndex refers to a global IRQ number that the pin
+      // is connected to
+      global_irq = entry->SourceIndex;
     }
-#endif
 
     // Check if we've seen this IRQ already, and if so, confirm the
     // IRQ signaling is the same.
@@ -199,7 +181,7 @@ static zx_status_t find_pcie_config(zx_pci_init_arg_t* arg) {
   ACPI_TABLE_HEADER* raw_table = NULL;
   ACPI_STATUS status = AcpiGetTable((char*)ACPI_SIG_MCFG, 1, &raw_table);
   if (status != AE_OK) {
-    printf("could not find MCFG");
+    xprintf("could not find MCFG\n");
     return ZX_ERR_NOT_FOUND;
   }
   ACPI_TABLE_MCFG* mcfg = (ACPI_TABLE_MCFG*)raw_table;
@@ -209,16 +191,16 @@ static zx_status_t find_pcie_config(zx_pci_init_arg_t* arg) {
       reinterpret_cast<uintptr_t>(mcfg) + mcfg->Header.Length);
   uintptr_t table_bytes = (uintptr_t)table_end - (uintptr_t)table_start;
   if (table_bytes % sizeof(*table_start) != 0) {
-    printf("MCFG has unexpected size");
+    xprintf("MCFG has unexpected size\n");
     return ZX_ERR_INTERNAL;
   }
   size_t num_entries = table_end - table_start;
   if (num_entries == 0) {
-    printf("MCFG has no entries");
+    xprintf("MCFG has no entries\n");
     return ZX_ERR_NOT_FOUND;
   }
   if (num_entries > 1) {
-    printf("MCFG has more than one entry, just taking the first");
+    xprintf("MCFG has more than one entry, just taking the first\n");
   }
 
   size_t size_per_bus =
@@ -226,7 +208,7 @@ static zx_status_t find_pcie_config(zx_pci_init_arg_t* arg) {
   int num_buses = table_start->EndBusNumber - table_start->StartBusNumber + 1;
 
   if (table_start->PciSegment != 0) {
-    printf("Non-zero segment found");
+    xprintf("Non-zero segment found\n");
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -257,31 +239,30 @@ static acpi::status<> get_pcie_devices_irq(acpi::Acpi* acpi, ACPI_HANDLE object,
   // Start with the Root's _PRT. The spec requires that one exists.
   ACPI_STATUS status = handle_prt(object, arg, UINT8_MAX, UINT8_MAX);
   if (status != AE_OK) {
-    LTRACEF("Couldn't find an IRQ routing table for root\n");
     return acpi::make_status(status);
   }
 
-  // If there are any host bridges / pcie-to-pci bridges or other ports under
-  // the root then check them for PRTs as well. This is unnecessary in most
-  // configurations.
-  ACPI_HANDLE child = NULL;
-  while ((status = AcpiGetNextObject(ACPI_TYPE_DEVICE, object, child, &child)) == AE_OK) {
-    if (auto res = acpi->GetObjectInfo(child); res.is_ok()) {
-      // If the object we're examining has a PCI address then use that as the
-      // basis for the routing table we're inspecting.
-      // Format: Acpi 6.1 section 6.1.1 "_ADR (Address)"
-      uint8_t port_dev_id = (res->Address >> 16) & (PCI_MAX_DEVICES_PER_BUS - 1);
-      uint8_t port_func_id = res->Address & (PCI_MAX_FUNCTIONS_PER_DEVICE - 1);
-
-      LTRACEF("Processing _PRT for %02x.%1x (%.*s)\n", port_dev_id, port_func_id, 4,
-              reinterpret_cast<char*>(&res->Name));
-
-      // Ignore the return value of this, since if child is not a
-      // root port, it will fail and we don't care.
-      handle_prt(child, arg, port_dev_id, port_func_id);
+  // Enumerate root ports
+  ACPI_HANDLE child = nullptr;
+  while (true) {
+    status = AcpiGetNextObject(ACPI_TYPE_DEVICE, object, child, &child);
+    if (status == AE_NOT_FOUND) {
+      break;
+    } else if (status != AE_OK) {
+      return acpi::make_status(status);
     }
-  }
 
+    auto acpi_status = acpi->EvaluateObject(child, "_ADR", std::nullopt);
+    if (acpi_status.is_error() || acpi_status->Type != ACPI_TYPE_INTEGER) {
+      continue;
+    }
+    UINT64 data = acpi_status->Integer.Value;
+    uint8_t port_dev_id = (data >> 16) & (PCI_MAX_DEVICES_PER_BUS - 1);
+    uint8_t port_func_id = data & (PCI_MAX_FUNCTIONS_PER_DEVICE - 1);
+    // Ignore the return value of this, since if child is not a
+    // root port, it will fail and we don't care.
+    handle_prt(child, arg, port_dev_id, port_func_id);
+  }
   return acpi::ok();
 }
 /* @brief Find the legacy IRQ swizzling for the PCIe root bus
@@ -300,7 +281,9 @@ static zx_status_t find_pci_legacy_irq_mapping(acpi::Acpi* acpi, ACPI_HANDLE obj
   }
   arg->num_irqs = 0;
 
-  acpi::status<> status = get_pcie_devices_irq(acpi, object, arg);
+  acpi::status<> status = acpi->GetDevices(
+      (arg->addr_windows[0].has_ecam) ? PCIE_HID : PCI_HID,
+      [acpi, arg](ACPI_HANDLE hnd, uint32_t) { return get_pcie_devices_irq(acpi, hnd, arg); });
   if (status.is_error()) {
     return ZX_ERR_INTERNAL;
   }
@@ -356,7 +339,7 @@ static zx_status_t find_pci_config(acpi::Acpi* acpi, zx_pci_init_arg_t* arg) {
  */
 zx_status_t get_pci_init_arg(acpi::Acpi* acpi, ACPI_HANDLE object, zx_pci_init_arg_t** arg,
                              uint32_t* size) {
-  zx_pci_init_arg_t* res = NULL;
+  zx_pci_init_arg_t* res = nullptr;
 
   // TODO(teisenbe): We assume only one ECAM window right now...
   size_t obj_size = sizeof(*res) + sizeof(res->addr_windows[0]) * 1;
@@ -370,25 +353,22 @@ zx_status_t get_pci_init_arg(acpi::Acpi* acpi, ACPI_HANDLE object, zx_pci_init_a
   // will be handled when the PCI bus driver binds to roots via ACPI.
   zx_status_t status = find_pcie_config(res);
   if (status != ZX_OK) {
-    printf("PCIe config not found, trying legacy PCI\n");
     status = find_pci_config(acpi, res);
     if (status != ZX_OK) {
-      printf("Failed to find either PCIe or PCI config: %d\n", status);
       goto fail;
     }
   }
 
-  // Add more detailed error handling for IRQ mapping
   status = find_pci_legacy_irq_mapping(acpi, object, res);
   if (status != ZX_OK) {
-    goto fail;
+    // We log but we do not fail here. QEMU does not have _PRT.
+    LTRACEF("acpi: error %d in find_pci_legacy_irq_mapping\n", status);
   }
 
   *arg = res;
   *size =
       static_cast<uint32_t>(sizeof(*res) + sizeof(res->addr_windows[0]) * res->addr_window_count);
   return ZX_OK;
-
 fail:
   free(res);
   return status;
@@ -456,7 +436,7 @@ static ACPI_STATUS report_current_resources_resource_cb(ACPI_RESOURCE* res, void
     }
 
     if (io.minimum != io.maximum) {
-      printf("WARNING: ACPI found bad _CRS IO entry\n");
+      xprintf("WARNING: ACPI found bad _CRS IO entry\n");
       return AE_OK;
     }
 
@@ -570,10 +550,12 @@ zx_status_t pci_init(ACPI_HANDLE object, acpi::UniquePtr<ACPI_DEVICE_INFO> info,
     LTRACEF("acpi: WARNING: ACPI failed to report all current resources!\n");
   }
 
+#if 0
   char name[ACPI_NAMESEG_SIZE + 1];
   memcpy(name, &info->Name, ACPI_NAMESEG_SIZE);
   name[ACPI_NAMESEG_SIZE] = '\0';
   LTRACEF("acpi: root %s\n", name);
+#endif
 
   // Initialize kernel PCI driver
   zx_pci_init_arg_t* arg;
@@ -581,13 +563,13 @@ zx_status_t pci_init(ACPI_HANDLE object, acpi::UniquePtr<ACPI_DEVICE_INFO> info,
   status = get_pci_init_arg(manager->acpi(), object, &arg, &arg_size);
   if (status != ZX_OK) {
     LTRACEF("acpi: error %d in get_pci_init_arg\n", status);
-    return status;
+    return AE_ERROR;
   }
 
   status = zx_pci_init(arg, arg_size);
   if (status != ZX_OK) {
     LTRACEF("acpi: error %d in zx_pci_init\n", status);
-    return status;
+    return AE_ERROR;
   }
 
   free(arg);
