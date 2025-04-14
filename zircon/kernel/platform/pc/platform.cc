@@ -410,6 +410,8 @@ void platform_init(void) {
 
   platform_init_smp();
 
+#ifndef MISTOS_LEGACY_PC
+  // TODO (Herrera): Some old pcs are crashing when parsing the SMBIOS tables.
   pc_init_smbios();
 
   SmbiosWalkStructs([](smbios::SpecVersion version, const smbios::Header* h,
@@ -421,6 +423,7 @@ void platform_init(void) {
     }
     return ZX_OK;
   });
+#endif
   printf("smbios: manufacturer=\"%s\" product=\"%s\"\n", manufacturer, product);
 }
 

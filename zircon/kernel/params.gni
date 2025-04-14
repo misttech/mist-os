@@ -132,6 +132,11 @@ declare_args() {
   enable_lock_dep_tests = enable_lock_dep
 }
 
+declare_args() {
+  # Enable legacy PC support.
+  enable_legacy_pc = false
+}
+
 # These are all the places where kernel unittests and core-tests (and some
 # variants thereof) will be run in automation.
 kernel_test_environments = [
