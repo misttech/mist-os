@@ -23,8 +23,7 @@ use std::time::Duration;
 use zx::MonotonicDuration;
 use {
     fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_broker as fbroker,
-    fidl_fuchsia_power_observability as fobs, fidl_fuchsia_power_suspend as fsuspend,
-    fidl_fuchsia_power_system as fsystem,
+    fidl_fuchsia_power_suspend as fsuspend, fidl_fuchsia_power_system as fsystem,
 };
 
 const SUSPEND_DEVICE_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(10);
@@ -119,6 +118,7 @@ async fn main() -> Result<()> {
     let inspector = fuchsia_inspect::component::inspector();
     let _inspect_server_task =
         inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
+    fuchsia_inspect::component::serve_inspect_stats();
     fuchsia_inspect::component::health().set_starting_up();
 
     let config = Config::take_from_startup_handle();
@@ -148,8 +148,7 @@ async fn main() -> Result<()> {
     };
 
     let topology = connect_to_protocol::<fbroker::TopologyMarker>()?;
-    let sag_event_logger =
-        SagEventLogger::new(inspector.root().create_child(fobs::SUSPEND_EVENTS_NODE));
+    let sag_event_logger = SagEventLogger::new(inspector.root());
 
     let topology2 = topology.clone();
     let sag_event_logger2 = sag_event_logger.clone();
