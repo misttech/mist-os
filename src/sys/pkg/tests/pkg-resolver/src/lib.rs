@@ -562,7 +562,7 @@ where
                         handles.outgoing_dir.into_channel(),
                     )
                     .handle(|request| {
-                        local_child_out_dir.open3(
+                        local_child_out_dir.open(
                             scope.clone(),
                             vfs::path::Path::dot(),
                             flags,

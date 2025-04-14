@@ -149,7 +149,7 @@ mod tests {
         }
     }
     impl RemoteLike for MockDir {
-        fn open(
+        fn deprecated_open(
             self: Arc<Self>,
             _scope: ExecutionScope,
             _flags: fio::OpenFlags,
@@ -159,7 +159,7 @@ mod tests {
             self.0.inc();
         }
 
-        fn open3(
+        fn open(
             self: Arc<Self>,
             _scope: ExecutionScope,
             _relative_path: Path,

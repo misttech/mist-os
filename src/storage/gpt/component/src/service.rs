@@ -136,7 +136,7 @@ impl StorageHostService {
             )
             .unwrap();
 
-        self.export_dir.clone().open(
+        self.export_dir.clone().deprecated_open(
             self.scope.clone(),
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE

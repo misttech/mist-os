@@ -383,16 +383,6 @@ mod tests {
     impl Directory for MockDirectory {
         fn open(
             self: Arc<Self>,
-            _scope: ExecutionScope,
-            _flags: fio::OpenFlags,
-            _path: vfs::path::Path,
-            _server_end: fidl::endpoints::ServerEnd<fio::NodeMarker>,
-        ) {
-            unimplemented!("Not implemented!");
-        }
-
-        fn open3(
-            self: Arc<Self>,
             scope: ExecutionScope,
             _path: vfs::path::Path,
             flags: fio::Flags,

@@ -221,7 +221,7 @@ impl Node for Simple {
 }
 
 impl Directory for Simple {
-    fn open(
+    fn deprecated_open(
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
@@ -233,7 +233,7 @@ impl Directory for Simple {
             .handle(|object_request| self.open_impl(scope, path, flags, object_request));
     }
 
-    fn open3(
+    fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: Path,
@@ -458,7 +458,12 @@ mod tests {
             let (proxy, server_end) = create_proxy::<fio::NodeMarker>();
             let flags = fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DESCRIBE;
             let path = Path::validate_and_split(path).unwrap();
-            dir.clone().open(scope.clone(), flags, path, server_end.into_channel().into());
+            dir.clone().deprecated_open(
+                scope.clone(),
+                flags,
+                path,
+                server_end.into_channel().into(),
+            );
             assert_event!(proxy, fio::NodeEvent::OnOpen_ { .. }, {});
 
             assert_eq!(expectation, path_mutex.lock().take());

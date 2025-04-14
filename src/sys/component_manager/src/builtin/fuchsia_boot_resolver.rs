@@ -530,7 +530,7 @@ mod tests {
         const FLAGS: fio::Flags = fio::PERM_READABLE.union(fio::PERM_EXECUTABLE);
         FLAGS
             .to_object_request(server.into_channel())
-            .handle(|request| root.open3(fs_scope.clone(), VfsPath::dot(), FLAGS, request));
+            .handle(|request| root.open(fs_scope.clone(), VfsPath::dot(), FLAGS, request));
         let vfs_task = Task::spawn(async move { fs_scope.wait().await });
         (vfs_task, client)
     }

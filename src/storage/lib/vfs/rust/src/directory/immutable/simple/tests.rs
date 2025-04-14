@@ -105,7 +105,7 @@ fn open_empty_directory_with_describe() {
         let (root, server_end) = create_proxy::<fio::DirectoryMarker>();
 
         let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE;
-        server.open(scope, flags, Path::dot(), server_end.into_channel().into());
+        server.deprecated_open(scope, flags, Path::dot(), server_end.into_channel().into());
 
         assert_event!(root, fio::DirectoryEvent::OnOpen_ { s, info }, {
             assert_eq!(s, Status::OK.into_raw());
@@ -1107,7 +1107,7 @@ fn in_tree_open() {
         let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
 
         let flags = fio::OpenFlags::RIGHT_READABLE;
-        ssh.open(scope, flags, Path::dot(), server_end.into_channel().into());
+        ssh.deprecated_open(scope, flags, Path::dot(), server_end.into_channel().into());
 
         let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE;
         open_as_vmo_file_assert_content!(&proxy, flags, "sshd_config", "# Empty");
@@ -1135,7 +1135,7 @@ fn in_tree_open_path_one_component() {
 
         let flags = fio::OpenFlags::RIGHT_READABLE;
         let path = Path::validate_and_split("ssh").unwrap();
-        etc.open(scope, flags, path, server_end.into_channel().into());
+        etc.deprecated_open(scope, flags, path, server_end.into_channel().into());
 
         let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE;
         open_as_vmo_file_assert_content!(&proxy, flags, "sshd_config", "# Empty");
@@ -1163,7 +1163,7 @@ fn in_tree_open_path_two_components() {
 
         let flags = fio::OpenFlags::RIGHT_READABLE;
         let path = Path::validate_and_split("ssh/sshd_config").unwrap();
-        etc.open(scope, flags, path, server_end.into_channel().into());
+        etc.deprecated_open(scope, flags, path, server_end.into_channel().into());
 
         assert_read!(&proxy, "# Empty");
         assert_close!(proxy);
@@ -1505,7 +1505,7 @@ fn watch_addition_with_two_scopes() {
                 let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
 
                 let flags = fio::OpenFlags::RIGHT_READABLE;
-                server.open(scope, flags, Path::dot(), server_end.into_channel().into());
+                server.deprecated_open(scope, flags, Path::dot(), server_end.into_channel().into());
                 proxy
             }
 

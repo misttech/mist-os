@@ -56,7 +56,7 @@ async fn run_mocks(
     };
 
     let scope = ExecutionScope::new();
-    export.open(
+    export.deprecated_open(
         scope.clone(),
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
         Path::dot(),

@@ -220,7 +220,7 @@ async fn test_read_link_error() {
     }
 
     impl RemoteLike for ErrorSymlink {
-        fn open(
+        fn deprecated_open(
             self: Arc<Self>,
             _scope: ExecutionScope,
             _flags: fio::OpenFlags,
@@ -230,7 +230,7 @@ async fn test_read_link_error() {
             panic!("fuchsia.io/Directory.DeprecatedOpen should not be used in these tests.")
         }
 
-        fn open3(
+        fn open(
             self: Arc<Self>,
             scope: ExecutionScope,
             path: Path,

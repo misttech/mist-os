@@ -377,7 +377,7 @@ impl MockPackageResolverService {
 
                     let (dir_server, res) = self.resolve_response.lock().take().unwrap();
                     fio::PERM_READABLE.to_object_request(dir).handle(|request| {
-                        dir_server.open3(
+                        dir_server.open(
                             vfs::execution_scope::ExecutionScope::new(),
                             vfs::Path::dot(),
                             fio::PERM_READABLE,

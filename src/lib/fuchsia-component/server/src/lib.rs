@@ -485,7 +485,7 @@ impl<ServiceObjTy: ServiceObjTrait> ServiceFs<ServiceObjTy> {
     fn serve_connection_impl(&self, chan: fidl::endpoints::ServerEnd<fio::DirectoryMarker>) {
         self.dir
             .clone()
-            .open3(
+            .open(
                 self.scope.clone(),
                 Path::dot(),
                 Self::base_connection_flags(),

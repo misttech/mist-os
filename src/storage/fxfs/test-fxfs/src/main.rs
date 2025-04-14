@@ -391,7 +391,7 @@ async fn main() -> Result<(), Error> {
     let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
     flags
         .to_object_request(export_handle)
-        .handle(|object_request| out_dir.open3(scope.clone(), Path::dot(), flags, object_request));
+        .handle(|object_request| out_dir.open(scope.clone(), Path::dot(), flags, object_request));
     scope.wait().await;
 
     Ok(())

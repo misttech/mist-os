@@ -856,7 +856,7 @@ impl vfs::node::Node for FxDirectory {
 }
 
 impl VfsDirectory for FxDirectory {
-    fn open(
+    fn deprecated_open(
         self: Arc<Self>,
         _scope: ExecutionScope,
         flags: fio::OpenFlags,
@@ -918,7 +918,7 @@ impl VfsDirectory for FxDirectory {
         ));
     }
 
-    fn open3(
+    fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: Path,
@@ -926,12 +926,12 @@ impl VfsDirectory for FxDirectory {
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), zx::Status> {
         self.volume().scope().clone().spawn(object_request.take().handle_async(
-            async move |object_request| self.open3_async(scope, path, flags, object_request).await,
+            async move |object_request| self.open_async(scope, path, flags, object_request).await,
         ));
         Ok(())
     }
 
-    async fn open3_async(
+    async fn open_async(
         self: Arc<Self>,
         _scope: ExecutionScope,
         path: Path,

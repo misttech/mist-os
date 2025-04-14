@@ -80,7 +80,7 @@ impl OutDir {
             let dir = dir.clone();
             let object_request = FLAGS.to_object_request(server_end.into_channel());
             object_request.handle(|request| {
-                dir.open3(ExecutionScope::new(), vfs::Path::dot(), FLAGS, request)
+                dir.open(ExecutionScope::new(), vfs::Path::dot(), FLAGS, request)
             });
         })
     }

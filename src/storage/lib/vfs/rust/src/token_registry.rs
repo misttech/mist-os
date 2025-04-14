@@ -295,7 +295,7 @@ mod tests {
         }
 
         impl Directory for MockDirectory {
-            fn open(
+            fn deprecated_open(
                 self: Arc<Self>,
                 _scope: ExecutionScope,
                 _flags: fio::OpenFlags,
@@ -304,7 +304,7 @@ mod tests {
             ) {
             }
 
-            fn open3(
+            fn open(
                 self: Arc<Self>,
                 _scope: ExecutionScope,
                 _path: Path,

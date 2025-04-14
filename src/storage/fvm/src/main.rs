@@ -953,7 +953,7 @@ impl Component {
             | fio::PERM_WRITABLE
             | fio::PERM_EXECUTABLE;
         ObjectRequest::new(flags, &fio::Options::default(), outgoing_dir).handle(|request| {
-            self.export_dir.clone().open3(self.scope.clone(), Path::dot(), flags, request)
+            self.export_dir.clone().open(self.scope.clone(), Path::dot(), flags, request)
         });
         Ok(())
     }
@@ -1241,7 +1241,7 @@ impl Component {
                 | fio::PERM_WRITABLE
                 | fio::PERM_EXECUTABLE;
             ObjectRequest::new(flags, &fio::Options::default(), server_end)
-                .handle(|request| outgoing_dir.open3(volume_scope, Path::dot(), flags, request));
+                .handle(|request| outgoing_dir.open(volume_scope, Path::dot(), flags, request));
         } else {
             // Expose the volume as a block device.
             let outgoing_dir = vfs::directory::immutable::simple();
@@ -1280,7 +1280,7 @@ impl Component {
                 | fio::PERM_WRITABLE
                 | fio::PERM_EXECUTABLE;
             ObjectRequest::new(flags, &fio::Options::default(), server_end)
-                .handle(|request| outgoing_dir.open3(volume_scope, Path::dot(), flags, request));
+                .handle(|request| outgoing_dir.open(volume_scope, Path::dot(), flags, request));
         }
 
         Ok(())

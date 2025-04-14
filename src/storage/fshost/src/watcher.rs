@@ -264,7 +264,7 @@ mod tests {
 
         let (client, server) = fidl::endpoints::create_endpoints();
         let scope = ExecutionScope::new();
-        class_block_and_nand.open(
+        class_block_and_nand.deprecated_open(
             scope.clone(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             Path::dot(),
@@ -277,7 +277,7 @@ mod tests {
         }
 
         let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        partitions_dir.clone().open(
+        partitions_dir.clone().deprecated_open(
             scope.clone(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             Path::dot(),
@@ -355,7 +355,7 @@ mod tests {
 
         let (client, server) = fidl::endpoints::create_endpoints();
         let scope = ExecutionScope::new();
-        class_block_and_nand.open(
+        class_block_and_nand.deprecated_open(
             scope.clone(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             Path::dot(),

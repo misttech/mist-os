@@ -679,7 +679,6 @@ impl StorageAdmin {
 #[cfg(test)]
 mod tests {
     use super::{DirType, StorageAdmin, StorageError};
-    use fidl::endpoints::ServerEnd;
     use fidl_fuchsia_io as fio;
     use std::fmt::Formatter;
     use std::path::PathBuf;
@@ -1048,16 +1047,6 @@ mod tests {
 
     impl Directory for FakeDir {
         fn open(
-            self: Arc<Self>,
-            _scope: ExecutionScope,
-            _flags: fio::OpenFlags,
-            _path: Path,
-            _server_end: ServerEnd<fio::NodeMarker>,
-        ) {
-            panic!("fuchsia.io/Directory.DeprecatedOpen should not be called from these tests")
-        }
-
-        fn open3(
             self: Arc<Self>,
             scope: ExecutionScope,
             _path: Path,

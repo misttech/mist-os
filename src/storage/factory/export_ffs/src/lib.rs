@@ -434,7 +434,7 @@ mod tests {
         };
         let (dir_proxy, dir_server) = endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
-        dir.open(
+        dir.deprecated_open(
             scope,
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
@@ -460,7 +460,7 @@ mod tests {
         };
         let (dir_proxy, dir_server) = endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
-        dir.open(
+        dir.deprecated_open(
             scope,
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE

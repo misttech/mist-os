@@ -464,7 +464,7 @@ mod tests {
             }
         }
         impl RemoteLike for MockDir {
-            fn open(
+            fn deprecated_open(
                 self: Arc<Self>,
                 _scope: ExecutionScope,
                 _flags: fio::OpenFlags,
@@ -474,7 +474,7 @@ mod tests {
                 panic!("fuchsia.io/Directory.DeprecatedOpen should not be called from these tests")
             }
 
-            fn open3(
+            fn open(
                 self: Arc<Self>,
                 _scope: ExecutionScope,
                 relative_path: path::Path,
@@ -531,7 +531,7 @@ mod tests {
             }
         }
         impl RemoteLike for MockDir {
-            fn open(
+            fn deprecated_open(
                 self: Arc<Self>,
                 _scope: ExecutionScope,
                 _flags: fio::OpenFlags,
@@ -541,7 +541,7 @@ mod tests {
                 panic!("fuchsia.io/Directory.DeprecatedOpen should not be called from these tests")
             }
 
-            fn open3(
+            fn open(
                 self: Arc<Self>,
                 _scope: ExecutionScope,
                 relative_path: path::Path,
