@@ -154,37 +154,9 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&r.testrunnerOptions.LLVMProfdataPath, "llvm-profdata", "", "Optional path to a llvm-profdata binary to use for merging profiles on the host in between tests.")
 }
 
-func (r *RunCommand) setupFFX(ctx context.Context, invokeMode ffxutil.FFXInvokeMode) (*ffxutil.FFXInstance, func(), error) {
+func setupFFXDaemon(ctx context.Context, ffx *ffxutil.FFXInstance) (*ffxutil.FFXInstance, func(), error) {
 	var cleanup func()
-	if r.ffxPath == "" {
-		return nil, cleanup, fmt.Errorf("ffx path must be provided with the -ffx flag.")
-	}
 	ffxOutputsDir := filepath.Join(os.Getenv(testrunnerconstants.TestOutDirEnvKey), "ffx_outputs")
-
-	extraConfigs := ffxutil.ConfigSettings{
-		Level: "global",
-		Settings: map[string]any{
-			"daemon.autostart":              false,
-			"discovery.mdns.enabled":        false,
-			"ffx.target-list.local-connect": true,
-		},
-	}
-	// By default, the ssh.priv and ssh.pub values are in $HOME, which had earlier been configured to be a tmpdir.
-	// But in case we're in strict mode, let's be explicit about the path. If there is no pub key, when we will
-	// let the FFXInstance specify the default
-	sshPriv := filepath.Join(os.Getenv("HOME"), ".ssh", "fuchsia_ed25519")
-	sshKeys := ffxutil.SSHInfo{SshPriv: sshPriv}
-	ffx, err := ffxutil.NewFFXInstance(ctx, r.ffxPath, "", []string{}, "", &sshKeys, ffxOutputsDir, invokeMode, extraConfigs)
-	if err != nil {
-		return nil, cleanup, err
-	}
-	stdout, stderr, flush := botanist.NewStdioWriters(ctx, "ffx")
-	defer flush()
-	ffx.SetStdoutStderr(stdout, stderr)
-	if err := ffx.ConfigEnv(ctx); err != nil {
-		return ffx, cleanup, err
-	}
-
 	daemonLog, err := osmisc.CreateFile(filepath.Join(ffxOutputsDir, "daemon.log"))
 	if err != nil {
 		return ffx, cleanup, err
@@ -225,8 +197,46 @@ func (r *RunCommand) setupFFX(ctx context.Context, invokeMode ffxutil.FFXInvokeM
 			logger.Errorf(ctx, "failed to close ffx daemon log: %s", err)
 		}
 	}
-
 	return ffx, cleanup, ffx.WaitForDaemon(ctx)
+}
+
+// This returns an `ffx` instance, a cleanup function (dispatched via `defer`), and an error.
+func (r *RunCommand) setupFFX(ctx context.Context, invokeMode ffxutil.FFXInvokeMode) (*ffxutil.FFXInstance, func(), error) {
+	if r.ffxPath == "" {
+		return nil, nil, fmt.Errorf("ffx path must be provided with the -ffx flag.")
+	}
+	ffxOutputsDir := filepath.Join(os.Getenv(testrunnerconstants.TestOutDirEnvKey), "ffx_outputs")
+
+	extraConfigs := ffxutil.ConfigSettings{
+		Level: "global",
+		Settings: map[string]any{
+			"daemon.autostart":              false,
+			"discovery.mdns.enabled":        false,
+			"ffx.target-list.local-connect": true,
+		},
+	}
+	// By default, the ssh.priv and ssh.pub values are in $HOME, which had earlier been configured to be a tmpdir.
+	// But in case we're in strict mode, let's be explicit about the path. If there is no pub key, when we will
+	// let the FFXInstance specify the default
+	sshPriv := filepath.Join(os.Getenv("HOME"), ".ssh", "fuchsia_ed25519")
+	sshKeys := ffxutil.SSHInfo{SshPriv: sshPriv}
+	ffx, err := ffxutil.NewFFXInstance(ctx, r.ffxPath, "", []string{}, "", &sshKeys, ffxOutputsDir, invokeMode, extraConfigs)
+	if err != nil {
+		return nil, nil, err
+	}
+	stdout, stderr, flush := botanist.NewStdioWriters(ctx, "ffx")
+	defer flush()
+	ffx.SetStdoutStderr(stdout, stderr)
+	if err := ffx.ConfigEnv(ctx); err != nil {
+		return ffx, nil, err
+	}
+	if invokeMode == ffxutil.UseFFXStrict {
+		// It should not be necessary to start the daemon when running --strict. Generally this
+		// shouldn't be this file's responsibility anyway, but it's the next best thing.
+		return ffx, nil, nil
+	} else {
+		return setupFFXDaemon(ctx, ffx)
+	}
 }
 
 func (r *RunCommand) setupSerialLog(ctx context.Context, eg *errgroup.Group, fuchsiaTargets []targets.FuchsiaTarget) error {
