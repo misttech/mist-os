@@ -1262,18 +1262,21 @@ class VmCowPages final : public VmHierarchyBase,
                                               AttributionCounts* count) const TA_REQ(lock());
 
   // Searches for the content for the page in |this| at |offset|. If the offset is already
-  // populated in |this| then that page is returned with the |owner| set to |this|, otherwise the
+  // populated in |this| then that page is returned with the |owner| unset, otherwise the
   // parent hierarchy is searched for any content. The result could be used to initialize a commit,
   // or compare an existing commit with the original. The initial content is a VMPLCursor and may
   // be invalid if there was no explicit initial content. How to interpret an absence of content,
   // whether it is zero or otherwise, is left up to the caller.
   //
   // If an ancestor has a committed page which corresponds to |offset|, returns a cursor with
-  // |current()| as that page as well as the VmCowPages and offset which own the page. If no
-  // ancestor has a committed page for the offset, returns a cursor with a |current()| of nullptr as
-  // well as the VmCowPages/offset which need to be queried to populate the page.
+  // |current()| as that page as well as a LockedPtr to the VmCowPages and offset which own the
+  // page. If no ancestor has a committed page for the offset, returns a cursor with a |current()|
+  // of nullptr as well as the VmCowPages/offset which need to be queried to populate the page. If
+  // |this| needs to be queried to populate the page, |owner| is not set, otherwise it is set to the
+  // ancestor that owns the page. The reason being that |this| will already be externally locked by
+  // the caller, whereas an ancestor needs to be locked inside this function.
   //
-  // The returned |visible_end| represents the size of the range in |owner| for which it can be
+  // The returned |visible_end| represents the size of the range in the owner for which it can be
   // assumed that no child has content for, although for which the content might be in yet a higher
   // up parent. This will always be a subset of the provided |max_owner_length|, which serves as a
   // bound for the calculation and so passing in a smaller |max_owner_length| can sometimes be more
@@ -1281,7 +1284,7 @@ class VmCowPages final : public VmHierarchyBase,
   // It is an error for the |max_owner_length| to be < PAGE_SIZE.
   struct PageLookup {
     VMPLCursor cursor;
-    VmCowPages* owner = nullptr;
+    LockedPtr owner;
     uint64_t owner_offset = 0;
     uint64_t visible_end = 0;
   };
@@ -1839,6 +1842,9 @@ class VmCowPages::LookupCursor {
     return target_->lock_ref();
   }
 
+  LookupCursor(LookupCursor& other) = delete;
+  LookupCursor(LookupCursor&& other) = default;
+
  private:
   LookupCursor(VmCowPages* target, VmCowRange range)
       : target_(target),
@@ -1881,7 +1887,8 @@ class VmCowPages::LookupCursor {
       // content, or if no parent keep returning empty slots. Unfortunately once the cursor returns
       // a nullptr we cannot know where the next content might be. To make things simpler we just
       // invalidate owner if we hit this case and re-walk from the bottom again.
-      if (!owner_cursor_ || (owner_cursor_->IsEmpty() && owner()->parent_)) {
+      if (!owner_cursor_ ||
+          (owner_cursor_->IsEmpty() && owner_info_.owner.locked_or(target_).parent_)) {
         InvalidateCursor();
       }
     }
@@ -1899,11 +1906,14 @@ class VmCowPages::LookupCursor {
   void EstablishCursor() TA_REQ(lock());
 
   // Returns true if target_ is the owner.
-  bool TargetIsOwner() const { return owner_info_.owner == target_; }
+  bool TargetIsOwner() const { return !owner_info_.owner; }
 
   // Invalidates the owner, so that the next page will have to perform the lookup again, walking up
   // the hierarchy if needed.
-  void InvalidateCursor() { is_valid_ = false; }
+  void InvalidateCursor() {
+    owner_info_.owner.release();
+    is_valid_ = false;
+  }
 
   // Helpers for querying the state of the cursor.
   bool CursorIsPage() const { return owner_cursor_ && owner_cursor_->IsPage(); }
@@ -1917,7 +1927,8 @@ class VmCowPages::LookupCursor {
   // zero interval.
   bool CursorIsInIntervalZero() const TA_REQ(lock()) {
     return CursorIsIntervalZero() ||
-           owner()->page_list_.IsOffsetInZeroInterval(owner_info_.owner_offset);
+           owner_info_.owner.locked_or(target_).page_list_.IsOffsetInZeroInterval(
+               owner_info_.owner_offset);
   }
 
   // The cursor can be considered to have content of zero if either it points at a zero marker, or
@@ -1977,10 +1988,6 @@ class VmCowPages::LookupCursor {
   // Helpers for generating read or dirty requests for the given maximal range.
   zx_status_t ReadRequest(uint max_request_pages, PageRequest* page_request) TA_REQ(lock());
   zx_status_t DirtyRequest(uint max_request_pages, LazyPageRequest* page_request) TA_REQ(lock());
-
-  // If we held lock(), then since owner_ is from the same hierarchy as the target then we must also
-  // hold its lock.
-  VmCowPages* owner() const TA_REQ(lock()) TA_ASSERT(owner()->lock()) { return owner_info_.owner; }
 
   // Target always exists. This is provided in the constructor and will always be non-null.
   VmCowPages* const target_;
