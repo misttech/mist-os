@@ -2620,7 +2620,7 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
 
   // For efficiently we would like to use the slot we already have in our cursor if possible,
   // however that can only be done if all of the following hold:
-  //  * owner_ == target_ - If not true then we do not even have a cursor (and hence slot) for where
+  //  * TargetIsOwner() - If not true then we do not even have a cursor (and hence slot) for where
   //    the insertion is happening.
   //  * owner_pl_cursor_.current() != nullptr - Must be an actual node and slot already allocated,
   //    it is just Empty()
@@ -2674,7 +2674,7 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
   // Need to increment the cursor, but we have also potentially modified the page lists in the
   // process of inserting the page.
   if (TargetIsOwner()) {
-    // In the case of owner_ == target_ we may have create a node and need to establish a cursor.
+    // In the case of TargetIsOwner() we may have to create a node and need to establish a cursor.
     // However, if we already had a node, i.e. the cursor was valid, then it would have had the page
     // inserted into it.
     if (!owner_info_.cursor.current()) {
@@ -2686,7 +2686,7 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
       IncrementCursor();
     }
   } else {
-    // If owner_ != target_ then owner_ page list will not have been modified, so safe to just
+    // If !TargetIsOwner() then the owner's page list will not have been modified, so safe to just
     // increment.
     IncrementCursor();
   }
@@ -2730,7 +2730,7 @@ zx_status_t VmCowPages::LookupCursor::ReadRequest(uint max_request_pages,
   if (!TargetIsOwner()) {
     DEBUG_ASSERT(owner_info_.visible_end > offset_);
     // Limit the request by the number of pages that are actually visible from the target_ to
-    // owner_
+    // owner.
     request_size = ktl::min(request_size, owner_info_.visible_end - offset_);
   }
   // Limit |request_size| to the first page visible in the page owner to avoid requesting pages
@@ -2767,19 +2767,18 @@ zx_status_t VmCowPages::LookupCursor::ReadRequest(uint max_request_pages,
 zx_status_t VmCowPages::LookupCursor::DirtyRequest(uint max_request_pages,
                                                    LazyPageRequest* page_request) {
   // Dirty requests, unlike read requests, happen directly against the target, and not the owner.
-  // This is because to make something dirty you must own it, i.e. target_ is already equal to
-  // owner_. Unfortunately we cannot explicitly check for target_ == owner_, since owner_ doubles as
-  // tracking for whether the cursor is valid, and it may have been made invalid just prior to
+  // This is because to make something dirty you must own it. Simply checking for TargetIsOwner() is
+  // insufficient, since the cursor may have been made invalid (clearing the owner) just prior to
   // generating this dirty request, and we do not otherwise need the cursor here.
-  // Instead we validate that we have no parent, and that we have a page source.
-  DEBUG_ASSERT(TargetIsOwner() || !IsCursorValid());
+  // So we also validate that we have no parent, and that we have a page source.
+  DEBUG_ASSERT(TargetIsOwner());
   DEBUG_ASSERT(!target_->parent_);
   DEBUG_ASSERT(target_->page_source_);
   DEBUG_ASSERT(max_request_pages > 0);
   DEBUG_ASSERT(offset_ + PAGE_SIZE * max_request_pages <= end_offset_);
 
-  // As we know target_==owner_ there is no need to trim the requested range to any kind of visible
-  // range, so just attempt to dirty the entire range.
+  // As we know target_ is the owner there is no need to trim the requested range to any kind of
+  // visible range, so just attempt to dirty the entire range.
   uint64_t dirty_len = 0;
   zx_status_t status = target_->PrepareForWriteLocked(
       VmCowRange(offset_, PAGE_SIZE * max_request_pages), page_request, &dirty_len);
@@ -2860,7 +2859,7 @@ uint VmCowPages::LookupCursor::IfExistPages(bool will_write, uint max_pages, pad
   }
 
   // Trim max pages to the visible length of the current owner. This only has an effect when
-  // target_ != owner_ as otherwise the visible_end_ is the same as end_offset_ and we already
+  // target_ is not the owner as otherwise the visible_end is the same as end_offset_ and we already
   // validated that we are within that range.
   if (!TargetIsOwner()) {
     max_pages =
