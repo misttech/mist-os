@@ -2,25 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::logs::utils::Listener;
+use crate::puppet::PuppetProxyExt;
 use crate::{test_topology, utils};
 use diagnostics_reader::ArchiveReader;
 use fidl_fuchsia_diagnostics_types::Severity;
-use futures::StreamExt;
+use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMarker, LogMessage, LogProxy};
+use futures::channel::mpsc;
+use futures::{Stream, StreamExt};
 use log::info;
-use {fidl_fuchsia_archivist_test as ftest, fuchsia_async as fasync};
-
-#[cfg(fuchsia_api_level_at_least = "PLATFORM")]
 use {
-    crate::logs::utils as syslog_listener,
-    crate::{logs::utils::Listener, puppet::PuppetProxyExt},
-    fidl_fuchsia_logger::LogLevelFilter,
-    fidl_fuchsia_logger::{LogFilterOptions, LogMarker, LogMessage, LogProxy},
-    futures::{channel::mpsc, Stream},
+    fidl_fuchsia_archivist_test as ftest, fuchsia_async as fasync,
+    fuchsia_syslog_listener as syslog_listener,
 };
 
 const PUPPET_NAME: &str = "puppet";
 
-#[cfg(fuchsia_api_level_at_least = "PLATFORM")]
 fn run_listener(tag: &str, proxy: LogProxy) -> impl Stream<Item = LogMessage> {
     let options = LogFilterOptions {
         filter_by_pid: false,
@@ -43,7 +40,6 @@ fn run_listener(tag: &str, proxy: LogProxy) -> impl Stream<Item = LogMessage> {
     recv_logs
 }
 
-#[cfg(fuchsia_api_level_at_least = "PLATFORM")]
 #[fuchsia::test]
 async fn listen_for_syslog() {
     let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
@@ -76,7 +72,6 @@ async fn listen_for_syslog() {
     assert_eq!(logs[1].msg, "log crate: 20");
 }
 
-#[cfg(fuchsia_api_level_at_least = "PLATFORM")]
 #[fuchsia::test]
 async fn listen_for_klog() {
     let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
