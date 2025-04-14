@@ -7,7 +7,7 @@ group("network-device") {
 
   deps = [
     "cpp",
-    "rust",
+    #"rust",
   ]
 }
 
@@ -16,6 +16,6 @@ group("tests") {
 
   deps = [
     "cpp:tests",
-    "rust:tests",
+    #"rust:tests",
   ]
 }

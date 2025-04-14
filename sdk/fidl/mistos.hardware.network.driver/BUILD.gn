@@ -1,0 +1,26 @@
+# Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/fidl/fidl.gni")
+
+fidl("mistos.hardware.network.driver") {
+  # TODO(https://fxbug.dev/369404264): Stabilize this API.
+  sources = [
+    "network-device.fidl",
+    "network-mac.fidl",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.net",
+    "//sdk/fidl/mistos.hardware.network",
+    "//zircon/vdso/zx",
+  ]
+  contains_drivers = true
+  enable_banjo = true
+
+  excluded_checks = [
+    "wrong-prefix-for-platform-source-library",
+    "invalid-copyright-for-platform-source-library",
+  ]
+}

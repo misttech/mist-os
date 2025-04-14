@@ -6,9 +6,9 @@
 #ifndef VENDOR_MISTTECH_SRC_CONNECTIVITY_LIB_NETWORK_DEVICE_CPP_NETWORK_DEVICE_CLIENT_H_
 #define VENDOR_MISTTECH_SRC_CONNECTIVITY_LIB_NETWORK_DEVICE_CPP_NETWORK_DEVICE_CLIENT_H_
 
-#include <fuchsia/hardware/network/c/banjo.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/stdcompat/span.h>
+#include <mistos/hardware/network/c/banjo.h>
 
 #include <fbl/macros.h>
 

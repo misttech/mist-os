@@ -6,11 +6,11 @@
 #ifndef SRC_CONNECTIVITY_ETHERNET_DRIVERS_VIRTIO_NETDEVICE_H_
 #define SRC_CONNECTIVITY_ETHERNET_DRIVERS_VIRTIO_NETDEVICE_H_
 
-#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <fuchsia/net/c/banjo.h>
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>
 #include <lib/zircon-internal/thread_annotations.h>
+#include <mistos/hardware/network/driver/cpp/banjo.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>

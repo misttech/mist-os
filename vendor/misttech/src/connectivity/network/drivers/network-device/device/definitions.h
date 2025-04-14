@@ -5,7 +5,7 @@
 #ifndef SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_DEFINITIONS_H_
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_DEFINITIONS_H_
 
-#include <fuchsia/hardware/network/driver/c/banjo.h>
+#include <mistos/hardware/network/driver/c/banjo.h>
 #include <zircon/types.h>
 
 #include <array>

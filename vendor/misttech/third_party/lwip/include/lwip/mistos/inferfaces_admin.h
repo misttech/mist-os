@@ -5,7 +5,7 @@
 #ifndef VENDOR_MISTTECH_THIRD_PARTY_LWIP_INCLUDE_LWIP_MISTOS_INFERFACES_ADMIN_H_
 #define VENDOR_MISTTECH_THIRD_PARTY_LWIP_INCLUDE_LWIP_MISTOS_INFERFACES_ADMIN_H_
 
-#include <fuchsia/hardware/network/driver/cpp/banjo.h>
+#include <mistos/hardware/network/driver/cpp/banjo.h>
 
 #include <lwip/netif.h>
 

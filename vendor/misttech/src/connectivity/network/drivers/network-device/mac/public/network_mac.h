@@ -1,3 +1,4 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -5,11 +6,9 @@
 #ifndef SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_MAC_PUBLIC_NETWORK_MAC_H_
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_MAC_PUBLIC_NETWORK_MAC_H_
 
-// #include <fidl/fuchsia.hardware.network.driver/cpp/driver/wire.h>
-// #include <fidl/fuchsia.hardware.network/cpp/wire.h>
-#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <lib/fit/function.h>
 #include <lib/zx/result.h>
+#include <mistos/hardware/network/driver/cpp/banjo.h>
 
 #include <fbl/alloc_checker.h>
 

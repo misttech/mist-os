@@ -1,13 +1,10 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #ifndef SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_MAC_MAC_INTERFACE_H_
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_MAC_MAC_INTERFACE_H_
-
-// #include <fidl/fuchsia.hardware.network.driver/cpp/driver/wire.h>
-// #include <fidl/fuchsia.hardware.network.driver/cpp/fidl.h>
-// #include <fidl/fuchsia.hardware.network/cpp/wire.h>
 
 #include <algorithm>
 #include <unordered_set>
@@ -25,15 +22,12 @@ namespace network {
 
 using MacAddress = mac_address_t;
 
-// namespace netdev = fuchsia_hardware_network;
-// namespace netdriver = fuchsia_hardware_network_driver;
-
 namespace internal {
 
 class MacClientInstance;
 
 // Implements the API translation between MacAddr (banjo) and
-// fuchsia.hardware.network.MacAddressing (FIDL).
+// mistos.hardware.network.MacAddressing (FIDL).
 class MacInterface : public ::network::MacAddrDeviceInterface {
  public:
   static void Create(ddk::MacAddrProtocolClient parent, OnCreated&& on_created);

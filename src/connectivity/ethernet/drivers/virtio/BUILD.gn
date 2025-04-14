@@ -9,7 +9,7 @@ source_set("virtio_netdevice_lib") {
     "netdevice.h",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
+    "//sdk/fidl/mistos.hardware.network.driver:mistos.hardware.network.driver_banjo_cpp",
     "//sdk/fidl/fuchsia.net:fuchsia.net_banjo_cpp",
     "//src/connectivity/lib/network-device/buffer_descriptor",
     "//src/devices/bus/lib/virtio",

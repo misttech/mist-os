@@ -11,7 +11,7 @@ source_set("mac") {
   ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
+    "//sdk/fidl/mistos.hardware.network.driver:mistos.hardware.network.driver_banjo_cpp",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
   ]

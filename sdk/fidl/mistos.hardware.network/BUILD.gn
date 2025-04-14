@@ -1,0 +1,32 @@
+# Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
+# Copyright 2020 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/fidl/fidl.gni")
+
+fidl("mistos.hardware.network") {
+  sources = [
+    "device.fidl",
+    "diagnostics.fidl",
+    "frames.fidl",
+    "instance.fidl",
+    "mac.fidl",
+    "overview.fidl",
+    "port.fidl",
+    "session.fidl",
+  ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.net",
+    "//zircon/vdso/zx",
+  ]
+
+  enable_hlcpp = true
+  enable_banjo = true
+
+  excluded_checks = [
+    "wrong-prefix-for-platform-source-library",
+    "invalid-copyright-for-platform-source-library",
+  ]
+}

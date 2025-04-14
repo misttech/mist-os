@@ -15,8 +15,8 @@ source_set("cpp") {
   deps = [ "//vendor/misttech/zircon/kernel/lib/mistos/util:headers" ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
+    "//sdk/fidl/mistos.hardware.network:mistos.hardware.network_banjo_cpp",
+    "//sdk/fidl/mistos.hardware.network.driver:mistos.hardware.network.driver_banjo_cpp",
 
     #"//sdk/lib/async:async-cpp",
     #"//sdk/lib/async-default",

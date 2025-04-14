@@ -1,0 +1,17 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library mistos.hardware.network;
+
+
+/// Provides two way communications between device and upper layers to exchange
+/// device health information.
+//@available(added=HEAD)
+closed protocol Diagnostics {
+    /// Requests that the device produces debugging information in the system
+    /// logs.
+    ///
+    /// The call returns once device debug information has been produced.
+    strict LogDebugInfoToSyslog() -> ();
+};

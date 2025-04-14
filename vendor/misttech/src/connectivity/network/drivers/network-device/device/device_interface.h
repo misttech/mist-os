@@ -6,16 +6,17 @@
 #ifndef SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_DEVICE_INTERFACE_H_
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_DEVICE_INTERFACE_H_
 
-#include <fuchsia/hardware/network/cpp/banjo.h>
-#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <lib/fit/function.h>
+#include <mistos/hardware/network/cpp/banjo.h>
+#include <mistos/hardware/network/driver/cpp/banjo.h>
+
+#include <object/fifo_dispatcher.h>
 
 #include "data_structs.h"
 #include "definitions.h"
 #include "device_port.h"
 #include "port_watcher.h"
 #include "public/locks.h"
-#include <object/fifo_dispatcher.h>
 
 namespace network::testing {
 class NetworkDeviceTest;

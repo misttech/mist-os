@@ -1,3 +1,4 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -74,10 +75,10 @@
 /// - (4) When the data is successfully transmitted, `NetworkDeviceImpl` marks
 /// the transmission as complete referencing the buffer's identifier to
 /// [`NetworkDeviceIfc.CompleteTx`].
-@available(added=HEAD)
-library fuchsia.hardware.network.driver;
+//@available(added=HEAD)
+library mistos.hardware.network.driver;
 
-using fuchsia.hardware.network;
+using mistos.hardware.network;
 using zx;
 
 /// Maximum number of disjoint parts a buffer may have.
@@ -125,7 +126,7 @@ type BufferRegion = struct {
 /// Metadata associated with a [`TxBuffer`] or an [`RxBuffer`].
 type BufferMetadata = struct {
     /// Destination or source port identifier for this buffer.
-    port fuchsia.hardware.network.BasePortId;
+    port mistos.hardware.network.BasePortId;
     /// Frame tx or rx flags, as defined in
     /// [`fuchsia.hardware.network/RxFlags`],
     /// [`fuchsia.hardware.network/TxFlags`], and
@@ -133,7 +134,7 @@ type BufferMetadata = struct {
     flags uint32;
     /// Type of frame contained in this buffer, as defined in
     /// [`fuchsia.hardware.network/FrameType`].
-    frame_type fuchsia.hardware.network.FrameType;
+    frame_type mistos.hardware.network.FrameType;
 };
 
 /// A transmit buffer containing a single frame.
@@ -223,7 +224,7 @@ closed protocol NetworkPort {
     ///
     /// - response `info` port information.
     strict GetInfo() -> (struct {
-        info fuchsia.hardware.network.PortBaseInfo;
+        info mistos.hardware.network.PortBaseInfo;
     });
     /// Gets operational status of the port.
     ///
@@ -232,7 +233,7 @@ closed protocol NetworkPort {
     ///
     /// - response `status` snapshot of port's operational status.
     strict GetStatus() -> (struct {
-        status fuchsia.hardware.network.PortStatus;
+        status mistos.hardware.network.PortStatus;
     });
     /// Notifies the port that there are sessions interested in it.
     ///
@@ -301,8 +302,8 @@ closed protocol NetworkDeviceIfc {
     /// + request `id` port identifier.
     /// + request `new_status` new port's status.
     strict PortStatusChanged(struct {
-        id fuchsia.hardware.network.BasePortId;
-        new_status fuchsia.hardware.network.PortStatus;
+        id mistos.hardware.network.BasePortId;
+        new_status mistos.hardware.network.PortStatus;
     });
     /// Instantiates a new port with `id`.
     ///
@@ -317,7 +318,7 @@ closed protocol NetworkDeviceIfc {
     /// + request `port` handle to network port implementation.
     @async
     strict AddPort(resource struct {
-        id fuchsia.hardware.network.BasePortId;
+        id mistos.hardware.network.BasePortId;
         port client_end:NetworkPort;
     }) -> (struct {
         status zx.Status;
@@ -329,7 +330,7 @@ closed protocol NetworkDeviceIfc {
     ///
     /// + request `id` removed port identifier.
     strict RemovePort(struct {
-        id fuchsia.hardware.network.BasePortId;
+        id mistos.hardware.network.BasePortId;
     });
     /// Notifies interface of incoming rx data, contained in [`RxBuffer`].
     ///
@@ -384,7 +385,7 @@ closed protocol NetworkDeviceIfc {
     /// Note that this is a one-way method and flow-control is enforced via the
     /// regular rx space -> rx completion flow.
     strict DelegateRxLease(resource struct {
-        delegated fuchsia.hardware.network.DelegatedRxLease;
+        delegated mistos.hardware.network.DelegatedRxLease;
     });
 };
 
@@ -463,7 +464,7 @@ type DeviceImplInfo = table {
     /// semantic acceleration features described by `RxAcceleration`. Position
     /// `n` of `rx_accel` conveys the meaning of the `RX_ACCEL_n` flag.
     /// Required.
-    12: rx_accel vector<fuchsia.hardware.network.RxAcceleration>:MAX;
+    12: rx_accel vector<mistos.hardware.network.RxAcceleration>:MAX;
     /// Available tx acceleration flags for this device, as defined in
     /// [`fuchsia.hardware.network/TxAcceleration`].
     ///
@@ -471,7 +472,7 @@ type DeviceImplInfo = table {
     /// semantic acceleration features described by `TxAcceleration`. Position
     /// `n` of `tx_accel` conveys the meaning of the `TX_ACCEL_n` flag.
     /// Required.
-    13: tx_accel vector<fuchsia.hardware.network.TxAcceleration>:MAX;
+    13: tx_accel vector<mistos.hardware.network.TxAcceleration>:MAX;
 };
 
 /// The maximum number of `TxBuffer` structs that could be sent in a single FIDL
@@ -611,7 +612,7 @@ closed protocol NetworkDeviceImpl {
     @async
     strict PrepareVmo(resource struct {
         id VmoId;
-        vmo zx.Handle:VMO;
+        vmo vector<byte>:1;
     }) -> (struct {
         s zx.Status;
     });

@@ -5,15 +5,11 @@
 
 #include "mac_interface.h"
 
-// #include <lib/async/cpp/task.h>
+#include <trace.h>
 
 #include <fbl/alloc_checker.h>
 
-// #include "log.h"
-
-#include <trace.h>
-
-#define LOCAL_TRACE 2
+#define LOCAL_TRACE 0
 
 namespace network {
 
