@@ -51,6 +51,7 @@ _partner_idk_source_sets_list = [
   "//sdk/lib/driver/fake-mmio-reg/cpp:cpp",
   "//sdk/lib/driver/incoming/cpp",
   "//sdk/lib/driver/logging/cpp",
+  "//sdk/lib/driver/mock-mmio/cpp",
   "//sdk/lib/driver/outgoing/cpp",
   "//sdk/lib/driver/runtime:driver_runtime_cpp",
   "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
@@ -146,7 +147,6 @@ _internal_source_sets_list = [
   # TODO(https://fxbug.dev/343059325): Promote devicetree to "partner".
   "//sdk/lib/device-watcher/cpp:cpp",
   "//sdk/lib/driver/devicetree/manager:headers",
-  "//sdk/lib/driver/mock-mmio/cpp",
   "//sdk/lib/driver/devicetree/manager:manager",
   "//sdk/lib/driver/devicetree/manager:manager-test-helper",
   "//sdk/lib/driver/devicetree/testing:board-test-helper",

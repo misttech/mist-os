@@ -18,23 +18,22 @@ namespace mock_mmio {
 // An MMIO range that responds to a list of pre-determined memory accesses.
 //
 // GloballyOrderedRegion enforces a global ordering on all accesses to the mocked MMIO
-// range. This is stricter than MockMmioRegRegion, which accepts any
-// interleaving of the access lists specified at the register level. So,
-// GloballyOrderedRegion results in more brittle mocks, and should only be used when
-// there is a single acceptable access ordering.
+// range. This is stricter than Region, which accepts any interleaving of the access
+// lists specified at the register level. So, GloballyOrderedRegion results in more brittle
+// mocks, and should only be used when there is a single acceptable access ordering.
 //
 // Example usage:
-//   constexpr static size_t kMmioRangeSize = 0x4000;
-//   GloballyOrderedRegion range_{kMmioRangeSize, GloballyOrderedRegion::Size::k32};
-//   fdf::MmioBuffer buffer_{range_.GetMmioBuffer()};
+//   constexpr static size_t kMmioRegionSize = 0x4000;
+//   GloballyOrderedRegion region_{kMmioRegionSize, GloballyOrderedRegion::Size::k32};
+//   fdf::MmioBuffer buffer_{region_.GetMmioBuffer()};
 //
 //   // Expect a 32-bit read at 0x1000, the read will return 0x12345678.
-//   range_.Expect({.address = 0x1000, .value = 0x12345678});
+//   region_.Expect({.address = 0x1000, .value = 0x12345678});
 //   // Expect a 32-bit write of 0x87654321 at 0x1002
-//   range_.Expect({.address = 0x1002, .value = 0x87654321, .write = true});
+//   region_.Expect({.address = 0x1002, .value = 0x87654321, .write = true});
 //
 //   // Test polling for a ready flag at 0x1004.
-//   range_.Expect(GloballyOrderedRegion::AccessList({
+//   region_.Expect(GloballyOrderedRegion::AccessList({
 //       {.address = 0x1004, .value = 0x0},
 //       {.address = 0x1004, .value = 0x0},
 //       {.address = 0x1004, .value = 0x0},
@@ -42,18 +41,18 @@ namespace mock_mmio {
 //   }));
 //
 //   // This could go in TearDown().
-//   range_.CheckAllAccessesReplayed();
+//   region_.CheckAllAccessesReplayed();
 //
 // The following practices are not required, but are consistent with the
 // recommendation of keeping testing logic simple:
 //
 // * Expect() calls should be at the beginning of the test case, before
-//   executing the code that accesses the MMIO range.
+//   executing the code that accesses the MMIO region.
 // * A test's expectations should be grouped in a single Expect() call. In rare
 //   cases, multiple cases and conditional logic may improve readability.
 // * Expect() should not be called concurrently from multiple threads.
 //
-// GloballyOrderedRegion instances are 100% thread-safe because all MMIO accesses to the range are
+// GloballyOrderedRegion instances are 100% thread-safe because all MMIO accesses to the region are
 // serialized using a mutex.
 
 class GloballyOrderedRegion {
@@ -80,8 +79,8 @@ class GloballyOrderedRegion {
 
   // `default_access_size` is used for Access instances whose `size` is
   // `kUseDefault`.
-  explicit GloballyOrderedRegion(size_t range_size, Size default_access_size = Size::k32)
-      : range_size_(range_size), default_access_size_(default_access_size) {}
+  explicit GloballyOrderedRegion(size_t region_size, Size default_access_size = Size::k32)
+      : region_size_(region_size), default_access_size_(default_access_size) {}
   ~GloballyOrderedRegion() = default;
 
   // Appends an entry to the list of expected memory accesses.
@@ -139,7 +138,7 @@ class GloballyOrderedRegion {
   mutable std::mutex mutex_;
   mutable std::vector<Access> access_list_ __TA_GUARDED(mutex_);
   mutable size_t access_index_ __TA_GUARDED(mutex_) = 0;
-  const size_t range_size_;
+  const size_t region_size_;
   const Size default_access_size_;
 };
 

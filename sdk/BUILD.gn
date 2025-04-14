@@ -1208,6 +1208,7 @@ sdk_molecule("core_cc_source_libraries") {
     "//sdk/lib/driver/fake-object/cpp:cpp_sdk",
     "//sdk/lib/driver/fake-platform-device/cpp:cpp_sdk",
     "//sdk/lib/driver/metadata/cpp:cpp_sdk",
+    "//sdk/lib/driver/mock-mmio/cpp:cpp_sdk",
     "//sdk/lib/driver/platform-device/cpp:cpp_sdk",
     "//sdk/lib/driver/power/cpp:cpp_sdk",
     "//sdk/lib/driver/testing/cpp:cpp_sdk",

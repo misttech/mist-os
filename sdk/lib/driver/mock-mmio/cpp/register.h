@@ -12,8 +12,17 @@
 namespace mock_mmio {
 
 // Mocks a single MMIO register. This class is intended to be used with a fdf::MmioBuffer;
-// operations on an instance of that class will be directed to the mock if the mock-mmio-reg library
+// operations on an instance of that class will be directed to the mock if the mock-mmio library
 // is a dependency of the test.
+//
+// Each ExpectRead() and ExpectWrite() call adds to the Register's list of expected transactions
+// in FIFO order and must be added before the actual read or write call. When the Register receives
+// a Read() or Write() call, it removes the next expected transaction in the list and verifies that
+// it matches the Read() or Write() call.
+//
+// At the end of the test, VerifyAndClear() should be called to verify that the Register has no
+// outstanding expected transactions.
+//
 class Register {
  public:
   // Reads from the mocked register. Returns the value set by the next expectation, or the default

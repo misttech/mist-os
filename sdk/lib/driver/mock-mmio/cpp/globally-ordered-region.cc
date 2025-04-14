@@ -47,7 +47,7 @@ fdf::MmioBuffer GloballyOrderedRegion::GetMmioBuffer() {
       .Write64 = GloballyOrderedRegion::Write64,
   };
 
-  return CreateMmioBuffer(range_size_, ZX_CACHE_POLICY_CACHED, &kMockMmioOps, this);
+  return CreateMmioBuffer(region_size_, ZX_CACHE_POLICY_CACHED, &kMockMmioOps, this);
 }
 
 uint64_t GloballyOrderedRegion::Read(zx_off_t address, GloballyOrderedRegion::Size size) const {
