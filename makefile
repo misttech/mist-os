@@ -71,8 +71,8 @@ gdb: args ## Set debug arguments
 .PHONY: gdb
 
 release: args ## Set release arguments
-	$(NOECHO)echo "is_debug = false" >> $(OUTPUT)/args.gn
-.PHONY: debug
+	$(NOECHO)echo "compilation_mode = \"release\"" >> $(OUTPUT)/args.gn
+.PHONY: release
 
 kasan: args ## Compile with Kernel Address Sanitazier enabled
 	$(NOECHO)echo "select_variant = [ \"kasan\" ]" >> $(OUTPUT)/args.gn
