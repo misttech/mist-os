@@ -6,9 +6,10 @@ package fidlgen
 
 import (
 	"bytes"
-	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -33,8 +34,6 @@ type externalFormatter struct {
 }
 
 var _ = []Formatter{identityFormatter{}, externalFormatter{}}
-
-const timeout = 2 * time.Minute
 
 // NewFormatter creates a new external formatter.
 //
@@ -77,9 +76,7 @@ func (f externalFormatter) Format(source []byte) ([]byte, error) {
 	if f.limit > 0 && len(source) > f.limit {
 		return source, nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, f.path, f.args...)
+	cmd := exec.Command(f.path, f.args...)
 	formattedBuf := new(bytes.Buffer)
 	cmd.Stdout = formattedBuf
 	errBuf := new(bytes.Buffer)
@@ -91,13 +88,27 @@ func (f externalFormatter) Format(source []byte) ([]byte, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("Error starting formatter process: %w", err)
 	}
+	start := time.Now()
 	if _, err := in.Write(source); err != nil {
 		return nil, fmt.Errorf("Error writing stdin: %w", err)
 	}
 	if err := in.Close(); err != nil {
 		return nil, fmt.Errorf("Error closing stdin: %w", err)
 	}
-	if err := cmd.Wait(); err != nil {
+	err = cmd.Wait()
+	end := time.Now()
+	// On builders, formatting can take a long time, and it's nice to know when this happens.
+	// We'll emit a warning describing what we're trying to do to help diagnose slow downs if
+	// they happen.
+	formatting_duration := end.Sub(start)
+	if formatting_duration > 2*time.Minute {
+		fmt.Fprintf(os.Stderr, "WARNING: Slow formatting operation took %v: %v %v\n",
+			formatting_duration,
+			f.path,
+			strings.Join(f.args, " "))
+	}
+
+	if err != nil {
 		if errContent := errBuf.Bytes(); len(errContent) != 0 {
 			return nil, fmt.Errorf("Formatter (%v) error: %w (stderr: %s)", cmd, err, string(errContent))
 		}
