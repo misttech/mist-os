@@ -86,6 +86,7 @@ fho::embedded_plugin!(FlashTool);
 #[derive(Debug, Serialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum FlashMessage {
+    Preflight { message: String },
     Progress(FlashProgress),
     Finished { success: bool, error_message: String },
 }
@@ -115,7 +116,7 @@ impl FfxMain for FlashTool {
         preflight_checks(&self.cmd, &mut writer)?;
 
         // Massage FlashCommand
-        let cmd = preprocess_flash_cmd(&self.cmd).await?;
+        let cmd = preprocess_flash_cmd(&mut writer, &self.cmd).await?;
 
         self.flash_plugin_impl(cmd, &mut writer).await
     }
@@ -134,7 +135,10 @@ fn preflight_checks<W: Write>(cmd: &FlashCommand, mut writer: W) -> Result<()> {
     Ok(())
 }
 
-async fn preprocess_flash_cmd(i_cmd: &FlashCommand) -> Result<FlashCommand> {
+async fn preprocess_flash_cmd(
+    writer: &mut VerifiedMachineWriter<FlashMessage>,
+    i_cmd: &FlashCommand,
+) -> Result<FlashCommand> {
     let cmd: &mut FlashCommand = &mut i_cmd.clone();
     match cmd.authorized_keys.as_ref() {
         Some(ssh) => {
@@ -195,10 +199,13 @@ async fn preprocess_flash_cmd(i_cmd: &FlashCommand) -> Result<FlashCommand> {
 
     if cmd.product_bundle.is_none() && cmd.manifest_path.is_none() && cmd.manifest.is_none() {
         let product_path: String = ffx_config::get("product.path")?;
-        tracing::debug!(
+        let message = format!(
             "No product bundle or manifest passed. Inferring product bundle path from config: {}",
             product_path
         );
+        tracing::debug!(message);
+        writer.machine_or(&FlashMessage::Preflight { message: message.clone() }, message)?;
+
         cmd.product_bundle = Some(product_path);
     }
 
@@ -683,7 +690,7 @@ async fn handle_event(
 #[cfg(test)]
 mod test {
     use super::*;
-    use ffx_writer::Format;
+    use ffx_writer::{Format, TestBuffers};
     use pretty_assertions::assert_eq;
     use std::path::PathBuf;
     use tempfile::NamedTempFile;
@@ -697,17 +704,26 @@ mod test {
             .set("foo".into())
             .await
             .expect("creating temp product.path");
-        let cmd = preprocess_flash_cmd(&FlashCommand { ..Default::default() }).await.unwrap();
+        let buffers = TestBuffers::default();
+        let mut writer = <FlashTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
+        let cmd = preprocess_flash_cmd(&mut writer, &FlashCommand { ..Default::default() })
+            .await
+            .unwrap();
         assert_eq!(cmd.product_bundle, Some("foo".to_string()));
     }
 
     #[fuchsia::test]
     async fn test_nonexistent_file_throws_err() {
         let _env = ffx_config::test_init().await.expect("Failed to initialize test env");
-        assert!(preprocess_flash_cmd(&FlashCommand {
-            manifest_path: Some(PathBuf::from("ffx_test_does_not_exist")),
-            ..Default::default()
-        })
+        let buffers = TestBuffers::default();
+        let mut writer = <FlashTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
+        assert!(preprocess_flash_cmd(
+            &mut writer,
+            &FlashCommand {
+                manifest_path: Some(PathBuf::from("ffx_test_does_not_exist")),
+                ..Default::default()
+            }
+        )
         .await
         .is_err())
     }
@@ -722,11 +738,17 @@ mod test {
         let ssh_tmp_file = NamedTempFile::new().expect("tmp access failed");
         let ssh_tmp_file_name = ssh_tmp_file.path().to_string_lossy().to_string();
 
-        let cmd = preprocess_flash_cmd(&FlashCommand {
-            product_bundle: Some(wrapped_pb_tmp_file_name),
-            authorized_keys: Some(ssh_tmp_file_name),
-            ..Default::default()
-        })
+        let buffers = TestBuffers::default();
+        let mut writer = <FlashTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
+
+        let cmd = preprocess_flash_cmd(
+            &mut writer,
+            &FlashCommand {
+                product_bundle: Some(wrapped_pb_tmp_file_name),
+                authorized_keys: Some(ssh_tmp_file_name),
+                ..Default::default()
+            },
+        )
         .await
         .unwrap();
         assert_eq!(Some(pb_tmp_file_name), cmd.product_bundle);
@@ -737,11 +759,17 @@ mod test {
         let _env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
-        assert!(preprocess_flash_cmd(&FlashCommand {
-            manifest_path: Some(PathBuf::from(tmp_file_name)),
-            authorized_keys: Some("ssh_does_not_exist".to_string()),
-            ..Default::default()
-        },)
+
+        let buffers = TestBuffers::default();
+        let mut writer = <FlashTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
+        assert!(preprocess_flash_cmd(
+            &mut writer,
+            &FlashCommand {
+                manifest_path: Some(PathBuf::from(tmp_file_name)),
+                authorized_keys: Some("ssh_does_not_exist".to_string()),
+                ..Default::default()
+            },
+        )
         .await
         .is_err())
     }
@@ -751,7 +779,8 @@ mod test {
         let _env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
-        let mut writer = VerifiedMachineWriter::<FlashMessage>::new(Some(Format::Json));
+        let buffers = TestBuffers::default();
+        let mut writer = <FlashTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
         assert!(preflight_checks(
             &FlashCommand {
                 manifest: Some(PathBuf::from(tmp_file_name.clone())),
