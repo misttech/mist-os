@@ -963,7 +963,7 @@ class AsyncMain:
             build_command_line.extend(vals)
 
         if tests.has_e2e_test() and allow_build_updates:
-            build_command_line.extend(["--default", "updates"])
+            build_command_line.extend(["--default", "//build/images/updates"])
             recorder.emit_instruction_message(
                 "E2E test selected, building updates package"
             )
