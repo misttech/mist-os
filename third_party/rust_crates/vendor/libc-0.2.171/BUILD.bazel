@@ -62,7 +62,25 @@ rust_library(
     edition = "2021",
     rustc_flags = [
         "--cap-lints=allow",
-    ],
+        "--cfg=libc_priv_mod_use",
+        "--cfg=libc_union",
+        "--cfg=libc_const_size_of",
+        "--cfg=libc_align",
+        "--cfg=libc_core_cvoid",
+        "--cfg=libc_packedN",
+        "--cfg=libc_cfg_target_vendor",
+        "--cfg=libc_int128",
+        "--cfg=libc_non_exhaustive",
+        "--cfg=libc_long_array",
+        "--cfg=libc_ptr_addr_of",
+        "--cfg=libc_underscore_const_names",
+        "--cfg=libc_const_extern_fn",
+    ] + select({
+        "@platforms//os:freebsd": [
+            "--cfg=freebsd11",  # @platforms//os:freebsd
+        ],
+        "//conditions:default": [],
+    }),
     tags = [
         "cargo-bazel",
         "crate-name=libc",

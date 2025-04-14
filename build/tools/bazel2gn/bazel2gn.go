@@ -50,9 +50,10 @@ var attrsToOmitByRules = map[string]map[string]bool{
 // and GN. specialIdentifiers maps from their Bazel representations to GN
 // representations.
 var specialIdentifiers = map[string]string{
-	"True":  "true",
-	"False": "false",
-	"srcs":  "sources",
+	"True":           "true",
+	"False":          "false",
+	"srcs":           "sources",
+	"crate_features": "features",
 }
 
 // specialTokens maps from special tokens in Bazel to their GN equivalents.
@@ -304,7 +305,7 @@ func attrAssignmentToGN(expr *syntax.BinaryExpr) ([]string, error) {
 	switch attrName {
 	case "visibility":
 		transformers = append(transformers, bazelVisibilityToGN)
-	case "deps":
+	case "deps", "test_deps":
 		transformers = append(transformers, bazelDepToGN)
 	}
 

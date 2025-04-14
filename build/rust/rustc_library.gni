@@ -153,6 +153,13 @@ import("//build/rust/rustc_test.gni")
 #     The usual GN meaning.
 #
 #
+#   The following fields are only used by Bazel-converted targets.
+#   See //build/tools/bazel2gn/README.md for details.
+#
+#      proc_macro_deps (optional)
+#        For sources used by go:embed, has the same semantics as deps in GN.
+#
+#
 # Example of usage:
 #
 #   rustc_library("foo-bar") {
@@ -274,6 +281,10 @@ template("rustc_library") {
     # TODO(https://fxbug.dev/42120123) remove "non_rust_deps"
     if (defined(invoker.non_rust_deps)) {
       deps += invoker.non_rust_deps
+    }
+
+    if (defined(invoker.proc_macro_deps)) {
+      deps += invoker.proc_macro_deps
     }
 
     forward_variables_from(invoker,

@@ -2,18 +2,15 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@rules_rust//rust:defs.bzl", "rust_proc_macro")
+load("//build/tools/bazel2gn/bazel_rules:defs.bzl", "rustc_library")
 
 package(default_visibility = ["//visibility:public"])
 
-rust_proc_macro(
-    name = "fuchsia-async-macro",
+rustc_library(
+    name = "zx-status",
     srcs = ["src/lib.rs"],
     edition = "2021",
     version = "0.1.0",
-    deps = [
-        "//third_party/rust_crates/vendor:proc-macro2",
-        "//third_party/rust_crates/vendor:quote",
-        "//third_party/rust_crates/vendor:syn",
-    ],
+    with_unit_tests = True,
+    deps = ["//sdk/rust/zx-types"],
 )

@@ -189,6 +189,9 @@ template("rustc_test_internal") {
     if (defined(invoker.non_rust_deps)) {
       deps += invoker.non_rust_deps
     }
+    if (defined(invoker.proc_macro_deps)) {
+      deps += invoker.proc_macro_deps
+    }
 
     # test_deps specified in the parent template (if not used directly)
     # should also be treated as normal dependencies

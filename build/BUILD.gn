@@ -47,7 +47,10 @@ if (is_host) {
     deps = [
       "//build/tools/bazel2gn:verify_bazel2gn",
       "//build/tools/formatjson5:verify_bazel2gn",
+      "//sdk/rust/zx-status:verify_bazel2gn",
+      "//sdk/rust/zx-types:verify_bazel2gn",
       "//src/developer/ffx/lib/netext:verify_bazel2gn",
+      "//src/lib/fuchsia-async:verify_bazel2gn",
       "//src/lib/fuchsia-async-macro:verify_bazel2gn",
       "//tools/fidl/fidlgen_cpp:verify_bazel2gn",
       "//tools/fidl/fidlgen_cpp/codegen:verify_bazel2gn",
