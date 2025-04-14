@@ -42,7 +42,6 @@ Device::Device(fdf::DriverStartArgs start_args,
                fdf::UnownedSynchronizedDispatcher driver_dispatcher)
     : DriverBase("bt-hci-intel", std::move(start_args), std::move(driver_dispatcher)),
       devfs_connector_(fit::bind_member<&Device::Connect>(this)),
-      node_(fidl::WireClient(std::move(node()), dispatcher())),
       firmware_loaded_(false) {}
 
 void Device::Start(fdf::StartCompleter completer) {
@@ -115,48 +114,19 @@ zx_status_t Device::AddNode() {
     return connector.error_value();
   }
 
-  fidl::Arena args_arena;
-  auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(args_arena)
-                   .connector(std::move(connector.value()))
-                   .class_name("bt-hci")
-                   .Build();
+  auto devfs_args = fuchsia_driver_framework::DevfsAddArgs{{
+      .connector = std::move(connector.value()),
+      .class_name = "bt-hci",
+  }};
 
-  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(args_arena)
-                  .name("bt-hci-intel")
-                  .devfs_args(devfs)
-                  .Build();
-
-  auto controller_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  if (controller_endpoints.is_error()) {
-    errorf("Create node controller end points failed: %s",
-           zx_status_get_string(controller_endpoints.error_value()));
-    return controller_endpoints.error_value();
+  zx::result child = AddOwnedChild("bt-hci-intel", devfs_args);
+  if (child.is_error()) {
+    errorf("Failed to add bt-hci-intel node, FIDL error: %s", child.status_string());
+    return child.status_value();
   }
 
-  // Create the endpoints of fuchsia_driver_framework::Node protocol for the child node, and hold
-  // the client end of it, because no driver will bind to the child node.
-  auto child_node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
-  if (child_node_endpoints.is_error()) {
-    errorf("Create child node end points failed: %s",
-           zx_status_get_string(child_node_endpoints.error_value()));
-    return child_node_endpoints.error_value();
-  }
-
-  auto result = node_.sync()->AddChild(args, std::move(controller_endpoints->server),
-                                       std::move(child_node_endpoints->server));
-
-  if (!result.ok()) {
-    errorf("Failed to add bt-hci-intel node, FIDL error: %s", result.status_string());
-    return result.status();
-  }
-
-  if (result->is_error()) {
-    errorf("Failed to add bt-hci-intel node: %u", static_cast<uint32_t>(result->error_value()));
-    return ZX_ERR_INTERNAL;
-  }
-
-  child_node_.Bind(std::move(child_node_endpoints->client), dispatcher(), this);
-  node_controller_.Bind(std::move(controller_endpoints->client), dispatcher(), this);
+  child_node_.Bind(std::move(child->node_), dispatcher());
+  child_node_controller_.Bind(std::move(child->node_controller_), dispatcher());
   return ZX_OK;
 }
 
