@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
-use component_debug::dirs::{connect_to_instance_protocol_at_dir_root, OpenDirType};
+use component_debug::dirs::{connect_to_instance_protocol, OpenDirType};
 use fidl_fuchsia_net_stackmigrationdeprecated as fnet_stack_migration;
 use once_cell::sync::OnceCell;
 use serde::Serialize;
@@ -217,9 +217,7 @@ async fn get_netstack_proxy<P: fidl::endpoints::DiscoverableProtocolMarker>(
     let query =
         fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_sys2::RealmQueryMarker>()?;
     let moniker = "./core/network/netstack".try_into()?;
-    let proxy =
-        connect_to_instance_protocol_at_dir_root::<P>(&moniker, OpenDirType::Exposed, &query)
-            .await?;
+    let proxy = connect_to_instance_protocol::<P>(&moniker, OpenDirType::Exposed, &query).await?;
     Ok(proxy)
 }
 
@@ -228,9 +226,7 @@ async fn get_netstack_migration_proxy<P: fidl::endpoints::DiscoverableProtocolMa
     let query =
         fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_sys2::RealmQueryMarker>()?;
     let moniker = "./core/network/netstack-migration".try_into()?;
-    let proxy =
-        connect_to_instance_protocol_at_dir_root::<P>(&moniker, OpenDirType::Exposed, &query)
-            .await?;
+    let proxy = connect_to_instance_protocol::<P>(&moniker, OpenDirType::Exposed, &query).await?;
     Ok(proxy)
 }
 

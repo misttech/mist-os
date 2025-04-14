@@ -3,13 +3,11 @@
 // found in the LICENSE file.
 
 use byteorder::{LittleEndian, WriteBytesExt};
-use fidl::endpoints::{create_endpoints, create_proxy, ControlHandle, RequestStream, ServerEnd};
+use fidl::endpoints::{create_endpoints, create_proxy, ServerEnd};
 use fidl_fuchsia_component_decl::{
     Capability, Component, Dictionary, Expose, ExposeDictionary, ExposeProtocol, ParentRef,
     Protocol, Ref, SelfRef,
 };
-use fidl_fuchsia_io::{self as fio, DirectoryMarker};
-use fidl_fuchsia_sys2 as fsys2;
 use futures::{StreamExt, TryStreamExt};
 use moniker::Moniker;
 use std::collections::HashMap;
@@ -19,6 +17,7 @@ use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use zx_status::Status;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys2};
 
 /// Builder struct for `RealmQueryResult`/
 /// This is an builder interface meant to simplify building of test fixtures.
@@ -74,7 +73,7 @@ impl MockRealmQueryBuilderInner {
         parent
     }
 
-    pub fn serve_exposed_dir(&self, server_end: ServerEnd<DirectoryMarker>, path: &str) {
+    pub fn serve_exposed_dir(&self, server_end: ServerEnd<fio::DirectoryMarker>, path: &str) {
         let mut mock_dir_top = MockDir::new("expose".to_owned());
         let mut mock_accessors = MockDir::new("diagnostics-accessors".to_owned());
         for expose in &self.exposes {
@@ -284,25 +283,6 @@ impl MockRealmQuery {
                     let res = self.mapping.get(&query_moniker.to_string()).unwrap();
                     responder.send(Ok(&res.to_instance())).unwrap();
                 }
-                fsys2::RealmQueryRequest::DeprecatedOpen {
-                    moniker,
-                    dir_type,
-                    object,
-                    responder,
-                    path,
-                    ..
-                } => {
-                    let query_moniker = Moniker::from_str(moniker.as_str()).unwrap();
-                    if let Some(res) = self.mapping.get(&query_moniker.to_string()) {
-                        if dir_type == fsys2::OpenDirType::ExposedDir {
-                            // Serve the out dir, everything else doesn't get served.
-                            res.serve_exposed_dir(object.into_channel().into(), &path);
-                        }
-                        responder.send(Ok(())).unwrap();
-                    } else {
-                        responder.send(Err(fsys2::OpenError::InstanceNotFound)).unwrap();
-                    }
-                }
                 fsys2::RealmQueryRequest::OpenDirectory {
                     moniker,
                     dir_type,
@@ -312,7 +292,7 @@ impl MockRealmQuery {
                 } => {
                     let query_moniker = Moniker::from_str(moniker.as_str()).unwrap();
                     if let Some(res) = self.mapping.get(&query_moniker.to_string()) {
-                        if dir_type == fsys2::OpenDirType::OutgoingDir {
+                        if dir_type == fsys2::OpenDirType::ExposedDir {
                             // Serve the out dir, everything else doesn't get served.
                             res.serve_exposed_dir(object, "");
                         }
@@ -400,7 +380,7 @@ impl MockRealmQuery {
 
 // Mock directory structure.
 pub trait Entry {
-    fn open(self: Rc<Self>, flags: fio::OpenFlags, path: &str, object: ServerEnd<fio::NodeMarker>);
+    fn open(self: Rc<Self>, path: &str, object: fidl::Channel);
     fn encode(&self, buf: &mut Vec<u8>);
     fn name(&self) -> String;
 }
@@ -427,14 +407,10 @@ impl MockDir {
 
     async fn serve(self: Rc<Self>, object: ServerEnd<fio::DirectoryMarker>) {
         let mut stream = object.into_stream();
-        let _ = stream.control_handle().send_on_open_(
-            Status::OK.into_raw(),
-            Some(fio::NodeInfoDeprecated::Directory(fio::DirectoryObject {})),
-        );
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
-                fio::DirectoryRequest::DeprecatedOpen { flags, mode: _, path, object, .. } => {
-                    self.clone().open(flags, &path, object);
+                fio::DirectoryRequest::Open { path, object, .. } => {
+                    self.clone().open(&path, object);
                 }
                 fio::DirectoryRequest::Rewind { responder, .. } => {
                     self.at_end.store(false, Ordering::Relaxed);
@@ -470,27 +446,28 @@ fn encode_entries(subdirs: &HashMap<String, Rc<dyn Entry>>) -> Vec<u8> {
 }
 
 impl Entry for MockDir {
-    fn open(self: Rc<Self>, flags: fio::OpenFlags, path: &str, object: ServerEnd<fio::NodeMarker>) {
+    fn open(self: Rc<Self>, path: &str, object: fidl::Channel) {
         let path = Path::new(path);
         let mut path_iter = path.iter();
         let segment = if let Some(segment) = path_iter.next() {
             if let Some(segment) = segment.to_str() {
                 segment
             } else {
-                send_error(object, Status::NOT_FOUND);
+                let _ =
+                    ServerEnd::<fio::NodeMarker>::new(object).close_with_epitaph(Status::NOT_FOUND);
                 return;
             }
         } else {
             "."
         };
         if segment == "." {
-            fuchsia_async::Task::local(self.serve(ServerEnd::new(object.into_channel()))).detach();
+            fuchsia_async::Task::local(self.serve(ServerEnd::new(object))).detach();
             return;
         }
         if let Some(entry) = self.subdirs.get(segment) {
-            entry.clone().open(flags, path_iter.as_path().to_str().unwrap(), object);
+            entry.clone().open(path_iter.as_path().to_str().unwrap(), object);
         } else {
-            send_error(object, Status::NOT_FOUND);
+            let _ = ServerEnd::<fio::NodeMarker>::new(object).close_with_epitaph(Status::NOT_FOUND);
         }
     }
 
@@ -504,26 +481,6 @@ impl Entry for MockDir {
 
     fn name(&self) -> String {
         self.name.clone()
-    }
-}
-
-impl Entry for fio::DirectoryProxy {
-    fn open(self: Rc<Self>, flags: fio::OpenFlags, path: &str, object: ServerEnd<fio::NodeMarker>) {
-        let _ = fio::DirectoryProxy::deprecated_open(
-            &self,
-            flags,
-            fio::ModeType::empty(),
-            path,
-            object,
-        );
-    }
-
-    fn encode(&self, _buf: &mut Vec<u8>) {
-        unimplemented!();
-    }
-
-    fn name(&self) -> String {
-        unimplemented!();
     }
 }
 
@@ -541,12 +498,7 @@ impl MockFile {
 }
 
 impl Entry for MockFile {
-    fn open(
-        self: Rc<Self>,
-        _flags: fio::OpenFlags,
-        _path: &str,
-        _object: ServerEnd<fio::NodeMarker>,
-    ) {
+    fn open(self: Rc<Self>, _path: &str, _object: fidl::Channel) {
         unimplemented!();
     }
 
@@ -561,11 +513,4 @@ impl Entry for MockFile {
     fn name(&self) -> String {
         self.name.clone()
     }
-}
-
-fn send_error(object: ServerEnd<fio::NodeMarker>, status: Status) {
-    let stream = object.into_stream();
-    let control_handle = stream.control_handle();
-    let _ = control_handle.send_on_open_(status.into_raw(), None);
-    control_handle.shutdown_with_epitaph(status);
 }

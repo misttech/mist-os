@@ -4,7 +4,7 @@
 
 use anyhow::{Context, Error};
 use argh::FromArgs;
-use component_debug::dirs::{connect_to_instance_protocol_at_dir_root, OpenDirType};
+use component_debug::dirs::{connect_to_instance_protocol, OpenDirType};
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_device::ControllerMarker;
 use fidl_fuchsia_fs_realm as fs_realm;
@@ -38,7 +38,7 @@ async fn main() -> Result<(), Error> {
     let realm_query_proxy =
         connect_to_protocol_at_path::<RealmQueryMarker>(REALM_QUERY_SERVICE_PATH)?;
     let moniker = "./core/fs_realm".try_into().unwrap();
-    let fs_realm_proxy = connect_to_instance_protocol_at_dir_root::<fs_realm::ControllerMarker>(
+    let fs_realm_proxy = connect_to_instance_protocol::<fs_realm::ControllerMarker>(
         &moniker,
         OpenDirType::Exposed,
         &realm_query_proxy,

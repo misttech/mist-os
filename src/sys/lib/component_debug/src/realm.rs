@@ -5,7 +5,6 @@
 use crate::io::{Directory, RemoteDirectory};
 use anyhow::Context;
 use cm_rust::{ComponentDecl, FidlIntoNative};
-use flex_client::fidl::ServerEnd;
 use flex_client::ProxyHasDomain;
 use fuchsia_async::TimeoutExt;
 use futures::TryFutureExt;
@@ -472,16 +471,8 @@ pub async fn get_runtime(
     let moniker_str = moniker.to_string();
     let (runtime_dir, server_end) = realm_query.domain().create_proxy::<fio::DirectoryMarker>();
     let runtime_dir = RemoteDirectory::from_proxy(runtime_dir);
-    let server_end = ServerEnd::new(server_end.into_channel());
     realm_query
-        .deprecated_open(
-            &moniker_str,
-            fsys::OpenDirType::RuntimeDir,
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::ModeType::empty(),
-            ".",
-            server_end,
-        )
+        .open_directory(&moniker_str, fsys::OpenDirType::RuntimeDir, server_end)
         .await?
         .map_err(|e| GetRuntimeError::OpenError(e))?;
     parse_runtime_from_dir(runtime_dir)
@@ -547,19 +538,11 @@ pub async fn get_outgoing_capabilities(
 ) -> Result<Vec<String>, GetOutgoingCapabilitiesError> {
     let moniker_str = moniker.to_string();
     let (out_dir, server_end) = realm_query.domain().create_proxy::<fio::DirectoryMarker>();
-    let out_dir = RemoteDirectory::from_proxy(out_dir);
-    let server_end = ServerEnd::new(server_end.into_channel());
     realm_query
-        .deprecated_open(
-            &moniker_str,
-            fsys::OpenDirType::OutgoingDir,
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::ModeType::empty(),
-            ".",
-            server_end,
-        )
+        .open_directory(&moniker_str, fsys::OpenDirType::OutgoingDir, server_end)
         .await?
         .map_err(|e| GetOutgoingCapabilitiesError::OpenError(e))?;
+    let out_dir = RemoteDirectory::from_proxy(out_dir);
     get_capabilities(out_dir)
         .map_err(|e| GetOutgoingCapabilitiesError::ParseError(e))
         .on_timeout(DIR_TIMEOUT, || Err(GetOutgoingCapabilitiesError::Timeout))
@@ -571,19 +554,20 @@ pub async fn get_merkle_root(
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<String, GetMerkleRootError> {
     let moniker_str = moniker.to_string();
-    let (meta_file, server_end) = realm_query.domain().create_proxy::<fio::FileMarker>();
-    let server_end = ServerEnd::new(server_end.into_channel());
+    let (package_dir, server_end) = realm_query.domain().create_proxy::<fio::DirectoryMarker>();
     realm_query
-        .deprecated_open(
-            &moniker_str,
-            fsys::OpenDirType::PackageDir,
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::ModeType::empty(),
-            "meta",
-            server_end,
-        )
+        .open_directory(&moniker_str, fsys::OpenDirType::PackageDir, server_end)
         .await?
         .map_err(|e| GetMerkleRootError::OpenError(e))?;
+    let (meta_file, server_end) = realm_query.domain().create_proxy::<fio::FileMarker>();
+    package_dir
+        .open(
+            "meta",
+            fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
+            server_end.into_channel(),
+        )
+        .map_err(|e| GetMerkleRootError::Fidl(e))?;
     let merkle_root = fuchsia_fs::file::read_to_string(&meta_file).await?;
     Ok(merkle_root)
 }

@@ -69,7 +69,7 @@ pub async fn open_toolbox(rcs: &RemoteControlProxy) -> Result<fio::DirectoryProx
         }
     };
     let moniker = moniker::Moniker::try_from(moniker)?;
-    let namespace_dir = component_debug::dirs::open_instance_dir_root_readable(
+    let namespace_dir = component_debug::dirs::open_instance_directory(
         &moniker,
         sys2::OpenDirType::NamespaceDir.into(),
         &query,

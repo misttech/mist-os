@@ -196,23 +196,21 @@ impl DriverConnector {
                 }
                 false => (moniker.to_string(), default_capability_name_for_query),
             };
-            // TODO(https://fxbug.dev/384050847): Use RealmQuery.OpenDirectory when available at all
-            // API levels. This requires that we first open the exposed directory and issue an open
-            // request to the capability path explicitly, rather than proxying the request through
-            // component manager.
+            let (exposed_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+            query_proxy
+                .open_directory(&moniker, fsys::OpenDirType::ExposedDir, server_end)
+                .await?
+                .expect("open exposed directory error");
             let (capability_dir, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-            query_proxy
-                .deprecated_open(
-                    &moniker,
-                    fsys::OpenDirType::ExposedDir,
-                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-                    fio::ModeType::empty(),
+            exposed_dir
+                .open(
                     capability,
-                    server_end.into_channel().into(),
+                    fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                    &Default::default(),
+                    server_end.into_channel(),
                 )
-                .await?
-                .expect("open directory capability error");
+                .expect("open capability directory error");
             Ok(capability_dir)
         } else {
             anyhow::bail!("Failed to get remote control proxy");

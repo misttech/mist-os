@@ -7,7 +7,6 @@ use crate::path::{
     add_source_filename_to_path_if_absent, open_parent_subdir_readable, LocalOrRemoteDirectoryPath,
 };
 use anyhow::{bail, Result};
-use flex_client::fidl::ServerEnd;
 use flex_client::ProxyHasDomain;
 use regex::Regex;
 use std::path::PathBuf;
@@ -291,15 +290,7 @@ async fn open_component_dir_for_moniker(
     dir_type: &fsys::OpenDirType,
 ) -> Result<fio::DirectoryProxy> {
     let (dir, server_end) = realm_query.domain().create_proxy::<fio::DirectoryMarker>();
-    let server_end = ServerEnd::new(server_end.into_channel());
-    let flags = match dir_type {
-        fsys::OpenDirType::PackageDir => fio::OpenFlags::RIGHT_READABLE,
-        _ => fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-    };
-    match realm_query
-        .deprecated_open(&moniker, dir_type.clone(), flags, fio::ModeType::empty(), ".", server_end)
-        .await?
-    {
+    match realm_query.open_directory(&moniker, dir_type.clone(), server_end).await? {
         Ok(()) => Ok(dir),
         Err(fsys::OpenError::InstanceNotFound) => {
             Err(CopyError::InstanceNotFound { moniker: moniker.to_string() }.into())

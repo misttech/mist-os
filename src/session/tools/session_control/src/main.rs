@@ -4,7 +4,7 @@
 
 use anyhow::{format_err, Error};
 use argh::FromArgs;
-use component_debug::dirs::{connect_to_instance_protocol_at_dir_root, OpenDirType};
+use component_debug::dirs::{connect_to_instance_protocol, OpenDirType};
 use fuchsia_component::client::connect_to_protocol_at_path;
 use {
     fidl_fuchsia_element as felement, fidl_fuchsia_session as fsession, fidl_fuchsia_sys2 as fsys,
@@ -61,8 +61,7 @@ async fn connect_to_exposed_protocol<P: fidl::endpoints::DiscoverableProtocolMar
 ) -> Result<P::Proxy, Error> {
     let moniker = moniker.try_into()?;
     let proxy =
-        connect_to_instance_protocol_at_dir_root::<P>(&moniker, OpenDirType::Exposed, realm_query)
-            .await?;
+        connect_to_instance_protocol::<P>(&moniker, OpenDirType::Exposed, realm_query).await?;
     Ok(proxy)
 }
 

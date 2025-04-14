@@ -320,7 +320,7 @@ impl CFDirectory {
                             return;
                         };
                         let proxy = self.inner.lock().unwrap().proxy.clone();
-                        let Ok(dir) = component_debug::dirs::open_instance_dir_root_readable(
+                        let Ok(dir) = component_debug::dirs::open_instance_directory(
                             &local_path,
                             ty.into(),
                             &proxy,
@@ -586,27 +586,6 @@ mod test {
                         let instances = instance_map.values().cloned().collect();
                         let iterator = serve_instance_iterator(instances);
                         responder.send(Ok(iterator)).unwrap();
-                    }
-                    sys2::RealmQueryRequest::DeprecatedOpen {
-                        moniker,
-                        dir_type,
-                        flags,
-                        mode,
-                        path,
-                        object,
-                        responder,
-                    } => {
-                        eprintln!(
-                            "DeprecatedOpen call for {} for {:?} at path '{}' with flags {:?}",
-                            moniker, dir_type, path, flags
-                        );
-                        let moniker = Moniker::parse_str(&moniker).unwrap().to_string();
-                        if let Some(dir) = dirs.get(&(moniker, dir_type)) {
-                            dir.deprecated_open(flags, mode, &path, object).unwrap();
-                            responder.send(Ok(())).unwrap();
-                        } else {
-                            responder.send(Err(sys2::OpenError::NoSuchDir)).unwrap();
-                        }
                     }
                     sys2::RealmQueryRequest::OpenDirectory {
                         moniker,
