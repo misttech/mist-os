@@ -600,7 +600,11 @@ impl ThreadGroup {
         Ok(())
     }
 
-    pub fn remove<L>(&self, locked: &mut Locked<'_, L>, pids: &mut PidTable, task: &Task)
+    /// Remove the task from the children of this ThreadGroup.
+    ///
+    /// It is important that the task is taken as an `OwnedRef`. It ensures the tasks of the
+    /// ThreadGroup are always valid as they are still valid when removed.
+    pub fn remove<L>(&self, locked: &mut Locked<'_, L>, pids: &mut PidTable, task: &OwnedRef<Task>)
     where
         L: LockBefore<ProcessGroupState>,
     {

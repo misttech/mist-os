@@ -96,7 +96,15 @@ impl Releasable for TaskBuilder {
 
     fn release<'a: 'b, 'b>(self, locked: Self::Context<'a, 'b>) {
         let kernel = Arc::clone(self.kernel());
-        let pids = kernel.pids.write();
+        let mut pids = kernel.pids.write();
+
+        // We remove from the thread group here because the WeakRef in the pid
+        // table to this task must be valid until this task is removed from the
+        // thread group, and the code below will invalidate it.
+        // Moreover, this requires a OwnedRef of the task to ensure the tasks of
+        // the thread group are always valid.
+        self.task.thread_group().remove(locked, &mut pids, &self.task);
+
         let context = (self.thread_state, locked, pids);
         self.task.release(context);
     }
@@ -213,7 +221,15 @@ impl Releasable for CurrentTask {
         let _ignored = self.clear_child_tid_if_needed();
 
         let kernel = Arc::clone(self.kernel());
-        let pids = kernel.pids.write();
+        let mut pids = kernel.pids.write();
+
+        // We remove from the thread group here because the WeakRef in the pid
+        // table to this task must be valid until this task is removed from the
+        // thread group, and the code below will invalidate it.
+        // Moreover, this requires a OwnedRef of the task to ensure the tasks of
+        // the thread group are always valid.
+        self.task.thread_group().remove(locked, &mut pids, &self.task);
+
         let context = (self.thread_state, locked, pids);
         self.task.release(context);
     }

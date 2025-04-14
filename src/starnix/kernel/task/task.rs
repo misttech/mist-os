@@ -1593,11 +1593,6 @@ impl Releasable for Task {
     fn release<'a: 'b, 'b>(mut self, context: Self::Context<'a, 'b>) {
         let (thread_state, locked, mut pids) = context;
 
-        // We remove from the thread group here because the WeakRef in the pid
-        // table to this task must be valid until this task is removed from the
-        // thread group, and the code below will invalidate it.
-        self.thread_group().remove(locked, &mut pids, &self);
-
         *self.proc_pid_directory_cache.get_mut() = None;
         self.ptrace_disconnect(&pids);
 
