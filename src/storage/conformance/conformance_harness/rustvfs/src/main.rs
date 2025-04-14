@@ -15,12 +15,10 @@ use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
 use log::error;
 use std::sync::Arc;
-use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::immutable::{simple, Simple};
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo;
-use vfs::path::Path;
 use vfs::remote::remote_dir;
 
 struct Harness(TestHarnessRequestStream);
@@ -105,13 +103,7 @@ async fn run(mut stream: TestHarnessRequestStream) -> Result<(), Error> {
                         add_entry(*entry, &dir)?;
                     }
                 }
-                let mut object_request = vfs::ObjectRequest::new(
-                    flags,
-                    &Default::default(),
-                    object_request.into_channel(),
-                );
-                dir.open(ExecutionScope::new(), Path::dot(), flags, &mut object_request)
-                    .expect("failed to open directory");
+                vfs::directory::serve_on(dir, flags, ExecutionScope::new(), object_request);
             }
             TestHarnessRequest::OpenServiceDirectory { responder } => {
                 let svc_dir = simple();

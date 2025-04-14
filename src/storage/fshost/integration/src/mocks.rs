@@ -10,10 +10,7 @@ use futures::channel::mpsc::{self};
 use futures::future::BoxFuture;
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _};
 use std::sync::Arc;
-use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
-use vfs::path::Path;
-use vfs::service;
 use {fidl_fuchsia_boot as fboot, fidl_fuchsia_feedback as ffeedback, fidl_fuchsia_io as fio};
 
 /// Identifier for ramdisk storage. Defined in sdk/lib/zbi-format/include/lib/zbi-format/zbi.h.
@@ -42,26 +39,21 @@ async fn run_mocks(
 ) -> Result<(), Error> {
     let export = vfs::pseudo_directory! {
         "svc" => vfs::pseudo_directory! {
-            fboot::ArgumentsMarker::PROTOCOL_NAME => service::host(move |stream| {
+            fboot::ArgumentsMarker::PROTOCOL_NAME => vfs::service::host(move |stream| {
                 run_boot_args(stream, netboot)
             }),
-            fboot::ItemsMarker::PROTOCOL_NAME => service::host(move |stream| {
+            fboot::ItemsMarker::PROTOCOL_NAME => vfs::service::host(move |stream| {
                 let vmo_clone = vmo.clone();
                 run_boot_items(stream, vmo_clone)
             }),
-            ffeedback::CrashReporterMarker::PROTOCOL_NAME => service::host(move |stream| {
+            ffeedback::CrashReporterMarker::PROTOCOL_NAME => vfs::service::host(move |stream| {
                 run_crash_reporter(stream, crash_reports_sink.clone())
             }),
         },
     };
 
     let scope = ExecutionScope::new();
-    export.deprecated_open(
-        scope.clone(),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-        Path::dot(),
-        fidl::endpoints::ServerEnd::from(handles.outgoing_dir.into_channel()),
-    );
+    vfs::directory::serve_on(export, fio::PERM_READABLE, scope.clone(), handles.outgoing_dir);
     scope.wait().await;
 
     Ok(())

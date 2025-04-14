@@ -507,8 +507,6 @@ mod tests {
     use gpt::{Gpt, Guid, PartitionInfo};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
-    use vfs::directory::entry_container::Directory as _;
-    use vfs::ObjectRequest;
     use {
         fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
         fidl_fuchsia_io as fio, fidl_fuchsia_storage_partitions as fpartitions,
@@ -900,30 +898,16 @@ mod tests {
             .await
             .expect("load should succeed");
 
-        let (part_0_dir, server_end_0) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let (part_1_dir, server_end_1) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let flags =
-            fio::Flags::PERM_CONNECT | fio::Flags::PERM_TRAVERSE | fio::Flags::PERM_ENUMERATE;
-        let options = fio::Options::default();
-        let scope = vfs::execution_scope::ExecutionScope::new();
-        partitions_dir
-            .clone()
-            .open(
-                scope.clone(),
-                vfs::path::Path::validate_and_split("part-000").unwrap(),
-                flags.clone(),
-                &mut ObjectRequest::new(flags, &options, server_end_0.into_channel().into()),
-            )
-            .unwrap();
-        partitions_dir
-            .clone()
-            .open(
-                scope.clone(),
-                vfs::path::Path::validate_and_split("part-001").unwrap(),
-                flags.clone(),
-                &mut ObjectRequest::new(flags, &options, server_end_1.into_channel().into()),
-            )
-            .unwrap();
+        let part_0_dir = vfs::serve_directory(
+            partitions_dir.clone(),
+            vfs::Path::validate_and_split("part-000").unwrap(),
+            fio::PERM_READABLE,
+        );
+        let part_1_dir = vfs::serve_directory(
+            partitions_dir.clone(),
+            vfs::Path::validate_and_split("part-001").unwrap(),
+            fio::PERM_READABLE,
+        );
         let part_0_proxy = connect_to_named_protocol_at_dir_root::<fpartitions::PartitionMarker>(
             &part_0_dir,
             "partition",

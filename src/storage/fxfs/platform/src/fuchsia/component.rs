@@ -31,10 +31,8 @@ use std::ops::Deref;
 use std::sync::{Arc, Weak};
 use storage_device::block_device::BlockDevice;
 use storage_device::DeviceHolder;
-use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::execution_scope::ExecutionScope;
-use vfs::path::Path;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 const FXFS_INFO_NAME: &'static str = "fxfs";
@@ -199,16 +197,13 @@ impl Component {
                 }
             }),
         )?;
-        let flags = fio::PERM_READABLE
-            | fio::PERM_WRITABLE
-            | fio::PERM_EXECUTABLE
-            | fio::Flags::PROTOCOL_DIRECTORY;
-        self.export_dir.clone().open(
+
+        vfs::directory::serve_on(
+            self.export_dir.clone(),
+            fio::PERM_READABLE | fio::PERM_WRITABLE | fio::PERM_EXECUTABLE,
             self.scope.clone(),
-            Path::dot(),
-            flags,
-            &mut vfs::ObjectRequest::new(flags, &Default::default(), outgoing_dir.into()),
-        )?;
+            fidl::endpoints::ServerEnd::new(outgoing_dir),
+        );
 
         if let Some(channel) = lifecycle_channel {
             let me = self.clone();

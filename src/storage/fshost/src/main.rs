@@ -16,10 +16,8 @@ use futures::{stream, StreamExt};
 use manager::DevicePublisher;
 use std::collections::HashSet;
 use std::sync::Arc;
-use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::execution_scope::ExecutionScope;
-use vfs::path::Path;
 use vfs::remote::remote_dir;
 use zx::sys::zx_debug_write;
 use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio};
@@ -174,14 +172,11 @@ async fn main() -> Result<(), Error> {
     let _ = service::handle_lifecycle_requests(shutdown_tx)?;
 
     let scope = ExecutionScope::new();
-    export.deprecated_open(
+    vfs::directory::serve_on(
+        export,
+        fio::PERM_READABLE | fio::PERM_WRITABLE | fio::PERM_EXECUTABLE,
         scope.clone(),
-        fio::OpenFlags::RIGHT_READABLE
-            | fio::OpenFlags::RIGHT_WRITABLE
-            | fio::OpenFlags::DIRECTORY
-            | fio::OpenFlags::RIGHT_EXECUTABLE,
-        Path::dot(),
-        directory_request.into(),
+        fidl::endpoints::ServerEnd::new(directory_request.into()),
     );
 
     // TODO(https://fxbug.dev/42069366): //src/tests/oom looks for "fshost: lifecycle handler ready" to

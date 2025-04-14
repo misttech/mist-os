@@ -23,10 +23,6 @@ use std::ops::Deref;
 use std::sync::Arc;
 use storage_isolated_driver_manager::fvm::format_for_fvm;
 use uuid::Uuid;
-use vfs::directory::entry_container::Directory;
-use vfs::execution_scope::ExecutionScope;
-use vfs::path::Path;
-use vfs::ObjectRequest;
 use zerocopy::{Immutable, IntoBytes};
 use zx::{self as zx, HandleBased};
 use {fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger, fuchsia_async as fasync};
@@ -364,11 +360,8 @@ impl DiskBuilder {
             let partitions_dir = vfs::directory::immutable::simple();
             let manager =
                 GptManager::new(server.block_proxy(), partitions_dir.clone()).await.unwrap();
-            let scope = ExecutionScope::new();
-            let (dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-            let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
-            ObjectRequest::new(flags, &fio::Options::default(), server_end.into_channel())
-                .handle(|request| partitions_dir.open(scope.clone(), Path::dot(), flags, request));
+            let dir =
+                vfs::directory::serve(partitions_dir, fio::PERM_READABLE | fio::PERM_WRITABLE);
             gpt = Some(manager);
             Box::new(DirBasedBlockConnector::new(dir, String::from("part-000/volume")))
         } else {

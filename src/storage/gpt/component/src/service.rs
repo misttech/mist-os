@@ -9,10 +9,8 @@ use fidl::endpoints::{DiscoverableProtocolMarker as _, RequestStream as _, Servi
 use futures::lock::Mutex as AsyncMutex;
 use futures::stream::TryStreamExt as _;
 use std::sync::Arc;
-use vfs::directory::entry_container::Directory as _;
 use vfs::directory::helper::DirectlyMutable as _;
 use vfs::execution_scope::ExecutionScope;
-use vfs::path::Path;
 use {
     fidl_fuchsia_fs as ffs, fidl_fuchsia_fs_startup as fstartup,
     fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_io as fio,
@@ -136,14 +134,11 @@ impl StorageHostService {
             )
             .unwrap();
 
-        self.export_dir.clone().deprecated_open(
+        vfs::directory::serve_on(
+            self.export_dir.clone(),
+            fio::PERM_READABLE | fio::PERM_WRITABLE | fio::PERM_EXECUTABLE,
             self.scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY
-                | fio::OpenFlags::RIGHT_EXECUTABLE,
-            Path::dot(),
-            outgoing_dir.into(),
+            fidl::endpoints::ServerEnd::new(outgoing_dir),
         );
 
         if let Some(channel) = lifecycle_channel {

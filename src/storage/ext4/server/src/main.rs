@@ -31,9 +31,7 @@ use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
 use futures::future::TryFutureExt;
 use futures::stream::{StreamExt, TryStreamExt};
 use log::info;
-use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
-use vfs::path::Path;
 use zx::{Channel, Vmo};
 
 async fn run_ext4_server(mut stream: Server_RequestStream) -> Result<(), Error> {
@@ -158,14 +156,7 @@ fn serve_vmo(
         Ok(tree) => tree,
         Err(err) => return construct_fs_error_to_mount_vmo_result(err),
     };
-
-    tree.deprecated_open(
-        scope,
-        fio::OpenFlags::RIGHT_READABLE,
-        Path::dot(),
-        root.into_channel().into(),
-    );
-
+    vfs::directory::serve_on(tree, fio::PERM_READABLE, scope, root);
     MountVmoResult::Success(Success {})
 }
 
@@ -194,11 +185,11 @@ async fn main() -> Result<(), Error> {
         };
 
         let scope = ExecutionScope::new();
-        tree.deprecated_open(
+        vfs::directory::serve_on(
+            tree,
+            fio::PERM_READABLE,
             scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE,
-            Path::dot(),
-            Channel::from(directory_handle).into(),
+            ServerEnd::new(directory_handle.into()),
         );
 
         // Wait until the directory connection is closed by the client before exiting.

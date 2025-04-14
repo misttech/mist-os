@@ -119,9 +119,7 @@ pub mod test {
     use futures::prelude::*;
     use ramdevice_client::RamdiskClient;
     use std::io::Write;
-    use vfs::directory::entry_container::Directory;
     use vfs::node::Node as _;
-    use vfs::path::Path;
 
     /// Dictates the FIDL protocol a MockPartition should speak.
     enum MockPartitionMode {
@@ -308,12 +306,7 @@ pub mod test {
     fn open_root(dev: &FatDevice) -> fio::DirectoryProxy {
         let (proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let root = dev.get_root().unwrap();
-        let () = root.clone().deprecated_open(
-            dev.scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE,
-            Path::dot(),
-            remote.into_channel().into(),
-        );
+        vfs::directory::serve_on(root.clone(), fio::PERM_READABLE, dev.scope.clone(), remote);
         root.close();
         proxy
     }

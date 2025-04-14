@@ -338,11 +338,8 @@ mod tests {
     };
 
     use assert_matches::assert_matches;
-    use fidl::endpoints;
     use fidl_fuchsia_io as fio;
     use ramdevice_client::RamdiskClient;
-    use vfs::directory::entry_container::Directory;
-    use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
     use vfs::pseudo_directory;
 
@@ -432,17 +429,7 @@ mod tests {
                 "c" => read_only("c content"),
             },
         };
-        let (dir_proxy, dir_server) = endpoints::create_proxy::<fio::DirectoryMarker>();
-        let scope = ExecutionScope::new();
-        dir.deprecated_open(
-            scope,
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            endpoints::ServerEnd::new(dir_server.into_channel()),
-        );
-
+        let dir_proxy = vfs::directory::serve(dir, fio::PERM_READABLE | fio::PERM_WRITABLE);
         let ramdisk = RamdiskClient::create(512, 1 << 16).await.unwrap();
         let channel = ramdisk.open().unwrap();
 
@@ -458,17 +445,7 @@ mod tests {
                 "c" => read_only("c content"),
             },
         };
-        let (dir_proxy, dir_server) = endpoints::create_proxy::<fio::DirectoryMarker>();
-        let scope = ExecutionScope::new();
-        dir.deprecated_open(
-            scope,
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            endpoints::ServerEnd::new(dir_server.into_channel()),
-        );
-
+        let dir_proxy = vfs::directory::serve(dir, fio::PERM_READABLE | fio::PERM_WRITABLE);
         let entries = get_entries(&dir_proxy).await.unwrap();
 
         assert_eq!(

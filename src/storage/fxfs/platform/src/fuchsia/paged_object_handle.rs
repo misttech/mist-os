@@ -1204,7 +1204,6 @@ mod tests {
     use storage_device::fake_device::FakeDevice;
     use storage_device::{buffer, DeviceHolder};
     use test_util::{assert_geq, assert_lt};
-    use vfs::path::Path;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     const BLOCK_SIZE: u32 = 512;
@@ -1297,18 +1296,12 @@ mod tests {
 
     fn open_volume(volume: &FxVolumeAndRoot) -> fio::DirectoryProxy {
         let (root, server_end) = create_proxy::<fio::DirectoryMarker>();
-        let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
-        volume
-            .root()
-            .clone()
-            .as_directory()
-            .open(
-                volume.volume().scope().clone(),
-                Path::dot(),
-                flags,
-                &mut vfs::ObjectRequest::new(flags, &Default::default(), server_end.into_channel()),
-            )
-            .expect("failed to open volume directory");
+        vfs::directory::serve_on(
+            volume.root().clone().as_directory(),
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
+            volume.volume().scope().clone(),
+            server_end,
+        );
         root
     }
 

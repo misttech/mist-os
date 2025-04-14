@@ -16,10 +16,8 @@ use futures::lock::Mutex;
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
-use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::immutable::Simple as PseudoDirectory;
-use vfs::service;
 use {fidl_fuchsia_fs_realm as fs_realm, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[derive(Clone)]
@@ -153,7 +151,7 @@ async fn check(name: &str, device: ClientEnd<ControllerMarker>) -> Result<(), Er
     filesystem.fsck().await
 }
 
-pub fn fs_realm_service(fs_realm_state: FsRealmState) -> Arc<service::Service> {
+pub fn fs_realm_service(fs_realm_state: FsRealmState) -> Arc<vfs::service::Service> {
     vfs::service::host(move |mut stream: fs_realm::ControllerRequestStream| {
         let fs_realm_state = fs_realm_state.clone();
         async move {
@@ -244,11 +242,11 @@ async fn main() -> Result<(), Error> {
     let _ = handle_lifecycle_requests(shutdown_tx)?;
 
     let scope = vfs::execution_scope::ExecutionScope::new();
-    export.deprecated_open(
+    vfs::directory::serve_on(
+        export,
+        fio::PERM_READABLE | fio::PERM_WRITABLE,
         scope.clone(),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        vfs::path::Path::dot(),
-        directory_request.into(),
+        fidl::endpoints::ServerEnd::new(directory_request.into()),
     );
     log::info!("Waiting for shutdown request");
     // Once _lifecycle_request_stream goes out of scope, the LifecycleRequestStream will

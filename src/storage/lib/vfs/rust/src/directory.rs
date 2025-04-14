@@ -5,7 +5,10 @@
 //! Module holding different kinds of pseudo directories and their building blocks.
 
 use crate::directory::entry_container::Directory;
+use crate::execution_scope::ExecutionScope;
+use crate::object_request::ToObjectRequest as _;
 use crate::path::Path;
+use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use std::sync::Arc;
 
@@ -78,4 +81,16 @@ pub fn serve<D: Directory + ?Sized>(directory: Arc<D>, flags: fio::Flags) -> fio
 /// [`crate::execution_scope::ExecutionScope`] will be created for the request.
 pub fn serve_read_only<D: Directory + ?Sized>(directory: Arc<D>) -> fio::DirectoryProxy {
     crate::serve_directory(directory, Path::dot(), fio::PERM_READABLE)
+}
+
+/// Helper function to serve a connection to `directory` on `server_end` with specified `flags` and
+/// `scope`. Errors will be communicated via epitaph on `server_end`.
+pub fn serve_on<D: Directory + ?Sized>(
+    directory: Arc<D>,
+    flags: fio::Flags,
+    scope: ExecutionScope,
+    server_end: ServerEnd<fio::DirectoryMarker>,
+) {
+    let request = flags.to_object_request(server_end);
+    request.handle(|request| directory.open(scope, Path::dot(), flags, request));
 }

@@ -10,7 +10,6 @@ use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstan
 use futures::future::FutureExt;
 use std::path::Path;
 use storage_benchmarks::{BlockDeviceFactory, Filesystem, FilesystemConfig};
-use vfs::directory::entry_container::Directory as _;
 /// Config object for starting a `PkgDirInstance`. The `PkgDirInstance` allows blob benchmarks to
 /// open and read a blob through its package directory as opposed to talking directly to the
 /// filesystem.
@@ -132,11 +131,11 @@ impl PkgDirRealm {
                 "service_reflector",
                 move |handles| {
                     let scope = vfs::execution_scope::ExecutionScope::new();
-                    let () = exposed_dir.clone().deprecated_open(
+                    vfs::directory::serve_on(
+                        exposed_dir.clone(),
+                        fio::PERM_READABLE,
                         scope.clone(),
-                        fio::OpenFlags::RIGHT_READABLE,
-                        vfs::path::Path::dot(),
-                        handles.outgoing_dir.into_channel().into(),
+                        handles.outgoing_dir,
                     );
                     async move {
                         scope.wait().await;

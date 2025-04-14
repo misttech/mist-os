@@ -44,11 +44,8 @@ use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use uuid::Uuid;
-use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::execution_scope::ExecutionScope;
-use vfs::path::Path;
-use vfs::ObjectRequest;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 use {
     fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio, fuchsia_async as fasync,
@@ -948,13 +945,12 @@ impl Component {
                 }
             }),
         )?;
-        let flags = fio::Flags::PROTOCOL_DIRECTORY
-            | fio::PERM_READABLE
-            | fio::PERM_WRITABLE
-            | fio::PERM_EXECUTABLE;
-        ObjectRequest::new(flags, &fio::Options::default(), outgoing_dir).handle(|request| {
-            self.export_dir.clone().open(self.scope.clone(), Path::dot(), flags, request)
-        });
+        vfs::directory::serve_on(
+            self.export_dir.clone(),
+            fio::PERM_READABLE | fio::PERM_WRITABLE | fio::PERM_EXECUTABLE,
+            self.scope.clone(),
+            ServerEnd::new(outgoing_dir),
+        );
         Ok(())
     }
 
@@ -1148,8 +1144,6 @@ impl Component {
             Arc::new(PartitionInterface { partition_index, device_info, key, fvm: fvm.clone() }),
         );
 
-        let server_end = server_end.into_channel();
-
         if let Some(uri) = options.uri {
             // For now we only support URIs of the form: "#meta/<component_name>.cm".
             let re = Regex::new(r"^#meta/(.*)\.cm$").unwrap();
@@ -1236,12 +1230,12 @@ impl Component {
                 &fio::Options::default(),
                 root_server_end.into_channel(),
             )?;
-            let flags = fio::Flags::PROTOCOL_DIRECTORY
-                | fio::PERM_READABLE
-                | fio::PERM_WRITABLE
-                | fio::PERM_EXECUTABLE;
-            ObjectRequest::new(flags, &fio::Options::default(), server_end)
-                .handle(|request| outgoing_dir.open(volume_scope, Path::dot(), flags, request));
+            vfs::directory::serve_on(
+                outgoing_dir,
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::PERM_EXECUTABLE,
+                volume_scope,
+                server_end,
+            );
         } else {
             // Expose the volume as a block device.
             let outgoing_dir = vfs::directory::immutable::simple();
@@ -1275,12 +1269,12 @@ impl Component {
             })
             .detach();
 
-            let flags = fio::Flags::PROTOCOL_DIRECTORY
-                | fio::PERM_READABLE
-                | fio::PERM_WRITABLE
-                | fio::PERM_EXECUTABLE;
-            ObjectRequest::new(flags, &fio::Options::default(), server_end)
-                .handle(|request| outgoing_dir.open(volume_scope, Path::dot(), flags, request));
+            vfs::directory::serve_on(
+                outgoing_dir,
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::PERM_EXECUTABLE,
+                volume_scope,
+                server_end,
+            );
         }
 
         Ok(())

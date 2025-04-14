@@ -126,7 +126,6 @@ mod tests {
     use std::io::Write;
     use std::ops::Deref;
     use vfs::node::Node;
-    use vfs::path::Path;
 
     #[derive(Debug, PartialEq)]
     /// Helper class for creating a filesystem layout on a FAT disk programatically.
@@ -304,13 +303,14 @@ mod tests {
         structure.create(&disk.root_dir());
 
         let fatfs = disk.into_fatfs();
-        let scope = ExecutionScope::new();
-        let (proxy, remote) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
-        let root = fatfs.get_root().expect("get_root OK");
-        root.clone().deprecated_open(scope, fio::OpenFlags::RIGHT_READABLE, Path::dot(), remote);
+        let root = fatfs.get_root().unwrap();
+        let proxy = vfs::directory::serve_read_only(root.clone());
         root.close();
 
-        structure.verify(proxy).await.expect("Verify succeeds");
+        structure
+            .verify(fio::NodeProxy::from_channel(proxy.into_channel().unwrap().into()))
+            .await
+            .expect("Verify succeeds");
     }
 
     #[fuchsia::test]

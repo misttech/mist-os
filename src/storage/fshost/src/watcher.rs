@@ -181,15 +181,12 @@ impl Watcher {
 #[cfg(test)]
 mod tests {
     use super::{DirSource, PathSource, PathSourceType, Watcher};
+    use fidl::endpoints::Proxy as _;
     use fidl_fuchsia_device::{ControllerRequest, ControllerRequestStream};
     use fidl_fuchsia_hardware_block_volume::VolumeRequestStream;
-    use fidl_fuchsia_io as fio;
     use futures::StreamExt;
     use std::sync::Arc;
-    use vfs::directory::entry_container::Directory;
     use vfs::directory::helper::DirectlyMutable;
-    use vfs::execution_scope::ExecutionScope;
-    use vfs::path::Path;
     use vfs::service;
 
     pub fn volume_service() -> Arc<service::Service> {
@@ -262,28 +259,15 @@ mod tests {
             },
         };
 
-        let (client, server) = fidl::endpoints::create_endpoints();
-        let scope = ExecutionScope::new();
-        class_block_and_nand.deprecated_open(
-            scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            Path::dot(),
-            fidl::endpoints::ServerEnd::new(server.into_channel()),
-        );
+        let client =
+            vfs::directory::serve_read_only(class_block_and_nand).into_client_end().unwrap();
 
         {
             let ns = fdio::Namespace::installed().expect("failed to get installed namespace");
             ns.bind("/test-dev", client).expect("failed to bind dev in namespace");
         }
 
-        let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        partitions_dir.clone().deprecated_open(
-            scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            Path::dot(),
-            fidl::endpoints::ServerEnd::new(server.into_channel()),
-        );
-
+        let client = vfs::directory::serve_read_only(partitions_dir);
         let (_watcher, mut device_stream) = Watcher::new(vec![
             Box::new(PathSource::new("/test-dev/class/block", PathSourceType::Block)),
             Box::new(PathSource::new("/test-dev/class/nand", PathSourceType::Nand)),
@@ -353,14 +337,8 @@ mod tests {
             },
         };
 
-        let (client, server) = fidl::endpoints::create_endpoints();
-        let scope = ExecutionScope::new();
-        class_block_and_nand.deprecated_open(
-            scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            Path::dot(),
-            fidl::endpoints::ServerEnd::new(server.into_channel()),
-        );
+        let client =
+            vfs::directory::serve_read_only(class_block_and_nand).into_client_end().unwrap();
 
         {
             let ns = fdio::Namespace::installed().expect("failed to get installed namespace");

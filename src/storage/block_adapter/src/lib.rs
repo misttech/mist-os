@@ -10,14 +10,12 @@
 
 use anyhow::Error;
 use block_client::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient};
-use fidl::endpoints::{create_endpoints, ServerEnd};
+use fidl::endpoints::create_endpoints;
 use std::sync::Arc;
 use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
-use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode};
 use vfs::node::Node;
-use vfs::path::Path;
 use vfs::{immutable_attributes, pseudo_directory, ObjectRequestRef};
 use {
     fidl_fuchsia_hardware_block as fhardware_block, fidl_fuchsia_io as fio, fuchsia_async as fasync,
@@ -145,11 +143,11 @@ pub async fn run(
         };
 
         let scope = ExecutionScope::new();
-        let () = dir.deprecated_open(
+        vfs::directory::serve_on(
+            dir,
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
             scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            Path::dot(),
-            ServerEnd::new(server.into_channel()),
+            server,
         );
         async move { scope.wait().await }
     };

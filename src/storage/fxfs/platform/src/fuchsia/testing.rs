@@ -21,7 +21,6 @@ use fxfs_insecure_crypto::InsecureCrypt;
 use std::sync::{Arc, Weak};
 use storage_device::fake_device::FakeDevice;
 use storage_device::DeviceHolder;
-use vfs::path::Path;
 use vfs::temp_clone::unblock;
 use zx::{self as zx, Status};
 
@@ -157,18 +156,12 @@ impl TestFixture {
         };
 
         let (root, server_end) = create_proxy::<fio::DirectoryMarker>();
-        let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
-        volume
-            .root()
-            .clone()
-            .as_directory()
-            .open(
-                volume.volume().scope().clone(),
-                Path::dot(),
-                flags,
-                &mut vfs::ObjectRequest::new(flags, &Default::default(), server_end.into_channel()),
-            )
-            .unwrap();
+        vfs::directory::serve_on(
+            volume.root().clone().as_directory(),
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
+            volume.volume().scope().clone(),
+            server_end,
+        );
 
         let volume_out_dir = if options.serve_volume {
             let (out_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();

@@ -30,9 +30,8 @@ use fxfs_trace::{trace_future_args, TraceFutureExt};
 use rustc_hash::FxHashMap as HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock, Weak};
-use vfs::directory::entry_container::{self, MutableDirectory};
+use vfs::directory::entry_container::MutableDirectory;
 use vfs::directory::helper::DirectlyMutable;
-use vfs::path::Path;
 use zx::{self as zx, AsHandleRef};
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -559,17 +558,7 @@ impl VolumesDirectory {
         if as_blob {
             flags |= fio::PERM_EXECUTABLE;
         }
-        entry_container::Directory::open(
-            outgoing_dir,
-            scope,
-            Path::dot(),
-            flags,
-            &mut vfs::ObjectRequest::new(
-                flags,
-                &Default::default(),
-                outgoing_dir_server_end.into_channel(),
-            ),
-        )?;
+        vfs::directory::serve_on(outgoing_dir, flags, scope, outgoing_dir_server_end);
 
         info!(
             store_id;
@@ -917,22 +906,12 @@ mod tests {
 
         let new_dirty = {
             let (root, server_end) = create_proxy::<fio::DirectoryMarker>();
-            let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
-            vol.root()
-                .clone()
-                .as_directory()
-                .open(
-                    vol.volume().scope().clone(),
-                    Path::dot(),
-                    flags,
-                    &mut vfs::ObjectRequest::new(
-                        flags,
-                        &Default::default(),
-                        server_end.into_channel(),
-                    ),
-                )
-                .expect("failed to open vo lumes directory");
-
+            vfs::directory::serve_on(
+                vol.root().clone().as_directory(),
+                fio::PERM_READABLE | fio::PERM_WRITABLE,
+                vol.volume().scope().clone(),
+                server_end,
+            );
             let f = open_file_checked(
                 &root,
                 "foo",
@@ -1152,25 +1131,8 @@ mod tests {
             entries
         };
 
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let dir_proxy = Arc::new(dir_proxy);
-        let flags =
-            fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY;
-        volumes_directory
-            .directory_node()
-            .clone()
-            .open(
-                ExecutionScope::new(),
-                Path::dot(),
-                flags,
-                &mut vfs::ObjectRequest::new(
-                    flags,
-                    &Default::default(),
-                    dir_server_end.into_channel(),
-                ),
-            )
-            .expect("failed to open volumes directory");
-
+        let dir_proxy =
+            Arc::new(vfs::directory::serve_read_only(volumes_directory.directory_node().clone()));
         let entries = readdir(dir_proxy.clone()).await;
         assert_eq!(entries, [".", "encrypted", "unencrypted"]);
 

@@ -4,7 +4,7 @@
 
 use anyhow::{bail, Context, Error};
 use block_client::RemoteBlockClientSync;
-use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, RequestStream};
+use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, RequestStream, ServerEnd};
 use fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream};
 use fidl_fuchsia_fs_startup::{
     CheckOptions, FormatOptions, StartOptions, StartupMarker, StartupRequest, StartupRequestStream,
@@ -16,11 +16,9 @@ use futures::lock::Mutex;
 use futures::TryStreamExt;
 use log::{error, info, warn};
 use std::sync::Arc;
-use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::execution_scope::ExecutionScope;
 use vfs::node::Node as _;
-use vfs::path::Path;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 fn map_to_raw_status(e: Error) -> zx::sys::zx_status_t {
@@ -124,11 +122,11 @@ impl Component {
             }),
         )?;
 
-        self.outgoing_dir.clone().deprecated_open(
+        vfs::directory::serve_on(
+            self.outgoing_dir.clone(),
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
             self.scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            Path::dot(),
-            outgoing_dir.into(),
+            ServerEnd::new(outgoing_dir),
         );
 
         if let Some(channel) = lifecycle_channel {

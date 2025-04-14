@@ -186,9 +186,6 @@ mod tests {
     use crate::tests::{TestDiskContents, TestFatDisk};
     use fidl::endpoints::Proxy;
     use scopeguard::defer;
-    use vfs::directory::entry_container::Directory;
-    use vfs::execution_scope::ExecutionScope;
-    use vfs::path::Path;
 
     const TEST_DISK_SIZE: u64 = 2048 << 10; // 2048K
 
@@ -204,15 +201,11 @@ mod tests {
         dir.open_ref(&fs.filesystem().lock()).unwrap();
         defer! { dir.close_ref(&fs.filesystem().lock()) };
 
-        let scope = ExecutionScope::new();
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
-        dir.clone().deprecated_open(
-            scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            Path::validate_and_split("test").unwrap(),
-            server_end,
+        let proxy = vfs::serve_file(
+            dir.clone(),
+            vfs::Path::validate_and_split("test").unwrap(),
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
         );
-
         assert!(fs.filesystem().dirty_task.lock().is_none());
         let file = fio::FileProxy::new(proxy.into_channel().unwrap());
         file.write("hello there".as_bytes()).await.unwrap().map_err(Status::from_raw).unwrap();
