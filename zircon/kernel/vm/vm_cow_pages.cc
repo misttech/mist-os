@@ -4087,8 +4087,14 @@ zx_status_t VmCowPages::ProtectRangeFromReclamation(VmCowRange range, bool set_a
         // eviction, and hinted pages should not be evicted.
         if (page->is_loaned()) {
           DEBUG_ASSERT(is_page_clean(page));
-          AssertHeld(owner->lock_ref());
-          loaned_page_owner = fbl::MakeRefPtrUpgradeFromRaw<VmCowPages>(owner, owner->lock());
+          // The lock of |owner| may or may not be held depending on the current state of the
+          // LookupCursor, however we do not need the owner lock in order to take a RefPtr. Since we
+          // were able to get a reference to the page, the page cannot be removed or changed in
+          // owner without informing us, as we might have a mapping to it. Us holding our lock
+          // blocks that and prevents it from completing, meaning that owner must still be a live
+          // object. The page could already be removed from owner, but we will deal with that race
+          // in the ReplacePage step down below.
+          loaned_page_owner = fbl::MakeRefPtrUpgradeFromRaw<VmCowPages>(owner, lock());
           loaned_page = page;
           loaned_page_offset = page->object.get_page_offset();
           break;
