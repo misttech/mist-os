@@ -139,7 +139,10 @@ fuchsia_cc = rule(
         ),
         "data": attr.label_list(
             doc = "Packaged files needed by this target at runtime.",
-            providers = [FuchsiaPackageResourcesInfo],
+            providers = [
+                [FuchsiaPackageResourcesInfo],
+                [FuchsiaUnstrippedBinaryInfo],
+            ],
         ),
         "restricted_symbols": attr.label(
             doc = """A file containing a list of restricted symbols.
