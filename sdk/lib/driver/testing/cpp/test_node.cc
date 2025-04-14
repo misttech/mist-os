@@ -108,9 +108,37 @@ void TestNode::AddChild(AddChildRequestView request, AddChildCompleter::Sync& co
     return;
   }
   TestNode& node = it->second;
+
+#if FUCHSIA_API_LEVEL_LESS_THAN(NEXT)
   if (request->args.has_properties()) {
     node.SetProperties(fidl::ToNatural(request->args.properties()).value());
   }
+#else
+  if (request->args.has_properties() && request->args.has_properties2()) {
+    completer.ReplyError(fuchsia_driver_framework::NodeError::kUnsupportedArgs);
+    return;
+  }
+
+  if (request->args.has_properties()) {
+    std::vector<fuchsia_driver_framework::NodeProperty2> properties;
+    properties.reserve(request->args.properties().count());
+    for (auto& deprecated_prop : request->args.properties().get()) {
+      if (deprecated_prop.key.Which() !=
+          fuchsia_driver_framework::wire::NodePropertyKey::Tag::kStringValue) {
+        completer.ReplyError(fuchsia_driver_framework::NodeError::kUnsupportedArgs);
+        return;
+      }
+
+      properties.emplace_back(fuchsia_driver_framework::NodeProperty2{
+          {.key = std::string(deprecated_prop.key.string_value().get()),
+           .value = fidl::ToNatural(deprecated_prop.value)}});
+    }
+    node.SetProperties(properties);
+  } else if (request->args.has_properties2()) {
+    node.SetProperties(fidl::ToNatural(request->args.properties2()).value());
+  }
+#endif
+
   node.SetParent(this, std::move(request->controller));
   if (request->node) {
     zx::result result = node.Serve(std::move(request->node));
@@ -163,10 +191,18 @@ void TestNode::SetParent(TestNode* parent,
                               fidl::kIgnoreBindingClosure);
 }
 
+#if FUCHSIA_API_LEVEL_LESS_THAN(NEXT)
 void TestNode::SetProperties(std::vector<fuchsia_driver_framework::NodeProperty> properties) {
   std::lock_guard guard(checker_);
   properties_ = std::move(properties);
 }
+#else
+
+void TestNode::SetProperties(std::vector<fuchsia_driver_framework::NodeProperty2> properties) {
+  std::lock_guard guard(checker_);
+  properties_ = std::move(properties);
+}
+#endif
 
 void TestNode::RemoveFromParent() {
   std::lock_guard guard(checker_);

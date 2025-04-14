@@ -191,7 +191,7 @@ TEST_F(DeviceTest, AddChildWithProtoStrPropAndProtoId) {
   const fdf_testing::TestNode& child_node = node.children().at("child");
   std::vector properties = child_node.GetProperties();
   ASSERT_EQ(1ul, properties.size());
-  ASSERT_EQ(properties[0].key().string_value().value(), bind_fuchsia::PROTOCOL);
+  ASSERT_EQ(properties[0].key(), bind_fuchsia::PROTOCOL);
   ASSERT_EQ(properties[0].value().int_value().value(), static_cast<uint32_t>(ZX_PROTOCOL_I2C));
 }
 
@@ -233,13 +233,13 @@ TEST_F(DeviceTest, AddChildWithStringProps) {
   const fdf_testing::TestNode& child_node = node.children().at("child");
   std::vector properties = child_node.GetProperties();
   ASSERT_EQ(5ul, properties.size());
-  ASSERT_EQ(properties[0].key().string_value().value(), "hello");
+  ASSERT_EQ(properties[0].key(), "hello");
   ASSERT_EQ(properties[0].value().int_value().value(), 1u);
-  ASSERT_EQ(properties[1].key().string_value().value(), "another");
+  ASSERT_EQ(properties[1].key(), "another");
   ASSERT_EQ(properties[1].value().bool_value().value(), true);
-  ASSERT_EQ(properties[2].key().string_value().value(), "key");
+  ASSERT_EQ(properties[2].key(), "key");
   ASSERT_EQ(properties[2].value().string_value().value(), "value");
-  ASSERT_EQ(properties[3].key().string_value().value(), "enum_key");
+  ASSERT_EQ(properties[3].key(), "enum_key");
   ASSERT_EQ(properties[3].value().string_value().value(), "enum_value");
 }
 

@@ -90,12 +90,21 @@ class TestNode final : public fidl::WireServer<fuchsia_driver_framework::NodeCon
     return node_binding_.has_value();
   }
 
+#if FUCHSIA_API_LEVEL_LESS_THAN(NEXT)
   // Get the node properties that this node was created with. Can be used to validate that a driver
   // is creating valid child nodes.
   std::vector<fuchsia_driver_framework::NodeProperty> GetProperties() const {
     std::lock_guard guard(checker_);
     return properties_;
   }
+#else
+  // Get the node properties that this node was created with. Can be used to validate that a driver
+  // is creating valid child nodes.
+  std::vector<fuchsia_driver_framework::NodeProperty2> GetProperties() const {
+    std::lock_guard guard(checker_);
+    return properties_;
+  }
+#endif
 
   // Gets the bind data that were stored as part of NodeController::RequestBind calls.
   std::vector<BindData> GetBindData() const {
@@ -121,7 +130,12 @@ class TestNode final : public fidl::WireServer<fuchsia_driver_framework::NodeCon
 
   void SetParent(TestNode* parent,
                  fidl::ServerEnd<fuchsia_driver_framework::NodeController> controller);
+
+#if FUCHSIA_API_LEVEL_LESS_THAN(NEXT)
   void SetProperties(std::vector<fuchsia_driver_framework::NodeProperty> properties);
+#else
+  void SetProperties(std::vector<fuchsia_driver_framework::NodeProperty2> properties);
+#endif
 
   void RemoveFromParent();
 
@@ -138,7 +152,13 @@ class TestNode final : public fidl::WireServer<fuchsia_driver_framework::NodeCon
       __TA_GUARDED(checker_);
 
   async_dispatcher_t* dispatcher_;
+
+#if FUCHSIA_API_LEVEL_LESS_THAN(NEXT)
   std::vector<fuchsia_driver_framework::NodeProperty> properties_ __TA_GUARDED(checker_);
+#else
+  std::vector<fuchsia_driver_framework::NodeProperty2> properties_ __TA_GUARDED(checker_);
+#endif
+
   std::vector<BindData> bind_data_ __TA_GUARDED(checker_);
   std::string name_ __TA_GUARDED(checker_);
   std::optional<std::reference_wrapper<TestNode>> parent_ __TA_GUARDED(checker_);

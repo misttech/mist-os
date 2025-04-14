@@ -80,7 +80,7 @@ TEST_F(ChildDriverTest, VerifyChildNode) {
     auto props = child->second.GetProperties();
     EXPECT_EQ(1u, props.size());
     auto prop = props.begin();
-    EXPECT_EQ(bind_fuchsia_test::TEST_CHILD, prop->key().string_value().value());
+    EXPECT_EQ(bind_fuchsia_test::TEST_CHILD, prop->key());
     EXPECT_EQ(kTestName, prop->value().string_value().value());
   });
 }

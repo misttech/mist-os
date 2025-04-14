@@ -684,7 +684,7 @@ TEST_F(GpioTest, ControllerId) {
       ASSERT_EQ(
           node.children().at("gpio").children().count(std::string{"gpio-"} + pin.name().value()),
           1ul);
-      std::vector<fuchsia_driver_framework::NodeProperty> properties =
+      std::vector<fuchsia_driver_framework::NodeProperty2> properties =
           node.children()
               .at("gpio")
               .children()
@@ -693,14 +693,12 @@ TEST_F(GpioTest, ControllerId) {
 
       ASSERT_EQ(properties.size(), 2ul);
 
-      ASSERT_TRUE(properties[0].key().string_value().has_value());
-      EXPECT_EQ(properties[0].key().string_value().value(), bind_fuchsia::GPIO_PIN);
+      EXPECT_EQ(properties[0].key(), bind_fuchsia::GPIO_PIN);
 
       ASSERT_TRUE(properties[0].value().int_value().has_value());
       EXPECT_EQ(properties[0].value().int_value().value(), pin.pin().value());
 
-      ASSERT_TRUE(properties[1].key().string_value().has_value());
-      EXPECT_EQ(properties[1].key().string_value().value(), bind_fuchsia::GPIO_CONTROLLER);
+      EXPECT_EQ(properties[1].key(), bind_fuchsia::GPIO_CONTROLLER);
 
       ASSERT_TRUE(properties[1].value().int_value().has_value());
       EXPECT_EQ(properties[1].value().int_value().value(), kController);

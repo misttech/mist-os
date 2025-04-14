@@ -61,7 +61,7 @@ TEST_F(SimpleDriverBackgroundTest, VerifyChildNode) {
     auto props = child->second.GetProperties();
     EXPECT_EQ(1u, props.size());
     auto prop = props.begin();
-    EXPECT_STREQ(bind_fuchsia_test::TEST_CHILD.c_str(), prop->key().string_value()->c_str());
+    EXPECT_STREQ(bind_fuchsia_test::TEST_CHILD.c_str(), prop->key().c_str());
     EXPECT_STREQ("simple", prop->value().string_value()->c_str());
   });
 }

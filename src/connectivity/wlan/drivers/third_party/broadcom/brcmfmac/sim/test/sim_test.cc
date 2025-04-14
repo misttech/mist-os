@@ -677,8 +677,8 @@ zx_status_t SimTest::StartInterface(wlan_common::WlanMacRole role, SimInterface*
   }
 
   // check that fullmac device count is expected.
-  auto fullmac_service_prop = fdf::MakeProperty(bind_fuchsia_wlan_fullmac::SERVICE,
-                                                bind_fuchsia_wlan_fullmac::SERVICE_ZIRCONTRANSPORT);
+  auto fullmac_service_prop = fdf::MakeProperty2(
+      bind_fuchsia_wlan_fullmac::SERVICE, bind_fuchsia_wlan_fullmac::SERVICE_ZIRCONTRANSPORT);
   EXPECT_EQ(ifaces_.size(), DeviceCountWithProperty(fullmac_service_prop));
 
   return ZX_OK;
@@ -697,8 +697,8 @@ zx_status_t SimTest::InterfaceDestroyed(SimInterface* ifc) {
   ifc->Reset();
   ifaces_.erase(iter);
 
-  auto fullmac_service_prop = fdf::MakeProperty(bind_fuchsia_wlan_fullmac::SERVICE,
-                                                bind_fuchsia_wlan_fullmac::SERVICE_ZIRCONTRANSPORT);
+  auto fullmac_service_prop = fdf::MakeProperty2(
+      bind_fuchsia_wlan_fullmac::SERVICE, bind_fuchsia_wlan_fullmac::SERVICE_ZIRCONTRANSPORT);
   WaitForDeviceCountWithProperty(fullmac_service_prop, ifaces_.size());
 
   // Wait until reset is complete. This has to happen on this thread, not the driver dispatcher.
@@ -715,11 +715,11 @@ uint32_t SimTest::DeviceCount() {
   return node_server_.SyncCall([](fdf_testing::TestNode* root) { return root->children().size(); });
 }
 
-uint32_t SimTest::DeviceCountWithProperty(const fuchsia_driver_framework::NodeProperty& property) {
+uint32_t SimTest::DeviceCountWithProperty(const fuchsia_driver_framework::NodeProperty2& property) {
   return node_server_.SyncCall([&](fdf_testing::TestNode* root) {
     uint32_t count = 0;
     for (const auto& [_, child] : root->children()) {
-      for (const fuchsia_driver_framework::NodeProperty& child_property : child.GetProperties()) {
+      for (const fuchsia_driver_framework::NodeProperty2& child_property : child.GetProperties()) {
         if (child_property == property) {
           count++;
           break;
@@ -737,8 +737,8 @@ void SimTest::WaitForDeviceCount(uint32_t expected) {
   }
 }
 
-void SimTest::WaitForDeviceCountWithProperty(const fuchsia_driver_framework::NodeProperty& property,
-                                             uint32_t expected) {
+void SimTest::WaitForDeviceCountWithProperty(
+    const fuchsia_driver_framework::NodeProperty2& property, uint32_t expected) {
   while (expected != DeviceCountWithProperty(property)) {
     std::this_thread::sleep_for(std::chrono::seconds(1));
   }
@@ -775,8 +775,8 @@ zx_status_t SimTest::DeleteInterface(SimInterface* ifc) {
   // Once the interface data structures have been deleted, our pointers are no longer valid.
   ifaces_.erase(iter);
 
-  auto fullmac_service_prop = fdf::MakeProperty(bind_fuchsia_wlan_fullmac::SERVICE,
-                                                bind_fuchsia_wlan_fullmac::SERVICE_ZIRCONTRANSPORT);
+  auto fullmac_service_prop = fdf::MakeProperty2(
+      bind_fuchsia_wlan_fullmac::SERVICE, bind_fuchsia_wlan_fullmac::SERVICE_ZIRCONTRANSPORT);
   WaitForDeviceCountWithProperty(fullmac_service_prop, ifaces_.size());
 
   return ZX_OK;
