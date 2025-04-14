@@ -38,7 +38,7 @@ library for unit tests.
 
 There are a number of helpful mock libraries:
 
-* [fake_pdev](/src/devices/bus/testing/fake-pdev/fake-pdev.h) - Creates info for a fake pdev parent
+* [fake-pdev](/sdk/lib/driver/fake-platform-device/cpp/fake-pdev.h) - Creates info for a fake pdev parent
 * [mock-mmio-reg](/src/devices/testing/mock-mmio-reg/include/mock-mmio-reg/mock-mmio-reg.h) Mocking Mmio registers
 * [fake-object](/src/devices/testing/fake-object/README.md) - fake userspace versions of kernel objects
 

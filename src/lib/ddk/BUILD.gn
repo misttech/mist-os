@@ -164,7 +164,6 @@ static_library("ddk") {
     "//src/devices/bus/drivers/pci/test:*",
     "//src/devices/bus/drivers/platform:*",
     "//src/devices/bus/drivers/platform/test:*",
-    "//src/devices/bus/lib/device-protocol-pdev:*",
     "//src/devices/bus/lib/platform-bus-composites:*",
     "//src/devices/bus/lib/virtio:*",
     "//src/devices/clock/drivers/amlogic-clk:*",

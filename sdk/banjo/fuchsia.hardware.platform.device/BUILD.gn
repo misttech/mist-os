@@ -16,7 +16,6 @@ fidl("fuchsia.hardware.platform.device") {
     "//sdk/banjo/*",
     "//src/devices/bus/drivers/pci:*",
     "//src/devices/bus/drivers/platform/*",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/misc/drivers/cpu-trace:*",
     "//vendor/*",
   ]
