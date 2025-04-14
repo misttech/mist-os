@@ -82,6 +82,7 @@ static_library("boot-shim") {
     "efi-boot-shim.cc",
     "efi.cc",
     "pool-mem-config.cc",
+    "reboot-reason.cc",
     "test-serial-number.cc",
     "tty.cc",
   ]
@@ -181,6 +182,7 @@ if (!is_kernel) {
       "efi-boot-shim-tests.cc",
       "efi-tests.cc",
       "pool-mem-config-tests.cc",
+      "reboot-reason-test.cc",
       "test-serial-number-tests.cc",
       "tty-tests.cc",
       "uart-tests.cc",
