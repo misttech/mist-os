@@ -79,8 +79,14 @@ fn close_inaccessible_file_descriptors(
     // Remap-to-null any fds that failed a check for allowing
     // `[child-process] [fd-from-child-fd-table]:fd { use }`.
     current_task.files.remap_fds(|file| {
-        let fd_use_result =
-            has_file_permissions(&permission_check, source_sid, file, &[], audit_context);
+        let fd_use_result = has_file_permissions(
+            &permission_check,
+            current_task.kernel(),
+            source_sid,
+            file,
+            &[],
+            audit_context,
+        );
         fd_use_result.map_or_else(|_| Some(null_file_handle.clone()), |_| None)
     });
 }
@@ -97,6 +103,7 @@ fn maybe_reset_rlimits(
     let permission_check = security_server.as_permission_check();
     if check_permission(
         &permission_check,
+        current_task.kernel(),
         old_sid,
         new_sid,
         ProcessPermission::RlimitInh,
@@ -140,7 +147,13 @@ pub(in crate::security) fn check_task_create_access(
 ) -> Result<(), Errno> {
     let audit_context = current_task.into();
     let task_sid = current_task.security_state.lock().current_sid;
-    check_self_permission(permission_check, task_sid, ProcessPermission::Fork, audit_context)
+    check_self_permission(
+        permission_check,
+        current_task.kernel(),
+        task_sid,
+        ProcessPermission::Fork,
+        audit_context,
+    )
 }
 
 /// Checks the SELinux permissions required for exec. Returns the SELinux state of a resolved
@@ -173,6 +186,7 @@ pub(in crate::security) fn check_exec_access(
         // "execute_no_trans" permission to the binary.
         check_permission(
             &permission_check,
+            current_task.kernel(),
             current_sid,
             executable_sid,
             FilePermission::ExecuteNoTrans,
@@ -182,6 +196,7 @@ pub(in crate::security) fn check_exec_access(
         // Check that the domain transition is allowed.
         check_permission(
             &permission_check,
+            current_task.kernel(),
             current_sid,
             new_sid,
             ProcessPermission::Transition,
@@ -191,6 +206,7 @@ pub(in crate::security) fn check_exec_access(
         // Check that the executable file has an entry point into the new domain.
         check_permission(
             &permission_check,
+            current_task.kernel(),
             new_sid,
             executable_sid,
             FilePermission::Entrypoint,
@@ -202,6 +218,7 @@ pub(in crate::security) fn check_exec_access(
             let tracer_sid = ptracer.security_state.lock().current_sid;
             check_permission(
                 &permission_check,
+                current_task.kernel(),
                 tracer_sid,
                 new_sid,
                 ProcessPermission::Ptrace,
@@ -214,6 +231,7 @@ pub(in crate::security) fn check_exec_access(
         if current_task.thread_group().read().is_sharing {
             check_permission(
                 &permission_check,
+                current_task.kernel(),
                 current_sid,
                 new_sid,
                 ProcessPermission::Share,
@@ -237,6 +255,7 @@ pub(in crate::security) fn check_getsched_access(
     let target_sid = target.security_state.lock().current_sid;
     check_permission(
         permission_check,
+        current_task.kernel(),
         source_sid,
         target_sid,
         ProcessPermission::GetSched,
@@ -256,6 +275,7 @@ pub(in crate::security) fn check_setsched_access(
     let target_sid = target.security_state.lock().current_sid;
     check_permission(
         permission_check,
+        current_task.kernel(),
         source_sid,
         target_sid,
         ProcessPermission::SetSched,
@@ -275,6 +295,7 @@ pub(in crate::security) fn check_getpgid_access(
     let target_sid = target.security_state.lock().current_sid;
     check_permission(
         permission_check,
+        current_task.kernel(),
         source_sid,
         target_sid,
         ProcessPermission::GetPgid,
@@ -294,6 +315,7 @@ pub(in crate::security) fn check_setpgid_access(
     let target_sid = target.security_state.lock().current_sid;
     check_permission(
         permission_check,
+        current_task.kernel(),
         source_sid,
         target_sid,
         ProcessPermission::SetPgid,
@@ -313,6 +335,7 @@ pub(in crate::security) fn check_task_getsid(
     let target_sid = target.security_state.lock().current_sid;
     check_permission(
         permission_check,
+        current_task.kernel(),
         source_sid,
         target_sid,
         ProcessPermission::GetSession,
@@ -334,6 +357,7 @@ pub(in crate::security) fn check_signal_access(
         // The `sigkill` permission is required for sending SIGKILL.
         SIGKILL => check_permission(
             permission_check,
+            current_task.kernel(),
             source_sid,
             target_sid,
             ProcessPermission::SigKill,
@@ -342,6 +366,7 @@ pub(in crate::security) fn check_signal_access(
         // The `sigstop` permission is required for sending SIGSTOP.
         SIGSTOP => check_permission(
             permission_check,
+            current_task.kernel(),
             source_sid,
             target_sid,
             ProcessPermission::SigStop,
@@ -350,6 +375,7 @@ pub(in crate::security) fn check_signal_access(
         // The `sigchld` permission is required for sending SIGCHLD.
         SIGCHLD => check_permission(
             permission_check,
+            current_task.kernel(),
             source_sid,
             target_sid,
             ProcessPermission::SigChld,
@@ -359,6 +385,7 @@ pub(in crate::security) fn check_signal_access(
         // or SIGCHLD.
         _ => check_permission(
             permission_check,
+            current_task.kernel(),
             source_sid,
             target_sid,
             ProcessPermission::Signal,
@@ -515,7 +542,7 @@ pub(in crate::security) fn check_task_capable(
 ) -> Result<(), Errno> {
     let sid = task.security_state.lock().current_sid;
     let permission = permission_from_capability(capabilities);
-    check_self_permission(&permission_check, sid, permission, task.into())
+    check_self_permission(&permission_check, task.kernel(), sid, permission, task.into())
 }
 
 /// Checks if the task with `source_sid` has the permission to get and/or set limits on the task with `target_sid`.
@@ -532,6 +559,7 @@ pub(in crate::security) fn task_prlimit(
     if check_get_rlimit {
         check_permission(
             permission_check,
+            current_task.kernel(),
             source_sid,
             target_sid,
             ProcessPermission::GetRlimit,
@@ -541,6 +569,7 @@ pub(in crate::security) fn task_prlimit(
     if check_set_rlimit {
         check_permission(
             permission_check,
+            current_task.kernel(),
             source_sid,
             target_sid,
             ProcessPermission::SetRlimit,
@@ -564,6 +593,7 @@ pub fn task_setrlimit(
     if new_limit.rlim_max != old_limit.rlim_max {
         check_permission(
             permission_check,
+            current_task.kernel(),
             source_sid,
             target_sid,
             ProcessPermission::SetRlimit,
@@ -584,6 +614,7 @@ pub(in crate::security) fn ptrace_access_check(
     let tracee_sid = tracee.security_state.lock().current_sid;
     check_permission(
         permission_check,
+        current_task.kernel(),
         tracer_sid,
         tracee_sid,
         ProcessPermission::Ptrace,
@@ -635,6 +666,7 @@ pub(in crate::security) fn set_procattr(
         ProcAttr::Current => {
             check_self_permission(
                 &permission_check,
+                current_task.kernel(),
                 current_sid,
                 ProcessPermission::SetCurrent,
                 audit_context,
@@ -644,6 +676,7 @@ pub(in crate::security) fn set_procattr(
             let new_sid = sid.ok_or_else(|| errno!(EINVAL))?;
             check_permission(
                 &permission_check,
+                current_task.kernel(),
                 current_sid,
                 new_sid,
                 ProcessPermission::DynTransition,
@@ -666,6 +699,7 @@ pub(in crate::security) fn set_procattr(
                 let tracer_sid = ptracer.security_state.lock().current_sid;
                 check_permission(
                     &permission_check,
+                    current_task.kernel(),
                     tracer_sid,
                     new_sid,
                     ProcessPermission::Ptrace,
@@ -681,6 +715,7 @@ pub(in crate::security) fn set_procattr(
         ProcAttr::Exec => {
             check_self_permission(
                 &permission_check,
+                current_task.kernel(),
                 current_sid,
                 ProcessPermission::SetExec,
                 audit_context,
@@ -690,6 +725,7 @@ pub(in crate::security) fn set_procattr(
         ProcAttr::FsCreate => {
             check_self_permission(
                 &permission_check,
+                current_task.kernel(),
                 current_sid,
                 ProcessPermission::SetFsCreate,
                 audit_context,
@@ -699,6 +735,7 @@ pub(in crate::security) fn set_procattr(
         ProcAttr::KeyCreate => {
             check_self_permission(
                 &permission_check,
+                current_task.kernel(),
                 current_sid,
                 ProcessPermission::SetKeyCreate,
                 audit_context,
@@ -708,6 +745,7 @@ pub(in crate::security) fn set_procattr(
         ProcAttr::SockCreate => {
             check_self_permission(
                 &permission_check,
+                current_task.kernel(),
                 current_sid,
                 ProcessPermission::SetSockCreate,
                 audit_context,

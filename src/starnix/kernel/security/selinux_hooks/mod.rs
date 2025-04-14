@@ -34,6 +34,7 @@ use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use std::collections::HashSet;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 
 /// Returns the set of `Permissions` on `class`, corresponding to the specified `flags`.
@@ -66,6 +67,7 @@ fn permissions_from_flags(flags: PermissionFlags, class: FsNodeClass) -> Vec<Ker
 /// `permissions` to the underlying [`crate::vfs::FsNode`].
 fn has_file_permissions(
     permission_check: &PermissionCheck<'_>,
+    kernel: &Kernel,
     subject_sid: SecurityId,
     file: &FileObject,
     permissions: &[KernelPermission],
@@ -79,6 +81,7 @@ fn has_file_permissions(
         let audit_context = [audit_context, file.into(), node.into()];
         check_permission(
             permission_check,
+            kernel,
             subject_sid,
             file_sid,
             FdPermission::Use,
@@ -91,6 +94,7 @@ fn has_file_permissions(
         let audit_context = [audit_context, file.into()];
         has_fs_node_permissions(
             permission_check,
+            kernel,
             subject_sid,
             file.node(),
             permissions,
@@ -149,6 +153,7 @@ fn todo_has_file_permissions(
 /// Checks that `current_task` has the specified `permissions` to the `node`.
 fn has_fs_node_permissions(
     permission_check: &PermissionCheck<'_>,
+    kernel: &Kernel,
     subject_sid: SecurityId,
     fs_node: &FsNode,
     permissions: &[KernelPermission],
@@ -164,6 +169,7 @@ fn has_fs_node_permissions(
     for permission in permissions {
         check_permission(
             permission_check,
+            kernel,
             subject_sid,
             target.sid,
             permission.clone(),
@@ -267,7 +273,14 @@ fn todo_check_permission<P: ClassPermission + Into<KernelPermission> + Clone + '
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
     if kernel.features.selinux_test_suite {
-        check_permission(permission_check, source_sid, target_sid, permission, audit_context)
+        check_permission(
+            permission_check,
+            kernel,
+            source_sid,
+            target_sid,
+            permission,
+            audit_context,
+        )
     } else {
         let result = permission_check.has_permission(source_sid, target_sid, permission.clone());
 
@@ -290,6 +303,7 @@ fn todo_check_permission<P: ClassPermission + Into<KernelPermission> + Clone + '
 /// Checks whether `source_sid` is allowed the specified `permission` on `target_sid`.
 fn check_permission<P: ClassPermission + Into<KernelPermission> + Clone + 'static>(
     permission_check: &PermissionCheck<'_>,
+    kernel: &Kernel,
     source_sid: SecurityId,
     target_sid: SecurityId,
     permission: P,
@@ -298,6 +312,16 @@ fn check_permission<P: ClassPermission + Into<KernelPermission> + Clone + 'stati
     let result = permission_check.has_permission(source_sid, target_sid, permission.clone());
 
     if result.audit {
+        if !result.permit {
+            kernel
+                .security_state
+                .state
+                .as_ref()
+                .unwrap()
+                .access_denial_count
+                .fetch_add(1, Ordering::Release);
+        }
+
         audit_decision(
             permission_check,
             result.clone(),
@@ -314,11 +338,12 @@ fn check_permission<P: ClassPermission + Into<KernelPermission> + Clone + 'stati
 /// Checks that `subject_sid` has the specified process `permission` on `self`.
 fn check_self_permission<P: ClassPermission + Into<KernelPermission> + Clone + 'static>(
     permission_check: &PermissionCheck<'_>,
+    kernel: &Kernel,
     subject_sid: SecurityId,
     permission: P,
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
-    check_permission(permission_check, subject_sid, subject_sid, permission, audit_context)
+    check_permission(permission_check, kernel, subject_sid, subject_sid, permission, audit_context)
 }
 
 /// Returns the security state structure for the kernel.
@@ -327,6 +352,7 @@ pub(super) fn kernel_init_security(exceptions_config: String) -> KernelState {
         server: SecurityServer::new_with_exceptions(exceptions_config),
         pending_file_systems: Mutex::default(),
         selinuxfs_null: OnceLock::default(),
+        access_denial_count: AtomicU64::new(0u64),
     }
 }
 
@@ -342,6 +368,15 @@ pub(super) struct KernelState {
     /// Stashed reference to "/sys/fs/selinux/null" used for replacing inaccessible file descriptors
     /// with a null file.
     pub(super) selinuxfs_null: OnceLock<FileHandle>,
+
+    /// Counts the number of times that an AVC denial is audit-logged.
+    pub(super) access_denial_count: AtomicU64,
+}
+
+impl KernelState {
+    pub(super) fn access_denial_count(&self) -> u64 {
+        self.access_denial_count.load(Ordering::Acquire)
+    }
 }
 
 /// The SELinux security structure for `ThreadGroup`.

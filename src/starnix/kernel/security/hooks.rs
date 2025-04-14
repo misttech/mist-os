@@ -1538,10 +1538,10 @@ pub fn selinuxfs_check_access(
 }
 
 pub mod testing {
-    use std::sync::OnceLock;
-
     use super::{selinux_hooks, Arc, KernelState, SecurityServer};
     use starnix_sync::Mutex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::OnceLock;
 
     /// Used by Starnix' `testing.rs` to create `KernelState` wrapping a test-
     /// supplied `SecurityServer`.
@@ -1551,6 +1551,7 @@ pub mod testing {
                 server,
                 pending_file_systems: Mutex::default(),
                 selinuxfs_null: OnceLock::default(),
+                access_denial_count: AtomicU64::new(0u64),
             }),
         }
     }

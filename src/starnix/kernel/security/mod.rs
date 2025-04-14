@@ -27,6 +27,12 @@ pub struct KernelState {
     state: Option<selinux_hooks::KernelState>,
 }
 
+impl KernelState {
+    pub fn access_denial_count(&self) -> u64 {
+        self.state.as_ref().map_or(0u64, |state| state.access_denial_count())
+    }
+}
+
 /// Opaque structure encapsulating security state for a `ThreadGroup`.
 #[derive(Debug)]
 pub struct TaskState(Mutex<selinux_hooks::TaskAttrs>);

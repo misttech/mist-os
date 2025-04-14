@@ -45,7 +45,13 @@ pub(in crate::security) fn check_bpf_access<Attr: FromBytes>(
         bpf_cmd_BPF_PROG_RUN => BpfPermission::ProgRun,
         _ => return Ok(()),
     };
-    check_self_permission(&security_server.as_permission_check(), sid, permission, audit_context)
+    check_self_permission(
+        &security_server.as_permission_check(),
+        current_task.kernel(),
+        sid,
+        permission,
+        audit_context,
+    )
 }
 
 /// Performs necessary checks when the kernel generates and returns a file descriptor for BPF
@@ -69,6 +75,7 @@ pub(in crate::security) fn check_bpf_map_access(
     for permission in permissions {
         check_permission(
             &security_server.as_permission_check(),
+            current_task.kernel(),
             subject_sid,
             bpf_map.security_state.state.sid,
             permission,
@@ -90,6 +97,7 @@ pub fn check_bpf_prog_access(
     let subject_sid = current_task.security_state.lock().current_sid;
     check_permission(
         &security_server.as_permission_check(),
+        current_task.kernel(),
         subject_sid,
         bpf_program.security_state.state.sid,
         BpfPermission::ProgRun,

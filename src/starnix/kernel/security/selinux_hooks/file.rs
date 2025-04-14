@@ -48,6 +48,7 @@ pub(in crate::security) fn file_permission(
 
     has_file_permissions(
         &security_server.as_permission_check(),
+        current_task.kernel(),
         current_sid,
         file,
         &[],
@@ -80,7 +81,14 @@ pub(in crate::security) fn file_receive(
     // but have a distinct set of permissions associated with the underlying objects rather
     // than on the `FsNode`.
     if let Some(bpf_handle) = file.downcast_file::<BpfHandle>() {
-        has_file_permissions(&permission_check, subject_sid, file, &[], current_task.into())?;
+        has_file_permissions(
+            &permission_check,
+            current_task.kernel(),
+            subject_sid,
+            file,
+            &[],
+            current_task.into(),
+        )?;
         match bpf_handle {
             BpfHandle::Map(ref map) => {
                 check_bpf_map_access(security_server, current_task, map, permission_flags)?
@@ -126,7 +134,14 @@ pub(in crate::security) fn check_file_ioctl_access(
         _ => &[CommonFsNodePermission::Ioctl.for_class(file_class)],
     };
 
-    has_file_permissions(&permission_check, subject_sid, file, permissions, current_task.into())
+    has_file_permissions(
+        &permission_check,
+        current_task.kernel(),
+        subject_sid,
+        file,
+        permissions,
+        current_task.into(),
+    )
 }
 
 /// Returns whether `current_task` can perform a lock operation on the given `file`.
@@ -140,6 +155,7 @@ pub(in crate::security) fn check_file_lock_access(
     let fs_node_class = file.node().security_state.lock().class;
     has_file_permissions(
         &permission_check,
+        current_task.kernel(),
         subject_sid,
         file,
         &[CommonFsNodePermission::Lock.for_class(fs_node_class)],
@@ -165,6 +181,7 @@ pub(in crate::security) fn check_file_fcntl_access(
             // Checks both the Lock and Use permissions.
             has_file_permissions(
                 &permission_check,
+                current_task.kernel(),
                 subject_sid,
                 file,
                 &[CommonFsNodePermission::Lock.for_class(fs_node_class)],
@@ -173,7 +190,14 @@ pub(in crate::security) fn check_file_fcntl_access(
         }
         _ => {
             // Only checks the Use permission.
-            has_file_permissions(&permission_check, subject_sid, file, &[], current_task.into())?;
+            has_file_permissions(
+                &permission_check,
+                current_task.kernel(),
+                subject_sid,
+                file,
+                &[],
+                current_task.into(),
+            )?;
         }
     }
 

@@ -4,7 +4,7 @@
 
 use super::audit::Auditable;
 use super::fs_node::compute_new_fs_node_sid;
-use crate::task::CurrentTask;
+use crate::task::{CurrentTask, Kernel};
 use crate::vfs::socket::{
     NetlinkFamily, Socket, SocketAddress, SocketDomain, SocketProtocol, SocketType,
 };
@@ -21,6 +21,7 @@ use super::{check_permission, fs_node_effective_sid_and_class};
 /// Checks that `current_task` has the specified `permission` for the `socket_node`.
 fn has_socket_permission(
     permission_check: &PermissionCheck<'_>,
+    kernel: &Kernel,
     subject_sid: SecurityId,
     socket_node: &FsNode,
     permission: &KernelPermission,
@@ -35,6 +36,7 @@ fn has_socket_permission(
     let audit_context = [audit_context, socket_node.into()];
     has_socket_permission_for_sid(
         permission_check,
+        kernel,
         subject_sid,
         socket_sid,
         permission,
@@ -45,6 +47,7 @@ fn has_socket_permission(
 /// Checks that `current_task` has the specified `permission` for the `socket_sid`.
 fn has_socket_permission_for_sid(
     permission_check: &PermissionCheck<'_>,
+    kernel: &Kernel,
     subject_sid: SecurityId,
     socket_sid: SecurityId,
     permission: &KernelPermission,
@@ -58,7 +61,14 @@ fn has_socket_permission_for_sid(
     {
         return Ok(());
     }
-    check_permission(permission_check, subject_sid, socket_sid, permission.clone(), audit_context)
+    check_permission(
+        permission_check,
+        kernel,
+        subject_sid,
+        socket_sid,
+        permission.clone(),
+        audit_context,
+    )
 }
 
 /// Computes the socket security class for `domain`, `socket_type` and `protocol`.
@@ -153,6 +163,7 @@ pub(in crate::security) fn check_socket_create_access(
 
     has_socket_permission_for_sid(
         &security_server.as_permission_check(),
+        current_task.kernel(),
         current_sid,
         new_socket_sid,
         &CommonFsNodePermission::Create.for_class(new_socket_class),
@@ -183,6 +194,7 @@ pub(in crate::security) fn check_socket_bind_access(
     // of the port number, and for `node_bind` between the socket and the SID of the IP address.
     has_socket_permission(
         &security_server.as_permission_check(),
+        current_task.kernel(),
         current_sid,
         socket_node,
         &CommonSocketPermission::Bind.for_class(socket_class),
@@ -207,6 +219,7 @@ pub(in crate::security) fn check_socket_connect_access(
     // SID of the port number for TCP sockets.
     has_socket_permission(
         &security_server.as_permission_check(),
+        current_task.kernel(),
         current_sid,
         socket_node,
         &CommonSocketPermission::Connect.for_class(socket_class),
