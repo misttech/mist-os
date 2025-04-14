@@ -32,13 +32,13 @@ pub fn new_socket_file<L>(
 where
     L: LockBefore<FileOpsCore>,
 {
-    Ok(Socket::new_file(
+    Socket::new_file(
         locked,
         current_task,
         Socket::new(current_task, domain, socket_type, protocol)?,
         open_flags,
         kernel_private,
-    ))
+    )
 }
 
 pub struct SocketFile {
