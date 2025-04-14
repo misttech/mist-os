@@ -1236,17 +1236,21 @@ fn enable_ipv6_device_with_config<
         .with_address_ids(device_id, |addrs, _core_ctx| addrs.collect::<Vec<_>>())
         .into_iter()
         .for_each(|addr_id| {
-            bindings_ctx.on_event(IpDeviceEvent::AddressStateChanged {
-                device: device_id.clone(),
-                addr: addr_id.addr().into(),
-                state: IpAddressState::Tentative,
-            });
-            DadHandler::start_duplicate_address_detection(
+            let (state, start_dad) = DadHandler::initialize_duplicate_address_detection(
                 core_ctx,
                 bindings_ctx,
                 device_id,
                 &addr_id,
-            );
+            )
+            .into_address_state_and_start_dad();
+            bindings_ctx.on_event(IpDeviceEvent::AddressStateChanged {
+                device: device_id.clone(),
+                addr: addr_id.addr().into(),
+                state,
+            });
+            if let Some(token) = start_dad {
+                core_ctx.start_duplicate_address_detection(bindings_ctx, token);
+            }
         });
 
     // Only generate a link-local address if the device supports link-layer
@@ -1365,6 +1369,7 @@ fn enable_ipv4_device_with_config<
     GmpHandler::gmp_handle_maybe_enabled(core_ctx, bindings_ctx, device_id);
     core_ctx.with_address_ids(device_id, |addrs, _core_ctx| {
         addrs.for_each(|addr| {
+            // TODO(https://fxbug.dev/42077260): Start DAD, if enabled.
             bindings_ctx.on_event(IpDeviceEvent::AddressStateChanged {
                 device: device_id.clone(),
                 addr: addr.addr().into(),
@@ -1594,9 +1599,18 @@ pub fn add_ip_addr_subnet_with_config<
     let ip_enabled =
         core_ctx.with_ip_device_flags(device_id, |IpDeviceFlags { ip_enabled }| *ip_enabled);
 
-    let state = match ip_enabled {
-        true => CC::INITIAL_ADDRESS_STATE,
-        false => IpAddressState::Unavailable,
+    let (state, start_dad) = if ip_enabled {
+        DadHandler::initialize_duplicate_address_detection(
+            core_ctx,
+            bindings_ctx,
+            device_id,
+            &addr_id,
+        )
+        .into_address_state_and_start_dad()
+    } else {
+        // NB: We don't start DAD if the device is disabled. DAD will be
+        // performed when the device is enabled for all addresses.
+        (IpAddressState::Unavailable, None)
     };
 
     bindings_ctx.on_event(IpDeviceEvent::AddressAdded {
@@ -1607,10 +1621,8 @@ pub fn add_ip_addr_subnet_with_config<
         preferred_lifetime,
     });
 
-    if ip_enabled {
-        // NB: We don't start DAD if the device is disabled. DAD will be
-        // performed when the device is enabled for all addresses.
-        DadHandler::start_duplicate_address_detection(core_ctx, bindings_ctx, device_id, &addr_id)
+    if let Some(token) = start_dad {
+        core_ctx.start_duplicate_address_detection(bindings_ctx, token);
     }
 
     Ok(addr_id)

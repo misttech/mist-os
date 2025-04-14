@@ -213,21 +213,25 @@ pub enum DadAddressStateLookupResult {
 pub trait DadHandler<I: IpDeviceIpExt, BC>:
     DeviceIdContext<AnyDevice> + IpDeviceAddressIdContext<I>
 {
-    /// The initial address state for newly added addresses.
-    // TODO(https://fxbug.dev/42077260): This can probably be removed when we
-    // can do DAD over IPv4.
-    const INITIAL_ADDRESS_STATE: IpAddressState;
+    /// Initializes the DAD state for the given device and address.
+    ///
+    /// If DAD is required, the return value holds a [`StartDad`] token that
+    /// can be used to start the DAD algorithm.
+    fn initialize_duplicate_address_detection<'a>(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device_id: &'a Self::DeviceId,
+        addr: &'a Self::AddressId,
+    ) -> NeedsDad<'a, Self::AddressId, Self::DeviceId>;
 
     /// Starts duplicate address detection.
     ///
-    /// # Panics
-    ///
-    /// Panics if tentative state for the address is not found.
-    fn start_duplicate_address_detection(
+    /// The provided [`StartDad`] token is proof that DAD is required for the
+    /// address & device.
+    fn start_duplicate_address_detection<'a>(
         &mut self,
         bindings_ctx: &mut BC,
-        device_id: &Self::DeviceId,
-        addr: &Self::AddressId,
+        start_dad: StartDad<'_, Self::AddressId, Self::DeviceId>,
     );
 
     /// Stops duplicate address detection.
@@ -256,31 +260,66 @@ pub trait DadHandler<I: IpDeviceIpExt, BC>:
     ) -> DadAddressStateLookupResult;
 }
 
-enum DoDadVariation {
-    Start,
-    Continue,
+/// Indicates whether DAD is needed for a given address on a given device.
+#[derive(Debug)]
+pub enum NeedsDad<'a, A, D> {
+    No,
+    Yes(StartDad<'a, A, D>),
 }
 
-fn do_duplicate_address_detection<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<BC>>(
+impl<'a, A, D> NeedsDad<'a, A, D> {
+    // Returns the address's current state, and whether DAD needs to be started.
+    pub(crate) fn into_address_state_and_start_dad(
+        self,
+    ) -> (IpAddressState, Option<StartDad<'a, A, D>>) {
+        match self {
+            // Addresses proceed directly to assigned when DAD is disabled.
+            NeedsDad::No => (IpAddressState::Assigned, None),
+            NeedsDad::Yes(start_dad) => (IpAddressState::Tentative, Some(start_dad)),
+        }
+    }
+}
+
+/// Signals that DAD is allowed to run for the given address & device.
+///
+/// Inner members are private to ensure the type can only be constructed in the
+/// current module, which ensures that duplicate address detection can only be
+/// started after having checked that it's necessary.
+#[derive(Debug)]
+pub struct StartDad<'a, A, D> {
+    address_id: &'a A,
+    device_id: &'a D,
+}
+
+/// Initializes the DAD state for the given device and address.
+fn initialize_duplicate_address_detection<
+    'a,
+    BC: DadBindingsContext<CC::OuterEvent>,
+    CC: DadContext<BC>,
+>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    device_id: &CC::DeviceId,
-    addr: &CC::AddressId,
-    variation: DoDadVariation,
-) {
-    let nonce_if_should_send_message = core_ctx.with_dad_state(
+    device_id: &'a CC::DeviceId,
+    addr: &'a CC::AddressId,
+) -> NeedsDad<'a, CC::AddressId, CC::DeviceId> {
+    core_ctx.with_dad_state(
         device_id,
         addr,
-        |DadStateRef { state, retrans_timer, max_dad_transmits }| {
+        |DadStateRef { state, retrans_timer: _, max_dad_transmits }| {
             let DadAddressStateRef { dad_state, core_ctx } = state;
 
-            match variation {
-                DoDadVariation::Start => {
-                    // Mark the address as tentative/unassigned before joining
-                    // the group so that the address is not used as the source
-                    // for any outgoing MLD message.
+            let needs_dad = match max_dad_transmits {
+                None => {
+                    *dad_state = Ipv6DadState::Assigned;
+                    core_ctx.with_address_assigned(device_id, addr, |assigned| *assigned = true);
+                    NeedsDad::No
+                }
+                Some(max_dad_transmits) => {
+                    // Mark the address as tentative before joining the multicast group
+                    // so that the address is not used as the source for any outgoing
+                    // MLD message.
                     *dad_state = Ipv6DadState::Tentative {
-                        dad_transmits_remaining: *max_dad_transmits,
+                        dad_transmits_remaining: Some(*max_dad_transmits),
                         timer: CC::new_timer(
                             bindings_ctx,
                             DadTimerId { device_id: device_id.downgrade(), addr: addr.downgrade() },
@@ -289,23 +328,42 @@ fn do_duplicate_address_detection<BC: DadBindingsContext<CC::OuterEvent>, CC: Da
                         added_extra_transmits_after_detecting_looped_back_ns: false,
                     };
                     core_ctx.with_address_assigned(device_id, addr, |assigned| *assigned = false);
-
-                    // As per RFC 4861 section 5.6.2,
-                    //
-                    //   Before sending a Neighbor Solicitation, an interface MUST join
-                    //   the all-nodes multicast address and the solicited-node
-                    //   multicast address of the tentative address.
-                    //
-                    // Note that we join the all-nodes multicast address on interface
-                    // enable.
-                    core_ctx.join_multicast_group(
-                        bindings_ctx,
-                        device_id,
-                        addr.addr().addr().to_solicited_node_address(),
-                    );
+                    NeedsDad::Yes(StartDad { device_id, address_id: addr })
                 }
-                DoDadVariation::Continue => {}
-            }
+            };
+
+            // As per RFC 4862 section 5.4.2,
+            //
+            //   Before sending a Neighbor Solicitation, an interface MUST join
+            //   the all-nodes multicast address and the solicited-node
+            //   multicast address of the tentative address.
+            //
+            // Note that:
+            // * We join the all-nodes multicast address on interface enable.
+            // * We join the solicited-node multicast address, even if the
+            //   address is skipping DAD (and therefore, the tentative state).
+            core_ctx.join_multicast_group(
+                bindings_ctx,
+                device_id,
+                addr.addr().addr().to_solicited_node_address(),
+            );
+
+            needs_dad
+        },
+    )
+}
+
+fn do_duplicate_address_detection<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<BC>>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
+    addr: &CC::AddressId,
+) {
+    let nonce_if_should_send_message = core_ctx.with_dad_state(
+        device_id,
+        addr,
+        |DadStateRef { state, retrans_timer, max_dad_transmits: _ }| {
+            let DadAddressStateRef { dad_state, core_ctx } = state;
 
             let (remaining, timer, nonces) = match dad_state {
                 Ipv6DadState::Tentative {
@@ -403,12 +461,19 @@ impl<BC, CC> DadHandler<Ipv4, BC> for CC
 where
     CC: IpDeviceAddressIdContext<Ipv4> + DeviceIdContext<AnyDevice>,
 {
-    const INITIAL_ADDRESS_STATE: IpAddressState = IpAddressState::Assigned;
-    fn start_duplicate_address_detection(
+    fn initialize_duplicate_address_detection<'a>(
         &mut self,
         _bindings_ctx: &mut BC,
-        _device_id: &Self::DeviceId,
-        _addr: &Self::AddressId,
+        _device_id: &'a Self::DeviceId,
+        _addr: &'a Self::AddressId,
+    ) -> NeedsDad<'a, Self::AddressId, Self::DeviceId> {
+        NeedsDad::No
+    }
+
+    fn start_duplicate_address_detection<'a>(
+        &mut self,
+        _bindings_ctx: &mut BC,
+        _start_dad: StartDad<'_, Self::AddressId, Self::DeviceId>,
     ) {
     }
 
@@ -432,15 +497,22 @@ where
 }
 
 impl<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<BC>> DadHandler<Ipv6, BC> for CC {
-    const INITIAL_ADDRESS_STATE: IpAddressState = IpAddressState::Tentative;
-
-    fn start_duplicate_address_detection(
+    fn initialize_duplicate_address_detection<'a>(
         &mut self,
         bindings_ctx: &mut BC,
-        device_id: &Self::DeviceId,
-        addr: &Self::AddressId,
+        device_id: &'a Self::DeviceId,
+        addr: &'a Self::AddressId,
+    ) -> NeedsDad<'a, Self::AddressId, Self::DeviceId> {
+        initialize_duplicate_address_detection(self, bindings_ctx, device_id, addr)
+    }
+
+    fn start_duplicate_address_detection<'a>(
+        &mut self,
+        bindings_ctx: &mut BC,
+        start_dad: StartDad<'_, Self::AddressId, Self::DeviceId>,
     ) {
-        do_duplicate_address_detection(self, bindings_ctx, device_id, addr, DoDadVariation::Start)
+        let StartDad { device_id, address_id } = start_dad;
+        do_duplicate_address_detection(self, bindings_ctx, device_id, address_id)
     }
 
     fn stop_duplicate_address_detection(
@@ -549,13 +621,7 @@ impl<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<BC>> HandleableTimer
         let Some(addr_id) = addr.upgrade() else {
             return;
         };
-        do_duplicate_address_detection(
-            core_ctx,
-            bindings_ctx,
-            &device_id,
-            &addr_id,
-            DoDadVariation::Continue,
-        )
+        do_duplicate_address_detection(core_ctx, bindings_ctx, &device_id, &addr_id)
     }
 }
 
@@ -764,21 +830,20 @@ mod tests {
                     }),
                 })
             });
-        DadHandler::<Ipv6, _>::start_duplicate_address_detection(
+        let address_id = get_address_id(DAD_ADDRESS.get());
+        let start_dad = DadHandler::<Ipv6, _>::initialize_duplicate_address_detection(
             &mut core_ctx,
             &mut bindings_ctx,
             &FakeDeviceId,
-            &get_address_id(DAD_ADDRESS.get()),
+            &address_id,
         );
+        assert_matches!(start_dad, NeedsDad::No);
         let FakeDadContext { state, address_ctx, .. } = &core_ctx.state;
         assert_matches!(*state, Ipv6DadState::Assigned);
         let FakeDadAddressContext { assigned, groups, .. } = &address_ctx.state;
         assert!(*assigned);
         assert_eq!(groups, &HashMap::from([(DAD_ADDRESS.to_solicited_node_address(), 1)]));
-        assert_eq!(
-            bindings_ctx.take_events(),
-            &[DadEvent::AddressAssigned { device: FakeDeviceId, addr: DAD_ADDRESS }][..]
-        );
+        assert_eq!(bindings_ctx.take_events(), &[][..]);
     }
 
     fn dad_timer_id() -> TestDadTimerId {
@@ -852,12 +917,15 @@ mod tests {
             })
         });
         let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-        DadHandler::<Ipv6, _>::start_duplicate_address_detection(
+        let address_id = get_address_id(DAD_ADDRESS.get());
+        let start_dad = DadHandler::<Ipv6, _>::initialize_duplicate_address_detection(
             core_ctx,
             bindings_ctx,
             &FakeDeviceId,
-            &get_address_id(DAD_ADDRESS.get()),
+            &address_id,
         );
+        let token = assert_matches!(start_dad, NeedsDad::Yes(token) => token);
+        DadHandler::<Ipv6, _>::start_duplicate_address_detection(core_ctx, bindings_ctx, token);
 
         for count in 0..=(DAD_TRANSMITS_REQUIRED - 1) {
             check_dad(
@@ -904,12 +972,20 @@ mod tests {
                     }),
                 })
             });
-        DadHandler::<Ipv6, _>::start_duplicate_address_detection(
+        let address_id = get_address_id(DAD_ADDRESS.get());
+        let start_dad = DadHandler::<Ipv6, _>::initialize_duplicate_address_detection(
             &mut core_ctx,
             &mut bindings_ctx,
             &FakeDeviceId,
-            &get_address_id(DAD_ADDRESS.get()),
+            &address_id,
         );
+        let token = assert_matches!(start_dad, NeedsDad::Yes(token) => token);
+        DadHandler::<Ipv6, _>::start_duplicate_address_detection(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            token,
+        );
+
         check_dad(
             &core_ctx,
             &bindings_ctx,
@@ -1003,12 +1079,15 @@ mod tests {
         let addr = get_address_id(DAD_ADDRESS.get());
 
         let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-        DadHandler::<Ipv6, _>::start_duplicate_address_detection(
+        let address_id = get_address_id(DAD_ADDRESS.get());
+        let start_dad = DadHandler::<Ipv6, _>::initialize_duplicate_address_detection(
             core_ctx,
             bindings_ctx,
             &FakeDeviceId,
-            &addr,
+            &address_id,
         );
+        let token = assert_matches!(start_dad, NeedsDad::Yes(token) => token);
+        DadHandler::<Ipv6, _>::start_duplicate_address_detection(core_ctx, bindings_ctx, token);
 
         check_dad(core_ctx, bindings_ctx, 1, None, RETRANS_TIMER);
 

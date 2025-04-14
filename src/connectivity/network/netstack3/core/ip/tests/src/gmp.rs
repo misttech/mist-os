@@ -244,7 +244,7 @@ fn test_mldv1_enable_disable_integration() {
             )
             .unwrap();
     };
-    let check_sent_report = |bindings_ctx: &mut FakeBindingsCtx, specified_source: bool| {
+    let check_sent_report = |bindings_ctx: &mut FakeBindingsCtx| {
         let frames = bindings_ctx.take_ethernet_frames();
         let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
         assert_eq!(egress_device, &eth_device_id);
@@ -260,10 +260,7 @@ fn test_mldv1_enable_disable_integration() {
                 .unwrap();
         assert_eq!(src_mac, local_mac.get());
         assert_eq!(dst_mac, Mac::from(&snmc_addr));
-        assert_eq!(
-            src_ip,
-            if specified_source { ll_addr.get() } else { Ipv6::UNSPECIFIED_ADDRESS }
-        );
+        assert_eq!(src_ip, ll_addr.get());
         assert_eq!(dst_ip, snmc_addr.get());
         assert_eq!(ttl, 1);
         assert_eq!(code, IcmpSenderZeroCode);
@@ -303,7 +300,7 @@ fn test_mldv1_enable_disable_integration() {
     ctx.bindings_ctx
         .timer_ctx()
         .assert_timers_installed_range([(snmc_timer_id.clone(), range.clone())]);
-    check_sent_report(&mut ctx.bindings_ctx, false);
+    check_sent_report(&mut ctx.bindings_ctx);
 
     // Disable MLD.
     set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: false });
@@ -329,7 +326,7 @@ fn test_mldv1_enable_disable_integration() {
     ctx.bindings_ctx
         .timer_ctx()
         .assert_timers_installed_range([(snmc_timer_id.clone(), range.clone())]);
-    check_sent_report(&mut ctx.bindings_ctx, true);
+    check_sent_report(&mut ctx.bindings_ctx);
 
     // Disable IPv6.
     set_config(&mut ctx, TestConfig { ip_enabled: false, gmp_enabled: true });
@@ -339,7 +336,7 @@ fn test_mldv1_enable_disable_integration() {
     // Enable IPv6.
     set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
     ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(snmc_timer_id, range)]);
-    check_sent_report(&mut ctx.bindings_ctx, false);
+    check_sent_report(&mut ctx.bindings_ctx);
 
     // Remove the device to cleanup all dangling references.
     core::mem::drop(device_id);

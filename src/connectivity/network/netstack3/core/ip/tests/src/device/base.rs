@@ -555,6 +555,126 @@ fn forget_learned_network_params_on_disable_ipv6() {
 }
 
 #[test]
+fn add_ipv6_address_with_dad_disabled() {
+    let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
+    let ethernet_device_id =
+        ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
+            EthernetCreationProperties {
+                mac: Ipv6::TEST_ADDRS.local_mac,
+                max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            },
+            DEFAULT_INTERFACE_METRIC,
+        );
+    let ll_addr = Ipv6::TEST_ADDRS.local_mac.to_ipv6_link_local();
+    let device_id: DeviceId<FakeBindingsCtx> = ethernet_device_id.into();
+    let weak_device_id = device_id.downgrade();
+    let _: Ipv6DeviceConfigurationUpdate = ctx
+        .core_api()
+        .device_ip::<Ipv6>()
+        .update_configuration(
+            &device_id,
+            Ipv6DeviceConfigurationUpdate {
+                // Disable DAD.
+                dad_transmits: None,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+    // Enable the device
+    assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv6>(&device_id, true), false);
+    assert_eq!(
+        ctx.bindings_ctx.take_events()[..],
+        [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
+            device: weak_device_id.clone(),
+            ip_enabled: true,
+        })]
+    );
+
+    // Add the address, and expect its assignment state to immediately be
+    // `Assigned` (without traversing through `Tentative`).
+    ctx.core_api()
+        .device_ip::<Ipv6>()
+        .add_ip_addr_subnet(&device_id, ll_addr.replace_witness().unwrap())
+        .expect("add MAC based IPv6 link-local address");
+
+    assert_eq!(
+        ctx.bindings_ctx.take_events()[..],
+        [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
+            device: weak_device_id,
+            addr: ll_addr.to_witness(),
+            state: IpAddressState::Assigned,
+            valid_until: Lifetime::Infinite,
+            preferred_lifetime: PreferredLifetime::preferred_forever(),
+        })]
+    );
+}
+
+#[test]
+fn enable_ipv6_dev_with_dad_disabled() {
+    let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
+    let ethernet_device_id =
+        ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
+            EthernetCreationProperties {
+                mac: Ipv6::TEST_ADDRS.local_mac,
+                max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            },
+            DEFAULT_INTERFACE_METRIC,
+        );
+    let ll_addr = Ipv6::TEST_ADDRS.local_mac.to_ipv6_link_local();
+    let device_id: DeviceId<FakeBindingsCtx> = ethernet_device_id.into();
+    let weak_device_id = device_id.downgrade();
+    let _: Ipv6DeviceConfigurationUpdate = ctx
+        .core_api()
+        .device_ip::<Ipv6>()
+        .update_configuration(
+            &device_id,
+            Ipv6DeviceConfigurationUpdate {
+                // Disable DAD.
+                dad_transmits: None,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+    // Add the address. Because the device is disabled, its assignment state
+    // should be `Unavailable`.
+    ctx.core_api()
+        .device_ip::<Ipv6>()
+        .add_ip_addr_subnet(&device_id, ll_addr.replace_witness().unwrap())
+        .expect("add MAC based IPv6 link-local address");
+
+    assert_eq!(
+        ctx.bindings_ctx.take_events()[..],
+        [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
+            device: weak_device_id.clone(),
+            addr: ll_addr.to_witness(),
+            state: IpAddressState::Unavailable,
+            valid_until: Lifetime::Infinite,
+            preferred_lifetime: PreferredLifetime::preferred_forever(),
+        })]
+    );
+
+    // Enable the device, and expect to see the address's assignment state
+    // change to `Assigned` without traversing through `Tentative`.
+    assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv6>(&device_id, true), false);
+    assert_eq!(
+        ctx.bindings_ctx.take_events()[..],
+        [
+            DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressStateChanged {
+                device: weak_device_id.clone(),
+                addr: ll_addr.addr().into(),
+                state: IpAddressState::Assigned,
+            }),
+            DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
+                device: weak_device_id,
+                ip_enabled: true,
+            })
+        ]
+    );
+}
+
+#[test]
 fn notify_on_dad_failure_ipv6() {
     let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
 
