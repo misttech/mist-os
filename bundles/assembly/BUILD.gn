@@ -3422,6 +3422,12 @@ assembly_input_bundle("virtualization_support") {
   # TODO(https://fxbug.dev/42079015): Move to the list above once build errors are resolved.
   if (current_cpu != "riscv64") {
     base_packages = [ "//src/virtualization/bin/vmm_launcher" ]
+    shell_commands = [
+      {
+        package = "guest"
+        components = [ "guest" ]
+      },
+    ]
     compiled_packages = [
       {
         name = "core"
