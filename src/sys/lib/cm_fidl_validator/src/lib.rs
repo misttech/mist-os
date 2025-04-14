@@ -558,20 +558,24 @@ fn get_dependencies_from_collections<'a>(
     }
 }
 
-fn find_offer_source<'a>(
+fn find_offer_node<'a>(
     offer: &'a fdecl::Offer,
-    source: &'a fdecl::Ref,
+    source: Option<&'a fdecl::Ref>,
     source_name: &'a Option<String>,
     _dictionary: Option<&'a String>,
 ) -> Option<DependencyNode<'a>> {
-    match source {
+    if source.is_none() {
+        return None;
+    }
+
+    match source? {
         fdecl::Ref::Child(fdecl::ChildRef { name, collection }) => {
             Some(DependencyNode::Child(name, collection.as_ref().map(|s| s.as_str())))
         }
         #[cfg(fuchsia_api_level_at_least = "25")]
         fdecl::Ref::Self_(_) if _dictionary.is_some() => {
             let root_dict = _dictionary.unwrap().split('/').next().unwrap();
-            Some(DependencyNode::Capability(root_dict))
+            return Some(DependencyNode::Capability(root_dict));
         }
         fdecl::Ref::Self_(_) => {
             if let Some(source_name) = source_name {
@@ -589,11 +593,49 @@ fn find_offer_source<'a>(
         fdecl::Ref::Collection(fdecl::CollectionRef { name }) => {
             Some(DependencyNode::Collection(name))
         }
-        fdecl::Ref::Parent(_)
-        | fdecl::Ref::Framework(_)
-        | fdecl::Ref::Capability(_)
-        | fdecl::Ref::VoidType(_) => None,
+        fdecl::Ref::Capability(fdecl::CapabilityRef { name }) => {
+            Some(DependencyNode::Capability(name))
+        }
+        fdecl::Ref::Parent(_) | fdecl::Ref::Framework(_) | fdecl::Ref::VoidType(_) => None,
         _ => None,
+    }
+}
+
+fn add_offer_edges<'a>(
+    source_node: Option<DependencyNode<'a>>,
+    target_node: Option<DependencyNode<'a>>,
+    strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
+    dynamic_children: &Vec<(&'a str, &'a str)>,
+) {
+    if source_node.is_none() {
+        return;
+    }
+
+    let source = source_node.unwrap();
+
+    if let DependencyNode::Collection(name) = source {
+        for child_name in ValidationContext::dynamic_children_in_collection(dynamic_children, &name)
+        {
+            strong_dependencies.add_edge(
+                DependencyNode::Child(&child_name, Some(&name)),
+                DependencyNode::Collection(name),
+            );
+        }
+    }
+
+    if target_node.is_none() {
+        return;
+    }
+
+    let target = target_node.unwrap();
+
+    strong_dependencies.add_edge(source, target);
+
+    if let DependencyNode::Collection(name) = target {
+        for child_name in ValidationContext::dynamic_children_in_collection(dynamic_children, &name)
+        {
+            strong_dependencies.add_edge(source, DependencyNode::Child(child_name, Some(&name)));
+        }
     }
 }
 
@@ -618,65 +660,130 @@ fn get_dependencies_from_offers<'a>(
     }
 
     for offer in all_offers {
-        let (_dependency_type, source, _target, _dict) = match offer {
+        let (source_node, target_node) = match offer {
             fdecl::Offer::Protocol(o) => {
-                (o.dependency_type, &o.source, &o.target, get_source_dictionary!(o))
+                let source_node = find_offer_node(
+                    offer,
+                    o.source.as_ref(),
+                    &o.source_name,
+                    get_source_dictionary!(o),
+                );
+
+                if let Some(fdecl::DependencyType::Strong) = o.dependency_type.as_ref() {
+                    let target_node = find_offer_node(offer, o.target.as_ref(), &None, None);
+
+                    (source_node, target_node)
+                } else {
+                    continue;
+                }
             }
             #[cfg(fuchsia_api_level_at_least = "25")]
             fdecl::Offer::Dictionary(o) => {
-                (o.dependency_type, &o.source, &o.target, get_source_dictionary!(o))
+                let source_node = find_offer_node(
+                    offer,
+                    o.source.as_ref(),
+                    &o.source_name,
+                    get_source_dictionary!(o),
+                );
+
+                if let Some(fdecl::DependencyType::Strong) = o.dependency_type.as_ref() {
+                    let target_node = find_offer_node(offer, o.target.as_ref(), &None, None);
+
+                    (source_node, target_node)
+                } else {
+                    continue;
+                }
             }
             fdecl::Offer::Directory(o) => {
-                (o.dependency_type, &o.source, &o.target, get_source_dictionary!(o))
+                let source_node = find_offer_node(
+                    offer,
+                    o.source.as_ref(),
+                    &o.source_name,
+                    get_source_dictionary!(o),
+                );
+                if let Some(fdecl::DependencyType::Strong) = o.dependency_type.as_ref() {
+                    let target_node = find_offer_node(offer, o.target.as_ref(), &None, None);
+
+                    (source_node, target_node)
+                } else {
+                    continue;
+                }
             }
-            fdecl::Offer::Service(o) => (None, &o.source, &o.target, get_source_dictionary!(o)),
-            fdecl::Offer::Storage(o) => {
-                if let Some(source_ref) = o.source.as_ref() {
-                    if let Some(source_node) =
-                        find_offer_source(offer, source_ref, &o.source_name, None)
+            fdecl::Offer::Service(o) => {
+                let source_node = find_offer_node(
+                    offer,
+                    o.source.as_ref(),
+                    &o.source_name,
+                    get_source_dictionary!(o),
+                );
+
+                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                {
+                    if &fdecl::DependencyType::Strong
+                        == o.dependency_type.as_ref().unwrap_or(&fdecl::DependencyType::Strong)
                     {
-                        if let Some(target_node) = ref_to_dependency_node(o.target.as_ref()) {
-                            strong_dependencies.add_edge(source_node, target_node);
-                        }
+                        let target_node = find_offer_node(offer, o.target.as_ref(), &None, None);
+
+                        (source_node, target_node)
+                    } else {
+                        continue;
                     }
                 }
-                (None, &o.source, &o.target, None::<&String>)
+
+                #[cfg(fuchsia_api_level_less_than = "HEAD")]
+                {
+                    let target_node = find_offer_node(offer, o.target.as_ref(), &None, None);
+
+                    (source_node, target_node)
+                }
             }
-            fdecl::Offer::Runner(o) => (
-                Some(fdecl::DependencyType::Strong),
-                &o.source,
-                &o.target,
-                get_source_dictionary!(o),
-            ),
-            fdecl::Offer::Resolver(o) => (
-                Some(fdecl::DependencyType::Strong),
-                &o.source,
-                &o.target,
-                get_source_dictionary!(o),
-            ),
-            fdecl::Offer::Config(o) => (
-                Some(fdecl::DependencyType::Strong),
-                &o.source,
-                &o.target,
-                get_source_dictionary!(o),
-            ),
+            fdecl::Offer::Storage(o) => {
+                let source_node = find_offer_node(offer, o.source.as_ref(), &o.source_name, None);
+
+                let target_node = find_offer_node(offer, o.target.as_ref(), &None, None);
+
+                (source_node, target_node)
+            }
+            fdecl::Offer::Runner(o) => {
+                let source_node = find_offer_node(
+                    offer,
+                    o.source.as_ref(),
+                    &o.source_name,
+                    get_source_dictionary!(o),
+                );
+
+                let target_node = find_offer_node(offer, o.target.as_ref(), &None, None);
+
+                (source_node, target_node)
+            }
+            fdecl::Offer::Resolver(o) => {
+                let source_node = find_offer_node(
+                    offer,
+                    o.source.as_ref(),
+                    &o.source_name,
+                    get_source_dictionary!(o),
+                );
+
+                let target_node = find_offer_node(offer, o.target.as_ref(), &None, None);
+
+                (source_node, target_node)
+            }
+            fdecl::Offer::Config(o) => {
+                let source_node = find_offer_node(
+                    offer,
+                    o.source.as_ref(),
+                    &o.source_name,
+                    get_source_dictionary!(o),
+                );
+
+                let target_node = find_offer_node(offer, o.target.as_ref(), &None, None);
+
+                (source_node, target_node)
+            }
             _ => continue,
         };
 
-        // If `source` is a collection, add dependency edges from all its dynamic children
-        // to the collection, since the collection forms an aggregate.
-        if let Some(fdecl::Ref::Collection(fdecl::CollectionRef { name: collection })) =
-            source.as_ref()
-        {
-            for name in
-                ValidationContext::dynamic_children_in_collection(dynamic_children, &collection)
-            {
-                strong_dependencies.add_edge(
-                    DependencyNode::Child(&name, Some(&collection)),
-                    DependencyNode::Collection(collection),
-                );
-            }
-        }
+        add_offer_edges(source_node, target_node, strong_dependencies, dynamic_children);
     }
 }
 
@@ -2315,32 +2422,6 @@ impl<'a> ValidationContext<'a> {
         }
     }
 
-    /// Adds a strong dependency between two nodes in the dependency graph between `source` and
-    /// `target`.
-    ///
-    /// `source_name` is the name of the capability being routed (if applicable). The function is
-    /// a no-op if `source` or `target` is `None`; this behavior is a convenience so that the
-    /// caller can directly pass the result of `DependencyNode::try_from_ref`.
-    fn add_strong_dep(
-        &mut self,
-        source: Option<DependencyNode<'a>>,
-        target: Option<DependencyNode<'a>>,
-    ) {
-        if source.is_none() || target.is_none() {
-            return;
-        }
-        let source = source.unwrap();
-        let target = target.unwrap();
-        match (source, target) {
-            (DependencyNode::Self_, DependencyNode::Self_) => {
-                // `self` dependencies (e.g. `use from self`) are allowed.
-            }
-            (source, target) => {
-                self.strong_dependencies.add_edge(source, target);
-            }
-        }
-    }
-
     // Checks a group of offer decls to confirm that any duplicate offers are
     // valid aggregate offer declarations.
     fn validate_offer_group(&mut self, offers: &'a Vec<fdecl::Offer>, offer_type: OfferType) {
@@ -2576,9 +2657,6 @@ impl<'a> ValidationContext<'a> {
         decl: DeclType,
         allowable_names: AllowableIds,
         collection_source: CollectionSource,
-        // This takes a callback that returns a [Container], instead of the &[Container] directly,
-        // to avoid a borrow checker error that would occur from a simultaneous borrow on
-        // &mut self.
         capability_checker: impl Fn(&Self) -> &dyn Container,
         source: Option<&'a fdecl::Ref>,
         source_name: Option<&'a String>,
@@ -2600,26 +2678,6 @@ impl<'a> ValidationContext<'a> {
 
         if dependency_type.is_none() {
             self.errors.push(Error::missing_field(decl, "dependency_type"));
-        } else if dependency_type == Some(&fdecl::DependencyType::Strong) {
-            self.add_strong_dep(
-                self.source_dependency_from_ref(source_name, source_dictionary, source),
-                self.target_dependency_from_ref(target),
-            );
-
-            // If `target` is a collection, we should add a dependency edge to all dynamic
-            // instances in this collection.
-            if let Some(fdecl::Ref::Collection(fdecl::CollectionRef { name: collection })) =
-                target.as_ref()
-            {
-                for name in
-                    Self::dynamic_children_in_collection(&self.dynamic_children, &collection)
-                {
-                    self.add_strong_dep(
-                        self.source_dependency_from_ref(source_name, source_dictionary, source),
-                        Some(DependencyNode::Child(name, Some(&collection))),
-                    );
-                }
-            }
         }
 
         self.validate_route_from_self(
@@ -3101,13 +3159,6 @@ impl<'a> ValidationContext<'a> {
                 None
             }
         }
-    }
-
-    fn target_dependency_from_ref(
-        &self,
-        ref_: Option<&'a fdecl::Ref>,
-    ) -> Option<DependencyNode<'a>> {
-        self.source_dependency_from_ref(None, None, ref_)
     }
 
     fn dynamic_children_in_collection(
