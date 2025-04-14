@@ -429,20 +429,30 @@ appended to the generated crashlog during a kernel panic to assist in debugging.
 
 ### kernel.serial=\[none | legacy | qemu | \<type>,\<base>,\<irq>\]
 
-**Default:** `none`
+**Default:** _from ZBI item_
 
-This controls what serial port is used.  If provided, it overrides the serial
-port described by the system's bootdata.  The kernel debug serial port is
+This controls what serial port is used.  The kernel debug serial port is
 a reserved resource and may not be used outside of the kernel.
 
-If set to "none", the kernel debug serial port will be disabled and will not
+If set to `none`, the kernel debug serial port will be disabled and will not
 be reserved, allowing the default serial port to be used outside the kernel.
 
+If there is no explicit setting of this option, then an equivalent value is
+derived from the last ZBI item of type `ZBI_TYPE_KERNEL_DRIVER` with one of the
+`ZBI_KERNEL_DRIVER_*_UART` subtypes, either one provided in the original ZBI or
+one appended by the boot loader (or boot shim).  An explicit boot option always
+overrides the ZBI item, even `none`.  (The order of `ZBI_TYPE_CMDLINE` items
+with respect to `ZBI_TYPE_KERNEL_DRIVER` items does not matter.)
+
 The configuration string format is as follows:
-  For MMIO UART:
-      "kernel.serial=UART_MODEL,MMIO_ADDR,IRQ,FLAGS"
-  For PIO UART:
-      "kernel.serial=UART_MODEL,IOPORT,IRQ"
+  * For MMIO UART:
+    - `kernel.serial=UART_MODEL,MMIO_ADDR,IRQ,FLAGS`
+  * For PIO UART:
+    - `kernel.serial=UART_MODEL,IOPORT,IRQ`
+  * For the default used in common QEMU virtual machines on this architecture:
+    - `qemu`
+  * For the traditional `COM1` setting on x86:
+    - `legacy`
 
 ### kernel.vdso.always_use_next=\<bool>
 

@@ -6,12 +6,16 @@
 
 // This file is #include'd multiple times with the DEFINE_OPTION macro defined.
 //
-// #define DEFINE_OPTION(name, type, member, {init}, docstring) ...
+// #define DEFINE_OPTION(name, type, member, {init}, docstring, ...) ...
 // #include "options.inc"
 // #undef DEFINE_OPTION
 //
 // See boot-options.h for admonitions about what kinds of types can be used, as
 // well as test-optons.inc for basic examples.
+//
+// The final `, ...` matches the optional "default-description" string that can
+// come after the "docstring".  If omitted, the default is just described by
+// the string corresponding to the "init" expression given the type.
 
 DEFINE_OPTION("aslr.disable", bool, aslr_disabled, {false}, R"""(
 If this option is set, the system will not use Address Space Layout
@@ -365,19 +369,30 @@ appended to the generated crashlog during a kernel panic to assist in debugging.
 )""")
 
 DEFINE_OPTION("kernel.serial", uart::all::Config<>, serial, {}, R"""(
-This controls what serial port is used.  If provided, it overrides the serial
-port described by the system's bootdata.  The kernel debug serial port is
+This controls what serial port is used.  The kernel debug serial port is
 a reserved resource and may not be used outside of the kernel.
 
-If set to "none", the kernel debug serial port will be disabled and will not
+If set to `none`, the kernel debug serial port will be disabled and will not
 be reserved, allowing the default serial port to be used outside the kernel.
 
+If there is no explicit setting of this option, then an equivalent value is
+derived from the last ZBI item of type `ZBI_TYPE_KERNEL_DRIVER` with one of the
+`ZBI_KERNEL_DRIVER_*_UART` subtypes, either one provided in the original ZBI or
+one appended by the boot loader (or boot shim).  An explicit boot option always
+overrides the ZBI item, even `none`.  (The order of `ZBI_TYPE_CMDLINE` items
+with respect to `ZBI_TYPE_KERNEL_DRIVER` items does not matter.)
+
 The configuration string format is as follows:
-  For MMIO UART:
-      "kernel.serial=UART_MODEL,MMIO_ADDR,IRQ,FLAGS"
-  For PIO UART:
-      "kernel.serial=UART_MODEL,IOPORT,IRQ"
-)""")
+  * For MMIO UART:
+    - `kernel.serial=UART_MODEL,MMIO_ADDR,IRQ,FLAGS`
+  * For PIO UART:
+    - `kernel.serial=UART_MODEL,IOPORT,IRQ`
+  * For the default used in common QEMU virtual machines on this architecture:
+    - `qemu`
+  * For the traditional `COM1` setting on x86:
+    - `legacy`
+)""",
+              "_from ZBI item_")
 
 DEFINE_OPTION("kernel.vdso.always_use_next", bool, always_use_next_vdso, {false}, R"""(
 If this option is set, the kernel will supply userspace with the "next" vDSO

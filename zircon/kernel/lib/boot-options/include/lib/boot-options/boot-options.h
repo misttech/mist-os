@@ -153,7 +153,7 @@ struct BootOptions {
   // the member was updated, else it wasn't touched (but still returns true).
   WordResult ParseWord(std::string_view);
 
-#define DEFINE_OPTION(name, type, member, init, doc) type member init;
+#define DEFINE_OPTION(name, type, member, init, doc, ...) type member init;
 #include "options.inc"
 #if BOOT_OPTIONS_GENERATOR
 #include "arm64.inc"

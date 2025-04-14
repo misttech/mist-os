@@ -33,7 +33,9 @@ def generate_doc(option):
         option["type"] = SPECIAL_TYPES.get(
             option["type"], r"\<%s>" % option["type"]
         )
-    if option["default"] != "":
+    if "default_description" in option:
+        option["default"] = "**Default:** %s\n" % option["default_description"]
+    elif option["default"] != "":
         if isinstance(option["default"], bool):
             option["default"] = "true" if option["default"] else "false"
         elif isinstance(option["default"], int):
