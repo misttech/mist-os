@@ -5,7 +5,7 @@
 use fidl::endpoints::SynchronousProxy;
 use fidl_fuchsia_hardware_adb as fadb;
 use futures_util::StreamExt;
-use starnix_core::power::{create_proxy_for_wake_events_counter, mark_proxy_message_handled};
+use starnix_core::power::{create_proxy_for_wake_events_counter_zero, mark_proxy_message_handled};
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::{
     fileops_impl_noop_sync, fileops_impl_seekless, fs_args, fs_node_impl_dir_readonly,
@@ -143,6 +143,7 @@ async fn handle_adb(
                 // We can simply decrement this after getting a response because responses to
                 // writes from the container to the host are not expected to wake the container.
                 message_counter.as_ref().map(mark_proxy_message_handled);
+
                 response_sender
                     .send(response)
                     .map_err(|e| log_error!("Failed to send to main thread: {:#?}", e))
@@ -274,8 +275,10 @@ fn connect_to_device(
     let (adb_proxy, message_counter) = match proxy {
         AdbProxyMode::None => (adb_proxy, None),
         AdbProxyMode::WakeContainer => {
-            let (adb_proxy, message_counter) =
-                create_proxy_for_wake_events_counter(adb_proxy.into_channel(), "adb".to_string());
+            let (adb_proxy, message_counter) = create_proxy_for_wake_events_counter_zero(
+                adb_proxy.into_channel(),
+                "adb".to_string(),
+            );
             let adb_proxy = fadb::UsbAdbImpl_SynchronousProxy::from_channel(adb_proxy);
             (adb_proxy, Some(message_counter))
         }
@@ -291,9 +294,8 @@ fn connect_to_device(
             .wait_for_event(zx::MonotonicInstant::INFINITE)
             .expect("failed to wait for event");
 
-        // Decrement the counter after we receive a response, since we don't need to schedule
-        // another message before allowing the container to suspend.
-        message_counter.as_ref().map(mark_proxy_message_handled);
+        // Don't decrement the counter here, since the first adb read call will decrement the
+        // counter for this message, keeping the container alive until the read call can be made.
 
         if status == fadb::StatusFlags::ONLINE {
             break;
