@@ -234,7 +234,7 @@ group("csv") {
 }
 
 group("darling") {
-  public_deps = [ ":darling-v0_20_11" ]
+  public_deps = [ ":darling-v0_20_10" ]
 }
 
 group("data-encoding") {
@@ -4657,35 +4657,35 @@ rust_library("darling-v0_12_4") {
   applicable_licenses = [ ":darling-v0_12_4.license" ]
 }
 
-license("darling-v0_20_11.license") {
+license("darling-v0_20_10.license") {
   public_package_name = "darling"
-  license_files = [ "//third_party/rust_crates/vendor/darling-0.20.11/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/darling-0.20.10/LICENSE" ]
 }
 
-rust_library("darling-v0_20_11") {
+rust_library("darling-v0_20_10") {
   crate_name = "darling"
-  crate_root = "//third_party/rust_crates/vendor/darling-0.20.11/src/lib.rs"
-  output_name = "darling-d4aec3ecac1d21c0"
+  crate_root = "//third_party/rust_crates/vendor/darling-0.20.10/src/lib.rs"
+  output_name = "darling-aba10c1c1db5226"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":darling_core-v0_20_11" ]
-  deps += [ ":darling_macro-v0_20_11($host_toolchain)" ]
+  deps += [ ":darling_core-v0_20_10" ]
+  deps += [ ":darling_macro-v0_20_10($host_toolchain)" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=d4aec3ecac1d21c0",
-    "-Cextra-filename=-d4aec3ecac1d21c0",
+    "-Cmetadata=aba10c1c1db5226",
+    "-Cextra-filename=-aba10c1c1db5226",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"suggestions\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":darling-v0_20_11.license" ]
+  applicable_licenses = [ ":darling-v0_20_10.license" ]
 }
 
 license("darling_core-v0_12_4.license") {
@@ -4724,17 +4724,17 @@ rust_library("darling_core-v0_12_4") {
   applicable_licenses = [ ":darling_core-v0_12_4.license" ]
 }
 
-license("darling_core-v0_20_11.license") {
+license("darling_core-v0_20_10.license") {
   public_package_name = "darling_core"
   license_files =
-      [ "//third_party/rust_crates/vendor/darling_core-0.20.11/LICENSE" ]
+      [ "//third_party/rust_crates/vendor/darling_core-0.20.10/LICENSE" ]
 }
 
-rust_library("darling_core-v0_20_11") {
+rust_library("darling_core-v0_20_10") {
   crate_name = "darling_core"
   crate_root =
-      "//third_party/rust_crates/vendor/darling_core-0.20.11/src/lib.rs"
-  output_name = "darling_core-2982f95a89e69e0e"
+      "//third_party/rust_crates/vendor/darling_core-0.20.10/src/lib.rs"
+  output_name = "darling_core-4193772822bb2796"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -4750,15 +4750,15 @@ rust_library("darling_core-v0_20_11") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=2982f95a89e69e0e",
-    "-Cextra-filename=-2982f95a89e69e0e",
+    "-Cmetadata=4193772822bb2796",
+    "-Cextra-filename=-4193772822bb2796",
     "--cfg=feature=\"strsim\"",
     "--cfg=feature=\"suggestions\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":darling_core-v0_20_11.license" ]
+  applicable_licenses = [ ":darling_core-v0_20_10.license" ]
 }
 
 license("darling_macro-v0_12_4.license") {
@@ -4793,21 +4793,21 @@ rust_proc_macro("darling_macro-v0_12_4") {
   applicable_licenses = [ ":darling_macro-v0_12_4.license" ]
 }
 
-license("darling_macro-v0_20_11.license") {
+license("darling_macro-v0_20_10.license") {
   public_package_name = "darling_macro"
   license_files =
-      [ "//third_party/rust_crates/vendor/darling_macro-0.20.11/LICENSE" ]
+      [ "//third_party/rust_crates/vendor/darling_macro-0.20.10/LICENSE" ]
 }
 
-rust_proc_macro("darling_macro-v0_20_11") {
+rust_proc_macro("darling_macro-v0_20_10") {
   crate_name = "darling_macro"
   crate_root =
-      "//third_party/rust_crates/vendor/darling_macro-0.20.11/src/lib.rs"
-  output_name = "darling_macro-e8bf3cbb482c549e"
+      "//third_party/rust_crates/vendor/darling_macro-0.20.10/src/lib.rs"
+  output_name = "darling_macro-216b822b3685897b"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":darling_core-v0_20_11" ]
+  deps += [ ":darling_core-v0_20_10" ]
   deps += [ ":quote-v1_0_38" ]
   deps += [ ":syn-v2_0_100" ]
 
@@ -4816,13 +4816,13 @@ rust_proc_macro("darling_macro-v0_20_11") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=e8bf3cbb482c549e",
-    "-Cextra-filename=-e8bf3cbb482c549e",
+    "-Cmetadata=216b822b3685897b",
+    "-Cextra-filename=-216b822b3685897b",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":darling_macro-v0_20_11.license" ]
+  applicable_licenses = [ ":darling_macro-v0_20_10.license" ]
 }
 
 license("data-encoding-v2_3_2.license") {

@@ -667,14 +667,14 @@ alias(
 )
 
 alias(
-    name = "darling-0.20.11",
-    actual = "//third_party/rust_crates/vendor/darling-0.20.11:darling",
+    name = "darling-0.20.10",
+    actual = "//third_party/rust_crates/vendor/darling-0.20.10:darling",
     tags = ["manual"],
 )
 
 alias(
     name = "darling",
-    actual = "//third_party/rust_crates/vendor/darling-0.20.11:darling",
+    actual = "//third_party/rust_crates/vendor/darling-0.20.10:darling",
     tags = ["manual"],
 )
 
