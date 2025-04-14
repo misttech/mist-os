@@ -938,13 +938,13 @@ zx_status_t PcieDevice::InitLegacyIrqStateLocked(PcieUpstreamNode& upstream) {
     switch (res) {
       case ZX_OK:
         cfg_->Write(PciConfig::kInterruptLine, static_cast<uint8_t>(irq_.legacy.irq_id));
-        TRACEF("[%02x:%02x.%01x] pin %u mapped to %#x\n", bus_id_, dev_id_, func_id_,
-               irq_.legacy.pin, irq_.legacy.irq_id);
+        LTRACEF("[%02x:%02x.%01x] pin %u mapped to %#x\n", bus_id_, dev_id_, func_id_,
+                irq_.legacy.pin, irq_.legacy.irq_id);
         break;
       case ZX_ERR_NOT_FOUND:
         // QEMU does not have _PRT tables.
-        TRACEF("[%02x:%02x.%01x] no legacy routing entry found for device\n", bus_id_, dev_id_,
-               func_id_);
+        LTRACEF("[%02x:%02x.%01x] no legacy routing entry found for device\n", bus_id_, dev_id_,
+                func_id_);
         irq_.legacy.irq_id = cfg_->Read(PciConfig::kInterruptLine);
         break;
       default:
