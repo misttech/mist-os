@@ -1,39 +1,21 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/pciroot/c/banjo.h>
-#include <inttypes.h>
-#include <lib/ddk/debug.h>
-#include <limits.h>
-#include <sys/types.h>
+#include <trace.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
-#include <zircon/process.h>
-#include <zircon/syscalls.h>
-#include <zircon/syscalls/iommu.h>
-#include <zircon/syscalls/resource.h>
-#include <zircon/threads.h>
-
-#include <variant>
-#include <vector>
 
 #include <acpica/acpi.h>
-#include <fbl/auto_lock.h>
 
-#include "acpi-dev/dev-ec.h"
 #include "acpi-private.h"
 #include "acpi.h"
 #include "dev.h"
-#include "errors.h"
-#include "methods.h"
-#include "power.h"
-#include "src/devices/board/lib/acpi/device.h"
 #include "src/devices/board/lib/acpi/manager.h"
-#include "src/devices/board/lib/acpi/resources.h"
 #include "src/devices/board/lib/acpi/status.h"
-#include "src/devices/lib/iommu/iommu.h"
-#include "sysmem.h"
+
+#define LOCAL_TRACE 0
 
 namespace {
 
@@ -65,7 +47,8 @@ acpi::status<UniquePtr<ACPI_DEVICE_INFO>> GetObjectInfo(ACPI_HANDLE obj) {
 
 }  // namespace acpi
 
-zx_status_t acpi_suspend(zx_device_t* device, bool enable_wake, uint8_t suspend_reason) {
+#if 0
+zx_status_t acpi_suspend(bool enable_wake, uint8_t suspend_reason) {
   switch (suspend_reason & DEVICE_MASK_SUSPEND_REASON) {
     case DEVICE_SUSPEND_REASON_MEXEC: {
       AcpiTerminate();
@@ -83,62 +66,60 @@ zx_status_t acpi_suspend(zx_device_t* device, bool enable_wake, uint8_t suspend_
       return ZX_ERR_NOT_SUPPORTED;
   };
 }
+#endif
 
-zx_status_t publish_acpi_devices(acpi::Manager* manager, zx_device_t* platform_bus,
-                                 zx_device_t* acpi_root) {
+zx_status_t publish_acpi_devices(acpi::Manager* manager) {
   acpi::Acpi* acpi = manager->acpi();
 
   auto result = manager->DiscoverDevices();
   if (result.is_error()) {
-    zxlogf(INFO, "discover devices failed");
+    LTRACEF("discover devices failed\n");
   }
   result = manager->ConfigureDiscoveredDevices();
   if (result.is_error()) {
-    zxlogf(INFO, "configure failed");
+    LTRACEF("configure failed\n");
   }
-  result = manager->PublishDevices(platform_bus, fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  result = manager->PublishDevices();
 
   // Now walk the ACPI namespace looking for devices we understand, and publish
   // them.  For now, publish only the first PCI bus we encounter.
   // TODO(https://fxbug.dev/42158465): remove this when all drivers are removed from the x86 board
   // driver.
-  acpi::status<> acpi_status =
-      acpi->WalkNamespace(ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT, MAX_NAMESPACE_DEPTH,
-                          [acpi_root, acpi](ACPI_HANDLE object, uint32_t level,
-                                            acpi::WalkDirection dir) -> acpi::status<> {
-                            // We don't have anything useful to do during the ascent
-                            // phase.  Just skip it.
-                            if (dir == acpi::WalkDirection::Ascending) {
-                              return acpi::ok();
-                            }
+  acpi::status<> acpi_status = acpi->WalkNamespace(
+      ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT, MAX_NAMESPACE_DEPTH,
+      [](ACPI_HANDLE object, uint32_t level, acpi::WalkDirection dir) -> acpi::status<> {
+        // We don't have anything useful to do during the ascent
+        // phase.  Just skip it.
+        if (dir == acpi::WalkDirection::Ascending) {
+          return acpi::ok();
+        }
 
-                            // We are descending.  Grab our object info.
-                            acpi::UniquePtr<ACPI_DEVICE_INFO> info;
-                            if (auto res = acpi::GetObjectInfo(object); res.is_error()) {
-                              return res.take_error();
-                            } else {
-                              info = std::move(res.value());
-                            }
+        // We are descending.  Grab our object info.
+        acpi::UniquePtr<ACPI_DEVICE_INFO> info;
+        if (auto res = acpi::GetObjectInfo(object); res.is_error()) {
+          return res.take_error();
+        } else {
+          info = std::move(res.value());
+        }
 
-                            // Extract pointers to the hardware ID and the compatible ID
-                            // if present. If there is no hardware ID, just skip the
-                            // device.
-                            const std::string_view hid = hid_from_acpi_devinfo(*info);
-                            if (hid.empty()) {
-                              return acpi::ok();
-                            }
+        // Extract pointers to the hardware ID and the compatible ID
+        // if present. If there is no hardware ID, just skip the
+        // device.
+        const std::string_view hid = hid_from_acpi_devinfo(*info);
+        if (hid.empty()) {
+          return acpi::ok();
+        }
 
-                            // Now, if we recognize the HID, go ahead and deal with
-                            // publishing the device.
-                            if (hid == EC_HID_STRING) {
-                              acpi_ec::EcDevice::Create(acpi_root, acpi, object);
-                            }
-                            return acpi::ok();
-                          });
+        // Now, if we recognize the HID, go ahead and deal with
+        // publishing the device.
+        if (hid == EC_HID_STRING) {
+          // acpi_ec::EcDevice::Create(acpi_root, acpi, object);
+        }
+        return acpi::ok();
+      });
 
   if (acpi_status.is_error()) {
     return ZX_ERR_BAD_STATE;
   }
-
   return ZX_OK;
 }

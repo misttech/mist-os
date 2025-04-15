@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BOARD_DRIVERS_X86_INCLUDE_DEV_H_
 #define SRC_DEVICES_BOARD_DRIVERS_X86_INCLUDE_DEV_H_
 
-#include <lib/ddk/device.h>
+//#include <lib/ddk/device.h>
 #include <zircon/compiler.h>
 
 #include <acpica/acpi.h>
@@ -27,6 +27,6 @@
 #define HID_LENGTH 8
 #define CID_LENGTH 8
 
-zx_status_t ec_init(zx_device_t* parent, ACPI_HANDLE acpi_handle);
+//zx_status_t ec_init(zx_device_t* parent, ACPI_HANDLE acpi_handle);
 
 #endif  // SRC_DEVICES_BOARD_DRIVERS_X86_INCLUDE_DEV_H_

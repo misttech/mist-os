@@ -42,7 +42,7 @@ source_set("top") {
     "//third_party/lk/lib/fs/fat",
 
     # Board Drivers
-    "//vendor/misttech/devices/board/drivers/x86",
+    "//vendor/misttech/src/devices/board/drivers/x86",
 
     # Platform Drivers
     "//vendor/misttech/src/devices/bus/drivers/platform",
