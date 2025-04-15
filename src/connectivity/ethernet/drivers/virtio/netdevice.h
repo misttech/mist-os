@@ -1,4 +1,3 @@
-// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -6,24 +5,27 @@
 #ifndef SRC_CONNECTIVITY_ETHERNET_DRIVERS_VIRTIO_NETDEVICE_H_
 #define SRC_CONNECTIVITY_ETHERNET_DRIVERS_VIRTIO_NETDEVICE_H_
 
-#include <fuchsia/net/c/banjo.h>
+#include <fidl/fuchsia.hardware.network/cpp/wire.h>
+#include <fuchsia/hardware/network/driver/cpp/banjo.h>
+#include <lib/ddk/io-buffer.h>
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>
 #include <lib/zircon-internal/thread_annotations.h>
-#include <mistos/hardware/network/driver/cpp/banjo.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
-#include <bitset>
+#include <memory>
+#include <mutex>
+#include <shared_mutex>
 
 #include <ddktl/device.h>
 #include <fbl/macros.h>
-#include <kernel/brwlock.h>
 #include <virtio/net.h>
 
+#include "src/connectivity/network/drivers/network-device/device/public/locks.h"
 #include "src/lib/vmo_store/vmo_store.h"
 
 namespace virtio {
@@ -32,18 +34,15 @@ using VmoStore = vmo_store::VmoStore<vmo_store::SlabStorage<uint32_t>>;
 
 class NetworkDevice;
 
-// using DeviceType = ddk::Device<NetworkDevice>;
+using DeviceType = ddk::Device<NetworkDevice>;
 class NetworkDevice : public Device,
                       // Mixins for protocol device:
-                      // public DeviceType,
+                      public DeviceType,
                       // Mixin for Network device banjo protocol:
                       public ddk::NetworkDeviceImplProtocol<NetworkDevice, ddk::base_protocol>,
                       public ddk::NetworkPortProtocol<NetworkDevice>,
                       public ddk::MacAddrProtocol<NetworkDevice> {
  public:
-  class Buffer;
-  class BufferData;
-
   // Specifies how many packets can fit in each of the receive and transmit
   // backlogs.
   // Chosen arbitrarily. Larger values will cause increased memory consumption,
@@ -60,11 +59,11 @@ class NetworkDevice : public Device,
   static constexpr uint16_t kRxId = 0u;
   static constexpr uint16_t kTxId = 1u;
 
-  NetworkDevice(fbl::RefPtr<BusTransactionInitiatorDispatcher> bti,
-                ktl::unique_ptr<Backend> backend);
+  NetworkDevice(zx_device_t* device, zx::bti, std::unique_ptr<Backend> backend);
   virtual ~NetworkDevice();
 
   zx_status_t Init() override __TA_EXCLUDES(state_lock_);
+  void DdkRelease() __TA_EXCLUDES(state_lock_);
 
   // VirtIO callbacks
   void IrqRingUpdate() override __TA_EXCLUDES(state_lock_);
@@ -78,7 +77,7 @@ class NetworkDevice : public Device,
   void NetworkDeviceImplGetInfo(device_impl_info_t* out_info);
   void NetworkDeviceImplQueueTx(const tx_buffer_t* buf_list, size_t buf_count);
   void NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buf_list, size_t buf_count);
-  void NetworkDeviceImplPrepareVmo(uint8_t vmo_id, const uint8_t* vmo_list, size_t vmo_count,
+  void NetworkDeviceImplPrepareVmo(uint8_t vmo_id, zx::vmo vmo,
                                    network_device_impl_prepare_vmo_callback callback, void* cookie);
   void NetworkDeviceImplReleaseVmo(uint8_t vmo_id);
 
@@ -87,8 +86,8 @@ class NetworkDevice : public Device,
   void NetworkPortGetStatus(port_status_t* out_status);
   void NetworkPortSetActive(bool active);
   void NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc);
-  void NetworkPortRemoved() { /* do nothing, we never remove our port */ }
-
+  void NetworkPortRemoved() { /* do nothing, we never remove our port */
+  }
   // MacAddr protocol:
   void MacAddrGetAddress(mac_address_t* out_mac);
   void MacAddrGetFeatures(features_t* out_features);
@@ -98,10 +97,6 @@ class NetworkDevice : public Device,
   const char* tag() const override { return "virtio-net"; }
 
   uint16_t virtio_header_len() const { return virtio_hdr_len_; }
-
-  network_device_impl_protocol_t device_impl_proto() {
-    return network_device_impl_protocol_t{.ops = &network_device_impl_protocol_ops_, .ctx = this};
-  }
 
  private:
   friend class NetworkDeviceTests;
@@ -115,9 +110,9 @@ class NetworkDevice : public Device,
   port_status_t ReadStatus() const;
 
   // Mutexes to control concurrent access
-  DECLARE_BRWLOCK_PI(NetworkDevice, lockdep::LockFlagsMultiAcquire) state_lock_;
-  DECLARE_MUTEX(NetworkDevice) tx_lock_;
-  DECLARE_MUTEX(NetworkDevice) rx_lock_;
+  network::SharedLock state_lock_;
+  std::mutex tx_lock_;
+  std::mutex rx_lock_;
 
   // Virtqueues; see section 5.1.2 of the spec
   //
@@ -160,7 +155,7 @@ class NetworkDevice : public Device,
   };
   FifoQueue rx_in_flight_ __TA_GUARDED(rx_lock_);
 
-  ktl::array<uint32_t, kMaxDepth> tx_in_flight_buffer_ids_ __TA_GUARDED(tx_lock_);
+  std::array<uint32_t, kMaxDepth> tx_in_flight_buffer_ids_ __TA_GUARDED(tx_lock_);
   std::bitset<kMaxDepth> tx_in_flight_active_ __TA_GUARDED(tx_lock_);
 
   // Whether the status field in virtio_net_config is supported.
@@ -168,7 +163,7 @@ class NetworkDevice : public Device,
   // Whether the device supports multiqueue with automatic receive steering.
   bool is_multiqueue_supported_;
 
-  mac_address mac_;
+  fuchsia_net::wire::MacAddress mac_;
   uint16_t virtio_hdr_len_;
 
   ddk::NetworkDeviceIfcProtocolClient ifc_ __TA_GUARDED(state_lock_);
