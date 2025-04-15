@@ -3583,7 +3583,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track, Defe
   // more than once.
   struct InitialPageContent {
     bool inited = false;
-    VmCowPages* page_owner;
+    LockedPtr page_owner;
     uint64_t owner_offset;
     uint64_t cached_offset;
     VmPageOrMarkerRef page_or_marker;
@@ -3599,8 +3599,9 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track, Defe
     if (!initial_content_.inited || offset != initial_content_.cached_offset) {
       DEBUG_ASSERT(can_see_parent(offset));
       PageLookup content;
+      initial_content_.page_owner.release();
       FindInitialPageContentLocked(offset, &content);
-      initial_content_.page_owner = &content.owner.locked_or(this);
+      initial_content_.page_owner = ktl::move(content.owner);
       initial_content_.owner_offset = content.owner_offset;
       initial_content_.page_or_marker = content.cursor.current();
       // We only care about the parent having a 'true' vm_page for content. If the parent has a
@@ -3711,20 +3712,19 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track, Defe
     // We are able to insert a marker, but if our page content is from a hidden owner we need to
     // perform slightly more complex cow forking.
     const InitialPageContent& content = get_initial_page_content(offset);
-    AssertHeld(content.page_owner->lock_ref());
-    if (!slot && content.page_owner->is_hidden()) {
+    if (!slot && content.page_owner.locked_or(this).is_hidden()) {
       // TODO(https://fxbug.dev/42138396): This could be more optimal since unlike a regular cow
       // clone, we are not going to actually need to read the target page we are cloning, and hence
       // it does not actually need to get converted.
       if (content.page_or_marker->IsReference()) {
-        zx_status_t result = content.page_owner->ReplaceReferenceWithPageLocked(
+        zx_status_t result = content.page_owner.locked_or(this).ReplaceReferenceWithPageLocked(
             content.page_or_marker, content.owner_offset, page_request->GetAnonymous());
         if (result != ZX_OK) {
           return result;
         }
       }
       zx_status_t result = CloneCowPageAsZeroLocked(
-          offset, deferred.FreedList(this).List(), content.page_owner,
+          offset, deferred.FreedList(this).List(), &content.page_owner.locked_or(this),
           content.page_or_marker->Page(), content.owner_offset, page_request->GetAnonymous());
       if (result != ZX_OK) {
         return result;
