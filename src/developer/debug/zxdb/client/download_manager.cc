@@ -53,7 +53,7 @@ class Download {
         file_type_(file_type),
         result_cb_(std::move(result_cb)),
         weak_factory_(this) {
-    LOGS(Info) << "Starting download for " << build_id_;
+    DEBUG_LOG(DownloadManager) << "Starting download for " << build_id_;
   }
 
   ~Download() { Finish(); }
@@ -107,7 +107,7 @@ void Download::Finish() {
     LOGS(Info) << "Download for " << build_id_ << " failed(" << ErrTypeToString(final_err.type())
                << "): " << final_err.msg();
   } else {
-    LOGS(Info) << "Download for " << build_id_ << " succeeded.";
+    DEBUG_LOG(DownloadManager) << "Download for " << build_id_ << " succeeded.";
   }
 
   if (debug::MessageLoop::Current()) {
@@ -123,7 +123,8 @@ void Download::AddServer(SymbolServer* server) {
   if (!result_cb_) {
     return;
   }
-  LOGS(Info) << "Adding server " << server->name() << " to download for " << build_id_;
+  DEBUG_LOG(DownloadManager) << "Adding server " << server->name() << " to download for "
+                             << build_id_;
 
   SymbolServer::FetchCallback cb = [weak_this = weak_factory_.GetWeakPtr(), server](
                                        const Err& err, const std::string& path) {
@@ -134,11 +135,12 @@ void Download::AddServer(SymbolServer* server) {
 
     if (path.empty()) {
       if (err.msg().empty()) {
-        LOGS(Info) << "Error downloading " << weak_this->build_id_ << " from " << server->name()
-                   << ": " << ErrTypeToString(err.type());
+        DEBUG_LOG(DownloadManager) << "Error downloading " << weak_this->build_id_ << " from "
+                                   << server->name() << ": " << ErrTypeToString(err.type());
       } else {
-        LOGS(Info) << "Error downloading " << weak_this->build_id_ << " from " << server->name()
-                   << ": " << ErrTypeToString(err.type()) << ", " << err.msg();
+        DEBUG_LOG(DownloadManager)
+            << "Error downloading " << weak_this->build_id_ << " from " << server->name() << ": "
+            << ErrTypeToString(err.type()) << ", " << err.msg();
       }
       weak_this->Error(err);
     } else {
