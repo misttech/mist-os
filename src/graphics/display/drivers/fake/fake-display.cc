@@ -535,6 +535,9 @@ fuchsia_sysmem2::wire::BufferCollectionConstraints FakeDisplay::CreateBufferColl
       usage_builder.cpu(fuchsia_sysmem2::kCpuUsageReadOften | fuchsia_sysmem2::kCpuUsageWriteOften);
       break;
     case BufferCollectionUsage::kPrimaryLayer:
+      if (IsCaptureSupported()) {
+        usage_builder.cpu(fuchsia_sysmem2::kCpuUsageReadOften);
+      }
       usage_builder.display(fuchsia_sysmem2::kDisplayUsageLayer);
       break;
   }
