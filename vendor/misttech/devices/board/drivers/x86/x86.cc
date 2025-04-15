@@ -35,7 +35,7 @@ zx_status_t X86::DoInit() {
 
   zx_status_t status = publish_acpi_devices(acpi_manager_.get());
   if (status != ZX_OK) {
-    LTRACEF("failed to publish acpi devices: %d\n", status);
+    LTRACEF("publish_acpi_devices() failed: %d\n", status);
     return status;
   }
 
