@@ -105,13 +105,12 @@ pub struct Features {
     pub thermal: Option<Vec<String>>,
 }
 
-#[derive(Default, Debug)]
-pub struct SELinuxFeature {
-    pub enabled: bool,
-
-    /// A path to a file in the Container's package that lists all the permission checks
-    /// that are allowed to fail.
-    pub exceptions_path: Option<String>,
+#[derive(Default, Debug, PartialEq)]
+pub enum SELinuxFeature {
+    #[default]
+    Disabled,
+    EnabledWithExceptionsFile(String),
+    EnabledWithExceptionsConfig(Vec<String>),
 }
 
 impl Features {
@@ -154,7 +153,7 @@ impl Features {
                 enable_utc_time_adjustment,
                 thermal,
             } => {
-                inspect_node.record_bool("selinux", selinux.enabled);
+                inspect_node.record_bool("selinux", *selinux != SELinuxFeature::Disabled);
                 inspect_node.record_bool("ashmem", *ashmem);
                 inspect_node.record_bool("framebuffer", *framebuffer);
                 inspect_node.record_bool("gralloc", *gralloc);
@@ -241,6 +240,7 @@ pub fn parse_features(start_info: &ContainerStartInfo) -> Result<Features, Error
         extra_features,
         mlock_always_onfault,
         mlock_pin_flavor,
+        selinux_exceptions,
         ui_visual_debugging_level,
     } = &start_info.config;
 
@@ -308,7 +308,11 @@ pub fn parse_features(start_info: &ContainerStartInfo) -> Result<Features, Error
             ("rootfs_rw", _) => features.rootfs_rw = true,
             ("self_profile", _) => features.self_profile = true,
             ("selinux", arg) => {
-                features.selinux = SELinuxFeature { enabled: true, exceptions_path: arg };
+                features.selinux = if let Some(path) = arg {
+                    SELinuxFeature::EnabledWithExceptionsFile(path)
+                } else {
+                    SELinuxFeature::EnabledWithExceptionsConfig(selinux_exceptions.clone())
+                }
             }
             ("selinux_test_suite", _) => features.kernel.selinux_test_suite = true,
             ("test_data", _) => features.test_data = true,

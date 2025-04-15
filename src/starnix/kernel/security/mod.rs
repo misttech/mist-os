@@ -84,6 +84,3 @@ pub struct BpfMapState {
 pub struct BpfProgState {
     state: selinux_hooks::BpfProgState,
 }
-
-/// Default access-check exceptions configuration for SELinux-enabled Starnix containers.
-pub const DEFAULT_EXCEPTIONS_CONFIG: &str = include_str!("selinux_hooks/default_exceptions_config");

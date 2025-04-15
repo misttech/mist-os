@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
+    // TODO: https://fxbug.dev/409966399 - Remove this after soft-transitioning containers.
+    include: [ "//src/starnix/kernel/security/selinux_hooks/default_exceptions_config.shard.cml" ],
     use: [
         {
             config: "fuchsia.starnix.config.container.ExtraFeatures",
