@@ -473,7 +473,8 @@ zx_status_t brcmf_btcoex_set_mode(struct brcmf_cfg80211_vif* vif, enum brcmf_btc
 }
 
 void brcmf_btcoex_log_active_bt_tasks(brcmf_if* ifp) {
-  uint32_t bt_tasks_low, bt_tasks_high, wlan_preempt_count;
+  struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
+  uint32_t bt_tasks_low, bt_tasks_high;
 
   // BT tasks are represented by a bit map, where the bit to task mapping is as follows:
   // BT_TASK_UNKNOWN = 0, BT_TASK_ACL = 1, BT_TASK_SCO = 2, BT_TASK_ESCO = 3, BT_TASK_A2DP = 4,
@@ -487,10 +488,17 @@ void brcmf_btcoex_log_active_bt_tasks(brcmf_if* ifp) {
   //
   // btc_params 116 and 117 retuns the lower and higher order 16bits of the active tasks bitmap.
   // btc_params 39 returns a counter of the number of times wlan was preempted for BT operation.
+  // TODO(https://fxbug.dev/409841608): Log BT tasks mask to Inspect time series
   brcmf_btcoex_params_read(ifp, 116, &bt_tasks_low);
   brcmf_btcoex_params_read(ifp, 117, &bt_tasks_high);
-  // btc_param 39 indicates the # of times wlan was preempted for BT
-  brcmf_btcoex_params_read(ifp, 39, &wlan_preempt_count);
+  uint32_t prev_wlan_preempt_counter = cfg->wlan_preempt_counter;
+  cfg->wlan_preempt_counter = brcmf_btcoex_get_wlan_preempt_count(ifp);
+  uint32_t wlan_preempt_count;
+  if (cfg->wlan_preempt_counter >= prev_wlan_preempt_counter) {
+    wlan_preempt_count = cfg->wlan_preempt_counter - prev_wlan_preempt_counter;
+  } else {
+    wlan_preempt_count = cfg->wlan_preempt_counter;
+  }
   BRCMF_INFO("BTCoex: Active_BT_tasks: 0x%04x%04x WlanPreemptCnt: %u", bt_tasks_high, bt_tasks_low,
              wlan_preempt_count);
 
@@ -498,5 +506,11 @@ void brcmf_btcoex_log_active_bt_tasks(brcmf_if* ifp) {
   // interim activity).
   brcmf_btcoex_params_write(ifp, 116, 0);
   brcmf_btcoex_params_write(ifp, 117, 0);
-  brcmf_btcoex_params_write(ifp, 39, 0);
+}
+
+uint32_t brcmf_btcoex_get_wlan_preempt_count(brcmf_if* ifp) {
+  uint32_t wlan_preempt_count;
+  // btc_param 39 indicates the # of times wlan was preempted for BT
+  brcmf_btcoex_params_read(ifp, 39, &wlan_preempt_count);
+  return wlan_preempt_count;
 }
