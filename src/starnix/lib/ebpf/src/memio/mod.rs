@@ -80,7 +80,7 @@ impl EbpfPtr<'_, u64> {
 /// reference either a whole VMO allocated for and eBPF map or individual
 /// elements of that VMO (see `slice()`). The address and the size of the
 /// buffer are always 8-byte aligned.
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub struct EbpfBufferPtr<'a> {
     ptr: *mut u8,
     size: usize,

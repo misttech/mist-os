@@ -20,8 +20,8 @@ use ebpf::{
     BpfProgramContext, BpfValue, CbpfConfig, DataWidth, EbpfProgram, Packet, ProgramArgument, Type,
 };
 use ebpf_api::{
-    get_socket_filter_helpers, PinnedMap, ProgramType, SocketFilterContext,
-    SOCKET_FILTER_CBPF_CONFIG, SOCKET_FILTER_SK_BUF_TYPE,
+    get_socket_filter_helpers, MapValueRef, MapsContext, PinnedMap, ProgramType,
+    SocketFilterContext, SOCKET_FILTER_CBPF_CONFIG, SOCKET_FILTER_SK_BUF_TYPE,
 };
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, Unlocked};
@@ -961,11 +961,11 @@ impl UnixSocketInner {
             let Some(bpf_program) = self.bpf_program.as_ref() else {
                 return Some(message);
             };
-            let mut context = UnixSocketEbpfHelpersContext {};
 
             // TODO(https://fxbug.dev/385015056): Fill in SkBuf.
             let mut sk_buf = SkBuf::default();
 
+            let mut context = UnixSocketEbpfHelpersContext::<'_>::default();
             let s = bpf_program.run(&mut context, &mut sk_buf);
             if s == 0 {
                 None
@@ -1037,9 +1037,18 @@ impl Packet for &mut SkBuf {
     }
 }
 
-struct UnixSocketEbpfHelpersContext {}
+#[derive(Default)]
+struct UnixSocketEbpfHelpersContext<'a> {
+    map_refs: Vec<MapValueRef<'a>>,
+}
 
-impl SocketFilterContext for UnixSocketEbpfHelpersContext {
+impl<'a> MapsContext<'a> for UnixSocketEbpfHelpersContext<'a> {
+    fn add_value_ref(&mut self, map_ref: MapValueRef<'a>) {
+        self.map_refs.push(map_ref)
+    }
+}
+
+impl<'a> SocketFilterContext for UnixSocketEbpfHelpersContext<'a> {
     type SkBuf = SkBuf;
     fn get_socket_uid(&self, _sk_buf: &SkBuf) -> uid_t {
         track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_get_socket_uid");
@@ -1060,7 +1069,7 @@ impl ProgramArgument for &'_ mut SkBuf {
 
 struct UnixSocketEbpfContext {}
 impl BpfProgramContext for UnixSocketEbpfContext {
-    type RunContext<'a> = UnixSocketEbpfHelpersContext;
+    type RunContext<'a> = UnixSocketEbpfHelpersContext<'a>;
     type Packet<'a> = &'a mut SkBuf;
     type Map = PinnedMap;
     const CBPF_CONFIG: &'static CbpfConfig = &SOCKET_FILTER_CBPF_CONFIG;

@@ -79,7 +79,7 @@
 
 use super::buffer::MapBuffer;
 use super::lock::RwMapLock;
-use super::{MapError, MapImpl, MapKey};
+use super::{MapError, MapImpl, MapKey, MapValueRef};
 use ebpf::MapSchema;
 use linux_uapi::{BPF_EXIST, BPF_NOEXIST};
 use rand::RngCore;
@@ -334,6 +334,14 @@ mod internal {
             // the list.
             unsafe { Some(self.data_entry(entry.next().get()?)) }
         }
+
+        /// Returns a ref-counted reference to the `entry`.
+        pub fn get_value_reference<'b>(&self, entry: &DataEntry<'b>) -> HashMapEntryRef<'a> {
+            // SAFETY: ref-counter will be decremented when the returned
+            // `HashMapEntryRef` is dropped.
+            unsafe { entry.ref_count().fetch_add(1, Ordering::Relaxed) };
+            HashMapEntryRef { index: Some(entry.index), store: self.clone() }
+        }
     }
 
     #[derive(Clone)]
@@ -420,6 +428,13 @@ mod internal {
             // SAFETY: The entry is only used to get the ref-count.
             let entry = unsafe { self.store.data_entry(index) };
             return entry.get_ref_count() == 1;
+        }
+
+        pub fn ptr(&self) -> EbpfBufferPtr<'a> {
+            // SAFETY: The value stored in the data entry is safe to access as
+            // long as we have a strong reference.
+            let entry = unsafe { self.store.data_entry(self.index.unwrap()) };
+            entry.value()
         }
     }
 
@@ -552,6 +567,7 @@ mod internal {
     }
 }
 
+pub(super) use internal::HashMapEntryRef;
 use internal::{BucketState, HashMapStore, HashTableHeader, Layout};
 
 #[derive(Debug)]
@@ -607,21 +623,11 @@ impl HashMap {
 }
 
 impl MapImpl for HashMap {
-    fn get_raw(&self, key: &[u8]) -> Option<*mut u8> {
+    fn lookup<'a>(&'a self, key: &[u8]) -> Option<MapValueRef<'a>> {
         let bucket = self.get_bucket_for_key(&key).read();
         let entry = bucket.find(&key)?;
-        // TODO(https://fxbug.dev/378507648): This method should return a
-        // ref-counted reference to the entry to ensure the entry isn't reused
-        // for the lifetime of the program.
-        Some(entry.value().raw_ptr())
-    }
-
-    fn lookup(&self, key: &[u8]) -> Option<Vec<u8>> {
-        let bucket = self.get_bucket_for_key(&key).read();
-        let entry = bucket.find(&key)?;
-        let mut result = entry.value().load();
-        result.resize(self.layout.value_size as usize, 0);
-        Some(result)
+        let value_ref = self.store().get_value_reference(&entry);
+        Some(MapValueRef::new_from_hashmap(value_ref))
     }
 
     fn update(&self, key: MapKey, value: &[u8], flags: u64) -> Result<(), MapError> {

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use super::buffer::MapBuffer;
-use super::{MapError, MapImpl, MapKey};
+use super::{MapError, MapImpl, MapKey, MapValueRef};
 use ebpf::{EbpfBufferPtr, MapSchema};
 use linux_uapi::BPF_NOEXIST;
 use std::fmt::Debug;
@@ -70,18 +70,8 @@ impl Array {
 }
 
 impl MapImpl for Array {
-    fn get_raw(&self, key: &[u8]) -> Option<*mut u8> {
-        self.value_ptr(key).map(|buf| buf.raw_ptr())
-    }
-
-    fn lookup(&self, key: &[u8]) -> Option<Vec<u8>> {
-        let buf = self.value_ptr(key)?;
-        let mut result = buf.load();
-
-        // Remove the padding.
-        result.resize(self.value_size, 0);
-
-        Some(result)
+    fn lookup<'a>(&'a self, key: &[u8]) -> Option<MapValueRef<'a>> {
+        self.value_ptr(key).map(|ptr| MapValueRef::new(ptr))
     }
 
     fn update(&self, key: MapKey, value: &[u8], flags: u64) -> Result<(), MapError> {
@@ -135,8 +125,8 @@ mod test {
         };
 
         let array = Array::new(&schema, None).unwrap();
-        assert_eq!(array.get_raw(&[0, 0, 0, 0]).unwrap() as usize % 8, 0);
-        assert_eq!(array.get_raw(&[1, 0, 0, 0]).unwrap() as usize % 8, 0);
+        assert_eq!(array.lookup(&[0, 0, 0, 0]).unwrap().ptr().raw_ptr() as usize % 8, 0);
+        assert_eq!(array.lookup(&[1, 0, 0, 0]).unwrap().ptr().raw_ptr() as usize % 8, 0);
 
         let schema = MapSchema {
             map_type: bpf_map_type_BPF_MAP_TYPE_ARRAY,
@@ -146,7 +136,7 @@ mod test {
         };
 
         let array = Array::new(&schema, None).unwrap();
-        assert_eq!(array.get_raw(&[0, 0, 0, 0]).unwrap() as usize % 8, 0);
-        assert_eq!(array.get_raw(&[1, 0, 0, 0]).unwrap() as usize % 8, 0);
+        assert_eq!(array.lookup(&[0, 0, 0, 0]).unwrap().ptr().raw_ptr() as usize % 8, 0);
+        assert_eq!(array.lookup(&[1, 0, 0, 0]).unwrap().ptr().raw_ptr() as usize % 8, 0);
     }
 }

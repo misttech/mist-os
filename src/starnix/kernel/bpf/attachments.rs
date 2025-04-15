@@ -10,7 +10,7 @@ use crate::task::CurrentTask;
 use crate::vfs::socket::{SocketAddress, SocketDomain, SocketProtocol, SocketType};
 use crate::vfs::FdNumber;
 use ebpf::{EbpfProgram, EbpfProgramContext, ProgramArgument, Type};
-use ebpf_api::{AttachType, PinnedMap, BPF_SOCK_ADDR_TYPE};
+use ebpf_api::{AttachType, BaseEbpfRunContext, PinnedMap, BPF_SOCK_ADDR_TYPE};
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{BpfPrograms, FileOpsCore, Locked, OrderedRwLock, Unlocked};
 use starnix_syscalls::{SyscallResult, SUCCESS};
@@ -291,7 +291,7 @@ impl ProgramArgument for &'_ mut BpfSockAddr {
 struct SockAddrEbpfProgram(EbpfProgram<SockAddrEbpfProgram>);
 
 impl EbpfProgramContext for SockAddrEbpfProgram {
-    type RunContext<'a> = ();
+    type RunContext<'a> = BaseEbpfRunContext<'a>;
     type Packet<'a> = ();
     type Arg1<'a> = &'a mut BpfSockAddr;
     type Arg2<'a> = ();
@@ -310,7 +310,8 @@ pub enum SockAddrEbpfProgramResult {
 
 impl SockAddrEbpfProgram {
     fn run(&self, addr: &mut BpfSockAddr) -> SockAddrEbpfProgramResult {
-        if self.0.run_with_1_argument(&mut (), addr) == 0 {
+        let mut run_context = BaseEbpfRunContext::<'_>::default();
+        if self.0.run_with_1_argument(&mut run_context, addr) == 0 {
             SockAddrEbpfProgramResult::Block
         } else {
             SockAddrEbpfProgramResult::Allow

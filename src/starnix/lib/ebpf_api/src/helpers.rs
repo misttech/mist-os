@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::maps::{Map, MapKey, RingBuffer, RingBufferWakeupPolicy};
+use crate::maps::{Map, MapKey, MapValueRef, RingBuffer, RingBufferWakeupPolicy};
 use ebpf::{BpfValue, EbpfHelperImpl, EbpfProgramContext};
 use inspect_stubs::track_stub;
 use linux_uapi::{
@@ -17,14 +17,21 @@ use linux_uapi::{
     bpf_func_id_BPF_FUNC_skb_load_bytes_relative, bpf_func_id_BPF_FUNC_trace_printk, uid_t,
 };
 
-fn bpf_map_lookup_elem<C: EbpfProgramContext>(
-    _context: &mut C::RunContext<'_>,
+pub trait MapsContext<'a> {
+    fn add_value_ref(&mut self, map_ref: MapValueRef<'a>);
+}
+
+fn bpf_map_lookup_elem<'a, C: EbpfProgramContext>(
+    context: &mut C::RunContext<'a>,
     map: BpfValue,
     key: BpfValue,
     _: BpfValue,
     _: BpfValue,
     _: BpfValue,
-) -> BpfValue {
+) -> BpfValue
+where
+    for<'b> C::RunContext<'b>: MapsContext<'b>,
+{
     // SAFETY
     //
     // The safety of the operation is ensured by the bpf verifier. The `map` must be a reference to
@@ -33,7 +40,19 @@ fn bpf_map_lookup_elem<C: EbpfProgramContext>(
     let key =
         unsafe { std::slice::from_raw_parts(key.as_ptr::<u8>(), map.schema.key_size as usize) };
 
-    map.get_raw(&key).map(BpfValue::from).unwrap_or_else(BpfValue::default)
+    let Some(value_ref) = map.lookup(key) else {
+        return BpfValue::default();
+    };
+
+    let result: BpfValue = value_ref.ptr().raw_ptr().into();
+
+    // If this is a map with ref-counted elements then save the reference for
+    // the lifetime of the program.
+    if value_ref.is_ref_counted() {
+        context.add_value_ref(value_ref);
+    }
+
+    result
 }
 
 fn bpf_map_update_elem<C: EbpfProgramContext>(
@@ -225,7 +244,10 @@ fn bpf_get_smp_processor_id<C: EbpfProgramContext>(
     0.into()
 }
 
-pub fn get_common_helpers<C: EbpfProgramContext>() -> Vec<(u32, EbpfHelperImpl<C>)> {
+pub fn get_common_helpers<C: EbpfProgramContext>() -> Vec<(u32, EbpfHelperImpl<C>)>
+where
+    for<'a> C::RunContext<'a>: MapsContext<'a>,
+{
     vec![
         (bpf_func_id_BPF_FUNC_ktime_get_boot_ns, EbpfHelperImpl(bpf_ktime_get_boot_ns)),
         (bpf_func_id_BPF_FUNC_ktime_get_coarse_ns, EbpfHelperImpl(bpf_ktime_get_coarse_ns)),

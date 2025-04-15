@@ -5,7 +5,7 @@
 use super::buffer::MapBuffer;
 use super::lock::RwMapLock;
 use super::vmar::AllocatedVmar;
-use super::{MapError, MapImpl, MapKey};
+use super::{MapError, MapImpl, MapKey, MapValueRef};
 use ebpf::MapSchema;
 use linux_uapi::{
     BPF_RB_FORCE_WAKEUP, BPF_RB_NO_WAKEUP, BPF_RINGBUF_BUSY_BIT, BPF_RINGBUF_DISCARD_BIT,
@@ -320,11 +320,7 @@ impl RingBuffer {
 }
 
 impl MapImpl for RingBuffer {
-    fn get_raw(&self, _key: &[u8]) -> Option<*mut u8> {
-        None
-    }
-
-    fn lookup(&self, _key: &[u8]) -> Option<Vec<u8>> {
+    fn lookup<'a>(&'a self, _key: &[u8]) -> Option<MapValueRef<'a>> {
         None
     }
 

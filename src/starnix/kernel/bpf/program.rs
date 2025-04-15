@@ -12,7 +12,9 @@ use ebpf::{
     BPF_PSEUDO_BTF_ID, BPF_PSEUDO_FUNC, BPF_PSEUDO_MAP_FD, BPF_PSEUDO_MAP_IDX,
     BPF_PSEUDO_MAP_IDX_VALUE, BPF_PSEUDO_MAP_VALUE,
 };
-use ebpf_api::{get_common_helpers, AttachType, EbpfApiError, Map, PinnedMap, ProgramType};
+use ebpf_api::{
+    get_common_helpers, AttachType, EbpfApiError, Map, MapsContext, PinnedMap, ProgramType,
+};
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_uapi::auth::{CAP_BPF, CAP_NET_ADMIN, CAP_PERFMON, CAP_SYS_ADMIN};
 use starnix_uapi::errors::Errno;
@@ -87,7 +89,10 @@ impl Program {
         program_type: ProgramType,
         struct_mappings: &[StructMapping],
         local_helpers: &[(u32, EbpfHelperImpl<C>)],
-    ) -> Result<EbpfProgram<C>, Errno> {
+    ) -> Result<EbpfProgram<C>, Errno>
+    where
+        for<'a> C::RunContext<'a>: MapsContext<'a>,
+    {
         if program_type != self.info.program_type {
             return error!(EINVAL);
         }
