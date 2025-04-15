@@ -71,12 +71,12 @@ def _to_starlark_string_list(items: T.List[str], indent: int = 4) -> str:
 
 
 def _to_starlark_string_dict(mapping: T.Dict[str, str], indent: int = 4) -> str:
-    items = sorted(mapping.items())
     if not mapping:
         return "{}"
     if len(mapping) == 1:
-        key, value = mapping[0]
+        key, value = mapping.popitem()
         return f'{{ "{key}": "{value}" }}'
+    items = sorted(mapping.items())
     result = "{\n"
     for key, value in items:
         result += " " * indent + f'    "{key}": "{value}",\n'
@@ -84,7 +84,7 @@ def _to_starlark_string_dict(mapping: T.Dict[str, str], indent: int = 4) -> str:
     return result
 
 
-def split_path_to_package_name(path: str) -> (str, str):
+def split_path_to_package_name(path: str) -> tuple[str, str]:
     """Convert IDK-relative path to Bazel (package path, target/file name) pair."""
     # Use a single .build-id/BUILD.bazel file for all .build-id files.
     if path.startswith(".build-id/"):
@@ -129,7 +129,7 @@ def split_path_to_package_name(path: str) -> (str, str):
 class OutputPackageInfo(object):
     """Information about a given Bazel package in the output IDK directory."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # The list of files exported by this package.
         self._exports: T.Set[str] = set()
         # The list of filesgroups in this package.
@@ -543,7 +543,7 @@ class PathRewriter(object):
         raise Exception(f"Unknown atom type {atom_type} in {meta}")
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--repository-name", required=True, help="IDK repository name."
@@ -618,17 +618,11 @@ def main():
 
     rewriter = PathRewriter(repo_name, output_idk, input_dir, ninja_build_dir)
 
-    def handle_path_list(
-        path_list: T.List[str], keep_as_symlinks: T.Sequence[str] = []
-    ):
-        output_idk.handle_meta_path_list_inplace(path_list, keep_as_symlinks)
-
     # Handle each part separately.
     for part in input_manifest["parts"]:
         part_meta_path = part["meta"]
 
         src_meta_path = input_dir / part_meta_path
-        out_dir / part_meta_path
         try:
             meta = json.load(src_meta_path.open())
         except:
