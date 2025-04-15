@@ -1,0 +1,18 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        runner: "driver",
+        binary: "driver/test-child-2.so",
+        bind: "meta/bind/test-child-2-bind.bindbc",
+        fallback: "false",
+        default_dispatcher_opts: [ "allow_sync_calls" ],
+        colocate: "true",
+    },
+    use: [],
+}

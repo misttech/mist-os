@@ -1,0 +1,34 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "driver_component/driver.shard.cml",
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        runner: "driver",
+        binary: "driver/test-gpio.so",
+        bind: "meta/bind/test-gpio-bind.bindbc",
+        default_dispatcher_opts: [ "allow_sync_calls" ],
+        colocate: "true",
+    },
+    capabilities: [
+        { service: "fuchsia.hardware.pinimpl.Service" },
+        { service: "fuchsia.hardware.pinimpl.Metadata" },
+    ],
+    use: [
+        { service: "fuchsia.hardware.platform.device.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.pinimpl.Service",
+            from: "self",
+        },
+        {
+            service: "fuchsia.hardware.pinimpl.Metadata",
+            from: "self",
+        },
+    ],
+}

@@ -1,0 +1,386 @@
+# Copyright 2019 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bind/bind.gni")
+import("//build/components.gni")
+import("//build/drivers.gni")
+import("//build/fidl/fidl.gni")
+import("//build/test.gni")
+
+test("platform-bus") {
+  output_name = "platform-bus-test"
+  sources = [ "main.cc" ]
+  deps = [
+    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/fdio",
+    "//src/devices/testing/devmgr-integration-test-shim",
+    "//src/lib/ddk",
+    "//src/lib/files",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/fdio-caller",
+    "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest",
+  ]
+
+  # TODO(https://fxbug.dev/42113849): Migrate to the new bind rules and delete this dep.
+  deps += [ "//src/lib/ddk:ddk-deprecated-binding-headers" ]
+}
+
+driver_bind_rules("test-board-bind") {
+  testonly = true
+  rules = "meta/test-board.bind"
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib",
+    "//src/devices/bind/fuchsia.test.platform",
+  ]
+}
+
+fuchsia_cc_driver("test-board-driver") {
+  legacy = true
+  testonly = true
+  output_name = "test-board"
+  configs += [ "//build/config:all_source" ]
+  sources = [
+    "test-board.cc",
+    "test-composite-node-spec.cc",
+    "test-gpio.cc",
+    "test-spi.cc",
+    "test.cc",
+  ]
+  deps = [
+    ":test-board-bind",
+    "//sdk/fidl/fuchsia.hardware.pinimpl:fuchsia.hardware.pinimpl_cpp",
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
+    "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
+    "//src/devices/bind/fuchsia.test.platform:fuchsia.test.platform_cpp",
+    "//src/devices/lib/amlogic",
+    "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/devices/lib/fidl-metadata",
+    "//src/lib/ddk",
+    "//src/lib/ddk:ddk-metadata-headers",
+    "//src/lib/ddktl",
+    "//zircon/system/ulib/fbl",
+  ]
+
+  # TODO(https://fxbug.dev/42113849): Migrate to the new bind rules and delete this dep.
+  deps += [ "//src/lib/ddk:ddk-deprecated-binding-headers" ]
+}
+
+fuchsia_driver_component("test-board") {
+  testonly = true
+  component_name = "test-board"
+  deps = [ ":test-board-driver" ]
+  info = "meta/test-driver-info.json"
+  manifest = "meta/test-board.cml"
+}
+
+driver_bind_rules("test-gpio-bind") {
+  testonly = true
+  rules = "meta/test-gpio.bind"
+  deps = [
+    "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.test.platform",
+  ]
+}
+
+fuchsia_cc_driver("test-gpio-driver") {
+  testonly = true
+  output_name = "test-gpio"
+  configs += [ "//build/config:all_source" ]
+  sources = [ "test/gpio.cc" ]
+  deps = [
+    ":test-gpio-bind",
+    "//sdk/fidl/fuchsia.hardware.pinimpl:fuchsia.hardware.pinimpl_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/metadata/cpp",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+fuchsia_driver_component("test-gpio") {
+  testonly = true
+  component_name = "test-gpio"
+  deps = [ ":test-gpio-driver" ]
+  info = "meta/test-driver-info.json"
+  manifest = "meta/test-gpio.cml"
+}
+
+driver_bind_rules("test-power-bind") {
+  testonly = true
+  rules = "meta/test-power.bind"
+  deps = [
+    "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.test.platform",
+  ]
+}
+
+fuchsia_cc_driver("test-power-driver") {
+  legacy = true
+  testonly = true
+  output_name = "test-power"
+  configs += [ "//build/config:all_source" ]
+  sources = [ "test/power.cc" ]
+  deps = [
+    ":test-power-bind",
+    "//sdk/banjo/fuchsia.hardware.powerimpl:fuchsia.hardware.powerimpl_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+    "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+fuchsia_driver_component("test-power") {
+  testonly = true
+  component_name = "test-power"
+  deps = [ ":test-power-driver" ]
+  info = "meta/test-driver-info.json"
+  manifest = "meta/test-power.cml"
+}
+
+driver_bind_rules("test-spi-bind") {
+  testonly = true
+  rules = "meta/test-spi.bind"
+  deps = [
+    "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.test.platform",
+  ]
+}
+
+fuchsia_cc_driver("test-spi-driver") {
+  testonly = true
+  output_name = "test-spi"
+  configs += [ "//build/config:all_source" ]
+  sources = [ "test/spi.cc" ]
+  deps = [
+    ":test-spi-bind",
+    "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp",
+    "//sdk/fidl/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/metadata/cpp",
+    "//src/lib/ddk:ddk_metadata",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+fuchsia_driver_component("test-spi") {
+  testonly = true
+  component_name = "test-spi"
+  deps = [ ":test-spi-driver" ]
+  info = "meta/test-driver-info.json"
+  manifest = "meta/test-spi.cml"
+}
+
+driver_bind_rules("test-composite-node-spec-bind") {
+  testonly = true
+  rules = "meta/test-composite-node-spec.bind"
+  deps = [
+    "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.test",
+    "//src/devices/bind/fuchsia.test.platform",
+  ]
+}
+
+fuchsia_cc_driver("test-composite-node-spec-driver") {
+  legacy = true
+  testonly = true
+  output_name = "test-composite-node-spec"
+  configs += [ "//build/config:all_source" ]
+  sources = [ "test/composite-node-spec.cc" ]
+  deps = [
+    ":test-composite-node-spec-bind",
+    "//src/devices/lib/driver",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+fuchsia_driver_component("test-composite-node-spec") {
+  testonly = true
+  component_name = "test-composite-node-spec"
+  deps = [ ":test-composite-node-spec-driver" ]
+  info = "meta/test-driver-info.json"
+  manifest = "meta/test-composite-node-spec.cml"
+}
+
+simple_drivers = [
+  "child-1",
+  "child-2",
+  "child-3",
+  "parent",
+]
+
+foreach(driver, simple_drivers) {
+  driver_bind_rules("test-${driver}-bind") {
+    testonly = true
+    rules = "meta/test-${driver}.bind"
+    deps = [ "//src/devices/bind/fuchsia.test.platform" ]
+  }
+
+  fuchsia_cc_driver("test-$driver-driver") {
+    testonly = true
+    output_name = "test-$driver"
+    configs += [ "//build/config:all_source" ]
+    sources = [ "test/$driver.cc" ]
+    deps = [
+      ":test-${driver}-bind",
+      "//sdk/lib/driver/component/cpp",
+      "//src/devices/bind/fuchsia:fuchsia_cpp",
+      "//src/devices/bind/fuchsia.test.platform:fuchsia.test.platform_cpp",
+      "//src/devices/lib/driver:driver_runtime",
+    ]
+  }
+
+  fuchsia_driver_component("test-$driver") {
+    testonly = true
+    component_name = "test-$driver"
+    deps = [ ":test-$driver-driver" ]
+    info = "meta/test-driver-info.json"
+    manifest = "meta/test-$driver.cml"
+  }
+}
+
+fuchsia_unittest_package("platform-bus-test") {
+  deps = [
+    ":platform-bus",
+    ":test-board",
+    ":test-composite-node-spec",
+    ":test-gpio",
+    ":test-power",
+    ":test-spi",
+    "//src/devices/bus/drivers/platform",
+    "//src/devices/gpio/drivers/gpio",
+    "//src/devices/power/drivers/power",
+    "//src/devices/spi/drivers/spi",
+  ]
+  foreach(driver, simple_drivers) {
+    deps += [ ":test-$driver" ]
+  }
+}
+
+fidl("fuchsia.hardware.btitest") {
+  testonly = true
+  sources = [ "bti.test.fidl" ]
+}
+
+driver_bind_rules("test-bti-board-bind") {
+  testonly = true
+  rules = "meta/test-bti-board.bind"
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib",
+    "//src/devices/bind/fuchsia.test.platform",
+  ]
+}
+
+fuchsia_cc_driver("test-bti-board-driver") {
+  legacy = true
+  testonly = true
+  output_name = "test-bti-board"
+  configs += [ "//build/config:all_source" ]
+  sources = [ "test-bti-board.cc" ]
+  deps = [
+    ":test-bti-board-bind",
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
+    "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
+    "//zircon/system/ulib/fbl",
+  ]
+
+  # TODO(https://fxbug.dev/42113849): Migrate to the new bind rules and delete this dep.
+  deps += [ "//src/lib/ddk:ddk-deprecated-binding-headers" ]
+}
+
+fuchsia_driver_component("test-bti-board") {
+  testonly = true
+  component_name = "test-bti-board"
+  deps = [ ":test-bti-board-driver" ]
+  info = "meta/test-driver-info.json"
+  manifest = "meta/test-bti-board.cml"
+}
+
+driver_bind_rules("test-bti-bind") {
+  testonly = true
+  rules = "meta/test-bti.bind"
+  deps = [
+    "//src/devices/bind/fuchsia.resource",
+    "//src/devices/bind/fuchsia.test.platform",
+  ]
+}
+
+fuchsia_cc_driver("test-bti-driver") {
+  legacy = true
+  testonly = true
+  output_name = "test-bti"
+  configs += [ "//build/config:all_source" ]
+  sources = [ "test-bti.cc" ]
+  deps = [
+    ":fuchsia.hardware.btitest_cpp",
+    ":test-bti-bind",
+    "//sdk/lib/driver/platform-device/cpp",
+    "//src/devices/lib/driver",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+fuchsia_driver_component("test-bti") {
+  testonly = true
+  component_name = "test-bti"
+  deps = [ ":test-bti-driver" ]
+  info = "meta/test-driver-info.json"
+  manifest = "meta/test-bti.cml"
+}
+
+test("platform-bus-bti") {
+  output_name = "platform-bus-bti-test"
+  sources = [ "bti-test.cc" ]
+  deps = [
+    ":fuchsia.hardware.btitest_cpp",
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/device-watcher/cpp",
+    "//sdk/lib/driver_test_realm/realm_builder/cpp",
+    "//sdk/lib/fdio",
+    "//src/lib/ddk",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/fdio-caller",
+    "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest",
+  ]
+
+  # TODO(fxb/38132): Migrate to the new bind rules and delete this dep.
+  deps += [ "//src/lib/ddk:ddk-deprecated-binding-headers" ]
+}
+
+fuchsia_unittest_package("platform-bus-bti-test") {
+  manifest = "meta/platform-bus-bti-test.cml"
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+  deps = [
+    ":platform-bus-bti",
+    ":test-bti",
+    ":test-bti-board",
+    "//src/devices/bus/drivers/platform",
+  ]
+  test_type = "system"
+}
