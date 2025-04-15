@@ -305,6 +305,7 @@ if (is_kernel) {
     configs = [
       ":jtrace_config",
       ":lock_dep",
+      ":vmo_fine_lock",
       ":scheduler",
       ":standalone",
       ":warnings",
@@ -499,6 +500,11 @@ if (is_kernel) {
         defines += [ "JTRACE_IS_PERSISTENT=false" ]
       }
     }
+  }
+
+  config("vmo_fine_lock") {
+    visibility = [ ":*" ]
+    defines = [ "VMO_FINE_LOCK=$vmo_fine_grained_locking" ]
   }
 
   kernel_elf_binary("physzircon") {

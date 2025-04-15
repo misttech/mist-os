@@ -188,8 +188,13 @@ struct Fine {
 // To avoid using additional memory for no benefit, the TrackedHierarchy lock (i.e. combination of
 // both local and shared locks) is only used if lockdep is in use, otherwise the regular global
 // hierarchy lock is used.
+#if VMO_FINE_LOCK
+#define VMO_USE_LOCAL_LOCK true
+#define VMO_USE_SHARED_LOCK true
+#else
 #define VMO_USE_LOCAL_LOCK (LOCK_DEP_ENABLED_FEATURE_LEVEL > 0)
 #define VMO_USE_SHARED_LOCK true
+#endif
 
 #if VMO_USE_LOCAL_LOCK && VMO_USE_SHARED_LOCK
 using VmoLockTraits = vmo_lock_traits::TrackedHierarchy;

@@ -125,6 +125,9 @@ declare_args() {
 
   # Support streaming ktrace data out of the kernel.
   experimental_ktrace_streaming_enabled = false
+
+  # Use fine grained (per VMO) locks instead of a single lock for the entire clone hierarchy.
+  vmo_fine_grained_locking = false
 }
 
 declare_args() {
