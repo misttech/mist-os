@@ -34,6 +34,12 @@ static inline uint16_t SWAP_16(uint16_t x) { return __builtin_bswap16(x); }
 #define BE64(val) (val)
 #define BE32(val) (val)
 #define BE16(val) (val)
+#if __mist_os__
+#define le16toh(x) __builtin_bswap16(x)
+#define le32toh(x) __builtin_bswap32(x)
+#define htole16(x) __builtin_bswap16(x)
+#define htole32(x) __builtin_bswap32(x)
+#endif
 #else
 #define LE64(val) (val)
 #define LE32(val) (val)
@@ -41,6 +47,12 @@ static inline uint16_t SWAP_16(uint16_t x) { return __builtin_bswap16(x); }
 #define BE64(val) SWAP_64(val)
 #define BE32(val) SWAP_32(val)
 #define BE16(val) SWAP_16(val)
+#if __mist_os__
+#define le16toh(x) (uint16_t)(x)
+#define le32toh(x) (uint32_t)(x)
+#define htole16(x) (uint16_t)(x)
+#define htole32(x) (uint32_t)(x)
+#endif
 #endif
 
 /* classic network byte swap stuff */
