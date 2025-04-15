@@ -10,6 +10,7 @@ source_set("scudo") {
   public = [ "mallopt.h" ]
   visibility = [
     # Please discuss with the owners before adding a dependency.
+    "//src/developer/memory/metrics:*",
   ]
 }
 
