@@ -4,12 +4,14 @@
 // found in the LICENSE file.
 #ifndef SRC_DEVICES_BUS_DRIVERS_PCI_BUS_DEVICE_INTERFACE_H_
 #define SRC_DEVICES_BUS_DRIVERS_PCI_BUS_DEVICE_INTERFACE_H_
-#include <lib/zx/bti.h>
-#include <lib/zx/msi.h>
+
 #include <stdint.h>
 #include <zircon/errors.h>
+#include <zircon/types.h>
 
 #include <fbl/ref_ptr.h>
+#include <object/bus_transaction_initiator_dispatcher.h>
+#include <object/msi_dispatcher.h>
 
 namespace pci {
 
@@ -24,9 +26,10 @@ class BusDeviceInterface {
  public:
   virtual ~BusDeviceInterface() = default;
   // Get the BTI at |index| for a device.
-  virtual zx_status_t GetBti(const pci::Device* device, uint32_t index, zx::bti* bti) = 0;
+  virtual zx_status_t GetBti(const pci::Device* device, uint32_t index,
+                             fbl::RefPtr<BusTransactionInitiatorDispatcher>* bti) = 0;
   // Allocate |count| messagge signaled interrupts for a device.
-  virtual zx_status_t AllocateMsi(uint32_t count, zx::msi* msi) = 0;
+  virtual zx_status_t AllocateMsi(uint32_t count, fbl::RefPtr<MsiAllocation>* msi) = 0;
   // Add device to the Bus device tree.
   virtual zx_status_t LinkDevice(fbl::RefPtr<pci::Device> device) = 0;
   // Remove a device from the Bus device tree.

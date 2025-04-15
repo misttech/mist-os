@@ -1,10 +1,12 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #ifndef SRC_DEVICES_BUS_DRIVERS_PCI_CAPABILITIES_POWER_MANAGEMENT_H_
 #define SRC_DEVICES_BUS_DRIVERS_PCI_CAPABILITIES_POWER_MANAGEMENT_H_
 
 #include <lib/zx/result.h>
+#include <lib/zx/time.h>
 
 #include <hwreg/bitfields.h>
 

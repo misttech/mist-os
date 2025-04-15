@@ -67,7 +67,7 @@ class MsixCapability : public Capability {
   PciReg32 pba() { return pba_reg_; }
   uint8_t table_bar() const { return table_bar_; }
   uint32_t table_offset() const { return table_offset_; }
-  zx::unowned_vmo table_vmo() { return table_mmio_->get_vmo(); }
+  fbl::RefPtr<VmObjectDispatcher> table_vmo() { return table_mmio_->get_vmo(); }
   uint16_t table_size() const { return std::min(kMaxMsixVectors, table_size_); }
   uint8_t pba_bar() const { return pba_bar_; }
   uint32_t pba_offset() const { return pba_offset_; }

@@ -5,12 +5,12 @@
 #include "src/devices/bus/drivers/pci/device.h"
 
 #include <assert.h>
-#include <err.h>
-#include <fidl/fuchsia.io/cpp/wire.h>
-#include <inttypes.h>
-#include <lib/ddk/binding_driver.h>
+// #include <err.h>
+// #include <fidl/fuchsia.io/cpp/wire.h>
+// #include <inttypes.h>
+// #include <lib/ddk/binding_driver.h>
 #include <lib/fit/defer.h>
-#include <lib/inspect/cpp/inspector.h>
+// #include <lib/inspect/cpp/inspector.h>
 #include <lib/zx/interrupt.h>
 #include <string.h>
 #include <zircon/compiler.h>
@@ -20,13 +20,16 @@
 #include <zircon/types.h>
 
 #include <array>
+#include <deque>
 #include <optional>
+#include <utility>
 
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/string_buffer.h>
+#include <object/virtual_interrupt_dispatcher.h>
 
 #include "src/devices/bus/drivers/pci/bus_device_interface.h"
 #include "src/devices/bus/drivers/pci/capabilities/msi.h"
@@ -36,14 +39,16 @@
 #include "src/devices/bus/drivers/pci/ref_counted.h"
 #include "src/devices/bus/drivers/pci/upstream_node.h"
 
+#define LOCAL_TRACE 0
+
 namespace pci {
 
 namespace {  // anon namespace.  Externals do not need to know about DeviceImpl
 
 class DeviceImpl : public Device {
  public:
-  static zx_status_t Create(zx_device_t* parent, std::unique_ptr<Config>&& cfg,
-                            UpstreamNode* upstream, BusDeviceInterface* bdi, inspect::Node node,
+  static zx_status_t Create(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&& cfg,
+                            UpstreamNode* upstream, BusDeviceInterface* bdi, /*inspect::Node node,*/
                             bool has_acpi);
 
   // Implement ref counting, do not let derived classes override.
@@ -53,28 +58,29 @@ class DeviceImpl : public Device {
   DISALLOW_COPY_ASSIGN_AND_MOVE(DeviceImpl);
 
  protected:
-  DeviceImpl(zx_device_t* parent, std::unique_ptr<Config>&& cfg, UpstreamNode* upstream,
-             BusDeviceInterface* bdi, inspect::Node node, bool has_acpi)
-      : Device(parent, std::move(cfg), upstream, bdi, std::move(node), /*is_bridge=*/false,
+  DeviceImpl(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&& cfg, UpstreamNode* upstream,
+             BusDeviceInterface* bdi, /*inspect::Node node,*/ bool has_acpi)
+      : Device(parent, std::move(cfg), upstream, bdi, /*std::move(node),*/ /*is_bridge=*/false,
                has_acpi) {}
 };
 
-zx_status_t DeviceImpl::Create(zx_device_t* parent, std::unique_ptr<Config>&& cfg,
-                               UpstreamNode* upstream, BusDeviceInterface* bdi, inspect::Node node,
+zx_status_t DeviceImpl::Create(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&& cfg,
+                               UpstreamNode* upstream,
+                               BusDeviceInterface* bdi, /*inspect::Node node,*/
                                bool has_acpi) {
   fbl::AllocChecker ac;
   auto raw_dev =
-      new (&ac) DeviceImpl(parent, std::move(cfg), upstream, bdi, std::move(node), has_acpi);
+      new (&ac) DeviceImpl(parent, std::move(cfg), upstream, bdi, /*std::move(node),*/ has_acpi);
   if (!ac.check()) {
-    zxlogf(ERROR, "[%s] Out of memory attemping to create PCIe device.", cfg->addr());
+    LTRACEF("[%s] Out of memory attemping to create PCIe device.\n", cfg->addr());
     return ZX_ERR_NO_MEMORY;
   }
 
   auto dev = fbl::AdoptRef(static_cast<Device*>(raw_dev));
   const zx_status_t status = raw_dev->Init();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "[%s] Failed to initialize PCIe device: %s", dev->config()->addr(),
-           zx_status_get_string(status));
+    LTRACEF("[%s] Failed to initialize PCIe device: %s\n", dev->config()->addr(),
+            zx_status_get_string(status));
     return status;
   }
 
@@ -84,16 +90,17 @@ zx_status_t DeviceImpl::Create(zx_device_t* parent, std::unique_ptr<Config>&& cf
 
 }  // namespace
 
-Device::Device(zx_device_t* parent, std::unique_ptr<Config>&& config, UpstreamNode* upstream,
-               BusDeviceInterface* bdi, inspect::Node node, bool is_bridge, bool has_acpi)
+Device::Device(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&& config,
+               UpstreamNode* upstream, BusDeviceInterface* bdi /*, inspect::Node node*/,
+               bool is_bridge, bool has_acpi)
     : cfg_(std::move(config)),
       upstream_(upstream),
       bdi_(bdi),
       bar_count_(is_bridge ? PCI_BAR_REGS_PER_BRIDGE : PCI_BAR_REGS_PER_DEVICE),
       is_bridge_(is_bridge),
       has_acpi_(has_acpi),
-      parent_(parent),
-      inspect_(std::move(node))
+      parent_(std::move(parent)) /*,
+       inspect_(std::move(node))*/
 
 {}
 
@@ -108,13 +115,14 @@ Device::~Device() {
   SetBusMastering(false);
   ModifyCmd(/*clr_bits=*/PCI_CONFIG_COMMAND_IO_EN | PCI_CONFIG_COMMAND_MEM_EN, /*set_bits=*/0);
   // TODO(cja/https://fxbug.dev/42108123): Remove this after porting is finished.
-  zxlogf(TRACE, "%s [%s] dtor finished", is_bridge() ? "bridge" : "device", cfg_->addr());
+  LTRACEF("%s [%s] dtor finished\n", is_bridge() ? "bridge" : "device", cfg_->addr());
 }
 
-zx_status_t Device::Create(zx_device_t* parent, std::unique_ptr<Config>&& config,
-                           UpstreamNode* upstream, BusDeviceInterface* bdi, inspect::Node node,
+zx_status_t Device::Create(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&& config,
+                           UpstreamNode* upstream, BusDeviceInterface* bdi /*, inspect::Node node*/,
                            bool has_acpi) {
-  return DeviceImpl::Create(parent, std::move(config), upstream, bdi, std::move(node), has_acpi);
+  return DeviceImpl::Create(parent, std::move(config), upstream, bdi,
+                            /*std::move(node),*/ has_acpi);
 }
 
 zx_status_t Device::Init() {
@@ -122,7 +130,7 @@ zx_status_t Device::Init() {
 
   const zx_status_t status = InitLocked();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to initialize device %s: %d", cfg_->addr(), status);
+    LTRACEF("failed to initialize device %s: %d\n", cfg_->addr(), status);
     return status;
   }
 
@@ -136,13 +144,15 @@ zx_status_t Device::Init() {
 }
 
 zx_status_t Device::InitInterrupts() {
-  zx_status_t status = zx::interrupt::create(*zx::unowned_resource(ZX_HANDLE_INVALID), 0,
-                                             ZX_INTERRUPT_VIRTUAL, &irqs_.legacy);
+  KernelHandle<InterruptDispatcher> handle;
+  zx_rights_t rights;
+  zx_status_t status = VirtualInterruptDispatcher::Create(&handle, &rights, ZX_INTERRUPT_VIRTUAL);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "device %s could not create its legacy interrupt: %s", cfg_->addr(),
-           zx_status_get_string(status));
+    LTRACEF("device %s could not create its legacy interrupt: %s\n", cfg_->addr(),
+            zx_status_get_string(status));
     return status;
   }
+  irqs_.legacy = handle.release();
 
   // Disable all interrupt modes until a driver enables the preferred method.
   // The legacy interrupt is disabled by hand because our Enable/Disable methods
@@ -153,7 +163,7 @@ zx_status_t Device::InitInterrupts() {
   if (caps_.msi) {
     status = DisableMsi();
     if (status != ZX_OK) {
-      zxlogf(ERROR, "failed to disable MSI: %s", zx_status_get_string(status));
+      LTRACEF("failed to disable MSI: %s\n", zx_status_get_string(status));
       return status;
     }
   }
@@ -161,12 +171,12 @@ zx_status_t Device::InitInterrupts() {
   if (caps_.msix) {
     status = DisableMsix();
     if (status != ZX_OK) {
-      zxlogf(ERROR, "failed to disable MSI-X: %s", zx_status_get_string(status));
+      LTRACEF("failed to disable MSI-X: %s\n", zx_status_get_string(status));
       return status;
     }
   }
 
-  irqs_.mode = fuchsia_hardware_pci::InterruptMode::kDisabled;
+  irqs_.mode = INTERRUPT_MODE_DISABLED;
   return ZX_OK;
 }
 
@@ -188,7 +198,7 @@ zx_status_t Device::InitLocked() {
   // if they exist
   zx_status_t st = ProbeCapabilities();
   if (st != ZX_OK) {
-    zxlogf(ERROR, "device %s encountered an error parsing capabilities: %d", cfg_->addr(), st);
+    LTRACEF("device %s encountered an error parsing capabilities: %d\n", cfg_->addr(), st);
     return st;
   }
 
@@ -206,15 +216,17 @@ zx_status_t Device::InitLocked() {
   if (caps_.power) {
     if (auto state = caps_.power->GetPowerState(*cfg_);
         state != PowerManagementCapability::PowerState::D0) {
-      zxlogf(DEBUG, "[%s] transitioning power state from D%d to D0", cfg_->addr(), state);
+      LTRACEF("[%s] transitioning power state from D%d to D0\n", cfg_->addr(), state);
       caps_.power->SetPowerState(*cfg_, PowerManagementCapability::PowerState::D0);
     }
   }
 
+#if 0
   zx::result result = FidlDevice::Create(parent_, this);
   if (result.is_error()) {
     return result.status_value();
   }
+#endif
 
   disable.cancel();
   return ZX_OK;
@@ -253,7 +265,7 @@ void Device::DisableLocked() {
   // Disable a device because we cannot allocate space for all of its BARs (or
   // forwarding windows, in the case of a bridge).  Flag the device as
   // disabled from here on out.
-  zxlogf(TRACE, "[%s] %s %s", cfg_->addr(), (is_bridge()) ? " (b)" : "", __func__);
+  LTRACEF("[%s] %s %s\n", cfg_->addr(), (is_bridge()) ? " (b)" : "", __func__);
 
   // Flag the device as disabled.  Close the device's MMIO/PIO windows, shut
   // off device initiated accesses to the bus, disable legacy interrupts.
@@ -314,12 +326,12 @@ zx::result<> Device::ProbeBar(uint8_t bar_id) {
   // Check the read-only configuration of the BAR. If it's invalid then don't add it to our BAR
   // list.
   if (bar.is_64bit && (bar.bar_id == bar_count_ - 1)) {
-    zxlogf(ERROR, "[%s] has a 64bit bar in invalid position %u!", cfg_->addr(), bar.bar_id);
+    LTRACEF("[%s] has a 64bit bar in invalid position %u!\n", cfg_->addr(), bar.bar_id);
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
   if (bar.is_64bit && !bar.is_mmio) {
-    zxlogf(ERROR, "[%s] bar %u is 64bit but not mmio!", cfg_->addr(), bar.bar_id);
+    LTRACEF("[%s] bar %u is 64bit but not mmio!\n", cfg_->addr(), bar.bar_id);
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
@@ -369,7 +381,7 @@ zx::result<> Device::ProbeBar(uint8_t bar_id) {
     // then they should be removed from the size mask before incrementing it.
     size_mask &= UINT16_MAX;
   }
-  InspectRecordBarInitialState(bar_id, bar.address);
+  // InspectRecordBarInitialState(bar_id, bar.address);
 
   // No matter what configuration we've found, |size_mask| should contain a
   // mask representing all the valid bits that can be set in the address.
@@ -379,7 +391,7 @@ zx::result<> Device::ProbeBar(uint8_t bar_id) {
   // access mode now that probing is complete.
   WriteBarInformation(bar);
 
-  InspectRecordBarProbedState(bar_id, bar);
+  // InspectRecordBarProbedState(bar_id, bar);
   bars_[bar_id] = std::move(bar);
   return zx::ok();
 }
@@ -388,8 +400,8 @@ void Device::ProbeBars() {
   for (uint32_t bar_id = 0; bar_id < bar_count_; bar_id++) {
     auto result = ProbeBar(bar_id);
     if (result.is_error()) {
-      zxlogf(ERROR, "[%s] Skipping bar %u due to probing error: %s", cfg_->addr(), bar_id,
-             result.status_string());
+      LTRACEF("[%s] Skipping bar %u due to probing error: %s\n", cfg_->addr(), bar_id,
+              result.status_string());
       continue;
     }
 
@@ -457,7 +469,7 @@ zx::result<> Device::AllocateBar(uint8_t bar_id) {
   if (bar.address) {
     result = AllocateFromUpstream(bar, bar.address);
     if (!result.is_ok()) {
-      InspectRecordBarFailure(bar_id, {bar.address, bar.size});
+      // InspectRecordBarFailure(bar_id, {bar.address, bar.size});
     }
   }
 
@@ -471,11 +483,11 @@ zx::result<> Device::AllocateBar(uint8_t bar_id) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
-  InspectRecordBarAllocation(bar_id, {result.value()->base(), result.value()->size()});
+  // InspectRecordBarAllocation(bar_id, {result.value()->base(), result.value()->size()});
   bar.allocation = std::move(result.value());
   bar.address = bar.allocation->base();
   WriteBarInformation(bar);
-  InspectRecordBarConfiguredState(bar_id, cfg_->Read(Config::kBar(bar_id)));
+  // InspectRecordBarConfiguredState(bar_id, cfg_->Read(Config::kBar(bar_id)));
 
   return zx::ok();
 }
@@ -503,8 +515,8 @@ zx::result<> Device::AllocateBars() {
   for (auto bar_id : bar_allocation_order) {
     if (bars_[bar_id]) {
       if (auto result = AllocateBar(bar_id); result.is_error()) {
-        zxlogf(ERROR, "[%s] failed to allocate bar %u: %s", cfg_->addr(), bar_id,
-               result.status_string());
+        LTRACEF("[%s] failed to allocate bar %u: %s\n", cfg_->addr(), bar_id,
+                result.status_string());
         return result.take_error();
       }
     }
@@ -523,7 +535,7 @@ zx::result<PowerManagementCapability::PowerState> Device::GetPowerState() {
 }
 
 void Device::Unplug() {
-  zxlogf(TRACE, "[%s] %s %s", cfg_->addr(), (is_bridge()) ? " (b)" : "", __func__);
+  LTRACEF("[%s] %s %s\n", cfg_->addr(), (is_bridge()) ? " (b)" : "", __func__);
   const fbl::AutoLock dev_lock(&dev_lock_);
   // Disable should have been called before Unplug and would have disabled
   // everything in the command register
@@ -533,7 +545,7 @@ void Device::Unplug() {
   // device and the dtor will be called.
   bdi_->UnlinkDevice(this);
   plugged_in_ = false;
-  zxlogf(TRACE, "device [%s] unplugged", cfg_->addr());
+  LTRACEF("device [%s] unplugged\n", cfg_->addr());
 }
 
 }  // namespace pci

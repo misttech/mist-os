@@ -4,23 +4,26 @@
 
 #include "src/devices/bus/drivers/pci/bus.h"
 
-#include <fidl/fuchsia.hardware.pci/cpp/natural_types.h>
-#include <fuchsia/hardware/pciroot/c/banjo.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
+// #include <fidl/mistos.hardware.pci/cpp/natural_types.h>
+#include <mistos/hardware/pciroot/c/banjo.h>
+// #include <lib/ddk/debug.h>
+// #include <lib/ddk/device.h>
+// #include <lib/ddk/metadata.h>
+// include <lib/ddk/platform-defs.h>
 #include <lib/mmio/mmio.h>
 #include <lib/pci/hw.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/time.h>
+#include <trace.h>
 #include <zircon/errors.h>
 #include <zircon/hw/pci.h>
 #include <zircon/status.h>
-#include <zircon/syscalls/port.h>
 
+#include <algorithm>
 #include <list>
-#include <thread>
+
+#include <object/port_dispatcher.h>
+// #include <thread>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
@@ -31,8 +34,11 @@
 #include "src/devices/bus/drivers/pci/config.h"
 #include "src/devices/bus/drivers/pci/device.h"
 
+#define LOCAL_TRACE 0
+
 namespace pci {
 
+#if 0
 zx_status_t pci_bus_bind(void* ctx, zx_device_t* parent) {
   pciroot_protocol_t pciroot = {};
   zx_status_t status = device_get_protocol(parent, ZX_PROTOCOL_PCIROOT, &pciroot);
@@ -80,8 +86,11 @@ zx_status_t pci_bus_bind(void* ctx, zx_device_t* parent) {
   [[maybe_unused]] void* released_ptr = bus.release();
   return ZX_OK;
 }
+#endif
 
 zx_status_t Bus::Initialize() {
+  zx_status_t status;
+#if 0
   zx_status_t status = DdkAdd(ddk::DeviceAddArgs("bus")
                                   .set_flags(DEVICE_ADD_NON_BINDABLE)
                                   .set_inspect_vmo(GetInspectVmo()));
@@ -95,6 +104,7 @@ zx_status_t Bus::Initialize() {
       result.is_ok()) {
     board_config_ = std::move(result.value());
   }
+#endif
 
   // Stash the ops/ctx pointers for the pciroot protocol so we can pass
   // them to the allocators provided by Pci(e)Root. The initial root is
@@ -103,7 +113,7 @@ zx_status_t Bus::Initialize() {
   fbl::AllocChecker ac;
   root_ = std::unique_ptr<PciRoot>(new (&ac) PciRoot(info_.start_bus_num, pciroot_));
   if (!ac.check()) {
-    zxlogf(ERROR, "failed to allocate root");
+    LTRACEF("failed to allocate root\n");
     return ZX_ERR_NO_MEMORY;
   }
 
@@ -112,15 +122,15 @@ zx_status_t Bus::Initialize() {
   irq_routing_entries_ =
       cpp20::span<const pci_irq_routing_entry_t>(info_.irq_routing_list, info_.irq_routing_count);
 
-  InspectInit();
-  InspectRecordPlatformInformation();
+  // InspectInit();
+  // InspectRecordPlatformInformation();
 
   // Begin our bus scan starting at our root
   ScanDownstream();
   status = ConfigureLegacyIrqs();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "error configuring legacy IRQs, they will be unavailable: %s",
-           zx_status_get_string(status));
+    LTRACEF("error configuring legacy IRQs, they will be unavailable: %s\n",
+            zx_status_get_string(status));
     return status;
   }
   root_->ConfigureDownstreamDevices();
@@ -131,22 +141,22 @@ zx_status_t Bus::Initialize() {
 
 // Maps a vmo as an mmio_buffer to be used as this Bus driver's ECAM region
 // for config space access.
-zx::result<fdf::MmioBuffer> Bus::MapConfigRegion(zx::vmo cam_vmo) {
+zx::result<fdf::MmioBuffer> Bus::MapConfigRegion(fbl::RefPtr<VmObjectDispatcher> cam_vmo) {
   size_t size;
-  zx_status_t status = cam_vmo.get_size(&size);
+  zx_status_t status = cam_vmo->GetSize(&size);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "couldn't get ecam vmo size: %d!", status);
+    LTRACEF("couldn't get ecam vmo size: %d!\n", status);
     return zx::error(status);
   }
 
   zx::result<fdf::MmioBuffer> result =
       fdf::MmioBuffer::Create(0, size, std::move(cam_vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE);
   if (result.is_error()) {
-    zxlogf(ERROR, "couldn't map ecam vmo: %s!", result.status_string());
+    LTRACEF("couldn't map ecam vmo: %s!\n", result.status_string());
     return result.take_error();
   }
 
-  zxlogf(DEBUG, "ecam for mapped at %p (size: %#zx)", result->get(), result->get_size());
+  LTRACEF("ecam for mapped at %p (size: %#zx)\n", result->get(), result->get_size());
   return zx::ok(std::move(*result));
 }
 
@@ -170,7 +180,8 @@ zx::result<std::unique_ptr<Config>> Bus::MakeConfig(pci_bdf_t bdf) {
 zx_status_t Bus::ScanDownstream() {
   std::list<BusScanEntry> scan_list;
   // First scan the bus id associated with our root.
-  BusScanEntry entry = {{static_cast<uint8_t>(root_->managed_bus_id()), 0, 0}, root_.get()};
+  BusScanEntry entry = {.bdf = {static_cast<uint8_t>(root_->managed_bus_id()), 0, 0},
+                        .upstream = root_.get()};
   entry.upstream = root_.get();
   scan_list.push_back(entry);
 
@@ -179,16 +190,16 @@ zx_status_t Bus::ScanDownstream() {
   // when we implement bus id assignment it will affect the overall numbering
   // scheme of the bus topology.
   while (!scan_list.empty()) {
-    auto entry = scan_list.back();
-    zxlogf(TRACE, "scanning from %02x:%02x.%01x upstream: %s", entry.bdf.bus_id,
-           entry.bdf.device_id, entry.bdf.function_id,
-           (entry.upstream->type() == UpstreamNode::Type::ROOT)
-               ? "root"
-               : static_cast<Bridge*>(entry.upstream)->config()->addr());
+    auto list_entry = scan_list.back();
+    LTRACEF("scanning from %02x:%02x.%01x upstream: %s\n", list_entry.bdf.bus_id,
+            list_entry.bdf.device_id, list_entry.bdf.function_id,
+            (list_entry.upstream->type() == UpstreamNode::Type::ROOT)
+                ? "root"
+                : static_cast<Bridge*>(list_entry.upstream)->config()->addr());
     // Remove this entry, otherwise we'll pop the wrong child off if the scan
     // adds any new bridges / resume points.
     scan_list.pop_back();
-    ScanBus(entry, &scan_list);
+    ScanBus(list_entry, &scan_list);
   }
 
   return ZX_OK;
@@ -223,20 +234,20 @@ void Bus::ScanBus(BusScanEntry entry, std::list<BusScanEntry>* scan_list) {
 
       bool is_bridge = ((config->Read(Config::kHeaderType) & PCI_HEADER_TYPE_MASK) ==
                         PCI_HEADER_TYPE_PCI_BRIDGE);
-      zxlogf(TRACE, "\tfound %s at %02x:%02x.%1x", (is_bridge) ? "bridge" : "device", bus_id,
-             dev_id, func_id);
+      LTRACEF("\tfound %s at %02x:%02x.%1x\n", (is_bridge) ? "bridge" : "device", bus_id, dev_id,
+              func_id);
 
-      inspect::Node node = devices_node_.CreateChild(config->addr());
-      // If we found a bridge, add it to our bridge list and initialize /
-      // enumerate it after we finish scanning this bus
+      // inspect::Node node = devices_node_.CreateChild(config->addr());
+      //  If we found a bridge, add it to our bridge list and initialize /
+      //  enumerate it after we finish scanning this bus
       if (is_bridge) {
         fbl::RefPtr<Bridge> bridge;
         uint8_t mbus_id = config->Read(Config::kSecondaryBusId);
-        zx_status_t status = Bridge::Create(zxdev(), std::move(config.value()), upstream, this,
-                                            std::move(node), mbus_id, &bridge);
+        zx_status_t status = Bridge::Create(nullptr, std::move(config.value()), upstream,
+                                            this /*,std::move(node)*/, mbus_id, &bridge);
         if (status != ZX_OK) {
-          zxlogf(ERROR, "failed to create Bridge at %s: %s", config->addr(),
-                 zx_status_get_string(status));
+          LTRACEF("failed to create Bridge at %s: %s\n", config->addr(),
+                  zx_status_get_string(status));
           continue;
         }
 
@@ -267,10 +278,10 @@ void Bus::ScanBus(BusScanEntry entry, std::list<BusScanEntry>* scan_list) {
       char addr[ZX_MAX_NAME_LEN];
       strncpy(addr, config->addr(), sizeof(addr));
       zx_status_t status =
-          pci::Device::Create(zxdev(), std::move(config.value()), upstream, this, std::move(node),
-                              /*has_acpi=*/DeviceHasAcpi(config->bdf()));
+          pci::Device::Create(nullptr, std::move(config.value()), upstream,
+                              this /*,std::move(node)*/, /*has_acpi=*/DeviceHasAcpi(config->bdf()));
       if (status != ZX_OK) {
-        zxlogf(ERROR, "failed to create device at %s: %s", addr, zx_status_get_string(status));
+        LTRACEF("failed to create device at %s: %s\n", addr, zx_status_get_string(status));
       }
     }
 
@@ -290,27 +301,33 @@ bool Bus::DeviceHasAcpi(pci_bdf_t bdf) {
 }
 
 zx_status_t Bus::SetUpLegacyIrqHandlers() {
-  zx_status_t status = zx::port::create(ZX_PORT_BIND_TO_INTERRUPT, &legacy_irq_port_);
+  KernelHandle<PortDispatcher> legacy_irq_port;
+  zx_rights_t rights;
+  zx_status_t status = PortDispatcher::Create(ZX_PORT_BIND_TO_INTERRUPT, &legacy_irq_port, &rights);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to create IRQ port: %s", zx_status_get_string(status));
+    LTRACEF("failed to create IRQ port: %s\n", zx_status_get_string(status));
     return status;
   }
+  legacy_irq_port_ = legacy_irq_port.release();
 
   // most cases they'll be using MSI / MSI-X anyway so a warning is sufficient.
   for (auto& irq : irqs_) {
-    zx::interrupt interrupt(irq.interrupt);
-    status = interrupt.bind(legacy_irq_port_, irq.vector, ZX_INTERRUPT_BIND);
+    ZX_DEBUG_ASSERT(irq.interrupt_count == 1);
+    ZX_DEBUG_ASSERT(irq.interrupt_list != nullptr);
+    fbl::RefPtr<InterruptDispatcher> interrupt = fbl::ImportFromRawPtr(
+        reinterpret_cast<InterruptDispatcher*>(const_cast<uint8_t*>(&irq.interrupt_list[0])));
+
+    status = interrupt->Bind(legacy_irq_port_, irq.vector);
     if (status != ZX_OK) {
       // In most cases a function will use MSI or MSI-X so a warning is sufficient.
-      zxlogf(WARNING, "failed to bind irq %#x to port: %s", irq.vector,
-             zx_status_get_string(status));
+      LTRACEF("failed to bind irq %#x to port: %s\n", irq.vector, zx_status_get_string(status));
       return status;
     }
 
     fbl::AllocChecker ac;
     auto shared_vector = std::unique_ptr<SharedVector>(new (&ac) SharedVector());
     if (!ac.check()) {
-      zxlogf(ERROR, "failed to allocate shared vector for irq %#x", irq.vector);
+      LTRACEF("failed to allocate shared vector for irq %#x\n", irq.vector);
       return ZX_ERR_NO_MEMORY;
     }
     shared_vector->interrupt = std::move(interrupt);
@@ -337,7 +354,7 @@ zx_status_t Bus::ConfigureLegacyIrqs() {
     uint8_t pin = device.config()->Read(Config::kInterruptPin);
     // If a device has no pin configured in the InterruptPin register then it
     // has no legacy interrupt. PCI Local Bus Spec v3 Section 2.2.6.
-    if (pin == 0 && board_config_.use_intx_workaround().has_value()) {
+    if (pin == 0 /*&& board_config_.use_intx_workaround().has_value()*/) {
       pin = 1;  // TODO(365837900): Re-add 'continue' here when crosvm Interrupt Pin is populated.
     }
 
@@ -376,13 +393,13 @@ zx_status_t Bus::ConfigureLegacyIrqs() {
              entry.port_function_id == port->function_id && entry.device_id == device.dev_id();
     };
 
-    auto found = std::find_if(irq_routing_entries_.begin(), irq_routing_entries_.end(), find_fn);
+    auto found = std::ranges::find_if(irq_routing_entries_, find_fn);
     if (found != std::end(irq_routing_entries_)) {
       uint8_t vector = found->pins[pin - 1];
       device.config()->Write(Config::kInterruptLine, vector);
-      zxlogf(DEBUG, "[%s] pin %u mapped to %#x", device.config()->addr(), pin, vector);
+      LTRACEF("[%s] pin %u mapped to %#x\n", device.config()->addr(), pin, vector);
     } else {
-      zxlogf(DEBUG, "[%s] no legacy routing entry found for device", device.config()->addr());
+      LTRACEF("[%s] no legacy routing entry found for device\n", device.config()->addr());
     }
   }
 
@@ -397,30 +414,61 @@ Bus::~Bus() {
   if (irq_thread_) {
     zx_status_t status = StopIrqWorker();
     if (status != ZX_OK) {
-      zxlogf(ERROR, "failed to stop the irq thread: %s", zx_status_get_string(status));
+      LTRACEF("failed to stop the irq thread: %s\n", zx_status_get_string(status));
     }
-    irq_thread_->join();
+    irq_thread_.value()->Join(nullptr, ZX_TIME_INFINITE);
   }
 }
 
+struct IrqWorkerArgs {
+  Bus* bus;
+  fbl::RefPtr<PortDispatcher> port;
+  fbl::Mutex* lock;
+  SharedIrqMap* shared_irqs;
+  // const PciFidl::BoardConfiguration* board_config;
+};
+
+int IrqWorkerWrapper(void* args) {
+  IrqWorkerArgs* irq_worker_args = static_cast<IrqWorkerArgs*>(args);
+  irq_worker_args->bus->LegacyIrqWorker(irq_worker_args->port, irq_worker_args->lock,
+                                        irq_worker_args->shared_irqs);
+  delete irq_worker_args;
+  return 0;
+}
+
 void Bus::StartIrqWorker() {
-  std::thread worker(LegacyIrqWorker, std::ref(legacy_irq_port_), &devices_lock_, &shared_irqs_,
-                     &board_config_);
-  irq_thread_ = std::move(worker);
+  fbl::AllocChecker ac;
+  IrqWorkerArgs* irq_worker_args = new (&ac) IrqWorkerArgs();
+  if (!ac.check()) {
+    LTRACEF("failed to allocate irq worker args\n");
+    return;
+  }
+
+  irq_worker_args->bus = this;
+  irq_worker_args->port = legacy_irq_port_;
+  irq_worker_args->lock = &devices_lock_;
+  irq_worker_args->shared_irqs = &shared_irqs_;
+
+  Thread* irq_thread =
+      Thread::Create("pci-irq-worker", IrqWorkerWrapper, (void*)irq_worker_args, DEFAULT_PRIORITY);
+  irq_thread->Resume();
+
+  irq_thread_ = ktl::move(irq_thread);
 }
 
 zx_status_t Bus::StopIrqWorker() {
-  zx_port_packet_t packet = {.type = ZX_PKT_TYPE_USER};
-  return legacy_irq_port_.queue(&packet);
+  zx_port_packet_t packet;
+  return legacy_irq_port_->QueueUser(packet);
 }
 
-void Bus::LegacyIrqWorker(const zx::port& port, fbl::Mutex* lock, SharedIrqMap* shared_irq_map,
-                          const PciFidl::BoardConfiguration* board_config) {
-  zxlogf(TRACE, "IRQ worker started");
+void Bus::LegacyIrqWorker(
+    const fbl::RefPtr<PortDispatcher>& port, fbl::Mutex* lock,
+    SharedIrqMap* shared_irq_map /*,const PciFidl::BoardConfiguration* board_config*/) {
+  LTRACEF("IRQ worker started");
   zx_port_packet_t packet = {};
   zx_status_t status = ZX_OK;
   do {
-    status = port.wait(zx::time::infinite(), &packet);
+    status = port->Dequeue(Deadline::infinite(), &packet);
     if (status == ZX_OK && packet.status == ZX_OK) {
       // Signal to exit the IRQ thread
       if (packet.type == ZX_PKT_TYPE_USER) {
@@ -443,13 +491,13 @@ void Bus::LegacyIrqWorker(const zx::port& port, fbl::Mutex* lock, SharedIrqMap* 
       ZX_DEBUG_ASSERT(result != shared_irq_map->end());
       for (auto& device : list) {
         fbl::AutoLock device_lock(device.dev_lock());
-        config::Status status = {.value = device.config()->Read(Config::kStatus)};
-        if (status.interrupt_status() || board_config->use_intx_workaround()) {
+        config::Status config_status = {.value = device.config()->Read(Config::kStatus)};
+        if (config_status.interrupt_status() /*|| board_config->use_intx_workaround()*/) {
           // Trigger the virtual interrupt the device driver is using by proxy.
           zx_status_t signal_status = device.SignalLegacyIrq(packet.interrupt.timestamp);
           if (signal_status != ZX_OK) {
-            zxlogf(ERROR, "failed to signal vector %#lx for device %s: %s", vector,
-                   device.config()->addr(), zx_status_get_string(signal_status));
+            LTRACEF("failed to signal vector %#lx for device %s: %s\n", vector,
+                    device.config()->addr(), zx_status_get_string(signal_status));
           }
 
           // In the case of fpci::InterruptMode::kLegacyNoack, disable the legacy interrupt on
@@ -460,7 +508,7 @@ void Bus::LegacyIrqWorker(const zx::port& port, fbl::Mutex* lock, SharedIrqMap* 
           // no way to re-enable it without changing IRQ modes.
           auto& irqs = device.irqs();
           bool disable_irq = true;
-          if (irqs.mode == PciFidl::InterruptMode::kLegacyNoack) {
+          if (irqs.mode == INTERRUPT_MODE_LEGACY_NOACK) {
             irqs.irqs_in_period++;
             if (packet.interrupt.timestamp - irqs.legacy_irq_period_start >= kLegacyNoAckPeriod) {
               irqs.legacy_irq_period_start = packet.interrupt.timestamp;
@@ -479,14 +527,14 @@ void Bus::LegacyIrqWorker(const zx::port& port, fbl::Mutex* lock, SharedIrqMap* 
       }
 
       // Re-arm the given interrupt now that all the devices have been checked.
-      status = interrupt.ack();
+      status = interrupt->Ack();
       if (status != ZX_OK) {
-        zxlogf(ERROR, "Failed to ack vector %#lx after servicing device: %s", vector,
-               zx_status_get_string(status));
+        LTRACEF("Failed to ack vector %#lx after servicing device: %s\n", vector,
+                zx_status_get_string(status));
       }
     } else {
-      zxlogf(ERROR, "Unexpected error in IRQ handling, status = %s, pkt status = %s",
-             zx_status_get_string(status), zx_status_get_string(packet.status));
+      LTRACEF("Unexpected error in IRQ handling, status = %s, pkt status = %s\n",
+              zx_status_get_string(status), zx_status_get_string(packet.status));
     }
   } while (status == ZX_OK && packet.status == ZX_OK);
 }

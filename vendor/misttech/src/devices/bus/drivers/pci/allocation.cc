@@ -4,40 +4,42 @@
 
 #include "src/devices/bus/drivers/pci/allocation.h"
 
-#include <err.h>
-#include <lib/zx/resource.h>
+// #include <err.h>
+// #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
-#include <lib/zx/vmo.h>
+// #include <lib/zx/vmo.h>
+#include <trace.h>
 #include <zircon/rights.h>
 #include <zircon/status.h>
 
 #include <cassert>
-#include <cinttypes>
 #include <cstring>
 #include <memory>
 
 #include <fbl/algorithm.h>
 
+#define LOCAL_TRACE 0
+
 namespace pci {
 
-zx::result<zx::vmo> PciAllocation::CreateVmo() const {
-  zx::vmo vmo;
-  zx_status_t status = zx::vmo::create_physical(resource(), base(), size(), &vmo);
-  if (status != ZX_OK) {
-    return zx::error(status);
-  }
+zx::result<fbl::RefPtr<VmObjectDispatcher>> PciAllocation::CreateVmo() const {
+  fbl::RefPtr<VmObjectDispatcher> vmo;
+  // zx_status_t status = zx::vmo::create_physical(resource(), base(), size(), &vmo);
+  // if (status != ZX_OK) {
+  //   return zx::error(status);
+  // }
 
   return zx::ok(std::move(vmo));
 }
 
-zx::result<zx::resource> PciAllocation::CreateResource() const {
-  zx::resource resource;
+zx::result<fbl::RefPtr<ResourceDispatcher>> PciAllocation::CreateResource() const {
+  fbl::RefPtr<ResourceDispatcher> resource;
   // A BAR allocation will already be sized to the BAR, so we can simply
   // duplicate the resource rather than creating a sub-resource.
-  zx_status_t status = resource_.duplicate(ZX_RIGHT_SAME_RIGHTS, &resource);
-  if (status != ZX_OK) {
-    return zx::error(status);
-  }
+  // zx_status_t status = resource_.duplicate(ZX_RIGHT_SAME_RIGHTS, &resource);
+  // if (status != ZX_OK) {
+  //  return zx::error(status);
+  //}
   return zx::ok(std::move(resource));
 }
 
@@ -45,15 +47,17 @@ zx::result<std::unique_ptr<PciAllocation>> PciRootAllocator::Allocate(
     std::optional<zx_paddr_t> base, size_t size) {
   zx_paddr_t in_base = (base) ? *base : 0;
   zx_paddr_t out_base = {};
-  zx::resource res = {};
-  zx::eventpair ep = {};
-  zx_status_t status = pciroot_.GetAddressSpace(in_base, size, type(), low_, &out_base, &res, &ep);
+  fbl::RefPtr<ResourceDispatcher> res = {};
+  fbl::RefPtr<EventPairDispatcher> ep = {};
+
+  zx_status_t status = pciroot_.GetAddressSpace(in_base, size, type(), low_, nullptr, nullptr, 0,
+                                                nullptr, nullptr, 0, nullptr);
   if (status != ZX_OK) {
     bool mmio = type() == PCI_ADDRESS_SPACE_MEMORY;
     // This error may not be fatal, the Device probe/allocation methods will know for sure.
-    zxlogf(DEBUG, "failed to allocate %s %s [%#8lx, %#8lx) from root: %s", (mmio) ? "mmio" : "io",
-           (mmio) ? ((low_) ? "<4GB" : ">4GB") : "", in_base, in_base + size,
-           zx_status_get_string(status));
+    LTRACEF("failed to allocate %s %s [%#8lx, %#8lx) from root: %s\n", (mmio) ? "mmio" : "io",
+            (mmio) ? ((low_) ? "<4GB" : ">4GB") : "", in_base, in_base + size,
+            zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -79,22 +83,23 @@ zx::result<std::unique_ptr<PciAllocation>> PciRegionAllocator::Allocate(
     };
     status = allocator_.GetRegion(request, region_uptr);
   } else {
-    status = allocator_.GetRegion(size, zx_system_get_page_size(), region_uptr);
+    status = allocator_.GetRegion(size, PAGE_SIZE, region_uptr);
   }
 
   if (status != ZX_OK) {
     return zx::error(status);
   }
 
-  zx::resource out_resource = {};
-  // TODO(https://fxbug.dev/42108122): When the resource subset CL lands, make this a smaller resource.
-  status = parent_alloc_->resource().duplicate(ZX_DEFAULT_RESOURCE_RIGHTS, &out_resource);
-  if (status != ZX_OK) {
-    return zx::error(status);
-  }
+  fbl::RefPtr<ResourceDispatcher> out_resource = {};
+  // TODO(https://fxbug.dev/42108122): When the resource subset CL lands, make this a smaller
+  // resource.
+  // status = parent_alloc_->resource().duplicate(ZX_DEFAULT_RESOURCE_RIGHTS, &out_resource);
+  // if (status != ZX_OK) {
+  //  return zx::error(status);
+  //}
 
-  zxlogf(TRACE, "bridge: assigned [%#lx, %#lx) downstream", region_uptr->base,
-         region_uptr->base + size);
+  LTRACEF("bridge: assigned [%#lx, %#lx) downstream\n", region_uptr->base,
+          region_uptr->base + size);
 
   auto allocation = std::unique_ptr<PciAllocation>(
       new PciRegionAllocation(type(), std::move(out_resource), std::move(region_uptr)));

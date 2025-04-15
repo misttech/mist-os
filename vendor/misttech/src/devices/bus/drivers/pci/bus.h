@@ -1,36 +1,41 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #ifndef SRC_DEVICES_BUS_DRIVERS_PCI_BUS_H_
 #define SRC_DEVICES_BUS_DRIVERS_PCI_BUS_H_
 
-#include <fidl/fuchsia.hardware.pci/cpp/natural_types.h>
-#include <fidl/fuchsia.hardware.pci/cpp/wire.h>
-#include <fuchsia/hardware/pciroot/c/banjo.h>
-#include <fuchsia/hardware/pciroot/cpp/banjo.h>
-#include <lib/ddk/device.h>
-#include <lib/inspect/cpp/inspector.h>
-#include <lib/inspect/cpp/vmo/types.h>
+// #include <fidl/fuchsia.hardware.pci/cpp/natural_types.h>
+// #include <lib/ddk/device.h>
+// #include <lib/inspect/cpp/inspector.h>
+// #include <lib/inspect/cpp/vmo/types.h>
 #include <lib/mmio/mmio.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/interrupt.h>
-#include <lib/zx/msi.h>
-#include <lib/zx/thread.h>
+// #include <lib/zx/msi.h>
+// #include <lib/zx/thread.h>
+#include <lib/mistos/util/allocator.h>
 #include <zircon/compiler.h>
 #include <zircon/syscalls/port.h>
 
 #include <list>
+#include <map>
 #include <memory>
-#include <thread>
-#include <unordered_map>
 
-#include <ddktl/device.h>
-#include <ddktl/fidl.h>
-#include <ddktl/metadata_server.h>
-#include <ddktl/protocol/empty-protocol.h>
+#include <kernel/thread.h>
+
+// #include <ddktl/device.h>
+// #include <ddktl/fidl.h>
+// #include <ddktl/metadata_server.h>
+// #include <ddktl/protocol/empty-protocol.h>
+#include <mistos/hardware/pci/cpp/banjo.h>
+#include <mistos/hardware/pciroot/cpp/banjo.h>
+
 #include <fbl/intrusive_double_list.h>
 #include <fbl/intrusive_wavl_tree.h>
 #include <fbl/vector.h>
+#include <object/port_dispatcher.h>
 
 #include "src/devices/bus/drivers/pci/bus_device_interface.h"
 #include "src/devices/bus/drivers/pci/config.h"
@@ -54,14 +59,17 @@ struct BusScanEntry {
 // A list of pci::Device which share the same legacy IRQ and are configured to use legacy irqs.
 using SharedIrqList = fbl::TaggedDoublyLinkedList<pci::Device*, SharedIrqListTag>;
 struct SharedVector {
-  zx::interrupt interrupt;
+  fbl::RefPtr<InterruptDispatcher> interrupt;
   SharedIrqList list;
 };
 
-using LegacyIrqs = std::unordered_map<uint32_t, pci_legacy_irq>;
+using LegacyIrqs = std::map<uint32_t, pci_legacy_irq, std::less<>,
+                            util::Allocator<std::pair<const uint32_t, pci_legacy_irq>>>;
 // A map of vector -> SharedVector for use in handling interrupts.
-using SharedIrqMap = std::unordered_map<uint32_t, std::unique_ptr<SharedVector>>;
-namespace PciFidl = fuchsia_hardware_pci;
+using SharedIrqMap =
+    std::map<uint32_t, std::unique_ptr<SharedVector>, std::less<>,
+             util::Allocator<std::pair<const uint32_t, std::unique_ptr<SharedVector>>>>;
+// namespace PciFidl = fuchsia_hardware_pci;
 
 class BusInspect {
  public:
@@ -86,29 +94,31 @@ using DeviceTree =
     fbl::WAVLTree<pci_bdf_t, fbl::RefPtr<pci::Device>, pci::Device::KeyTraitsSortByBdf>;
 
 class Bus;
-using PciBusType = ddk::Device<Bus, ddk::Messageable<PciFidl::Bus>::Mixin>;
-class Bus : public PciBusType,
-            public ddk::EmptyProtocol<ZX_PROTOCOL_PCI>,
+// using PciBusType = ddk::Device<Bus, ddk::Messageable<PciFidl::Bus>::Mixin>;
+class Bus : /*public PciBusType,*/
+            /*ublic ddk::EmptyProtocol<ZX_PROTOCOL_PCI>,*/
             public BusDeviceInterface,
             public BusInspect {
  public:
-  static zx_status_t Create(zx_device_t* parent);
-  Bus(zx_device_t* parent, const pciroot_protocol_t* pciroot, pci_platform_info_t info,
+  static zx_status_t Create(fbl::RefPtr<pci::Device> parent);
+  Bus(fbl::RefPtr<pci::Device> parent, const pciroot_protocol_t* pciroot, pci_platform_info_t info,
       std::optional<fdf::MmioBuffer> ecam)
-      : PciBusType(parent),  // fulfills the DDK mixins
+      : /*PciBusType(parent),  // fulfills the DDK mixins*/
         pciroot_(pciroot),
         info_(info),
         ecam_(std::move(ecam)) {}
   ~Bus() override;
   // Map an ecam VMO for Bus and Config use.
-  static zx::result<fdf::MmioBuffer> MapConfigRegion(zx::vmo cam_vmo);
+  static zx::result<fdf::MmioBuffer> MapConfigRegion(fbl::RefPtr<VmObjectDispatcher> cam_vmo);
 
   zx_status_t Initialize() __TA_EXCLUDES(devices_lock_);
   // Bus Device Interface implementation
   zx_status_t LinkDevice(fbl::RefPtr<pci::Device> device) __TA_EXCLUDES(devices_lock_) final;
   zx_status_t UnlinkDevice(pci::Device* device) __TA_EXCLUDES(devices_lock_) final;
-  zx_status_t AllocateMsi(uint32_t count, zx::msi* msi) __TA_EXCLUDES(devices_lock_) final;
-  zx_status_t GetBti(const pci::Device* device, uint32_t index, zx::bti* bti)
+  zx_status_t AllocateMsi(uint32_t count, fbl::RefPtr<MsiAllocation>* msi)
+      __TA_EXCLUDES(devices_lock_) final;
+  zx_status_t GetBti(const pci::Device* device, uint32_t index,
+                     fbl::RefPtr<BusTransactionInitiatorDispatcher>* bti)
       __TA_EXCLUDES(devices_lock_) final;
   zx_status_t AddToSharedIrqList(pci::Device* device, uint32_t vector)
       __TA_EXCLUDES(devices_lock_) final;
@@ -117,11 +127,11 @@ class Bus : public PciBusType,
 
   // All methods related to the fuchsia.hardware.pci service and the DDK.
   void DdkRelease() { delete this; }
-  void GetDevices(GetDevicesCompleter::Sync& completer) final;
-  void GetHostBridgeInfo(GetHostBridgeInfoCompleter::Sync& completer) final;
-  void ReadBar(ReadBarRequestView request, ReadBarCompleter::Sync& completer) final;
+  // void GetDevices(GetDevicesCompleter::Sync& completer) final;
+  // void GetHostBridgeInfo(GetHostBridgeInfoCompleter::Sync& completer) final;
+  // void ReadBar(ReadBarRequestView request, ReadBarCompleter::Sync& completer) final;
 
-  zx::vmo GetInspectVmo() { return inspector_.DuplicateVmo(); }
+  // zx::vmo GetInspectVmo() { return inspector_.DuplicateVmo(); }
 
  protected:
   // These are used by the derived TestBus class.
@@ -129,7 +139,7 @@ class Bus : public PciBusType,
   pci::DeviceTree& devices() { return devices_; }
   SharedIrqMap& shared_irqs() { return shared_irqs_; }
   LegacyIrqs& legacy_irqs() { return legacy_irqs_; }
-  const PciFidl::BoardConfiguration& board_config() { return board_config_; }
+  // const PciFidl::BoardConfiguration& board_config() { return board_config_; }
 
  private:
   // Map an ecam VMO for Bus and Config use.
@@ -150,16 +160,16 @@ class Bus : public PciBusType,
   zx_status_t ConfigureLegacyIrqs() __TA_EXCLUDES(devices_lock_);
   // Creates and binds interrupts to the irq port and sets up Shared IRQ handler lists.
   zx_status_t SetUpLegacyIrqHandlers() __TA_REQUIRES(devices_lock_);
-  static void LegacyIrqWorker(const zx::port& port, fbl::Mutex* lock, SharedIrqMap* shared_irq_map,
-                              const PciFidl::BoardConfiguration* board_config);
+  static void LegacyIrqWorker(const fbl::RefPtr<PortDispatcher>& port, fbl::Mutex* lock, SharedIrqMap* shared_irq_map/*,
+                              const PciFidl::BoardConfiguration* board_config*/);
   // Creates and starts the legacy IRQ worker thread.
   void StartIrqWorker();
   // Queues a packet informing the IRQ worker that it should exit.
   zx_status_t StopIrqWorker();
 
   // Diagnostic methods
-  void InspectInit();
-  void InspectRecordPlatformInformation();
+  // void InspectInit();
+  // void InspectRecordPlatformInformation();
 
   // members
   ddk::PcirootProtocolClient pciroot_;
@@ -168,14 +178,14 @@ class Bus : public PciBusType,
   cpp20::span<const pci_legacy_irq> irqs_;
   cpp20::span<const pci_bdf_t> acpi_devices_;
   cpp20::span<const pci_irq_routing_entry_t> irq_routing_entries_;
-  PciFidl::BoardConfiguration board_config_;
+  // PciFidl::BoardConfiguration board_config_;
 
   // All devices hang off of this Bus's root port.
   std::unique_ptr<PciRoot> root_;
   fbl::Mutex devices_lock_;
   // A port all legacy IRQs are bound to.
-  zx::port legacy_irq_port_;
-  std::optional<std::thread> irq_thread_;
+  fbl::RefPtr<PortDispatcher> legacy_irq_port_;
+  std::optional<Thread*> irq_thread_;
 
   // All devices downstream of this bus are held here. Devices are keyed by
   // BDF so they will not experience any collisions.
@@ -185,13 +195,15 @@ class Bus : public PciBusType,
   SharedIrqMap shared_irqs_ __TA_GUARDED(devices_lock_);
 
   // Diagnostics.
-  inspect::Inspector inspector_;
-  inspect::Node bus_node_;
-  inspect::Node devices_node_;
-  inspect::StringArray acpi_node_;
+  // inspect::Inspector inspector_;
+  // inspect::Node bus_node_;
+  // inspect::Node devices_node_;
+  // inspect::StringArray acpi_node_;
+
+  friend int IrqWorkerWrapper(void* args);
 };
 
-zx_status_t pci_bus_bind(void* ctx, zx_device_t* parent);
+// zx_status_t pci_bus_bind(void* ctx, zx_device_t* parent);
 
 }  // namespace pci
 

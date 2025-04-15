@@ -1,13 +1,17 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #include "src/devices/bus/drivers/pci/capabilities/msix.h"
 
 #include <lib/zx/result.h>
+#include <trace.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls.h>
 
 #include "src/devices/bus/drivers/pci/config.h"
+
+#define LOCAL_TRACE 0
 
 namespace pci {
 
@@ -41,46 +45,44 @@ zx_status_t MsixCapability::Init(const Bar& tbar, const Bar& pbar) {
   // Every vector has a single bit in a large contiguous bitmask.  where the
   // smallest allocation is 64 bits.
   size_t pba_bytes = ((table_size_ / 64) + 1) * sizeof(uint64_t);
-  zxlogf(TRACE, "[%s] MSI-X supports %u vector%c", addr(), table_size_,
-         (table_size_ == 1) ? ' ' : 's');
-  zxlogf(TRACE, "[%s] MSI-X mask table bar %u @ %#x-%#zx", addr(), table_bar_, table_offset_,
-         table_offset_ + table_bytes);
-  zxlogf(TRACE, "[%s] MSI-X pending table bar %u @ %#x-%#zx", addr(), pba_bar_, pba_offset_,
-         pba_offset_ + pba_bytes);
+  LTRACEF("[%s] MSI-X supports %u vector%c\n", addr(), table_size_, (table_size_ == 1) ? ' ' : 's');
+  LTRACEF("[%s] MSI-X mask table bar %u @ %#x-%#zx\n", addr(), table_bar_, table_offset_,
+          table_offset_ + table_bytes);
+  LTRACEF("[%s] MSI-X pending table bar %u @ %#x-%#zx\n", addr(), pba_bar_, pba_offset_,
+          pba_offset_ + pba_bytes);
   // Treat each bar as separate to simplify the configuration logic. Size checks
   // double as a way to ensure the bars are valid.
   if (tbar.size < table_offset_ + table_bytes) {
-    zxlogf(ERROR, "[%s] MSI-X table doesn't fit within BAR %u size of %#zx", addr(), table_bar_,
-           tbar.size);
+    LTRACEF("[%s] MSI-X table doesn't fit within BAR %u size of %#zx\n", addr(), table_bar_,
+            tbar.size);
     return ZX_ERR_BAD_STATE;
   }
 
   if (pbar.size < pba_offset_ + pba_bytes) {
-    zxlogf(ERROR, "[%s] MSI-X pba doesn't fit within BAR %u size of %#zx", addr(), pba_bar_,
-           pbar.size);
+    LTRACEF("[%s] MSI-X pba doesn't fit within BAR %u size of %#zx\n", addr(), pba_bar_, pbar.size);
     return ZX_ERR_BAD_STATE;
   }
 
-  zx::result<zx::vmo> vmo_result = tbar.allocation->CreateVmo();
+  zx::result<fbl::RefPtr<VmObjectDispatcher>> vmo_result = tbar.allocation->CreateVmo();
   if (!vmo_result.is_ok()) {
-    zxlogf(ERROR, "[%s] Couldn't allocate VMO for MSI-X table bar: %s", addr(),
-           vmo_result.status_string());
+    LTRACEF("[%s] Couldn't allocate VMO for MSI-X table bar: %s\n", addr(),
+            vmo_result.status_string());
     return vmo_result.status_value();
   }
-  zx::vmo table_vmo(std::move(vmo_result.value()));
+  fbl::RefPtr<VmObjectDispatcher> table_vmo(std::move(vmo_result.value()));
 
   vmo_result = pbar.allocation->CreateVmo();
   if (!vmo_result.is_ok()) {
-    zxlogf(ERROR, "[%s] Couldn't allocate VMO for MSI-X pba bar: %s", addr(),
-           vmo_result.status_string());
+    LTRACEF("[%s] Couldn't allocate VMO for MSI-X pba bar: %s\n", addr(),
+            vmo_result.status_string());
     return vmo_result.status_value();
   }
-  zx::vmo pba_vmo(std::move(vmo_result.value()));
+  fbl::RefPtr<VmObjectDispatcher> pba_vmo(std::move(vmo_result.value()));
 
   zx::result<fdf::MmioBuffer> mmio_result = fdf::MmioBuffer::Create(
       table_offset_, table_bytes, std::move(table_vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE);
   if (mmio_result.is_error()) {
-    zxlogf(ERROR, "[%s] Couldn't map MSI-X table: %s", addr(), mmio_result.status_string());
+    LTRACEF("[%s] Couldn't map MSI-X table: %s\n", addr(), mmio_result.status_string());
     return mmio_result.status_value();
   }
   table_mmio_ = std::move(mmio_result.value());
@@ -89,7 +91,7 @@ zx_status_t MsixCapability::Init(const Bar& tbar, const Bar& pbar) {
   mmio_result = fdf::MmioBuffer::Create(pba_offset_, pba_bytes, std::move(pba_vmo),
                                         ZX_CACHE_POLICY_UNCACHED_DEVICE);
   if (mmio_result.is_error()) {
-    zxlogf(ERROR, "[%s] Couldn't map MSI-X pba: %s", addr(), mmio_result.status_string());
+    LTRACEF("[%s] Couldn't map MSI-X pba: %s\n", addr(), mmio_result.status_string());
     return mmio_result.status_value();
   }
   pba_mmio_ = std::move(mmio_result.value());

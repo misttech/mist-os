@@ -1,6 +1,7 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #ifndef SRC_DEVICES_BUS_DRIVERS_PCI_BRIDGE_H_
 #define SRC_DEVICES_BUS_DRIVERS_PCI_BRIDGE_H_
 
@@ -23,9 +24,10 @@ namespace pci {
 
 class Bridge : public pci::Device, public UpstreamNode {
  public:
-  static zx_status_t Create(zx_device_t* parent, std::unique_ptr<Config>&& config,
-                            UpstreamNode* upstream, BusDeviceInterface* bdi, inspect::Node node,
-                            uint8_t mbus_id, fbl::RefPtr<pci::Bridge>* out_bridge);
+  static zx_status_t Create(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&& config,
+                            UpstreamNode* upstream,
+                            BusDeviceInterface* bdi /*, inspect::Node node*/, uint8_t mbus_id,
+                            fbl::RefPtr<pci::Bridge>* out_bridge);
   // Derived device objects need to have refcounting implemented
   PCI_IMPLEMENT_REFCOUNTED;
 
@@ -59,8 +61,8 @@ class Bridge : public pci::Device, public UpstreamNode {
   void Disable() final __TA_EXCLUDES(dev_lock_);
 
  private:
-  Bridge(zx_device_t* parent, std::unique_ptr<Config>&&, UpstreamNode* upstream,
-         BusDeviceInterface* bdi, inspect::Node node, uint8_t managed_bus_id);
+  Bridge(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&&, UpstreamNode* upstream,
+         BusDeviceInterface* bdi /*, inspect::Node node*/, uint8_t managed_bus_id);
   zx_status_t Init() __TA_EXCLUDES(dev_lock_);
 
   zx_status_t ParseBusWindowsLocked() __TA_REQUIRES(dev_lock_);

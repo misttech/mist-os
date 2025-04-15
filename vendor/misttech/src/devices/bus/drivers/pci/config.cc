@@ -5,9 +5,9 @@
 #include "src/devices/bus/drivers/pci/config.h"
 
 #include <assert.h>
-#include <fuchsia/hardware/pciroot/cpp/banjo.h>
 #include <inttypes.h>
-#include <lib/ddk/debug.h>
+//#include <lib/ddk/debug.h>
+#include <mistos/hardware/pciroot/cpp/banjo.h>
 
 #include <optional>
 

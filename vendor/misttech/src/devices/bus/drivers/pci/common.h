@@ -4,7 +4,7 @@
 #ifndef SRC_DEVICES_BUS_DRIVERS_PCI_COMMON_H_
 #define SRC_DEVICES_BUS_DRIVERS_PCI_COMMON_H_
 
-#include <lib/ddk/debug.h>
+//#include <lib/ddk/debug.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <zircon/hw/pci.h>

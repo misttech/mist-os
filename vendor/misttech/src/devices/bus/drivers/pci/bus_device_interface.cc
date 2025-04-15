@@ -1,10 +1,15 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+#include <trace.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
 #include "src/devices/bus/drivers/pci/bus.h"
+
+#define LOCAL_TRACE 0
 
 namespace pci {
 
@@ -27,17 +32,20 @@ zx_status_t Bus::UnlinkDevice(pci::Device* device) {
   return ZX_ERR_NOT_FOUND;
 }
 
-zx_status_t Bus::AllocateMsi(uint32_t count, zx::msi* msi) {
+zx_status_t Bus::AllocateMsi(uint32_t count, fbl::RefPtr<MsiAllocation>* msi) {
   fbl::AutoLock _(&devices_lock_);
-  return pciroot().AllocateMsi(count, false, msi);
+  // return pciroot().AllocateMsi(count, false, msi);
+  return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t Bus::GetBti(const pci::Device* device, uint32_t index, zx::bti* bti) {
+zx_status_t Bus::GetBti(const pci::Device* device, uint32_t index,
+                        fbl::RefPtr<BusTransactionInitiatorDispatcher>* bti) {
   if (!device) {
     return ZX_ERR_INVALID_ARGS;
   }
   fbl::AutoLock devices_lock(&devices_lock_);
-  return pciroot().GetBti(device->packed_addr(), index, bti);
+  // return pciroot().GetBti(device->packed_addr(), index, bti);
+  return ZX_ERR_NOT_SUPPORTED;
 }
 
 zx_status_t Bus::AddToSharedIrqList(pci::Device* device, uint32_t vector) {
@@ -50,7 +58,7 @@ zx_status_t Bus::AddToSharedIrqList(pci::Device* device, uint32_t vector) {
       return ZX_ERR_ALREADY_EXISTS;
     }
     list.push_back(device);
-    zxlogf(TRACE, "[%s] inserted into list for vector %#x", device->config()->addr(), vector);
+    LTRACEF("[%s] inserted into list for vector %#x\n", device->config()->addr(), vector);
     return ZX_OK;
   }
   return ZX_ERR_BAD_STATE;
@@ -63,7 +71,7 @@ zx_status_t Bus::RemoveFromSharedIrqList(pci::Device* device, uint32_t vector) {
   if (auto result = shared_irqs_.find(vector); result != shared_irqs_.end()) {
     auto& list = result->second->list;
     if (list.erase(*device) != nullptr) {
-      zxlogf(TRACE, "[%s] removed from vector %#x list", device->config()->addr(), vector);
+      LTRACEF("[%s] removed from vector %#x list\n", device->config()->addr(), vector);
       return ZX_OK;
     }
     return ZX_ERR_NOT_FOUND;

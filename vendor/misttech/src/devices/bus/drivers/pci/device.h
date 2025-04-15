@@ -1,3 +1,4 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -5,13 +6,12 @@
 #define SRC_DEVICES_BUS_DRIVERS_PCI_DEVICE_H_
 
 #include <assert.h>
-#include <fidl/fuchsia.hardware.pci/cpp/wire.h>
-#include <fidl/fuchsia.hardware.pci/cpp/wire_types.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/device-protocol/pci.h>
-#include <lib/fdf/cpp/dispatcher.h>
-#include <lib/inspect/cpp/inspector.h>
-#include <lib/zx/channel.h>
+#include <mistos/hardware/pci/c/banjo.h>
+//  #include <lib/component/outgoing/cpp/outgoing_directory.h>
+// #include <lib/device-protocol/pci.h>
+//  #include <lib/fdf/cpp/dispatcher.h>
+//  #include <lib/inspect/cpp/inspector.h>
+//  #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <sys/types.h>
 #include <zircon/compiler.h>
@@ -19,8 +19,8 @@
 
 #include <limits>
 
-#include <ddktl/device.h>
-#include <ddktl/unbind-txn.h>
+// #include <ddktl/device.h>
+// #include <ddktl/unbind-txn.h>
 #include <fbl/algorithm.h>
 #include <fbl/intrusive_container_utils.h>
 #include <fbl/intrusive_double_list.h>
@@ -28,6 +28,8 @@
 #include <fbl/macros.h>
 #include <fbl/mutex.h>
 #include <fbl/ref_ptr.h>
+#include <object/interrupt_dispatcher.h>
+#include <object/msi_allocation.h>
 #include <region-alloc/region-alloc.h>
 
 #include "src/devices/bus/drivers/pci/allocation.h"
@@ -66,15 +68,15 @@ class Device : public fbl::WAVLTreeContainable<fbl::RefPtr<pci::Device>>,
   // This structure contains all bookkeeping and state for a device's
   // configured IRQ mode. It is initialized to fpci::InterruptMode::kDisabled.
   struct Irqs {
-    fuchsia_hardware_pci::InterruptMode mode;  // The mode currently configured.
-    zx::interrupt legacy;                      // Virtual interrupt for legacy signaling.
+    interrupt_mode_t mode;                    // The mode currently configured.
+    fbl::RefPtr<InterruptDispatcher> legacy;  // Virtual interrupt for legacy signaling.
     uint32_t legacy_vector;             // Vector for the legacy interrupt, mirrors kInterruptLine
                                         // in Config.
     uint8_t legacy_pin;                 // Pin for the legacy interrupt, mirrors kInterruptPin.
     zx_time_t legacy_irq_period_start;  // Timestamp of the current second we're monitoring for
                                         // IRQ floods.
     bool legacy_disabled;               // Whether  the legacy vector has been disabled
-    zx::msi msi_allocation;             // The MSI allocation object for MSI & MSI-X
+    fbl::RefPtr<MsiAllocation> msi_allocation;  // The MSI allocation object for MSI & MSI-X
     uint64_t irqs_in_period;  // Current count of interrupts per fpci::InterruptMode::kLegacyNoack
                               // period.
   };
@@ -106,6 +108,7 @@ class Device : public fbl::WAVLTreeContainable<fbl::RefPtr<pci::Device>>,
     }
   };
 
+#if 0
   struct Inspect {
     explicit Inspect(inspect::Node node) : device(std::move(node)) {}
 
@@ -140,6 +143,7 @@ class Device : public fbl::WAVLTreeContainable<fbl::RefPtr<pci::Device>>,
     inspect::Node bar;  // The top level 'BARs' header
     std::array<std::optional<inspect::Node>, fuchsia_hardware_pci::wire::kMaxBarCount> bars;
   };
+#endif
 
   // Templated helpers to assist with differently sized protocol reads and writes.
   // TODO(91513): Move these back to a .cc after we no longer have both Banjo and FIDL callers for
@@ -169,9 +173,9 @@ class Device : public fbl::WAVLTreeContainable<fbl::RefPtr<pci::Device>>,
   }
 
   // Create, but do not initialize, a device.
-  static zx_status_t Create(zx_device_t* parent, std::unique_ptr<Config>&& config,
-                            UpstreamNode* upstream, BusDeviceInterface* bdi, inspect::Node node,
-                            bool has_acpi);
+  static zx_status_t Create(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&& config,
+                            UpstreamNode* upstream,
+                            BusDeviceInterface* bdi /*, inspect::Node node*/, bool has_acpi);
   virtual ~Device();
 
   // Bridge or DeviceImpl will need to implement refcounting
@@ -246,7 +250,9 @@ class Device : public fbl::WAVLTreeContainable<fbl::RefPtr<pci::Device>>,
     const fbl::AutoLock dev_lock(&dev_lock_);
     return irqs_.legacy_vector;
   }
-  const zx::msi& msi_allocation() const __TA_REQUIRES(dev_lock_) { return irqs_.msi_allocation; }
+  const fbl::RefPtr<MsiAllocation>& msi_allocation() const __TA_REQUIRES(dev_lock_) {
+    return irqs_.msi_allocation;
+  }
 
   // A packed version of the BDF addr used for BTI identifiers by the IOMMU implementation.
   uint32_t packed_addr() const {
@@ -257,12 +263,11 @@ class Device : public fbl::WAVLTreeContainable<fbl::RefPtr<pci::Device>>,
   // These methods handle IRQ configuration and are generally called by the
   // PciProtocol methods, though they may be used to disable IRQs on
   // initialization as well.
-  zx::result<uint32_t> QueryIrqMode(fuchsia_hardware_pci::InterruptMode mode)
+  zx::result<uint32_t> QueryIrqMode(interrupt_mode_t mode) __TA_EXCLUDES(dev_lock_);
+  interrupt_modes_t GetInterruptModes() __TA_EXCLUDES(dev_lock_);
+  zx_status_t SetIrqMode(interrupt_mode_t mode, uint32_t irq_cnt) __TA_EXCLUDES(dev_lock_);
+  zx::result<fbl::RefPtr<InterruptDispatcher>> MapInterrupt(uint32_t which_irq)
       __TA_EXCLUDES(dev_lock_);
-  pci_interrupt_modes_t GetInterruptModes() __TA_EXCLUDES(dev_lock_);
-  zx_status_t SetIrqMode(fuchsia_hardware_pci::InterruptMode mode, uint32_t irq_cnt)
-      __TA_EXCLUDES(dev_lock_);
-  zx::result<zx::interrupt> MapInterrupt(uint32_t which_irq) __TA_EXCLUDES(dev_lock_);
   zx_status_t DisableInterrupts() __TA_REQUIRES(dev_lock_);
   zx_status_t EnableLegacy(bool needs_ack) __TA_REQUIRES(dev_lock_);
   zx_status_t EnableMsi(uint32_t irq_cnt) __TA_REQUIRES(dev_lock_);
@@ -293,8 +298,8 @@ class Device : public fbl::WAVLTreeContainable<fbl::RefPtr<pci::Device>>,
   // as in a list for roots/bridges to track their downstream children. These
   // traits facilitate that for us.
  protected:
-  Device(zx_device_t* parent, std::unique_ptr<Config>&& config, UpstreamNode* upstream,
-         BusDeviceInterface* bdi, inspect::Node node, bool is_bridge, bool has_acpi);
+  Device(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&& config, UpstreamNode* upstream,
+         BusDeviceInterface* bdi /*, inspect::Node node*/, bool is_bridge, bool has_acpi);
 
   zx_status_t Init() __TA_EXCLUDES(dev_lock_);
   zx_status_t InitLocked() __TA_REQUIRES(dev_lock_);
@@ -344,7 +349,7 @@ class Device : public fbl::WAVLTreeContainable<fbl::RefPtr<pci::Device>>,
   // configuring downstream BARs..
   virtual zx::result<> AllocateBars() __TA_EXCLUDES(dev_lock_);
   zx::result<> ConfigureCapabilities() __TA_EXCLUDES(dev_lock_);
-  zx::result<std::pair<zx::msi, zx_info_msi_t>> AllocateMsi(uint32_t irq_cnt)
+  zx::result<std::pair<fbl::RefPtr<MsiAllocation>, zx_info_msi_t>> AllocateMsi(uint32_t irq_cnt)
       __TA_REQUIRES(dev_lock_);
   zx_status_t VerifyAllMsisFreed() __TA_REQUIRES(dev_lock_);
 
@@ -355,7 +360,8 @@ class Device : public fbl::WAVLTreeContainable<fbl::RefPtr<pci::Device>>,
   virtual void Disable() __TA_EXCLUDES(dev_lock_);
   void DisableLocked() __TA_REQUIRES(dev_lock_);
 
-  // Inspect methods
+// Inspect methods
+#if 0
   void InspectUpdateInterrupts() __TA_REQUIRES(dev_lock_);
   void InspectIncrementLegacySignalCount();
   void InspectIncrementLegacyAckCount();
@@ -367,6 +373,7 @@ class Device : public fbl::WAVLTreeContainable<fbl::RefPtr<pci::Device>>,
   void InspectRecordBarFailure(uint8_t bar_id, ralloc_region_t region);
   void InspectRecordBarAllocation(uint8_t bar_id, ralloc_region_t region);
   void InspectRecordBarProbedState(uint8_t bar_id, const Bar& bar);
+#endif
 
   mutable fbl::Mutex dev_lock_;
   mutable fbl::Mutex cmd_reg_lock_;    // Protection for access to the command register.
@@ -392,12 +399,13 @@ class Device : public fbl::WAVLTreeContainable<fbl::RefPtr<pci::Device>>,
   bool is_pcie_ = false;
 
   Capabilities caps_ __TA_GUARDED(dev_lock_){};
-  Irqs irqs_ __TA_GUARDED(dev_lock_){.mode = fuchsia_hardware_pci::InterruptMode::kDisabled};
+  Irqs irqs_ __TA_GUARDED(dev_lock_){.mode = INTERRUPT_MODE_DISABLED};
 
-  zx_device_t* parent_;
-  Inspect inspect_;
+  fbl::RefPtr<Device> parent_;
+  // Inspect inspect_;
 };
 
+#if 0
 class FidlDevice;
 using FidlDeviceType = ddk::Device<pci::FidlDevice, ddk::Unbindable>;
 class FidlDevice : public FidlDeviceType, public fidl::WireServer<fuchsia_hardware_pci::Device> {
@@ -449,6 +457,7 @@ class FidlDevice : public FidlDeviceType, public fidl::WireServer<fuchsia_hardwa
   fidl::ServerBindingGroup<fuchsia_hardware_pci::Device> bindings_;
   component::OutgoingDirectory outgoing_dir_;
 };
+#endif
 
 }  // namespace pci
 

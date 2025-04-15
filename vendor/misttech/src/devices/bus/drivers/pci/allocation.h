@@ -1,12 +1,13 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #ifndef SRC_DEVICES_BUS_DRIVERS_PCI_ALLOCATION_H_
 #define SRC_DEVICES_BUS_DRIVERS_PCI_ALLOCATION_H_
 
-#include <fuchsia/hardware/pciroot/cpp/banjo.h>
-#include <lib/ddk/debug.h>
-#include <lib/zx/resource.h>
+#include <mistos/hardware/pciroot/cpp/banjo.h>
+// #include <lib/ddk/debug.h>
+// #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -14,6 +15,9 @@
 #include <optional>
 
 #include <fbl/macros.h>
+#include <object/event_pair_dispatcher.h>
+#include <object/resource_dispatcher.h>
+#include <object/vm_object_dispatcher.h>
 #include <region-alloc/region-alloc.h>
 
 // PciAllocations and PciAllocators are concepts internal to UpstreamNodes which
@@ -71,15 +75,15 @@ class PciAllocation {
   // Create a VMO bounded by the base/size of this allocation using the
   // provided resource. This is used to provide VMOs for device BAR
   // allocations.
-  virtual zx::result<zx::vmo> CreateVmo() const;
+  virtual zx::result<fbl::RefPtr<VmObjectDispatcher>> CreateVmo() const;
   // Create a resource for use with zx_ioports_request in the device driver.
-  virtual zx::result<zx::resource> CreateResource() const;
+  virtual zx::result<fbl::RefPtr<ResourceDispatcher>> CreateResource() const;
   pci_address_space_t type() const { return type_; }
 
  protected:
-  PciAllocation(pci_address_space_t type, zx::resource&& resource)
+  PciAllocation(pci_address_space_t type, fbl::RefPtr<ResourceDispatcher>&& resource)
       : type_(type), resource_(std::move(resource)) {}
-  const zx::resource& resource() { return resource_; }
+  const fbl::RefPtr<ResourceDispatcher>& resource() { return resource_; }
 
  private:
   // Allow PciRegionAllocator / Device to duplicate the resource for use further
@@ -93,16 +97,17 @@ class PciAllocation {
   // This is only needed for PciRegionAllocators because PciRootAllocators do not
   // hold a backing PciAllocation object.
   const pci_address_space_t type_;
-  const zx::resource resource_;
+  const fbl::RefPtr<ResourceDispatcher> resource_;
   friend class PciRegionAllocator;
   friend class Device;
-  const zx::resource& resource() const { return resource_; }
+  const fbl::RefPtr<ResourceDispatcher>& resource() const { return resource_; }
 };
 
 class PciRootAllocation final : public PciAllocation {
  public:
   PciRootAllocation(const ddk::PcirootProtocolClient client, const pci_address_space_t type,
-                    zx::resource resource, zx::eventpair ep, zx_paddr_t base, size_t size)
+                    fbl::RefPtr<ResourceDispatcher> resource, fbl::RefPtr<EventPairDispatcher> ep,
+                    zx_paddr_t base, size_t size)
       : PciAllocation(type, std::move(resource)),
         pciroot_client_(client),
         ep_(std::move(ep)),
@@ -115,7 +120,7 @@ class PciRootAllocation final : public PciAllocation {
 
  private:
   const ddk::PcirootProtocolClient pciroot_client_;
-  zx::eventpair ep_;
+  const fbl::RefPtr<EventPairDispatcher> ep_;
   const zx_paddr_t base_;
   const size_t size_;
   // The platform bus driver is notified the allocation is free when this eventpair is closed.
@@ -123,7 +128,7 @@ class PciRootAllocation final : public PciAllocation {
 
 class PciRegionAllocation final : public PciAllocation {
  public:
-  PciRegionAllocation(pci_address_space_t type, zx::resource&& resource,
+  PciRegionAllocation(pci_address_space_t type, fbl::RefPtr<ResourceDispatcher> resource,
                       RegionAllocator::Region::UPtr&& region)
       : PciAllocation(type, std::move(resource)), region_(std::move(region)) {}
 

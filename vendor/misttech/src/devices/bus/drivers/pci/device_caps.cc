@@ -1,6 +1,8 @@
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+#include <trace.h>
 #include <zircon/errors.h>
 
 #include <fbl/string_buffer.h>
@@ -12,6 +14,8 @@
 #include "src/devices/bus/drivers/pci/capabilities/power_management.h"
 #include "src/devices/bus/drivers/pci/common.h"
 #include "src/devices/bus/drivers/pci/device.h"
+
+#define LOCAL_TRACE 0
 
 namespace pci {
 
@@ -94,7 +98,7 @@ bool CapabilityCycleExists(const Config& cfg,
       log.AppendPrintf("%#x", cap->base());
     }
     log.AppendPrintf(" -> %#x", offset);
-    zxlogf(ERROR, "%s", log.c_str());
+    TRACEF("%s\n", log.c_str());
     return true;
   }
 
@@ -131,7 +135,7 @@ zx::result<> Device::ConfigureCapabilities() {
 
     const zx_status_t status = msix.Init(*bars()[msix.table_bar()], *bars()[msix.pba_bar()]);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to initialize MSI-X: %d", status);
+      TRACEF("Failed to initialize MSI-X: %d\n", status);
       return zx::error(status);
     }
   }
@@ -151,7 +155,7 @@ zx_status_t Device::ParseCapabilities() {
   // cycles and invalid pointers.
   while (ReadCapability(*cfg_, cap_offset, &hdr)) {
     if (CapabilityCycleExists<Capability>(*cfg_, &caps_.list, cap_offset)) {
-      zxlogf(ERROR, "%s capability cycle detected", cfg_->addr());
+      TRACEF("%s capability cycle detected\n", cfg_->addr());
       return ZX_ERR_BAD_STATE;
     }
 
@@ -165,7 +169,7 @@ zx_status_t Device::ParseCapabilities() {
         st = AllocateCapability<PowerManagementCapability>(cap_offset, *cfg_, &caps_.power,
                                                            &caps_.list);
         if (st != ZX_OK) {
-          zxlogf(ERROR, "%s Error allocating PowerManagement capability: %d, %p", cfg_->addr(), st,
+          TRACEF("%s Error allocating PowerManagement capability: %d, %p\n", cfg_->addr(), st,
                  caps_.pcie);
           return st;
         }
@@ -173,8 +177,7 @@ zx_status_t Device::ParseCapabilities() {
       case Capability::Id::kPciExpress:
         st = AllocateCapability<PciExpressCapability>(cap_offset, *cfg_, &caps_.pcie, &caps_.list);
         if (st != ZX_OK) {
-          zxlogf(ERROR, "%s Error allocating PCIe capability: %d, %p", cfg_->addr(), st,
-                 caps_.pcie);
+          TRACEF("%s Error allocating PCIe capability: %d, %p\n", cfg_->addr(), st, caps_.pcie);
           return st;
         }
         is_pcie_ = true;
@@ -182,15 +185,14 @@ zx_status_t Device::ParseCapabilities() {
       case Capability::Id::kMsi:
         st = AllocateCapability<MsiCapability>(cap_offset, *cfg_, &caps_.msi, &caps_.list);
         if (st != ZX_OK) {
-          zxlogf(ERROR, "%s Error allocating MSI capability: %d, %p", cfg_->addr(), st, caps_.msi);
+          TRACEF("%s Error allocating MSI capability: %d, %p\n", cfg_->addr(), st, caps_.msi);
           return st;
         }
         break;
       case Capability::Id::kMsiX:
         st = AllocateCapability<MsixCapability>(cap_offset, *cfg_, &caps_.msix, &caps_.list);
         if (st != ZX_OK) {
-          zxlogf(ERROR, "%s Error allocating MSI-X capability: %d, %p", cfg_->addr(), st,
-                 caps_.msix);
+          TRACEF("%s Error allocating MSI-X capability: %d, %p\n", cfg_->addr(), st, caps_.msix);
           return st;
         }
         break;
@@ -218,8 +220,7 @@ zx_status_t Device::ParseCapabilities() {
 
     cap_offset = hdr.ptr;
     if (cap_offset && (cap_offset < PCI_CAP_PTR_MIN_VALID || cap_offset > PCI_CAP_PTR_MAX_VALID)) {
-      zxlogf(ERROR, "%s capability pointer out of range: %#02x, disabling device", cfg_->addr(),
-             cap_offset);
+      TRACEF("%s capability pointer out of range: %#02x, disabling device\n", cfg_->addr(), cap_offset);
       return ZX_ERR_OUT_OF_RANGE;
     }
   }
@@ -237,7 +238,7 @@ zx_status_t Device::ParseExtendedCapabilities() {
   // cycles and invalid pointers.
   while (ReadExtCapability(*cfg_, cap_offset, &hdr)) {
     if (CapabilityCycleExists<ExtCapability>(*cfg_, &caps_.ext_list, cap_offset)) {
-      zxlogf(TRACE, "%s ext_capability cycle detected", cfg_->addr());
+      TRACEF("%s ext_capability cycle detected\n", cfg_->addr());
       return ZX_ERR_BAD_STATE;
     }
 
@@ -298,7 +299,7 @@ zx_status_t Device::ParseExtendedCapabilities() {
     cap_offset = hdr.ptr;
     if (cap_offset &&
         (cap_offset < PCIE_EXT_CAP_PTR_MIN_VALID || cap_offset > PCIE_EXT_CAP_PTR_MAX_VALID)) {
-      zxlogf(ERROR, "%s ext_capability pointer out of range: %#02x, disabling device", cfg_->addr(),
+      TRACEF("%s ext_capability pointer out of range: %#02x, disabling device\n", cfg_->addr(),
              cap_offset);
       return ZX_ERR_OUT_OF_RANGE;
     }

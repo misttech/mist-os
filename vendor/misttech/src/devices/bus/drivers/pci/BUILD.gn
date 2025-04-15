@@ -1,9 +1,10 @@
+# Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 # Copyright 2019 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/bind/bind.gni")
-import("//build/drivers.gni")
+#import("//build/bind/bind.gni")
+#import("//build/drivers.gni")
 
 group("pci") {
   deps = [ ":bus-pci" ]
@@ -11,7 +12,7 @@ group("pci") {
 
 # The userspace PCI bus driver uses this set, as well as the
 # automated tests.
-source_set("user_pci") {
+source_set("bus-pci") {
   visibility = [
     ":*",
     "test/:*",
@@ -22,45 +23,56 @@ source_set("user_pci") {
     "bridge.cc",
     "bus.cc",
     "bus_device_interface.cc",
-    "bus_inspect.cc",
+
+    #"bus_inspect.cc",
     "capabilities/msix.cc",
     "capabilities/power_management.cc",
-    "composite.cc",
+
+    #"composite.cc",
     "config.cc",
     "device.cc",
     "device_caps.cc",
-    "device_inspect.cc",
+
+    #"device_inspect.cc",
     "device_irqs.cc",
-    "device_service.cc",
-    "fidl.cc",
+
+    #"device_service.cc",
+    #"fidl.cc",
     "upstream_node.cc",
   ]
 
   deps = [
-    "//sdk/lib/driver/metadata/cpp",
-    "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
+    #"//sdk/lib/driver/metadata/cpp",
+    #"//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
   ]
 
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.pciroot:fuchsia.hardware.pciroot_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib_cpp",
-    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//src/devices/bind/fuchsia:fuchsia_cpp",
-    "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/devices/pci/lib/device-protocol-pci",
+    "//sdk/banjo/mistos.hardware.pciroot:mistos.hardware.pciroot_banjo_cpp",
+
+    #"//sdk/fidl/mistos.hardware.pci:mistos.hardware.pci_bindlib_cpp",
+    "//sdk/fidl/mistos.hardware.pci:mistos.hardware.pci_banjo_cpp",
+    "//vendor/misttech/zircon/kernel/lib/mistos/util:headers",
+    "//zircon/kernel/object:headers",
+
+    #"//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    #"//sdk/lib/component/outgoing/cpp",
+    #"//src/devices/bind/fuchsia:fuchsia_cpp",
+    #"//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
+    #"//src/devices/lib/driver",
+    #"//src/devices/lib/driver:driver_runtime",
+    #"//src/devices/pci/lib/device-protocol-pci",
     "//src/devices/pci/lib/pci",
-    "//src/lib/ddk",
+
+    #"//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/inspect",
+
+    #"//zircon/system/ulib/inspect",
     "//zircon/system/ulib/pretty",
-    "//zircon/system/ulib/region-alloc",
-    "//zircon/system/ulib/zircon-internal",
+
+    #"//zircon/system/ulib/region-alloc",
+    #"//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
 
     # TODO(https://fxbug.dev/42109087): This shouldn't be here if the mmio code is actually
@@ -71,104 +83,15 @@ source_set("user_pci") {
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
-}
 
-driver_bind_rules("pci_bind") {
-  rules = "meta/pci.bind"
-  tests = "meta/pci_bind_tests.json"
-  deps = [
-    "//src/devices/bind/fuchsia.pci",
-    "//src/devices/bind/fuchsia.platform",
-  ]
-}
-
-# bus-pci is used on boards that enable user space PCI support.
-fuchsia_cc_driver("bus-pci-driver") {
-  legacy = true
-  output_name = "bus-pci"
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
-
-  sources = [
-    # The driver needs bind glue, unlike tests.
-    "bind.cc",
-  ]
-  deps = [
-    ":pci_bind",
-    ":user_pci",
-    "//src/devices/lib/driver",
-  ]
-}
-
-fuchsia_driver_component("bus-pci") {
-  component_name = "bus-pci"
-  deps = [ ":bus-pci-driver" ]
-  info = "meta/bus-pci-info.json"
-  manifest = "meta/pci.cml"
-}
-
-fuchsia_driver_package("bus-pci-package") {
-  package_name = "bus-pci"
-  driver_components = [ ":bus-pci" ]
-}
-
-# bus-kpci is used by boards that use kernel PCI support.
-# TODO(https://fxbug.dev/42182308): Delete this once qemu-arm64 is converted to user space PCI.
-fuchsia_cc_driver("bus-kpci-driver") {
-  legacy = true
-  output_name = "bus-kpci"
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
-  sources = [
-    "composite.cc",
-    "kpci.cc",
-  ]
-  deps = [
-    ":pci_bind",
-    "//sdk/banjo/fuchsia.hardware.pciroot:fuchsia.hardware.pciroot_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib_cpp",
-    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/platform-device/cpp",
-    "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//sdk/lib/fidl",
-    "//src/devices/bind/fuchsia:fuchsia_cpp",
-    "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/devices/pci/lib/device-protocol-pci",
-    "//src/devices/pci/lib/pci",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/pretty",
-  ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
-}
-
-fuchsia_driver_component("bus-kpci") {
-  component_name = "bus-kpci"
-  deps = [ ":bus-kpci-driver" ]
-  info = "meta/bus-pci-info.json"
-  manifest = "meta/kpci.cml"
-}
-
-fuchsia_driver_package("bus-kpci-package") {
-  package_name = "bus-kpci"
-  driver_components = [ ":bus-kpci" ]
+  configs += [ "//build/config:default_include_dirs" ]
 }
 
 group("tests") {
   testonly = true
   deps = [
-    ":pci_bind_test",
-    "test:pci-driver-test",
-    "test:pci-unit-test",
+    #":pci_bind_test",
+    #"test:pci-driver-test",
+    #"test:pci-unit-test",
   ]
 }
