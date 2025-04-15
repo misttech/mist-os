@@ -23,7 +23,7 @@ pub struct PlatformMediaConfig {
     pub enable_codecs: bool,
 
     /// Enable a platform-provided service that allows active media players (sessions) to be
-    /// published and discovered, primarily for user control of those sessiosn.
+    /// published and discovered, primarily for user control of those sessions.
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enable_sessions: bool,
 }
@@ -37,6 +37,9 @@ pub enum AudioConfig {
 
     /// Use the partial AudioDeviceRegistry stack.
     PartialStack,
+
+    /// Use AudioDeviceRegistry (the "partial" stack).
+    DeviceRegistry(AudioDeviceRegistryConfig),
 }
 
 /// Configuration options for the AudioCore stack.
@@ -46,6 +49,15 @@ pub struct AudioCoreConfig {
     /// Route the ADC device to audio_core.
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub use_adc_device: bool,
+}
+
+/// Configuration options for the AudioDeviceRegistry stack.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(default, deny_unknown_fields)]
+pub struct AudioDeviceRegistryConfig {
+    /// Start the ADR during target boot-up, rather than upon first client connection.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub eager_start: bool,
 }
 
 /// The camera settings for the platform.

@@ -2,16 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    children: [
-        {
-            name: "audio_device_registry",
-            url: "fuchsia-pkg://fuchsia.com/audio_device_registry#meta/audio_device_registry.cm",
-            environment: "#core-env",
-        },
-    ],
     offer: [
         {
-            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been
+            // migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-audio-composite",
@@ -25,7 +19,8 @@
             to: "#audio_device_registry",
         },
         {
-            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been
+            // migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-codec",

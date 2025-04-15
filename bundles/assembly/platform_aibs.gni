@@ -209,6 +209,7 @@ user_platform_aib_names =
       "audio_core_routing",
       "audio_core_use_adc_device",
       "audio_device_registry",
+      "audio_device_registry_demand",
       "soundplayer",
       "camera",
       "media_codecs",
@@ -425,6 +426,7 @@ eng_only_platform_aib_names =
 
       # Audio development/debugging
       "audio_development_support",
+      "audio_device_registry_eager",
       "audio_driver_development_tools",
       "audio_full_stack_development_tools",
       "intel_hda",

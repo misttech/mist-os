@@ -40,6 +40,15 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
             }
             Some(AudioConfig::PartialStack) => {
                 builder.platform_bundle("audio_device_registry");
+                builder.platform_bundle("audio_device_registry_demand");
+            }
+            Some(AudioConfig::DeviceRegistry(adr_config)) => {
+                builder.platform_bundle("audio_device_registry");
+                if adr_config.eager_start {
+                    builder.platform_bundle("audio_device_registry_eager");
+                } else {
+                    builder.platform_bundle("audio_device_registry_demand");
+                }
             }
             None => {}
         }

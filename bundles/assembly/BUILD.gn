@@ -4026,6 +4026,32 @@ assembly_input_bundle("audio_device_registry") {
     },
   ]
 }
+assembly_input_bundle("audio_device_registry_demand") {
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/media/audio/services/device_registry/meta/audio_device_registry.demand.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+assembly_input_bundle("audio_device_registry_eager") {
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/media/audio/services/device_registry/meta/audio_device_registry.eager.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
 
 # Component that routes audio on Smart Displays
 #

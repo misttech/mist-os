@@ -22,7 +22,8 @@
     ],
     use: [
         {
-            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been
+            // migrated to services. The service capability has been added below.
             directory: "dev-audio-composite",
             rights: [ "r*" ],
             path: "/dev/class/audio-composite",
@@ -32,7 +33,8 @@
             service: "fuchsia.hardware.audio.CompositeConnectorService",
         },
         {
-            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been
+            // migrated to services. The service capability has been added below.
             directory: "dev-codec",
             rights: [ "r*" ],
             path: "/dev/class/codec",

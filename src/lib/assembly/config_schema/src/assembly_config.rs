@@ -215,7 +215,9 @@ pub struct CompiledComponentDefinition {
 mod tests {
     use super::*;
     use crate::common::PackageSet;
-    use crate::platform_config::media_config::{AudioConfig, PlatformMediaConfig};
+    use crate::platform_config::media_config::{
+        AudioConfig, AudioDeviceRegistryConfig, PlatformMediaConfig,
+    };
     use crate::platform_config::{BuildType, FeatureSupportLevel};
     use crate::product_config::ProductPackageDetails;
     use assembly_util as util;
@@ -563,7 +565,9 @@ mod tests {
         let overrides = serde_json::json!({
             "platform": {
                 "media": {
-                    "audio": "partial_stack",
+                    "audio": {
+                      "device_registry": {},
+                    },
                 },
             },
         });
@@ -572,7 +576,12 @@ mod tests {
 
         assert_eq!(
             config.platform.media,
-            PlatformMediaConfig { audio: Some(AudioConfig::PartialStack), ..Default::default() },
+            PlatformMediaConfig {
+                audio: Some(AudioConfig::DeviceRegistry(AudioDeviceRegistryConfig {
+                    eager_start: false
+                })),
+                ..Default::default()
+            },
         );
     }
 
