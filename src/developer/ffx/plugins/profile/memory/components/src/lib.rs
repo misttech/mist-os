@@ -7,20 +7,22 @@ mod output;
 
 #[macro_use]
 extern crate prettytable;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use attribution_processing::kernel_statistics::KernelStatistics;
-use attribution_processing::summary::MemorySummary;
+use attribution_processing::summary::{ComponentProfileResult, MemorySummary};
 use attribution_processing::{AttributionData, Principal, Resource};
 use errors::ffx_error;
 use ffx_profile_memory_components_args::ComponentsCommand;
-use ffx_writer::{SimpleWriter, ToolIO};
+use ffx_writer::{MachineWriter, ToolIO};
 use fho::{AvailabilityFlag, FfxMain, FfxTool};
+use fidl_fuchsia_memory_attribution_plugin as fplugin;
 use futures::AsyncReadExt;
 use json::JsonConvertible;
+use serde::Serialize;
+use std::io::Write;
 use target_holders::moniker;
-
-use fidl_fuchsia_memory_attribution_plugin as fplugin;
 
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("ffx_profile_memory_components"))]
@@ -33,19 +35,54 @@ pub struct MemoryComponentsTool {
 
 fho::embedded_plugin!(MemoryComponentsTool);
 
+/// Minimal interface to output text or data.
+/// It makes possible to adapt `MachineWriter` of various types and to delegate execution between
+/// plugins.
+pub trait PluginOutput<T>
+where
+    T: Serialize,
+{
+    fn is_machine(&self) -> bool;
+    fn machine(&mut self, output: T) -> Result<()>;
+    fn stderr(&mut self) -> &mut dyn Write;
+    fn stdout(&mut self) -> &mut dyn Write;
+}
+
+impl PluginOutput<ComponentProfileResult> for MachineWriter<ComponentProfileResult> {
+    fn is_machine(&self) -> bool {
+        ToolIO::is_machine(self)
+    }
+
+    fn machine(&mut self, output: ComponentProfileResult) -> Result<()> {
+        MachineWriter::<ComponentProfileResult>::machine(self, &output)?;
+        Ok(())
+    }
+
+    fn stderr(&mut self) -> &mut dyn Write {
+        ToolIO::stderr(self)
+    }
+
+    fn stdout(&mut self) -> &mut dyn Write {
+        self
+    }
+}
+
 #[async_trait(?Send)]
 impl FfxMain for MemoryComponentsTool {
-    type Writer = SimpleWriter;
+    type Writer = MachineWriter<ComponentProfileResult>;
 
     /// Forwards the specified memory pressure level to the fuchsia.memory.debug.MemoryPressure FIDL
     /// interface.
-    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+    async fn main(self, writer: MachineWriter<ComponentProfileResult>) -> fho::Result<()> {
         self.run(writer).await
     }
 }
 
 impl MemoryComponentsTool {
-    pub async fn run(&self, mut writer: impl ToolIO) -> fho::Result<()> {
+    pub async fn run(
+        &self,
+        mut writer: impl PluginOutput<ComponentProfileResult>,
+    ) -> fho::Result<()> {
         let snapshot = match self.cmd.stdin_input {
             false => self.load_from_device().await?,
             true => {
@@ -53,11 +90,21 @@ impl MemoryComponentsTool {
                     .unwrap()
             }
         };
+
         if self.cmd.debug_json {
             println!("{}", serde_json::to_string(&snapshot.to_json()).unwrap());
+            return Ok(());
+        }
+
+        let (summary, kernel_statistics) = process_snapshot(snapshot);
+        if writer.is_machine() {
+            writer.machine(ComponentProfileResult {
+                kernel: kernel_statistics,
+                principals: summary.principals,
+                undigested: summary.undigested,
+            })?;
         } else {
-            let (output, kernel_statistics) = process_snapshot(snapshot);
-            output::write_summary(&mut writer, &self.cmd, &output, kernel_statistics)
+            output::write_summary(&mut writer.stdout(), &self.cmd, &summary, kernel_statistics)
                 .or_else(|e| writeln!(writer.stderr(), "Error: {}", e))
                 .map_err(|e| fho::Error::Unexpected(e.into()))?;
         }

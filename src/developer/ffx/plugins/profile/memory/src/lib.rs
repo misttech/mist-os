@@ -15,11 +15,12 @@ use crate::write_csv_output::write_csv_output;
 use crate::write_human_readable_output::write_human_readable_output;
 use anyhow::Result;
 use async_trait::async_trait;
+use attribution_processing::summary::ComponentProfileResult;
 use digest::{processed, raw};
 use errors::ffx_bail;
 use ffx_optional_moniker::optional_moniker;
 use ffx_profile_memory_args::{Backend, MemoryCommand};
-use ffx_profile_memory_components::MemoryComponentsTool;
+use ffx_profile_memory_components::{MemoryComponentsTool, PluginOutput};
 use ffx_profile_memory_components_args::ComponentsCommand;
 use ffx_writer::{MachineWriter, ToolIO};
 use fho::{FfxMain, FfxTool};
@@ -29,6 +30,31 @@ use futures::AsyncReadExt;
 use plugin_output::ProfileMemoryOutput;
 use std::io::Write;
 use std::time::Duration;
+
+/// Adapts the output of ffx profile component `ComponentProfileResult` with this plugin's output
+/// writer.
+struct ComponentProfileResultWriter {
+    writer: MachineWriter<ProfileMemoryOutput>,
+}
+
+impl PluginOutput<ComponentProfileResult> for ComponentProfileResultWriter {
+    fn machine(&mut self, output: ComponentProfileResult) -> Result<()> {
+        self.writer.machine(&ProfileMemoryOutput::ComponentDigest(output))?;
+        Ok(())
+    }
+
+    fn stderr(&mut self) -> &mut dyn Write {
+        self.writer.stderr()
+    }
+
+    fn stdout(&mut self) -> &mut dyn Write {
+        &mut self.writer
+    }
+
+    fn is_machine(&self) -> bool {
+        self.writer.is_machine()
+    }
+}
 
 #[derive(FfxTool)]
 pub struct MemoryTool {
@@ -86,7 +112,7 @@ impl FfxMain for MemoryTool {
                     },
                     monitor_proxy: mm2,
                 };
-                tool.run(writer).await
+                tool.run(ComponentProfileResultWriter { writer }).await
             }
             _ => ffx_bail!("Unable to connect to memory_monitor"),
         }

@@ -36,14 +36,19 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
             ["config", "set", "ffx_profile_memory_components", "true"]
         )
 
-    def test_ffx_memory_component_without_args(self) -> None:
+    def write_output(self, cmd_output: str) -> None:
+        """Writes the command output to a dedicated file for investigation."""
+        with open(
+            Path(self.test_case_path) / "ffx_command_stdout_and_stderr.txt",
+            "wt",
+        ) as out:
+            out.write(cmd_output)
+
+    def test_ffx_profile_memory_component_without_args(self) -> None:
         profile = self.dut.ffx.run(
             ["profile", "memory", "components"], log_output=False
         )
-        with open(
-            Path(self.test_case_path) / "profile_memory_components.txt", "wt"
-        ) as out:
-            out.write(profile)
+        self.write_output(profile)
 
         # Verifies that some data is produced.
         assertContainsRegex(r"(?m)^Total memory: \d+\.\d+ MiB$", profile)
@@ -51,6 +56,27 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
         assertContainsRegex(
             r"(?m)^\s*Processes:\s*memory_monitor2\.cm \(\d+\)\s*$", profile
         )
+
+    def test_ffx_profile_memory_component_with_json_output(self) -> None:
+        cmd_output = self.dut.ffx.run(
+            ["--machine", "json", "profile", "memory", "components"],
+            log_output=False,
+        )
+        self.write_output(cmd_output)
+        # Remove `Resource %d not found` line from the output.
+        # TODO(b/409272413): simplify this code when stdio and stderr are no longer aggregated.
+        cmd_output = "\n".join(
+            l for l in cmd_output.split("\n") if not l.startswith("Resource ")
+        )
+
+        profile = json.loads(cmd_output)
+        (mm2,) = [
+            p
+            for p in profile["principals"]
+            if p["name"] == "core/memory_monitor2"
+        ]
+        asserts.assert_in("processes", mm2)
+        asserts.assert_in("vmos", mm2)
 
     def test_memory_monitor2_inspect(self) -> None:
         inspect_json = self.dut.ffx.run(
@@ -111,7 +137,7 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
             asserts.assert_in(field, value_dict)
             asserts.assert_greater(value_dict[field], 0)
 
-    def test_memory_monitor2_traces_provider(self) -> None:
+    def test_memory_monitor2_is_in_traces_provider(self) -> None:
         json_text = self.dut.ffx.run(
             ["--machine", "json", "trace", "list-providers"]
         )
@@ -124,7 +150,7 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
             "memory_monitor2.cm", [prov["name"] for prov in providers]
         )
 
-    def test_memory_monitor2_traces_collect(self) -> None:
+    def test_memory_traces_content_collect(self) -> None:
         CATEGORY = "memory:kernel"
         trace_path = Path(self.test_case_path) / "trace.fxt"
         with self.dut.tracing.trace_session(
@@ -162,7 +188,7 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
             },
         )
 
-    def test_memory_monitor2_report(self) -> None:
+    def test_profile_memory_with_monitor2_report(self) -> None:
         profile = self.dut.ffx.run(
             [
                 "profile",
@@ -175,7 +201,36 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
         # Verifies that the report comes from memory_monitor2.
         assertContainsRegex(r"(?m)^ Principal name:", profile)
 
-    def test_memory_monitor2_incompatible_args(self) -> None:
+    def test_ffx_profile_memory_with_json_output(self) -> None:
+        cmd_output = self.dut.ffx.run(
+            [
+                "--machine",
+                "json",
+                "profile",
+                "memory",
+                "--backend",
+                "memory_monitor_2",
+            ],
+            log_output=False,
+        )
+        self.write_output(cmd_output)
+        # Remove `Resource %d not found` line from the output.
+        # TODO(b/409272413): simplify this code when stdio and stderr are no longer aggregated.
+        cmd_output = "\n".join(
+            l for l in cmd_output.split("\n") if not l.startswith("Resource ")
+        )
+        # Assert that this is a ComponentDigest
+        profile = json.loads(cmd_output)["ComponentDigest"]
+        # Assert that is has a principal for memory monitor 2.
+        (principal,) = [
+            p
+            for p in profile["principals"]
+            if p["name"] == "core/memory_monitor2"
+        ]
+        asserts.assert_in("processes", principal)
+        asserts.assert_in("vmos", principal)
+
+    def test_profile_memory_with_monitor2_incompatible_args(self) -> None:
         INCOMPATIBLE_ARGS_LIST: list[list[str]] = [
             ["--process_koids", "123"],
             ["--process_names", "123"],

@@ -2,24 +2,35 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::kernel_statistics::KernelStatistics;
 use crate::{PrincipalType, ResourceReference};
 use core::default::Default;
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
-
 use fidl_fuchsia_memory_attribution_plugin as fplugin;
 use fplugin::Vmo;
+use serde::Serialize;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
+use std::fmt::Display;
 
 use crate::{InflatedPrincipal, InflatedResource, PrincipalIdentifier};
 
 /// Consider that two floats are equals if they differ less than [FLOAT_COMPARISON_EPSILON].
 const FLOAT_COMPARISON_EPSILON: f64 = 1e-10;
 
+#[derive(Debug, PartialEq, Serialize)]
+pub struct ComponentProfileResult {
+    pub kernel: KernelStatistics,
+    pub principals: Vec<PrincipalSummary>,
+    /// Amount, in bytes, of memory that is known but remained unclaimed. Should be equal to zero.
+    pub undigested: u64,
+}
+
 /// Summary view of the memory usage on a device.
 ///
 /// This view aggregates the memory usage for each Principal, and, for each Principal, for VMOs
 /// sharing the same name or belonging to the same logical group. This is a view appropriate to
 /// display to developers who want to understand the memory usage of their Principal.
+#[derive(Debug, PartialEq, Serialize)]
 pub struct MemorySummary {
     pub principals: Vec<PrincipalSummary>,
     /// Amount, in bytes, of memory that is known but remained unclaimed. Should be equal to zero.
@@ -165,8 +176,14 @@ impl MemorySummary {
     }
 }
 
+impl Display for MemorySummary {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Ok(())
+    }
+}
+
 /// Summary of a Principal memory usage, and its breakdown per VMO group.
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct PrincipalSummary {
     /// Identifier for the Principal. This number is not meaningful outside of the memory
     /// attribution system.
@@ -216,7 +233,7 @@ impl PartialEq for PrincipalSummary {
 }
 
 /// Group of VMOs sharing the same name.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct VmoSummary {
     /// Number of distinct VMOs under the same name.
     pub count: u64,

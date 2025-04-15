@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::digest;
+use attribution_processing::summary::ComponentProfileResult;
 use digest::processed;
 use serde::Serialize;
 
@@ -18,13 +19,14 @@ pub struct ProcessesMemoryUsage {
 
 /// The plugin can output one of these based on the options:
 /// * A complete digest of the memory usage.
-/// * A digest of the memory usage of a subset of the processes running on the targetted device.
+/// * A digest of the memory usage of a subset of the processes running on the targeted device.
 // TODO(https://fxbug.dev/324167674): fix.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq, Serialize)]
 pub enum ProfileMemoryOutput {
     CompleteDigest(processed::Digest),
     ProcessDigest(ProcessesMemoryUsage),
+    ComponentDigest(ComponentProfileResult),
 }
 
 /// Returns a ProfileMemoryOutput that only contains information related to the process identified by `koid`.
