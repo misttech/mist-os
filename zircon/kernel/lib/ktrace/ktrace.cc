@@ -577,6 +577,8 @@ uint64_t* KTraceState::ReserveRaw(uint32_t num_words) {
 
 template <>
 void KTraceImpl<BufferMode::kSingle>::Init(uint32_t bufsize, uint32_t initial_grpmask) {
+  KTraceGuard guard{&lock_};
+
   cpu_context_map_.Init();
   internal_state_.Init(bufsize, initial_grpmask);
   set_categories_bitmask(initial_grpmask);
@@ -638,9 +640,38 @@ zx::result<size_t> KTraceImpl<BufferMode::kSingle>::ReadUser(user_out_ptr<void> 
   return zx::ok(ret);
 }
 
+template <>
+ktl::byte* KTraceImpl<BufferMode::kSingle>::KernelAspaceAllocator::Allocate(uint32_t size) {
+  return nullptr;
+}
+
+template <>
+void KTraceImpl<BufferMode::kSingle>::KernelAspaceAllocator::Free(ktl::byte* ptr) {}
+
 //
 // TODO(https://fxbug.dev/404539312): Implement the per-CPU buffer specializations for KTraceImpl.
 //
+
+template <>
+ktl::byte* KTraceImpl<BufferMode::kPerCpu>::KernelAspaceAllocator::Allocate(uint32_t size) {
+  VmAspace* kaspace = VmAspace::kernel_aspace();
+  char name[32] = "ktrace-percpu-buffer";
+  void* ptr;
+  const zx_status_t status = kaspace->Alloc(name, size, &ptr, 0, VmAspace::VMM_FLAG_COMMIT,
+                                            ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE);
+  if (status != ZX_OK) {
+    return nullptr;
+  }
+  return static_cast<ktl::byte*>(ptr);
+}
+
+template <>
+void KTraceImpl<BufferMode::kPerCpu>::KernelAspaceAllocator::Free(ktl::byte* ptr) {
+  if (ptr != nullptr) {
+    VmAspace* kaspace = VmAspace::kernel_aspace();
+    kaspace->FreeRegion(reinterpret_cast<vaddr_t>(ptr));
+  }
+}
 
 template <>
 void KTraceImpl<BufferMode::kPerCpu>::DisableWrites() {
@@ -662,6 +693,104 @@ void KTraceImpl<BufferMode::kPerCpu>::DisableWrites() {
   InterruptDisableGuard irq_guard;
   auto wait_for_write_completion = [](void*) {};
   mp_sync_exec(MP_IPI_TARGET_ALL_BUT_LOCAL, 0, wait_for_write_completion, nullptr);
+}
+
+template <>
+zx_status_t KTraceImpl<BufferMode::kPerCpu>::Allocate() {
+  if (percpu_buffers_) {
+    return ZX_OK;
+  }
+
+  // The number of buffers to initialize and their size should be set before this method is called.
+  DEBUG_ASSERT(num_buffers_ != 0);
+  DEBUG_ASSERT(buffer_size_ != 0);
+
+  // Allocate the per-CPU SPSC buffer data structures.
+  // Initially, store the unique pointer in a local variable. This will ensure that the buffers are
+  // destructed upon initialization below.
+  fbl::AllocChecker ac;
+  ktl::unique_ptr buffers = ktl::make_unique<PerCpuBuffer[]>(&ac, num_buffers_);
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  // Initialize each per-CPU buffer by allocating the storage used to back it.
+  for (uint32_t i = 0; i < num_buffers_; i++) {
+    const zx_status_t status = buffers[i].Init(buffer_size_);
+    if (status != ZX_OK) {
+      // Any allocated buffers will be destructed when we return.
+      DiagsPrintf(INFO, "ktrace: cannot alloc buffer %u: %d\n", i, status);
+      return ZX_ERR_NO_MEMORY;
+    }
+  }
+
+  // Take ownership of the newly created per-CPU buffers.
+  percpu_buffers_ = ktl::move(buffers);
+  return ZX_OK;
+}
+
+template <>
+zx_status_t KTraceImpl<BufferMode::kPerCpu>::Start(uint32_t, uint32_t categories) {
+  // Allocate the buffers. This will be a no-op if the buffers are already initialized.
+  if (zx_status_t status = Allocate(); status != ZX_OK) {
+    return status;
+  }
+
+  // If writes are already enabled, then a trace session is already in progress and all we need to
+  // do is set the categories bitmask and return.
+  if (WritesEnabled()) {
+    set_categories_bitmask(categories);
+    return ZX_OK;
+  }
+
+  // Otherwise, enable writes and report static metadata before setting the categories bitmask.
+  // The metadata needs to be emitted before we enable arbitrary categories, otherwise the thread
+  // and process records will be interspersed with generic trace records.
+  EnableWrites();
+  // TODO(rudymathu): Implement me!!!
+  // ReportMetadata();
+  set_categories_bitmask(categories);
+  DiagsPrintf(INFO, "Enabled category mask: 0x%03x\n", categories);
+  DiagsPrintf(INFO, "Trace category states:\n");
+  for (const fxt::InternedCategory& category : fxt::InternedCategory::Iterate()) {
+    DiagsPrintf(INFO, "  %-20s : 0x%03x : %s\n", category.string(), (1u << category.index()),
+                IsCategoryEnabled(category) ? "enabled" : "disabled");
+  }
+
+  return ZX_OK;
+}
+
+template <>
+void KTraceImpl<BufferMode::kPerCpu>::Init(uint32_t bufsize, uint32_t initial_grpmask) {
+  KTraceGuard guard{&lock_};
+
+  ASSERT_MSG(buffer_size_ == 0, "KTrace::Init called twice");
+  // Allocate the KOIDs used to annotate CPU trace records.
+  cpu_context_map_.Init();
+
+  // Compute the per-CPU buffer size, ensuring that the resulting value is page aligned.
+  num_buffers_ = arch_max_num_cpus();
+  buffer_size_ = PAGE_ALIGN(bufsize / num_buffers_);
+
+  // If the initial_grpmask was zero, then we can delay allocation of the KTrace buffer.
+  if (initial_grpmask == 0) {
+    return;
+  }
+  // Otherwise, begin tracing immediately.
+  Start(KTRACE_ACTION_START, initial_grpmask);
+}
+
+template <>
+zx_status_t KTraceImpl<BufferMode::kPerCpu>::Stop() {
+  set_categories_bitmask(0u);
+  DisableWrites();
+  return ZX_OK;
+}
+
+template <>
+zx_status_t KTraceImpl<BufferMode::kPerCpu>::Rewind() {
+  // TODO(https://fxbug.dev/404539312): Implement me!
+  return ZX_ERR_NOT_SUPPORTED;
 }
 
 // The InitHook is the same for both the single and per-CPU buffer implementation of KTrace.

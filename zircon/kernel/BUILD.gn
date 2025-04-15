@@ -107,6 +107,9 @@ if (current_toolchain == default_toolchain) {
         # <lib/ktrace.h> has #include <lib/zircon-internal/ktrace.h>.
         "//zircon/system/ulib/zircon-internal:headers.config",
 
+        # <lib/ktrace.h> has #include <lib/spsc_buffer/spsc_buffer.h>.
+        "//zircon/kernel/lib/spsc_buffer:headers.config",
+
         # <lib/ktrace.h> has #include <lib/ktrace/string_ref.h>.
         "//zircon/kernel/lib/ktrace:headers.config",
         "//zircon/kernel/lib/ktrace:suppress-warning.config",

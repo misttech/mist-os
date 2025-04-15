@@ -11,6 +11,7 @@
 #include <lib/fxt/serializer.h>
 #include <lib/fxt/trace_base.h>
 #include <lib/ktrace/ktrace_internal.h>
+#include <lib/spsc_buffer/spsc_buffer.h>
 #include <lib/user_copy/user_ptr.h>
 #include <lib/zircon-internal/ktrace.h>
 #include <platform.h>
@@ -631,16 +632,22 @@ enum class BufferMode {
 
 template <BufferMode Mode>
 class KTraceImpl {
- public:
-  // Initializes the KTrace instance. Calling any other function on KTrace before calling Init
-  // should be a no-op.
-  void Init(uint32_t bufsize, uint32_t initial_grpmask);
+ private:
+  // Allocator used by SpscBuffer to allocate and free its underlying storage.
+  class KernelAspaceAllocator {
+   public:
+    static ktl::byte* Allocate(uint32_t size);
+    static void Free(ktl::byte* ptr);
+  };
+  using PerCpuBuffer = SpscBuffer<KernelAspaceAllocator>;
 
+ public:
   // Control is responsible for starting, stopping, or rewinding the ktrace buffer.
   //
   // The meaning of the options changes based on the action. If the action is to start tracing,
   // then the options field functions as the group mask.
-  zx_status_t Control(uint32_t action, uint32_t options) {
+  zx_status_t Control(uint32_t action, uint32_t options) TA_EXCL(lock_) {
+    KTraceGuard guard{&lock_};
     switch (action) {
       case KTRACE_ACTION_START:
       case KTRACE_ACTION_START_CIRCULAR:
@@ -925,17 +932,24 @@ class KTraceImpl {
     return 0;
   }
 
+  // Initializes the KTrace instance. Calling any other function on KTrace before calling Init
+  // should be a no-op. This should only be called from the InitHook.
+  void Init(uint32_t bufsize, uint32_t initial_grpmask) TA_EXCL(lock_);
+
+  // Allocate our per-CPU buffers. This is only called when BufferMode::kPerCpu is enabled.
+  zx_status_t Allocate() TA_REQ(lock_);
+
   // Start collecting trace data.
   // `action` must be one of KTRACE_ACTION_START or KTRACE_ACTION_START_CIRCULAR.
   // `categories` is the set of categories to trace. Cannot be zero.
   // TODO(https://fxbug.dev/404539312): The `action` argument is unnecessary once we switch to
   // the per-CPU streaming implementation by default.
-  zx_status_t Start(uint32_t action, uint32_t categories);
+  zx_status_t Start(uint32_t action, uint32_t categories) TA_REQ(lock_);
   // Stop collecting trace data.
-  zx_status_t Stop();
+  zx_status_t Stop() TA_REQ(lock_);
   // Rewinds the buffer, meaning that all contained trace data is dropped and the buffer is reset
   // to its initial state.
-  zx_status_t Rewind();
+  zx_status_t Rewind() TA_REQ(lock_);
 
   // Returns true if the given category is enabled for tracing.
   bool IsCategoryEnabled(const fxt::InternedCategory& category) const {
@@ -992,6 +1006,25 @@ class KTraceImpl {
 
   // Stores whether writes are currently enabled.
   ktl::atomic<bool> writes_enabled_{false};
+
+  // The buffers used to store data when using per-CPU mode.
+  ktl::unique_ptr<PerCpuBuffer[]> percpu_buffers_{nullptr};
+  // The number of buffers in percpu_buffers_. This is logically equivalent to the number of cores.
+  // This should be set during Init and never modified.
+  uint32_t num_buffers_ TA_GUARDED(lock_){0};
+  // The size of each buffer in the percpu_buffers_.
+  // This should be set during Init and never modified.
+  uint32_t buffer_size_ TA_GUARDED(lock_){0};
+
+  // Lock used to serialize non-write operations.
+  // The internal::KTraceState object already has a lock to synchronize these operations, so this
+  // is a NullLock when using BufferMode::kSingle. Setting up the LockType in this way allows us
+  // to annotate methods with thread safety annotations.
+  using LockType =
+      ktl::conditional_t<Mode == BufferMode::kSingle, fbl::NullLock, DECLARE_MUTEX(KTraceImpl)>;
+  using KTraceGuard =
+      ktl::conditional_t<Mode == BufferMode::kSingle, lockdep::NullGuard, Guard<Mutex>>;
+  LockType lock_;
 };
 
 // Utilize the per-CPU implementation of ktrace if streaming has been enabled.
