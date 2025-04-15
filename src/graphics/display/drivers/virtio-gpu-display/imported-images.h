@@ -28,10 +28,13 @@ namespace virtio_display {
 struct SysmemBufferInfo {
   zx::vmo image_vmo;
   uint64_t image_vmo_offset;
+
   display::PixelFormat pixel_format;
   fuchsia_images2::wire::PixelFormatModifier pixel_format_modifier;
   fuchsia_math::wire::SizeU minimum_size;
   uint32_t minimum_bytes_per_row;
+
+  fuchsia_sysmem2::wire::CoherencyDomain coherency_domain;
 };
 
 class ImportedBufferCollection {
