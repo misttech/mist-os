@@ -248,6 +248,7 @@ zx_status_t zxio_default_init(zxio_t* io) {
 
 static constexpr zxio_ops_t zxio_null_ops = []() {
   zxio_ops_t ops = zxio_default_ops;
+  ops.close = [](zxio_t*) { return ZX_OK; };
   ops.readv = [](zxio_t* io, const zx_iovec_t* vector, size_t vector_count, zxio_flags_t flags,
                  size_t* out_actual) {
     if (flags) {

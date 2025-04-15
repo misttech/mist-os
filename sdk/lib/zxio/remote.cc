@@ -358,7 +358,7 @@ class Remote : public HasIo {
 
     // Operations we disallow "overloading" as this class manages the associated object's resources.
     ops.destroy = Remote::Destroy<T>;
-    ops.close2 = Adaptor<T>::template From<&T::Close>;
+    ops.close = Adaptor<T>::template From<&T::Close>;
     ops.release = Adaptor<T>::template From<&T::Release>;
     ops.borrow = Adaptor<T>::template From<&T::Borrow>;
     ops.clone = Adaptor<T>::template From<&T::Clone>;

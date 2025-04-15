@@ -200,7 +200,8 @@ TEST_F(Directory, Open) {
   ASSERT_EQ(attrs.protocols, ZXIO_NODE_PROTOCOL_FILE);
   zxio_t* file = &file_storage.io;
 
-  ASSERT_OK(zxio_close(directory(), /*should_wait=*/true));
+  ASSERT_OK(zxio_close(directory()));
+  zxio_destroy(directory());
 
   // Verify the zxio_t object by reading some test data from the server.
   char buffer[sizeof(zxio_tests::TestReadFileServer::kTestData)];
@@ -211,7 +212,8 @@ TEST_F(Directory, Open) {
   EXPECT_EQ(sizeof(buffer), actual);
   EXPECT_BYTES_EQ(buffer, zxio_tests::TestReadFileServer::kTestData, sizeof(buffer));
 
-  ASSERT_OK(zxio_close(file, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(file));
+  zxio_destroy(file);
 }
 
 TEST_F(Directory, OpenCreateAttrs) {
@@ -224,8 +226,10 @@ TEST_F(Directory, OpenCreateAttrs) {
   ASSERT_OK(zxio_open(directory(), kTestPath.data(), kTestPath.length(),
                       static_cast<zxio_open_flags_t>(flags), &options, &file_storage));
   zxio_t* file = &file_storage.io;
-  ASSERT_OK(zxio_close(directory(), /*should_wait=*/true));
-  ASSERT_OK(zxio_close(file, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(directory()));
+  zxio_destroy(directory());
+  ASSERT_OK(zxio_close(file));
+  zxio_destroy(file);
 }
 
 TEST_F(Directory, OpenNoOptions) {
@@ -234,8 +238,10 @@ TEST_F(Directory, OpenNoOptions) {
   zxio_storage_t file_storage;
   ASSERT_OK(zxio_open(directory(), kTestPath.data(), kTestPath.length(),
                       static_cast<zxio_open_flags_t>(flags), nullptr, &file_storage));
-  ASSERT_OK(zxio_close(directory(), /*should_wait=*/true));
-  ASSERT_OK(zxio_close(&file_storage.io, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(directory()));
+  zxio_destroy(directory());
+  ASSERT_OK(zxio_close(&file_storage.io));
+  zxio_destroy(&file_storage.io);
 }
 
 TEST_F(Directory, Unlink) {
@@ -246,7 +252,8 @@ TEST_F(Directory, Unlink) {
   // correctly.
   ASSERT_OK(zxio_unlink(directory(), name.data(), 2, 0));
 
-  ASSERT_OK(zxio_close(directory(), /*should_wait=*/true));
+  ASSERT_OK(zxio_close(directory()));
+  zxio_destroy(directory());
 
   StopServerThread();
 
@@ -277,7 +284,8 @@ TEST_F(Directory, Link) {
   ASSERT_OK(zxio_token_get(directory(), &directory_token));
   ASSERT_OK(zxio_link(directory(), src.data(), src.length(), directory_token, dst.data(), 1));
 
-  ASSERT_OK(zxio_close(directory(), /*should_wait=*/true));
+  ASSERT_OK(zxio_close(directory()));
+  zxio_destroy(directory());
 
   StopServerThread();
 
@@ -317,7 +325,8 @@ TEST_F(Directory, Rename) {
   ASSERT_OK(zxio_token_get(directory(), &directory_token));
   ASSERT_OK(zxio_rename(directory(), src.data(), src.length(), directory_token, dst.data(), 1));
 
-  ASSERT_OK(zxio_close(directory(), /*should_wait=*/true));
+  ASSERT_OK(zxio_close(directory()));
+  zxio_destroy(directory());
 
   StopServerThread();
 

@@ -2451,7 +2451,7 @@ static constexpr zxio_ops_t zxio_synchronous_datagram_socket_ops = []() {
     SynchronousDatagramSocket::Storage& zs = zxio_synchronous_datagram_socket(io);
     zs.~Storage();
   };
-  ops.close2 = [](zxio_t* io) {
+  ops.close = [](zxio_t* io) {
     SynchronousDatagramSocket::Storage& zs = zxio_synchronous_datagram_socket(io);
     zx_status_t status = ZX_OK;
     if (zs.client.is_valid()) {
@@ -2995,7 +2995,7 @@ static constexpr zxio_ops_t zxio_datagram_socket_ops = []() {
     zxio_datagram_socket_t& zs = zxio_datagram_socket(io);
     zs.~zxio_datagram_socket();
   };
-  ops.close2 = [](zxio_t* io) {
+  ops.close = [](zxio_t* io) {
     zxio_datagram_socket_t& zs = zxio_datagram_socket(io);
     zx_status_t status = ZX_OK;
     if (zs.client.is_valid()) {
@@ -3390,7 +3390,7 @@ static constexpr zxio_ops_t zxio_stream_socket_ops = []() {
     zxio_stream_socket_t& zs = zxio_stream_socket(io);
     zs.~zxio_stream_socket_t();
   };
-  ops.close2 = [](zxio_t* io) {
+  ops.close = [](zxio_t* io) {
     zxio_stream_socket_t& zs = zxio_stream_socket(io);
     zx_status_t status = ZX_OK;
     if (zs.client.is_valid()) {
@@ -3616,7 +3616,7 @@ static constexpr zxio_ops_t zxio_raw_socket_ops = []() {
     RawSocket::Storage& zs = zxio_raw_socket(io);
     zs.~Storage();
   };
-  ops.close2 = [](zxio_t* io) {
+  ops.close = [](zxio_t* io) {
     RawSocket::Storage& zs = zxio_raw_socket(io);
     zx_status_t status = ZX_OK;
     if (zs.client.is_valid()) {
@@ -3825,7 +3825,7 @@ static constexpr zxio_ops_t zxio_packet_socket_ops = []() {
     PacketSocket::Storage& zs = zxio_packet_socket(io);
     zs.~Storage();
   };
-  ops.close2 = [](zxio_t* io) {
+  ops.close = [](zxio_t* io) {
     PacketSocket::Storage& zs = zxio_packet_socket(io);
     zx_status_t status = ZX_OK;
     if (zs.client.is_valid()) {

@@ -127,14 +127,10 @@ zx_status_t zxio_create_with_type(zxio_storage_t* storage, zxio_object_type_t ty
 // Always consumes |io|.
 ZXIO_EXPORT void zxio_destroy(zxio_t* io);
 
-// Attempt to close |io|.
-//
-// The parameter |should_wait| indicates whether the function should wait for a response from
-// remote connections. If set to |false|, the function will not wait for the operation to be
-// acknowledged.
-//
-// Always consumes |io|.
-ZXIO_EXPORT zx_status_t zxio_close(zxio_t* io, bool should_wait);
+// Closes |io|. This is safe to call whilst other operations are concurrently, although it may
+// cause other operations to return errors. zxio_destroy still needs to be called afterwards to
+// release resources that may be held.
+ZXIO_EXPORT zx_status_t zxio_close(zxio_t* io);
 
 // Extracts the underlying |zx_handle_t| for |io| if one exists. Does not
 // terminate the connection with the server.

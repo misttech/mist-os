@@ -75,7 +75,8 @@ class Remote : public zxtest::Test {
 
   void TearDown() final {
     ASSERT_EQ(0, server_->num_close());
-    ASSERT_OK(zxio_close(&remote_.io, /*should_wait=*/true));
+    ASSERT_OK(zxio_close(&remote_.io));
+    zxio_destroy(&remote_.io);
     ASSERT_EQ(1, server_->num_close());
   }
 

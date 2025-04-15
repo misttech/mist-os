@@ -56,7 +56,7 @@ TEST(Transferable, Clone) {
   const fidl::WireResult response = fidl::WireCall(clone_client)->Close();
   ASSERT_OK(response.status());
 
-  EXPECT_OK(zxio_close(io, true));
+  zxio_destroy(io);
 }
 
 TEST(Transferable, FlagsGetDefault) {

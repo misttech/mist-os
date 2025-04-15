@@ -116,7 +116,8 @@ class File : public zxtest::Test {
 
   void TearDown() override {
     ASSERT_EQ(0, server_->num_close());
-    ASSERT_OK(zxio_close(&file_.io, /*should_wait=*/true));
+    ASSERT_OK(zxio_close(&file_.io));
+    zxio_destroy(&file_.io);
     ASSERT_EQ(1, server_->num_close());
   }
 

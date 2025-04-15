@@ -55,7 +55,8 @@ class SynchronousDatagramSocketTest : public zxtest::Test {
 
   void TearDown() final {
     if (zxio_) {
-      ASSERT_OK(zxio_close(zxio_, /*should_wait=*/true));
+      ASSERT_OK(zxio_close(zxio_));
+      zxio_destroy(zxio_);
     }
     control_loop_.Shutdown();
   }
@@ -99,7 +100,8 @@ TEST_F(SynchronousDatagramSocketTest, Borrow) {
 TEST_F(SynchronousDatagramSocketTest, CreateWithType) {
   ASSERT_OK(zxio_create_with_type(storage(), ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET,
                                   TakeEvent().release(), TakeClientEnd().TakeChannel().release()));
-  ASSERT_OK(zxio_close(&storage()->io, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(&storage()->io));
+  zxio_destroy(&storage()->io);
 }
 
 TEST_F(SynchronousDatagramSocketTest, Attr) {
@@ -131,7 +133,8 @@ class StreamSocketTest : public zxtest::Test {
 
   void TearDown() final {
     if (zxio_) {
-      ASSERT_OK(zxio_close(zxio_, /*should_wait=*/true));
+      ASSERT_OK(zxio_close(zxio_));
+      zxio_destroy(zxio_);
     }
     control_loop_.Shutdown();
   }
@@ -176,7 +179,8 @@ TEST_F(StreamSocketTest, CreateWithType) {
   ASSERT_OK(zxio_create_with_type(storage(), ZXIO_OBJECT_TYPE_STREAM_SOCKET, TakeSocket().release(),
                                   &info(), /*is_connected=*/false,
                                   TakeClientEnd().TakeChannel().release()));
-  ASSERT_OK(zxio_close(&storage()->io, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(&storage()->io));
+  zxio_destroy(&storage()->io);
 }
 
 TEST_F(StreamSocketTest, Attr) {
@@ -208,7 +212,8 @@ class DatagramSocketTest : public zxtest::Test {
 
   void TearDown() final {
     if (zxio_) {
-      ASSERT_OK(zxio_close(zxio_, /*should_wait=*/true));
+      ASSERT_OK(zxio_close(zxio_));
+      zxio_destroy(zxio_);
     }
     control_loop_.Shutdown();
   }
@@ -255,7 +260,8 @@ TEST_F(DatagramSocketTest, CreateWithType) {
   ASSERT_OK(zxio_create_with_type(storage(), ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET,
                                   TakeSocket().release(), &info(), &prelude_size(),
                                   TakeClientEnd().TakeChannel().release()));
-  ASSERT_OK(zxio_close(&storage()->io, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(&storage()->io));
+  zxio_destroy(&storage()->io);
 }
 
 TEST_F(DatagramSocketTest, Attr) {
@@ -760,7 +766,8 @@ class RawSocketTest : public zxtest::Test {
 
   void TearDown() final {
     if (zxio_) {
-      ASSERT_OK(zxio_close(zxio_, /*should_wait=*/true));
+      ASSERT_OK(zxio_close(zxio_));
+      zxio_destroy(zxio_);
     }
     control_loop_.Shutdown();
   }
@@ -801,7 +808,8 @@ TEST_F(RawSocketTest, CreateWithType) {
   ASSERT_OK(zxio_create_with_type(storage(), ZXIO_OBJECT_TYPE_RAW_SOCKET,
                                   TakeEventClient().release(),
                                   TakeClientEnd().TakeChannel().release()));
-  ASSERT_OK(zxio_close(&storage()->io, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(&storage()->io));
+  zxio_destroy(&storage()->io);
 }
 
 TEST_F(RawSocketTest, Attr) {
@@ -831,7 +839,8 @@ class PacketSocketTest : public zxtest::Test {
 
   void TearDown() final {
     if (zxio_) {
-      ASSERT_OK(zxio_close(zxio_, /*should_wait=*/true));
+      ASSERT_OK(zxio_close(zxio_));
+      zxio_destroy(zxio_);
     }
     control_loop_.Shutdown();
   }
@@ -872,7 +881,8 @@ TEST_F(PacketSocketTest, CreateWithType) {
   ASSERT_OK(zxio_create_with_type(storage(), ZXIO_OBJECT_TYPE_PACKET_SOCKET,
                                   TakeEventClient().release(),
                                   TakeClientEnd().TakeChannel().release()));
-  ASSERT_OK(zxio_close(&storage()->io, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(&storage()->io));
+  zxio_destroy(&storage()->io);
 }
 
 TEST_F(PacketSocketTest, Attr) {

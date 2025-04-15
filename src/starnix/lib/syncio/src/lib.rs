@@ -1480,9 +1480,7 @@ impl Zxio {
     }
 
     pub fn close(&self) -> Result<(), zx::Status> {
-        let status = unsafe {
-            zxio::zxio_close(self.as_ptr(), /* should_wait= */ true)
-        };
+        let status = unsafe { zxio::zxio_close(self.as_ptr()) };
         zx::ok(status)
     }
 }
@@ -1788,8 +1786,11 @@ mod test {
         };
         assert_eq!(status, zx::sys::ZX_OK);
         let io = &storage.io as *const zxio::zxio_t as *mut zxio::zxio_t;
-        let close_status = unsafe { zxio::zxio_close(io, true) };
+        let close_status = unsafe { zxio::zxio_close(io) };
         assert_eq!(close_status, zx::sys::ZX_OK);
+        unsafe {
+            zxio::zxio_destroy(io);
+        }
         Ok(())
     }
 

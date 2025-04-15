@@ -51,7 +51,7 @@ TEST(VmoTest, FlagsGetReadWrite) {
   EXPECT_TRUE(deprecated_flags & fuchsia_io::wire::OpenFlags::kRightWritable);
   EXPECT_FALSE(deprecated_flags & fuchsia_io::wire::OpenFlags::kRightExecutable);
 
-  ASSERT_OK(zxio_close(io, /*should_wait=*/true));
+  zxio_destroy(io);
 }
 
 TEST(VmoTest, FlagsGetReadOnly) {
@@ -86,7 +86,7 @@ TEST(VmoTest, FlagsGetReadOnly) {
   EXPECT_FALSE(deprecated_flags & fuchsia_io::wire::OpenFlags::kRightWritable);
   EXPECT_FALSE(deprecated_flags & fuchsia_io::wire::OpenFlags::kRightExecutable);
 
-  ASSERT_OK(zxio_close(io, /*should_wait=*/true));
+  zxio_destroy(io);
 }
 
 TEST(VmoTest, FlagsGetReadExec) {
@@ -128,7 +128,7 @@ TEST(VmoTest, FlagsGetReadExec) {
   EXPECT_FALSE(deprecated_flags & fuchsia_io::wire::OpenFlags::kRightWritable);
   EXPECT_TRUE(deprecated_flags & fuchsia_io::wire::OpenFlags::kRightExecutable);
 
-  ASSERT_OK(zxio_close(exec_io, /*should_wait=*/true));
+  zxio_destroy(exec_io);
 }
 
 }  // namespace

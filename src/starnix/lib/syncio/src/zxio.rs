@@ -744,7 +744,7 @@ unsafe extern "C" {
     pub fn zxio_destroy(io: *mut zxio_t);
 }
 unsafe extern "C" {
-    pub fn zxio_close(io: *mut zxio_t, should_wait: bool) -> zx_status_t;
+    pub fn zxio_close(io: *mut zxio_t) -> zx_status_t;
 }
 unsafe extern "C" {
     pub fn zxio_release(io: *mut zxio_t, out_handle: *mut zx_handle_t) -> zx_status_t;
