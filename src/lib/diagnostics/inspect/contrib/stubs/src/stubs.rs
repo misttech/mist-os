@@ -33,6 +33,28 @@ macro_rules! track_stub {
     }};
 }
 
+#[macro_export]
+macro_rules! track_stub_log {
+    ($level:expr, TODO($bug_url:literal), $message:expr, $flags:expr $(,)?) => {{
+        $crate::__track_stub_inner_with_level(
+            $level,
+            $crate::bug_ref!($bug_url),
+            $message,
+            Some($flags.into()),
+            std::panic::Location::caller(),
+        );
+    }};
+    ($level:expr, TODO($bug_url:literal), $message:expr $(,)?) => {{
+        $crate::__track_stub_inner_with_level(
+            $level,
+            $crate::bug_ref!($bug_url),
+            $message,
+            None,
+            std::panic::Location::caller(),
+        );
+    }};
+}
+
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct Invocation {
     location: &'static Location<'static>,
@@ -53,6 +75,18 @@ pub fn __track_stub_inner(
     flags: Option<u64>,
     location: &'static Location<'static>,
 ) -> u64 {
+    __track_stub_inner_with_level(log::Level::Debug, bug, message, flags, location)
+}
+
+#[doc(hidden)]
+#[inline]
+pub fn __track_stub_inner_with_level(
+    level: log::Level,
+    bug: BugRef,
+    message: &'static str,
+    flags: Option<u64>,
+    location: &'static Location<'static>,
+) -> u64 {
     let mut counts = STUB_COUNTS.lock();
     let message_counts = counts.entry(Invocation { location, message, bug }).or_default();
     let context_count = message_counts.by_flags.entry(flags).or_default();
@@ -61,10 +95,10 @@ pub fn __track_stub_inner(
     if *context_count == 0 {
         match flags {
             Some(flags) => {
-                log::debug!(tag = "track_stub", location:%; "{bug} {message}: 0x{flags:x}");
+                log::log!(level, tag = "track_stub", location:%; "{bug} {message}: 0x{flags:x}");
             }
             None => {
-                log::debug!(tag = "track_stub", location:%; "{bug} {message}");
+                log::log!(level, tag = "track_stub", location:%; "{bug} {message}");
             }
         }
     }

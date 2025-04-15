@@ -464,7 +464,12 @@ pub fn sys_unknown(
     #[cfg(feature = "arch32")]
     if current_task.is_arch32() {
         let name = for_each_arch32_syscall! { syscall_arch32_number_to_name_literal_callback, syscall_number };
-        track_stub!(TODO("https://fxbug.dev/322874143"), name, syscall_number,);
+        starnix_logging::track_stub_log!(
+            starnix_logging::Level::Info,
+            TODO("https://fxbug.dev/322874143"),
+            name,
+            syscall_number,
+        );
         return error!(ENOSYS);
     }
     let name = for_each_syscall! { syscall_number_to_name_literal_callback, syscall_number };
