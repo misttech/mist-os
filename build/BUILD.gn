@@ -52,6 +52,7 @@ if (is_host) {
       "//src/developer/ffx/lib/netext:verify_bazel2gn",
       "//src/lib/fuchsia-async:verify_bazel2gn",
       "//src/lib/fuchsia-async-macro:verify_bazel2gn",
+      "//src/lib/fuchsia-hyper:verify_bazel2gn",
       "//tools/fidl/fidlgen_cpp:verify_bazel2gn",
       "//tools/fidl/fidlgen_cpp/codegen:verify_bazel2gn",
       "//tools/fidl/fidlgen_hlcpp:verify_bazel2gn",

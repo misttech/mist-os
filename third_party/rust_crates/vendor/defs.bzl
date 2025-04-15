@@ -291,7 +291,7 @@ def aliases(
 ###############################################################################
 
 _NORMAL_DEPENDENCIES = {
-    "": {
+    "third_party/rust_crates": {
         _COMMON_CONDITION: {
             "aes": Label("//third_party/rust_crates/vendor/aes-0.8.4:aes"),
             "aes-gcm": Label("//third_party/rust_crates/vendor/aes-gcm-0.10.2:aes_gcm"),
@@ -569,7 +569,7 @@ _NORMAL_DEPENDENCIES = {
 }
 
 _NORMAL_ALIASES = {
-    "": {
+    "third_party/rust_crates": {
         _COMMON_CONDITION: {
         },
         "cfg(not(target_os = \"fuchsia\"))": {
@@ -580,17 +580,17 @@ _NORMAL_ALIASES = {
 }
 
 _NORMAL_DEV_DEPENDENCIES = {
-    "": {
+    "third_party/rust_crates": {
     },
 }
 
 _NORMAL_DEV_ALIASES = {
-    "": {
+    "third_party/rust_crates": {
     },
 }
 
 _PROC_MACRO_DEPENDENCIES = {
-    "": {
+    "third_party/rust_crates": {
         _COMMON_CONDITION: {
             "async-trait": Label("//third_party/rust_crates/vendor/async-trait-0.1.71:async_trait"),
             "derivative": Label("//third_party/rust_crates/vendor/derivative-2.2.0:derivative"),
@@ -611,37 +611,37 @@ _PROC_MACRO_DEPENDENCIES = {
 }
 
 _PROC_MACRO_ALIASES = {
-    "": {
+    "third_party/rust_crates": {
     },
 }
 
 _PROC_MACRO_DEV_DEPENDENCIES = {
-    "": {
+    "third_party/rust_crates": {
     },
 }
 
 _PROC_MACRO_DEV_ALIASES = {
-    "": {
+    "third_party/rust_crates": {
     },
 }
 
 _BUILD_DEPENDENCIES = {
-    "": {
+    "third_party/rust_crates": {
     },
 }
 
 _BUILD_ALIASES = {
-    "": {
+    "third_party/rust_crates": {
     },
 }
 
 _BUILD_PROC_MACRO_DEPENDENCIES = {
-    "": {
+    "third_party/rust_crates": {
     },
 }
 
 _BUILD_PROC_MACRO_ALIASES = {
-    "": {
+    "third_party/rust_crates": {
     },
 }
 

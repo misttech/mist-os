@@ -6,7 +6,6 @@
 #     fx update-rustc-third-party
 ###############################################################################
 
-load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
 load("@rules_rust//rust:defs.bzl", "rust_library")
 load("@rules_license//rules:package_info.bzl", "package_info")
 
@@ -47,6 +46,9 @@ rust_library(
     ],
     crate_root = "src/lib.rs",
     edition = "2021",
+    rustc_env = {
+        "RING_CORE_PREFIX": "ring_core_0_17_8_",
+    },
     rustc_flags = [
         "--cap-lints=allow",
     ],
@@ -65,7 +67,7 @@ rust_library(
     }),
     version = "0.17.8",
     deps = [
-        "//third_party/rust_crates/forks/ring-0.17.8:build_script_build",
+        "//third_party/rust_crates:ring-core",
         "//third_party/rust_crates/vendor/cfg-if-1.0.0:cfg_if",
         "//third_party/rust_crates/vendor/getrandom-0.2.10:getrandom",
         "//third_party/rust_crates/vendor/untrusted-0.9.0:untrusted",
@@ -81,68 +83,4 @@ rust_library(
         ],
         "//conditions:default": [],
     }),
-)
-
-cargo_build_script(
-    name = "_bs",
-    srcs = glob(
-        include = ["**/*.rs"],
-        allow_empty = False,
-    ),
-    compile_data = glob(
-        include = ["**"],
-        allow_empty = True,
-        exclude = [
-            "**/* *",
-            "**/*.rs",
-            ".tmp_git_root/**/*",
-            "BUILD",
-            "BUILD.bazel",
-            "WORKSPACE",
-            "WORKSPACE.bazel",
-        ],
-    ),
-    crate_features = [
-        "alloc",
-        "default",
-        "dev_urandom_fallback",
-    ],
-    crate_name = "build_script_build",
-    crate_root = "build.rs",
-    data = glob(
-        include = ["**"],
-        allow_empty = True,
-        exclude = [
-            "**/* *",
-            ".tmp_git_root/**/*",
-            "BUILD",
-            "BUILD.bazel",
-            "WORKSPACE",
-            "WORKSPACE.bazel",
-        ],
-    ),
-    edition = "2021",
-    links = "ring_core_0_17_8",
-    pkg_name = "ring",
-    rustc_flags = [
-        "--cap-lints=allow",
-    ],
-    tags = [
-        "cargo-bazel",
-        "crate-name=ring",
-        "manual",
-        "noclippy",
-        "norustfmt",
-    ],
-    version = "0.17.8",
-    visibility = ["//visibility:private"],
-    deps = [
-        "//third_party/rust_crates/empty/cc",
-    ],
-)
-
-alias(
-    name = "build_script_build",
-    actual = ":_bs",
-    tags = ["manual"],
 )

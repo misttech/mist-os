@@ -136,4 +136,18 @@ CRATE_ANNOTATIONS = {
             ],
         ),
     ],
+    "ring": [
+        crate.annotation(
+            version = "0.17.8",
+            # NOTE: Build script of this crate doesn't run due to missing
+            # dependency. See https://fxbug.dev/345712835.
+            gen_build_script = False,
+            deps = [
+                "//third_party/rust_crates:ring-core",
+            ],
+            rustc_env = {
+                "RING_CORE_PREFIX": "ring_core_0_17_8_",
+            },
+        ),
+    ],
 }

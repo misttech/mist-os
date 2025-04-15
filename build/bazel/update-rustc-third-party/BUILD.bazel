@@ -11,8 +11,8 @@ crates_vendor(
     annotations = CRATE_ANNOTATIONS,
     bazel = "//:bazel",
     buildifier = "//:buildifier",
-    cargo_lockfile = "//:third_party/rust_crates/Cargo.lock",
-    manifests = ["//:third_party/rust_crates/Cargo.toml"],
+    cargo_lockfile = "//third_party/rust_crates:Cargo.lock",
+    manifests = ["//third_party/rust_crates:Cargo.toml"],
     mode = "local",
     render_config = render_config(
         # We don't generate cargo_toml_env_vars because these targets require

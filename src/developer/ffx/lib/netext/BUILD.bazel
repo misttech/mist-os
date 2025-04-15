@@ -5,6 +5,8 @@
 load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
 load("//build/tools/bazel2gn/bazel_rules:defs.bzl", "rustc_library")
 
+package(default_visibility = ["//visibility:public"])
+
 rustc_library(
     name = "lib",
     srcs = ["src/lib.rs"],

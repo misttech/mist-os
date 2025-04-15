@@ -1,0 +1,83 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "Cargo.toml",
+    "Cargo.lock",
+])
+
+# TODO(https://fxbug.dev/400557011): Figure out how to sync this with
+# //third_party/rust_crates/compat/ring-0.17.8:ring-core in GN.
+cc_library(
+    name = "ring-core",
+    srcs = [
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/cpu_intel.c",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/crypto.c",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/curve25519/curve25519.c",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/curve25519/curve25519_64_adx.c",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/fipsmodule/aes/aes_nohw.c",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/fipsmodule/bn/montgomery.c",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/fipsmodule/bn/montgomery_inv.c",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/fipsmodule/ec/ecp_nistz.c",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/fipsmodule/ec/gfp_p256.c",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/fipsmodule/ec/gfp_p384.c",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/fipsmodule/ec/p256.c",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/fipsmodule/ec/p256-nistz.c",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/limbs/limbs.c",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/mem.c",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/poly1305/poly1305.c",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/poly1305/poly1305_vec.c",
+        "//third_party/rust_crates/forks/ring-0.17.8:third_party/fiat/asm/fiat_curve25519_adx_mul.S",
+        "//third_party/rust_crates/forks/ring-0.17.8:third_party/fiat/asm/fiat_curve25519_adx_square.S",
+    ] + [
+        "//third_party/rust_crates/forks/ring-0.17.8:pregenerated/{}-elf.S".format(asm)
+        for asm in [
+            "chacha-x86_64",
+            "aesni-x86_64",
+            "vpaes-x86_64",
+            "x86_64-mont",
+            "x86_64-mont5",
+            "p256-x86_64-asm",
+            "aesni-gcm-x86_64",
+            "ghash-x86_64",
+            "sha256-x86_64",
+            "sha512-x86_64",
+            "chacha20_poly1305_x86_64",
+        ]
+    ] + [
+        "compat/ring-0.17.8/ring_core_generated/prefix_symbols.h",
+        "compat/ring-0.17.8/ring_core_generated/prefix_symbols_asm.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/curve25519/curve25519_tables.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/curve25519/internal.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/fipsmodule/bn/internal.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/fipsmodule/ec/ecp_nistz.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/fipsmodule/ec/ecp_nistz384.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/fipsmodule/ec/ecp_nistz384.inl",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/fipsmodule/ec/p256-nistz.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/fipsmodule/ec/p256-nistz-table.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/fipsmodule/ec/p256_shared.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/fipsmodule/ec/util.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/internal.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/limbs/limbs.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/limbs/limbs.inl",
+        "//third_party/rust_crates/forks/ring-0.17.8:crypto/poly1305/internal.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:include/ring-core/aes.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:include/ring-core/arm_arch.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:include/ring-core/asm_base.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:include/ring-core/base.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:include/ring-core/check.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:include/ring-core/mem.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:include/ring-core/poly1305.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:include/ring-core/target.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:include/ring-core/type_check.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:third_party/fiat/curve25519_64.h",
+        "//third_party/rust_crates/forks/ring-0.17.8:third_party/fiat/curve25519_64_adx.h",
+    ],
+    includes = [
+        "compat/ring-0.17.8",
+        "forks/ring-0.17.8/include",
+    ],
+)
