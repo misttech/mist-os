@@ -95,14 +95,14 @@ VS Code command palette. In most cases, you have the following options:
      src="images/extensions/ext-command-palette.png"/>
 
 * **VSCode target device: `<device-name>`**: This option shows which Fuchsia
-  device is currently configured as the active target for your VSCode editor
-  window. This device is applied across the Fuchsia VSCode extension's features and VSCode
-  spawned terminal sessions. If you have additional Fuchsia devices, click the
+  device is currently configured as the active target for the Fuchsia VSCode
+  extension's features. If you have additional Fuchsia devices, click the
   `Use target device: <device-name>` to switch to that specific device.
   This is equivalent to running `ffx target default get`.
 * **Use target device: `<device-name>`**: This options lets you connect and
   switch to the selected Fuchsia device. This is equivalent to setting the
-  `$FUCHSIA_NODENAME` environment variable across VSCode IDE's scope.
+  `$FUCHSIA_NODENAME` environment variable across Fuchsia Extension's ffx
+  usages.
 * **Show log for `<device-name>`**: This option opens the **Fuchsia logs** tab
   of the Fuchsia extension. For more information, see
   [View Fuchsia logs](#view-fuchsia-logs). This is equivalent to running
