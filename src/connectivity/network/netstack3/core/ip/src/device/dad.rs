@@ -23,6 +23,33 @@ use crate::internal::device::nud::DEFAULT_MAX_MULTICAST_SOLICIT;
 use crate::internal::device::state::Ipv6DadState;
 use crate::internal::device::{IpAddressState, IpDeviceIpExt, WeakIpAddressId};
 
+/// Whether DAD is enable by default for IPv4 Addresses.
+///
+/// In the context of IPv4 addresses, DAD refers to Address Conflict Detection
+/// (ACD) as specified in RFC 5227.
+///
+/// This value is set to false, which is out of compliance with RFC 5227. As per
+/// section 2.1:
+///   Before beginning to use an IPv4 address (whether received from manual
+///   configuration, DHCP, or some other means), a host implementing this
+///   specification MUST test to see if the address is already in use.
+///
+/// However, we believe that disabling DAD for IPv4 addresses by default is more
+/// inline with industry expectations. For example, Linux does not implement
+/// DAD for IPv4 addresses at all: applications that want to prevent duplicate
+/// IPv4 addresses must implement the ACD specification themselves (e.g.
+/// dhclient, a common DHCP client on Linux).
+pub const DEFAULT_DAD_ENABLED_IPV4: bool = false;
+
+/// Whether DAD is enabled by default for IPv6 Addresses.
+///
+/// True, as per RFC 4862, Section 5.4:
+///   Duplicate Address Detection MUST be performed on all unicast
+///   addresses prior to assigning them to an interface, regardless of
+///   whether they are obtained through stateless autoconfiguration,
+///   DHCPv6, or manual configuration.
+pub const DEFAULT_DAD_ENABLED_IPV6: bool = true;
+
 /// A timer ID for duplicate address detection.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub struct DadTimerId<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> {
@@ -46,8 +73,6 @@ impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> DadTimerId<D, A> {
 /// A reference to the DAD address state.
 pub struct DadAddressStateRef<'a, CC, BT: DadBindingsTypes> {
     /// A mutable reference to an address' state.
-    ///
-    /// `None` if the address is not recognized.
     pub dad_state: &'a mut Ipv6DadState<BT>,
     /// The execution context available with the address's DAD state.
     pub core_ctx: &'a mut CC,
@@ -73,6 +98,9 @@ pub trait DadAddressContext<BC>: IpDeviceAddressIdContext<Ipv6> {
         addr: &Self::AddressId,
         cb: F,
     ) -> O;
+
+    /// Returns whether or not DAD should be performed for the given address.
+    fn should_perform_dad(&mut self, device_id: &Self::DeviceId, addr: &Self::AddressId) -> bool;
 
     /// Joins the multicast group on the device.
     fn join_multicast_group(
@@ -308,13 +336,14 @@ fn initialize_duplicate_address_detection<
         |DadStateRef { state, retrans_timer: _, max_dad_transmits }| {
             let DadAddressStateRef { dad_state, core_ctx } = state;
 
-            let needs_dad = match max_dad_transmits {
-                None => {
+            let needs_dad = match (core_ctx.should_perform_dad(device_id, addr), max_dad_transmits)
+            {
+                (false, _) | (true, None) => {
                     *dad_state = Ipv6DadState::Assigned;
                     core_ctx.with_address_assigned(device_id, addr, |assigned| *assigned = true);
                     NeedsDad::No
                 }
-                Some(max_dad_transmits) => {
+                (true, Some(max_dad_transmits)) => {
                     // Mark the address as tentative before joining the multicast group
                     // so that the address is not used as the source for any outgoing
                     // MLD message.
@@ -650,6 +679,18 @@ mod tests {
         addr: UnicastAddr<Ipv6Addr>,
         assigned: bool,
         groups: HashMap<MulticastAddr<Ipv6Addr>, usize>,
+        should_perform_dad: bool,
+    }
+
+    impl Default for FakeDadAddressContext {
+        fn default() -> Self {
+            Self {
+                addr: DAD_ADDRESS,
+                assigned: false,
+                groups: Default::default(),
+                should_perform_dad: true,
+            }
+        }
     }
 
     type FakeAddressCtxImpl = FakeCoreCtx<FakeDadAddressContext, (), FakeDeviceId>;
@@ -664,6 +705,16 @@ mod tests {
             let FakeDadAddressContext { addr, assigned, .. } = &mut self.state;
             assert_eq!(*request_addr.addr(), *addr);
             cb(assigned)
+        }
+
+        fn should_perform_dad(
+            &mut self,
+            &FakeDeviceId: &Self::DeviceId,
+            request_addr: &Self::AddressId,
+        ) -> bool {
+            let FakeDadAddressContext { addr, should_perform_dad, .. } = &mut self.state;
+            assert_eq!(*request_addr.addr(), *addr);
+            *should_perform_dad
         }
 
         fn join_multicast_group(
@@ -796,11 +847,7 @@ mod tests {
                 state: Ipv6DadState::Assigned,
                 retrans_timer: RETRANS_TIMER,
                 max_dad_transmits: None,
-                address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext {
-                    addr: DAD_ADDRESS,
-                    assigned: false,
-                    groups: HashMap::default(),
-                }),
+                address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
             }));
         TimerHandler::handle_timer(
             &mut core_ctx,
@@ -823,11 +870,7 @@ mod tests {
                     },
                     retrans_timer: RETRANS_TIMER,
                     max_dad_transmits: None,
-                    address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext {
-                        addr: DAD_ADDRESS,
-                        assigned: false,
-                        groups: HashMap::default(),
-                    }),
+                    address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
                 })
             });
         let address_id = get_address_id(DAD_ADDRESS.get());
@@ -909,11 +952,7 @@ mod tests {
                 },
                 retrans_timer: RETRANS_TIMER,
                 max_dad_transmits: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
-                address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext {
-                    addr: DAD_ADDRESS,
-                    assigned: false,
-                    groups: HashMap::default(),
-                }),
+                address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
             })
         });
         let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
@@ -965,11 +1004,7 @@ mod tests {
                     },
                     retrans_timer: RETRANS_TIMER,
                     max_dad_transmits: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
-                    address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext {
-                        addr: DAD_ADDRESS,
-                        assigned: false,
-                        groups: HashMap::default(),
-                    }),
+                    address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
                 })
             });
         let address_id = get_address_id(DAD_ADDRESS.get());
@@ -1024,11 +1059,7 @@ mod tests {
             state: if assigned { Ipv6DadState::Assigned } else { Ipv6DadState::Uninitialized },
             retrans_timer: RETRANS_TIMER,
             max_dad_transmits: NonZeroU16::new(MAX_DAD_TRANSMITS),
-            address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext {
-                addr: DAD_ADDRESS,
-                assigned: false,
-                groups: HashMap::default(),
-            }),
+            address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
         }));
         let addr = get_address_id(DAD_ADDRESS.get());
 
@@ -1069,11 +1100,7 @@ mod tests {
                 },
                 retrans_timer: RETRANS_TIMER,
                 max_dad_transmits: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
-                address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext {
-                    addr: DAD_ADDRESS,
-                    assigned: false,
-                    groups: HashMap::default(),
-                }),
+                address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
             })
         });
         let addr = get_address_id(DAD_ADDRESS.get());

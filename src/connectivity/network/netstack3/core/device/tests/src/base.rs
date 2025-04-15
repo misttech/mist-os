@@ -19,9 +19,10 @@ use netstack3_core::device::{
 };
 use netstack3_core::error::NotFoundError;
 use netstack3_core::ip::{
-    AddIpAddrSubnetError, CommonAddressProperties, IpDeviceConfigurationUpdate, Ipv4AddrConfig,
-    Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfigurationUpdate, Lifetime,
-    PreferredLifetime, SlaacConfigurationUpdate, StableSlaacAddressConfiguration,
+    AddIpAddrSubnetError, CommonAddressConfig, CommonAddressProperties,
+    IpDeviceConfigurationUpdate, Ipv4AddrConfig, Ipv4DeviceConfigurationUpdate,
+    Ipv6AddrManualConfig, Ipv6DeviceConfigurationUpdate, Lifetime, PreferredLifetime,
+    SlaacConfigurationUpdate, StableSlaacAddressConfiguration,
 };
 use netstack3_core::testutil::{
     CtxPairExt as _, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC,
@@ -315,12 +316,13 @@ fn test_add_remove_ip_addresses<I: Ip + TestIpExt + IpExt>(
 
 #[test_case(None; "with no AddressConfig specified")]
 #[test_case(Some(Ipv4AddrConfig {
-        common: CommonAddressProperties {
+        config: CommonAddressConfig {should_perform_dad: None},
+        properties: CommonAddressProperties {
             valid_until: Lifetime::Finite(FakeInstant::from(Duration::from_secs(1))),
             preferred_lifetime: PreferredLifetime::preferred_until(
                 FakeInstant::from(Duration::from_secs(1))
             )
-        }
+        },
     }); "with AddressConfig specified")]
 fn test_add_remove_ipv4_addresses(addr_config: Option<Ipv4AddrConfig<FakeInstant>>) {
     test_add_remove_ip_addresses::<Ipv4>(addr_config);
@@ -328,7 +330,8 @@ fn test_add_remove_ipv4_addresses(addr_config: Option<Ipv4AddrConfig<FakeInstant
 
 #[test_case(None; "with no AddressConfig specified")]
 #[test_case(Some(Ipv6AddrManualConfig {
-        common: CommonAddressProperties {
+        config: CommonAddressConfig {should_perform_dad: None},
+        properties: CommonAddressProperties {
             valid_until: Lifetime::Finite(FakeInstant::from(Duration::from_secs(2))),
             preferred_lifetime: PreferredLifetime::preferred_until(
                 FakeInstant::from(Duration::from_secs(1))

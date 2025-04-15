@@ -321,7 +321,7 @@ impl IpDeviceIpExt for Ipv4 {
     type ConfigurationUpdate = Ipv4DeviceConfigurationUpdate;
 
     fn get_common_props<I: Instant>(config: &Self::AddressConfig<I>) -> CommonAddressProperties<I> {
-        config.common
+        config.properties
     }
 
     fn is_addr_assigned<I: Instant>(addr_state: &Ipv4AddressState<I>) -> bool {

@@ -727,6 +727,13 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>
         cb(assigned)
     }
 
+    fn should_perform_dad(&mut self, _: &Self::DeviceId, addr: &Self::AddressId) -> bool {
+        let mut locked = self.core_ctx.adopt(addr.deref());
+        let state = locked
+            .write_lock_with::<crate::lock_ordering::Ipv6DeviceAddressState, _>(|c| c.right());
+        state.should_perform_dad()
+    }
+
     fn join_multicast_group(
         &mut self,
         bindings_ctx: &mut BC,

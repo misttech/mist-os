@@ -52,12 +52,13 @@ use netstack3_core::device::{
     DeviceConfigurationUpdateError, DeviceId, NdpConfiguration, NdpConfigurationUpdate,
 };
 use netstack3_core::ip::{
-    AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, CommonAddressProperties, IgmpConfigMode,
-    IpDeviceConfiguration, IpDeviceConfigurationAndFlags, IpDeviceConfigurationUpdate,
-    Ipv4AddrConfig, Ipv4DeviceConfiguration, Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig,
-    Ipv6DeviceConfiguration, Ipv6DeviceConfigurationUpdate, Lifetime, MldConfigMode,
-    PreferredLifetime, SetIpAddressPropertiesError, SlaacConfigurationUpdate,
-    TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
+    AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, CommonAddressConfig,
+    CommonAddressProperties, IgmpConfigMode, IpDeviceConfiguration, IpDeviceConfigurationAndFlags,
+    IpDeviceConfigurationUpdate, Ipv4AddrConfig, Ipv4DeviceConfiguration,
+    Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfiguration,
+    Ipv6DeviceConfigurationUpdate, Lifetime, MldConfigMode, PreferredLifetime,
+    SetIpAddressPropertiesError, SlaacConfigurationUpdate, TemporarySlaacAddressConfiguration,
+    UpdateIpConfigurationError,
 };
 use zx::{self as zx, HandleBased, Rights};
 
@@ -1352,6 +1353,7 @@ fn add_address(
         initial_properties,
         temporary,
         add_subnet_route,
+        perform_dad,
         __source_breaking: fidl::marker::SourceBreaking,
     } = params;
 
@@ -1402,7 +1404,8 @@ fn add_address(
 
     let temporary = temporary.unwrap_or(false);
 
-    let common = CommonAddressProperties { valid_until, preferred_lifetime };
+    let common_properties = CommonAddressProperties { valid_until, preferred_lifetime };
+    let common_config = CommonAddressConfig { should_perform_dad: perform_dad };
 
     let addr_subnet_either = match addr_subnet_either {
         AddrSubnetEither::V4(addr_subnet) => {
@@ -1412,11 +1415,18 @@ fn add_address(
             if temporary {
                 warn!("v4 address {core_addr} requested temporary, ignoring for IPv4");
             }
-            AddrSubnetAndManualConfigEither::V4(addr_subnet, Ipv4AddrConfig { common })
+            AddrSubnetAndManualConfigEither::V4(
+                addr_subnet,
+                Ipv4AddrConfig { config: common_config, properties: common_properties },
+            )
         }
         AddrSubnetEither::V6(addr_subnet) => AddrSubnetAndManualConfigEither::V6(
             addr_subnet,
-            Ipv6AddrManualConfig { common, temporary },
+            Ipv6AddrManualConfig {
+                config: common_config,
+                properties: common_properties,
+                temporary,
+            },
         ),
     };
 

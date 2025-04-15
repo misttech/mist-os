@@ -405,6 +405,10 @@ func (ci *adminControlImpl) AddAddress(_ fidl.Context, subnet net.Subnet, parame
 		properties.Lifetimes = propertiesToLifetimes(parameters.GetInitialProperties())
 	}
 
+	if parameters.HasPerformDad() {
+		_ = syslog.WarnTf(controlName, "ignoring 'perform_dad=%t' parameter. Not Supported.", parameters.GetPerformDad())
+	}
+
 	var reason admin.AddressRemovalReason
 	if protocolAddr.AddressWithPrefix.PrefixLen > protocolAddr.AddressWithPrefix.Address.BitLen() {
 		reason = admin.AddressRemovalReasonInvalid

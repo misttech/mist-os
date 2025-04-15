@@ -172,4 +172,21 @@ type AddressParameters = table {
     @deprecated(
             "TODO(https://fxbug.dev/42074223): Do not use this without consulting with the Netstack team.")
     3: add_subnet_route bool;
+
+    /// True if Duplicate Address Detection (DAD) should be performed.
+    ///
+    /// For IPv6, DAD is defined in RFC 4862, Section 5.4.
+    ///
+    /// For IPv4, Address Conflict Detection (ACD) is defined in RFC 5227. For
+    /// simplicity's sake, both specifications are refered to as DAD on this
+    /// API.
+    ///
+    /// If not set, interpreted as `true` for IPv6 addresses, and `false` for
+    /// IPv4 addresses.
+    ///
+    /// Note, the `fuchsia.net.interfaces.admin/Control` API allows setting
+    /// per-interface DAD configuration. DAD will only be performed for a given
+    /// address if its interface's configuration allows for it. Setting this
+    /// property to `true` will not override the interface's DAD configuration.
+    4: perform_dad bool;
 };

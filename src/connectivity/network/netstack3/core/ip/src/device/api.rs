@@ -226,7 +226,7 @@ where
                 Wrap(address_state),
                 |Wrap(Ipv4AddressState { config })| {
                     match config {
-                        Some(Ipv4AddrConfig { common }) => Ok(common),
+                        Some(Ipv4AddrConfig { config: _, properties }) => Ok(properties),
                         // Address is being removed, configuration has been
                         // taken out.
                         None => Err(NotFoundError.into()),
@@ -241,9 +241,10 @@ where
                             Err(SetIpAddressPropertiesError::NotManual)
                         }
                         Some(Ipv6AddrConfig::Manual(Ipv6AddrManualConfig {
-                            common,
+                            config: _,
+                            properties,
                             temporary: _,
-                        })) => Ok(common),
+                        })) => Ok(properties),
                     }
                 },
             )?;

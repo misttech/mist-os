@@ -130,12 +130,12 @@ pub mod ip {
     pub use netstack3_base::{Mark, MarkDomain, SubnetMatcher, WrapBroadcastMarker};
     pub use netstack3_ip::device::{
         AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, AddressRemovedReason,
-        CommonAddressProperties, IidGenerationConfiguration, IidSecret, IpAddressState,
-        IpDeviceConfiguration, IpDeviceConfigurationAndFlags, IpDeviceConfigurationUpdate,
-        IpDeviceEvent, Ipv4AddrConfig, Ipv4DeviceConfiguration, Ipv4DeviceConfigurationUpdate,
-        Ipv6AddrManualConfig, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationUpdate, Lifetime,
-        PreferredLifetime, SetIpAddressPropertiesError, SlaacConfiguration,
-        SlaacConfigurationUpdate, StableSlaacAddressConfiguration,
+        CommonAddressConfig, CommonAddressProperties, IidGenerationConfiguration, IidSecret,
+        IpAddressState, IpDeviceConfiguration, IpDeviceConfigurationAndFlags,
+        IpDeviceConfigurationUpdate, IpDeviceEvent, Ipv4AddrConfig, Ipv4DeviceConfiguration,
+        Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfiguration,
+        Ipv6DeviceConfigurationUpdate, Lifetime, PreferredLifetime, SetIpAddressPropertiesError,
+        SlaacConfiguration, SlaacConfigurationUpdate, StableSlaacAddressConfiguration,
         TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
     };
     pub use netstack3_ip::gmp::{IgmpConfigMode, MldConfigMode};

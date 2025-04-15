@@ -28,7 +28,9 @@ use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 use packet_formats::utils::NonZeroDuration;
 
 use crate::internal::counters::{IpCounters, IpCountersIpExt};
-use crate::internal::device::dad::DadBindingsTypes;
+use crate::internal::device::dad::{
+    DadBindingsTypes, DEFAULT_DAD_ENABLED_IPV4, DEFAULT_DAD_ENABLED_IPV6,
+};
 use crate::internal::device::route_discovery::Ipv6RouteDiscoveryState;
 use crate::internal::device::router_solicitation::RsState;
 use crate::internal::device::slaac::{SlaacConfiguration, SlaacState};
@@ -1020,6 +1022,8 @@ impl<I: Instant> InspectableValue for PreferredLifetime<I> {
 }
 
 /// Address properties common to IPv4 and IPv6.
+///
+/// These properties may change throughout the lifetime of the address.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CommonAddressProperties<Instant> {
     /// The lifetime for which the address is valid.
@@ -1051,17 +1055,34 @@ impl<Inst: Instant> Inspectable for CommonAddressProperties<Inst> {
     }
 }
 
-/// The configuration for an IPv4 address.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Ipv4AddrConfig<Instant> {
-    /// IP version agnostic properties.
-    pub common: CommonAddressProperties<Instant>,
+/// Address configuration common to IPv4 and IPv6.
+///
+/// Unlike [`CommonAddressProperties`], the fields here are not expected to
+/// change throughout the lifetime of the address.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct CommonAddressConfig {
+    /// Whether the address was installed with a specific preference towards
+    /// performing Duplicate Address Detection (DAD).
+    pub should_perform_dad: Option<bool>,
 }
 
-impl<I> Default for Ipv4AddrConfig<I> {
-    fn default() -> Self {
-        Self { common: Default::default() }
+impl Inspectable for CommonAddressConfig {
+    fn record<I: Inspector>(&self, inspector: &mut I) {
+        let Self { should_perform_dad } = self;
+        if let Some(should_perform_dad) = should_perform_dad {
+            inspector.record_bool("DadOverride", *should_perform_dad);
+        }
     }
+}
+
+/// The configuration for an IPv4 address.
+#[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq, Hash)]
+#[derivative(Default(bound = ""))]
+pub struct Ipv4AddrConfig<Instant> {
+    /// IP version agnostic config.
+    pub config: CommonAddressConfig,
+    /// IP version agnostic properties.
+    pub properties: CommonAddressProperties<Instant>,
 }
 
 /// Data associated with an IPv4 address on an interface.
@@ -1105,9 +1126,21 @@ pub struct Ipv4AddressState<Instant> {
 impl<Inst: Instant> Inspectable for Ipv4AddressState<Inst> {
     fn record<I: Inspector>(&self, inspector: &mut I) {
         let Self { config } = self;
-        if let Some(Ipv4AddrConfig { common }) = config {
-            inspector.delegate_inspectable(common);
+        if let Some(Ipv4AddrConfig { config, properties }) = config {
+            inspector.delegate_inspectable(config);
+            inspector.delegate_inspectable(properties);
         }
+    }
+}
+
+impl<Instant> Ipv4AddressState<Instant> {
+    /// Return whether DAD should be performed for this address.
+    pub fn should_perform_dad(&self) -> bool {
+        self.config
+            .as_ref()
+            .map(|c| c.config.should_perform_dad)
+            .flatten()
+            .unwrap_or(DEFAULT_DAD_ENABLED_IPV4)
     }
 }
 
@@ -1171,20 +1204,17 @@ pub struct Ipv6AddrSlaacConfig<Instant> {
 }
 
 /// The configuration for a manually-assigned IPv6 address.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq, Hash)]
+#[derivative(Default(bound = ""))]
 pub struct Ipv6AddrManualConfig<Instant> {
+    /// IP version agnostic config.
+    pub config: CommonAddressConfig,
     /// IP version agnostic properties.
-    pub common: CommonAddressProperties<Instant>,
+    pub properties: CommonAddressProperties<Instant>,
     /// True if the address is temporary.
     ///
     /// Used in source address selection.
     pub temporary: bool,
-}
-
-impl<Instant> Default for Ipv6AddrManualConfig<Instant> {
-    fn default() -> Self {
-        Self { common: Default::default(), temporary: false }
-    }
 }
 
 impl<Instant> From<Ipv6AddrManualConfig<Instant>> for Ipv6AddrConfig<Instant> {
@@ -1198,15 +1228,17 @@ impl<Instant: Copy + PartialEq> Ipv6AddrConfig<Instant> {
     pub fn valid_until(&self) -> Lifetime<Instant> {
         match self {
             Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, .. }) => inner.valid_until(),
-            Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { common, .. }) => common.valid_until,
+            Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { properties, .. }) => {
+                properties.valid_until
+            }
         }
     }
 
     /// Returns the preferred lifetime for this address.
     pub fn preferred_lifetime(&self) -> PreferredLifetime<Instant> {
         match self {
-            Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { common, .. }) => {
-                common.preferred_lifetime
+            Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { properties, .. }) => {
+                properties.preferred_lifetime
             }
             Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { preferred_lifetime, .. }) => {
                 *preferred_lifetime
@@ -1255,6 +1287,20 @@ pub struct Ipv6AddressState<Instant> {
     pub config: Option<Ipv6AddrConfig<Instant>>,
 }
 
+impl<Instant> Ipv6AddressState<Instant> {
+    /// Return whether DAD should be performed for this address.
+    pub fn should_perform_dad(&self) -> bool {
+        self.config
+            .as_ref()
+            .map(|c| match c {
+                Ipv6AddrConfig::Slaac(_) => None,
+                Ipv6AddrConfig::Manual(c) => c.config.should_perform_dad,
+            })
+            .flatten()
+            .unwrap_or(DEFAULT_DAD_ENABLED_IPV6)
+    }
+}
+
 impl<Inst: Instant> Inspectable for Ipv6AddressState<Inst> {
     fn record<I: Inspector>(&self, inspector: &mut I) {
         let Self { flags: Ipv6AddressFlags { assigned }, config } = self;
@@ -1262,7 +1308,14 @@ impl<Inst: Instant> Inspectable for Ipv6AddressState<Inst> {
 
         if let Some(config) = config {
             match config {
-                Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { .. }) => {}
+                // NB: Ignored fields are recorded after the match.
+                Ipv6AddrConfig::Manual(Ipv6AddrManualConfig {
+                    config,
+                    properties: _,
+                    temporary: _,
+                }) => {
+                    inspector.delegate_inspectable(config);
+                }
                 Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, preferred_lifetime: _ }) => {
                     match inner {
                         SlaacConfig::Stable {
@@ -1369,7 +1422,8 @@ mod tests {
 
         let mut ipv4 = IpDeviceAddresses::<Ipv4, FakeBindingsCtxImpl>::default();
         let config = Ipv4AddrConfig {
-            common: CommonAddressProperties { valid_until, ..Default::default() },
+            properties: CommonAddressProperties { valid_until, ..Default::default() },
+            ..Default::default()
         };
 
         let _: AddressId<_> = ipv4
@@ -1424,12 +1478,39 @@ mod tests {
                 AddrSubnet::new(ADDRESS, PREFIX_LEN + 1).unwrap(),
                 Ipv6DadState::Assigned,
                 Ipv6AddrConfig::Manual(Ipv6AddrManualConfig {
-                    common: CommonAddressProperties { valid_until, ..Default::default() },
+                    properties: CommonAddressProperties { valid_until, ..Default::default() },
                     ..Default::default()
                 }),
             ))
             .unwrap_err(),
             ExistsError,
         );
+    }
+
+    #[test_case(None => false; "default")]
+    #[test_case(Some(false) => false; "disabled")]
+    #[test_case(Some(true) => true; "enabled")]
+    fn should_perform_dad_ipv4(setting: Option<bool>) -> bool {
+        let state = Ipv4AddressState {
+            config: Some(Ipv4AddrConfig::<()> {
+                config: CommonAddressConfig { should_perform_dad: setting },
+                ..Default::default()
+            }),
+        };
+        state.should_perform_dad()
+    }
+
+    #[test_case(None => true; "default")]
+    #[test_case(Some(false) => false; "disabled")]
+    #[test_case(Some(true) => true; "enabled")]
+    fn should_perform_dad_ipv6(setting: Option<bool>) -> bool {
+        let state = Ipv6AddressState {
+            flags: Ipv6AddressFlags { assigned: false },
+            config: Some(Ipv6AddrConfig::Manual(Ipv6AddrManualConfig::<()> {
+                config: CommonAddressConfig { should_perform_dad: setting },
+                ..Default::default()
+            })),
+        };
+        state.should_perform_dad()
     }
 }

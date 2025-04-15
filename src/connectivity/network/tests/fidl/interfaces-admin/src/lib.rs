@@ -12,10 +12,10 @@ use fidl_fuchsia_net_ext::IntoExt;
 use finterfaces_admin::GrantForInterfaceAuthorization;
 use fnet_interfaces_ext::admin::TerminalError;
 use fuchsia_async::net::{DatagramSocket, UdpSocket};
-use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _};
+use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _, Timer};
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::{
-    fidl_ip, fidl_mac, fidl_subnet, net_subnet_v6, std_ip, std_ip_v6, std_socket_addr,
+    fidl_ip, fidl_mac, fidl_subnet, net_ip_v6, net_subnet_v6, std_ip, std_ip_v6, std_socket_addr,
 };
 use net_types::ip::{Ip, IpAddress as _, IpVersion, Ipv4, Ipv6};
 use netemul::{InterfaceConfig, RealmUdpSocket as _, TestFakeEndpoint};
@@ -29,9 +29,13 @@ use netstack_testing_common::ndp::{send_ra_with_router_lifetime, wait_for_router
 use netstack_testing_common::realms::{
     Netstack, Netstack3, NetstackVersion, TestRealmExt as _, TestSandboxExt as _,
 };
-use netstack_testing_common::ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT;
+use netstack_testing_common::{
+    ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+};
 use netstack_testing_macros::netstack_test;
+use packet_formats::ethernet::EthernetFrameLengthCheck;
 use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
+use packet_formats::icmp::ndp::NeighborSolicitation;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto as _;
 use std::ops::Not as _;
@@ -44,7 +48,7 @@ use {
     fidl_fuchsia_net_interfaces_admin as finterfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_root as fnet_root,
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext,
-    fidl_fuchsia_posix_socket as fposix_socket, zx_status,
+    fidl_fuchsia_netemul as fnetemul, fidl_fuchsia_posix_socket as fposix_socket, zx_status,
 };
 
 #[netstack_test]
@@ -3946,4 +3950,76 @@ async fn interface_authorization_root_access<N: Netstack>(name: &str) {
         root_control.get_authorization_for_interface().await,
         Err(TerminalError::Terminal(_))
     );
+}
+
+// Verify that the `perform_dad` AddressParameter correctly influences the DAD
+// behavior when installing the address.
+#[netstack_test]
+#[test_case(true, 1, true; "enabled")]
+#[test_case(false, 1, false; "disabled")]
+#[test_case(true, 0, false; "interface_disabled")]
+#[test_case(false, 0, false; "both_disabled")]
+async fn perform_dad_parameter(
+    name: &str,
+    perform_dad: bool,
+    dad_transmits: u16,
+    expect_probe: bool,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    // NB: The `perform_dad` AddressParameter is only supported by Netstack3.
+    let (_network, _realm, interface, endpoint) =
+        netstack_testing_common::setup_network_with::<Netstack3, _>(
+            &sandbox,
+            name,
+            InterfaceConfig { dad_transmits: Some(dad_transmits), ..Default::default() },
+            std::iter::empty::<fnetemul::ChildDef>(),
+        )
+        .await
+        .expect("error setting up network");
+    // TODO(https://fxbug.dev/42077260): Test against IPv4.
+    const FIDL_ADDR: fidl_fuchsia_net::Subnet = fidl_subnet!("2001:0db8::1/64");
+    const ADDR: net_types::ip::Ipv6Addr = net_ip_v6!("2001:0db8::1");
+    let _addr_state_provider = interfaces::add_address_wait_assigned(
+        interface.control(),
+        FIDL_ADDR,
+        fidl_fuchsia_net_interfaces_admin::AddressParameters {
+            perform_dad: Some(perform_dad),
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("failed to add address");
+
+    // Check whether a DAD probe is sent.
+    let timeout = if expect_probe {
+        ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT
+    } else {
+        ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT
+    };
+    let sent_probe = endpoint
+        .frame_stream()
+        .take_until(Timer::new(timeout.after_now()))
+        .any(|frame| {
+            let (data, _dropped) = frame.expect("error in fake endpoint frame stream");
+
+            // Try to parse the data as a neighbor solicitation. Ignore errors
+            // or neighbor solicitations with the wrong target address.
+            let found =
+                match packet_formats::testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
+                    Ipv6,
+                    _,
+                    NeighborSolicitation,
+                    _,
+                >(&data, EthernetFrameLengthCheck::NoCheck, |_| {})
+                {
+                    Ok((_src_mac, _dst_mac, _src_ip, _dst_ip, _ttl, ns, _code)) => {
+                        *ns.target_address() == ADDR
+                    }
+                    Err(_) => false,
+                };
+            futures::future::ready(found)
+        })
+        .await;
+
+    assert_eq!(sent_probe, expect_probe)
 }
