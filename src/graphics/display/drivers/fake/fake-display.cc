@@ -469,6 +469,15 @@ void FakeDisplay::DisplayEngineApplyConfiguration(const display_config_t* displa
   std::lock_guard lock(mutex_);
   if (display_config.layer_count) {
     // Only support one display.
+    ZX_DEBUG_ASSERT_MSG(display_config.layer_list[0].display_destination.x == 0,
+                        "ApplyConfig() applied rejected config");
+    ZX_DEBUG_ASSERT_MSG(display_config.layer_list[0].display_destination.y == 0,
+                        "ApplyConfig() applied rejected config");
+    ZX_DEBUG_ASSERT_MSG(display_config.layer_list[0].display_destination.width == kWidth,
+                        "ApplyConfig() applied rejected config");
+    ZX_DEBUG_ASSERT_MSG(display_config.layer_list[0].display_destination.height == kHeight,
+                        "ApplyConfig() applied rejected config");
+
     applied_image_id_ = display::ToDriverImageId(display_config.layer_list[0].image_handle);
     applied_fallback_color_ = display::Color::From(display_config.layer_list[0].fallback_color);
   } else {
