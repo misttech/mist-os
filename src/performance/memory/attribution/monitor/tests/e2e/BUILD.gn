@@ -10,12 +10,25 @@ if (is_host) {
     libraries = [
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+    ]
+    test_data_deps =
+        [ "//src/developer/ffx/plugins/profile:ffx_profile_tool_test_data" ]
+    environments = [
+      # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
+      aemu_env,
+      vim3_env,
+    ]
+  }
+
+  python_mobly_test("memory_monitor2_traces_e2e_test") {
+    main_source = "memory_monitor2_traces_e2e_test.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
       "//src/performance/lib/trace_processing",
     ]
-    test_data_deps = [
-      "//src/developer/ffx/plugins/profile:ffx_profile_tool_test_data",
-      "//src/developer/ffx/plugins/trace:ffx_trace_tool_test_data",
-    ]
+    test_data_deps =
+        [ "//src/developer/ffx/plugins/trace:ffx_trace_tool_test_data" ]
     environments = [
       # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
       aemu_env,
@@ -26,5 +39,8 @@ if (is_host) {
 
 group("tests") {
   testonly = true
-  public_deps = [ ":memory_monitor2_e2e_test($host_toolchain)" ]
+  public_deps = [
+    ":memory_monitor2_e2e_test($host_toolchain)",
+    ":memory_monitor2_traces_e2e_test($host_toolchain)",
+  ]
 }
