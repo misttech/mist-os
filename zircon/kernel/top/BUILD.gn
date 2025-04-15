@@ -45,7 +45,7 @@ source_set("top") {
     "//vendor/misttech/devices/board/drivers/x86",
 
     # Platform Drivers
-    "//vendor/misttech/dev/platform",
+    "//vendor/misttech/src/devices/bus/drivers/platform",
 
     # LWIP
     "//vendor/misttech/third_party/lwip",
