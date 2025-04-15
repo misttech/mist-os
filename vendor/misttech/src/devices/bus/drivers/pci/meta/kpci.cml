@@ -1,0 +1,35 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//sdk/lib/driver/compat/compat.shard.cml",
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        runner: 'driver',
+        bind: 'meta/bind/pci_bind.bindbc',
+        compat: 'driver/bus-kpci.so',
+        colocate: 'false',
+    },
+    capabilities: [
+        { service: 'fuchsia.hardware.pci.Service' },
+    ],
+    use: [
+        {
+            protocol: [
+                "fuchsia.kernel.IoportResource",
+                "fuchsia.kernel.IrqResource",
+                "fuchsia.kernel.MmioResource",
+            ],
+        },
+        { service: "fuchsia.hardware.platform.device.Service" },
+    ],
+    expose: [
+        {
+            service: 'fuchsia.hardware.pci.Service',
+            from: 'self',
+        },
+    ],
+}
