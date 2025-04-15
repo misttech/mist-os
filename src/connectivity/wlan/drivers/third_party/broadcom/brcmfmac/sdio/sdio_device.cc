@@ -13,6 +13,7 @@
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sdio/sdio_device.h"
 
+#include <fidl/fuchsia.boot.metadata/cpp/fidl.h>
 #include <fidl/fuchsia.component.decl/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
@@ -26,6 +27,7 @@
 #include <lib/driver/compat/cpp/symbols.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/metadata/cpp/metadata.h>
 #include <lib/fit/defer.h>
 #include <lib/zircon-internal/align.h>
 #include <zircon/assert.h>
@@ -208,6 +210,27 @@ zx_status_t SdioDevice::LoadFirmware(const char* path, zx_handle_t* fw, size_t* 
   return ZX_OK;
 }
 
+zx::result<std::vector<uint8_t>> SdioDevice::DeviceGetPersistedMetadata(
+    std::string_view metadata_serializable_name) {
+  if (metadata_serializable_name == fuchsia_boot_metadata::MacAddressMetadata::kSerializableName) {
+    zx::result metadata =
+        fdf_metadata::GetMetadata<fuchsia_boot_metadata::MacAddressMetadata>(*incoming(), "pdev");
+    if (metadata.is_error()) {
+      BRCMF_ERR("Failed to get mac address metadata: %s", metadata.status_string());
+      return metadata.take_error();
+    }
+    fit::result persisted_metadata = fidl::Persist(metadata.value());
+    if (persisted_metadata.is_error()) {
+      BRCMF_ERR("Failed to persist mac address metadata: %s",
+                persisted_metadata.error_value().FormatDescription().c_str());
+      return zx::error(persisted_metadata.error_value().status());
+    }
+    return zx::ok(std::move(persisted_metadata.value()));
+  }
+
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
+}
+
 zx_status_t SdioDevice::DeviceGetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual) {
   if (type == DEVICE_METADATA_WIFI_CONFIG) {
     zx::result decoded =
@@ -220,22 +243,8 @@ zx_status_t SdioDevice::DeviceGetMetadata(uint32_t type, void* buf, size_t bufle
       *actual = sizeof(*wifi_cfg);
       return ZX_OK;
     }
-  } else if (type == DEVICE_METADATA_MAC_ADDRESS) {
-    using MacAddr = std::array<uint8_t, ETH_ALEN>;
-    static_assert(sizeof(MacAddr) == ETH_ALEN);
-
-    zx::result decoded =
-        compat::GetMetadata<MacAddr>(incoming(), DEVICE_METADATA_MAC_ADDRESS, "pdev");
-
-    if (decoded.is_error()) {
-      BRCMF_WARN("Unable to get mac address: %s", decoded.status_string());
-    } else {
-      MacAddr* mac_addr = decoded.value().get();
-      memcpy(buf, mac_addr->data(), sizeof(*mac_addr));
-      *actual = sizeof(*mac_addr);
-      return ZX_OK;
-    }
   }
+
   return ZX_ERR_NOT_SUPPORTED;
 }
 

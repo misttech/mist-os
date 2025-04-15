@@ -26,6 +26,7 @@ source_set("sdio") {
   ]
   public = [ "sdio_device.h" ]
   deps = [
+    "//sdk/fidl/fuchsia.boot.metadata:fuchsia.boot.metadata_cpp",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
@@ -35,6 +36,7 @@ source_set("sdio") {
     "//sdk/lib/driver/compat/cpp:symbols",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/devfs/cpp",
+    "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/fit",
     "//src/connectivity/wlan/drivers/lib/log/cpp:dfv2",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:bcdc",

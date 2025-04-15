@@ -15,6 +15,7 @@
  */
 /* ****************** SDIO CARD Interface Functions **************************/
 
+#include <fidl/fuchsia.boot.metadata/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fuchsia/hardware/sdio/cpp/banjo.h>
 #include <inttypes.h>
@@ -125,20 +126,26 @@ zx_status_t brcmf_sdiod_configure_oob_interrupt(struct brcmf_sdio_dev* sdiodev,
 }
 
 zx_status_t brcmf_sdiod_get_bootloader_macaddr(struct brcmf_sdio_dev* sdiodev, uint8_t* macaddr) {
-  uint8_t bootloader_macaddr[ETH_ALEN];
-  size_t actual_len;
-  zx_status_t ret = sdiodev->drvr->device->DeviceGetMetadata(
-      DEVICE_METADATA_MAC_ADDRESS, bootloader_macaddr, sizeof(bootloader_macaddr), &actual_len);
-
-  if (ret != ZX_OK) {
-    return ret;
+  zx::result persisted_mac_address = sdiodev->drvr->device->DeviceGetPersistedMetadata(
+      fuchsia_boot_metadata::MacAddressMetadata::kSerializableName);
+  if (persisted_mac_address.is_error()) {
+    BRCMF_ERR("Failed to get mac address: %s", persisted_mac_address.status_string());
+    return persisted_mac_address.status_value();
   }
-  if (actual_len != ETH_ALEN) {
-    BRCMF_ERR("Incorrect metadata size: Expected %d bytes but actual is %lu bytes", ETH_ALEN,
-              actual_len);
+  fit::result mac_address =
+      fidl::Unpersist<fuchsia_boot_metadata::MacAddressMetadata>(persisted_mac_address.value());
+  if (mac_address.is_error()) {
+    BRCMF_ERR("Failed to unpersist mac address metadata: %s",
+              mac_address.error_value().FormatDescription().c_str());
+    return mac_address.error_value().status();
+  }
+  if (!mac_address.value().mac_address().has_value()) {
+    BRCMF_ERR("Mac address metadata missing mac_address field");
     return ZX_ERR_INTERNAL;
   }
-  memcpy(macaddr, bootloader_macaddr, ETH_ALEN);
+
+  const auto& octets = mac_address.value().mac_address().value().octets();
+  memcpy(macaddr, octets.data(), octets.size());
   BRCMF_DBG(SDIO, "got bootloader mac address");
 #if !defined(NDEBUG)
   BRCMF_DBG(SDIO, "  address: " FMT_MAC, FMT_MAC_ARGS(macaddr));
@@ -865,8 +872,7 @@ out:
 }
 
 #ifdef TODO_ADD_SDIO_IDS  // Put some of these into binding.c
-#define BRCMF_SDIO_DEVICE(dev_id) \
-  { SDIO_DEVICE(SDIO_VENDOR_ID_BROADCOM, dev_id) }
+#define BRCMF_SDIO_DEVICE(dev_id) {SDIO_DEVICE(SDIO_VENDOR_ID_BROADCOM, dev_id)}
 
 /* devices we support, null terminated */
 static const struct sdio_device_id brcmf_sdmmc_ids[] = {

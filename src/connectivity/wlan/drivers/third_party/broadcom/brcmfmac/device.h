@@ -112,6 +112,10 @@ class Device : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
   virtual zx_status_t LoadFirmware(const char* path, zx_handle_t* fw, size_t* size) = 0;
   virtual zx_status_t DeviceGetMetadata(uint32_t type, void* buf, size_t buflen,
                                         size_t* actual) = 0;
+  virtual zx::result<std::vector<uint8_t>> DeviceGetPersistedMetadata(
+      std::string_view metadata_serializable_name) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
   // This is intended for implementations that want to perform additional actions when the driver's
   // recovery worker has finished.
   virtual void OnRecoveryComplete() {}

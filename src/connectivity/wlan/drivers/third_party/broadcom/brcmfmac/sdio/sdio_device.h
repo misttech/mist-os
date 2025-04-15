@@ -58,6 +58,8 @@ class SdioDevice final : public Device, public fdf::DriverBase {
   }
 
   zx_status_t DeviceGetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual) override;
+  zx::result<std::vector<uint8_t>> DeviceGetPersistedMetadata(
+      std::string_view metadata_serializable_name) override;
 
  private:
   void Shutdown(fit::callback<void()>&& on_complete);

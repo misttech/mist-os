@@ -29,6 +29,7 @@
         },
         { service: "fuchsia.hardware.pci.Service" },
         { service: "fuchsia.hardware.gpio.Service" },
+        { service: "fuchsia.boot.metadata.MacAddressMetadata" },
     ],
     expose: [
         {
