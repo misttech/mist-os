@@ -699,6 +699,9 @@ zx_status_t VmMappingCoalescer<NumPages>::Flush() {
     return ZX_OK;
   }
 
+  VM_KTRACE_DURATION(2, "map_page", ("va", ktrace::Pointer{base_}), ("count", count_),
+                     ("mmu_flags", mmu_flags_));
+
   // Assert that we're not accidentally mapping the zero page writable. Unless called from a kernel
   // aspace, as the zero page can be mapped writeable from the kernel aspace in mexec.
   DEBUG_ASSERT(
@@ -1010,72 +1013,62 @@ ktl::pair<zx_status_t, uint32_t> VmMapping::PageFaultLocked(vaddr_t va, const ui
     return {ZX_ERR_ACCESS_DENIED, 0};
   }
 
-  // grab the lock for the vmo
-  Guard<VmoLockType> guard{object_->lock()};
-
-  const uint64_t vmo_size = object_->size_locked();
-  if (vmo_offset >= vmo_size) {
-    return {ZX_ERR_OUT_OF_RANGE, 0};
-  }
-
-  // Calculate the number of pages from va until the end of the VMO and protection range, so we
-  // don't try to fault pages outside of the current VMO and protection range.
+  // Calculate the number of pages from va until the end of the protection range.
   const size_t num_protection_range_pages = (range.region_top - va) / PAGE_SIZE;
-  size_t num_vmo_pages = (vmo_size - vmo_offset) / PAGE_SIZE;
 
-  // If fault-beyond-stream-size is set, throw exception on memory accesses past the page
-  // containing the user defined stream size.
-  VmObjectPaged* paged = DownCastVmObject<VmObjectPaged>(object_.get());
-  if (flags_ & VMAR_FLAG_FAULT_BEYOND_STREAM_SIZE) {
-    DEBUG_ASSERT(paged);
-    AssertHeld(paged->lock_ref());
-
-    uint64_t stream_size;
-    auto res = paged->saturating_content_size_locked();
-    // Creating a fault-beyond-stream-size mapping should have allocated a CSM.
-    DEBUG_ASSERT(res);
-    stream_size = res.value();
-    if (vmo_offset >= stream_size) {
-      return {ZX_ERR_OUT_OF_RANGE, 0};
+  // Helper lambda that calculates two values:
+  //  * Number of pages we're aiming to fault. If a range > 1 page is supplied, it is assumed the
+  //    user knows the appropriate range, so opportunistic pages will not be added.
+  //  * Number of requested pages, trimmed to protection range & VMO.
+  // Requires the vmo_size to be passed in, which cannot be known until after the lock is acquired
+  // in each of the branches.
+  auto calculate_pages = [&](size_t vmo_size) -> ktl::optional<ktl::pair<size_t, size_t>> {
+    if (vmo_offset >= vmo_size) {
+      return ktl::nullopt;
     }
-
-    // Trim num_vmo_pages, to ensure no pages past the stream size are fault.
-    num_vmo_pages = (stream_size - vmo_offset) / PAGE_SIZE;
-  }
-
-  // Number of pages we're aiming to fault. If a range > 1 page is supplied, it is assumed the user
-  // knows the appropriate range, so opportunistic pages will not be added.
-  size_t num_fault_pages;
-  // Number of requested pages, trimmed to protection range & VMO.
-  size_t num_required_pages;
-  if (additional_pages == 0) {
-    // Calculate the number of pages from va until the end of the page table, so we don't make extra
-    // page table allocations for opportunistic pages.
-    const uint64_t next_pt_base = ArchVmAspace::NextUserPageTableOffset(va);
-    const size_t num_pt_pages = (next_pt_base - va) / PAGE_SIZE;
-    num_required_pages = 1;
-    // Number of opportunistic pages we can fault, including the required page.
-    num_fault_pages = ktl::min(
-        {kPageFaultMaxOptimisticPages, num_pt_pages, num_protection_range_pages, num_vmo_pages});
-  } else {
-    // Cap by requested pages
-    num_required_pages =
-        ktl::min({num_protection_range_pages, num_vmo_pages, additional_pages + 1});
-    num_fault_pages = num_required_pages;
-  }
-  DEBUG_ASSERT(num_required_pages > 0);
-
-  // Opportunistic pages are not considered in currently_faulting optimisation, as it is not
-  // guaranteed the mappings will be updated.
-  CurrentlyFaulting currently_faulting(this, vmo_offset, num_required_pages * PAGE_SIZE);
+    const size_t num_vmo_pages = (vmo_size - vmo_offset) / PAGE_SIZE;
+    if (additional_pages == 0) {
+      // Calculate the number of pages from va until the end of the page table, so we don't make
+      // extra page table allocations for opportunistic pages.
+      const uint64_t next_pt_base = ArchVmAspace::NextUserPageTableOffset(va);
+      const size_t num_pt_pages = (next_pt_base - va) / PAGE_SIZE;
+      // Number of opportunistic pages we can fault, including the required page.
+      const size_t num_fault_pages = ktl::min(
+          {kPageFaultMaxOptimisticPages, num_pt_pages, num_protection_range_pages, num_vmo_pages});
+      return ktl::optional<ktl::pair<size_t, size_t>>({1, num_fault_pages});
+    } else {
+      // Cap by requested pages.
+      const size_t num_pages =
+          ktl::min({num_protection_range_pages, num_vmo_pages, additional_pages + 1});
+      DEBUG_ASSERT(num_pages > 0);
+      return ktl::optional<ktl::pair<size_t, size_t>>({num_pages, num_pages});
+    }
+  };
 
   static constexpr uint64_t coalescer_size = ktl::max(kPageFaultMaxOptimisticPages, kBatchPages);
 
-  __UNINITIALIZED VmMappingCoalescer<coalescer_size> coalescer(
-      this, va, range.mmu_flags, ArchVmAspace::ExistingEntryAction::Upgrade);
+  if (VmObjectPaged* paged = DownCastVmObject<VmObjectPaged>(object_.get()); paged) {
+    __UNINITIALIZED VmCowPages::DeferredOps deferred(paged->MakeDeferredOps());
+    Guard<VmoLockType> guard{AssertOrderedAliasedLock, paged->lock(), object_->lock(),
+                             paged->lock_order(), VmLockAcquireMode::First};
 
-  if (likely(paged)) {
-    AssertHeld(paged->lock_ref());
+    // If fault-beyond-stream-size is set, throw exception on memory accesses past the page
+    // containing the user defined stream size.
+    const uint64_t vmo_size = (flags_ & VMAR_FLAG_FAULT_BEYOND_STREAM_SIZE)
+                                  ? *paged->saturating_content_size_locked()
+                                  : paged->size_locked();
+    auto pages = calculate_pages(vmo_size);
+    if (!pages) {
+      return {ZX_ERR_OUT_OF_RANGE, 0};
+    }
+    auto [num_required_pages, num_fault_pages] = *pages;
+
+    // Opportunistic pages are not considered in currently_faulting optimisation, as it is not
+    // guaranteed the mappings will be updated.
+    CurrentlyFaulting currently_faulting(this, vmo_offset, num_required_pages * PAGE_SIZE);
+
+    __UNINITIALIZED VmMappingCoalescer<coalescer_size> coalescer(
+        this, va, range.mmu_flags, ArchVmAspace::ExistingEntryAction::Upgrade);
 
     // fault in or grab existing pages.
     const size_t cursor_size = num_fault_pages * PAGE_SIZE;
@@ -1094,7 +1087,6 @@ ktl::pair<zx_status_t, uint32_t> VmMapping::PageFaultLocked(vaddr_t va, const ui
       uint curr_mmu_flags = range.mmu_flags;
 
       uint num_curr_pages = static_cast<uint>(num_required_pages - (offset / PAGE_SIZE));
-      __UNINITIALIZED VmCowPages::DeferredOps deferred(paged->MakeDeferredOpsLocked());
       __UNINITIALIZED zx::result<VmCowPages::LookupCursor::RequireResult> result =
           cursor->RequirePage(write, num_curr_pages, deferred, page_request);
       if (result.is_error()) {
@@ -1144,8 +1136,28 @@ ktl::pair<zx_status_t, uint32_t> VmMapping::PageFaultLocked(vaddr_t va, const ui
         coalescer.IncrementCount(num_extra_pages);
       }
     }
+    zx_status_t status = coalescer.Flush();
+    if (status == ZX_OK) {
+      // Mapping has been successfully updated by us. Inform the faulting helper so that it knows
+      // not to unmap the range instead.
+      currently_faulting.MappingUpdated();
+    }
+    return {status, coalescer.TotalMapped()};
   } else if (VmObjectPhysical* phys = DownCastVmObject<VmObjectPhysical>(object_.get()); phys) {
-    AssertHeld(phys->lock_ref());
+    Guard<VmoLockType> guard{AliasedLock, phys->lock(), object_->lock()};
+
+    auto pages = calculate_pages(phys->size_locked());
+    if (!pages) {
+      return {ZX_ERR_OUT_OF_RANGE, 0};
+    }
+    auto [num_required_pages, num_fault_pages] = *pages;
+
+    // Opportunistic pages are not considered in currently_faulting optimisation, as it is not
+    // guaranteed the mappings will be updated.
+    CurrentlyFaulting currently_faulting(this, vmo_offset, num_required_pages * PAGE_SIZE);
+
+    __UNINITIALIZED VmMappingCoalescer<coalescer_size> coalescer(
+        this, va, range.mmu_flags, ArchVmAspace::ExistingEntryAction::Upgrade);
 
     // Already validated the size, and since physical VMOs are always allocated, and not
     // resizable, we know we can always retrieve the maximum number of pages without failure.
@@ -1167,17 +1179,17 @@ ktl::pair<zx_status_t, uint32_t> VmMapping::PageFaultLocked(vaddr_t va, const ui
         return {status, coalescer.TotalMapped()};
       }
     }
-  }
 
-  VM_KTRACE_DURATION(2, "map_page", ("va", ktrace::Pointer{va}), ("pf_flags", pf_flags));
-
-  zx_status_t status = coalescer.Flush();
-  if (status == ZX_OK) {
-    // Mapping has been successfully updated by us. Inform the faulting helper so that it knows not
-    // to unmap the range instead.
-    currently_faulting.MappingUpdated();
+    status = coalescer.Flush();
+    if (status == ZX_OK) {
+      // Mapping has been successfully updated by us. Inform the faulting helper so that it knows
+      // not to unmap the range instead.
+      currently_faulting.MappingUpdated();
+    }
+    return {status, coalescer.TotalMapped()};
   }
-  return {status, coalescer.TotalMapped()};
+  panic("Unknown VMO type");
+  return {ZX_ERR_INTERNAL, 0};
 }
 
 void VmMapping::ActivateLocked() {
