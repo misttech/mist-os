@@ -1,3 +1,4 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2016 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -10,48 +11,49 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
-#include <zircon/status.h>
+#include <trace.h>
 #include <zircon/types.h>
 
 #include <array>
 #include <memory>
 #include <utility>
 
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
+#include <object/bus_transaction_initiator_dispatcher.h>
+#include <pretty/hexdump.h>
+
+#include <ktl/enforce.h>
+
+#define LOCAL_TRACE 0
 
 namespace virtio {
 
-namespace fpci = fuchsia_hardware_pci;
+Device::Device(fbl::RefPtr<BusTransactionInitiatorDispatcher> bti, ktl::unique_ptr<Backend> backend)
+    : bti_(ktl::move(bti)), backend_(ktl::move(backend)) {}
 
-Device::Device(zx::bti bti, std::unique_ptr<Backend> backend)
-    : bti_(std::move(bti)), backend_(std::move(backend)) {}
-
-Device::~Device() { zxlogf(TRACE, "%s: exit", __func__); }
+Device::~Device() { TRACEF("%s: exit", __func__); }
 
 void Device::Release() {
   backend_->Terminate();
-  irq_thread_should_exit_.store(true, std::memory_order_release);
-  thrd_join(irq_thread_, nullptr);
+  irq_thread_should_exit_.store(true, ktl::memory_order_release);
+  irq_thread_->Join(nullptr, ZX_TIME_INFINITE);
   backend_.reset();
 }
 
 void Device::IrqWorker() {
   const auto irq_mode = backend_->InterruptMode();
-  ZX_DEBUG_ASSERT(irq_mode == fpci::InterruptMode::kLegacy ||
-                  irq_mode == fpci::InterruptMode::kMsiX);
-  zxlogf(DEBUG, "starting %s irq worker",
-         (irq_mode == fpci::InterruptMode::kLegacy) ? "legacy" : "msi-x");
+  ZX_DEBUG_ASSERT(irq_mode == PCIE_IRQ_MODE_LEGACY || irq_mode == PCIE_IRQ_MODE_MSI_X);
+  LTRACEF("starting %s irq worker\n", (irq_mode == PCIE_IRQ_MODE_LEGACY) ? "legacy" : "msi-x");
 
   while (backend_->InterruptValid() == ZX_OK) {
     auto result = backend_->WaitForInterrupt();
     if (!result.is_ok()) {
       if (result.status_value() != ZX_ERR_TIMED_OUT) {
-        zxlogf(DEBUG, "error while waiting for interrupt: %s", result.status_string());
+        LTRACEF("error while waiting for interrupt: %d\n", result.error_value());
         break;
       }
 
-      if (irq_thread_should_exit_.load(std::memory_order_relaxed)) {
-        zxlogf(DEBUG, "terminating irq thread");
+      if (irq_thread_should_exit_.load(ktl::memory_order_relaxed)) {
+        LTRACEF("terminating irq thread\n");
         break;
       }
 
@@ -66,9 +68,9 @@ void Device::IrqWorker() {
 
     // Read the status before completing the interrupt in case
     // another interrupt fires and changes the status.
-    if (irq_mode == fpci::InterruptMode::kLegacy) {
+    if (irq_mode == PCIE_IRQ_MODE_LEGACY) {
       uint32_t irq_status = IsrStatus();
-      zxlogf(TRACE, "irq_status: %#x\n", irq_status);
+      LTRACEF("irq_status: %#x\n", irq_status);
 
       // Since we handle both interrupt types here it's possible for a
       // spurious interrupt if they come in sequence and we check IsrStatus
@@ -83,7 +85,7 @@ void Device::IrqWorker() {
       }
     } else {
       // MSI-X
-      zxlogf(TRACE, "irq key: %u\n", key);
+      LTRACEF("irq key: %u\n", key);
       switch (key) {
         case PciBackend::kMsiConfigVector:
           IrqConfigChange();
@@ -103,13 +105,14 @@ int Device::IrqThreadEntry(void* arg) {
 }
 
 void Device::StartIrqThread() {
-  std::array<char, ZX_MAX_NAME_LEN> name{};
+  ktl::array<char, ZX_MAX_NAME_LEN> name{};
   snprintf(name.data(), name.size(), "%s-irq-worker", tag());
-  thrd_create_with_name(&irq_thread_, IrqThreadEntry, this, name.data());
+  irq_thread_ = Thread::Create(name.data(), IrqThreadEntry, this, HIGH_PRIORITY);
+  irq_thread_->Resume();
 }
 
 void Device::CopyDeviceConfig(void* _buf, size_t len) const {
-  assert(_buf);
+  ZX_ASSERT(_buf);
 
   for (size_t i = 0; i < len; i++) {
     backend_->ReadDeviceConfig(static_cast<uint16_t>(i), static_cast<uint8_t*>(_buf) + i);
