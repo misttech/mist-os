@@ -53,7 +53,7 @@ pub enum NameReplace {
     Replace,
 }
 
-pub static HOST_INIT_TIMEOUT: i64 = 5; // Seconds
+pub static HOST_INIT_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(100);
 
 /// Available FIDL services that can be provided by a particular Host
 #[derive(Copy, Clone)]
@@ -1208,10 +1208,10 @@ struct WhenHostsFound {
 }
 
 impl WhenHostsFound {
-    // Constructs an WhenHostsFound that completes at the latest after HOST_INIT_TIMEOUT seconds.
+    // Constructs an WhenHostsFound that completes at the latest after HOST_INIT_TIMEOUT
     fn new(hd: HostDispatcher) -> impl Future<Output = HostDispatcher> {
         WhenHostsFound { hd: hd.clone(), waker_key: None }.on_timeout(
-            MonotonicDuration::from_seconds(HOST_INIT_TIMEOUT).after_now(),
+            HOST_INIT_TIMEOUT.after_now(),
             move || {
                 {
                     let mut inner = hd.state.write();
