@@ -333,9 +333,9 @@ pub fn sys_reboot(
         LINUX_REBOOT_CMD_SW_SUSPEND => error!(EINVAL),
 
         LINUX_REBOOT_CMD_HALT | LINUX_REBOOT_CMD_POWER_OFF => {
+            log_info!("Powering off");
             match proxy.poweroff(zx::MonotonicInstant::INFINITE) {
                 Ok(_) => {
-                    log_info!("Powering off device.");
                     // System is rebooting... wait until runtime ends.
                     zx::MonotonicInstant::INFINITE.sleep();
                 }
