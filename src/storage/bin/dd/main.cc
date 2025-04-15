@@ -170,9 +170,13 @@ int ParseArgs(int argc, const char** argv, DdOptions* options) {
 #define MAX(x, y) ((x) < (y) ? (y) : (x))
 
 bool IsBlockPath(std::string_view path) {
-  // E.g. /dev/class/block/000 or /dev/sys/platform/00:2d/ramctl/ramdisk-0/block
+  // E.g.
+  //   /dev/class/block/000
+  //   /dev/sys/platform/00:2d/ramctl/ramdisk-0/block
+  //   /block/000/fuchsia.hardware.block.volume.Volume
   return (path.starts_with("/dev") && path.ends_with("/block")) ||
-         path.starts_with("/dev/class/block");
+         path.starts_with("/dev/class/block") ||
+         (path.starts_with("/block") && path.ends_with("fuchsia.hardware.block.volume.Volume"));
 }
 
 bool IsSkipBlockPath(std::string_view path) {
