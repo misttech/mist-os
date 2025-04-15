@@ -1,0 +1,38 @@
+[
+    {
+        "device": {
+            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.intel.platform.BIND_PLATFORM_DEV_PID.X86",
+            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.intel.platform.BIND_PLATFORM_DEV_VID.INTEL",
+            "fuchsia.hardware.platform.bus.Service": "fuchsia.hardware.platform.bus.Service.DriverTransport"
+        },
+        "expected": "match",
+        "name": "Match"
+    },
+    {
+        "device": {
+            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.intel.platform.BIND_PLATFORM_DEV_PID.X86",
+            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.intel.platform.BIND_PLATFORM_DEV_VID.INTEL",
+            "fuchsia.hardware.i2c.Service": "fuchsia.hardware.i2c.Service.ZirconTransport"
+        },
+        "expected": "abort",
+        "name": "WrongProtocol"
+    },
+    {
+        "device": {
+            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.intel.platform.BIND_PLATFORM_DEV_PID.X86",
+            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC",
+            "fuchsia.hardware.platform.bus.Service": "fuchsia.hardware.platform.bus.Service.DriverTransport"
+        },
+        "expected": "abort",
+        "name": "WrongVendor"
+    },
+    {
+        "device": {
+            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.google.platform.BIND_PLATFORM_DEV_PID.ASTRO",
+            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.intel.platform.BIND_PLATFORM_DEV_VID.INTEL",
+            "fuchsia.hardware.platform.bus.Service": "fuchsia.hardware.platform.bus.Service.DriverTransport"
+        },
+        "expected": "abort",
+        "name": "WrongPlatform"
+    }
+]
