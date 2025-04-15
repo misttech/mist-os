@@ -224,6 +224,7 @@ DEFINE_BASIC_TEST_CLASS(Health, { RequestHealthAndExpectHealthy(); });
 DEFINE_BASIC_TEST_CLASS(GetProperties, {
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ValidateProperties();
+  WaitForError();
 });
 
 // Verify the initial WatchGainState responses are successfully received.

@@ -545,6 +545,7 @@ DEFINE_ADMIN_TEST_CLASS(CompositeHealth, { RequestHealthAndExpectHealthy(); });
 DEFINE_ADMIN_TEST_CLASS(CompositeProperties, {
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ValidateProperties();
+  WaitForError();
 });
 
 // Verify that a valid element list is successfully received.
@@ -553,6 +554,7 @@ DEFINE_ADMIN_TEST_CLASS(GetElements, {
   if (kDisplayElementsAndTopologies) {
     DisplayElements(elements());
   }
+  WaitForError();
 });
 
 // Verify that a valid topology list is successfully received.
@@ -561,12 +563,14 @@ DEFINE_ADMIN_TEST_CLASS(GetTopologies, {
   if (kDisplayElementsAndTopologies) {
     DisplayTopologies(topologies());
   }
+  WaitForError();
 });
 
 // Verify that a valid topology is successfully received.
 DEFINE_ADMIN_TEST_CLASS(GetTopology, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
   RequestTopology();
+  WaitForError();
 });
 
 // All elements should be in at least one topology, all topology elements should be known.
@@ -575,6 +579,7 @@ DEFINE_ADMIN_TEST_CLASS(ElementTopologyClosure, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
 
   ValidateElementTopologyClosure();
+  WaitForError();
 });
 
 // Verify that format-retrieval responses are successfully received and are complete and valid.
@@ -592,7 +597,10 @@ DEFINE_ADMIN_TEST_CLASS(CompositeDaiFormats, {
 });
 
 // Verify that a Reset() returns a valid completion.
-DEFINE_ADMIN_TEST_CLASS(Reset, { ResetAndExpectResponse(); });
+DEFINE_ADMIN_TEST_CLASS(Reset, {
+  ResetAndExpectResponse();
+  WaitForError();
+});
 
 // Start-while-started should always succeed, so we test this twice.
 DEFINE_ADMIN_TEST_CLASS(CodecStart, {

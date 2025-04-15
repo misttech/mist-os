@@ -186,7 +186,8 @@ class TestBase : public media::audio::test::TestFixture {
   }
 
   void WaitForError(zx::duration wait_duration = kWaitForErrorDuration) {
-    RunLoopWithTimeoutOrUntil([]() { return HasFailure() || IsSkipped(); }, wait_duration);
+    // Instead of just polling for disconnect, we proactively confirm with a basic call & response.
+    RequestHealthAndExpectHealthy();
   }
   std::optional<uint64_t>& ring_buffer_id() { return ring_buffer_id_; }
 
