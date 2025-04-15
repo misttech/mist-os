@@ -200,7 +200,7 @@ config("compiler_profile") {
 }
 
 config("netstack3_configs") {
-  if (!is_debug && !is_host) {
+  if (is_release && !is_host) {
     configs = [
       # Always optimize speed, even if it increases size.
       "//build/config:optimize_speed",
