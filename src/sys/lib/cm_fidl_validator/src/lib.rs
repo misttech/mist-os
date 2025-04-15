@@ -1617,17 +1617,13 @@ impl<'a> ValidationContext<'a> {
         if let Some(runners) = environment.runners.as_ref() {
             let mut registered_runners = HashSet::new();
             for runner in runners {
-                self.validate_runner_registration(runner, name.clone(), &mut registered_runners);
+                self.validate_runner_registration(runner, &mut registered_runners);
             }
         }
         if let Some(resolvers) = environment.resolvers.as_ref() {
             let mut registered_schemes = HashSet::new();
             for resolver in resolvers {
-                self.validate_resolver_registration(
-                    resolver,
-                    name.clone(),
-                    &mut registered_schemes,
-                );
+                self.validate_resolver_registration(resolver, &mut registered_schemes);
             }
         }
 
@@ -1651,7 +1647,6 @@ impl<'a> ValidationContext<'a> {
     fn validate_runner_registration(
         &mut self,
         runner_registration: &'a fdecl::RunnerRegistration,
-        environment_name: Option<&'a String>,
         runner_names: &mut HashSet<&'a str>,
     ) {
         check_name(
@@ -1661,7 +1656,6 @@ impl<'a> ValidationContext<'a> {
             &mut self.errors,
         );
         self.validate_registration_source(
-            environment_name,
             runner_registration.source.as_ref(),
             DeclType::RunnerRegistration,
         );
@@ -1698,7 +1692,6 @@ impl<'a> ValidationContext<'a> {
     fn validate_resolver_registration(
         &mut self,
         resolver_registration: &'a fdecl::ResolverRegistration,
-        environment_name: Option<&'a String>,
         schemes: &mut HashSet<&'a str>,
     ) {
         check_name(
@@ -1708,7 +1701,6 @@ impl<'a> ValidationContext<'a> {
             &mut self.errors,
         );
         self.validate_registration_source(
-            environment_name,
             resolver_registration.source.as_ref(),
             DeclType::ResolverRegistration,
         );
@@ -1729,12 +1721,7 @@ impl<'a> ValidationContext<'a> {
         }
     }
 
-    fn validate_registration_source(
-        &mut self,
-        environment_name: Option<&'a String>,
-        source: Option<&'a fdecl::Ref>,
-        ty: DeclType,
-    ) {
+    fn validate_registration_source(&mut self, source: Option<&'a fdecl::Ref>, ty: DeclType) {
         match source {
             Some(fdecl::Ref::Parent(_)) => {}
             Some(fdecl::Ref::Self_(_)) => {}
@@ -1747,14 +1734,6 @@ impl<'a> ValidationContext<'a> {
             }
             None => {
                 self.errors.push(Error::missing_field(ty, "source"));
-            }
-        }
-
-        let source = self.source_dependency_from_ref(None, None, source);
-        if let Some(source) = source {
-            if let Some(env_name) = &environment_name {
-                let target = DependencyNode::Environment(env_name);
-                self.strong_dependencies.add_edge(source, target);
             }
         }
     }
@@ -3080,83 +3059,6 @@ impl<'a> ValidationContext<'a> {
                 if !(capability_checker)(self).contains(name) {
                     self.errors.push(Error::invalid_capability(decl, "source", name));
                 }
-            }
-        }
-    }
-
-    fn source_dependency_from_ref(
-        &self,
-        source_name: Option<&'a String>,
-        source_dictionary: Option<&'a String>,
-        ref_: Option<&'a fdecl::Ref>,
-    ) -> Option<DependencyNode<'a>> {
-        if ref_.is_none() {
-            return None;
-        }
-        match ref_.unwrap() {
-            fdecl::Ref::Child(fdecl::ChildRef { name, collection }) => {
-                Some(DependencyNode::Child(name.as_str(), collection.as_ref().map(|s| s.as_str())))
-            }
-            fdecl::Ref::Collection(fdecl::CollectionRef { name, .. }) => {
-                Some(DependencyNode::Collection(name.as_str()))
-            }
-            fdecl::Ref::Capability(fdecl::CapabilityRef { name, .. }) => {
-                Some(DependencyNode::Capability(name.as_str()))
-            }
-            fdecl::Ref::Self_(_) => {
-                #[cfg(fuchsia_api_level_at_least = "25")]
-                if let Some(source_dictionary) = source_dictionary {
-                    let root_dict = source_dictionary.split('/').next().unwrap();
-                    if self.all_dictionaries.contains_key(root_dict) {
-                        Some(DependencyNode::Capability(root_dict))
-                    } else {
-                        Some(DependencyNode::Self_)
-                    }
-                } else if let Some(source_name) = source_name {
-                    if self.all_storages.contains_key(source_name.as_str())
-                        || self.all_dictionaries.contains_key(source_name.as_str())
-                    {
-                        Some(DependencyNode::Capability(source_name))
-                    } else {
-                        Some(DependencyNode::Self_)
-                    }
-                } else {
-                    Some(DependencyNode::Self_)
-                }
-                #[cfg(not(fuchsia_api_level_at_least = "25"))]
-                {
-                    let _ = source_dictionary;
-                    if let Some(source_name) = source_name {
-                        if self.all_storages.contains_key(source_name.as_str()) {
-                            Some(DependencyNode::Capability(source_name))
-                        } else {
-                            Some(DependencyNode::Self_)
-                        }
-                    } else {
-                        Some(DependencyNode::Self_)
-                    }
-                }
-            }
-            fdecl::Ref::Parent(_) => {
-                // We don't care about dependency cycles with the parent, as any potential issues
-                // with that are resolved by cycle detection in the parent's manifest.
-                None
-            }
-            fdecl::Ref::Framework(_) => {
-                // We don't care about dependency cycles with the framework, as the framework
-                // always outlives the component.
-                None
-            }
-            fdecl::Ref::Debug(_) => {
-                // We don't care about dependency cycles with any debug capabilities from the
-                // environment, as those are put there by our parent, and any potential cycles with
-                // our parent are handled by cycle detection in the parent's manifest.
-                None
-            }
-            fdecl::Ref::VoidType(_) => None,
-            fdecl::RefUnknown!() => {
-                // We were unable to understand this FIDL value
-                None
             }
         }
     }
