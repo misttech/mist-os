@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use pin_project::pin_project;
+use std::boxed::Box;
 use std::ffi::CStr;
 use std::future::Future;
 use std::marker::PhantomData;
@@ -2146,7 +2147,8 @@ pub struct TraceFuture<'a, Fut: Future> {
     args: Vec<Arg<'a>>,
     flow_id: Option<Id>,
     #[pin]
-    future: Fut,
+    // This future can be large (> 3000 bytes) so we Box it to avoid extra memcpy's when creating
+    future: Pin<Box<Fut>>,
 }
 
 impl<'a, Fut: Future> TraceFuture<'a, Fut> {
@@ -2160,7 +2162,7 @@ impl<'a, Fut: Future> TraceFuture<'a, Fut> {
             name: args.name,
             args: args.args,
             flow_id: args.flow_id,
-            future: future,
+            future: Box::pin(future),
         };
         if let Some(context) = args.context {
             this.trace_create(context);
