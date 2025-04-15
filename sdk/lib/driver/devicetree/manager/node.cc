@@ -108,33 +108,6 @@ void Node::AddBootMetadata(fuchsia_hardware_platform_bus::BootMetadata boot_meta
   add_platform_device_ = true;
 }
 
-void Node::AddNodeSpec(const fuchsia_driver_framework::ParentSpec &spec) {
-  std::vector<fuchsia_driver_framework::BindRule2> bind_rules;
-  std::transform(
-      spec.bind_rules().begin(), spec.bind_rules().end(), std::back_inserter(bind_rules),
-      [](const fuchsia_driver_framework::BindRule &bind_rule) {
-        ZX_ASSERT(bind_rule.key().Which() ==
-                  fuchsia_driver_framework::NodePropertyKey::Tag::kStringValue);
-        return fuchsia_driver_framework::BindRule2{{.key = bind_rule.key().string_value().value(),
-                                                    .condition = bind_rule.condition(),
-                                                    .values = bind_rule.values()}};
-      });
-
-  std::vector<fuchsia_driver_framework::NodeProperty2> properties;
-  std::transform(spec.properties().begin(), spec.properties().end(), std::back_inserter(properties),
-                 [](const fuchsia_driver_framework::NodeProperty &property) {
-                   ZX_ASSERT(property.key().Which() ==
-                             fuchsia_driver_framework::NodePropertyKey::Tag::kStringValue);
-                   return fuchsia_driver_framework::NodeProperty2{
-                       {.key = property.key().string_value().value(), .value = property.value()}};
-                 });
-  parents_.emplace_back(fuchsia_driver_framework::ParentSpec2{{
-      .bind_rules = std::move(bind_rules),
-      .properties = std::move(properties),
-  }});
-  composite_ = true;
-}
-
 void Node::AddNodeSpec(const fuchsia_driver_framework::ParentSpec2 &spec) {
   parents_.emplace_back(spec);
   composite_ = true;

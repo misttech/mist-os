@@ -69,7 +69,6 @@ class Node {
 
   void AddBootMetadata(fuchsia_hardware_platform_bus::BootMetadata boot_metadata);
 
-  void AddNodeSpec(const fuchsia_driver_framework::ParentSpec& spec);
   void AddNodeSpec(const fuchsia_driver_framework::ParentSpec2& spec);
 
   void AddSmc(fuchsia_hardware_platform_bus::Smc smc);
@@ -213,7 +212,6 @@ class ChildNode {
 
   Node* GetNode() const { return node_; }
 
-  void AddNodeSpec(const fuchsia_driver_framework::ParentSpec& spec) { node_->AddNodeSpec(spec); }
   void AddNodeSpec(const fuchsia_driver_framework::ParentSpec2& spec) { node_->AddNodeSpec(spec); }
 
   void set_register_type(RegisterType type) { node_->set_register_type(type); }
