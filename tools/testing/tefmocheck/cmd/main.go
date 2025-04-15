@@ -139,6 +139,11 @@ func main() {
 		log.Fatalf("failed to run checks: %v", err)
 	}
 
+	// Instruct flake analysis tools to ignore failed top level tests when
+	// there is a tefmocheck in the same shard. This is accomplished by adding
+	// a "flake_analysis_ignore" tag with a value of "true" to the tests.
+	// This also ignores test failures where more than 5 top level tests fail in the same shard.
+	tefmocheck.IgnoreTestsForFlakeAnalysis(inputSummary.Tests, checkTests)
 	inputSummary.Tests = append(inputSummary.Tests, checkTests...)
 	outFile := os.Stdout
 	if *jsonOutput != "" {
