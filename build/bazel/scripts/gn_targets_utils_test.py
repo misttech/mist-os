@@ -28,6 +28,9 @@ class BazelBuildActionsMapTest(unittest.TestCase):
             "gn_targets_dir": "obj/some/gn/target_1.gn_targets",
             "gn_targets_manifest": "gen/some/gn/target_1.gn_targets.json",
             "no_sdk": False,
+            "bazel_command_file": "obj/some/gn/target_1.bazel_command.sh",
+            "build_events_log_json": "obj/some/gn/target_1.events_log.json",
+            "path_mapping": "obj/some/gn/target_1.path_mapping",
         },
         {
             "bazel_targets": [
@@ -38,6 +41,9 @@ class BazelBuildActionsMapTest(unittest.TestCase):
             "gn_targets_dir": "obj/some/gn/target_2.gn_targets",
             "gn_targets_manifest": "gen/some/gn/target_2.gn_targets.json",
             "no_sdk": False,
+            "bazel_command_file": "obj/some/gn/target_2.bazel_command.sh",
+            "build_events_log_json": "obj/some/gn/target_2.events_log.json",
+            "path_mapping": "obj/some/gn/target_2.path_mapping",
         },
     ]
 
@@ -161,6 +167,9 @@ class FindGnBazelActioInfosForTest(unittest.TestCase):
             "gn_targets_dir": "obj/some/gn/target_1.gn_targets",
             "gn_targets_manifest": "gen/some/gn/target_1.gn_targets.json",
             "no_sdk": False,
+            "bazel_command_file": "obj/some/gn/target_1.bazel_command.sh",
+            "build_events_log_json": "obj/some/gn/target_1.events_log.json",
+            "path_mapping": "obj/some/gn/target_1.path_mapping",
         },
         {
             "bazel_targets": [
@@ -171,12 +180,15 @@ class FindGnBazelActioInfosForTest(unittest.TestCase):
             "gn_targets_dir": "obj/some/gn/target_2.gn_targets",
             "gn_targets_manifest": "gen/some/gn/target_2.gn_targets.json",
             "no_sdk": False,
+            "bazel_command_file": "obj/some/gn/target_2.bazel_command.sh",
+            "build_events_log_json": "obj/some/gn/target_2.events_log.json",
+            "path_mapping": "obj/some/gn/target_2.path_mapping",
         },
     ]
 
     def setUp(self) -> None:
         self.actions_map = BazelBuildActionsMap(self._JSON_INPUT)
-        self.errors = []
+        self.errors: list[str] = []
 
     def tearDown(self) -> None:
         pass
@@ -329,7 +341,7 @@ ERROR: Evaluation of query "allpaths(set(...), //bazel/target/dependency:5) fail
             ],
         )
 
-    def test_unknown_dependency(self):
+    def test_unknown_dependency(self) -> None:
         def command_runner(args: T.List[str]) -> T.Tuple[int, str, str]:
             return 0, "", ""
 
@@ -344,7 +356,7 @@ ERROR: Evaluation of query "allpaths(set(...), //bazel/target/dependency:5) fail
         self.assertListEqual(result, [])
         self.assertListEqual(self.errors, [])
 
-    def test_unexpected_query_errors(self):
+    def test_unexpected_query_errors(self) -> None:
         def command_runner(args: T.List[str]) -> T.Tuple[int, str, str]:
             return 1, "", "An unexpected error\nAnd another one\n"
 

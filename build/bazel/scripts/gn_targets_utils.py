@@ -25,6 +25,9 @@ class BazelBuildActionInfo(object):
     no_sdk: bool
     gn_targets_dir: str
     gn_targets_manifest: str
+    bazel_command_file: str = ""
+    build_events_log_json: str = ""
+    path_mapping: str = ""
     # LINT.ThenChange(//BUILD.gn)
 
 

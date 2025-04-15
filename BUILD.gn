@@ -2067,6 +2067,21 @@ group("vnames_config.metadata") {
 #         that all files exposed by the repository are up-to-date.
 #     - Type: string
 #
+#   bazel_command_file
+#     - Optional: Path to a file containing the shell command used to invoke Bazel.
+#         This is only used for debugging.
+#     - Type: string
+#
+#   path_mapping
+#     - Optional: Path to a file used to map Bazel artifacts to their copy location in the
+#         Ninja build directory. Only used for debugging.
+#     - Type: string
+#
+#   build_events_log_json:
+#     - Optional: Path to a file that will contain the Bazel event log for the latest
+#        invocation of this action, as a JSON file. Used for debugging.
+#     - Type: string
+#
 generated_file("bazel_build_action_targets") {
   testonly = true
   deps = [ ":default" ]
