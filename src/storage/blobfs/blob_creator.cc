@@ -8,6 +8,7 @@
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/status.h>
 #include <lib/fzl/vmo-mapper.h>
+#include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
@@ -33,15 +34,28 @@
 
 namespace blobfs {
 namespace {
-
 constexpr uint64_t kRingBufferSize = 256ul * 1024;
+}  // namespace
 
 class BlobWriter final : public fidl::WireServer<fuchsia_fxfs::BlobWriter> {
  public:
-  explicit BlobWriter(fbl::RefPtr<Blob> blob) : blob_(std::move(blob)) {}
+  explicit BlobWriter(fbl::RefPtr<Blob> blob, zx::unowned_channel server_channel)
+      : blob_(std::move(blob)), server_channel_(std::move(server_channel)) {
+    blob_->SetBlobWriterHandler(this);
+  }
+
+  ~BlobWriter() {
+    if (blob_) {
+      blob_->SetBlobWriterHandler(nullptr);
+    }
+  }
 
   void GetVmo(fuchsia_fxfs::wire::BlobWriterGetVmoRequest* request,
               GetVmoCompleter::Sync& completer) final {
+    if (!blob_) {
+      completer.ReplyError(ZX_ERR_BAD_STATE);
+      completer.Close(ZX_ERR_BAD_STATE);
+    }
     auto result = GetVmoImpl(request->size);
     if (result.is_error()) {
       completer.ReplyError(result.status_value());
@@ -52,12 +66,31 @@ class BlobWriter final : public fidl::WireServer<fuchsia_fxfs::BlobWriter> {
 
   void BytesReady(fuchsia_fxfs::wire::BlobWriterBytesReadyRequest* request,
                   BytesReadyCompleter::Sync& completer) final {
+    if (!blob_) {
+      completer.ReplyError(ZX_ERR_BAD_STATE);
+      completer.Close(ZX_ERR_BAD_STATE);
+    }
     if (auto result = BytesReadyImpl(request->bytes_written); result.is_error()) {
       completer.ReplyError(result.status_value());
       completer.Close(result.status_value());
     } else {
       completer.ReplySuccess();
     }
+  }
+
+  // Checks if the server channel is still active. If the client side has closed the associated
+  // blob will be dropped synchronously, failing any future requests.
+  bool ChannelActive() {
+    if (!blob_) {
+      return false;
+    }
+    zx_status_t status = server_channel_->signal_peer(0, 0);
+    FX_LOGS(INFO) << "Checking BlobWriter channel active: " << zx_status_get_string(status);
+    if (status != ZX_OK) {
+      blob_.reset();
+      return false;
+    }
+    return true;
   }
 
  private:
@@ -136,15 +169,18 @@ class BlobWriter final : public fidl::WireServer<fuchsia_fxfs::BlobWriter> {
     return zx::ok();
   }
 
+  static zx_status_t CleanupInactiveBlobWritersInternal(Blob* blob) { return ZX_OK; }
+
   fbl::RefPtr<Blob> blob_;
+  // Holds a borrow of the server_channel, it should be valid as long as the binding is. Used to
+  // internally check if the client end is still open or not.
+  zx::unowned_channel server_channel_;
   std::optional<uint64_t> expected_size_;
   uint64_t total_written_ = 0;
   zx::vmo vmo_;
   fzl::VmoMapper vmo_mapper_;
   uint8_t* buffer_ = nullptr;
-};
-
-}  // namespace
+};  // class BlobWriter
 
 BlobCreator::BlobCreator(Blobfs& blobfs)
     : fs::Service([this](fidl::ServerEnd<fuchsia_fxfs::BlobCreator> server_end) {
@@ -172,37 +208,66 @@ void BlobCreator::Create(fuchsia_fxfs::wire::BlobCreatorCreateRequest* request,
 zx::result<fidl::ClientEnd<fuchsia_fxfs::BlobWriter>> BlobCreator::CreateImpl(const Digest& digest,
                                                                               bool allow_existing) {
   std::optional<fbl::RefPtr<Blob>> to_overwrite;
-  if (allow_existing) {
-    // Check the cache if a previous version is here. If so, save a ref to it to replace it. To keep
-    // the number of states low, only allow this if the existing version is readable, and there is
-    // not another overwrite already in-flight. Also blocks if the blob is already marked deleted
-    // and has not yet been purged. It would be confusing to allow overwrite to start after a purge
-    // has been queued, but will later purge both versions.
-    fbl::RefPtr<CacheNode> found;
-    if (zx_status_t status = blobfs_.GetCache().Lookup(digest, &found); status == ZX_OK) {
-      auto blob = fbl::RefPtr<Blob>::Downcast(std::move(found));
-      if (!blob->IsReadable() || blob->SetOverwriting() != ZX_OK || blob->DeletionQueued()) {
+  fbl::RefPtr<CacheNode> found;
+  if (zx_status_t status = blobfs_.GetCache().Lookup(digest, &found); status == ZX_OK) {
+    auto blob = fbl::RefPtr<Blob>::Downcast(std::move(found));
+
+    if (allow_existing) {
+      Blob* overwriting_by = blob->GetOverwritingBy();
+      if (overwriting_by) {
+        if (BlobWriter* handler = overwriting_by->GetBlobWriterHandler(); handler) {
+          // If there is an active writer, check if it is still open.
+          if (handler->ChannelActive()) {
+            return zx::error(ZX_ERR_ALREADY_EXISTS);
+          }
+        }
+      }
+
+      // Check the cache if a previous version is here. If so, save a ref to it to replace it. To
+      // keep the number of states low, only allow this if the existing version is readable, and
+      // there is not another overwrite already in-flight. Also blocks if the blob is already marked
+      // deleted and has not yet been purged. It would be confusing to allow overwrite to start
+      // after a purge has been queued, but will later purge both versions.
+      if (!blob->IsReadable() || blob->GetOverwritingBy() || blob->DeletionQueued()) {
         return zx::error(ZX_ERR_ALREADY_EXISTS);
       }
       to_overwrite = std::move(blob);
+    } else if (BlobWriter* handler = blob->GetBlobWriterHandler(); handler) {
+      // Drop the local reference, either we're exiting because a write is in-flight or we're going
+      // let the blob get cleaned up by removing the binding.
+      blob.reset();
+      // If there is an active writer, check if it is still open.
+      if (handler->ChannelActive()) {
+        return zx::error(ZX_ERR_ALREADY_EXISTS);
+      }
+    } else {
+      // This branch handles when the blob exists, but is not currently being written.
+      return zx::error(ZX_ERR_ALREADY_EXISTS);
     }
   }
 
   fbl::RefPtr new_blob = fbl::AdoptRef(new Blob(blobfs_, digest, true));
   if (to_overwrite.has_value()) {
     // Don't put it in the cache if it is not the canonical version yet.
-    new_blob->SetBlobToOverwrite(std::move(to_overwrite.value()));
-  } else {
-    if (zx_status_t status = blobfs_.GetCache().Add(new_blob); status != ZX_OK) {
+    if (zx_status_t status = to_overwrite.value()->SetOverwritingBy(new_blob.get());
+        status != ZX_OK) {
+      // This should never happen due to earlier checks.
+      ZX_DEBUG_ASSERT(status == ZX_OK);
       return zx::error(status);
     }
+    new_blob->SetBlobToOverwrite(std::move(to_overwrite.value()));
+  } else if (zx_status_t status = blobfs_.GetCache().Add(new_blob); status != ZX_OK) {
+    // This should never happen due to earlier checks.
+    ZX_DEBUG_ASSERT(status == ZX_OK);
+    return zx::error(status);
   }
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_fxfs::BlobWriter>();
   if (endpoints.is_error()) {
     return endpoints.take_error();
   }
-  auto writer = std::make_unique<BlobWriter>(std::move(new_blob));
+  auto writer =
+      std::make_unique<BlobWriter>(std::move(new_blob), endpoints->server.handle()->borrow());
   writer_bindings_.AddBinding(blobfs_.dispatcher(), std::move(endpoints->server), writer.get(),
                               [writer = std::move(writer)](fidl::UnbindInfo info) {
                                 // The lambda owns the writer. When the binding is closed, the

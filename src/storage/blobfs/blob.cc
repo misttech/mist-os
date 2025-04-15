@@ -834,23 +834,28 @@ zx::result<> Blob::CompleteReplacement(uint32_t map_index, uint64_t block_count)
 
 void Blob::FailedReplacement() { is_corrupt_.store(true, std::memory_order_relaxed); }
 
-zx_status_t Blob::SetOverwriting() {
+zx_status_t Blob::SetOverwritingBy(Blob* overwriter) {
   std::lock_guard lock(mutex_);
-  if (being_overwritten_) {
+  if (overwritten_by_) {
     return ZX_ERR_ALREADY_EXISTS;
   }
-  being_overwritten_ = true;
+  overwritten_by_ = overwriter;
   return ZX_OK;
 }
 
-zx_status_t Blob::ClearOverwriting() {
+zx_status_t Blob::ClearOverwritingBy() {
   std::lock_guard lock(mutex_);
-  if (!being_overwritten_) {
+  if (!overwritten_by_) {
     return ZX_ERR_BAD_STATE;
   }
-  being_overwritten_ = false;
+  overwritten_by_ = nullptr;
   // This may be queued for deletion that was previously blocked by `being_overwritten_`.
   return TryPurge();
+}
+
+Blob* Blob::GetOverwritingBy() {
+  std::lock_guard lock(mutex_);
+  return overwritten_by_;
 }
 
 void Blob::SetBlobToOverwrite(fbl::RefPtr<Blob> to_overwrite) {
@@ -859,6 +864,16 @@ void Blob::SetBlobToOverwrite(fbl::RefPtr<Blob> to_overwrite) {
   if (writer_) {
     writer_->SetBlobToOverwrite(std::move(to_overwrite));
   }
+}
+
+void Blob::SetBlobWriterHandler(BlobWriter* writer_handler) {
+  std::lock_guard lock(mutex_);
+  blob_writer_handler_ = writer_handler;
+}
+
+BlobWriter* Blob::GetBlobWriterHandler() {
+  std::lock_guard lock(mutex_);
+  return blob_writer_handler_;
 }
 
 }  // namespace blobfs

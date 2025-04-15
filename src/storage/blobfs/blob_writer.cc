@@ -91,7 +91,7 @@ Blob::Writer::Writer(const Blob& blob, bool is_delivery_blob)
 
 Blob::Writer::~Writer() {
   if (to_overwrite_.has_value()) {
-    zx_status_t status = to_overwrite_.value()->ClearOverwriting();
+    zx_status_t status = to_overwrite_.value()->ClearOverwritingBy();
     ZX_DEBUG_ASSERT(status == ZX_OK);
     to_overwrite_ = std::nullopt;
   }
