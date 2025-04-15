@@ -1,5 +1,14 @@
 {
     "extends": "pyrightconfig.base.json",
+    "include": [
+        "build",
+        "sdk",
+        "src",
+        "scripts",
+        "tools",
+        "vendor",
+        "zircon"
+    ],
     // Paths added to fuchsiaExtraPaths will be included in the extraPaths of the
     // generated pyrightconfig.base.json config that this pyrightconfig.json is
     // extended from.
@@ -31,7 +40,6 @@
         "third_party/pyyaml/src"
     ],
     "exclude": [
-        "out",
         "prebuilt",
         "**/prebuilt_symlink",
         "**/__pycache__"

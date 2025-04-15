@@ -225,6 +225,9 @@
       "${workspaceFolder}/pyproject.toml"
     ],
 
+    // Index more than 2k files
+    "python.analysis.languageServerMode": "full",
+
     ////////
     // Markdown
     //
