@@ -4,7 +4,9 @@
 
 #include "src/graphics/display/drivers/fake/fake-display.h"
 
-#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
+#include <fidl/fuchsia.images2/cpp/wire.h>
+#include <fidl/fuchsia.math/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fit/result.h>
@@ -25,18 +27,17 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
-#include <cinttypes>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <format>
 #include <initializer_list>
 #include <iterator>
 #include <limits>
 #include <mutex>
+#include <string>
 #include <utility>
-
-#include <fbl/alloc_checker.h>
-#include <fbl/vector.h>
+#include <vector>
 
 #include "src/graphics/display/drivers/coordinator/preferred-scanout-image-type.h"
 #include "src/graphics/display/drivers/fake/image-info.h"
@@ -49,18 +50,25 @@
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 #include "src/lib/fsl/handles/object_info.h"
-#include "src/lib/fxl/strings/string_printf.h"
 
 namespace fake_display {
 
 namespace {
 
-// List of supported pixel formats
+// List of supported pixel formats.
 constexpr fuchsia_images2_pixel_format_enum_value_t kSupportedPixelFormats[] = {
     static_cast<fuchsia_images2_pixel_format_enum_value_t>(
         fuchsia_images2::wire::PixelFormat::kB8G8R8A8),
     static_cast<fuchsia_images2_pixel_format_enum_value_t>(
         fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
+};
+constexpr auto kSupportedFormatModifiers =
+    std::to_array<fuchsia_images2::wire::PixelFormatModifier>({
+        fuchsia_images2::wire::PixelFormatModifier::kLinear,
+        fuchsia_images2::wire::PixelFormatModifier::kGoogleGoldfishOptimal,
+    });
+constexpr fuchsia_images2::wire::ColorSpace kSupportedColorSpaces[] = {
+    fuchsia_images2::wire::ColorSpace::kSrgb,
 };
 
 // Arbitrary dimensions - the same as sherlock.
@@ -117,13 +125,13 @@ FakeDisplay::FakeDisplay(FakeDisplayDeviceConfig device_config,
                          inspect::Inspector inspector)
     : display_engine_banjo_protocol_({&display_engine_protocol_ops_, this}),
       device_config_(device_config),
-      sysmem_(std::move(sysmem_allocator)),
+      sysmem_client_(std::move(sysmem_allocator)),
       applied_fallback_color_({
           .format = display::PixelFormat::kB8G8R8A8,
           .bytes = std::initializer_list<uint8_t>{0, 0, 0, 0, 0, 0, 0, 0},
       }),
       inspector_(std::move(inspector)) {
-  ZX_DEBUG_ASSERT(sysmem_.is_valid());
+  ZX_DEBUG_ASSERT(sysmem_client_.is_valid());
   InitializeSysmemClient();
 
   if (device_config_.periodic_vsync) {
@@ -156,20 +164,22 @@ zx_status_t FakeDisplay::DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) {
 }
 
 void FakeDisplay::InitializeSysmemClient() {
-  std::string debug_name = fxl::StringPrintf("fake-display[%lu]", fsl::GetCurrentProcessKoid());
-  fuchsia_sysmem2::AllocatorSetDebugClientInfoRequest request;
-  request.name() = debug_name;
-  request.id() = fsl::GetCurrentProcessKoid();
+  zx_koid_t koid = fsl::GetCurrentProcessKoid();
 
+  std::string debug_name = std::format("virtio-gpu-display[{}]", koid);
+
+  fidl::Arena arena;
   std::lock_guard lock(mutex_);
-  fit::result<fidl::OneWayStatus> set_debug_status =
-      sysmem_->SetDebugClientInfo(std::move(request));
-  if (!set_debug_status.is_ok()) {
+  fidl::OneWayStatus set_debug_status = sysmem_client_->SetDebugClientInfo(
+      fuchsia_sysmem2::wire::AllocatorSetDebugClientInfoRequest::Builder(arena)
+          .name(fidl::StringView::FromExternal(debug_name))
+          .id(koid)
+          .Build());
+  if (!set_debug_status.ok()) {
     // Errors here mean that the FIDL transport was not set up correctly, and
     // all future Sysmem client calls will fail. Crashing here exposes the
     // failure early.
-    fdf::fatal("SetDebugClientInfo() FIDL call failed: {}",
-               set_debug_status.error_value().status_string());
+    fdf::fatal("SetDebugClientInfo() FIDL call failed: {}", set_debug_status.status_string());
   }
 }
 
@@ -210,24 +220,25 @@ void FakeDisplay::DisplayEngineUnsetListener() {
 }
 
 zx::result<display::DriverImageId> FakeDisplay::ImportVmoImageForTesting(zx::vmo vmo,
-                                                                         size_t offset) {
+                                                                         size_t vmo_offset) {
   std::lock_guard lock(mutex_);
 
   display::DriverImageId driver_image_id = next_imported_display_driver_image_id_++;
 
   // Image metadata for testing only and may not reflect the actual image
   // buffer format.
-  ImageMetadata display_image_metadata = {
-      .pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8,
-      .coherency_domain = fuchsia_sysmem2::CoherencyDomain::kCpu,
+  SysmemBufferInfo sysmem_buffer_info = {
+      .image_vmo = std::move(vmo),
+      .image_vmo_offset = vmo_offset,
+      .pixel_format = fuchsia_images2::wire::PixelFormat::kB8G8R8A8,
+      .pixel_format_modifier = fuchsia_images2::wire::PixelFormatModifier::kLinear,
+      .minimum_size = fuchsia_math::wire::SizeU{.width = 0, .height = 0},
+      .minimum_bytes_per_row = 0,
+      .coherency_domain = fuchsia_sysmem2::wire::CoherencyDomain::kRam,
   };
 
-  fbl::AllocChecker alloc_checker;
-  auto import_info = fbl::make_unique_checked<DisplayImageInfo>(
-      &alloc_checker, driver_image_id, display_image_metadata, std::move(vmo));
-  if (!alloc_checker.check()) {
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
+  auto import_info =
+      std::make_unique<DisplayImageInfo>(driver_image_id, std::move(sysmem_buffer_info));
 
   imported_images_.insert(std::move(import_info));
   return zx::ok(driver_image_id);
@@ -244,118 +255,90 @@ bool IsAcceptableImageTilingType(uint32_t image_tiling_type) {
 
 zx_status_t FakeDisplay::DisplayEngineImportBufferCollection(
     uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
-  const display::DriverBufferCollectionId driver_buffer_collection_id =
+  const display::DriverBufferCollectionId buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
 
   std::lock_guard lock(mutex_);
 
-  if (buffer_collections_.find(driver_buffer_collection_id) != buffer_collections_.end()) {
-    fdf::error("Buffer Collection (id={}) already exists", driver_buffer_collection_id.value());
+  auto buffer_collection_it = buffer_collections_.find(buffer_collection_id);
+  if (buffer_collection_it != buffer_collections_.end()) {
+    fdf::warn("Rejected BufferCollection import request with existing ID: {}",
+              buffer_collection_id.value());
     return ZX_ERR_ALREADY_EXISTS;
   }
 
   auto [collection_client_endpoint, collection_server_endpoint] =
       fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
 
-  fuchsia_sysmem2::AllocatorBindSharedCollectionRequest bind_request;
-  bind_request.token() =
-      fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>(std::move(collection_token));
-  bind_request.buffer_collection_request() = std::move(collection_server_endpoint);
-  auto bind_result = sysmem_->BindSharedCollection(std::move(bind_request));
-  if (bind_result.is_error()) {
-    fdf::error("Cannot complete FIDL call BindSharedCollection: {}",
-               bind_result.error_value().status_string());
+  // TODO(costan): fidl::Arena may allocate memory and crash. Find a way to get
+  // control over memory allocation.
+  fidl::Arena arena;
+  fidl::OneWayStatus bind_result = sysmem_client_->BindSharedCollection(
+      fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena)
+          .token(
+              fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>(std::move(collection_token)))
+          .buffer_collection_request(std::move(collection_server_endpoint))
+          .Build());
+  if (!bind_result.ok()) {
+    fdf::error("FIDL call BindSharedCollection failed: {}", bind_result.status_string());
     return ZX_ERR_INTERNAL;
   }
 
-  buffer_collections_[driver_buffer_collection_id] =
-      fidl::SyncClient(std::move(collection_client_endpoint));
+  buffer_collections_.insert(
+      buffer_collection_it,
+      std::make_pair(buffer_collection_id, fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>(
+                                               std::move(collection_client_endpoint))));
+
   return ZX_OK;
 }
 
 zx_status_t FakeDisplay::DisplayEngineReleaseBufferCollection(
     uint64_t banjo_driver_buffer_collection_id) {
-  const display::DriverBufferCollectionId driver_buffer_collection_id =
+  const display::DriverBufferCollectionId buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
 
   std::lock_guard lock(mutex_);
 
-  if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
-    fdf::error("Cannot release buffer collection {}: buffer collection doesn't exist",
-               driver_buffer_collection_id.value());
+  auto buffer_collection_it = buffer_collections_.find(buffer_collection_id);
+  if (buffer_collection_it == buffer_collections_.end()) {
+    fdf::warn("Rejected request to release BufferCollection with unknown ID: {}",
+              buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
-  buffer_collections_.erase(driver_buffer_collection_id);
+
+  buffer_collections_.erase(buffer_collection_it);
   return ZX_OK;
 }
 
 zx_status_t FakeDisplay::DisplayEngineImportImage(const image_metadata_t* image_metadata,
                                                   uint64_t banjo_driver_buffer_collection_id,
-                                                  uint32_t index, uint64_t* out_image_handle) {
-  const display::DriverBufferCollectionId driver_buffer_collection_id =
+                                                  uint32_t buffer_index,
+                                                  uint64_t* out_image_handle) {
+  const display::DriverBufferCollectionId buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
 
   std::lock_guard lock(mutex_);
 
-  const auto it = buffer_collections_.find(driver_buffer_collection_id);
-  if (it == buffer_collections_.end()) {
-    fdf::error("ImportImage: Cannot find imported buffer collection (id={})",
-               driver_buffer_collection_id.value());
+  auto buffer_collection_it = buffer_collections_.find(buffer_collection_id);
+  if (buffer_collection_it == buffer_collections_.end()) {
+    fdf::error("ImportImage: Cannot find imported buffer collection ID: {}",
+               buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
-  const fidl::SyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
+  fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& buffer_collection =
+      buffer_collection_it->second;
+
   if (!IsAcceptableImageTilingType(image_metadata->tiling_type)) {
     fdf::info("ImportImage() will fail due to invalid Image tiling type {}",
               image_metadata->tiling_type);
     return ZX_ERR_INVALID_ARGS;
   }
 
-  auto check_result = collection->CheckAllBuffersAllocated();
-  // TODO(https://fxbug.dev/42072690): The sysmem FIDL error logging patterns are
-  // inconsistent across drivers. The FIDL error handling and logging should be
-  // unified.
-  if (check_result.is_error()) {
-    if (check_result.error_value().is_framework_error()) {
-      return check_result.error_value().framework_error().status();
-    }
-    fuchsia_sysmem2::Error check_error = check_result.error_value().domain_error();
-    if (check_error == fuchsia_sysmem2::Error::kPending) {
-      return ZX_ERR_SHOULD_WAIT;
-    }
-    return sysmem::V1CopyFromV2Error(check_error);
-  }
-
-  auto wait_result = collection->WaitForAllBuffersAllocated();
-  // TODO(https://fxbug.dev/42072690): The sysmem FIDL error logging patterns are
-  // inconsistent across drivers. The FIDL error handling and logging should be
-  // unified.
-  if (wait_result.is_error()) {
-    if (wait_result.error_value().is_framework_error()) {
-      return wait_result.error_value().framework_error().status();
-    }
-    fuchsia_sysmem2::Error wait_error = wait_result.error_value().domain_error();
-    return sysmem::V1CopyFromV2Error(wait_error);
-  }
-  auto& wait_response = wait_result.value();
-  auto& collection_info = wait_response.buffer_collection_info();
-
-  fbl::AllocChecker alloc_checker;
-  fbl::Vector<zx::vmo> vmos;
-  vmos.reserve(collection_info->buffers()->size(), &alloc_checker);
-  if (!alloc_checker.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
-  for (auto& buffer : *collection_info->buffers()) {
-    ZX_DEBUG_ASSERT_MSG(vmos.size() < collection_info->buffers()->size(),
-                        "Incorrect capacity passed to earlier reserve()");
-    vmos.push_back(std::move(buffer.vmo().value()), &alloc_checker);
-    ZX_DEBUG_ASSERT_MSG(alloc_checker.check(), "Incorrect capacity passed to earlier reserve()");
-  }
-
-  if (!collection_info->settings()->image_format_constraints().has_value() ||
-      index >= vmos.size()) {
-    return ZX_ERR_OUT_OF_RANGE;
+  zx::result<SysmemBufferInfo> sysmem_buffer_info_result =
+      SysmemBufferInfo::GetSysmemMetadata(buffer_collection, buffer_index);
+  if (sysmem_buffer_info_result.is_error()) {
+    // SysmemBufferInfo::GetSysmemMetadata() has already logged the error.
+    return sysmem_buffer_info_result.error_value();
   }
 
   // TODO(https://fxbug.dev/42079320): When capture is enabled
@@ -363,37 +346,32 @@ zx_status_t FakeDisplay::DisplayEngineImportImage(const image_metadata_t* image_
   // the display images should not be of "inaccessible" coherency domain.
 
   display::DriverImageId driver_image_id = next_imported_display_driver_image_id_++;
-  ImageMetadata display_image_metadata = {
-      .pixel_format =
-          collection_info->settings()->image_format_constraints()->pixel_format().value(),
-      .coherency_domain =
-          collection_info->settings()->buffer_settings()->coherency_domain().value(),
-  };
 
-  auto import_info = fbl::make_unique_checked<DisplayImageInfo>(
-      &alloc_checker, driver_image_id, std::move(display_image_metadata), std::move(vmos[index]));
-  if (!alloc_checker.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
+  auto display_image_info = std::make_unique<DisplayImageInfo>(
+      driver_image_id, std::move(sysmem_buffer_info_result).value());
 
   *out_image_handle = display::ToBanjoDriverImageId(driver_image_id);
-  imported_images_.insert(std::move(import_info));
+  imported_images_.insert(std::move(display_image_info));
   return ZX_OK;
 }
 
 void FakeDisplay::DisplayEngineReleaseImage(uint64_t image_handle) {
-  display::DriverImageId driver_image_id = display::ToDriverImageId(image_handle);
+  display::DriverImageId image_id = display::ToDriverImageId(image_handle);
 
   std::lock_guard lock(mutex_);
 
-  if (applied_image_id_ == driver_image_id) {
+  if (applied_image_id_ == image_id) {
     fdf::fatal("Cannot safely release an image used in currently applied configuration");
     return;
   }
 
-  if (imported_images_.erase(driver_image_id) == nullptr) {
-    fdf::error("Image release request with unused handle: {}", driver_image_id.value());
+  auto image_it = imported_images_.find(image_id);
+  if (image_it == imported_images_.end()) {
+    fdf::warn("Rejected request to release Image with unknown ID: {}", image_id.value());
+    return;
   }
+
+  imported_images_.erase(image_it);
 }
 
 config_check_result_t FakeDisplay::DisplayEngineCheckConfiguration(
@@ -509,96 +487,91 @@ enum class FakeDisplay::BufferCollectionUsage {
   kCapture = 2,
 };
 
-fuchsia_sysmem2::BufferCollectionConstraints FakeDisplay::CreateBufferCollectionConstraints(
-    BufferCollectionUsage usage) {
-  fuchsia_sysmem2::BufferCollectionConstraints constraints;
+namespace {
+
+fuchsia_sysmem2::wire::BufferMemoryConstraints CreateBufferMemoryConstraints(
+    fidl::AnyArena& arena) {
+  return fuchsia_sysmem2::wire::BufferMemoryConstraints::Builder(arena)
+      .min_size_bytes(0)
+      .max_size_bytes(std::numeric_limits<uint32_t>::max())
+      .physically_contiguous_required(false)
+      .secure_required(false)
+      .ram_domain_supported(true)
+      .cpu_domain_supported(true)
+      .inaccessible_domain_supported(true)
+      .Build();
+}
+
+void SetLayerImageFormatConstraints(
+    fidl::WireTableBuilder<fuchsia_sysmem2::wire::ImageFormatConstraints>& constraints_builder) {
+  constraints_builder.min_size(fuchsia_math::wire::SizeU{.width = 0, .height = 0})
+      .max_size(fuchsia_math::wire::SizeU{.width = std::numeric_limits<uint32_t>::max(),
+                                          .height = std::numeric_limits<uint32_t>::max()})
+      .min_bytes_per_row(0)
+      .max_bytes_per_row(std::numeric_limits<uint32_t>::max())
+      .max_width_times_height(std::numeric_limits<uint32_t>::max());
+}
+
+}  // namespace
+
+void FakeDisplay::SetCaptureImageFormatConstraints(
+    fidl::WireTableBuilder<fuchsia_sysmem2::wire::ImageFormatConstraints>& constraints_builder) {
+  constraints_builder.min_size(fuchsia_math::wire::SizeU{.width = kWidth, .height = kHeight})
+      .max_size(fuchsia_math::wire::SizeU{.width = kWidth, .height = kHeight})
+      .min_bytes_per_row(kWidth * 4)
+      .max_bytes_per_row(kWidth * 4)
+      .max_width_times_height(kWidth * kHeight);
+}
+
+fuchsia_sysmem2::wire::BufferCollectionConstraints FakeDisplay::CreateBufferCollectionConstraints(
+    BufferCollectionUsage usage, fidl::AnyArena& arena) {
+  fidl::WireTableBuilder<fuchsia_sysmem2::wire::BufferCollectionConstraints> constraints_builder =
+      fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
+
+  fidl::WireTableBuilder<fuchsia_sysmem2::wire::BufferUsage> usage_builder =
+      fuchsia_sysmem2::wire::BufferUsage::Builder(arena);
   switch (usage) {
     case BufferCollectionUsage::kCapture:
-      constraints.usage().emplace();
-      constraints.usage()->cpu() =
-          fuchsia_sysmem2::kCpuUsageReadOften | fuchsia_sysmem2::kCpuUsageWriteOften;
+      usage_builder.cpu(fuchsia_sysmem2::kCpuUsageReadOften | fuchsia_sysmem2::kCpuUsageWriteOften);
       break;
     case BufferCollectionUsage::kPrimaryLayer:
-      constraints.usage().emplace();
-      constraints.usage()->display() = fuchsia_sysmem2::kDisplayUsageLayer;
+      usage_builder.display(fuchsia_sysmem2::kDisplayUsageLayer);
       break;
   }
+  constraints_builder.usage(usage_builder.Build());
 
   // TODO(https://fxbug.dev/42079320): In order to support capture, both capture sources
   // and capture targets must not be in the "inaccessible" coherency domain.
-  constraints.buffer_memory_constraints().emplace();
-  SetBufferMemoryConstraints(constraints.buffer_memory_constraints().value());
+  constraints_builder.buffer_memory_constraints(CreateBufferMemoryConstraints(arena));
 
-  // When we have C++20, we can use std::to_array to avoid specifying the array
-  // size twice.
-  static constexpr std::array<fuchsia_images2::PixelFormat, 2> kPixelFormats = {
-      fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::PixelFormat::kB8G8R8A8};
-  static constexpr std::array<fuchsia_images2::PixelFormatModifier, 2> kFormatModifiers = {
-      fuchsia_images2::PixelFormatModifier::kLinear,
-      fuchsia_images2::PixelFormatModifier::kGoogleGoldfishOptimal};
-
-  constraints.image_format_constraints().emplace();
-  for (auto pixel_format : kPixelFormats) {
-    for (auto format_modifier : kFormatModifiers) {
-      fuchsia_sysmem2::ImageFormatConstraints& image_constraints =
-          constraints.image_format_constraints()->emplace_back();
-
-      SetCommonImageFormatConstraints(pixel_format, format_modifier, image_constraints);
+  std::vector<fuchsia_sysmem2::wire::ImageFormatConstraints> image_format_constraints;
+  image_format_constraints.reserve(std::size(kSupportedPixelFormats) *
+                                   kSupportedFormatModifiers.size());
+  for (fuchsia_images2_pixel_format_enum_value_t banjo_pixel_format : kSupportedPixelFormats) {
+    for (fuchsia_images2::wire::PixelFormatModifier format_modifier : kSupportedFormatModifiers) {
+      fidl::WireTableBuilder<fuchsia_sysmem2::wire::ImageFormatConstraints>
+          image_constraints_builder = fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena);
+      image_constraints_builder.pixel_format(display::PixelFormat(banjo_pixel_format).ToFidl())
+          .pixel_format_modifier(format_modifier)
+          .color_spaces(kSupportedColorSpaces)
+          .size_alignment(fuchsia_math::wire::SizeU{.width = 1, .height = 1})
+          .bytes_per_row_divisor(1)
+          .start_offset_divisor(1)
+          .display_rect_alignment(fuchsia_math::wire::SizeU{.width = 1, .height = 1});
       switch (usage) {
         case BufferCollectionUsage::kCapture:
-          SetCaptureImageFormatConstraints(image_constraints);
+          SetCaptureImageFormatConstraints(image_constraints_builder);
           break;
         case BufferCollectionUsage::kPrimaryLayer:
-          SetLayerImageFormatConstraints(image_constraints);
+          SetLayerImageFormatConstraints(image_constraints_builder);
           break;
       }
+      image_format_constraints.push_back(image_constraints_builder.Build());
     }
   }
-  return constraints;
-}
+  constraints_builder.image_format_constraints(image_format_constraints);
 
-void FakeDisplay::SetBufferMemoryConstraints(
-    fuchsia_sysmem2::BufferMemoryConstraints& constraints) {
-  constraints.min_size_bytes() = 0;
-  constraints.max_size_bytes() = std::numeric_limits<uint32_t>::max();
-  constraints.physically_contiguous_required() = false;
-  constraints.secure_required() = false;
-  constraints.ram_domain_supported() = true;
-  constraints.cpu_domain_supported() = true;
-  constraints.inaccessible_domain_supported() = true;
-}
-
-void FakeDisplay::SetCommonImageFormatConstraints(
-    fuchsia_images2::PixelFormat pixel_format, fuchsia_images2::PixelFormatModifier format_modifier,
-    fuchsia_sysmem2::ImageFormatConstraints& constraints) {
-  constraints.pixel_format() = pixel_format;
-  constraints.pixel_format_modifier() = format_modifier;
-
-  constraints.color_spaces() = {fuchsia_images2::ColorSpace::kSrgb};
-
-  constraints.size_alignment() = {1, 1};
-  constraints.bytes_per_row_divisor() = 1;
-  constraints.start_offset_divisor() = 1;
-  constraints.display_rect_alignment() = {1, 1};
-}
-
-void FakeDisplay::SetCaptureImageFormatConstraints(
-    fuchsia_sysmem2::ImageFormatConstraints& constraints) {
-  constraints.min_size() = {kWidth, kHeight};
-  constraints.max_size() = {kWidth, kHeight};
-  constraints.min_bytes_per_row() = kWidth * 4;
-  constraints.max_bytes_per_row() = kWidth * 4;
-  constraints.max_width_times_height() = kWidth * kHeight;
-}
-
-void FakeDisplay::SetLayerImageFormatConstraints(
-    fuchsia_sysmem2::ImageFormatConstraints& constraints) {
-  constraints.min_size() = {0, 0};
-  constraints.max_size() = {std::numeric_limits<uint32_t>::max(),
-                            std::numeric_limits<uint32_t>::max()};
-  constraints.min_bytes_per_row() = 0;
-  constraints.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
-  constraints.max_width_times_height() = std::numeric_limits<uint32_t>::max();
+  return constraints_builder.Build();
 }
 
 zx_status_t FakeDisplay::DisplayEngineSetBufferCollectionConstraints(
@@ -608,25 +581,26 @@ zx_status_t FakeDisplay::DisplayEngineSetBufferCollectionConstraints(
 
   std::lock_guard lock(mutex_);
 
-  const auto it = buffer_collections_.find(driver_buffer_collection_id);
-  if (it == buffer_collections_.end()) {
-    fdf::error("ImportImage: Cannot find imported buffer collection (id={})",
+  const auto buffer_collection_it = buffer_collections_.find(driver_buffer_collection_id);
+  if (buffer_collection_it == buffer_collections_.end()) {
+    fdf::error("SetBufferCollectionConstraints: Cannot find imported buffer collection ID: {}",
                driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
-  const fidl::SyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
+  fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& buffer_collection =
+      buffer_collection_it->second;
 
   BufferCollectionUsage buffer_collection_usage = (usage->tiling_type == IMAGE_TILING_TYPE_CAPTURE)
                                                       ? BufferCollectionUsage::kCapture
                                                       : BufferCollectionUsage::kPrimaryLayer;
-
-  fuchsia_sysmem2::BufferCollectionSetConstraintsRequest request;
-  request.constraints() = CreateBufferCollectionConstraints(buffer_collection_usage);
-  auto set_result = collection->SetConstraints(std::move(request));
-  if (set_result.is_error()) {
-    fdf::error("Failed to set constraints on a sysmem BufferCollection: {}",
-               set_result.error_value().status_string());
-    return set_result.error_value().status();
+  fidl::Arena arena;
+  fidl::OneWayStatus set_constraints_status = buffer_collection->SetConstraints(
+      fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena)
+          .constraints(CreateBufferCollectionConstraints(buffer_collection_usage, arena))
+          .Build());
+  if (!set_constraints_status.ok()) {
+    fdf::error("SetConstraints() FIDL call failed: {}", set_constraints_status.status_string());
+    return set_constraints_status.status();
   }
 
   return ZX_OK;
@@ -637,77 +611,39 @@ zx_status_t FakeDisplay::DisplayEngineSetDisplayPower(uint64_t display_id, bool 
 }
 
 zx_status_t FakeDisplay::DisplayEngineImportImageForCapture(
-    uint64_t banjo_driver_buffer_collection_id, uint32_t index, uint64_t* out_capture_handle) {
+    uint64_t banjo_driver_buffer_collection_id, uint32_t buffer_index,
+    uint64_t* out_capture_handle) {
   if (!IsCaptureSupported()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  const display::DriverBufferCollectionId driver_buffer_collection_id =
+  const display::DriverBufferCollectionId buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
 
   std::lock_guard lock(mutex_);
 
-  const auto it = buffer_collections_.find(driver_buffer_collection_id);
-  if (it == buffer_collections_.end()) {
-    fdf::error("ImportImage: Cannot find imported buffer collection (id={})",
-               driver_buffer_collection_id.value());
+  auto buffer_collection_it = buffer_collections_.find(buffer_collection_id);
+  if (buffer_collection_it == buffer_collections_.end()) {
+    fdf::error("ImportImage: Cannot find imported buffer collection ID: {}",
+               buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
-  const fidl::SyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
+  fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& buffer_collection =
+      buffer_collection_it->second;
 
-  auto check_result = collection->CheckAllBuffersAllocated();
-  // TODO(https://fxbug.dev/42072690): The sysmem FIDL error logging patterns are
-  // inconsistent across drivers. The FIDL error handling and logging should be
-  // unified.
-  if (check_result.is_error()) {
-    if (check_result.error_value().is_framework_error()) {
-      return check_result.error_value().framework_error().status();
-    }
-    fuchsia_sysmem2::Error check_error = check_result.error_value().domain_error();
-    if (check_error == fuchsia_sysmem2::Error::kPending) {
-      return ZX_ERR_SHOULD_WAIT;
-    }
-    return sysmem::V1CopyFromV2Error(check_error);
-  }
-
-  auto wait_result = collection->WaitForAllBuffersAllocated();
-  // TODO(https://fxbug.dev/42072690): The sysmem FIDL error logging patterns are
-  // inconsistent across drivers. The FIDL error handling and logging should be
-  // unified.
-  if (wait_result.is_error()) {
-    if (wait_result.error_value().is_framework_error()) {
-      return wait_result.error_value().framework_error().status();
-    }
-    fuchsia_sysmem2::Error wait_error = wait_result.error_value().domain_error();
-    return sysmem::V1CopyFromV2Error(wait_error);
-  }
-  auto& wait_response = wait_result.value();
-  fuchsia_sysmem2::BufferCollectionInfo& collection_info =
-      wait_response.buffer_collection_info().value();
-
-  if (!collection_info.settings()->image_format_constraints().has_value()) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  if (index >= collection_info.buffers()->size()) {
-    return ZX_ERR_OUT_OF_RANGE;
+  zx::result<SysmemBufferInfo> sysmem_buffer_info_result =
+      SysmemBufferInfo::GetSysmemMetadata(buffer_collection, buffer_index);
+  if (sysmem_buffer_info_result.is_error()) {
+    // SysmemBufferInfo::GetSysmemMetadata() has already logged the error.
+    return sysmem_buffer_info_result.error_value();
   }
 
   // TODO(https://fxbug.dev/42079320): Capture target images should not be of
   // "inaccessible" coherency domain. We should add a check here.
   display::DriverCaptureImageId driver_capture_image_id = next_imported_driver_capture_image_id_++;
-  ImageMetadata capture_image_metadata = {
-      .pixel_format =
-          collection_info.settings()->image_format_constraints()->pixel_format().value(),
-      .coherency_domain = collection_info.settings()->buffer_settings()->coherency_domain().value(),
-  };
-  zx::vmo vmo = std::move(collection_info.buffers()->at(index).vmo().value());
 
-  fbl::AllocChecker alloc_checker;
-  auto capture_image_info = fbl::make_unique_checked<CaptureImageInfo>(
-      &alloc_checker, driver_capture_image_id, std::move(capture_image_metadata), std::move(vmo));
-  if (!alloc_checker.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
+  auto capture_image_info = std::make_unique<CaptureImageInfo>(
+      driver_capture_image_id, std::move(sysmem_buffer_info_result).value());
 
   *out_capture_handle = display::ToBanjoDriverCaptureImageId(driver_capture_image_id);
   imported_captures_.insert(std::move(capture_image_info));
@@ -825,10 +761,11 @@ zx::result<> FakeDisplay::ServiceAnyCaptureRequest() {
 // static
 zx::result<> FakeDisplay::DoImageCapture(DisplayImageInfo& source_info,
                                          CaptureImageInfo& destination_info) {
-  if (source_info.metadata().pixel_format != destination_info.metadata().pixel_format) {
+  if (source_info.sysmem_buffer_info().pixel_format !=
+      destination_info.sysmem_buffer_info().pixel_format) {
     fdf::error("Capture will fail; trying to capture format={} as format={}\n",
-               static_cast<uint32_t>(source_info.metadata().pixel_format),
-               static_cast<uint32_t>(destination_info.metadata().pixel_format));
+               static_cast<uint32_t>(source_info.sysmem_buffer_info().pixel_format),
+               static_cast<uint32_t>(destination_info.sysmem_buffer_info().pixel_format));
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -886,12 +823,13 @@ zx::result<> FakeDisplay::DoImageCapture(DisplayImageInfo& source_info,
   std::span<uint32_t> destination_colors(static_cast<uint32_t*>(destination_mapper.start()),
                                          destination_vmo_size / sizeof(uint32_t));
 
-  if (source_info.metadata().coherency_domain == fuchsia_sysmem2::CoherencyDomain::kRam) {
+  if (source_info.sysmem_buffer_info().coherency_domain == fuchsia_sysmem2::CoherencyDomain::kRam) {
     zx_cache_flush(source_mapper.start(), source_vmo_size,
                    ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
   }
   std::ranges::copy(source_colors, destination_colors.begin());
-  if (destination_info.metadata().coherency_domain == fuchsia_sysmem2::CoherencyDomain::kRam) {
+  if (destination_info.sysmem_buffer_info().coherency_domain ==
+      fuchsia_sysmem2::CoherencyDomain::kRam) {
     zx_cache_flush(destination_mapper.start(), destination_vmo_size,
                    ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
   }
@@ -906,10 +844,10 @@ zx::result<> FakeDisplay::DoColorFillCapture(display::Color fill_color,
   // configuration is applied are constrained to the initial fill color format,
   // which happens to be 32-bit BGRA. This rough edge will be removed when we
   // explicitly disallow starting a capture before a config is applied.
-  if (fill_color.format().ToFidl() != destination_info.metadata().pixel_format) {
+  if (fill_color.format().ToFidl() != destination_info.sysmem_buffer_info().pixel_format) {
     fdf::error("Capture will fail; trying to capture format={} as format={}\n",
                fill_color.format().ValueForLogging(),
-               static_cast<uint32_t>(destination_info.metadata().pixel_format));
+               static_cast<uint32_t>(destination_info.sysmem_buffer_info().pixel_format));
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -945,7 +883,8 @@ zx::result<> FakeDisplay::DoColorFillCapture(display::Color fill_color,
                                          destination_vmo_size / sizeof(uint32_t));
 
   std::ranges::fill(destination_colors, source_color);
-  if (destination_info.metadata().coherency_domain == fuchsia_sysmem2::CoherencyDomain::kRam) {
+  if (destination_info.sysmem_buffer_info().coherency_domain ==
+      fuchsia_sysmem2::CoherencyDomain::kRam) {
     zx_cache_flush(destination_mapper.start(), destination_vmo_size,
                    ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
   }

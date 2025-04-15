@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_H_
 
-#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/cpp/inspector.h>
@@ -86,8 +86,8 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
                                                   zx::channel collection_token);
   zx_status_t DisplayEngineReleaseBufferCollection(uint64_t banjo_driver_buffer_collection_id);
   zx_status_t DisplayEngineImportImage(const image_metadata_t* image_metadata,
-                                       uint64_t banjo_driver_buffer_collection_id, uint32_t index,
-                                       uint64_t* out_image_handle);
+                                       uint64_t banjo_driver_buffer_collection_id,
+                                       uint32_t buffer_index, uint64_t* out_image_handle);
   void DisplayEngineReleaseImage(uint64_t image_handle);
   config_check_result_t DisplayEngineCheckConfiguration(
       const display_config_t* display_config_ptr,
@@ -99,7 +99,8 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
       const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
   zx_status_t DisplayEngineSetDisplayPower(uint64_t display_id, bool power_on);
   zx_status_t DisplayEngineImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
-                                                 uint32_t index, uint64_t* out_capture_handle);
+                                                 uint32_t buffer_index,
+                                                 uint64_t* out_capture_handle);
   zx_status_t DisplayEngineStartCapture(uint64_t capture_handle);
   zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle);
   zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb);
@@ -133,7 +134,7 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   // Just for display core unittests.
   //
   // Can be called from any thread.
-  zx::result<display::DriverImageId> ImportVmoImageForTesting(zx::vmo vmo, size_t offset);
+  zx::result<display::DriverImageId> ImportVmoImageForTesting(zx::vmo vmo, size_t vmo_offset);
 
   // Can be called from any thread.
   uint8_t GetClampRgbValue() const {
@@ -178,22 +179,11 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   // Must be called exactly once before using the Sysmem client.
   void InitializeSysmemClient();
 
-  fuchsia_sysmem2::BufferCollectionConstraints CreateBufferCollectionConstraints(
-      BufferCollectionUsage usage);
+  fuchsia_sysmem2::wire::BufferCollectionConstraints CreateBufferCollectionConstraints(
+      BufferCollectionUsage usage, fidl::AnyArena& arena);
 
-  // Constraints applicable to all buffers used for display images.
-  void SetBufferMemoryConstraints(fuchsia_sysmem2::BufferMemoryConstraints& constraints);
-
-  // Constraints applicable to all image buffers used in Display.
-  void SetCommonImageFormatConstraints(fuchsia_images2::PixelFormat pixel_format,
-                                       fuchsia_images2::PixelFormatModifier format_modifier,
-                                       fuchsia_sysmem2::ImageFormatConstraints& constraints);
-
-  // Constraints applicable to images buffers used in image capture.
-  void SetCaptureImageFormatConstraints(fuchsia_sysmem2::ImageFormatConstraints& constraints);
-
-  // Constraints applicable to image buffers that will be bound to layers.
-  void SetLayerImageFormatConstraints(fuchsia_sysmem2::ImageFormatConstraints& constraints);
+  void SetCaptureImageFormatConstraints(
+      fidl::WireTableBuilder<fuchsia_sysmem2::wire::ImageFormatConstraints>& constraints_builder);
 
   // Records the display config to the inspector's root node. The root node must
   // be already initialized.
@@ -230,14 +220,14 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   //
   // When the driver is migrated to FIDL, this member will only be accessed on
   // the Display Engine API serving dispatcher.
-  fidl::SyncClient<fuchsia_sysmem2::Allocator> sysmem_ __TA_GUARDED(mutex_);
+  fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_client_ __TA_GUARDED(mutex_);
 
   // Owns the Sysmem buffer collections imported into the driver.
   //
   // When the driver is migrated to FIDL, this member will only be accessed on
   // the Display Engine API serving dispatcher.
   std::unordered_map<display::DriverBufferCollectionId,
-                     fidl::SyncClient<fuchsia_sysmem2::BufferCollection>>
+                     fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>>
       buffer_collections_ __TA_GUARDED(mutex_);
 
   // Owns the display images imported into the driver.
