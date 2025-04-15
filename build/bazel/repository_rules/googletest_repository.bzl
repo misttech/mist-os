@@ -8,24 +8,29 @@ def _googletest_repository_impl(repo_ctx):
     """Create a @com_google_googletest repository that supports Fuchsia."""
     workspace_dir = str(repo_ctx.workspace_root)
 
-    # IMPORTANT: keep this function in sync with the computation of
-    # generated_repository_inputs['com_google_googletest'] in
-    # //build/bazel/update-workspace.py.
-    if hasattr(repo_ctx.attr, "content_hash_file"):
-        repo_ctx.path(workspace_dir + "/" + repo_ctx.attr.content_hash_file)
+    if repo_ctx.attr.content_hash_file:
+        # Record the content hash file as an input for this rule.
+        repo_ctx.path(Label("@//:" + repo_ctx.attr.content_hash_file))
+
+    # Locate the git bundle path, and record it as an input dependency for this rule.
+    # This works even if content_hash_file is not used.
+    bundle_path = repo_ctx.path(Label("@//:build/bazel/patches/googletest/fuchsia-support.bundle"))
+
+    # Do the same for the script's path.
+    script_path = repo_ctx.path(Label("@//:build/bazel/scripts/git-clone-then-apply-bundle.py"))
 
     # This uses a git bundle to ensure that we can always work from a
     # Jiri-managed clone of //third_party/googletest/src/. This is more reliable
     # than the previous approach that relied on patching.
     repo_ctx.execute(
         [
-            repo_ctx.path(workspace_dir + "/build/bazel/scripts/git-clone-then-apply-bundle.py"),
+            script_path,
             "--dst-dir",
             ".",
             "--git-url",
             repo_ctx.path(workspace_dir + "/third_party/googletest/src"),
             "--git-bundle",
-            repo_ctx.path(workspace_dir + "/build/bazel/patches/googletest/fuchsia-support.bundle"),
+            bundle_path,
             "--git-bundle-head",
             "fuchsia-support",
         ],

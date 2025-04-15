@@ -709,6 +709,16 @@ common --enable_bzlmod=false
 
     # LINT.IfChange
     generated.record_symlink(
+        "workspace/fuchsia_build_generated/com_google_googletest.hash",
+        gn_output_dir
+        / "regenerator_outputs"
+        / "bazel_content_hashes"
+        / "com_google_googletest.hash",
+    )
+    # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
+
+    # LINT.IfChange
+    generated.record_symlink(
         "workspace/fuchsia_build_generated/fuchsia_in_tree_idk.hash",
         gn_output_dir / "obj/build/bazel/fuchsia_in_tree_idk.hash",
     )
