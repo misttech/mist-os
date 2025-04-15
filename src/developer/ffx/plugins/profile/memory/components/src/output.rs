@@ -4,28 +4,33 @@
 
 use attribution_processing::kernel_statistics::KernelStatistics;
 use attribution_processing::summary::{MemorySummary, PrincipalSummary, VmoSummary};
-use ffx_profile_memory_components_args::ComponentsCommand;
-
 use prettytable::{row, table, Table};
 
 pub fn write_summary(
     f: &mut dyn std::io::Write,
-    cmd: &ComponentsCommand,
+    csv: bool,
     value: &MemorySummary,
-    kernel_statistics: KernelStatistics,
+    kernel_statistics: &KernelStatistics,
 ) -> std::io::Result<()> {
-    if cmd.csv {
-        writeln!(
-        f,
-        "attributor, principal, vmo, committed_private, populated_private, committed_scaled, populated_scaled, committed_total, populated_total"
-        )?;
+    if csv {
+        let mut csv_writer = csv::Writer::from_writer(f);
+        csv_writer.write_record(&[
+            "attributor",
+            "principal",
+            "vmo",
+            "committed_private",
+            "populated_private",
+            "committed_scaled",
+            "populated_scaled",
+            "committed_total",
+            "populated_total",
+        ])?;
+        for principal in &value.principals {
+            write_summary_principal_csv(&mut csv_writer, principal)?;
+        }
     } else {
-        write_summary_kernel_stats(f, &kernel_statistics)?;
-    }
-    for principal in &value.principals {
-        if cmd.csv {
-            write_summary_principal_csv(f, principal)?;
-        } else {
+        write_summary_kernel_stats(f, kernel_statistics)?;
+        for principal in &value.principals {
             writeln!(f)?;
             writeln!(f)?;
             write_summary_principal(f, principal)?;
@@ -174,40 +179,38 @@ fn write_summary_kernel_stats(
     )
 }
 
-fn write_summary_principal_csv(
-    w: &mut dyn std::io::Write,
+fn write_summary_principal_csv<W: std::io::Write>(
+    csv_writer: &mut csv::Writer<W>,
     value: &PrincipalSummary,
 ) -> std::io::Result<()> {
     let mut vmos: Vec<(&String, &VmoSummary)> = value.vmos.iter().collect();
     vmos.sort_by_key(|(_, v)| -(v.populated_total as i64));
     for (name, vmo) in vmos {
-        writeln!(
-            w,
-            "{}, {}, {}, {}, {}, {}, {}, {}, {}",
+        csv_writer.write_record(&[
             value.attributor.clone().unwrap_or_default(),
-            value.name,
-            name,
-            vmo.committed_private,
-            vmo.populated_private,
-            vmo.committed_scaled,
-            vmo.populated_scaled,
-            vmo.committed_total,
-            vmo.populated_total,
-        )?;
+            value.name.to_string(),
+            name.to_string(),
+            vmo.committed_private.to_string(),
+            vmo.populated_private.to_string(),
+            vmo.committed_scaled.to_string(),
+            vmo.populated_scaled.to_string(),
+            vmo.committed_total.to_string(),
+            vmo.populated_total.to_string(),
+        ])?;
     }
 
-    writeln!(
-        w,
-        "{}, {}, Total, {}, {}, {}, {}, {}, {}",
+    csv_writer.write_record(&[
         value.attributor.clone().unwrap_or_default(),
-        value.name,
-        value.committed_private,
-        value.populated_private,
-        value.committed_scaled,
-        value.populated_scaled,
-        value.committed_total,
-        value.populated_total,
-    )
+        value.name.to_string(),
+        "Total".to_string(),
+        value.committed_private.to_string(),
+        value.populated_private.to_string(),
+        value.committed_scaled.to_string(),
+        value.populated_scaled.to_string(),
+        value.committed_total.to_string(),
+        value.populated_total.to_string(),
+    ])?;
+    Ok(())
 }
 
 pub fn format_bytes(bytes: f64) -> String {
@@ -273,5 +276,77 @@ mod tests {
  [scudo]      42    10.00 B    40.00 B    20.00 B    50.00 B    30.00 B    60.00 B |
 "#;
         pretty_assertions::assert_eq!(actual_output, expected_output.replace("|", ""));
+    }
+
+    #[test]
+    fn test_write_summary() {
+        let principal = PrincipalSummary {
+            id: 42,
+            name: String::from("test_name"),
+            principal_type: String::from("R"),
+            committed_private: 1,
+            committed_scaled: 2.0,
+            committed_total: 3,
+            populated_private: 4,
+            populated_scaled: 5.0,
+            populated_total: 6,
+            attributor: Some(String::from("mr,freeze")),
+            processes: vec![],
+            vmos: HashMap::from([(
+                String::from("[scudo]"),
+                VmoSummary {
+                    count: 42,
+                    committed_private: 10,
+                    committed_scaled: 20.0,
+                    committed_total: 30,
+                    populated_private: 40,
+                    populated_scaled: 50.0,
+                    populated_total: 60,
+                },
+            )]),
+        };
+        let summary = MemorySummary { principals: vec![principal], undigested: 1 };
+
+        let actual_output = {
+            let mut buf = BufWriter::new(Vec::new());
+            write_summary(&mut buf, true, &summary, &Default::default()).unwrap();
+            let bytes = buf.into_inner().unwrap();
+            String::from_utf8(bytes).unwrap()
+        };
+        let expected_output = r#"attributor,principal,vmo,committed_private,populated_private,committed_scaled,populated_scaled,committed_total,populated_total
+"mr,freeze",test_name,[scudo],10,40,20,50,30,60
+"mr,freeze",test_name,Total,1,4,2,5,3,6
+"#;
+        pretty_assertions::assert_eq!(actual_output, expected_output);
+    }
+
+    #[test]
+    fn test_write_summary_scarce_info() {
+        let principal = PrincipalSummary {
+            id: 42,
+            name: String::from("test_name"),
+            principal_type: String::from("R"),
+            committed_private: 1,
+            committed_scaled: 2.0,
+            committed_total: 3,
+            populated_private: 4,
+            populated_scaled: 5.0,
+            populated_total: 6,
+            attributor: None,
+            processes: vec![],
+            vmos: HashMap::from([]),
+        };
+        let summary = MemorySummary { principals: vec![principal], undigested: 1 };
+
+        let actual_output = {
+            let mut buf = BufWriter::new(Vec::new());
+            write_summary(&mut buf, true, &summary, &Default::default()).unwrap();
+            let bytes = buf.into_inner().unwrap();
+            String::from_utf8(bytes).unwrap()
+        };
+        let expected_output = r#"attributor,principal,vmo,committed_private,populated_private,committed_scaled,populated_scaled,committed_total,populated_total
+,test_name,Total,1,4,2,5,3,6
+"#;
+        pretty_assertions::assert_eq!(actual_output, expected_output);
     }
 }

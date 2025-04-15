@@ -104,7 +104,7 @@ impl MemoryComponentsTool {
                 undigested: summary.undigested,
             })?;
         } else {
-            output::write_summary(&mut writer.stdout(), &self.cmd, &summary, kernel_statistics)
+            output::write_summary(&mut writer.stdout(), self.cmd.csv, &summary, &kernel_statistics)
                 .or_else(|e| writeln!(writer.stderr(), "Error: {}", e))
                 .map_err(|e| fho::Error::Unexpected(e.into()))?;
         }
