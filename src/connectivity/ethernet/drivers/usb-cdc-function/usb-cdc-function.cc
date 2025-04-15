@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/ethernet/drivers/usb-cdc-function/cdc-eth-function.h"
+#include "src/connectivity/ethernet/drivers/usb-cdc-function/usb-cdc-function.h"
 
 #include <endian.h>
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/fidl.h>
@@ -37,7 +37,8 @@ static void complete_txn(txn_info_t* txn, zx_status_t status) {
   txn->completion_cb(txn->cookie, status, &txn->netbuf);
 }
 
-zx_status_t UsbCdc::insert_usb_request(usb::FidlRequest&& req, usb::EndpointClient<UsbCdc>& ep) {
+zx_status_t UsbCdcFunction::insert_usb_request(usb::FidlRequest&& req,
+                                               usb::EndpointClient<UsbCdcFunction>& ep) {
   if (suspend_txn_.has_value()) {
     return ZX_OK;
   }
@@ -45,7 +46,8 @@ zx_status_t UsbCdc::insert_usb_request(usb::FidlRequest&& req, usb::EndpointClie
   return ZX_OK;
 }
 
-void UsbCdc::usb_request_queue(usb::FidlRequest&& req, usb::EndpointClient<UsbCdc>& ep) {
+void UsbCdcFunction::usb_request_queue(usb::FidlRequest&& req,
+                                       usb::EndpointClient<UsbCdcFunction>& ep) {
   if (suspend_txn_.has_value()) {
     return;
   }
@@ -56,7 +58,7 @@ void UsbCdc::usb_request_queue(usb::FidlRequest&& req, usb::EndpointClient<UsbCd
   ZX_ASSERT(result.is_ok());
 }
 
-zx_status_t UsbCdc::cdc_generate_mac_address() {
+zx_status_t UsbCdcFunction::cdc_generate_mac_address() {
   size_t actual;
   auto status = device_get_metadata(parent_, DEVICE_METADATA_MAC_ADDRESS, &mac_addr_,
                                     sizeof(mac_addr_), &actual);
@@ -77,7 +79,7 @@ zx_status_t UsbCdc::cdc_generate_mac_address() {
   return function_.AllocStringDesc(buffer, &descriptors_.cdc_eth.iMACAddress);
 }
 
-zx_status_t UsbCdc::EthernetImplQuery(uint32_t options, ethernet_info_t* out_info) {
+zx_status_t UsbCdcFunction::EthernetImplQuery(uint32_t options, ethernet_info_t* out_info) {
   // No options are supported
   if (options) {
     zxlogf(ERROR, "unexpected options (0x%" PRIx32 ") to ethernet_impl_query", options);
@@ -92,13 +94,13 @@ zx_status_t UsbCdc::EthernetImplQuery(uint32_t options, ethernet_info_t* out_inf
   return ZX_OK;
 }
 
-void UsbCdc::EthernetImplStop() {
+void UsbCdcFunction::EthernetImplStop() {
   std::lock_guard<std::mutex> tx(tx_mutex_);
   std::lock_guard<std::mutex> ethernet(ethernet_mutex_);
   ethernet_ifc_.clear();
 }
 
-zx_status_t UsbCdc::EthernetImplStart(const ethernet_ifc_protocol_t* ifc) {
+zx_status_t UsbCdcFunction::EthernetImplStart(const ethernet_ifc_protocol_t* ifc) {
   if (unbound_) {
     return ZX_ERR_BAD_STATE;
   }
@@ -111,7 +113,7 @@ zx_status_t UsbCdc::EthernetImplStart(const ethernet_ifc_protocol_t* ifc) {
   return ZX_OK;
 }
 
-zx_status_t UsbCdc::cdc_send_locked(ethernet_netbuf_t* netbuf) {
+zx_status_t UsbCdcFunction::cdc_send_locked(ethernet_netbuf_t* netbuf) {
   {
     std::lock_guard<std::mutex> _(ethernet_mutex_);
     if (!ethernet_ifc_.is_valid()) {
@@ -154,8 +156,8 @@ zx_status_t UsbCdc::cdc_send_locked(ethernet_netbuf_t* netbuf) {
   return ZX_OK;
 }
 
-void UsbCdc::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
-                                 ethernet_impl_queue_tx_callback callback, void* cookie) {
+void UsbCdcFunction::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
+                                         ethernet_impl_queue_tx_callback callback, void* cookie) {
   size_t length = netbuf->data_size;
   zx_status_t status;
 
@@ -190,12 +192,12 @@ void UsbCdc::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
   }
 }
 
-zx_status_t UsbCdc::EthernetImplSetParam(uint32_t param, int32_t value, const uint8_t* data_buffer,
-                                         size_t data_size) {
+zx_status_t UsbCdcFunction::EthernetImplSetParam(uint32_t param, int32_t value,
+                                                 const uint8_t* data_buffer, size_t data_size) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-void UsbCdc::cdc_intr_complete(fendpoint::Completion completion) {
+void UsbCdcFunction::cdc_intr_complete(fendpoint::Completion completion) {
   usb::FidlRequest req{std::move(completion.request().value())};
 
   std::lock_guard<std::mutex> intr(intr_mutex_);
@@ -205,7 +207,7 @@ void UsbCdc::cdc_intr_complete(fendpoint::Completion completion) {
   }
 }
 
-void UsbCdc::cdc_send_notifications() {
+void UsbCdcFunction::cdc_send_notifications() {
   std::lock_guard<std::mutex> _(ethernet_mutex_);
 
   usb_cdc_notification_t network_notification = {
@@ -283,7 +285,7 @@ void UsbCdc::cdc_send_notifications() {
   usb_request_queue(std::move(req2.value()), intr_ep_);
 }
 
-void UsbCdc::cdc_rx_complete(fendpoint::Completion completion) {
+void UsbCdcFunction::cdc_rx_complete(fendpoint::Completion completion) {
   usb::FidlRequest req{std::move(completion.request().value())};
   zx_status_t status = *completion.status();
 
@@ -316,7 +318,7 @@ void UsbCdc::cdc_rx_complete(fendpoint::Completion completion) {
   usb_request_queue(std::move(req), bulk_out_ep_);
 }
 
-void UsbCdc::cdc_tx_complete(fendpoint::Completion completion) {
+void UsbCdcFunction::cdc_tx_complete(fendpoint::Completion completion) {
   usb::FidlRequest req{std::move(completion.request().value())};
 
   if (unbound_) {
@@ -357,20 +359,20 @@ void UsbCdc::cdc_tx_complete(fendpoint::Completion completion) {
   }
 }
 
-size_t UsbCdc::UsbFunctionInterfaceGetDescriptorsSize() { return sizeof(descriptors_); }
+size_t UsbCdcFunction::UsbFunctionInterfaceGetDescriptorsSize() { return sizeof(descriptors_); }
 
-void UsbCdc::UsbFunctionInterfaceGetDescriptors(uint8_t* out_descriptors_buffer,
-                                                size_t descriptors_size,
-                                                size_t* out_descriptors_actual) {
+void UsbCdcFunction::UsbFunctionInterfaceGetDescriptors(uint8_t* out_descriptors_buffer,
+                                                        size_t descriptors_size,
+                                                        size_t* out_descriptors_actual) {
   const size_t length = std::min(sizeof(descriptors_), descriptors_size);
   memcpy(out_descriptors_buffer, &descriptors_, length);
   *out_descriptors_actual = length;
 }
 
-zx_status_t UsbCdc::UsbFunctionInterfaceControl(const usb_setup_t* setup,
-                                                const uint8_t* write_buffer, size_t write_size,
-                                                uint8_t* out_read_buffer, size_t read_size,
-                                                size_t* out_read_actual) {
+zx_status_t UsbCdcFunction::UsbFunctionInterfaceControl(const usb_setup_t* setup,
+                                                        const uint8_t* write_buffer,
+                                                        size_t write_size, uint8_t* out_read_buffer,
+                                                        size_t read_size, size_t* out_read_actual) {
   uint16_t w_value{le16toh(setup->w_value)};
   uint16_t w_index{le16toh(setup->w_index)};
   uint16_t w_length{le16toh(setup->w_length)};
@@ -404,7 +406,7 @@ zx_status_t UsbCdc::UsbFunctionInterfaceControl(const usb_setup_t* setup,
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t UsbCdc::UsbFunctionInterfaceSetConfigured(bool configured, usb_speed_t speed) {
+zx_status_t UsbCdcFunction::UsbFunctionInterfaceSetConfigured(bool configured, usb_speed_t speed) {
   TRACE_DURATION("cdc_eth", __func__, "configured", configured, "speed", speed);
 
   if (configured_ == configured) {
@@ -438,7 +440,8 @@ zx_status_t UsbCdc::UsbFunctionInterfaceSetConfigured(bool configured, usb_speed
   return ZX_OK;
 }
 
-zx_status_t UsbCdc::UsbFunctionInterfaceSetInterface(uint8_t interface, uint8_t alt_setting) {
+zx_status_t UsbCdcFunction::UsbFunctionInterfaceSetInterface(uint8_t interface,
+                                                             uint8_t alt_setting) {
   TRACE_DURATION("cdc_eth", __func__, "interface", interface, "alt_setting", alt_setting);
 
   if (interface != descriptors_.cdc_intf_0.b_interface_number || alt_setting > 1) {
@@ -498,7 +501,7 @@ zx_status_t UsbCdc::UsbFunctionInterfaceSetInterface(uint8_t interface, uint8_t 
   return ZX_OK;
 }
 
-void UsbCdc::DdkInit(ddk::InitTxn txn) {
+void UsbCdcFunction::DdkInit(ddk::InitTxn txn) {
   list_initialize(&tx_pending_infos_);
 
   auto status = function_.AllocInterface(&descriptors_.comm_intf.b_interface_number);
@@ -618,7 +621,7 @@ void UsbCdc::DdkInit(ddk::InitTxn txn) {
   txn.Reply(ZX_OK);
 }
 
-void UsbCdc::DdkUnbind(ddk::UnbindTxn txn) {
+void UsbCdcFunction::DdkUnbind(ddk::UnbindTxn txn) {
   unbound_ = true;
   {
     std::lock_guard<std::mutex> l(tx_mutex_);
@@ -631,7 +634,7 @@ void UsbCdc::DdkUnbind(ddk::UnbindTxn txn) {
   txn.Reply();
 }
 
-void UsbCdc::DdkRelease() {
+void UsbCdcFunction::DdkRelease() {
   if (suspend_thread_.has_value()) {
     suspend_thread_->join();
   }
@@ -642,7 +645,7 @@ void UsbCdc::DdkRelease() {
   delete this;
 }
 
-void UsbCdc::DdkSuspend(ddk::SuspendTxn txn) {
+void UsbCdcFunction::DdkSuspend(ddk::SuspendTxn txn) {
   // Start the suspend process by setting the suspend txn
   // When the pipeline tries to submit requests, they will be immediately free'd.
   suspend_txn_.emplace(std::move(txn));
@@ -673,8 +676,8 @@ void UsbCdc::DdkSuspend(ddk::SuspendTxn txn) {
   });
 }
 
-zx_status_t UsbCdc::Bind(void* ctx, zx_device_t* parent) {
-  auto cdc = std::make_unique<UsbCdc>(parent);
+zx_status_t UsbCdcFunction::Bind(void* ctx, zx_device_t* parent) {
+  auto cdc = std::make_unique<UsbCdcFunction>(parent);
   if (!cdc) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -683,7 +686,7 @@ zx_status_t UsbCdc::Bind(void* ctx, zx_device_t* parent) {
 
   // Either the DDK now owns this reference, or (in the case of failure) it will be freed in the
   // block below. In either case, we want to avoid the unique_ptr destructing the allocated
-  // UsbCdc instance.
+  // UsbCdcFunction instance.
   [[maybe_unused]] auto released = cdc.release();
 
   if (status != ZX_OK) {
@@ -698,11 +701,11 @@ zx_status_t UsbCdc::Bind(void* ctx, zx_device_t* parent) {
 static constexpr zx_driver_ops_t driver_ops = []() {
   zx_driver_ops_t ops = {};
   ops.version = DRIVER_OPS_VERSION;
-  ops.bind = UsbCdc::Bind;
+  ops.bind = UsbCdcFunction::Bind;
   return ops;
 }();
 
 }  // namespace usb_cdc_function
 
 // clang-format off
-ZIRCON_DRIVER(usb_cdc, usb_cdc_function::driver_ops, "zircon", "0.1");
+ZIRCON_DRIVER(usb_cdc_function, usb_cdc_function::driver_ops, "zircon", "0.1");

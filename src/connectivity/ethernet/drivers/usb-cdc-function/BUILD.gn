@@ -22,7 +22,7 @@ fuchsia_cc_driver("usb-cdc-function-driver") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "cdc-eth-function.cc" ]
+  sources = [ "usb-cdc-function.cc" ]
   deps = [
     ":usb_cdc_bind",
     "//sdk/banjo/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_banjo_cpp",
