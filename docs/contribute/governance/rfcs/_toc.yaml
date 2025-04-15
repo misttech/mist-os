@@ -552,3 +552,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0267_io_buffer_ring_buffer_discipline.md
   - title: "RFC-0268: SDK category updates"
     path: /docs/contribute/governance/rfcs/0268_sdk_category_updates.md
+  - title: "RFC-0269: Measuring Memory Stalls"
+    path: /docs/contribute/governance/rfcs/0269_measuring_memory_stalls.md

@@ -3504,3 +3504,16 @@
   reviewers: ['hjfreyer@google.com', "crjohns@google.com", 'wilkinsonclay@google.com']
   submitted: '2025-02-20'
   reviewed: '2025-04-02'
+
+- name: 'RFC-0269'
+  title: 'Measuring Memory Stalls'
+  short_description: 'Detecting and reporting memory stalls to userspace'
+  authors: ['fdurso@google.com']
+  file: '0269_measuring_memory_stalls.md'
+  area: ['Kernel']
+  issue: ['319641298']
+  gerrit_change_id: ['1138712']
+  status: 'Accepted'
+  reviewers: ['adanis@google.com', 'eieio@google.com', 'maniscalco@google.com', 'rashaeqbal@google.com']
+  submitted: '2024-10-15'
+  reviewed: '2025-04-10'
