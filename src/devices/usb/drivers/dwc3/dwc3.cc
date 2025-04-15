@@ -113,7 +113,7 @@ zx_status_t Dwc3::AcquirePDevResources() {
   pdev_ = fdf::PDev{std::move(pdev_client_end.value())};
 
   // Initialize mac address metadata server.
-  if (zx::result result = mac_address_metadata_server_.ForwardMetadataIfExists(incoming());
+  if (zx::result result = mac_address_metadata_server_.ForwardMetadataIfExists(incoming(), "pdev");
       result.is_error()) {
     FDF_LOG(ERROR, "Failed to forward mac address metadata: %s", result.status_string());
     return result.status_value();
@@ -125,7 +125,8 @@ zx_status_t Dwc3::AcquirePDevResources() {
   }
 
   // Initialize serial number metadata server.
-  if (zx::result result = serial_number_metadata_server_.ForwardMetadataIfExists(incoming());
+  if (zx::result result =
+          serial_number_metadata_server_.ForwardMetadataIfExists(incoming(), "pdev");
       result.is_error()) {
     FDF_LOG(ERROR, "Failed to forward serial number metadata: %s", result.status_string());
     return result.status_value();

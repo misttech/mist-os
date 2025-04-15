@@ -989,7 +989,7 @@ zx_status_t Dwc2::Init(const dwc2_config::Config& config) {
   fdf::PDev pdev{std::move(pdev_client_end.value())};
 
   // Initialize mac address metadata server.
-  if (zx::result result = mac_address_metadata_server_.ForwardMetadataIfExists(parent());
+  if (zx::result result = mac_address_metadata_server_.ForwardMetadataIfExists(parent(), "pdev");
       result.is_error()) {
     zxlogf(ERROR, "Failed to forward mac address metadata: %s", result.status_string());
     return result.status_value();
@@ -1001,7 +1001,7 @@ zx_status_t Dwc2::Init(const dwc2_config::Config& config) {
   }
 
   // Initialize serial number metadata server.
-  if (zx::result result = serial_number_metadata_server_.ForwardMetadataIfExists(parent());
+  if (zx::result result = serial_number_metadata_server_.ForwardMetadataIfExists(parent(), "pdev");
       result.is_error()) {
     zxlogf(ERROR, "Failed to forward serial number metadata: %s", result.status_string());
     return result.status_value();
