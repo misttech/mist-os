@@ -15,6 +15,8 @@ use futures::io::AsyncReadExt;
 use futures::stream::StreamExt;
 use futures::FutureExt;
 use netext::{MultithreadedTokioAsyncWrapper, TcpListenerStream, TokioAsyncReadExt};
+use schemars::JsonSchema;
+use serde::Serialize;
 use signal_hook::consts::signal::SIGINT;
 use signal_hook::iterator::Signals;
 use std::io::ErrorKind;
@@ -57,18 +59,37 @@ enum AdbSubcommand {
     Proxy(AdbProxyArgs),
 }
 
+#[derive(Debug, JsonSchema, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AdbCommandOutput {
+    Connect(ConnectOutput),
+    Proxy(()),
+}
+
+impl std::fmt::Display for AdbCommandOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Connect(o) => write!(f, "{o}"),
+            Self::Proxy(()) => Ok(()),
+        }
+    }
+}
+
 impl StarnixAdbCommand {
     pub async fn run(
-        &self,
+        self,
         context: &EnvironmentContext,
         rcs_connector: &Connector<RemoteControlProxyHolder>,
         target_proxy: TargetProxyHolder,
-    ) -> Result<()> {
-        match &self.subcommand {
-            AdbSubcommand::Connect(args) => {
-                args.run_connect(context, &self.adb, &target_proxy).await
+    ) -> Result<AdbCommandOutput> {
+        match self.subcommand {
+            AdbSubcommand::Connect(args) => args
+                .run_connect(context, self.adb, &target_proxy)
+                .await
+                .map(AdbCommandOutput::Connect),
+            AdbSubcommand::Proxy(args) => {
+                args.run_proxy(&self.adb, rcs_connector).await.map(AdbCommandOutput::Proxy)
             }
-            AdbSubcommand::Proxy(args) => args.run_proxy(&self.adb, rcs_connector).await,
         }
     }
 }
@@ -80,11 +101,13 @@ struct AdbConnectArgs {}
 
 impl AdbConnectArgs {
     async fn run_connect(
-        &self,
+        self,
         context: &EnvironmentContext,
-        adb: &str,
+        adb: String,
         target_proxy: &TargetProxyHolder,
-    ) -> Result<()> {
+    ) -> Result<ConnectOutput> {
+        let Self {} = self;
+
         let addr_info: TargetIpAddrInfo =
             timeout(Duration::from_secs(1), target_proxy.get_ssh_address())
                 .await
@@ -126,9 +149,20 @@ impl AdbConnectArgs {
             return_bug!("Couldn't run adb connect. stdout={stdout} stderr={stderr}");
         }
 
-        eprintln!("adb is connected!");
-        eprintln!("See https://fuchsia.dev/go/troubleshoot-adb-connect if it doesn't work.");
-        eprintln!("This connection's \"serial number\" for adb is '{adb_address}'.");
+        Ok(ConnectOutput { serial_number: adb_address })
+    }
+}
+
+#[derive(Debug, JsonSchema, Serialize)]
+pub struct ConnectOutput {
+    serial_number: SocketAddr,
+}
+
+impl std::fmt::Display for ConnectOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "adb is connected!")?;
+        writeln!(f, "See https://fuchsia.dev/go/troubleshoot-adb-connect if it doesn't work.")?;
+        writeln!(f, "This connection's \"serial number\" for adb is '{}'.", self.serial_number)?;
         Ok(())
     }
 }

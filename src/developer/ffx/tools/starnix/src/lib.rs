@@ -5,8 +5,10 @@
 use argh::{ArgsInfo, FromArgs};
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
-use ffx_writer::SimpleWriter;
-use fho::{Error, FfxMain, FfxTool, Result};
+use ffx_writer::VerifiedMachineWriter;
+use fho::{FfxContext, FfxMain, FfxTool, Result};
+use schemars::JsonSchema;
+use serde::Serialize;
 use target_connector::Connector;
 use target_holders::{RemoteControlProxyHolder, TargetProxyHolder};
 
@@ -24,6 +26,26 @@ pub enum StarnixSubCommand {
     #[cfg(feature = "enable_console_tool")]
     Console(console::StarnixConsoleCommand),
     Vmo(vmo::StarnixVmoCommand),
+}
+
+#[derive(Debug, JsonSchema, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum StarnixToolOutput {
+    Adb(adb::AdbCommandOutput),
+    #[cfg(feature = "enable_console_tool")]
+    Console(console::ConsoleCommandOutput),
+    Vmo(vmo::VmoCommandOutput),
+}
+
+impl std::fmt::Display for StarnixToolOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Adb(o) => write!(f, "{o}"),
+            #[cfg(feature = "enable_console_tool")]
+            Self::Console(o) => write!(f, "{o}"),
+            Self::Vmo(o) => write!(f, "{o}"),
+        }
+    }
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -44,21 +66,25 @@ pub struct StarnixTool {
 
 #[async_trait(?Send)]
 impl FfxMain for StarnixTool {
-    type Writer = SimpleWriter;
-    async fn main(self, writer: Self::Writer) -> Result<()> {
-        match &self.cmd.subcommand {
-            StarnixSubCommand::Adb(command) => {
-                command.run(&self.context, &self.rcs_connector, self.target_proxy?).await
-            }
+    type Writer = VerifiedMachineWriter<StarnixToolOutput>;
+
+    async fn main(self, mut writer: Self::Writer) -> Result<()> {
+        let output = match self.cmd.subcommand {
+            StarnixSubCommand::Adb(command) => command
+                .run(&self.context, &self.rcs_connector, self.target_proxy?)
+                .await
+                .map(StarnixToolOutput::Adb),
             #[cfg(feature = "enable_console_tool")]
             StarnixSubCommand::Console(command) => {
                 let rcs = connect_to_rcs(&self.rcs_connector).await?;
-                console::starnix_console(command, &rcs, writer).await.map_err(|e| Error::User(e))
+                console::starnix_console(command, &rcs).await.map(StarnixToolOutput::Console)
             }
             StarnixSubCommand::Vmo(command) => {
                 let rcs = connect_to_rcs(&self.rcs_connector).await?;
-                vmo::starnix_vmo(command, &rcs, writer).await.map_err(|e| Error::User(e))
+                vmo::starnix_vmo(command, &rcs).await.map(StarnixToolOutput::Vmo)
             }
-        }
+        }?;
+        writer.machine_or_else(&output, || output.to_string()).bug_context("writing output")?;
+        Ok(())
     }
 }

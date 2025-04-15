@@ -4,21 +4,21 @@
 
 #![cfg(feature = "enable_console_tool")]
 
-use anyhow::{anyhow, bail, Result};
+use crate::common::*;
 use argh::{ArgsInfo, FromArgs};
 use blocking::Unblock;
-use ffx_writer::SimpleWriter;
+use fho::{FfxContext, Result};
 use futures::future::FutureExt;
 use futures::join;
 use nix::unistd::dup;
+use schemars::JsonSchema;
+use serde::Serialize;
 use std::os::unix::io::FromRawFd;
 use termion::raw::IntoRawMode;
 use {
     fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_starnix_container as fstarcontainer,
     fuchsia_async as fasync,
 };
-
-use crate::common::*;
 
 fn forward_stdin(console_in: fidl::Socket) -> Result<()> {
     let mut tx = fidl::AsyncSocket::from_socket(console_in);
@@ -85,7 +85,7 @@ async fn run_console(
     let (local_console_in, remote_console_in) = fidl::Socket::create_stream();
     let (local_console_out, remote_console_out) = fidl::Socket::create_stream();
     let binary_path = argv[0].clone();
-    let (cols, rows) = termion::terminal_size()?;
+    let (cols, rows) = termion::terminal_size().bug_context("getting terminal size")?;
     let (x_pixels, y_pixels) = (0, 0); // TODO: Need a newer termion for `terminal_size_pixels()`.
     let exit_future = controller
         .spawn_console(fstarcontainer::ControllerSpawnConsoleRequest {
@@ -104,12 +104,12 @@ async fn run_console(
     let raw_mode = std::io::stdout().into_raw_mode().unwrap();
     let (_, exit_result) = join!(forward_future, exit_future);
     std::mem::drop(raw_mode);
-    let exit_code = exit_result?.map_err(|e| {
-        anyhow!(
-            "Failed to spawn console: {e:?}. Verify that the console binary exists at the specified path in the container.",
+    exit_result.bug_context("fidl transport error")?.map_err(|e| {
+        fho::user_error!(
+            "Failed to spawn console: {e:?}.\n\
+             Verify that the console binary exists at the specified path in the container."
         )
-    })?;
-    Ok(exit_code)
+    })
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -135,12 +135,11 @@ pub struct StarnixConsoleCommand {
 }
 
 pub async fn starnix_console(
-    command: &StarnixConsoleCommand,
+    StarnixConsoleCommand { moniker, mut env, argv }: StarnixConsoleCommand,
     rcs_proxy: &rc::RemoteControlProxy,
-    _writer: SimpleWriter,
-) -> Result<()> {
+) -> Result<ConsoleCommandOutput> {
     if !termion::is_tty(&std::io::stdout()) {
-        bail!(
+        fho::return_user_error!(
             "ffx starnix console must be run in a tty. \
 If you are attempting to use this command in a automated \
 test, please be aware that this command is intended only \
@@ -148,8 +147,8 @@ for interactive use. Please do not use this command in an \
 automated test."
         );
     }
-    if command.argv.is_empty() {
-        bail!(
+    if argv.is_empty() {
+        fho::return_user_error!(
             "Please specify a program to run.\n\
                Examples:\n\
                ffx starnix console /bin/bash\n\
@@ -157,14 +156,21 @@ automated test."
                Use ffx starnix console --help for more information."
         );
     }
-    let controller = connect_to_contoller(&rcs_proxy, command.moniker.clone()).await?;
+    let controller = connect_to_contoller(&rcs_proxy, moniker).await?;
 
-    let argv = command.argv.clone();
-
-    let mut env = command.env.clone();
     env.append(&mut get_environ());
 
     let exit_code = run_console(&controller, argv, env).await?;
-    println!("(exit code: {})", exit_code);
-    Ok(())
+    Ok(ConsoleCommandOutput { exit_code })
+}
+
+#[derive(Debug, JsonSchema, Serialize)]
+pub struct ConsoleCommandOutput {
+    exit_code: u8,
+}
+
+impl std::fmt::Display for ConsoleCommandOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "(exit code: {})", self.exit_code)
+    }
 }
