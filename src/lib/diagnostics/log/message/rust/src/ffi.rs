@@ -48,6 +48,18 @@ fn parse_archivist_args<'a>(
                         continue;
                     }
                 }
+                if name == fidl_fuchsia_diagnostics::COMPONENT_URL_ARG_NAME {
+                    if let Value::Text(_) = value {
+                        archivist_argument_count += 1;
+                        continue;
+                    }
+                }
+                if name == fidl_fuchsia_diagnostics::ROLLED_OUT_ARG_NAME {
+                    if let Value::UnsignedInt(_) = value {
+                        archivist_argument_count += 1;
+                        continue;
+                    }
+                }
                 break;
             }
             _ => break,
