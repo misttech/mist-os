@@ -751,18 +751,8 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
                (flags_ & VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING) ||
                object_->DebugIsRangePinned(object_offset_locked() + offset, len));
 
-  // grab the lock for the vmo
-  Guard<VmoLockType> object_guard{object_->lock()};
-
   // Cache whether the object is dirty tracked, we need to know this when computing mmu flags later.
   const bool dirty_tracked = object_->is_dirty_tracked();
-
-  // Trim our range to the current VMO size. Our mapping might exceed the VMO in the case where the
-  // VMO is resizable, and this should not be considered an error.
-  len = TrimmedObjectRangeLocked(offset, len);
-  if (len == 0) {
-    return ZX_OK;
-  }
 
   // The region to map could have multiple different current arch mmu flags, so we need to iterate
   // over them to ensure we install mappings with the correct permissions.
@@ -770,7 +760,6 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
       base_ + offset, len,
       [this, commit, dirty_tracked, ignore_existing](vaddr_t base, size_t len, uint mmu_flags) {
         AssertHeld(lock_ref());
-        AssertHeld(object_lock_ref());
 
         // Remove the write permission if this maps a vmo that supports dirty tracking, in order to
         // trigger write permission faults when writes occur, enabling us to track when pages are
@@ -781,7 +770,7 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
 
         // If there are no access permissions on this region then mapping has no effect, so skip.
         if (!(mmu_flags & ARCH_MMU_FLAG_PERM_RWX_MASK)) {
-          return ZX_OK;
+          return ZX_ERR_NEXT;
         }
 
         // In the scenario where we are committing, and calling RequireOwnedPage, we are supposed to
@@ -797,13 +786,26 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
         // pass in.
         __UNINITIALIZED MultiPageRequest page_request;
 
-        VmMappingCoalescer<16> coalescer(this, base, mmu_flags,
-                                         ignore_existing
-                                             ? ArchVmAspace::ExistingEntryAction::Skip
-                                             : ArchVmAspace::ExistingEntryAction::Error);
-        const uint64_t vmo_offset = object_offset_locked() + (base - base_);
+        const uint64_t map_offset = base - base_;
+        const uint64_t vmo_offset = object_offset_locked() + map_offset;
         if (VmObjectPaged* paged = DownCastVmObject<VmObjectPaged>(object_.get()); likely(paged)) {
-          AssertHeld(paged->lock_ref());
+          // grab the lock for the vmo
+          __UNINITIALIZED VmCowPages::DeferredOps deferred(paged->MakeDeferredOps());
+          Guard<VmoLockType> guard{AssertOrderedAliasedLock, paged->lock(), object_->lock(),
+                                   paged->lock_order(), VmLockAcquireMode::First};
+
+          // Trim our range to the current VMO size. Our mapping might exceed the VMO in the case
+          // where the VMO is resizable, and this should not be considered an error.
+          len = TrimmedObjectRangeLocked(map_offset, len);
+          if (len == 0) {
+            return ZX_ERR_STOP;
+          }
+
+          VmMappingCoalescer<16> coalescer(this, base, mmu_flags,
+                                           ignore_existing
+                                               ? ArchVmAspace::ExistingEntryAction::Skip
+                                               : ArchVmAspace::ExistingEntryAction::Error);
+
           const bool writing = mmu_flags & ARCH_MMU_FLAG_PERM_WRITE;
           __UNINITIALIZED auto cursor = paged->GetLookupCursorLocked(vmo_offset, len);
           if (cursor.is_error()) {
@@ -816,7 +818,6 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
           for (uint64_t off = 0; off < len; off += PAGE_SIZE) {
             vm_page_t* page = nullptr;
             if (commit) {
-              __UNINITIALIZED VmCowPages::DeferredOps deferred(paged->MakeDeferredOpsLocked());
               __UNINITIALIZED zx::result<VmCowPages::LookupCursor::RequireResult> result =
                   cursor->RequireOwnedPage(writing, 1, deferred, &page_request);
               if (result.is_error()) {
@@ -852,9 +853,18 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
               }
             }
           }
+          zx_status_t status = coalescer.Flush();
+          return status == ZX_OK ? ZX_ERR_NEXT : status;
         } else if (VmObjectPhysical* phys = DownCastVmObject<VmObjectPhysical>(object_.get());
                    phys) {
-          AssertHeld(phys->lock_ref());
+          // grab the lock for the vmo
+          Guard<VmoLockType> object_guard{AliasedLock, phys->lock(), object_->lock()};
+          // Physical VMOs are never resizable, so do not need to worry about trimming the range.
+          DEBUG_ASSERT(!phys->is_resizable());
+          VmMappingCoalescer<16> coalescer(this, base, mmu_flags,
+                                           ignore_existing
+                                               ? ArchVmAspace::ExistingEntryAction::Skip
+                                               : ArchVmAspace::ExistingEntryAction::Error);
 
           // Physical VMOs are always allocated and contiguous, just need to get the paddr.
           paddr_t phys_base = 0;
@@ -867,10 +877,12 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
               return status;
             }
           }
+          status = coalescer.Flush();
+          return status == ZX_OK ? ZX_ERR_NEXT : status;
         } else {
           panic("VmObject should be paged or physical");
+          return ZX_ERR_INTERNAL;
         }
-        return coalescer.Flush();
       });
 }
 
