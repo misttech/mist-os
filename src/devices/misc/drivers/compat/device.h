@@ -166,9 +166,6 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   // This calls Unbind on the device and then frees it.
   void UnbindAndRelease();
 
-  void InsertOrUpdateProperty(fuchsia_driver_framework::wire::NodePropertyKey key,
-                              fuchsia_driver_framework::wire::NodePropertyValue value);
-
   std::string OutgoingName();
 
   bool ShouldCallRelease() {
@@ -190,7 +187,7 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   // This arena backs `properties_`.
   // This should be declared before any objects it backs so it is destructed last.
   fidl::Arena<512> arena_;
-  std::vector<fuchsia_driver_framework::wire::NodeProperty> properties_;
+  std::vector<fuchsia_driver_framework::wire::NodeProperty2> properties_;
   std::optional<fuchsia_driver_framework::BusInfo> bus_info_;
 
   std::optional<driver_devfs::Connector<fuchsia_device::Controller>> devfs_connector_;
@@ -273,7 +270,7 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   fpromise::scope scope_;
 };
 
-std::vector<fuchsia_driver_framework::wire::NodeProperty> CreateProperties(
+std::vector<fuchsia_driver_framework::wire::NodeProperty2> CreateProperties(
     fidl::AnyArena& arena, fdf::Logger& logger, device_add_args_t* zx_args);
 
 }  // namespace compat

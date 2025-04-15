@@ -108,9 +108,9 @@ uint8_t PowerStateToSuspendReason(fdm::SystemPowerState power_state) {
 
 namespace compat {
 
-std::vector<fuchsia_driver_framework::wire::NodeProperty> CreateProperties(
+std::vector<fuchsia_driver_framework::wire::NodeProperty2> CreateProperties(
     fidl::AnyArena& arena, fdf::Logger& logger, device_add_args_t* zx_args) {
-  std::vector<fuchsia_driver_framework::wire::NodeProperty> properties;
+  std::vector<fuchsia_driver_framework::wire::NodeProperty2> properties;
   properties.reserve(zx_args->str_prop_count + zx_args->fidl_service_offer_count + 1);
   bool has_protocol = false;
   for (auto [key, value] : cpp20::span(zx_args->str_props, zx_args->str_prop_count)) {
@@ -119,16 +119,16 @@ std::vector<fuchsia_driver_framework::wire::NodeProperty> CreateProperties(
     }
     switch (value.data_type) {
       case ZX_DEVICE_PROPERTY_VALUE_BOOL:
-        properties.emplace_back(fdf::MakeProperty(arena, key, value.data.bool_val));
+        properties.emplace_back(fdf::MakeProperty2(arena, key, value.data.bool_val));
         break;
       case ZX_DEVICE_PROPERTY_VALUE_STRING:
-        properties.emplace_back(fdf::MakeProperty(arena, key, value.data.str_val));
+        properties.emplace_back(fdf::MakeProperty2(arena, key, value.data.str_val));
         break;
       case ZX_DEVICE_PROPERTY_VALUE_INT:
-        properties.emplace_back(fdf::MakeProperty(arena, key, value.data.int_val));
+        properties.emplace_back(fdf::MakeProperty2(arena, key, value.data.int_val));
         break;
       case ZX_DEVICE_PROPERTY_VALUE_ENUM:
-        properties.emplace_back(fdf::MakeProperty(arena, key, value.data.enum_val));
+        properties.emplace_back(fdf::MakeProperty2(arena, key, value.data.enum_val));
         break;
       default:
         logger.log(fdf::ERROR, "Unsupported property type, key: {}", key);
@@ -141,7 +141,7 @@ std::vector<fuchsia_driver_framework::wire::NodeProperty> CreateProperties(
   if (!has_protocol) {
     // If we do not have a protocol id, set it to MISC to match DFv1 behavior.
     uint32_t proto_id = zx_args->proto_id == 0 ? ZX_PROTOCOL_MISC : zx_args->proto_id;
-    properties.emplace_back(fdf::MakeProperty(arena, bind_fuchsia::PROTOCOL, proto_id));
+    properties.emplace_back(fdf::MakeProperty2(arena, bind_fuchsia::PROTOCOL, proto_id));
   }
   return properties;
 }
@@ -451,7 +451,7 @@ zx_status_t Device::CreateNode() {
       fdf::wire::NodeAddArgs::Builder(arena)
           .name(fidl::StringView::FromExternal(name_))
           .symbols(fidl::VectorView<fdf::wire::NodeSymbol>::FromExternal(symbols))
-          .properties(fidl::VectorView<fdf::wire::NodeProperty>::FromExternal(properties_))
+          .properties2(fidl::VectorView<fdf::wire::NodeProperty2>::FromExternal(properties_))
           .offers2(fidl::VectorView<fdf::wire::Offer>::FromExternal(offers.data(), offers.size()));
 
   if (bus_info_) {
@@ -737,37 +737,6 @@ void Device::UnbindAndRelease() {
         // shared pointer is removed.
         device->parent_.value()->children_.remove(device);
       }));
-}
-
-void Device::InsertOrUpdateProperty(fuchsia_driver_framework::wire::NodePropertyKey key,
-                                    fuchsia_driver_framework::wire::NodePropertyValue value) {
-  bool found = false;
-  for (auto& prop : properties_) {
-    if (prop.key.Which() != key.Which()) {
-      continue;
-    }
-
-    if (key.is_string_value()) {
-      std::string_view prop_key_view(prop.key.string_value().data(),
-                                     prop.key.string_value().size());
-      std::string_view key_view(key.string_value().data(), key.string_value().size());
-      if (key_view == prop_key_view) {
-        found = true;
-      }
-    } else if (key.is_int_value()) {
-      if (key.int_value() == prop.key.int_value()) {
-        found = true;
-      }
-    }
-
-    if (found) {
-      prop.value = value;
-      break;
-    }
-  }
-  if (!found) {
-    properties_.emplace_back(fdf::wire::NodeProperty{.key = key, .value = value});
-  }
 }
 
 std::string Device::OutgoingName() {

@@ -686,9 +686,9 @@ TEST_F(DeviceTest, CreateNodeProperties) {
 
   ASSERT_EQ(2ul, properties.size());
 
-  EXPECT_EQ("test", properties[0].key.string_value().get());
+  EXPECT_EQ("test", properties[0].key.get());
   EXPECT_EQ(5u, properties[0].value.int_value());
 
-  EXPECT_EQ(bind_fuchsia::PROTOCOL, properties[1].key.string_value().get());
+  EXPECT_EQ(bind_fuchsia::PROTOCOL, properties[1].key.get());
   EXPECT_EQ(10u, properties[1].value.int_value());
 }
