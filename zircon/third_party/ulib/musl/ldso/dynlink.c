@@ -44,6 +44,8 @@
 #include "threads_impl.h"
 #include "zircon_impl.h"
 
+void* __tls_get_addr(const size_t got[2]);
+
 static void early_init(void);
 static void error(const char*, ...);
 static void debugmsg(const char*, ...);
@@ -2265,7 +2267,7 @@ static void set_global(struct dso* p, int global) {
 // globals are registered by hwasan, and it can be used to register globals
 // early for hwasan.
 NO_ASAN
-static struct dl_phdr_info get_phdr_info(const struct dso* current) {
+static struct dl_phdr_info get_phdr_info(const struct dso* current, bool tls) {
   struct dl_phdr_info info = {
       .dlpi_addr = (uintptr_t)current->l_map.l_addr,
       .dlpi_name = current->l_map.l_name,
@@ -2274,8 +2276,12 @@ static struct dl_phdr_info get_phdr_info(const struct dso* current) {
       .dlpi_adds = gencnt,
       .dlpi_subs = 0,
       .dlpi_tls_modid = current->tls_id,
-      .dlpi_tls_data = current->tls.image,
+      .dlpi_tls_data = NULL,
   };
+  if (tls && current->tls_id > 0) {
+    const size_t fake_got[2] = {current->tls_id, 0};
+    info.dlpi_tls_data = (char*)__tls_get_addr(fake_got) - DTP_OFFSET;
+  }
   return info;
 }
 
@@ -2296,7 +2302,7 @@ __attribute__((visibility("hidden"))) void _dl_iterate_loaded_libs(void) {
   for (struct dso* current = tail; current; current = dso_prev(current)) {
     if (current->constructed)
       continue;
-    struct dl_phdr_info info = get_phdr_info(current);
+    struct dl_phdr_info info = get_phdr_info(current, false);
     __sanitizer_module_loaded(&info, sizeof(info));
   }
 }
@@ -2455,8 +2461,6 @@ static void* addr2dso(size_t a) {
   return 0;
 }
 
-void* __tls_get_addr(size_t*);
-
 static bool find_sym_for_dlsym(struct dso* p, const char* name, uint32_t* name_gnu_hash,
                                uint32_t* name_sysv_hash, void** result) {
   // Check if we already have seen this DSO before.
@@ -2571,7 +2575,7 @@ int dl_iterate_phdr(int (*callback)(struct dl_phdr_info* info, size_t size, void
   struct dso* current;
   int ret = 0;
   for (current = head; current;) {
-    struct dl_phdr_info info = get_phdr_info(current);
+    struct dl_phdr_info info = get_phdr_info(current, true);
 
     ret = (callback)(&info, sizeof(info), data);
 
