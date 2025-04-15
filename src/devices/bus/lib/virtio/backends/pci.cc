@@ -1,50 +1,56 @@
-// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2016 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #include <assert.h>
 #include <lib/virtio/backends/pci.h>
-#include <trace.h>
+#include <lib/zx/handle.h>
+#include <lib/zx/interrupt.h>
+#include <lib/zx/port.h>
 #include <zircon/errors.h>
+#include <zircon/status.h>
+#include <zircon/syscalls/port.h>
 
 #include <algorithm>
 #include <utility>
 
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
-#include <object/pci_interrupt_dispatcher.h>
 #include <virtio/virtio.h>
 
-#include <ktl/enforce.h>
-
-#define LOCAL_TRACE 0
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace virtio {
 
-PciBackend::PciBackend(KernelHandle<PciDeviceDispatcher> pci, zx_pcie_device_info_t info)
-    : pci_(ktl::move(pci)), info_(info) {
-  snprintf(tag_, sizeof(tag_), "pci[%02x:%02x.%1x]", info_.bus_id, info_.dev_id, info_.func_id);
+namespace fpci = fuchsia_hardware_pci;
+
+PciBackend::PciBackend(fidl::ClientEnd<fuchsia_hardware_pci::Device> pci,
+                       fuchsia_hardware_pci::DeviceInfo info)
+    : pci_(std::move(pci)), info_(std::move(info)) {
+  snprintf(tag_, sizeof(tag_), "pci[%02x:%02x.%1x]", info_.bus_id(), info_.dev_id(),
+           info_.func_id());
 }
 
 zx_status_t PciBackend::Bind() {
-  zx_rights_t rights;
-  zx_status_t status = PortDispatcher::Create(ZX_PORT_BIND_TO_INTERRUPT, &wait_port_, &rights);
+  zx::interrupt interrupt;
+  zx_status_t status = zx::port::create(/*options=*/ZX_PORT_BIND_TO_INTERRUPT, &wait_port_);
   if (status != ZX_OK) {
-    LTRACEF("cannot create wait port: %d\n", status);
+    zxlogf(ERROR, "cannot create wait port: %s", zx_status_get_string(status));
     return status;
   }
 
   // enable bus mastering
-  status = pci().EnableBusMaster(true);
-  if (status != ZX_OK) {
-    LTRACEF("cannot enable bus master: %d\n", status);
-    return status;
+  fidl::Result result = fidl::Call(pci())->SetBusMastering(true);
+  if (result.is_error()) {
+    zxlogf(ERROR, "cannot enable bus master: %s", result.error_value().FormatDescription().c_str());
+    if (result.error_value().is_domain_error()) {
+      return result.error_value().domain_error();
+    } else {
+      return result.error_value().framework_error().status();
+    }
   }
 
   status = ConfigureInterruptMode();
   if (status != ZX_OK) {
-    LTRACEF("cannot configure IRQs: %d\n", status);
+    zxlogf(ERROR, "cannot configure IRQs: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -63,65 +69,73 @@ zx_status_t PciBackend::ConfigureInterruptMode() {
   // This looks a lot like something ConfigureInterruptMode was designed for, but
   // since we have a specific requirement to use MSI-X if and only if we have 2
   // vectors it means rolling it by hand.
-  pcie_irq_mode_t mode = PCIE_IRQ_MODE_MSI_X;
+  fpci::InterruptMode mode = fpci::InterruptMode::kMsiX;
   uint32_t irq_cnt = 2;
-  zx_status_t status = pci().SetIrqMode(mode, irq_cnt);
-  if (status != ZX_OK) {
-    mode = PCIE_IRQ_MODE_LEGACY;
+  fidl::Result result = fidl::Call(pci())->SetInterruptMode({{mode, irq_cnt}});
+  if (result.is_error()) {
+    mode = fpci::InterruptMode::kLegacy;
     irq_cnt = 1;
-    status = pci().SetIrqMode(mode, irq_cnt);
-    if (status != ZX_OK) {
+    result = fidl::Call(pci())->SetInterruptMode({{mode, irq_cnt}});
+    if (result.is_error()) {
       irq_cnt = 0;
     }
   }
 
   if (irq_cnt == 0) {
-    LTRACEF("Failed to configure a virtio IRQ mode: %d\n", status);
-    return status;
+    zxlogf(ERROR, "Failed to configure a virtio IRQ mode: %s",
+           result.error_value().FormatDescription().c_str());
+    if (result.error_value().is_domain_error()) {
+      return result.error_value().domain_error();
+    } else {
+      return result.error_value().framework_error().status();
+    }
   }
 
   // Legacy only supports 1 IRQ, but for MSI-X we only need 2
   for (uint32_t i = 0; i < irq_cnt; i++) {
-    KernelHandle<InterruptDispatcher> interrupt;
-    zx_rights_t rights;
-    status = pci().MapInterrupt(i, &interrupt, &rights);
-    if (status != ZX_OK) {
-      LTRACEF("Failed to map interrupt %u: %d\n", i, status);
-      return status;
+    fidl::Result result = fidl::Call(pci())->MapInterrupt(i);
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to map interrupt %u: %s", i,
+             result.error_value().FormatDescription().c_str());
+      if (result.error_value().is_domain_error()) {
+        return result.error_value().domain_error();
+      } else {
+        return result.error_value().framework_error().status();
+      }
     }
+    zx::interrupt& interrupt = result.value().interrupt();
 
     // Use the interrupt index as the key so we can ack the correct interrupt after
     // a port wait.
-    status = interrupt.dispatcher()->Bind(wait_port_.dispatcher(), i);
+    zx_status_t status = interrupt.bind(wait_port_, /*key=*/i, /*options=*/0);
     if (status != ZX_OK) {
-      LTRACEF("Failed to bind interrupt %u: %d\n", i, status);
+      zxlogf(ERROR, "Failed to bind interrupt %u: %s", i, zx_status_get_string(status));
       return status;
     }
-    fbl::AllocChecker ac;
-    irq_handles().push_back(ktl::move(interrupt), &ac);
-    if (!ac.check()) {
-      LTRACEF("Failed to allocate interrupt %u\n", i);
-      return ZX_ERR_NO_MEMORY;
-    }
+    irq_handles().push_back(std::move(interrupt));
   }
   irq_mode() = mode;
-  LTRACEF("using %s IRQ mode (irq_cnt = %u)\n",
-          (irq_mode() == PCIE_IRQ_MODE_MSI_X ? "MSI-X" : "legacy"), irq_cnt);
+  zxlogf(DEBUG, "using %s IRQ mode (irq_cnt = %u)",
+         (irq_mode() == fpci::InterruptMode::kMsiX ? "MSI-X" : "legacy"), irq_cnt);
   return ZX_OK;
 }
 
 zx::result<uint32_t> PciBackend::WaitForInterrupt() {
-  zx_port_packet_t pp;
-  zx_status_t st = wait_port_.dispatcher()->Dequeue(Deadline::after_mono(ZX_MSEC(100)), &pp);
-  if (st != ZX_OK) {
-    return zx::error(st);
+  zx_port_packet packet;
+  zx_status_t status = wait_port_.wait(zx::deadline_after(zx::msec(100)), &packet);
+  if (status != ZX_OK) {
+    return zx::error(status);
   }
-  return zx::ok(pp.key);
+
+  return zx::ok(static_cast<uint32_t>(packet.key));
 }
 
 void PciBackend::InterruptAck(uint32_t key) {
   ZX_DEBUG_ASSERT(key < irq_handles().size());
-  ktl::ignore = irq_handles()[key].dispatcher()->Ack();
+  irq_handles()[key].ack();
+  if (irq_mode() == fpci::InterruptMode::kLegacy) {
+    std::ignore = fidl::Call(pci())->AckInterrupt();
+  }
 }
 
 }  // namespace virtio

@@ -1,18 +1,17 @@
-// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2017 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 #ifndef SRC_DEVICES_BUS_LIB_VIRTIO_INCLUDE_LIB_VIRTIO_BACKENDS_BACKEND_H_
 #define SRC_DEVICES_BUS_LIB_VIRTIO_INCLUDE_LIB_VIRTIO_BACKENDS_BACKEND_H_
 
+#include <fidl/fuchsia.hardware.pci/cpp/fidl.h>
+#include <lib/zx/handle.h>
+#include <lib/zx/port.h>
 #include <lib/zx/result.h>
 
-#include <dev/pcie_irqs.h>
-#include <fbl/mutex.h>
-#include <fbl/vector.h>
-#include <object/handle.h>
-#include <object/interrupt_dispatcher.h>
-#include <object/vm_object_dispatcher.h>
+#include <vector>
+
+#include <fbl/macros.h>
 #include <virtio/virtio.h>
 
 // Each backend will implement their own method for initialization / binding
@@ -23,8 +22,6 @@
 // ex: A device bound as a pci device will know to create a PCI backend
 // with the protocol and device info parameters.
 namespace virtio {
-
-class InterruptHandler {};
 
 class Backend {
  public:
@@ -65,13 +62,13 @@ class Backend {
   // specified by the isr capability.
   virtual uint32_t IsrStatus() = 0;
   virtual zx_status_t InterruptValid() {
-    if (irq_handles_.is_empty()) {
+    if (irq_handles_.empty()) {
       return ZX_ERR_BAD_HANDLE;
     }
     return ZX_OK;
   }
   // For Device level access to checking IRQ mode.
-  pcie_irq_mode_t InterruptMode() const { return irq_mode_; }
+  fuchsia_hardware_pci::InterruptMode InterruptMode() const { return irq_mode_; }
 
   // Wait for the device to raise an interrupt; may return early or may time out after an
   // internal waiting period.
@@ -83,20 +80,18 @@ class Backend {
   // Called when the driver is shutting down.
   virtual void Terminate() {}
 
-  virtual zx_status_t GetSharedMemoryVmo(KernelHandle<VmObjectDispatcher>* vmo_out) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+  virtual zx_status_t GetSharedMemoryVmo(zx::vmo* vmo_out) { return ZX_ERR_NOT_SUPPORTED; }
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(Backend);
 
  protected:
   // For derived backends who want to modify the IRQ mode
-  pcie_irq_mode_t& irq_mode() { return irq_mode_; }
-  fbl::Vector<KernelHandle<InterruptDispatcher>>& irq_handles() { return irq_handles_; }
+  fuchsia_hardware_pci::InterruptMode& irq_mode() { return irq_mode_; }
+  std::vector<zx::interrupt>& irq_handles() { return irq_handles_; }
 
  private:
-  pcie_irq_mode_t irq_mode_ = PCIE_IRQ_MODE_DISABLED;
-  fbl::Vector<KernelHandle<InterruptDispatcher>> irq_handles_;
+  fuchsia_hardware_pci::InterruptMode irq_mode_ = fuchsia_hardware_pci::InterruptMode::kDisabled;
+  std::vector<zx::interrupt> irq_handles_;
 };
 
 }  // namespace virtio

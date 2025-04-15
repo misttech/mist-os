@@ -1,4 +1,3 @@
-// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2016 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -6,10 +5,15 @@
 #define SRC_DEVICES_BUS_LIB_VIRTIO_INCLUDE_LIB_VIRTIO_DEVICE_H_
 
 #include <lib/virtio/backends/backend.h>
+#include <lib/zx/bti.h>
+#include <lib/zx/handle.h>
+#include <threads.h>
 #include <zircon/types.h>
 
-#include <fbl/mutex.h>
-#include <ktl/atomic.h>
+#include <atomic>
+#include <memory>
+#include <mutex>
+
 #include <virtio/virtio.h>
 
 // Virtio devices are represented by a derived class specific to their type (eg
@@ -22,7 +26,7 @@ namespace virtio {
 
 class Device {
  public:
-  Device(fbl::RefPtr<BusTransactionInitiatorDispatcher> bti, ktl::unique_ptr<Backend> backend);
+  Device(zx::bti bti, std::unique_ptr<Backend> backend);
   virtual ~Device();
 
   virtual zx_status_t Init() = 0;
@@ -30,7 +34,7 @@ class Device {
 
   void StartIrqThread();
   // interrupt cases that devices may override
-  pcie_irq_mode_t InterruptMode() { return backend_->InterruptMode(); }
+  fuchsia_hardware_pci::InterruptMode InterruptMode() { return backend_->InterruptMode(); }
   virtual void IrqRingUpdate() = 0;
   virtual void IrqConfigChange() = 0;
 
@@ -50,6 +54,11 @@ class Device {
 
   // It is expected that each derived device will implement tag().
   virtual const char* tag() const = 0;  // Implemented by derived devices
+
+  // Accessor for bti so that Rings can map IO buffers
+  const zx::bti& bti() { return bti_; }
+
+  zx_status_t GetSharedMemoryVmo(zx::vmo* vmo_out) { return backend_->GetSharedMemoryVmo(vmo_out); }
 
  protected:
   // Methods for checking / acknowledging features
@@ -79,18 +88,17 @@ class Device {
   void IrqWorker();
 
   // BTI for managing DMA
-  fbl::RefPtr<BusTransactionInitiatorDispatcher> bti_;
-
+  zx::bti bti_;
   // backend responsible for hardware io. Will be released when device goes out of scope
-  ktl::unique_ptr<Backend> backend_;
+  std::unique_ptr<Backend> backend_;
   // irq thread object
-  Thread* irq_thread_ = nullptr;
+  thrd_t irq_thread_ = {};
 
   // This lock exists for devices to synchronize themselves, it should not be used by the base
   // device class.
-  DECLARE_MUTEX(Device) lock_;
+  std::mutex lock_;
 
-  ktl::atomic<bool> irq_thread_should_exit_ = false;
+  std::atomic<bool> irq_thread_should_exit_ = false;
 };
 
 }  // namespace virtio
