@@ -392,27 +392,27 @@ void PlatformBus::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request, 
   auto instance_id = request->node.has_instance_id() ? request->node.instance_id() : 0;
 
   fuchsia_driver_framework::CompositeNodeSpec composite_node_spec = fidl::ToNatural(request->spec);
-  if (!composite_node_spec.parents().has_value()) {
-    composite_node_spec.parents().emplace();
+  if (!composite_node_spec.parents2().has_value()) {
+    composite_node_spec.parents2().emplace();
   }
-  composite_node_spec.parents()->push_back(fuchsia_driver_framework::ParentSpec{{
+  composite_node_spec.parents2()->push_back(fuchsia_driver_framework::ParentSpec2{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                                      bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
-              fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID, vid),
-              fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID, pid),
-              fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID, did),
-              fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::PROTOCOL,
+                                       bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_VID, vid),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_PID, pid),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_DID, did),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia::PROTOCOL,
-                                bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
-              fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID, vid),
-              fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_PID, pid),
-              fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID, did),
-              fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id),
+              fdf::MakeProperty2(bind_fuchsia::PROTOCOL,
+                                 bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
+              fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_VID, vid),
+              fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_PID, pid),
+              fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_DID, did),
+              fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id),
           },
   }});
   zx::result composite_node_manager =

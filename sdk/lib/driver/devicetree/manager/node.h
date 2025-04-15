@@ -57,7 +57,7 @@ class Node {
                 NodeManager* manager);
 
   // Add |prop| as a bind property of the device, when it is eventually published.
-  void AddBindProperty(fuchsia_driver_framework::NodeProperty prop);
+  void AddBindProperty(fuchsia_driver_framework::NodeProperty2 prop);
 
   void AddMmio(fuchsia_hardware_platform_bus::Mmio mmio);
 
@@ -69,7 +69,8 @@ class Node {
 
   void AddBootMetadata(fuchsia_hardware_platform_bus::BootMetadata boot_metadata);
 
-  void AddNodeSpec(fuchsia_driver_framework::ParentSpec spec);
+  void AddNodeSpec(const fuchsia_driver_framework::ParentSpec& spec);
+  void AddNodeSpec(const fuchsia_driver_framework::ParentSpec2& spec);
 
   void AddSmc(fuchsia_hardware_platform_bus::Smc smc);
 
@@ -121,10 +122,10 @@ class Node {
   fuchsia_hardware_platform_bus::Node pbus_node_;
 
   // Properties of the nodes after they have been transformed in the device group.
-  std::vector<fuchsia_driver_framework::NodeProperty> node_properties_;
+  std::vector<fuchsia_driver_framework::NodeProperty2> node_properties_;
 
   // Parent specifications.
-  std::vector<fuchsia_driver_framework::ParentSpec> parents_;
+  std::vector<fuchsia_driver_framework::ParentSpec2> parents_;
 
   // This is a unique ID we use to match our device group with the correct
   // platform bus node. It is generated at runtime and not stable across boots.
@@ -212,9 +213,8 @@ class ChildNode {
 
   Node* GetNode() const { return node_; }
 
-  void AddNodeSpec(fuchsia_driver_framework::ParentSpec spec) {
-    node_->AddNodeSpec(std::move(spec));
-  }
+  void AddNodeSpec(const fuchsia_driver_framework::ParentSpec& spec) { node_->AddNodeSpec(spec); }
+  void AddNodeSpec(const fuchsia_driver_framework::ParentSpec2& spec) { node_->AddNodeSpec(spec); }
 
   void set_register_type(RegisterType type) { node_->set_register_type(type); }
 

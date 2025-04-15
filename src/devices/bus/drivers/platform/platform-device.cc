@@ -314,11 +314,7 @@ zx::result<> PlatformDevice::CreateNode() {
       fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id_),
       fdf::MakeProperty2(bind_fuchsia::PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE)};
   if (const auto& node_props = node_.properties(); node_props.has_value()) {
-    std::transform(node_props->cbegin(), node_props->cend(), std::back_inserter(props),
-                   [](const fuchsia_driver_framework::NodeProperty& property) {
-                     return fuchsia_driver_framework::NodeProperty2{
-                         {.key = property.key().string_value().value(), .value = property.value()}};
-                   });
+    std::copy(node_props->cbegin(), node_props->cend(), std::back_inserter(props));
   }
 
   auto add_props = [&props](const auto& resource, const std::string& count_key,

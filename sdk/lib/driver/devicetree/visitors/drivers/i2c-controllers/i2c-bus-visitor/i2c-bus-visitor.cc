@@ -44,19 +44,19 @@ bool I2cBusVisitor::is_match(fdf_devicetree::Node& node) {
 
 zx::result<> I2cBusVisitor::AddChildNodeSpec(fdf_devicetree::ChildNode& child, uint32_t bus_id,
                                              uint32_t address) {
-  auto i2c_node = fuchsia_driver_framework::ParentSpec{{
+  auto i2c_node = fuchsia_driver_framework::ParentSpec2{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
-                                      bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bus_id),
-              fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS, address),
+              fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_i2c::SERVICE,
+                                       bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_BUS_ID, bus_id),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_ADDRESS, address),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
-                                bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeProperty(bind_fuchsia::I2C_ADDRESS, address),
+              fdf::MakeProperty2(bind_fuchsia_hardware_i2c::SERVICE,
+                                 bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeProperty2(bind_fuchsia::I2C_ADDRESS, address),
           },
   }};
   child.AddNodeSpec(i2c_node);

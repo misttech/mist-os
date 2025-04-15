@@ -217,48 +217,48 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
 
       auto mgr_request = gpio_tester->env().SyncCall(
           &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, mgr_request_idx++);
-      ASSERT_TRUE(mgr_request.parents().has_value());
-      ASSERT_EQ(4lu, mgr_request.parents()->size());
+      ASSERT_TRUE(mgr_request.parents2().has_value());
+      ASSERT_EQ(4lu, mgr_request.parents2()->size());
 
       // 1st parent is pdev. Skipping that.
       // 2nd parent is GPIO PIN1.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
-                              bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-            fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION,
-                              "fuchsia.gpio.FUNCTION." + std::string(PIN1_NAME))}},
-          (*mgr_request.parents())[1].properties(), false));
+          {{fdf::MakeProperty2(bind_fuchsia_hardware_gpio::SERVICE,
+                               bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+            fdf::MakeProperty2(bind_fuchsia_gpio::FUNCTION,
+                               "fuchsia.gpio.FUNCTION." + std::string(PIN1_NAME))}},
+          (*mgr_request.parents2())[1].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
-                                    bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-            fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, gpioA_id),
-            fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(PIN1))}},
-          (*mgr_request.parents())[1].bind_rules(), false));
+          {{fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_gpio::SERVICE,
+                                     bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+            fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_CONTROLLER, gpioA_id),
+            fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(PIN1))}},
+          (*mgr_request.parents2())[1].bind_rules(), false));
 
       // 3rd parent is GPIO PIN2.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
-                              bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-            fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION,
-                              "fuchsia.gpio.FUNCTION." + std::string(PIN2_NAME))}},
-          (*mgr_request.parents())[2].properties(), false));
+          {{fdf::MakeProperty2(bind_fuchsia_hardware_gpio::SERVICE,
+                               bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+            fdf::MakeProperty2(bind_fuchsia_gpio::FUNCTION,
+                               "fuchsia.gpio.FUNCTION." + std::string(PIN2_NAME))}},
+          (*mgr_request.parents2())[2].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
-                                    bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-            fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, gpioA_id),
-            fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(PIN2))}},
-          (*mgr_request.parents())[2].bind_rules(), false));
+          {{fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_gpio::SERVICE,
+                                     bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+            fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_CONTROLLER, gpioA_id),
+            fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(PIN2))}},
+          (*mgr_request.parents2())[2].bind_rules(), false));
 
       // 4th parent is GPIO INIT.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
-            fdf::MakeProperty(bind_fuchsia::GPIO_CONTROLLER, static_cast<uint32_t>(0))}},
-          (*mgr_request.parents())[3].properties(), false));
+          {{fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+            fdf::MakeProperty2(bind_fuchsia::GPIO_CONTROLLER, static_cast<uint32_t>(0))}},
+          (*mgr_request.parents2())[3].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
-                                    bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
-            fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, gpioA_id)}},
-          (*mgr_request.parents())[3].bind_rules(), false));
+          {{fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP,
+                                     bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+            fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_CONTROLLER, gpioA_id)}},
+          (*mgr_request.parents2())[3].bind_rules(), false));
     }
 
     if (node.name()->find("video") != std::string::npos) {
@@ -269,30 +269,30 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
 
       auto mgr_request = gpio_tester->env().SyncCall(
           &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, mgr_request_idx++);
-      ASSERT_TRUE(mgr_request.parents().has_value());
-      ASSERT_EQ(3lu, mgr_request.parents()->size());
+      ASSERT_TRUE(mgr_request.parents2().has_value());
+      ASSERT_EQ(3lu, mgr_request.parents2()->size());
 
       // 1st parent is pdev. Skipping that.
       // 2nd and 3rd parents are GPIO INIT of different gpio controllers.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
-            fdf::MakeProperty(bind_fuchsia::GPIO_CONTROLLER, static_cast<uint32_t>(0))}},
-          (*mgr_request.parents())[1].properties(), false));
+          {{fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+            fdf::MakeProperty2(bind_fuchsia::GPIO_CONTROLLER, static_cast<uint32_t>(0))}},
+          (*mgr_request.parents2())[1].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
-                                    bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
-            fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, gpioA_id)}},
-          (*mgr_request.parents())[1].bind_rules(), false));
+          {{fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP,
+                                     bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+            fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_CONTROLLER, gpioA_id)}},
+          (*mgr_request.parents2())[1].bind_rules(), false));
 
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
-            fdf::MakeProperty(bind_fuchsia::GPIO_CONTROLLER, static_cast<uint32_t>(1))}},
-          (*mgr_request.parents())[2].properties(), false));
+          {{fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+            fdf::MakeProperty2(bind_fuchsia::GPIO_CONTROLLER, static_cast<uint32_t>(1))}},
+          (*mgr_request.parents2())[2].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
-                                    bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
-            fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, gpioB_id)}},
-          (*mgr_request.parents())[2].bind_rules(), false));
+          {{fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP,
+                                     bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+            fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_CONTROLLER, gpioB_id)}},
+          (*mgr_request.parents2())[2].bind_rules(), false));
     }
   }
 

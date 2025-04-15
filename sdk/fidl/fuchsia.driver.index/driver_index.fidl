@@ -19,7 +19,7 @@ type MatchDriverResult = flexible union {
 
 type MatchDriverArgs = table {
     /// Properties of the node to be matched.
-    1: properties fuchsia.driver.framework.NodePropertyVector;
+    1: properties fuchsia.driver.framework.NodeProperties;
 
     /// The name of the node to be matched. Used for debugging purposes.
     2: name fuchsia.driver.framework.NodeName;

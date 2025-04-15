@@ -29,27 +29,27 @@ zx_status_t TestBoard::CompositeNodeSpecInit() {
   fdf::Arena arena('DVGP');
 
   auto bind_rules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
-                              bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST),
-      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
-                              bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_PBUS_TEST),
-      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
-                              bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_PARENT_SPEC),
+      fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_VID,
+                               bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST),
+      fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_PID,
+                               bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_PBUS_TEST),
+      fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_DID,
+                               bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_PARENT_SPEC),
   };
 
   auto properties = std::vector{
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_test::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty2(bind_fuchsia::PROTOCOL, bind_fuchsia_test::BIND_PROTOCOL_DEVICE),
   };
 
   auto parents = std::vector{
-      fuchsia_driver_framework::ParentSpec{{
+      fuchsia_driver_framework::ParentSpec2{{
           .bind_rules = bind_rules,
           .properties = properties,
       }},
   };
 
   auto composite_node_spec = fuchsia_driver_framework::CompositeNodeSpec{
-      {.name = "composite_node_spec", .parents = parents}};
+      {.name = "composite_node_spec", .parents2 = parents}};
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, dev), fidl::ToWire(fidl_arena, composite_node_spec));
 

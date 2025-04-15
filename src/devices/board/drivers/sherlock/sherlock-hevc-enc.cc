@@ -64,15 +64,15 @@ static const std::vector<fpbus::Irq> sherlock_hevc_enc_irqs{
     }},
 };
 
-const std::vector<fdf::BindRule> kClkDosRules = std::vector{
-    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
-                            bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, g12b_clk::G12B_CLK_DOS),
+const std::vector<fdf::BindRule2> kClkDosRules = std::vector{
+    fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_clock::SERVICE,
+                             bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeAcceptBindRule2(bind_fuchsia::CLOCK_ID, g12b_clk::G12B_CLK_DOS),
 };
-const std::vector<fdf::NodeProperty> kClkDosProperties = std::vector{
-    fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
-                      bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeProperty(bind_fuchsia_clock::FUNCTION, bind_fuchsia_clock::FUNCTION_DOS),
+const std::vector<fdf::NodeProperty2> kClkDosProperties = std::vector{
+    fdf::MakeProperty2(bind_fuchsia_hardware_clock::SERVICE,
+                       bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeProperty2(bind_fuchsia_clock::FUNCTION, bind_fuchsia_clock::FUNCTION_DOS),
 };
 
 static const fpbus::Node hevc_enc_dev = []() {
@@ -91,13 +91,13 @@ static const fpbus::Node hevc_enc_dev = []() {
 zx_status_t Sherlock::HevcEncInit() {
   fidl::Arena<> fidl_arena;
 
-  std::vector<fdf::ParentSpec> kHevcEncParents = {
-      fdf::ParentSpec{{kClkDosRules, kClkDosProperties}}};
+  std::vector<fdf::ParentSpec2> kHevcEncParents = {
+      fdf::ParentSpec2{{kClkDosRules, kClkDosProperties}}};
   fdf::Arena arena('HEVC');
   auto composite_result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, hevc_enc_dev),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = "aml-hevc-enc", .parents = kHevcEncParents}}));
+                                   {.name = "aml-hevc-enc", .parents2 = kHevcEncParents}}));
   if (!composite_result.ok()) {
     zxlogf(ERROR, "AddCompositeNodeSpec HevcEnc(hevc_enc_dev) request failed: %s",
            composite_result.FormatDescription().data());

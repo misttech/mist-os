@@ -55,28 +55,28 @@ zx::result<> PowerIntegrationBoard::Start() {
     pdev.power_config() = std::move(config.value().power_elements());
 
     auto bind_rules = std::vector{
-        fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
-                                bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST),
-        fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
-                                bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_POWER_TEST),
-        fdf::MakeAcceptBindRule(
+        fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_VID,
+                                 bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST),
+        fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_PID,
+                                 bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_POWER_TEST),
+        fdf::MakeAcceptBindRule2(
             bind_fuchsia::PLATFORM_DEV_DID,
             bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_FAKE_POWER_CHILD)};
 
     auto properties = std::vector{
-        fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
-                          bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST),
-        fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_PID,
-                          bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_POWER_TEST),
-        fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
-                          bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_FAKE_POWER_CHILD)};
+        fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_VID,
+                           bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST),
+        fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_PID,
+                           bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_POWER_TEST),
+        fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_DID,
+                           bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_FAKE_POWER_CHILD)};
 
-    auto parents = std::vector{
-        fuchsia_driver_framework::ParentSpec{{.bind_rules = bind_rules, .properties = properties}}};
+    auto parents = std::vector{fuchsia_driver_framework::ParentSpec2{
+        {.bind_rules = bind_rules, .properties = properties}}};
 
     auto composite_node_spec = fuchsia_driver_framework::CompositeNodeSpec{{
         .name = "composite_fake_child",
-        .parents = parents,
+        .parents2 = parents,
     }};
 
     auto result = platform_bus.buffer(arena)->AddCompositeNodeSpec(
@@ -133,28 +133,28 @@ zx::result<> PowerIntegrationBoard::Start() {
     };
 
     auto bind_rules = std::vector{
-        fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
-                                bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST),
-        fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
-                                bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_POWER_TEST),
-        fdf::MakeAcceptBindRule(
+        fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_VID,
+                                 bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST),
+        fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_PID,
+                                 bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_POWER_TEST),
+        fdf::MakeAcceptBindRule2(
             bind_fuchsia::PLATFORM_DEV_DID,
             bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_FAKE_POWER_PARENT)};
 
     auto properties = std::vector{
-        fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
-                          bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST),
-        fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_PID,
-                          bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_POWER_TEST),
-        fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
-                          bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_FAKE_POWER_PARENT)};
+        fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_VID,
+                           bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST),
+        fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_PID,
+                           bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_POWER_TEST),
+        fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_DID,
+                           bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_FAKE_POWER_PARENT)};
 
-    auto parents = std::vector{
-        fuchsia_driver_framework::ParentSpec{{.bind_rules = bind_rules, .properties = properties}}};
+    auto parents = std::vector{fuchsia_driver_framework::ParentSpec2{
+        {.bind_rules = bind_rules, .properties = properties}}};
 
     auto composite_node_spec = fuchsia_driver_framework::CompositeNodeSpec{{
         .name = "composite_fake_parent",
-        .parents = parents,
+        .parents2 = parents,
     }};
 
     auto result = platform_bus.buffer(arena)->AddCompositeNodeSpec(
