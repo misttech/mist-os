@@ -323,6 +323,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   struct ApplyConfigInfo {
     fuchsia_hardware_display::wire::ConfigStamp config_stamp;
     uint64_t frame_number;
+    uint64_t trace_flow_id;
   };
 
   // The next ConfigStamp value used in an ApplyConfig() call.

@@ -859,7 +859,9 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
     FX_CHECK(frame_number > *last_frame_number_);
   }
   last_frame_number_ = frame_number;
-  TRACE_FLOW_BEGIN("gfx", "render_frame_to_vsync", frame_number);
+
+  uint64_t trace_flow_id = TRACE_NONCE();
+  TRACE_FLOW_BEGIN("gfx", "render_frame_to_vsync", trace_flow_id);
 
   // Determine whether we need to fall back to GPU composition. Avoid calling CheckConfig() if we
   // don't need to, because this requires a round-trip to the display coordinator.
@@ -888,7 +890,8 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
   }
 
   const fuchsia_hardware_display::wire::ConfigStamp config_stamp = ApplyConfig();
-  pending_apply_configs_.push_back({.config_stamp = config_stamp, .frame_number = frame_number});
+  pending_apply_configs_.push_back(
+      {.config_stamp = config_stamp, .frame_number = frame_number, .trace_flow_id = trace_flow_id});
 
   return fallback_to_gpu_composition ? RenderFrameResult::kGpuComposition
                                      : RenderFrameResult::kDirectToDisplay;
@@ -955,7 +958,7 @@ void DisplayCompositor::OnVsync(zx::time timestamp,
   auto it = pending_apply_configs_.begin();
   auto end = std::next(vsync_frame_it);
   while (it != end) {
-    TRACE_FLOW_END("gfx", "render_frame_to_vsync", it->frame_number);
+    TRACE_FLOW_END("gfx", "render_frame_to_vsync", it->trace_flow_id);
     release_fence_manager_.OnVsync(it->frame_number, timestamp);
     it = pending_apply_configs_.erase(it);
   }
