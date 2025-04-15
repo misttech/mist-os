@@ -33,7 +33,7 @@ use linux_uapi::{
     bpf_map_type_BPF_MAP_TYPE_STACK, bpf_map_type_BPF_MAP_TYPE_STACK_TRACE,
     bpf_map_type_BPF_MAP_TYPE_STRUCT_OPS, bpf_map_type_BPF_MAP_TYPE_TASK_STORAGE,
     bpf_map_type_BPF_MAP_TYPE_UNSPEC, bpf_map_type_BPF_MAP_TYPE_USER_RINGBUF,
-    bpf_map_type_BPF_MAP_TYPE_XSKMAP,
+    bpf_map_type_BPF_MAP_TYPE_XSKMAP, BPF_EXIST, BPF_NOEXIST,
 };
 use std::fmt::Debug;
 use std::ops::Deref;
@@ -176,6 +176,10 @@ impl Map {
     }
 
     pub fn update(&self, key: MapKey, value: &[u8], flags: u64) -> Result<(), MapError> {
+        if flags & (BPF_EXIST as u64) > 0 && flags & (BPF_NOEXIST as u64) > 0 {
+            return Err(MapError::InvalidParam);
+        }
+
         self.map_impl.update(key, value, flags)
     }
 
@@ -198,12 +202,6 @@ impl Map {
     pub fn ringbuf_reserve(&self, size: u32, flags: u64) -> Result<usize, MapError> {
         self.map_impl.ringbuf_reserve(size, flags)
     }
-}
-
-type PinnedBuffer = Pin<Box<[u8]>>;
-
-fn new_pinned_buffer(size: usize) -> PinnedBuffer {
-    vec![0u8; size].into_boxed_slice().into()
 }
 
 fn create_map_impl(
@@ -389,6 +387,26 @@ mod test {
     fn test_sharing_array() {
         let schema = MapSchema {
             map_type: bpf_map_type_BPF_MAP_TYPE_ARRAY,
+            key_size: 4,
+            value_size: 4,
+            max_entries: 10,
+        };
+
+        // Create two array maps sharing the content.
+        let map1 = Map::new(schema, 0).unwrap();
+        let map2 = Map::new_shared(map1.share().unwrap()).unwrap();
+
+        // Set a value in one map and check that it's updated in the other.
+        let key = vec![0, 0, 0, 0];
+        let value = [0, 1, 2, 3];
+        map1.update(MapKey::from_vec(key.clone()), &value, 0).unwrap();
+        assert_eq!(&map2.lookup(&key).unwrap(), &value);
+    }
+
+    #[fuchsia::test]
+    fn test_sharing_hash_map() {
+        let schema = MapSchema {
+            map_type: bpf_map_type_BPF_MAP_TYPE_HASH,
             key_size: 4,
             value_size: 4,
             max_entries: 10,

@@ -93,17 +93,7 @@ impl MapImpl for Array {
             return Err(MapError::EntryExists);
         }
 
-        let mut copy_buf;
-        let value = if self.value_size == self.bytes_per_element {
-            value
-        } else {
-            // Add padding if necessary.
-            copy_buf = Vec::with_capacity(self.bytes_per_element);
-            copy_buf.extend_from_slice(value);
-            copy_buf.resize(self.bytes_per_element, 0);
-            &copy_buf
-        };
-        ptr.store(value);
+        ptr.store_padded(value);
 
         Ok(())
     }

@@ -44,6 +44,19 @@ impl<'a, T> EbpfPtr<'a, T> {
     pub unsafe fn new(ptr: *mut T) -> Self {
         Self { ptr, phantom: PhantomData }
     }
+
+    /// # Safety
+    /// Caller must ensure that the value cannot be updated by other threads
+    /// while the returned reference is live.
+    pub unsafe fn deref(&self) -> &'a T {
+        &*self.ptr
+    }
+
+    /// # Safety
+    /// Caller must ensure that the value is not being used by other threads.
+    pub unsafe fn deref_mut(&self) -> &'a mut T {
+        &mut *self.ptr
+    }
 }
 
 impl EbpfPtr<'_, u64> {
@@ -67,6 +80,7 @@ impl EbpfPtr<'_, u64> {
 /// reference either a whole VMO allocated for and eBPF map or individual
 /// elements of that VMO (see `slice()`). The address and the size of the
 /// buffer are always 8-byte aligned.
+#[derive(Clone)]
 pub struct EbpfBufferPtr<'a> {
     ptr: *mut u8,
     size: usize,
@@ -138,7 +152,7 @@ impl<'a> EbpfBufferPtr<'a> {
         let mut result = Vec::with_capacity(self.size);
 
         for pos in (0..self.size).step_by(Self::ALIGNMENT) {
-            // SAFETY: pos is guaranteed to be within the buffer bounds.
+            // SAFETY: the offset is guaranteed to be within the buffer bounds.
             let value: u64 = unsafe { self.get_ptr_internal(pos).load_relaxed() };
             result.extend_from_slice(value.as_bytes());
         }
@@ -146,15 +160,31 @@ impl<'a> EbpfBufferPtr<'a> {
         result
     }
 
-    /// Stores `data` at the head of the buffer. `data` must be the same size
-    /// as the buffer.
+    /// Stores `data` in the buffer. `data` must be the same size as the
+    /// buffer.
     pub fn store(&self, data: &[u8]) {
         assert!(data.len() == self.size);
+        self.store_padded(data);
+    }
 
-        for pos in (0..self.size).step_by(Self::ALIGNMENT) {
-            let value = u64::read_from_bytes(&data[pos..(pos + Self::ALIGNMENT)]).unwrap();
+    /// Stores `data` at the head of the buffer. If `data` is not multiple of 8
+    /// then it's padded at the end with zeros.
+    pub fn store_padded(&self, data: &[u8]) {
+        assert!(data.len() <= self.size);
+
+        let tail = data.len() % 8;
+        let end = data.len() - tail;
+        for pos in (0..end).step_by(Self::ALIGNMENT) {
+            let value = u64::read_from_bytes(&data[pos..(pos + 8)]).unwrap();
             // SAFETY: pos is guaranteed to be within the buffer bounds.
             unsafe { self.get_ptr_internal(pos).store_relaxed(value) };
+        }
+
+        if tail > 0 {
+            let mut value: u64 = 0;
+            value.as_mut_bytes()[..tail].copy_from_slice(&data[(data.len() - tail)..]);
+            // SAFETY: pos is guaranteed to be within the buffer bounds.
+            unsafe { self.get_ptr_internal(data.len() - tail).store_relaxed(value) };
         }
     }
 }
