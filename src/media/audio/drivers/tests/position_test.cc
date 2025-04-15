@@ -23,21 +23,12 @@ void PositionTest::EnablePositionNotifications() {
   RequestPositionNotification();
 }
 
-void PositionTest::RequestPositionNotification() {
-  ring_buffer()->WatchClockRecoveryPositionInfo(
-      [this](fuchsia::hardware::audio::RingBufferPositionInfo position_info) {
-        PositionNotificationCallback(position_info);
-      });
-}
-
 void PositionTest::PositionNotificationCallback(
     fuchsia::hardware::audio::RingBufferPositionInfo position_info) {
   zx::time now = zx::clock::get_monotonic();
   zx::time position_time = zx::time(position_info.timestamp);
 
   AdminTest::PositionNotificationCallback(position_info);
-
-  EXPECT_TRUE(position_notification_is_expected_);
 
   EXPECT_LT(start_time(), now);
   EXPECT_LT(position_time, now);
@@ -226,7 +217,7 @@ DEFINE_POSITION_TEST_CLASS(PositionNotifySlow, {
 });
 
 // Verify that NO position notifications arrive after Stop is called.
-DEFINE_POSITION_TEST_CLASS(NoPositionNotifyAfterStop, {
+DEFINE_POSITION_TEST_CLASS(NoMorePositionNotifyAfterStop, {
   constexpr auto kNotifsPerRingBuffer = 32u;
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
@@ -243,20 +234,6 @@ DEFINE_POSITION_TEST_CLASS(NoPositionNotifyAfterStop, {
   // register a position callback that will fail the test if any further notification occurs.
   ASSERT_NO_FAILURE_OR_SKIP(ExpectPositionNotifyCount(3u));
   RequestRingBufferStopAndExpectNoPositionNotifications();
-  WaitForError();
-});
-
-// Verify no position notifications arrive if notifications_per_ring is 0.
-DEFINE_POSITION_TEST_CLASS(PositionNotifyNone, {
-  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
-  ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000, 0));
-  ASSERT_NO_FAILURE_OR_SKIP(DisallowPositionNotifications());
-  ASSERT_NO_FAILURE_OR_SKIP(EnablePositionNotifications());
-
-  RequestRingBufferStart();
   WaitForError();
 });
 
@@ -282,8 +259,7 @@ void RegisterPositionTestsForDevice(const DeviceEntry& device_entry) {
 
   REGISTER_POSITION_TEST(PositionNotifySlow, device_entry);
   REGISTER_POSITION_TEST(PositionNotifyFast, device_entry);
-  REGISTER_POSITION_TEST(NoPositionNotifyAfterStop, device_entry);
-  REGISTER_POSITION_TEST(PositionNotifyNone, device_entry);
+  REGISTER_POSITION_TEST(NoMorePositionNotifyAfterStop, device_entry);
 }
 
 }  // namespace media::audio::drivers::test

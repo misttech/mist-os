@@ -335,11 +335,11 @@ void AdminTest::RequestRingBufferStart() {
   ASSERT_GT(ring_buffer_frames_, 0u) << "GetVmo must be called before RingBuffer::Start()";
 
   // Any position notifications that arrive before RingBuffer::Start callback should cause failures.
-  FailOnPositionNotifications();
+  ExpectNoPositionNotifications();
 
   auto send_time = zx::clock::get_monotonic();
   ring_buffer_->Start(AddCallback("RingBuffer::Start", [this](int64_t start_time) {
-    AllowPositionNotifications();
+    ExpectPositionNotifications();
     start_time_ = zx::time(start_time);
   }));
 
@@ -377,9 +377,17 @@ void AdminTest::RequestRingBufferStopAndExpectDisconnect(zx_status_t expected_er
 // To validate this without any race windows: from within the next position notification itself,
 // we call RingBuffer::Stop and flag that subsequent position notifications should FAIL.
 void AdminTest::RequestRingBufferStopAndExpectNoPositionNotifications() {
-  ring_buffer_->Stop(AddCallback("RingBuffer::Stop", [this]() { FailOnPositionNotifications(); }));
+  ring_buffer_->Stop(
+      AddCallback("RingBuffer::Stop", [this]() { ExpectNoPositionNotifications(); }));
 
   ExpectCallbacks();
+}
+
+void AdminTest::RequestPositionNotification() {
+  ring_buffer()->WatchClockRecoveryPositionInfo(
+      [this](fuchsia::hardware::audio::RingBufferPositionInfo position_info) {
+        PositionNotificationCallback(position_info);
+      });
 }
 
 void AdminTest::PositionNotificationCallback(
@@ -816,6 +824,49 @@ DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterStart, {
   WaitForError();
 });
 
+DEFINE_ADMIN_TEST_CLASS(PositionNotifyBeforeStart, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000));
+
+  ASSERT_NO_FAILURE_OR_SKIP(ExpectNoPositionNotifications());
+
+  RequestPositionNotification();
+  WaitForError();
+});
+
+DEFINE_ADMIN_TEST_CLASS(PositionNotifyNone, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000, 0));
+
+  ASSERT_NO_FAILURE_OR_SKIP(ExpectNoPositionNotifications());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStart());
+
+  RequestPositionNotification();
+  WaitForError();
+});
+
+DEFINE_ADMIN_TEST_CLASS(PositionNotifyAfterStop, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000));
+
+  ASSERT_NO_FAILURE_OR_SKIP(ExpectNoPositionNotifications());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStart());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStop());
+
+  RequestPositionNotification();
+  WaitForError();
+});
+
 // Create a RingBuffer, drop it, recreate it, then interact with it in any way (e.g. GetProperties).
 DEFINE_ADMIN_TEST_CLASS(GetRingBufferPropertiesAfterDroppingFirstRingBuffer, {
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
@@ -941,6 +992,10 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry) {
     REGISTER_ADMIN_TEST(SetActiveChannelsTooHigh, device_entry);
     REGISTER_ADMIN_TEST(SetActiveChannelsNoChange, device_entry);
 
+    REGISTER_ADMIN_TEST(PositionNotifyBeforeStart, device_entry);
+    REGISTER_ADMIN_TEST(PositionNotifyNone, device_entry);
+    REGISTER_ADMIN_TEST(PositionNotifyAfterStop, device_entry);
+
     REGISTER_ADMIN_TEST(RingBufferStart, device_entry);
     REGISTER_ADMIN_TEST(RingBufferStartBeforeGetVmoShouldDisconnect, device_entry);
     REGISTER_ADMIN_TEST(RingBufferStartWhileStartedShouldDisconnect, device_entry);
@@ -966,6 +1021,10 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry) {
     REGISTER_ADMIN_TEST(SetActiveChannelsTooHigh, device_entry);
     REGISTER_ADMIN_TEST(SetActiveChannelsNoChange, device_entry);
 
+    REGISTER_ADMIN_TEST(PositionNotifyBeforeStart, device_entry);
+    REGISTER_ADMIN_TEST(PositionNotifyNone, device_entry);
+    REGISTER_ADMIN_TEST(PositionNotifyAfterStop, device_entry);
+
     REGISTER_ADMIN_TEST(RingBufferStart, device_entry);
     REGISTER_ADMIN_TEST(RingBufferStartBeforeGetVmoShouldDisconnect, device_entry);
     REGISTER_ADMIN_TEST(RingBufferStartWhileStartedShouldDisconnect, device_entry);
@@ -990,6 +1049,10 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry) {
     REGISTER_ADMIN_TEST(SetActiveChannelsChange, device_entry);
     REGISTER_ADMIN_TEST(SetActiveChannelsTooHigh, device_entry);
     REGISTER_ADMIN_TEST(SetActiveChannelsNoChange, device_entry);
+
+    REGISTER_ADMIN_TEST(PositionNotifyBeforeStart, device_entry);
+    REGISTER_ADMIN_TEST(PositionNotifyNone, device_entry);
+    REGISTER_ADMIN_TEST(PositionNotifyAfterStop, device_entry);
 
     REGISTER_ADMIN_TEST(RingBufferStart, device_entry);
     REGISTER_ADMIN_TEST(RingBufferStartBeforeGetVmoShouldDisconnect, device_entry);

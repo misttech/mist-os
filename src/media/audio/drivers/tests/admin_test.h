@@ -66,11 +66,14 @@ class AdminTest : public TestBase {
   void RequestRingBufferStopAndExpectNoPositionNotifications();
   void RequestRingBufferStopAndExpectDisconnect(zx_status_t expected_error);
 
-  // Set flag so position notifications (even already-enqueued ones!) cause failures.
-  void FailOnPositionNotifications() { fail_on_position_notification_ = true; }
+  void RequestPositionNotification();
+  virtual void PositionNotificationCallback(
+      fuchsia::hardware::audio::RingBufferPositionInfo position_info);
+
   // Clear flag so position notifications (even already-enqueued ones) do not cause failures.
-  void AllowPositionNotifications() { fail_on_position_notification_ = false; }
-  void PositionNotificationCallback(fuchsia::hardware::audio::RingBufferPositionInfo position_info);
+  void ExpectPositionNotifications() { fail_on_position_notification_ = false; }
+  // Set flag so position notifications (even already-enqueued ones!) cause failures.
+  void ExpectNoPositionNotifications() { fail_on_position_notification_ = true; }
 
   void WatchDelayAndExpectUpdate();
   void WatchDelayAndExpectNoUpdate();
