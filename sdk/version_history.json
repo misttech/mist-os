@@ -69,7 +69,7 @@
             },
             "20": {
                 "abi_revision": "0xDB83211C067E1052",
-                "phase": "supported"
+                "phase": "retired"
             },
             "21": {
                 "abi_revision": "0x9C462E1B5EF9AE5F",
@@ -77,7 +77,7 @@
             },
             "22": {
                 "abi_revision": "0xEE3BE92BE27C6DEB",
-                "phase": "supported"
+                "phase": "retired"
             },
             "23": {
                 "abi_revision": "0x4C444771E8DDABE1",
@@ -85,7 +85,7 @@
             },
             "24": {
                 "abi_revision": "0x2C1497665AFD4223",
-                "phase": "supported"
+                "phase": "retired"
             },
             "25": {
                 "abi_revision": "0x851ACAA143F52ABB",
