@@ -113,6 +113,13 @@ assert(
     defined(_default_compilation_settings[compilation_mode]),
     "The specified compilation mode (${compilation_mode}) is not a valid option. They are: 'debug', 'balanced', and 'release'")
 
+# Create booleans for each compilation mode, to allow binaries to fine-tune
+# configuration
+
+# is_debug = is_debug  # this compilation mode has already been set
+is_balanced = compilation_mode == "balanced"
+is_release = compilation_mode == "release"
+
 compilation_settings = {
   # Set the compilation settings to use based on the chosen compilation mode
   _settings_defaults = _default_compilation_settings[compilation_mode]

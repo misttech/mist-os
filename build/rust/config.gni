@@ -20,7 +20,7 @@ declare_args() {
   rustc_prefix = default_rustc_prefix
 
   # Enable debug assertions, e.g. for overflow checking.
-  rust_debug_assertions = compilation_mode != "release"
+  rust_debug_assertions = !is_release
 }
 
 if (rustc_prefix == default_rustc_prefix) {
