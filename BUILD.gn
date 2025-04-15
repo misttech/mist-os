@@ -225,6 +225,7 @@ build_api_module("api") {
     ":delivery_blob_config",
     ":detailed_size_checker_data",
     ":exported_files",
+    ":fidl_python_dirs",
     ":fuzzers",
     ":generated_sources",
     ":gerrit_size_report",
@@ -762,6 +763,21 @@ group("checkout_artifacts.metadata") {
 build_api_module("generated_sources") {
   testonly = true
   data_keys = [ "generated_sources" ]
+  deps = [
+    "//build/images/updates:packages",
+    "//sdk",
+  ]
+}
+
+# This describes the path to all FIDL Python bindings in the build.
+#
+# This data is post-processed to instruct Python IDE integrations to search
+# these locations for type definitions to support code completion.
+#
+# Type: list(path relative to $root_build_dir)
+build_api_module("fidl_python_dirs") {
+  testonly = true
+  data_keys = [ "fidl_python_output" ]
   deps = [
     "//build/images/updates:packages",
     "//sdk",
@@ -1355,6 +1371,32 @@ compiled_action("test-list") {
     rebase_path(test_config_file, root_build_dir),
     "--depfile",
     "test-list.json.d",
+  ]
+}
+
+action("python_ide_integration") {
+  testonly = true
+  script = "//build/python/create_pyright_base_config.py"
+
+  # The final file is symlinked to the root of the checkout directory, and the paths
+  # contained the file must be relative to that directory. For that reason, we need to pass
+  # the real build directory path so that each file path is relative to the final symlink location.
+  no_output_dir_leaks = false
+
+  deps = [ ":fidl_python_dirs" ]
+
+  inputs = [ "//pyrightconfig.json" ] + get_target_outputs(deps[0])
+  outputs = [ "$root_build_dir/pyrightconfig.base.json" ]
+
+  args = [
+    "--fidl_python_paths_file",
+    rebase_path(inputs[1], root_build_dir),
+    "--output_file",
+    rebase_path(outputs[0], root_build_dir),
+    "--top_level_pyright_file",
+    rebase_path(inputs[0], root_build_dir),
+    "--build_directory_path",
+    string_replace(root_build_dir, "//", ""),
   ]
 }
 
@@ -2045,6 +2087,7 @@ group("default") {
     "//:build_only",
     "//:host",
     "//:product_bundles.check",
+    "//:python_ide_integration",
     "//:test-list",
     "//build:bazel2gn_dir_list",
     "//build/assembly:validate_product_defs",

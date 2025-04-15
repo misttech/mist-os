@@ -1,5 +1,19 @@
 {
-    "extraPaths": [
+    "extends": "pyrightconfig.base.json",
+    // Paths added to fuchsiaExtraPaths will be included in the extraPaths of the
+    // generated pyrightconfig.base.json config that this pyrightconfig.json is
+    // extended from.
+    //
+    // The fuchsiaExtraPaths variable itself is ignored by pyright tooling. This
+    // variable is read by the //:python_ide_integration build action to inject
+    // extraPaths into $root_build_dir/pyrightconfig.base.json. This
+    // pyrightconfig.json then uses pyrightconfig.base.json to extend itself.
+    //
+    // This is required because the //:python_ide_integration build action writes
+    // paths of build-time generated Python modules into the extraPaths of
+    // $root_build_dir/pyrightconfig.base.json, and pyright clobbers variables from
+    // extended configs.
+    "fuchsiaExtraPaths": [
         "build/python/modules",
         "build/python/tests",
         "src/developer/ffx/lib/fuchsia-controller/python",

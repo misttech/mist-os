@@ -99,6 +99,7 @@ template("fidl_python") {
 
       metadata = {
         generated_sources = rebase_path(outputs, root_build_dir)
+        fidl_python_output = [ rebase_path(fidl_gen_dir, root_build_dir) ]
       }
     }
   } else {

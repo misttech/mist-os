@@ -206,6 +206,9 @@ tables_generator_tests_*.txt
 # rust-analyzer
 /rust-project.json
 
+# Generated config for Python analysis
+/pyrightconfig.base.json
+
 # Symlinks related to the Bazel workspace
 /bazel-bin
 /bazel-out

@@ -471,7 +471,11 @@ def main() -> int:
         # but using different build directories.
 
         # These symlinks are useful for IDEs.
-        for artifact in ("compile_commands.json", "rust-project.json"):
+        for artifact in [
+            "compile_commands.json",
+            "rust-project.json",
+            "pyrightconfig.base.json",
+        ]:
             if (build_dir / artifact).exists():
                 make_relative_symlink(
                     fuchsia_dir / artifact, build_dir / artifact
