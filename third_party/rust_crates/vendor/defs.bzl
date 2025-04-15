@@ -339,7 +339,7 @@ _NORMAL_DEPENDENCIES = {
             "crossbeam-utils": Label("//third_party/rust_crates/vendor/crossbeam-utils-0.8.14:crossbeam_utils"),
             "crypto-common": Label("//third_party/rust_crates/vendor/crypto-common-0.1.6:crypto_common"),
             "csv": Label("//third_party/rust_crates/vendor/csv-1.3.1:csv"),
-            "darling": Label("//third_party/rust_crates/vendor/darling-0.20.10:darling"),
+            "darling": Label("//third_party/rust_crates/vendor/darling-0.20.11:darling"),
             "data-encoding": Label("//third_party/rust_crates/vendor/data-encoding-2.3.2:data_encoding"),
             "derive_builder": Label("//third_party/rust_crates/vendor/derive_builder-0.11.1:derive_builder"),
             "derp": Label("//third_party/rust_crates/vendor/derp-0.0.14:derp"),
