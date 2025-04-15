@@ -32,6 +32,17 @@ pub enum ObjType {
 impl ::fidl_next::Encodable for ObjType {
     type Encoded = WireObjType;
 }
+impl ::std::convert::TryFrom<u32> for ObjType {
+    type Error = ::fidl_next::UnknownStrictEnumMemberError;
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::None),
+            4 => Ok(Self::Channel),
+
+            _ => Err(Self::Error::new(value.into())),
+        }
+    }
+}
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for ObjType
 where

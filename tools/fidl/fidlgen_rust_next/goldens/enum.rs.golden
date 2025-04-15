@@ -11,6 +11,13 @@ pub enum MyEmptyFlexibleEnum {
 impl ::fidl_next::Encodable for MyEmptyFlexibleEnum {
     type Encoded = WireMyEmptyFlexibleEnum;
 }
+impl ::std::convert::From<u32> for MyEmptyFlexibleEnum {
+    fn from(value: u32) -> Self {
+        match value {
+            _ => Self::UnknownOrdinal_(value),
+        }
+    }
+}
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for MyEmptyFlexibleEnum
 where
@@ -94,6 +101,16 @@ pub enum MyFlexibleEnum {
 
 impl ::fidl_next::Encodable for MyFlexibleEnum {
     type Encoded = WireMyFlexibleEnum;
+}
+impl ::std::convert::From<u32> for MyFlexibleEnum {
+    fn from(value: u32) -> Self {
+        match value {
+            1 => Self::Foo,
+            2 => Self::Bar,
+
+            _ => Self::UnknownOrdinal_(value),
+        }
+    }
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for MyFlexibleEnum
@@ -195,6 +212,17 @@ pub enum MyFlexibleEnumWithCustomUnknown {
 
 impl ::fidl_next::Encodable for MyFlexibleEnumWithCustomUnknown {
     type Encoded = WireMyFlexibleEnumWithCustomUnknown;
+}
+impl ::std::convert::From<u32> for MyFlexibleEnumWithCustomUnknown {
+    fn from(value: u32) -> Self {
+        match value {
+            1 => Self::Foo,
+            2 => Self::Bar,
+            3 => Self::CustomUnknown,
+
+            _ => Self::UnknownOrdinal_(value),
+        }
+    }
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for MyFlexibleEnumWithCustomUnknown
@@ -313,6 +341,17 @@ pub enum MyStrictEnum {
 
 impl ::fidl_next::Encodable for MyStrictEnum {
     type Encoded = WireMyStrictEnum;
+}
+impl ::std::convert::TryFrom<u32> for MyStrictEnum {
+    type Error = ::fidl_next::UnknownStrictEnumMemberError;
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(Self::Foo),
+            2 => Ok(Self::Bar),
+
+            _ => Err(Self::Error::new(value.into())),
+        }
+    }
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for MyStrictEnum

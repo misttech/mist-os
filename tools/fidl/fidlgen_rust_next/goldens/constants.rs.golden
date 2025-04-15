@@ -195,6 +195,16 @@ pub enum Enum {
 impl ::fidl_next::Encodable for Enum {
     type Encoded = WireEnum;
 }
+impl ::std::convert::TryFrom<u32> for Enum {
+    type Error = ::fidl_next::UnknownStrictEnumMemberError;
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            170 => Ok(Self::E),
+
+            _ => Err(Self::Error::new(value.into())),
+        }
+    }
+}
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for Enum
 where
@@ -286,6 +296,17 @@ pub enum EnumType {
 
 impl ::fidl_next::Encodable for EnumType {
     type Encoded = WireEnumType;
+}
+impl ::std::convert::TryFrom<i32> for EnumType {
+    type Error = ::fidl_next::UnknownStrictEnumMemberError;
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            3 => Ok(Self::Value),
+            4 => Ok(Self::SecondValue),
+
+            _ => Err(Self::Error::new(value.into())),
+        }
+    }
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for EnumType

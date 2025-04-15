@@ -24,6 +24,7 @@
 mod buffer;
 mod client;
 mod endpoint;
+mod error;
 #[cfg(target_os = "fuchsia")]
 pub mod fuchsia;
 mod protocol;
@@ -33,6 +34,7 @@ mod service;
 pub use self::buffer::*;
 pub use self::client::*;
 pub use self::endpoint::*;
+pub use self::error::*;
 pub use self::protocol::*;
 pub use self::server::*;
 pub use self::service::*;

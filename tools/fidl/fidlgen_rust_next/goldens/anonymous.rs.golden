@@ -95,6 +95,17 @@ pub enum Op {
 impl ::fidl_next::Encodable for Op {
     type Encoded = WireOp;
 }
+impl ::std::convert::From<u32> for Op {
+    fn from(value: u32) -> Self {
+        match value {
+            1 => Self::Add,
+            2 => Self::Mul,
+            3 => Self::Div,
+
+            _ => Self::UnknownOrdinal_(value),
+        }
+    }
+}
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for Op
 where
@@ -1617,6 +1628,16 @@ pub enum SomeProtocolSomeMethodError {
 
 impl ::fidl_next::Encodable for SomeProtocolSomeMethodError {
     type Encoded = WireSomeProtocolSomeMethodError;
+}
+impl ::std::convert::From<u32> for SomeProtocolSomeMethodError {
+    fn from(value: u32) -> Self {
+        match value {
+            1 => Self::ErrorOne,
+            2 => Self::ErrorTwo,
+
+            _ => Self::UnknownOrdinal_(value),
+        }
+    }
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for SomeProtocolSomeMethodError

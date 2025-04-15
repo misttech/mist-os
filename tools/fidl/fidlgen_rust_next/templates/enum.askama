@@ -28,6 +28,32 @@ impl ::fidl_next::Encodable for {{ name }} {
     type Encoded = {{ wire_name }};
 }
 
+{%- if enm.is_strict %}
+impl ::std::convert::TryFrom<{{ natural_int }}> for {{ name }} {
+    type Error = ::fidl_next::UnknownStrictEnumMemberError;
+    fn try_from(value: {{ natural_int }}) -> Result<Self, Self::Error> {
+        match value {
+            {% for member in enm.members -%}
+                {{ member.value.value }} => Ok(Self::{{ member.name.camel()|ident }}),
+            {% endfor %}
+            _ => Err(Self::Error::new(value.into())),
+        }
+
+    }
+}
+{%- else %}
+impl ::std::convert::From<{{ natural_int }}> for {{ name }} {
+    fn from(value: {{ natural_int }}) -> Self {
+        match value {
+            {% for member in enm.members -%}
+              {{ member.value.value }} => Self::{{ member.name.camel()|ident }},
+            {% endfor %}
+            _ => Self::UnknownOrdinal_(value),
+        }
+    }
+}
+{%- endif %}
+
 unsafe impl<___E> ::fidl_next::Encode<___E> for {{ name }}
 where
     ___E: ?Sized,

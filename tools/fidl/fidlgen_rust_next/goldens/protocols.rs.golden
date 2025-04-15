@@ -1506,6 +1506,17 @@ pub enum ErrorEnum {
 impl ::fidl_next::Encodable for ErrorEnum {
     type Encoded = WireErrorEnum;
 }
+impl ::std::convert::TryFrom<u32> for ErrorEnum {
+    type Error = ::fidl_next::UnknownStrictEnumMemberError;
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(Self::ErrFoo),
+            2 => Ok(Self::ErrBar),
+
+            _ => Err(Self::Error::new(value.into())),
+        }
+    }
+}
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for ErrorEnum
 where

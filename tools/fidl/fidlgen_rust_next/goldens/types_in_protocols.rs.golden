@@ -348,6 +348,15 @@ pub enum Enum {
 impl ::fidl_next::Encodable for Enum {
     type Encoded = WireEnum;
 }
+impl ::std::convert::From<u32> for Enum {
+    fn from(value: u32) -> Self {
+        match value {
+            1 => Self::Val,
+
+            _ => Self::UnknownOrdinal_(value),
+        }
+    }
+}
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for Enum
 where
