@@ -22,8 +22,10 @@ _component_manager_bin = {
   edition = "2021"
 
   configs_to_add = [ "//build/config/rust:bootfs" ]
-  if (!is_debug && !is_lto_variant) {
-    configs_to_add += [ "//build/config/lto:lto-rust" ]
+  if (!is_lto_variant) {
+    if (is_release) {
+      configs_to_add += [ "//build/config/lto:lto-rust" ]
+    }
   }
 
   # As this is a large binary that uses many resources to compile (and takes minutes when LTO is
