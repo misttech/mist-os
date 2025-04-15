@@ -447,6 +447,51 @@
         "transport": "channel"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.bredr/ConnectionReceiver2.Connected",
+        "strictness": "flexible",
+        "ordinal": "6929937737919587550",
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.bredr/ConnectionReceiver2ConnectedRequest",
+        "response": "fuchsia.bluetooth.bredr/ConnectionReceiver2_Connected_Response"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.bredr/ConnectionReceiver2.OnRevoke",
+        "strictness": "flexible",
+        "ordinal": "1236263746484143388",
+        "direction": "event"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.bluetooth.bredr/ConnectionReceiver2",
+        "openness": "open",
+        "transport": "channel"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.bredr/ConnectionReceiver2ConnectedRequest.channel",
+        "ordinal": "2",
+        "type": "fuchsia.bluetooth.bredr/Channel"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.bredr/ConnectionReceiver2ConnectedRequest.peer_id",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth/PeerId"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.bredr/ConnectionReceiver2ConnectedRequest.protocol",
+        "ordinal": "3",
+        "type": "vector<fuchsia.bluetooth.bredr/ProtocolDescriptor>:255"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.bredr/ConnectionReceiver2ConnectedRequest",
+        "resourceness": "resource"
+    },
+    {
         "kind": "struct/member",
         "name": "fuchsia.bluetooth.bredr/ConnectionReceiverConnectedRequest.channel",
         "ordinal": "2",
@@ -871,6 +916,12 @@
         "name": "fuchsia.bluetooth.bredr/Profile",
         "openness": "open",
         "transport": "channel"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.bredr/ProfileAdvertiseRequest.connection_receiver",
+        "ordinal": "4",
+        "type": "client_end:fuchsia.bluetooth.bredr/ConnectionReceiver2"
     },
     {
         "kind": "table/member",

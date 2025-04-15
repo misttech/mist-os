@@ -185,6 +185,7 @@ open protocol AudioOffloadExt {
 
 /// Represents a service which is registered by this profile. Closing this protocol will remove the
 /// service registration.
+@available(deprecated=NEXT)
 open protocol ConnectionReceiver {
     /// Called when a peer connects to this service.  The channel connected is delivered
     /// with parameters in `channel`.
@@ -199,6 +200,26 @@ open protocol ConnectionReceiver {
     /// An event produced by a FIDL server to signal that the registered service should be revoked
     /// and removed from the Service Discovery Protocol database.
     /// It is expected that this protocol will be subsequently closed after issuing this event.
+    flexible -> OnRevoke();
+};
+
+/// Represents a service which is registered by this profile. Closing this protocol will remove the
+/// service registration.
+@available(added=NEXT)
+open protocol ConnectionReceiver2 {
+    /// Called when a peer connects to this service.  The channel connected is delivered
+    /// with parameters in `channel`.
+    /// `protocol` will contain a protocol list up to the point connected (for example, if
+    /// L2CAP is connected, it will contain the L2CAP protocol and specify the PSM connected)
+    flexible Connected(resource table {
+        1: peer_id fuchsia.bluetooth.PeerId;
+        2: channel Channel;
+        3: protocol ProtocolDescriptorList;
+    }) -> ();
+
+    /// Signals that the registered service should be revoked and removed from
+    /// the Service Discovery Protocol database. When the protocol is closed, the service
+    /// has been removed.
     flexible -> OnRevoke();
 };
 
@@ -257,11 +278,16 @@ open protocol Profile {
         /// Required.
         1: services vector<ServiceDefinition>:MAX_SERVICES_PER_ADVERTISEMENT;
         /// Receives connections made to the advertised services.
-        /// Required.
+        /// Either `receiver` or `connection_receiver` is required.
+        @available(deprecated=NEXT)
         2: receiver client_end:ConnectionReceiver;
         /// The default parameters used to configure L2CAP connections on the `receiver`.
         /// Optional. See `ChannelParameters` for defaults.
         3: parameters ChannelParameters;
+        /// Receives connections made to the advertised services.
+        /// Either `receiver` or `connection_receiver` is required.
+        @available(added=NEXT)
+        4: connection_receiver client_end:ConnectionReceiver2;
     }) -> (table {
         /// Set of service definitions as registered by the SDP server, updated with definitions
         /// for requested dyanmic PSM & RFCOMM assignments.
