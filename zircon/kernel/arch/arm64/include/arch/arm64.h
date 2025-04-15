@@ -19,14 +19,14 @@
 
 struct iframe_t;
 
-typedef struct {
+struct arm64_cache_desc {
   uint8_t ctype;
   uint32_t num_sets;
   uint32_t associativity;
   uint32_t line_size;
-} arm64_cache_desc_t;
+};
 
-typedef struct {
+struct arm64_cache_info {
   // from CLIDR_EL1
   uint8_t inner_boundary;
   uint8_t lou_u;
@@ -40,9 +40,9 @@ typedef struct {
   bool idc;  // requires icache invalidate to pou for instruction to data coherence
   bool dic;  // requires data clean to pou for data to instruction coherence
   // via iterating each cache level
-  arm64_cache_desc_t level_data_type[7];
-  arm64_cache_desc_t level_inst_type[7];
-} arm64_cache_info_t;
+  arm64_cache_desc level_data_type[7];
+  arm64_cache_desc level_inst_type[7];
+};
 
 struct arch_exception_context {
   struct iframe_t* frame;

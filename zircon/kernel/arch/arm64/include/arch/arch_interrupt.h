@@ -14,7 +14,7 @@
 // Implementation of arm64 specific routines to disable and reenable
 // local interrupts on the current cpu.
 
-typedef bool interrupt_saved_state_t;
+using interrupt_saved_state_t = bool;
 
 constexpr interrupt_saved_state_t kNoopInterruptSavedState = false;
 

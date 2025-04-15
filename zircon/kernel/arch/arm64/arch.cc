@@ -52,42 +52,18 @@ namespace {
 
 Arm64AlternateVbar gAlternateVbar;
 
-}  // namespace
-
 // Performance Monitors Count Enable Set, EL0.
-static constexpr uint64_t PMCNTENSET_EL0_ENABLE = 1UL << 31;  // Enable cycle count register.
+constexpr uint64_t PMCNTENSET_EL0_ENABLE = 1UL << 31;  // Enable cycle count register.
 
 // Performance Monitor Control Register, EL0.
-static constexpr uint64_t PMCR_EL0_ENABLE_BIT = 1 << 0;
-static constexpr uint64_t PMCR_EL0_LONG_COUNTER_BIT = 1 << 6;
+constexpr uint64_t PMCR_EL0_ENABLE_BIT = 1 << 0;
+constexpr uint64_t PMCR_EL0_LONG_COUNTER_BIT = 1 << 6;
 
 // Performance Monitors User Enable Regiser, EL0.
-static constexpr uint64_t PMUSERENR_EL0_ENABLE = 1 << 0;  // Enable EL0 access to cycle counter.
-
-struct arm64_sp_info_t {
-  uint64_t mpid;
-  void* sp;                   // Stack pointer points to arbitrary data.
-  uintptr_t* shadow_call_sp;  // SCS pointer points to array of addresses.
-
-  // This part of the struct itself will serve temporarily as the
-  // fake arch_thread in the thread pointer, so that safe-stack
-  // and stack-protector code can work early.  The thread pointer
-  // (TPIDR_EL1) points just past arm64_sp_info_t.
-  uintptr_t stack_guard;
-  void* unsafe_sp;
-};
-
-static_assert(sizeof(arm64_sp_info_t) == 40, "check arm64_get_secondary_sp assembly");
-static_assert(offsetof(arm64_sp_info_t, sp) == 8, "check arm64_get_secondary_sp assembly");
-static_assert(offsetof(arm64_sp_info_t, mpid) == 0, "check arm64_get_secondary_sp assembly");
-
-#define TP_OFFSET(field) ((int)offsetof(arm64_sp_info_t, field) - (int)sizeof(arm64_sp_info_t))
-static_assert(TP_OFFSET(stack_guard) == ZX_TLS_STACK_GUARD_OFFSET, "");
-static_assert(TP_OFFSET(unsafe_sp) == ZX_TLS_UNSAFE_SP_OFFSET, "");
-#undef TP_OFFSET
+constexpr uint64_t PMUSERENR_EL0_ENABLE = 1 << 0;  // Enable EL0 access to cycle counter.
 
 // Used to hold up the boot sequence on secondary CPUs until signaled by the primary.
-static ktl::atomic<bool> secondaries_released;
+ktl::atomic<bool> secondaries_released;
 
 // Whether or not to allow access to the PCT (physical counter) from EL0, in
 // addition to allowing access to the VCT (virtual counter).  This decision
@@ -104,32 +80,41 @@ static ktl::atomic<bool> secondaries_released;
 // mutated) on ARM happens before the secondary CPUs are started and perform
 // their early init (the only time they will read this variable).  There should
 // be no real chance of a data race here.
-static ktl::atomic<bool> allow_pct_in_el0{false};
+ktl::atomic<bool> allow_pct_in_el0{false};
 
-static void SetupCntkctlEl1() {
-  // If the process of clock reference selection has forced us to use the
-  // physical counter as our reference, make sure we give EL0 permission to
-  // access it.  For now, we still allow access to the virtual counter because
-  // there exists some code out there which actually tries to read the VCT in
-  // user-mode directly.
-  //
-  // If/when this eventually changes, we should come back here and lock out
-  // access to the VCT when we decide to use the PCT.
-  static constexpr uint64_t CNTKCTL_EL1_ENABLE_PHYSICAL_COUNTER = 1 << 0;
-  static constexpr uint64_t CNTKCTL_EL1_ENABLE_VIRTUAL_COUNTER = 1 << 1;
-  const uint64_t val = CNTKCTL_EL1_ENABLE_VIRTUAL_COUNTER |
-                       (allow_pct_in_el0.load() ? CNTKCTL_EL1_ENABLE_PHYSICAL_COUNTER : 0);
-  __arm_wsr64("cntkctl_el1", val);
-  __isb(ARM_MB_SY);
-}
-
-static volatile int secondaries_to_init = 0;
+volatile uint32_t secondaries_to_init = 0;
 
 // one for each secondary CPU, indexed by (cpu_num - 1).
-static Thread _init_thread[SMP_MAX_CPUS - 1];
+Thread _init_thread[SMP_MAX_CPUS - 1];
+
+}  // anonymous namespace
+
+struct arm64_sp_info {
+  uint64_t mpid;
+  void* sp;                   // Stack pointer points to arbitrary data.
+  uintptr_t* shadow_call_sp;  // SCS pointer points to array of addresses.
+
+  // This part of the struct itself will serve temporarily as the
+  // fake arch_thread in the thread pointer, so that safe-stack
+  // and stack-protector code can work early.  The thread pointer
+  // (TPIDR_EL1) points just past arm64_sp_info_t.
+  uintptr_t stack_guard;
+  void* unsafe_sp;
+};
+
+static_assert(sizeof(arm64_sp_info) == 40, "check arm64_get_secondary_sp assembly");
+static_assert(offsetof(arm64_sp_info, mpid) == 0, "check arm64_get_secondary_sp assembly");
+static_assert(offsetof(arm64_sp_info, sp) == 8, "check arm64_get_secondary_sp assembly");
+static_assert(offsetof(arm64_sp_info, shadow_call_sp) == 16,
+              "check arm64_get_secondary_sp assembly");
+
+#define TP_OFFSET(field) ((int)offsetof(arm64_sp_info, field) - (int)sizeof(arm64_sp_info))
+static_assert(TP_OFFSET(stack_guard) == ZX_TLS_STACK_GUARD_OFFSET);
+static_assert(TP_OFFSET(unsafe_sp) == ZX_TLS_UNSAFE_SP_OFFSET);
+#undef TP_OFFSET
 
 // one for each secondary CPU, indexed by (cpu_num - 1).
-arm64_sp_info_t arm64_secondary_sp_list[SMP_MAX_CPUS - 1];
+arm64_sp_info arm64_secondary_sp_list[SMP_MAX_CPUS - 1];
 
 zx_status_t arm64_create_secondary_stack(cpu_num_t cpu_num, uint64_t mpid) {
   // Allocate a stack, indexed by CPU num so that |arm64_secondary_entry| can find it.
@@ -177,7 +162,26 @@ zx_status_t arm64_free_secondary_stack(cpu_num_t cpu_num) {
   return _init_thread[cpu_num - 1].stack().Teardown();
 }
 
-static VbarFunction* arm64_select_vbar_via_smccc11(arch::ArmSmcccFunction function) {
+namespace {
+
+void SetupCntkctlEl1() {
+  // If the process of clock reference selection has forced us to use the
+  // physical counter as our reference, make sure we give EL0 permission to
+  // access it.  For now, we still allow access to the virtual counter because
+  // there exists some code out there which actually tries to read the VCT in
+  // user-mode directly.
+  //
+  // If/when this eventually changes, we should come back here and lock out
+  // access to the VCT when we decide to use the PCT.
+  static constexpr uint64_t CNTKCTL_EL1_ENABLE_PHYSICAL_COUNTER = 1 << 0;
+  static constexpr uint64_t CNTKCTL_EL1_ENABLE_VIRTUAL_COUNTER = 1 << 1;
+  const uint64_t val = CNTKCTL_EL1_ENABLE_VIRTUAL_COUNTER |
+                       (allow_pct_in_el0.load() ? CNTKCTL_EL1_ENABLE_PHYSICAL_COUNTER : 0);
+  __arm_wsr64("cntkctl_el1", val);
+  __isb(ARM_MB_SY);
+}
+
+VbarFunction* arm64_select_vbar_via_smccc11(arch::ArmSmcccFunction function) {
   constexpr auto no_workaround = []() -> VbarFunction* {
     // No mitigation is needed on this CPU.
     WRITE_PERCPU_FIELD(should_invalidate_bp_on_el0_exception, false);
@@ -235,7 +239,7 @@ static VbarFunction* arm64_select_vbar_via_smccc11(arch::ArmSmcccFunction functi
 
 // Select the alternate exception vector to use for the current CPU.
 // Returns nullptr to keep using the default one.
-static VbarFunction* arm64_select_vbar() {
+VbarFunction* arm64_select_vbar() {
   // In auto mode, the physboot detection code has "selected" a firmware option
   // if it's available generally.  The logic here then chooses whether this
   // particular CPU needs to use that firmware option by asking the firmware.
@@ -273,12 +277,12 @@ static VbarFunction* arm64_select_vbar() {
 }
 
 // Set the vector base.
-static void arm64_install_vbar(VbarFunction* table) {
+void arm64_install_vbar(VbarFunction* table) {
   arch::ArmVbarEl1::Write(reinterpret_cast<uintptr_t>(table));
   __isb(ARM_MB_SY);
 }
 
-static void arm64_cpu_early_init() {
+void arm64_cpu_early_init() {
   // Make sure the per cpu pointer is set up.
   arm64_init_percpu_early();
 
@@ -355,6 +359,8 @@ static void arm64_cpu_early_init() {
   arch_enable_fiqs();
 }
 
+}  // anonymous namespace
+
 void arch_early_init() {
   // Collect the setting that physboot determined.  arch_late_init_percpu()
   // will call arm64_select_vbar to use it later, when gPhysHandoff may no
@@ -389,7 +395,7 @@ void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
 
   lk_init_secondary_cpus(secondaries_to_init);
 
-  LTRACEF("releasing %d secondary cpus\n", secondaries_to_init);
+  LTRACEF("releasing %u secondary cpus\n", secondaries_to_init);
   secondaries_released.store(true);
 
   // Flush the signaling variable since the secondary cpus may have not yet enabled their caches.
@@ -412,7 +418,7 @@ void arch_late_init_percpu(void) {
 
 void ArchIdlePowerThread::EnterIdleState(zx_duration_t max_latency) { __asm__ volatile("wfi"); }
 
-void arch_setup_uspace_iframe(iframe_t* iframe, uintptr_t pc, uintptr_t sp, uintptr_t arg1,
+void arch_setup_uspace_iframe(iframe_t* iframe, uintptr_t entry_point, uintptr_t sp, uintptr_t arg1,
                               uintptr_t arg2) {
   // Set up a default spsr to get into 64bit user space:
   //  - Zeroed NZCV.
@@ -424,7 +430,7 @@ void arch_setup_uspace_iframe(iframe_t* iframe, uintptr_t pc, uintptr_t sp, uint
   iframe->r[0] = arg1;
   iframe->r[1] = arg2;
   iframe->usp = sp;
-  iframe->elr = pc;
+  iframe->elr = entry_point;
   iframe->spsr = spsr;
 }
 
@@ -483,7 +489,9 @@ extern "C" void arm64_secondary_entry() {
   lk_secondary_cpu_entry();
 }
 
-static int cmd_cpu(int argc, const cmd_args* argv, uint32_t flags) {
+namespace {
+
+int cmd_cpu(int argc, const cmd_args* argv, uint32_t flags) {
   auto usage = [cmd_name = argv[0].str]() -> int {
     printf("usage:\n");
     printf("%s sev                              : issue a SEV (Send Event) instruction\n",
@@ -510,3 +518,5 @@ static int cmd_cpu(int argc, const cmd_args* argv, uint32_t flags) {
 STATIC_COMMAND_START
 STATIC_COMMAND("cpu", "cpu diagnostic commands", &cmd_cpu)
 STATIC_COMMAND_END(cpu)
+
+}  // anonymous namespace

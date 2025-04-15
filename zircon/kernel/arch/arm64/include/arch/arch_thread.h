@@ -21,7 +21,6 @@
 
 #ifndef __ASSEMBLER__
 
-#include <assert.h>
 #include <stddef.h>
 #include <sys/types.h>
 #include <zircon/tls.h>

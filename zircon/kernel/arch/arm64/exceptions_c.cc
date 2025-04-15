@@ -32,16 +32,18 @@
 
 #define LOCAL_TRACE 0
 
-#define DFSC_ALIGNMENT_FAULT 0b100001
+namespace {
+
+constexpr uint32_t DFSC_ALIGNMENT_FAULT = 0b100001;
 
 using ESRExceptionClass = ::arch::ArmExceptionSyndromeRegister::ExceptionClass;
 
-static void dump_iframe(const iframe_t* iframe) {
+void dump_iframe(const iframe_t* iframe) {
   printf("iframe %p:\n", iframe);
   PrintFrame(stdout, *iframe);
 }
 
-static uint64_t kernel_addr_from_dfr(uint64_t dfr) {
+uint64_t kernel_addr_from_dfr(uint64_t dfr) {
   // Assert that the DFR is a valid kernel address by checking that the bit before the
   // ARM64_DFR_RUN_ACCESS_FAULT_HANDLER_BIT (which is before the ARM64_DFR_RUN_FAULT_HANDLER_BIT)
   // is a 1.
@@ -51,7 +53,7 @@ static uint64_t kernel_addr_from_dfr(uint64_t dfr) {
 }
 
 // clang-format off
-static const char* dfsc_to_string(uint32_t dfsc) {
+const char* dfsc_to_string(uint32_t dfsc) {
   switch (dfsc) {
     case 0b000000: return "Address Size Fault, Level 0";
     case 0b000001: return "Address Size Fault, Level 1";
@@ -93,7 +95,7 @@ static const char* dfsc_to_string(uint32_t dfsc) {
 // set the FAR_EL1 are Instruction Aborts (EC 0x20 or 0x21), Data Aborts (EC 0x24 or
 // 0x25), PC alignment faults (EC 0x22), and Watchpoints (EC 0x34 or 0x35).
 // ESR_EL1.EC holds the EC value for the exception.
-static bool exception_sets_far(ESRExceptionClass ec) {
+bool exception_sets_far(ESRExceptionClass ec) {
   switch (ec) {
     case ESRExceptionClass::kInstructionAbortLowerEl:
     case ESRExceptionClass::kInstructionAbortSameEl:
@@ -121,9 +123,9 @@ KCOUNTER(exceptions_access, "exceptions.access_fault")
 KCOUNTER(exceptions_serror, "exceptions.serror")
 KCOUNTER(exceptions_mops, "exceptions.mops")
 
-static zx_status_t try_dispatch_user_data_fault_exception(zx_excp_type_t type, iframe_t* iframe,
-                                                          uint32_t esr, uint64_t far,
-                                                          uint32_t error_code) {
+zx_status_t try_dispatch_user_data_fault_exception(zx_excp_type_t type, iframe_t* iframe,
+                                                   uint32_t esr, uint64_t far,
+                                                   uint32_t error_code) {
   arch_exception_context_t context = {};
   DEBUG_ASSERT(iframe != nullptr);
   context.frame = iframe;
@@ -139,8 +141,7 @@ static zx_status_t try_dispatch_user_data_fault_exception(zx_excp_type_t type, i
 }
 
 // Must be called with interrupts disabled from exception entry.
-static zx_status_t try_dispatch_user_exception(zx_excp_type_t type, iframe_t* iframe,
-                                               uint32_t esr) {
+zx_status_t try_dispatch_user_exception(zx_excp_type_t type, iframe_t* iframe, uint32_t esr) {
   auto esr_reg = arch::ArmExceptionSyndromeRegister::Get().FromValue(esr);
   static_assert(sizeof(esr_reg) <= sizeof(uint64_t) * 4);
   uint64_t maybe_far = exception_sets_far(esr_reg.ec()) ? __arm_rsr64("far_el1") : 0;
@@ -148,8 +149,8 @@ static zx_status_t try_dispatch_user_exception(zx_excp_type_t type, iframe_t* if
 }
 
 // Prints exception details and then panics.
-__NO_RETURN static void exception_die(iframe_t* iframe, uint32_t esr, uint64_t far,
-                                      const char* format, ...) {
+[[noreturn]] void exception_die(iframe_t* iframe, uint32_t esr, uint64_t far, const char* format,
+                                ...) {
   platform_panic_start();
 
   va_list args;
@@ -172,7 +173,7 @@ __NO_RETURN static void exception_die(iframe_t* iframe, uint32_t esr, uint64_t f
   platform_halt(HALT_ACTION_HALT, ZirconCrashReason::Panic);
 }
 
-static void arm64_unknown_handler(iframe_t* iframe, uint exception_flags, uint32_t esr) {
+void arm64_unknown_handler(iframe_t* iframe, uint exception_flags, uint32_t esr) {
   /* this is for a lot of reasons, but most of them are undefined instructions */
   if (unlikely((exception_flags & ARM64_EXCEPTION_FLAG_LOWER_EL) == 0)) {
     /* trapped inside the kernel, this is bad */
@@ -182,7 +183,7 @@ static void arm64_unknown_handler(iframe_t* iframe, uint exception_flags, uint32
   try_dispatch_user_exception(ZX_EXCP_UNDEFINED_INSTRUCTION, iframe, esr);
 }
 
-static void arm64_mops_handler(iframe_t* iframe, uint exception_flags, uint32_t esr) {
+void arm64_mops_handler(iframe_t* iframe, uint exception_flags, uint32_t esr) {
   // This means the PC and the PSTATE don't agree.  It's not an undefined
   // instruction but it's an illegal instruction.
   if (unlikely((exception_flags & ARM64_EXCEPTION_FLAG_LOWER_EL) == 0)) {
@@ -193,7 +194,7 @@ static void arm64_mops_handler(iframe_t* iframe, uint exception_flags, uint32_t 
   try_dispatch_user_exception(ZX_EXCP_UNDEFINED_INSTRUCTION, iframe, esr);
 }
 
-static void arm64_brk_handler(iframe_t* iframe, uint exception_flags, uint32_t esr) {
+void arm64_brk_handler(iframe_t* iframe, uint exception_flags, uint32_t esr) {
   if (unlikely((exception_flags & ARM64_EXCEPTION_FLAG_LOWER_EL) == 0)) {
     /* trapped inside the kernel, this is bad */
     exception_die(iframe, esr, __arm_rsr64("far_el1"), "BRK in kernel: PC at %#" PRIx64 "\n",
@@ -209,7 +210,7 @@ static void arm64_brk_handler(iframe_t* iframe, uint exception_flags, uint32_t e
   try_dispatch_user_exception(ZX_EXCP_SW_BREAKPOINT, iframe, esr);
 }
 
-static void arm64_pc_alignment_fault_handler(iframe_t* iframe, uint exception_flags, uint32_t esr) {
+void arm64_pc_alignment_fault_handler(iframe_t* iframe, uint exception_flags, uint32_t esr) {
   if (unlikely((exception_flags & ARM64_EXCEPTION_FLAG_LOWER_EL) == 0)) {
     /* trapped inside the kernel, this is bad */
     exception_die(iframe, esr, __arm_rsr64("far_el1"),
@@ -219,8 +220,7 @@ static void arm64_pc_alignment_fault_handler(iframe_t* iframe, uint exception_fl
   try_dispatch_user_exception(ZX_EXCP_UNALIGNED_ACCESS, iframe, esr);
 }
 
-static void arm64_hw_breakpoint_exception_handler(iframe_t* iframe, uint exception_flags,
-                                                  uint32_t esr) {
+void arm64_hw_breakpoint_exception_handler(iframe_t* iframe, uint exception_flags, uint32_t esr) {
   if (unlikely((exception_flags & ARM64_EXCEPTION_FLAG_LOWER_EL) == 0)) {
     /* trapped inside the kernel, this is bad */
     exception_die(iframe, esr, __arm_rsr64("far_el1"),
@@ -236,8 +236,7 @@ static void arm64_hw_breakpoint_exception_handler(iframe_t* iframe, uint excepti
   try_dispatch_user_exception(ZX_EXCP_HW_BREAKPOINT, iframe, esr);
 }
 
-static void arm64_watchpoint_exception_handler(iframe_t* iframe, uint exception_flags,
-                                               uint32_t esr) {
+void arm64_watchpoint_exception_handler(iframe_t* iframe, uint exception_flags, uint32_t esr) {
   // Arm64 uses the Fault Address Register to determine which watchpoint triggered the exception.
   uint64_t far = __arm_rsr64("far_el1");
 
@@ -252,7 +251,7 @@ static void arm64_watchpoint_exception_handler(iframe_t* iframe, uint exception_
   try_dispatch_user_data_fault_exception(ZX_EXCP_HW_BREAKPOINT, iframe, esr, far, 0);
 }
 
-static void arm64_step_handler(iframe_t* iframe, uint exception_flags, uint32_t esr) {
+void arm64_step_handler(iframe_t* iframe, uint exception_flags, uint32_t esr) {
   if (unlikely((exception_flags & ARM64_EXCEPTION_FLAG_LOWER_EL) == 0)) {
     /* trapped inside the kernel, this is bad */
     exception_die(iframe, esr, __arm_rsr64("far_el1"),
@@ -262,7 +261,7 @@ static void arm64_step_handler(iframe_t* iframe, uint exception_flags, uint32_t 
   try_dispatch_user_exception(ZX_EXCP_HW_BREAKPOINT, iframe, esr);
 }
 
-static void arm64_fpu_handler(iframe_t* iframe, uint exception_flags, uint32_t esr) {
+void arm64_fpu_handler(iframe_t* iframe, uint exception_flags, uint32_t esr) {
   if (unlikely((exception_flags & ARM64_EXCEPTION_FLAG_LOWER_EL) == 0)) {
     /* we trapped a floating point instruction inside our own EL, this is bad */
     exception_die(iframe, esr, __arm_rsr64("far_el1"),
@@ -271,7 +270,7 @@ static void arm64_fpu_handler(iframe_t* iframe, uint exception_flags, uint32_t e
   arm64_fpu_exception(iframe, exception_flags);
 }
 
-static void arm64_instruction_abort_handler(iframe_t* iframe, uint exception_flags, uint32_t esr) {
+void arm64_instruction_abort_handler(iframe_t* iframe, uint exception_flags, uint32_t esr) {
   /* read the FAR register */
   uint64_t far = __arm_rsr64("far_el1");
   uint32_t ec = BITS_SHIFT(esr, 31, 26);
@@ -337,7 +336,7 @@ static void arm64_instruction_abort_handler(iframe_t* iframe, uint exception_fla
                 is_user, far);
 }
 
-static void arm64_data_abort_handler(iframe_t* iframe, uint exception_flags, uint32_t esr) {
+void arm64_data_abort_handler(iframe_t* iframe, uint exception_flags, uint32_t esr) {
   /* read the FAR register */
   uint64_t far = __arm_rsr64("far_el1");
   uint32_t ec = BITS_SHIFT(esr, 31, 26);
@@ -464,6 +463,8 @@ static void arm64_data_abort_handler(iframe_t* iframe, uint exception_flags, uin
                 "DFSC %#x (%s)\n",
                 iframe->elr, far, iss, WnR, CM, dfsc, dfsc_to_string(dfsc));
 }
+
+}  // anonymous namespace
 
 /* called from assembly */
 extern "C" void arm64_sync_exception(iframe_t* iframe, uint exception_flags, uint32_t esr) {
@@ -654,8 +655,9 @@ void arch_dump_exception_context(const arch_exception_context_t* context) {
   // try to dump the user stack
   if (is_user_accessible(context->frame->usp)) {
     uint8_t buf[256];
-    if (arch_copy_from_user(buf, (void*)context->frame->usp, sizeof(buf)) == ZX_OK) {
-      printf("bottom of user stack at %#lx:\n", (vaddr_t)context->frame->usp);
+    if (arch_copy_from_user(buf, reinterpret_cast<void*>(context->frame->usp), sizeof(buf)) ==
+        ZX_OK) {
+      printf("bottom of user stack at %#lx:\n", static_cast<vaddr_t>(context->frame->usp));
       hexdump_ex(buf, sizeof(buf), context->frame->usp);
     }
   }

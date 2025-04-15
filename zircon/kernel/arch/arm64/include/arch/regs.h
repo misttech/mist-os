@@ -15,7 +15,6 @@
 
 #ifndef __ASSEMBLER__
 
-#include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -31,11 +30,11 @@ struct iframe_t {
 static_assert(sizeof(iframe_t) % 16u == 0u);
 static_assert(sizeof(iframe_t) == ARM64_IFRAME_SIZE);
 
-static_assert(__offsetof(iframe_t, r[0]) == ARM64_IFRAME_OFFSET_R, "");
-static_assert(__offsetof(iframe_t, lr) == ARM64_IFRAME_OFFSET_LR, "");
-static_assert(__offsetof(iframe_t, usp) == ARM64_IFRAME_OFFSET_USP, "");
-static_assert(__offsetof(iframe_t, elr) == ARM64_IFRAME_OFFSET_ELR, "");
-static_assert(__offsetof(iframe_t, spsr) == ARM64_IFRAME_OFFSET_SPSR, "");
+static_assert(__offsetof(iframe_t, r[0]) == ARM64_IFRAME_OFFSET_R);
+static_assert(__offsetof(iframe_t, lr) == ARM64_IFRAME_OFFSET_LR);
+static_assert(__offsetof(iframe_t, usp) == ARM64_IFRAME_OFFSET_USP);
+static_assert(__offsetof(iframe_t, elr) == ARM64_IFRAME_OFFSET_ELR);
+static_assert(__offsetof(iframe_t, spsr) == ARM64_IFRAME_OFFSET_SPSR);
 
 void PrintFrame(FILE* file, const iframe_t& frame);
 
