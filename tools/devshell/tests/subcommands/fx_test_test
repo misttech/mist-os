@@ -288,7 +288,7 @@ EOF
 EOF
   # check if environemnt is as expected for a user-defined IPV4 device and SSH port
   echo '[ "$1" == "target" ] && echo 1.1.1.1:8123' > "${ffx}.mock_side_effects"
-  BT_EXPECT ${fx} -d 1.1.1.1:8123 test -o --e2e example_host_test | grep "TESTING_E2E_VARS" > "${out}"
+  BT_EXPECT ${fx} -t 1.1.1.1:8123 test -o --e2e example_host_test | grep "TESTING_E2E_VARS" > "${out}"
   BT_EXPECT_FILE_CONTAINS_SUBSTRING "${out}" "FUCHSIA_DEVICE_ADDR=1.1.1.1"
   BT_EXPECT_FILE_CONTAINS_SUBSTRING "${out}" "FUCHSIA_SSH_PORT=8123"
   BT_EXPECT_FILE_CONTAINS_SUBSTRING "${out}" "FUCHSIA_SSH_KEY=..*"   # ensures no empty definition
@@ -296,7 +296,7 @@ EOF
 
   # check if environemnt is as expected for a user-defined IPV6 device and SSH port
   echo '[ "$1" == "target" ] && echo [::1]:1111' > "${ffx}.mock_side_effects"
-  BT_EXPECT ${fx} -d '[::1]:1111' test -o --e2e example_host_test | grep "TESTING_E2E_VARS" > "${out}"
+  BT_EXPECT ${fx} -t '[::1]:1111' test -o --e2e example_host_test | grep "TESTING_E2E_VARS" > "${out}"
   BT_EXPECT_FILE_CONTAINS_SUBSTRING "${out}" "FUCHSIA_DEVICE_ADDR=[::1]"
   BT_EXPECT_FILE_CONTAINS_SUBSTRING "${out}" "FUCHSIA_SSH_PORT=1111"
   BT_EXPECT_FILE_CONTAINS_SUBSTRING "${out}" "FUCHSIA_SSH_KEY=..*"   # ensures no empty definition

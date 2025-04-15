@@ -109,7 +109,7 @@ _fx() {
 
   _arguments \
     "--dir[build directory]:directory:__fx_build_dir" \
-    "-d[target device]:device:__fx_nodename" \
+    "-t[target device]:device:__fx_nodename" \
     "-i[iterative mode]" \
     "-x[print commands]" \
     "1: :{_describe 'command' commands}" \

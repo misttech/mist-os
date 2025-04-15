@@ -130,7 +130,7 @@ fi
 
 device_args=()
 if [[ ! -z "$DEVICE_NAME" ]]; then
-  device_args+=( -d="$DEVICE_NAME" )
+  device_args+=( -t "$DEVICE_NAME" )
 fi
 
 # Create a new window, then use it to capture the syslog.
@@ -147,7 +147,7 @@ args+=(
 )
 
 if [[ ! -z "$OLD_DEVICE_NAME" ]]; then
-  args+=( new-window -n "old-syslog" \; send-keys "fx -d="$OLD_DEVICE_NAME" log" C-m \; )
+  args+=( new-window -n "old-syslog" \; send-keys "fx -t "$OLD_DEVICE_NAME" log" C-m \; )
 fi
 
 # Create a new window, then use it to capture the serial log, or the kernel logs

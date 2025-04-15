@@ -23,11 +23,11 @@ shell programs without a significant test plan can lead to hard to maintain
 tools. If there is a need to produce a more sophisticated program the
 recommended approach is to author a host tool program as part of the regular
 Fuchsia build, and only to wrap that program in a very slim way in a script.
-Examples of such cases can be found in `fx make-fuchsia-vol`. A good rule of 
-thumb here is that if a script only needs to launch and manage a one or a few 
-sub-processes, then shell may be a fine language. If the program needs to 
-perform any significant string manipulation or business logic, it is likely 
-better authored in a language that provides more structural capabilities and 
+Examples of such cases can be found in `fx make-fuchsia-vol`. A good rule of
+thumb here is that if a script only needs to launch and manage a one or a few
+sub-processes, then shell may be a fine language. If the program needs to
+perform any significant string manipulation or business logic, it is likely
+better authored in a language that provides more structural capabilities and
 standard library.
 
 ## Consuming vars.sh and implementing subcommands
@@ -72,7 +72,7 @@ subcommand.
 configured by set-device, or detected via `ffx` and
 exports:
 
-* `FX_DEVICE_NAME` the device name as either set using `-d`, `fx
+* `FX_DEVICE_NAME` the device name as either set using `-t`, `fx
   set-device`, or resolved by search.
 * `FX_DEVICE_ADDR` the device fuchsia address as resolved.
 * `FX_SSH_ADDR` the device address formatted as required for `ssh(1)`.
@@ -80,7 +80,7 @@ exports:
 * `FX_SSH_PORT` the device SSH port if set via `fx set-device`.
 
 `get-device-name` returns either the device name that the user has set with
-`fx set-device` or `fx -d <device-name>`, if any.
+`fx set-device` or `fx -t <device-name>`, if any.
 
 `get-fuchsia-device-addr` consumes `get-device-name` and returns the Fuchsia
 address of the device. The returned address is the "netstack address", not

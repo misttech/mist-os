@@ -124,7 +124,7 @@ TEST_getdeviceaddr_resolved_ipv6_addresses_setdevice() {
 }
 
 # ensure that get-fuchsia-device-addr doesn't try to resolve IPv6 addresses
-# using "fx -d 'address' ..."
+# using "fx -t 'address' ..."
 TEST_getdeviceaddr_resolved_ipv6_addresses() {
   local addrs=("1:2:3:4" "1::" "b1::8" "1:2:3:4:5:6::8" \
     "1:2:3:4:5:6::8" "1::7:f8" "1:a2:3:b4:5::7:8" "1:2:3:d4:5e::8" "a1::6:7:8" \
@@ -136,7 +136,7 @@ TEST_getdeviceaddr_resolved_ipv6_addresses() {
   for addr in "${addrs[@]}"; do
     echo "[${addr}]" > "${ffx}.mock_stdout"
     # fx syntax requires that IPv6 address is surrounded by square brackets
-    BT_EXPECT_EQ "$(${fx} -d "[${addr}]" get-device-addr)"  "${addr}"
+    BT_EXPECT_EQ "$(${fx} -t "[${addr}]" get-device-addr)"  "${addr}"
 
     # default target get is called twice
     expect_args "${ffx}.mock_state.${counter}" "target" "default" "get"
@@ -151,10 +151,10 @@ TEST_getdeviceaddr_resolved_ipv6_addresses() {
   done
 }
 
-# ensure `fx -d` fails if ffx is overridding the default target
+# ensure `fx -t` fails if ffx is overridding the default target
 TEST_getdeviceaddr_overridden_target() {
   echo "ffx-target" > "${ffx}.mock_stdout"
-  BT_EXPECT_FAIL "${fx} -d fx-target get-device-addr"
+  BT_EXPECT_FAIL "${fx} -t fx-target get-device-addr"
 }
 
 # ensure that get-fuchsia-device-addr invocations of ffx use the proper network flags

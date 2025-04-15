@@ -174,7 +174,7 @@ TEST_fx-rbe-enabled-enabled() {
   BT_EXPECT fx-rbe-enabled
 }
 
-# Test parsing valid and invalid device names passed to "fx -d"
+# Test parsing valid and invalid device names passed to "fx -t"
 TEST_fx-getdeviceraw-and-isvaliddevice() {
   # Use subshells (parenthesis) in calls to get-device-raw to avoid premature exit
   local valids=(
@@ -207,7 +207,7 @@ TEST_fx-getdeviceraw-and-isvaliddevice() {
   done
 }
 
-# Test extracting port from device name passed to "fx -d"
+# Test extracting port from device name passed to "fx -t"
 TEST_fx-get-device-ssh-port() {
 
   FUCHSIA_NODENAME="127.0.0.1"

@@ -405,7 +405,7 @@ The command `fx serve` performs two functions internally:
 
 Internally the [`fx serve`][fx-serve-ref] command also searches for a device to
 configure, and upon discovery (which may be restricted/modulated with
-`fx set-device` or `fx -d`) the target device is configured to use the
+`fx set-device` or `fx -t`) the target device is configured to use the
 repository server as a source of dynamic packages and system updates.
 
 ## Update a target device {#update-a-target-device}

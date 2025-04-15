@@ -150,18 +150,17 @@ ffx target list
 ### Explicitly specifying a target
 
 To specify which target to use in one-off cases (such as flashing), you can specify
-the `-t` or `--target` flag to `ffx` commands, for example:
+the `-t` or `--target` flag to `ffx` and `fx` commands, for example:
 
 ```posix-terminal
-# These 2 commands are equivalent.
-ffx --target $NODENAME target flash
-ffx -t $NODENAME target flash
-```
+# These commands will all use the same target.
+fx -t $NODENAME serve
 
-For `fx` commands, the flag's name is `-d` instead of `-t|--target`. For example:
+fx --target $NODENAME serve
 
-```posix-terminal
-fx -d $NODENAME serve
+ffx -t $NODENAME repository server start
+
+ffx --target $NODENAME repository server start
 ```
 
 ### Controlling the state of target devices

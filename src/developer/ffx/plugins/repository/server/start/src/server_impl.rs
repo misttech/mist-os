@@ -1455,7 +1455,7 @@ mod test {
 
         let err = result.expect_err("Expected an error but did not get one");
 
-        let expected: String = "More than one device/emulator found. Use `ffx target list` to list known targets and choose a target with `ffx -t`.".into();
+        let expected: String = "More than one device/emulator found. Use `ffx target list` to list known targets and specify one with the `-t` or `--target` flag.".into();
         assert_eq!(err.to_string(), expected);
     }
 

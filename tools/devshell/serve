@@ -202,7 +202,7 @@ fi
 
 if [[ "${no_device}" == "--no-device" ]]; then
   fx-info "Please note that '--no-device' disables automatic device configuration."
-  fx-info "Use 'fx -d DEVICE add-update-source --port ${port}' to reconfigure devices"
+  fx-info "Use 'fx -t DEVICE add-update-source --port ${port}' to reconfigure devices"
   fx-info "as needed, since it is not persisted accross flashes."
   # move to config state directly
   log "Skipping discovering device because ${no_device} was specified"

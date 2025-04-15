@@ -20,22 +20,22 @@ function help_global_options {
   cat <<END
 
 Global fx options: fx [OPTION] ${cmd} ...
-  --dir=BUILD_DIR           Path to the build directory to use when running COMMAND.
-  -d=DEVICE[:SSH_PORT]      Target a specific device.
-                            DEVICE may be a Fuchsia device name to be resolved using
-                            ffx or an IP address.
-                            An IPv4 address must be specified directly, while an IPv6
-                            need to be surrounded by brackets.
-                            SSH_PORT, if specified, will be used for all commands
-                            that rely on SSH to connect to the device instead of the
-                            default SSH port (22).
-                            Note: See "fx help set-device" for more help and to set
-                            the default device for a BUILD_DIR.
-  -i                        Iterative mode.  Repeat the command whenever a file is
-                            modified under your Fuchsia directory, not including
-                            out/.
-  -x                        Print commands and their arguments as they are executed.
-  -xx                       Print extra logging of the fx tool itself (implies -x)
+  --dir=BUILD_DIR                  Path to the build directory to use when running COMMAND.
+  -t|--target DEVICE[:SSH_PORT]    Target a specific device.
+                                   DEVICE may be a Fuchsia device name to be resolved using
+                                   ffx or an IP address.
+                                   An IPv4 address must be specified directly, while an IPv6
+                                   need to be surrounded by brackets.
+                                   SSH_PORT, if specified, will be used for all commands
+                                   that rely on SSH to connect to the device instead of the
+                                   default SSH port (22).
+                                   Note: See "fx help set-device" for more help and to set
+                                   the default device for a BUILD_DIR.
+  -i                               Iterative mode. Repeat the command whenever a file is
+                                   modified under your Fuchsia directory, not including
+                                   out/.
+  -x                               Print commands and their arguments as they are executed.
+  -xx                              Print extra logging of the fx tool itself (implies -x)
 END
   if [[ -n "$(list_optional_features)" ]]; then
     echo "  --enable|disable=FEATURE  Enable or disable a feature (non-persistent). Valid features:"
@@ -244,6 +244,8 @@ while [[ $# -ne 0 ]]; do
   case $1 in
     --dir=*|-d=*|--disable=*|--enable=*)
       # Turn --switch=value into --switch value.
+      # Don't handle `-t=*|--target=*` since we want this argument to behave
+      # consistently with ffx `-t|--target` argument parsing.
       arg="$1"
       shift
       set -- "${arg%%=*}" "${arg#*=}" "$@"
@@ -301,13 +303,17 @@ while [[ $# -ne 0 ]]; do
       env_name="$(get_disable_feature_env_name "${feature}")"
       export ${env_name}=0
       ;;
-    -d)
+    -d|-t|--target)
       if [[ $# -lt 2 ]]; then
         usage
-        fx-error "Missing device name for -d argument"
+        fx-error "Missing device name for $1 argument"
         exit 1
       fi
-      shift # removes -d
+      if [[ "$1" == "-d" ]]; then
+        fx-warn "\`fx -d\` will be deprecated and will go away soon."
+        fx-warn "Please use \`fx -t $2 ...\` or \`fx --target $2 ...\` instead."
+      fi
+      shift # removes -t|--target
       if ! is-valid-device "$1"; then
         fx-error "Invalid device: $1. See valid values in 'fx help set-device'"
         exit 1

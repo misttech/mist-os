@@ -53,9 +53,9 @@ EOF
     BT_EXPECT_FILE_DOES_NOT_EXIST ${device_file}
 }
 
-# Check that the command fails if used with -d
+# Check that the command fails if used with -t
 TEST_fx-unset-device-fails-with-device-flag() {
-    BT_EXPECT_FAIL ${fx} -d foo unset-device foo 2>/dev/null
+    BT_EXPECT_FAIL ${fx} -t foo unset-device foo 2>/dev/null
 }
 
 # test that we warn the user if the set command will be a noop

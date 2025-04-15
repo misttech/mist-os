@@ -128,7 +128,7 @@ async def environment_collector() -> list[data.Result]:
         if os.environ.get("FUCHSIA_NODENAME_IS_FROM_FILE") == "true":
             device_notes = "set by `fx set-device`"
         else:
-            device_notes = "set by fx -d"
+            device_notes = "set by fx -t"
 
     if device_name:
         results.append(

@@ -31,7 +31,7 @@ BT_SET_UP() {
 
 TEST_klog_raw() {
   echo "testing" > "${ffx}.mock_stdout"
-  BT_EXPECT ${fx} -d "testing" klog --raw
+  BT_EXPECT ${fx} -t "testing" klog --raw
   btf::expect-mock-args "${ffx}.mock_state.1" "target" "default" "get"
   btf::expect-mock-args "${ffx}.mock_state.2" --config fuchsia.analytics.ffx_invoker=fx target default get
 
@@ -41,7 +41,7 @@ TEST_klog_raw() {
 
 TEST_klog() {
   echo "testing" > "${ffx}.mock_stdout"
-  BT_EXPECT ${fx} -d "testing" klog
+  BT_EXPECT ${fx} -t "testing" klog
   btf::expect-mock-args "${ffx}.mock_state.3" debug symbolize
 }
 

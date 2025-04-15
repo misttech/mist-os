@@ -291,10 +291,10 @@ function fx-export-default-target {
   fi
 }
 
-# Forces the command to fail if a user specifies the -d flag
+# Forces the command to fail if a user specifies the -t flag
 function fx-fail-if-device-specified {
   if [[ -n "${FUCHSIA_NODENAME_SET_BY_FX_FLAG}" ]]; then
-    fx-error "The -d flag is not supported when calling this function"
+    fx-error "The -t flag is not supported when calling this function"
     exit 1
   fi
 }
@@ -699,7 +699,7 @@ function fx-target-ssh-address {
 function multi-device-fail {
   local output devices
   fx-error "Multiple devices found."
-  fx-error "Please specify one of the following devices using either \`fx -d <device-name>\` or \`fx set-device <device-name>\`."
+  fx-error "Please specify one of the following devices using either \`fx -t <device-name>\` or \`fx set-device <device-name>\`."
   devices="$(fx-target-finder-info)" || {
     code=$?
     fx-error "Device discovery failed with status: $code"

@@ -35,7 +35,7 @@ BT_SET_UP() {
   ssh="${BT_TEMP_DIR}/tools/devshell/ssh"
 }
 
-# ensure that "fx -d ipv4:port shell" calls ssh with expected address and port number
+# ensure that "fx -t ipv4:port shell" calls ssh with expected address and port number
 TEST_ssh_ipv4_port() {
   addr="127.0.0.1:8022"
   cat >> "${ffx}.mock_side_effects" << EOF
@@ -45,11 +45,11 @@ TEST_ssh_ipv4_port() {
      echo "/path/to/ssh.priv"
   fi
 EOF
-  BT_EXPECT ${fx} -d "127.0.0.1:8022" shell
+  BT_EXPECT ${fx} -t "127.0.0.1:8022" shell
   BT_EXPECT btf::does-mock-args-contain "${ssh}.mock_state" "-p" "8022" "127.0.0.1"
 }
 
-# ensure that "fx -d [ipv6]:port shell" calls ssh with expected address and port number
+# ensure that "fx -t [ipv6]:port shell" calls ssh with expected address and port number
 TEST_ssh_ipv6_port() {
     addr="[fe80::7:8%eth0]:222"
     cat >> "${ffx}.mock_side_effects" << EOF
@@ -59,26 +59,26 @@ TEST_ssh_ipv6_port() {
      echo "/path/to/ssh.priv"
   fi
 EOF
-  BT_EXPECT ${fx} -d "[fe80::7:8%eth0]:222" shell
+  BT_EXPECT ${fx} -t "[fe80::7:8%eth0]:222" shell
   BT_EXPECT btf::does-mock-args-contain "${ssh}.mock_state" "-p" "222" "fe80::7:8%eth0"
 }
 
 # ensure that fx shell fails because hostname has invalid character (_)
 TEST_ssh_invalid_hostname_port() {
-  BT_EXPECT_FAIL ${fx} -d "invalid_hostname" shell 2> /dev/null
-  BT_EXPECT_FAIL ${fx} -d "invalid_hostname:22" shell 2> /dev/null
+  BT_EXPECT_FAIL ${fx} -t "invalid_hostname" shell 2> /dev/null
+  BT_EXPECT_FAIL ${fx} -t "invalid_hostname:22" shell 2> /dev/null
 }
 
-# ensure that "fx -d ipv6:port shell" fails because of invalid formats
+# ensure that "fx -t ipv6:port shell" fails because of invalid formats
 TEST_ssh_invalid_ipv6_port() {
   # no brackets
-  BT_EXPECT_FAIL ${fx} -d "fe80::7:8%eth0:222" shell 2> /dev/null
+  BT_EXPECT_FAIL ${fx} -t "fe80::7:8%eth0:222" shell 2> /dev/null
   # more than 7 colons
-  BT_EXPECT_FAIL ${fx} -d "[2001:db8:aaaa:bbbb:cccc:dddd:0:1:0]" shell 2> /dev/null
-  BT_EXPECT_FAIL ${fx} -d "[2001:db8:aaaa:bbbb:cccc:dddd:0:1:44f%enx44070ba0044e]" shell 2> /dev/null
+  BT_EXPECT_FAIL ${fx} -t "[2001:db8:aaaa:bbbb:cccc:dddd:0:1:0]" shell 2> /dev/null
+  BT_EXPECT_FAIL ${fx} -t "[2001:db8:aaaa:bbbb:cccc:dddd:0:1:44f%enx44070ba0044e]" shell 2> /dev/null
 }
 
-# ensure that "fx -d addr shell" calls ssh with expected address and no port number
+# ensure that "fx -t addr shell" calls ssh with expected address and no port number
 TEST_ssh_addr() {
   addr="127.0.0.1"
     cat >> "${ffx}.mock_side_effects" << EOF
@@ -88,7 +88,7 @@ TEST_ssh_addr() {
      echo "/path/to/ssh.priv"
   fi
 EOF
-  BT_EXPECT ${fx} -d "127.0.0.1" shell
+  BT_EXPECT ${fx} -t "127.0.0.1" shell
   BT_EXPECT btf::does-mock-args-contain "${ssh}.mock_state" "127.0.0.1"
   BT_EXPECT btf::does-mock-args-not-contain "${ssh}.mock_state" "-p"
 }
