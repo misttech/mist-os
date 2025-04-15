@@ -18,11 +18,12 @@
 #include <arch/arm64/mp.h>
 #include <kernel/cpu.h>
 #include <kernel/spin_tracing_config.h>
+#include <ktl/atomic.h>
 
 #define ARCH_SPIN_LOCK_INITIAL_VALUE (arch_spin_lock_t){0}
 
 struct TA_CAP("mutex") arch_spin_lock_t {
-  unsigned long value;
+  ktl::atomic<cpu_num_t> value;
 };
 
 void arch_spin_lock_non_instrumented(arch_spin_lock_t* lock) TA_ACQ(lock);
@@ -53,7 +54,7 @@ bool arch_spin_trylock(arch_spin_lock_t* lock) TA_TRY_ACQ(false, lock);
 void arch_spin_unlock(arch_spin_lock_t* lock) TA_REL(lock);
 
 static inline cpu_num_t arch_spin_lock_holder_cpu(const arch_spin_lock_t* lock) {
-  return static_cast<cpu_num_t>(__atomic_load_n(&lock->value, __ATOMIC_RELAXED)) - 1;
+  return lock->value.load(ktl::memory_order_relaxed) - 1;
 }
 
 static inline bool arch_spin_lock_held(const arch_spin_lock_t* lock) {
