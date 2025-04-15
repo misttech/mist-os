@@ -151,6 +151,8 @@ tables_generator_tests_*.txt
 !/third_party/mobly
 /third_party/mobly/src
 !/third_party/mini_chromium
+!/third_party/snippet-uiautomator
+/third_party/snippet-uiautomator/src
 !/third_party/crashpad
 /third_party/crashpad/src
 !/third_party/chromiumos-xorg-conf
