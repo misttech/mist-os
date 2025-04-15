@@ -97,47 +97,6 @@ log() {
   echo "$(date '+%Y-%m-%d %H:%M:%S') [serve] $@"
 }
 
-# In any multi-homing scenario (two target interfaces, or two host interfaces),
-# the resolve process can return different results at different times. As such
-# we pin the address here, and let the ssh check loop below perform a clear
-# whenever it is in the "discovery" state. This stabilizes the "connection"
-# under multi-homed conditions.
-serve_updates_target_addr=""
-target-addr() {
-  if [[ -z "${serve_updates_target_addr}" ]]; then
-    serve_updates_target_addr="$(get-device-addr-resource)"
-
-    if [[ -n "${serve_updates_target_addr}" && -n "$(get-fuchsia-device-port)" ]]; then
-      serve_updates_target_addr="${serve_updates_target_addr}:$(get-fuchsia-device-port)"
-    fi
-  fi
-
-  if [[ -n "${serve_updates_target_addr}" ]]; then
-    echo "${serve_updates_target_addr}"
-    return 0
-  fi
-
-  return 1
-}
-
-clear-target-addr() {
-  serve_updates_target_addr=""
-}
-
-with-pinned-target() {
-  # Ensure we pin in the running shell before making a subshell. We also want
-  # to make sure we get an address at all.
-  if ! target-addr > /dev/null; then
-    return 1
-  fi
-
-  (
-    FUCHSIA_NODENAME="$(target-addr)"
-    export FUCHSIA_NODENAME
-    "$@"
-  )
-}
-
 # TODO(b/360930691): Set the default repo_dir in the configuration.
 repo_dir="${FUCHSIA_BUILD_DIR}/amber-files"
 
@@ -204,102 +163,32 @@ if [[ "${no_device}" == "--no-device" ]]; then
   fx-info "Please note that '--no-device' disables automatic device configuration."
   fx-info "Use 'fx -t DEVICE add-update-source --port ${port}' to reconfigure devices"
   fx-info "as needed, since it is not persisted accross flashes."
-  # move to config state directly
-  log "Skipping discovering device because ${no_device} was specified"
-  state="config"
 else
   # Make sure the ssh config is present and has the expected private key
   check-ssh-config
-  state="discover"
-  log "Discovery..."
-
-  # Check if device is set via fx set-device before the discovery loop is started
-  device_name="$(get-device-name 2>/dev/null)"
-  if [[ -z "${device_name}" ]]; then
-    fx-warn ""
-    fx-warn "No default device set. If 'fx serve' gets stuck on"
-    fx-warn "\"Discovery...\" you can set a default device by running"
-    fx-warn "'ffx target list' to get a list of devices, and then running"
-    fx-warn "'fx set-device'."
-    fx-warn "\n"
-  else
-    fx-info ""
-    fx-info "Default device set: ${device_name}"
-    fx-info "\n"
-  fi
 fi
 
-# Keep track if we reported any discovery failures
-reported_discovery_failed=0
+log "Starting repository server"
 
-# exponential backoff in seconds.
-backoff=1
-while true; do
-  if [[ "${state}" == "discover" ]]; then
-    # While we're still trying to connect to the device, clear the target
-    # address state so we re-resolve.
-    clear-target-addr
-    with-pinned-target fx-command-run shell exit 2>/dev/null
-    ping_result=$?
+if [[ "${verbose}" == true ]]; then
+  ffx_flags+=( --verbose )
+fi
 
-    if [[ "${ping_result}" == 0 ]]; then
-      log "Device up"
-      reported_discovery_failed=0
-      backoff=1
-      state="config"
-    elif [[ "${reported_discovery_failed}" == 0 ]]; then
-      reported_discovery_failed=1
+# Start repository server in foreground, wait until it
+# voluntarily exits
+# TODO(b/360931702): Allow listening IP address to be set.
+server_flags=( repository server start "${server_mode}"  --address "[::]:${port}" )
+server_flags+=( --repository "${source_name}" --repo-path "${repo_dir}" )
+server_flags+=( --trusted-root "${repo_dir}/repository/9.root.json" )
+server_flags+=( --alias "fuchsia.com" --alias "chromium.org" )
+server_flags+=( --storage-type "${storage_type}" )
+if [[ -n "$no_device" ]]; then
+  server_flags+=( --no-device )
+fi
 
-      # Log if we don't know the device's address yet, or if we don't have a device configured.
-      device_addr="$(get-fuchsia-device-addr 2>/dev/null)"
-      if [[ -z "${device_addr}" ]]; then
-        device_name="$(get-device-name 2>/dev/null)"
-        if [[ -n "${device_name}" ]]; then
-          log "Trying to resolve '${device_name}'..."
-        else
-          log "Either no device or multiple devices are discoverable. Run 'ffx target list' and if necessary run 'fx set-device'."
-        fi
-      else
-        log "Trying to connect to ${device_addr}..."
-      fi
-    fi
+if is_feature_enabled "incremental" || is_feature_enabled "incremental_new"; then
+  server_flags+=(  --auto-publish "${FUCHSIA_BUILD_DIR}/all_package_manifests.list" )
+fi
+fx-command-run ffx "${ffx_flags[@]}" "${server_flags[@]}"
 
-    if [[ "${ping_result}" != 0 ]]; then
-      sleep "${backoff}"
-      backoff=$(( backoff * 2 ))
-      if [[ "${backoff}" -gt 10 ]]; then
-        backoff=10
-      fi
-    fi
-  else
-    with-pinned-target fx-command-run shell -O check > /dev/null 2>&1
-    ping_result=$?
-  fi
-
-  if [[ "${state}" == "config" ]]; then
-    log "Starting repository server"
-
-    if [[ "${verbose}" == true ]]; then
-      ffx_flags+=( --verbose )
-    fi
-
-    # Start repository server in foreground, wait until it
-    # voluntarily exits
-    # TODO(b/360931702): Allow listening IP address to be set.
-    server_flags=( repository server start "${server_mode}"  --address "[::]:${port}" )
-    server_flags+=( --repository "${source_name}" --repo-path "${repo_dir}" )
-    server_flags+=( --trusted-root "${repo_dir}/repository/9.root.json" )
-    server_flags+=( --alias "fuchsia.com" --alias "chromium.org" )
-    server_flags+=( --storage-type "${storage_type}" )
-    if [[ -n "$no_device" ]]; then
-      server_flags+=( --no-device )
-    fi
-
-    if is_feature_enabled "incremental" || is_feature_enabled "incremental_new"; then
-      server_flags+=(  --auto-publish "${FUCHSIA_BUILD_DIR}/all_package_manifests.list" )
-    fi
-    fx-command-run ffx "${ffx_flags[@]}" "${server_flags[@]}"
-
-    exit 0
-  fi
-done
+exit 0
