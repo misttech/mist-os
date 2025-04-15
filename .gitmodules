@@ -738,3 +738,8 @@
 	url = https://fuchsia.googlesource.com/third_party/github.com/ARMmbed/mbedtls
 	name = third_party/github.com/ARMmbed/mbedtls
 	ignore = all
+[submodule "third_party/snippet-uiautomator/src"]
+	path = third_party/snippet-uiautomator/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/google/snippet-uiautomator
+	name = third_party/github.com/google/snippet-uiautomator
+	ignore = all
