@@ -396,7 +396,8 @@ TEST_F(GuestManagerTest, LaunchAndGetInfo) {
 
   bool launch_callback_called = false;
   fuchsia::virtualization::GuestConfig user_guest_config;
-  user_guest_config.set_default_net(true);
+  // TODO(b/410037697): Re-enable networking and test accordingly.
+  user_guest_config.set_default_net(false);
 
   fuchsia::virtualization::GuestPtr guest;
   manager.Launch(std::move(user_guest_config), guest.NewRequest(),
@@ -422,9 +423,7 @@ TEST_F(GuestManagerTest, LaunchAndGetInfo) {
   ASSERT_FALSE(info->has_stop_error());
 
   ASSERT_TRUE(info->has_detected_problems());
-  ASSERT_EQ(info->detected_problems().size(), 1u);
-  ASSERT_EQ(info->detected_problems()[0], GuestManager::GuestNetworkStateToStringExplanation(
-                                              GuestNetworkState::NO_HOST_NETWORKING));
+  ASSERT_EQ(info->detected_problems().size(), 0u);
 
   const GuestDescriptor& guest_descriptor = info->guest_descriptor();
   ASSERT_EQ(guest_descriptor.guest_memory(), finalized_config.guest_memory());

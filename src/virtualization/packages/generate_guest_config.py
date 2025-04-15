@@ -46,7 +46,7 @@ def main():
         "--default-net",
         dest="default-net",
         action="store_const",
-        const=True,
+        const=False,
         help="Enable the default net device",
     )
     parser.add_argument(

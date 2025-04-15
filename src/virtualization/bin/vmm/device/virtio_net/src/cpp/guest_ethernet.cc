@@ -141,10 +141,12 @@ zx_status_t GuestEthernet::CreateGuestInterface(bool enable_bridge) {
   // Create a new network group.
   fuchsia::net::virtualization::Config config;
   if (enable_bridge) {
-    config.set_bridged(fuchsia::net::virtualization::Bridged{});
+    // See b/410037697 for bridging support.
+    FX_LOGS(ERROR) << "Bridging is not currently supported";
+    return ZX_ERR_NOT_SUPPORTED;
   } else {
     // See https://fxbug.dev/42052026 for NAT support.
-    FX_LOGS(ERROR) << "Only bridging is currently supported";
+    FX_LOGS(ERROR) << "NAT is not currently supported";
     return ZX_ERR_NOT_SUPPORTED;
   }
   netstack_->CreateNetwork(std::move(config),
