@@ -268,7 +268,7 @@ group("digest") {
 }
 
 group("downcast-rs") {
-  public_deps = [ ":downcast-rs-v1_2_0" ]
+  public_deps = [ ":downcast-rs-v2_0_1" ]
 }
 
 group("dyn-clone") {
@@ -5363,18 +5363,18 @@ rust_library("downcast-v0_10_0") {
   applicable_licenses = [ ":downcast-v0_10_0.license" ]
 }
 
-license("downcast-rs-v1_2_0.license") {
+license("downcast-rs-v2_0_1.license") {
   public_package_name = "downcast_rs"
   license_files = [
-    "//third_party/rust_crates/vendor/downcast-rs-1.2.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/downcast-rs-1.2.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/downcast-rs-2.0.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/downcast-rs-2.0.1/LICENSE-MIT",
   ]
 }
 
-rust_library("downcast-rs-v1_2_0") {
+rust_library("downcast-rs-v2_0_1") {
   crate_name = "downcast_rs"
-  crate_root = "//third_party/rust_crates/vendor/downcast-rs-1.2.0/src/lib.rs"
-  output_name = "downcast_rs-f02ee96ede03c448"
+  crate_root = "//third_party/rust_crates/vendor/downcast-rs-2.0.1/src/lib.rs"
+  output_name = "downcast_rs-149f4f3679de38d3"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -5383,16 +5383,17 @@ rust_library("downcast-rs-v1_2_0") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=f02ee96ede03c448",
-    "-Cextra-filename=-f02ee96ede03c448",
+    "--edition=2021",
+    "-Cmetadata=149f4f3679de38d3",
+    "-Cextra-filename=-149f4f3679de38d3",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
+    "--cfg=feature=\"sync\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":downcast-rs-v1_2_0.license" ]
+  applicable_licenses = [ ":downcast-rs-v2_0_1.license" ]
 }
 
 license("dyn-clone-v1_0_5.license") {

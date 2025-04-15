@@ -345,7 +345,7 @@ _NORMAL_DEPENDENCIES = {
             "derp": Label("//third_party/rust_crates/vendor/derp-0.0.14:derp"),
             "difference": Label("//third_party/rust_crates/vendor/difference-2.0.0:difference"),
             "digest": Label("//third_party/rust_crates/vendor/digest-0.10.7:digest"),
-            "downcast-rs": Label("//third_party/rust_crates/vendor/downcast-rs-1.2.0:downcast_rs"),
+            "downcast-rs": Label("//third_party/rust_crates/vendor/downcast-rs-2.0.1:downcast_rs"),
             "dyn-clone": Label("//third_party/rust_crates/vendor/dyn-clone-1.0.5:dyn_clone"),
             "ecb": Label("//third_party/rust_crates/vendor/ecb-0.1.2:ecb"),
             "ecdsa": Label("//third_party/rust_crates/vendor/ecdsa-0.14.8:ecdsa"),

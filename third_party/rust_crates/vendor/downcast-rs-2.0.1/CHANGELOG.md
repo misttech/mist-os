@@ -4,10 +4,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## 2.0.1 - 2025-01-06
+
+### Change
+- Updated how code conditioned on the `sync` flag is written in the crate
+  documentation to work around a [crates.io doc rendering
+  bug](https://github.com/rust-lang/crates.io/issues/10331).
+
+## 2.0.0 - 2025-01-06
+### Added
+- Gated the sync/`Arc` downcasting functionality behind a new `sync` feature
+  that is enabled by default.
+- Added a new `DowncastSend` trait to support downcasting to `Box<Any + Send>`
+  and made `DowncastSync` extend this trait.
+- Added downcasting support to `Box<Any + Send + Sync>` to `DowncastSync`.
+
+### Change
+- Updated minimum supported rust version 1.56 to enforce the
+  `rustdoc::bare_urls` lint (1.53) and switch to edition 2021 (1.56).
+
+## 1.2.1 - 2024-04-06
+### Change
+- Consolidated bounds on the trait to avoid triggering Clippy's
+  `multiple_bound_locations` lint.
+
 ## 1.2.0 - 2020-06-29
 ### Added
 - `no_std` support.
 - CI with GitHub actions.
+
+### Changed
+- Updated minimum supported rust version 1.36 for stable access to `alloc`.
 
 ## 1.1.1 - 2019-10-28
 ### Changed
@@ -17,6 +44,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## 1.1.0 - 2019-10-07
 ### Added
 - Support for downcasting `Rc<Trait>` and `Arc<Trait>`.
+
 ### Changed
 - Minimum supported Rust version upped to 1.33 to support `Rc` and `Arc` in the
   receiver position.

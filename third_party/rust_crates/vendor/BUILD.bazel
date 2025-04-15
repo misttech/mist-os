@@ -763,14 +763,14 @@ alias(
 )
 
 alias(
-    name = "downcast-rs-1.2.0",
-    actual = "//third_party/rust_crates/vendor/downcast-rs-1.2.0:downcast_rs",
+    name = "downcast-rs-2.0.1",
+    actual = "//third_party/rust_crates/vendor/downcast-rs-2.0.1:downcast_rs",
     tags = ["manual"],
 )
 
 alias(
     name = "downcast-rs",
-    actual = "//third_party/rust_crates/vendor/downcast-rs-1.2.0:downcast_rs",
+    actual = "//third_party/rust_crates/vendor/downcast-rs-2.0.1:downcast_rs",
     tags = ["manual"],
 )
 
