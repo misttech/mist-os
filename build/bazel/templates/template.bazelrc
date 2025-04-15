@@ -120,3 +120,9 @@ build --@io_bazel_rules_go//go/config:linkmode=pie
 # very intentionally.
 common:no_gn_targets \
   --override_repository=gn_targets=build/bazel/local_repositories/empty
+
+# Enable clippy for Rust targets specified on the build line.
+# See https://bazelbuild.github.io/rules_rust/rust_clippy.html.
+build --aspects=@rules_rust//rust:defs.bzl%rust_clippy_aspect
+build --output_groups=+clippy_checks
+build --@rules_rust//rust/settings:clippy_flag=-Wclippy::all

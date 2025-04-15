@@ -179,6 +179,7 @@ register_toolchains(
     "@fuchsia_prebuilt_rust//:rust_" + fuchsia_host_tag_alt,
     "@fuchsia_prebuilt_rust//:rust_fuchsia_x64",
     "@fuchsia_prebuilt_rust//:rust_fuchsia_arm64",
+    "@fuchsia_prebuilt_rust//:rust_fuchsia_riscv64",
 )
 
 # buildifier: disable=load-on-top
@@ -282,6 +283,7 @@ fuchsia_idk_repository(
 load(
     "@rules_fuchsia//fuchsia:deps.bzl",
     "fuchsia_sdk_repository",
+    "register_fuchsia_sdk_toolchain",
     "rules_fuchsia_deps",
 )
 
@@ -322,9 +324,6 @@ fuchsia_sdk_repository(
         ],
     },
 )
-
-# buildifier: disable=load-on-top
-load("@rules_fuchsia//fuchsia:deps.bzl", "register_fuchsia_sdk_toolchain")
 
 # Register the fuchsia toolchain for the fuchsia SDK
 register_fuchsia_sdk_toolchain()

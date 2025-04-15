@@ -27,6 +27,7 @@ rust_toolchain(
     name = "rust_%s_%s_toolchain" % (host_os, host_arch),
     rustc = "//:bin/rustc",
     rustc_lib = "//:rustc_lib",
+    clippy_driver = "//:bin/clippy-driver",
     rust_std = "//:rust_std_host",
     rust_doc = "//:bin/rustdoc",
     binary_ext = "",
@@ -62,6 +63,7 @@ rust_toolchain(
     name = "rust_fuchsia_x64_toolchain",
     rustc = "//:bin/rustc",
     rustc_lib = "//:rustc_lib",
+    clippy_driver = "//:bin/clippy-driver",
     rust_std = "//:rust_std_fuchsia_x64",
     rust_doc = "//:bin/rustdoc",
     binary_ext = "",
@@ -97,6 +99,7 @@ rust_toolchain(
     name = "rust_fuchsia_arm64_toolchain",
     rustc = "//:bin/rustc",
     rustc_lib = "//:rustc_lib",
+    clippy_driver = "//:bin/clippy-driver",
     rust_std = "//:rust_std_fuchsia_arm64",
     rust_doc = "//:bin/rustdoc",
     binary_ext = "",
@@ -118,5 +121,41 @@ toolchain(
         "@platforms//os:fuchsia",
     ],
     toolchain = ":rust_fuchsia_arm64_toolchain",
+    toolchain_type = "@rules_rust//rust:toolchain",
+)
+
+# Define the Fuchsia/riscv64 Rust toolchain
+
+rust_stdlib_filegroup(
+    name = "rust_std_fuchsia_riscv64",
+    srcs = glob(["lib/rustlib/riscv64-unknown-fuchsia/lib/*"]),
+)
+
+rust_toolchain(
+    name = "rust_fuchsia_riscv64_toolchain",
+    rustc = "//:bin/rustc",
+    rustc_lib = "//:rustc_lib",
+    clippy_driver = "//:bin/clippy-driver",
+    rust_std = "//:rust_std_fuchsia_riscv64",
+    rust_doc = "//:bin/rustdoc",
+    binary_ext = "",
+    staticlib_ext = ".a",
+    dylib_ext = ".so",
+    stdlib_linkflags = [],
+    exec_triple = "riscv64-unknown-fuchsia",
+    target_triple = "riscv64-unknown-fuchsia",
+)
+
+toolchain(
+    name = "rust_fuchsia_riscv64",
+    exec_compatible_with = [
+        build_config.host_platform_cpu_constraint,
+        build_config.host_platform_os_constraint,
+    ],
+    target_compatible_with = [
+        "@platforms//cpu:riscv64",
+        "@platforms//os:fuchsia",
+    ],
+    toolchain = ":rust_fuchsia_riscv64_toolchain",
     toolchain_type = "@rules_rust//rust:toolchain",
 )
