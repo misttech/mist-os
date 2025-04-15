@@ -30,8 +30,11 @@
 #define LOG(severity, format, ...)                                   \
   do {                                                               \
     static_assert(true || DDK_LOG_##severity);                       \
-    if (DDK_LOG_##severity >= DDK_LOG_INFO) {                        \
+    if (DDK_LOG_##severity >= DDK_LOG_WARNING) {                     \
       fprintf(stderr, "metrics_buffer " format "\n", ##__VA_ARGS__); \
+    } else if (DDK_LOG_##severity >= DDK_LOG_INFO) {                 \
+      fprintf(stdout, "metrics_buffer " format "\n", ##__VA_ARGS__); \
+      fflush(stdout);                                                \
     }                                                                \
   } while (0)
 

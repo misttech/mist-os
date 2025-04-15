@@ -5,6 +5,7 @@
 #ifndef SRC_SYSMEM_SERVER_LOGGING_H_
 #define SRC_SYSMEM_SERVER_LOGGING_H_
 
+#include <lib/fit/function.h>
 #include <lib/syslog/cpp/macros.h>
 #include <stdarg.h>
 #include <zircon/compiler.h>
@@ -12,6 +13,14 @@
 #include <string>
 
 namespace sysmem_service {
+
+using LogCallback = fit::function<void(::fuchsia_logging::LogSeverity severity, const char* file,
+                                       int line, const char* formatted_str)>;
+LogCallback& GetDefaultLogCallback();
+
+void vLogToCallback(::fuchsia_logging::LogSeverity severity, const char* file, int line,
+                    const char* prefix, const char* format, va_list args,
+                    const LogCallback& log_callback);
 
 void vLog(::fuchsia_logging::LogSeverity severity, const char* file, int line, const char* prefix,
           const char* format, va_list args);
