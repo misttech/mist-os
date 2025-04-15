@@ -28,8 +28,7 @@ class PlatformBus {
 
   PlatformBus() = default;
 
-  void DdkInit();
-  //void DdkRelease();
+  zx::result<> Start();
 
   zx_status_t GetBti(uint32_t iommu_index, uint32_t bti_id,
                      fbl::RefPtr<BusTransactionInitiatorDispatcher>* out_bti);
@@ -50,7 +49,6 @@ class PlatformBus {
   DISALLOW_COPY_ASSIGN_AND_MOVE(PlatformBus);
 
   zx::result<zbi_board_info_t> GetBoardInfo();
-  zx_status_t Init();
 
   // Dummy IOMMU.
   KernelHandle<IommuDispatcher> iommu_handle_;

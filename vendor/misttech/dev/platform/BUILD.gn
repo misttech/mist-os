@@ -4,16 +4,19 @@
 
 import("//build/zircon/zx_library.gni")
 
-zx_library("platform") {
+zx_library("platform-bus") {
   sources = [
     "bind.cc",
     "platform-bus.cc",
   ]
   deps = [
-    "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice_lib",
-    "//src/devices/block/drivers/virtio:block_lib",
-    "//src/devices/bus/lib/virtio",
+    #"//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_cpp",
+    #"//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_banjo_cpp",
+    #"//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+    "//vendor/misttech/src/connectivity/ethernet/drivers/virtio:virtio_netdevice_lib",
     "//vendor/misttech/src/connectivity/lib/network-device/cpp",
+    "//vendor/misttech/src/devices/block/drivers/virtio:block_lib",
+    "//vendor/misttech/src/devices/bus/lib/virtio",
     "//vendor/misttech/third_party/lwip",
     "//zircon/kernel/lib/init",
     "//zircon/system/ulib/virtio",

@@ -21,10 +21,10 @@
 #include <virtio/virtio.h>
 
 #include "platform/platform-bus.h"
-#include "src/connectivity/ethernet/drivers/virtio/netdevice.h"
-#include "src/devices/block/drivers/virtio/block.h"
+#include "vendor/misttech/src/connectivity/ethernet/drivers/virtio/netdevice.h"
 #include "vendor/misttech/src/connectivity/lib/network-device/cpp/network_device_client.h"
 #include "vendor/misttech/src/connectivity/network/drivers/network-device/device/device_interface.h"
+#include "vendor/misttech/src/devices/block/drivers/virtio/block.h"
 
 namespace platform_bus {
 
