@@ -183,11 +183,18 @@ class PrebuildMap(object):
             deps_labels, ("cc_source_library", "cc_prebuilt_library")
         )
 
-    def get_meta(self, info: AtomInfo) -> T.Optional[MetaJson]:
-        """Generate a meta.json file for a given AtomInfo, or None if unsupported type."""
+    def get_meta(
+        self, info: AtomInfo
+    ) -> tuple[T.Optional[MetaJson], list[dict[str, str]]]:
+        """Generate meta.json content for a given AtomInfo
+
+        Returns a tuple containing:
+        * The meta.json content or None if an unsupported type
+        * A list of additional atom files
+        """
         value = info["atom_meta"].get("value")
         if value is not None:
-            return value
+            return (value, [])
 
         generator = {
             "fidl_library": self._meta_for_fidl_library,
@@ -204,9 +211,11 @@ class PrebuildMap(object):
             # packages and add a package to `test_collection.json` along with
             # expected output to `validation_data/expected_idk/`.
         }.get(info["atom_type"], None)
-        return generator(info) if generator else None
+        return generator(info) if generator else (None, [])
 
-    def _meta_for_fidl_library(self, info: AtomInfo) -> MetaJson:
+    def _meta_for_fidl_library(
+        self, info: AtomInfo
+    ) -> tuple[MetaJson, list[dict[str, str]]]:
         prebuild = info["prebuild_info"]
         fidl_sources = [f["dest"] for f in info["atom_files"]]
         fidl_deps = self.resolve_unique_labels(prebuild.get("deps", []))
@@ -217,9 +226,11 @@ class PrebuildMap(object):
             "stable": info["write_stable_true_to_meta_json"],
             "type": info["atom_type"],
             "deps": [self.label_to_library_name(d) for d in fidl_deps],
-        }
+        }, []
 
-    def _meta_for_bind_library(self, info: AtomInfo) -> MetaJson:
+    def _meta_for_bind_library(
+        self, info: AtomInfo
+    ) -> tuple[MetaJson, list[dict[str, str]]]:
         prebuild = info["prebuild_info"]
         bind_sources = [f["dest"] for f in info["atom_files"]]
         bind_deps = self.resolve_unique_labels(prebuild.get("deps", []))
@@ -229,9 +240,11 @@ class PrebuildMap(object):
             "deps": [self.label_to_library_name(d) for d in bind_deps],
             "sources": bind_sources,
             "type": info["atom_type"],
-        }
+        }, []
 
-    def _meta_for_cc_source_library(self, info: AtomInfo) -> MetaJson:
+    def _meta_for_cc_source_library(
+        self, info: AtomInfo
+    ) -> tuple[MetaJson, list[dict[str, str]]]:
         prebuild = info["prebuild_info"]
         all_deps = self.resolve_unique_labels(prebuild.get("deps", []))
 
@@ -268,9 +281,11 @@ class PrebuildMap(object):
             "sources": prebuild["sources"],
             "stable": info["write_stable_true_to_meta_json"],
             "type": info["atom_type"],
-        }
+        }, []
 
-    def _meta_for_cc_prebuilt_library(self, info: AtomInfo) -> MetaJson:
+    def _meta_for_cc_prebuilt_library(
+        self, info: AtomInfo
+    ) -> tuple[MetaJson, list[dict[str, str]]]:
         prebuild = info["prebuild_info"]
         binaries = {}
         variants = []
@@ -324,9 +339,11 @@ class PrebuildMap(object):
             result["variants"] = variants
         if "ifs" in prebuild:
             result["ifs"] = prebuild["ifs"]
-        return result
+        return (result, [])
 
-    def _meta_for_version_history(self, info: AtomInfo) -> MetaJson:
+    def _meta_for_version_history(
+        self, info: AtomInfo
+    ) -> tuple[MetaJson, list[dict[str, str]]]:
         prebuild = info["prebuild_info"]
         # prebuild contains enough information to generate the final version
         # history file  by calling a Python module function.
@@ -351,9 +368,11 @@ class PrebuildMap(object):
         # been updated to use "phase" and it is removed from the real instance.
         generate_version_history.add_deprecated_status_field(version_history)
 
-        return version_history
+        return (version_history, [])
 
-    def _meta_for_companion_host_tool(self, info: AtomInfo) -> MetaJson:
+    def _meta_for_companion_host_tool(
+        self, info: AtomInfo
+    ) -> tuple[MetaJson, list[dict[str, str]]]:
         prebuild = info["prebuild_info"]
         result = {
             "name": prebuild["name"],
@@ -367,6 +386,7 @@ class PrebuildMap(object):
 
         binary_relpath = os.path.relpath(prebuild["binary"], src_root)
         files = [os.path.join(dest_root, binary_relpath)]
+        additional_atom_files = []
 
         prebuilt_files = None
         if "prebuilt_files" in prebuild:
@@ -379,10 +399,16 @@ class PrebuildMap(object):
             )
 
         assert prebuilt_files
-        files.extend(
-            os.path.join(dest_root, prebuilt_file)
-            for prebuilt_file in prebuilt_files
-        )
+        for prebuilt_file in prebuilt_files:
+            source_path = os.path.join(src_root, prebuilt_file)
+            dest_path = os.path.join(dest_root, prebuilt_file)
+            files.append(dest_path)
+            additional_atom_files.append(
+                {
+                    "source": source_path,
+                    "dest": dest_path,
+                }
+            )
 
         # Remove duplicates if any.
         files = get_unique_sequence(files)
@@ -390,9 +416,11 @@ class PrebuildMap(object):
         # Sort all files except the first one, which must be the binary.
         result["files"] = [files[0]] + sorted(files[1:])
 
-        return result
+        return (result, additional_atom_files)
 
-    def _meta_for_dart_library(self, info: AtomInfo) -> MetaJson:
+    def _meta_for_dart_library(
+        self, info: AtomInfo
+    ) -> tuple[MetaJson, list[dict[str, str]]]:
         prebuild = info["prebuild_info"]
 
         # The list of packages that should be pulled from a Flutter SDK instead of pub.
@@ -445,11 +473,11 @@ class PrebuildMap(object):
         }
         if prebuild["null_safe"]:
             result["dart_library_null_safe"] = True
-        return result
+        return (result, [])
 
     def _meta_for_experimental_python_e2e_test(
         self, info: AtomInfo
-    ) -> MetaJson:
+    ) -> tuple[MetaJson, list[dict[str, str]]]:
         prebuild = info["prebuild_info"]
 
         root = prebuild["file_base"]
@@ -483,12 +511,16 @@ class PrebuildMap(object):
             "root": root,
             "type": info["atom_type"],
             "files": [f.split("=")[0] for f in files],
-        }
+        }, []
 
-    def _meta_for_noop(self, info: AtomInfo) -> None:
-        return None
+    def _meta_for_noop(
+        self, info: AtomInfo
+    ) -> tuple[None, list[dict[str, str]]]:
+        return (None, [])
 
-    def _meta_for_collection(self, info: AtomInfo) -> MetaJson:
+    def _meta_for_collection(
+        self, info: AtomInfo
+    ) -> tuple[MetaJson, list[dict[str, str]]]:
         prebuild = info["prebuild_info"]
         return {
             "arch": prebuild["arch"],
@@ -496,7 +528,7 @@ class PrebuildMap(object):
             "parts": list[dict[str, T.Any]],
             "root": prebuild["root"],
             "schema_version": prebuild["schema_version"],
-        }
+        }, []
 
 
 def main() -> int:
@@ -557,7 +589,8 @@ def main() -> int:
     atom_files: list[dict[str, str]] = []
 
     for info in prebuild_map.values():
-        meta_json = prebuild_map.get_meta(info)
+        meta_json, additional_atom_files = prebuild_map.get_meta(info)
+        assert meta_json or not additional_atom_files
         if meta_json:
             meta_path = info["atom_meta"]["dest"]
             meta_files[meta_path] = meta_json
@@ -576,6 +609,9 @@ def main() -> int:
                     }
                 )
                 atom_files += info["atom_files"]
+
+            if additional_atom_files:
+                atom_files += additional_atom_files
         elif info["atom_type"] != "none":
             unhandled_labels.add(info["atom_label"])
 
