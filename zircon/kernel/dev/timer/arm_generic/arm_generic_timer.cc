@@ -152,10 +152,15 @@ static void write_cntps_tval(int32_t val) {
 
 // fwd decls to ensure that the read counter function all match the signature
 // defined by ReadArmCounterFunc.
+static ReadArmCounterFunc read_zero;
 static ReadArmCounterFunc read_cntpct_a73;
 static ReadArmCounterFunc read_cntvct_a73;
 static ReadArmCounterFunc read_cntpct;
 static ReadArmCounterFunc read_cntvct;
+
+static uint64_t read_zero() {
+  return 0;
+}
 
 static uint64_t read_cntpct_a73() {
   // Workaround for Cortex-A73 erratum 858921.
@@ -210,17 +215,19 @@ struct timer_reg_procs {
 
 // Notes about the `read_arm_counter` function pointer:
 //
-// There exists a bug in certain ARM Cortex-A73 CPUs which can lead to a bad
-// read of either the VCT or PCT counters.  It is documented as Errata 858921
-// ( https://documentation-service.arm.com/static/5fa29fa7b209f547eebd3613 )
+// At startup time, we have not yet initialized our timer hardware, and
+// therefore must return zero as required by platform_current_raw_ticks_synchronized
+// (see the comments around that function for more details). Therefore, this
+// function pointer initially points to a function that always returns zero.
 //
-// At startup time, we have not had a chance (yet) to figure out what CPUs we
-// are running on.  So, we start by using the read methods which implement the
-// workaround for errata-858921; they are safe to use no matter what CPU you are
-// on, they are just a bit slower.  Later on, once we have had a chance for all
-// of our secondary CPUs to boot, identify their HW, and check in with the rest
-// of the system, we can switch to the faster version (but only if there are no
-// A73s present in the system).
+// Once we figure out what CPUs we are running on, identify their HW, and check
+// in with the rest of the system, we can pick which version of the
+// read_arm_counter function we need to use. There exists a bug in certain ARM
+// Cortex-A73 CPUs which can lead to a bad read of either the VCT or PCT
+// counters.  It is documented as Errata 858921
+// ( https://documentation-service.arm.com/static/5fa29fa7b209f547eebd3613 )
+// Thus, on systems with A73 cores, we must utilize a function that accounts for
+// this errata. On systems without A73 cores, we select a faster implementation.
 //
 // In order to make this switch, however, and not need any locks, we need to
 // make sure that the function pointer is declared as an atomic.  Otherwise, we
@@ -236,11 +243,10 @@ struct timer_reg_procs {
 //
 #if (TIMER_ARM_GENERIC_SELECTED_CNTV)
 static struct timer_reg_procs reg_procs = cntv_procs;
-static ktl::atomic<ReadArmCounterFunc*> read_arm_counter{read_cntvct_a73};
 #else
 static struct timer_reg_procs reg_procs = cntp_procs;
-static ktl::atomic<ReadArmCounterFunc*> read_arm_counter{read_cntpct_a73};
 #endif
+static ktl::atomic<ReadArmCounterFunc*> read_arm_counter{read_zero};
 
 static inline void write_ctl(uint32_t val) { reg_procs.write_ctl(val); }
 static inline void write_cval(uint64_t val) { reg_procs.write_cval(val); }

@@ -183,6 +183,11 @@ enum class GetTicksSyncFlag : uint8_t {
 FBL_ENABLE_ENUM_BITS(GetTicksSyncFlag)
 
 // Reads a platform-specific ticks counter.
+//
+// This function is required to return zero if it is invoked before the timer hardware is
+// initialized. Not doing so could violate the monotonicity of both the monotonic and boot
+// timelines.
+//
 // This raw counter value is almost certainly not what you want; callers generally want to use the
 // monotonic ticks value provided by timer_current_mono_ticks. This ticks value is the raw counter
 // adjusted by a constant used to make the ticks timeline start ticking from 0 when the system
