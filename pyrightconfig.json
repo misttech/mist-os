@@ -23,21 +23,24 @@
     // $root_build_dir/pyrightconfig.base.json, and pyright clobbers variables from
     // extended configs.
     "fuchsiaExtraPaths": [
+        // keep-sorted start
         "build/python/modules",
         "build/python/tests",
+        "scripts/lib",
         "src/developer/ffx/lib/fuchsia-controller/python",
+        "src/lib/diagnostics/python",
         "src/testing/end_to_end/honeydew",
         "src/testing/end_to_end/mobly_base_tests",
-        "src/lib/diagnostics/python",
-        "scripts/lib",
+        "src/tests/end_to_end/lib",
         "third_party/antlion/packages",
+        "third_party/github.com/jd/tenacity/src",
         "third_party/jellyfish/jellyfish/jellyfish",
         "third_party/jinja2",
         "third_party/mako",
         "third_party/mobly/src",
-        "third_party/github.com/jd/tenacity/src",
         "third_party/parameterized/src",
         "third_party/pyyaml/src"
+        // keep-sorted end
     ],
     "exclude": [
         "prebuilt",
