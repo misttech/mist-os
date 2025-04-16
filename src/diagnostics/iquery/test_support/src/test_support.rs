@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 use byteorder::{LittleEndian, WriteBytesExt};
+use fdomain_client::fidl::{RequestStream as FRequestStream, ServerEnd as FServerEnd};
+use fdomain_client::AsHandleRef;
 use fidl::endpoints::{create_endpoints, create_proxy, ServerEnd};
 use fidl_fuchsia_component_decl::{
     Capability, Component, Dictionary, Expose, ExposeDictionary, ExposeProtocol, ParentRef,
@@ -17,7 +19,10 @@ use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use zx_status::Status;
-use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys2};
+use {
+    fdomain_fuchsia_io as fio_f, fdomain_fuchsia_sys2 as fsys2_f, fidl_fuchsia_io as fio,
+    fidl_fuchsia_sys2 as fsys2,
+};
 
 /// Builder struct for `RealmQueryResult`/
 /// This is an builder interface meant to simplify building of test fixtures.
@@ -71,6 +76,38 @@ impl MockRealmQueryBuilderInner {
 
         parent.mapping.insert(self.when.to_string(), Box::new(self));
         parent
+    }
+
+    pub fn serve_exposed_dir_f(&self, server_end: FServerEnd<fio_f::DirectoryMarker>, path: &str) {
+        let mut mock_dir_top = MockDir::new("expose".to_owned());
+        let mut mock_accessors = MockDir::new("diagnostics-accessors".to_owned());
+        for expose in &self.exposes {
+            let Expose::Protocol(ExposeProtocol {
+                source_name: Some(name), source_dictionary, ..
+            }) = expose
+            else {
+                continue;
+            };
+            if matches!(source_dictionary, Some(d) if d == "diagnostics-accessors") {
+                mock_accessors = mock_accessors.add_entry(MockFile::new_arc(name.to_owned()));
+            }
+        }
+
+        match path {
+            "diagnostics-accessors" => {
+                fuchsia_async::Task::local(async move {
+                    Rc::new(mock_accessors).serve_f(server_end).await
+                })
+                .detach();
+            }
+            _ => {
+                mock_dir_top = mock_dir_top.add_entry(Rc::new(mock_accessors));
+                fuchsia_async::Task::local(async move {
+                    Rc::new(mock_dir_top).serve_f(server_end).await
+                })
+                .detach();
+            }
+        }
     }
 
     pub fn serve_exposed_dir(&self, server_end: ServerEnd<fio::DirectoryMarker>, path: &str) {
@@ -274,6 +311,123 @@ impl Default for MockRealmQuery {
 
 impl MockRealmQuery {
     /// Serves the `RealmQuery` interface asynchronously and runs until the program terminates.
+    pub async fn serve_f(self: Rc<Self>, object: FServerEnd<fsys2_f::RealmQueryMarker>) {
+        let client = object.domain();
+        let mut stream = object.into_stream();
+        while let Ok(Some(request)) = stream.try_next().await {
+            match request {
+                fsys2_f::RealmQueryRequest::GetInstance { moniker, responder } => {
+                    let query_moniker = Moniker::from_str(moniker.as_str()).unwrap();
+                    let res = self.mapping.get(&query_moniker.to_string()).unwrap();
+                    responder.send(Ok(&res.to_instance())).unwrap();
+                }
+                fsys2_f::RealmQueryRequest::DeprecatedOpen {
+                    moniker,
+                    dir_type,
+                    object,
+                    responder,
+                    path,
+                    ..
+                } => {
+                    let query_moniker = Moniker::from_str(moniker.as_str()).unwrap();
+                    if let Some(res) = self.mapping.get(&query_moniker.to_string()) {
+                        if dir_type == fsys2_f::OpenDirType::ExposedDir {
+                            // Serve the out dir, everything else doesn't get served.
+                            res.serve_exposed_dir_f(object.into_channel().into(), &path);
+                        }
+                        responder.send(Ok(())).unwrap();
+                    } else {
+                        responder.send(Err(fsys2_f::OpenError::InstanceNotFound)).unwrap();
+                    }
+                }
+                fsys2_f::RealmQueryRequest::OpenDirectory {
+                    moniker,
+                    dir_type,
+                    object,
+                    responder,
+                    ..
+                } => {
+                    let query_moniker = Moniker::from_str(moniker.as_str()).unwrap();
+                    if let Some(res) = self.mapping.get(&query_moniker.to_string()) {
+                        if dir_type == fsys2_f::OpenDirType::OutgoingDir {
+                            // Serve the out dir, everything else doesn't get served.
+                            res.serve_exposed_dir_f(object, "");
+                        }
+                        responder.send(Ok(())).unwrap();
+                    } else {
+                        responder.send(Err(fsys2_f::OpenError::InstanceNotFound)).unwrap();
+                    }
+                }
+                fsys2_f::RealmQueryRequest::GetManifest { moniker, responder, .. } => {
+                    let query_moniker = Moniker::from_str(moniker.as_str()).unwrap();
+                    let res = self.mapping.get(&query_moniker.to_string()).unwrap();
+                    let manifest = res.make_manifest();
+                    let manifest = fidl::persist(&manifest).unwrap();
+                    let (client_end, server_end) =
+                        client.create_endpoints::<fsys2_f::ManifestBytesIteratorMarker>();
+
+                    fuchsia_async::Task::spawn(async move {
+                        let mut stream = server_end.into_stream();
+                        let fsys2_f::ManifestBytesIteratorRequest::Next { responder } =
+                            stream.next().await.unwrap().unwrap();
+                        responder.send(manifest.as_slice()).unwrap();
+                        let fsys2_f::ManifestBytesIteratorRequest::Next { responder } =
+                            stream.next().await.unwrap().unwrap();
+                        responder.send(&[]).unwrap();
+                    })
+                    .detach();
+
+                    responder.send(Ok(client_end)).unwrap();
+                }
+                fsys2_f::RealmQueryRequest::GetResolvedDeclaration {
+                    moniker, responder, ..
+                } => {
+                    let query_moniker = Moniker::from_str(moniker.as_str()).unwrap();
+                    let res = self.mapping.get(&query_moniker.to_string()).unwrap();
+                    let manifest = res.make_manifest();
+                    let manifest = fidl::persist(&manifest).unwrap();
+                    let (client_end, server_end) =
+                        client.create_endpoints::<fsys2_f::ManifestBytesIteratorMarker>();
+
+                    fuchsia_async::Task::spawn(async move {
+                        let mut stream = server_end.into_stream();
+                        let fsys2_f::ManifestBytesIteratorRequest::Next { responder } =
+                            stream.next().await.unwrap().unwrap();
+                        responder.send(manifest.as_slice()).unwrap();
+                        let fsys2_f::ManifestBytesIteratorRequest::Next { responder } =
+                            stream.next().await.unwrap().unwrap();
+                        responder.send(&[]).unwrap();
+                    })
+                    .detach();
+
+                    responder.send(Ok(client_end)).unwrap();
+                }
+                fsys2_f::RealmQueryRequest::GetAllInstances { responder } => {
+                    let instances: Vec<fsys2_f::Instance> =
+                        self.mapping.values().map(|m| m.to_instance()).collect();
+
+                    let (client_end, server_end) =
+                        client.create_endpoints::<fsys2_f::InstanceIteratorMarker>();
+
+                    fuchsia_async::Task::spawn(async move {
+                        let mut stream = server_end.into_stream();
+                        let fsys2_f::InstanceIteratorRequest::Next { responder } =
+                            stream.next().await.unwrap().unwrap();
+                        responder.send(&instances).unwrap();
+                        let fsys2_f::InstanceIteratorRequest::Next { responder } =
+                            stream.next().await.unwrap().unwrap();
+                        responder.send(&[]).unwrap();
+                    })
+                    .detach();
+
+                    responder.send(Ok(client_end)).unwrap();
+                }
+                _ => unreachable!("request {:?}", request),
+            }
+        }
+    }
+
+    /// Serves the `RealmQuery` interface asynchronously and runs until the program terminates.
     pub async fn serve(self: Rc<Self>, object: ServerEnd<fsys2::RealmQueryMarker>) {
         let mut stream = object.into_stream();
         while let Ok(Some(request)) = stream.try_next().await {
@@ -381,6 +535,7 @@ impl MockRealmQuery {
 // Mock directory structure.
 pub trait Entry {
     fn open(self: Rc<Self>, path: &str, object: fidl::Channel);
+    fn open_f(self: Rc<Self>, path: &str, object: fdomain_client::Channel);
     fn encode(&self, buf: &mut Vec<u8>);
     fn name(&self) -> String;
 }
@@ -403,6 +558,39 @@ impl MockDir {
     pub fn add_entry(mut self, entry: Rc<dyn Entry>) -> Self {
         self.subdirs.insert(entry.name(), entry);
         self
+    }
+
+    async fn serve_f(self: Rc<Self>, object: FServerEnd<fio_f::DirectoryMarker>) {
+        let mut stream = object.into_stream();
+        let _ = stream.control_handle().send_on_open_(
+            Status::OK.into_raw(),
+            Some(fio_f::NodeInfoDeprecated::Directory(fio_f::DirectoryObject {})),
+        );
+        while let Ok(Some(request)) = stream.try_next().await {
+            match request {
+                fio_f::DirectoryRequest::Open { path, object, .. } => {
+                    self.clone().open_f(&path, object);
+                }
+                fio_f::DirectoryRequest::Rewind { responder, .. } => {
+                    self.at_end.store(false, Ordering::Relaxed);
+                    responder.send(Status::OK.into_raw()).unwrap();
+                }
+                fio_f::DirectoryRequest::ReadDirents { max_bytes: _, responder, .. } => {
+                    let entries = match self.at_end.compare_exchange(
+                        false,
+                        true,
+                        Ordering::Relaxed,
+                        Ordering::Relaxed,
+                    ) {
+                        Ok(false) => encode_entries(&self.subdirs),
+                        Err(true) => Vec::new(),
+                        _ => unreachable!(),
+                    };
+                    responder.send(Status::OK.into_raw(), &entries).unwrap();
+                }
+                x => panic!("unsupported request: {:?}", x),
+            }
+        }
     }
 
     async fn serve(self: Rc<Self>, object: ServerEnd<fio::DirectoryMarker>) {
@@ -471,6 +659,32 @@ impl Entry for MockDir {
         }
     }
 
+    fn open_f(self: Rc<Self>, path: &str, object: fdomain_client::Channel) {
+        let path = Path::new(path);
+        let mut path_iter = path.iter();
+        let segment = if let Some(segment) = path_iter.next() {
+            if let Some(segment) = segment.to_str() {
+                segment
+            } else {
+                let _ = FServerEnd::<fio_f::NodeMarker>::new(object)
+                    .close_with_epitaph(Status::NOT_FOUND);
+                return;
+            }
+        } else {
+            "."
+        };
+        if segment == "." {
+            fuchsia_async::Task::local(self.serve_f(FServerEnd::new(object))).detach();
+            return;
+        }
+        if let Some(entry) = self.subdirs.get(segment) {
+            entry.clone().open_f(path_iter.as_path().to_str().unwrap(), object);
+        } else {
+            let _ =
+                FServerEnd::<fio_f::NodeMarker>::new(object).close_with_epitaph(Status::NOT_FOUND);
+        }
+    }
+
     fn encode(&self, buf: &mut Vec<u8>) {
         buf.write_u64::<LittleEndian>(fio::INO_UNKNOWN).expect("writing mockdir ino to work");
         buf.write_u8(self.name.len() as u8).expect("writing mockdir size to work");
@@ -499,6 +713,10 @@ impl MockFile {
 
 impl Entry for MockFile {
     fn open(self: Rc<Self>, _path: &str, _object: fidl::Channel) {
+        unimplemented!();
+    }
+
+    fn open_f(self: Rc<Self>, _path: &str, _object: fdomain_client::Channel) {
         unimplemented!();
     }
 
