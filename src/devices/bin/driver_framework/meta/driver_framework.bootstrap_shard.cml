@@ -418,6 +418,7 @@
         },
         {
             service: [
+                "fuchsia.gpu.magma.TestService",
                 "fuchsia.hardware.gnss.Service",
                 "fuchsia.hardware.google.nanohub.Service",
                 "fuchsia.hardware.nfc.Service",

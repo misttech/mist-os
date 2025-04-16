@@ -111,6 +111,7 @@
     expose: [
         {
             service: [
+                "fuchsia.gpu.magma.TestService",
                 "fuchsia.hardware.google.nanohub.Service",
                 "fuchsia.hardware.overnet.Service",
                 "fuchsia.hardware.sockettunnel.Service",

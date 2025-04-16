@@ -24,6 +24,7 @@
             service: [
                 "fuchsia.gpu.magma.PerformanceCounterService",
                 "fuchsia.gpu.magma.Service",
+                "fuchsia.gpu.magma.TestService",
             ],
         },
         { service: "fuchsia.hardware.gpu.mali.UtilsService" },

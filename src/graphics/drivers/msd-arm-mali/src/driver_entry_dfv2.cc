@@ -20,20 +20,19 @@
 
 #if MAGMA_TEST_DRIVER
 constexpr char kDriverName[] = "mali-test";
-using MagmaDriverBaseType = msd::MagmaTestDriverBase;
 
 zx_status_t magma_indriver_test(ParentDevice* device);
 
 #else
 constexpr char kDriverName[] = "mali";
-using MagmaDriverBaseType = msd::MagmaProductionDriverBase;
 #endif
 
-class MaliDriver : public MagmaDriverBaseType,
+class MaliDriver : public msd::MagmaProductionDriverBase,
                    public fidl::WireServer<fuchsia_hardware_gpu_mali::MaliUtils> {
  public:
   MaliDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : MagmaDriverBaseType(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
+      : msd::MagmaProductionDriverBase(kDriverName, std::move(start_args),
+                                       std::move(driver_dispatcher)) {}
 
   zx::result<> MagmaStart() override {
     zx::result info_resource = GetInfoResource();
@@ -57,7 +56,14 @@ class MaliDriver : public MagmaDriverBaseType,
     }
 
 #if MAGMA_TEST_DRIVER
-    set_unit_test_status(magma_indriver_test(parent_device_.get()));
+    {
+      test_server_.set_unit_test_status(magma_indriver_test(parent_device_.get()));
+      zx::result result = CreateTestService(test_server_);
+      if (result.is_error()) {
+        DMESSAGE("Failed to serve the TestService");
+        return zx::error(ZX_ERR_INTERNAL);
+      }
+    }
 #endif
 
     set_magma_system_device(msd::MagmaSystemDevice::Create(
@@ -79,7 +85,7 @@ class MaliDriver : public MagmaDriverBaseType,
   }
 
   void Stop() override {
-    MagmaDriverBaseType::Stop();
+    msd::MagmaProductionDriverBase::Stop();
     magma::PlatformBusMapper::SetInfoResource(zx::resource{});
   }
 
@@ -123,6 +129,10 @@ class MaliDriver : public MagmaDriverBaseType,
 
  private:
   std::unique_ptr<ParentDeviceDFv2> parent_device_;
+
+#if MAGMA_TEST_DRIVER
+  msd::MagmaTestServer test_server_;
+#endif
 
   fidl::ServerBindingGroup<fuchsia_hardware_gpu_mali::MaliUtils> mali_utils_bindings_;
 };

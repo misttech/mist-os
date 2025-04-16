@@ -23,26 +23,29 @@
 
 #if MAGMA_TEST_DRIVER
 constexpr char kDriverName[] = "vsi-vip-test";
-using MagmaDriverBaseType = msd::MagmaTestDriverBase;
 
 zx_status_t magma_indriver_test(ParentDeviceDfv2* device);
 
 #else
 
 constexpr char kDriverName[] = "vsi-vip";
-using MagmaDriverBaseType = msd::MagmaProductionDriverBase;
 
 #endif
 
-class NpuDevice : public MagmaDriverBaseType {
+class NpuDevice : public msd::MagmaProductionDriverBase {
  public:
   NpuDevice(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : MagmaDriverBaseType(kDriverName, std::move(start_args), std::move(driver_dispatcher)),
+      : msd::MagmaProductionDriverBase(kDriverName, std::move(start_args),
+                                       std::move(driver_dispatcher)),
         parent_{.incoming_ = incoming()} {}
 
   zx::result<> MagmaStart() override;
 
  private:
+#if MAGMA_TEST_DRIVER
+  msd::MagmaTestServer test_server_;
+#endif
+
   ParentDeviceDfv2 parent_;
 };
 
@@ -54,8 +57,15 @@ zx::result<> NpuDevice::MagmaStart() {
     return zx::error(ZX_ERR_INTERNAL);
   }
 #if MAGMA_TEST_DRIVER
-  DLOG("running magma indriver test");
-  set_unit_test_status(magma_indriver_test(&parent_));
+  {
+    DLOG("running magma indriver test");
+    test_server_.set_unit_test_status(magma_indriver_test(&parent_));
+    zx::result result = CreateTestService(test_server_);
+    if (result.is_error()) {
+      DMESSAGE("Failed to serve the TestService");
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+  }
 #endif
 
   set_magma_system_device(msd::MagmaSystemDevice::Create(

@@ -30,5 +30,11 @@
             availability: "optional",
             source_availability: "unknown",
         },
+        {
+            // Needed for graphics tests.
+            service: [ "fuchsia.gpu.magma.TestService" ],
+            from: "#bootstrap",
+            to: "#core",
+        },
     ],
 }

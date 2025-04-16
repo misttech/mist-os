@@ -23,6 +23,8 @@
 
 namespace msd {
 
+class MagmaTestServer;
+
 template <typename FidlDeviceType>
 class MagmaDriverBase : public fdf::DriverBase,
                         public fidl::WireServer<FidlDeviceType>,
@@ -244,6 +246,38 @@ class MagmaDriverBase : public fdf::DriverBase,
     completer.Reply(fidl::VectorView<fuchsia_gpu_magma::wire::IcdInfo>::FromExternal(icd_infos));
   }
 
+  zx::result<> CreateTestService(MagmaTestServer& test_server) {
+    auto power_protocol =
+        [this](fidl::ServerEnd<fuchsia_gpu_magma::PowerElementProvider> server_end) mutable {
+          fidl::BindServer(dispatcher(), std::move(server_end), this);
+        };
+    auto device_protocol =
+        [this](fidl::ServerEnd<fuchsia_gpu_magma::CombinedDevice> server_end) mutable {
+          fidl::BindServer(dispatcher(), fidl::ServerEnd<FidlDeviceType>(server_end.TakeChannel()),
+                           this);
+        };
+    auto test_protocol =
+        [this, &test_server](fidl::ServerEnd<fuchsia_gpu_magma::TestDevice2> server_end) mutable {
+          fidl::BindServer(dispatcher(), std::move(server_end), &test_server);
+        };
+
+    fuchsia_gpu_magma::TestService::InstanceHandler handler({
+        .device = std::move(device_protocol),
+        .power_element_provider = std::move(power_protocol),
+        .test_device = std::move(test_protocol),
+    });
+    {
+      auto status =
+          outgoing()->template AddService<fuchsia_gpu_magma::TestService>(std::move(handler));
+      if (status.is_error()) {
+        FDF_LOG(ERROR, "%s(): Failed to add service to outgoing directory: %s\n", __func__,
+                status.status_string());
+        return status.take_error();
+      }
+    }
+    return zx::ok();
+  }
+
  private:
   zx::result<> CreateDevfsNode() {
     fidl::Arena arena;
@@ -328,6 +362,18 @@ class MagmaDriverBase : public fdf::DriverBase,
 
   internal::PerformanceCountersServer perf_counter_;
   internal::DependencyInjectionServer dependency_injection_{this};
+};
+
+class MagmaTestServer : public fidl::WireServer<fuchsia_gpu_magma::TestDevice2> {
+ public:
+  void GetUnitTestStatus(GetUnitTestStatusCompleter::Sync& completer) override {
+    MAGMA_DLOG("MagmaTestServer::GetUnitTestStatus");
+    completer.Reply(unit_test_status_);
+  }
+  void set_unit_test_status(zx_status_t status) { unit_test_status_ = status; }
+
+ private:
+  zx_status_t unit_test_status_ = ZX_ERR_NOT_FOUND;
 };
 
 class MagmaTestDriverBase : public MagmaDriverBase<fuchsia_gpu_magma::TestDevice> {

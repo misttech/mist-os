@@ -93,6 +93,7 @@
             service: [
                 "fuchsia.gpu.magma.PerformanceCounterService",
                 "fuchsia.gpu.magma.Service",
+                "fuchsia.gpu.magma.TestService",
                 "fuchsia.hardware.audio.CodecConnectorService",
                 "fuchsia.hardware.audio.CompositeConnectorService",
                 "fuchsia.hardware.audio.DaiConnectorService",

@@ -23,26 +23,30 @@
 #if MAGMA_TEST_DRIVER
 #include "msd_intel_pci_device.h"
 
+constexpr char kDriverName[] = "magma-gpu-test";
 zx_status_t magma_indriver_test(magma::PlatformPciDevice* platform_device);
-using MagmaDriverBaseType = msd::MagmaTestDriverBase;
 #else
-using MagmaDriverBaseType = msd::MagmaProductionDriverBase;
+constexpr char kDriverName[] = "magma-gpu";
 #endif
 
-class IntelDevice : public MagmaDriverBaseType {
+class IntelDevice : public msd::MagmaProductionDriverBase {
  public:
   IntelDevice(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : MagmaDriverBaseType("magma_gpu", std::move(start_args), std::move(driver_dispatcher)) {}
+      : msd::MagmaProductionDriverBase(kDriverName, std::move(start_args),
+                                       std::move(driver_dispatcher)) {}
 
   zx::result<> MagmaStart() override;
 
   void Stop() override {
-    MagmaDriverBaseType::Stop();
+    msd::MagmaProductionDriverBase::Stop();
     magma::PlatformBusMapper::SetInfoResource(zx::resource{});
   }
 
  private:
   intel_gpu_core_protocol_t gpu_core_protocol_;
+#if MAGMA_TEST_DRIVER
+  msd::MagmaTestServer test_server_;
+#endif
 };
 
 zx::result<> IntelDevice::MagmaStart() {
@@ -71,7 +75,12 @@ zx::result<> IntelDevice::MagmaStart() {
   DLOG("running magma indriver test");
   {
     auto platform_device = MsdIntelPciDevice::CreateShim(&gpu_core_protocol_);
-    set_unit_test_status(magma_indriver_test(platform_device.get()));
+    test_server_.set_unit_test_status(magma_indriver_test(platform_device.get()));
+    zx::result result = CreateTestService(test_server_);
+    if (result.is_error()) {
+      DMESSAGE("Failed to serve the TestService");
+      return zx::error(ZX_ERR_INTERNAL);
+    }
   }
 #endif
 

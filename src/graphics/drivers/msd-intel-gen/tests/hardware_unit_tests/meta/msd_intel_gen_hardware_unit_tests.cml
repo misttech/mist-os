@@ -16,6 +16,7 @@
             service: [
                 "fuchsia.gpu.magma.PerformanceCounterService",
                 "fuchsia.gpu.magma.Service",
+                "fuchsia.gpu.magma.TestService",
             ],
         },
         { protocol: "fuchsia.tracing.provider.Registry" },

@@ -116,6 +116,7 @@ closed protocol CombinedDevice {
 };
 
 /// Additional device methods for the purposes of testing the MSD and should not be used by ICDs.
+/// DEPRECATED: Please use TestDevice2.
 closed protocol TestDevice {
     compose CombinedDevice;
 
@@ -566,4 +567,20 @@ open protocol PowerElementProvider {
 service Service {
     device client_end:CombinedDevice;
     power_element_provider client_end:PowerElementProvider;
+};
+
+/// Additional methods for reporting tests run in the MSD.
+@available(added=HEAD)
+closed protocol TestDevice2 {
+    strict GetUnitTestStatus() -> (struct {
+        status zx.Status;
+    });
+};
+
+/// This service is only exposed by test MSDs. This should not be used by an ICD.
+@available(added=HEAD)
+service TestService {
+    device client_end:CombinedDevice;
+    power_element_provider client_end:PowerElementProvider;
+    test_device client_end:TestDevice2;
 };
