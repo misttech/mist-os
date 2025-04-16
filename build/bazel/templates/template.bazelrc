@@ -39,7 +39,7 @@ build --incompatible_strict_action_env=true
 # though `bazel test` implicitly disables the behavior since  Bazel 7.1
 build --legacy_external_runfiles=false
 
-# Setup the default platform.
+# Setup the default platform. Note that this will be overridden by --config=no_sdk.
 # We need to set them for cqueries and aqueries as well as build (and
 # everything else that inherits from it). Alas, setting them in `common`
 # breaks other things.
@@ -66,9 +66,6 @@ common:exec_log --experimental_enable_execution_graph_log
 
 # Prevent repository downloads with custom downloader config file.
 common --experimental_downloader_config=build/bazel/config/no_downloads_allowed.config
-
-# Pass local developer overrides for assembly to Bazel
-common --@rules_fuchsia//fuchsia:assembly_developer_overrides_list=@assembly_developer_overrides//:in-tree_developer_overrides_list
 
 # Disable verbose Bazel output with --config=quiet
 # Note that --show_result=0 is not supported by `bazel query`.
@@ -102,16 +99,6 @@ import third_party/pigweed/configuration.bazelrc
 # As of Bazel 8, this will be enabled by default.
 build --experimental_collect_system_network_usage
 
-# Use --config=no_sdk to ensure that the @fuchsia_sdk and @fuchsia_clang
-# repositories will be empty. This prevents generating Fuchsia binaries
-# entirely but may be useful to run Bazel commands immediately in the build.
-common:no_sdk \
-  --override_repository=fuchsia_in_tree_idk=build/bazel/local_repositories/empty \
-  --override_repository=fuchsia_internal_idk=build/bazel/local_repositories/empty \
-  --override_repository=fuchsia_sdk=build/bazel/local_repositories/empty_fuchsia_sdk \
-  --override_repository=fuchsia_clang=build/bazel/local_repositories/empty_fuchsia_clang \
-  --platforms=//build/bazel/platforms:host
-
 # Link Go binaries with PIE to avoid relocation errors.
 build --@io_bazel_rules_go//go/config:linkmode=pie
 
@@ -121,8 +108,31 @@ build --@io_bazel_rules_go//go/config:linkmode=pie
 common:no_gn_targets \
   --override_repository=gn_targets=build/bazel/local_repositories/empty
 
+# The --config=no_sdk option is used as a marker detected by both bazel_action.py
+# and `fx bazel` to adjust the workspace variant. It is also used to switch the
+# default platform to the host one.
+cquery:no_sdk --platforms=//build/bazel/platforms:host
+aquery:no_sdk --platforms=//build/bazel/platforms:host
+build:no_sdk --platforms=//build/bazel/platforms:host
+
 # Enable clippy for Rust targets specified on the build line.
 # See https://bazelbuild.github.io/rules_rust/rust_clippy.html.
 build --aspects=@rules_rust//rust:defs.bzl%rust_clippy_aspect
 build --output_groups=+clippy_checks
 build --@rules_rust//rust/settings:clippy_flag=-Wclippy::all
+
+# Disable bzlmod by default.
+common --enable_bzlmod=false
+common --enable_workspace=true
+
+### FUCHSIA_SDK_CUTOFF
+# The line above and anything that follows will be removed from
+# the .bazelrc file used by the --config=no_sdk.
+
+# Pass local developer overrides for assembly to Bazel
+# For now, this needs to set the label_flag() in both @rules_fuchsia
+# and @fuchsia_sdk to ensure that all fuchsia_product() definitions
+# correctly support this feature. The @fuchsia_sdk one may be
+# removed when the fuchsia.git and vendor/*.git repositories no
+# longer include rules from @fuchsia_sdk.
+common --@rules_fuchsia//fuchsia:assembly_developer_overrides_list=@assembly_developer_overrides//:in-tree_developer_overrides_list

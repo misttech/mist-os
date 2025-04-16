@@ -233,6 +233,64 @@ boringssl_repository(
     # LINT.ThenChange(scripts/workspace_utils.py)
 )
 
+# buildifier: disable=load-on-top
+load("@bazel_skylib//lib:paths.bzl", "paths")
+
+# buildifier: disable=load-on-top
+load("@fuchsia_build_info//:args.bzl", "clang_prefix")
+
+# If clang_prefix is set in GN, it'll point to the "bin" directory under clang root.
+_clang_dir = paths.dirname(clang_prefix) if clang_prefix else "prebuilt/third_party/clang/" + fuchsia_host_tag
+
+# buildifier: disable=load-on-top
+load(
+    "//:build/bazel/toolchains/clang/repository_rules.bzl",
+    "generate_prebuilt_clang_toolchain_repository",
+    "generate_prebuilt_llvm_repository",
+)
+
+generate_prebuilt_clang_toolchain_repository(
+    name = "prebuilt_clang",
+    clang_install_dir = _clang_dir,
+    # LINT.IfChange
+    repository_version_file = "fuchsia_build_generated/prebuilt_clang.hash",
+    # LINT.ThenChange(scripts/workspace_utils.py)
+)
+register_toolchains("@prebuilt_clang//:host_clang_%s_x64_cc_toolchain" % fuchsia_host_os)
+register_toolchains("@prebuilt_clang//:host_clang_%s_arm64_cc_toolchain" % fuchsia_host_os)
+
+generate_prebuilt_llvm_repository(
+    name = "prebuilt_llvm",
+    # NOTE: We don't have Fuchsia variant of LLVM libraries yet, so always use
+    # host_platform's prebuilts for now. Currently, this repository is only used
+    # to expose headers from prebuilt LLVM, so it should make no difference as
+    # headers are the same across different platforms.
+    #
+    # See https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/llvm/BUILD.gn;l=51;drc=468d94479b10f5613ca928d782990e5340e943a4
+    llvm_install_dir = "prebuilt/third_party/llvm/" + fuchsia_host_tag,
+)
+
+# buildifier: disable=load-on-top
+load(
+    "@rules_fuchsia//common:toolchains/python/repository_rule.bzl",
+    "compact_python_runtime_repository",
+)
+
+compact_python_runtime_repository(
+    name = "prebuilt_python",
+    # LINT.IfChange
+    content_hash_file = "fuchsia_build_generated/prebuilt_python.hash",
+    # LINT.ThenChange(scripts/workspace_utils.py)
+)
+
+register_toolchains("@prebuilt_python//:py_toolchain")
+
+### FUCHSIA_SDK_CUTOFF ====================================================================
+# Everything after the line above is omitted from WORKSPACE.no_sdk.bazel, which is used
+# as a symlink destination for WORKSPACE.bazel when running `fx bazel-no-sdk`. This
+# prevents any repository related to GN artifacts (@gn_targets) or the Fuchsia IDK/SDK
+# (e.g. @fuchsia_sdk but also @fuchsia_clang) from being visible.
+
 # fuchsia_build_generated/gn_target_dir is a symlink to the content
 # of the @gn_targets repository. At `fx gen` time, it will point to
 # an empty repository, but bazel_action.py will update it just before
@@ -331,19 +389,10 @@ register_fuchsia_sdk_toolchain()
 register_toolchains("//:fuchsia_sdk_devicetree_toolchain")
 
 # buildifier: disable=load-on-top
-load("@bazel_skylib//lib:paths.bzl", "paths")
-
-# buildifier: disable=load-on-top
-load("@fuchsia_build_info//:args.bzl", "clang_prefix")
-
-# buildifier: disable=load-on-top
 load(
     "@rules_fuchsia//fuchsia:clang.bzl",
     "fuchsia_clang_repository",
 )
-
-# If clang_prefix is set in GN, it'll point to the "bin" directory under clang root.
-_clang_dir = paths.dirname(clang_prefix) if clang_prefix else "prebuilt/third_party/clang/" + fuchsia_host_tag
 
 fuchsia_clang_repository(
     name = "fuchsia_clang",
@@ -358,49 +407,6 @@ load(
 )
 
 register_clang_toolchains()
-
-# buildifier: disable=load-on-top
-load(
-    "//:build/bazel/toolchains/clang/repository_rules.bzl",
-    "generate_prebuilt_clang_toolchain_repository",
-    "generate_prebuilt_llvm_repository",
-)
-
-generate_prebuilt_llvm_repository(
-    name = "prebuilt_llvm",
-    # NOTE: We don't have Fuchsia variant of LLVM libraries yet, so always use
-    # host_platform's prebuilts for now. Currently, this repository is only used
-    # to expose headers from prebuilt LLVM, so it should make no difference as
-    # headers are the same across different platforms.
-    #
-    # See https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/llvm/BUILD.gn;l=51;drc=468d94479b10f5613ca928d782990e5340e943a4
-    llvm_install_dir = "prebuilt/third_party/llvm/" + fuchsia_host_tag,
-)
-
-generate_prebuilt_clang_toolchain_repository(
-    name = "prebuilt_clang",
-    clang_install_dir = _clang_dir,
-    # LINT.IfChange
-    repository_version_file = "fuchsia_build_generated/prebuilt_clang.hash",
-    # LINT.ThenChange(scripts/workspace_utils.py)
-)
-register_toolchains("@prebuilt_clang//:host_clang_%s_x64_cc_toolchain" % fuchsia_host_os)
-register_toolchains("@prebuilt_clang//:host_clang_%s_arm64_cc_toolchain" % fuchsia_host_os)
-
-# buildifier: disable=load-on-top
-load(
-    "@rules_fuchsia//common:toolchains/python/repository_rule.bzl",
-    "compact_python_runtime_repository",
-)
-
-compact_python_runtime_repository(
-    name = "prebuilt_python",
-    # LINT.IfChange
-    content_hash_file = "fuchsia_build_generated/prebuilt_python.hash",
-    # LINT.ThenChange(scripts/workspace_utils.py)
-)
-
-register_toolchains("@prebuilt_python//:py_toolchain")
 
 load(
     "//build/bazel/assembly:developer_overrides/repository_rules.bzl",

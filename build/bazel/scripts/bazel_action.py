@@ -1305,6 +1305,20 @@ def main() -> int:
 
         return result
 
+    # Update $WORKSPACE/fuchsia_generated_build/root_bazel_files symlink
+    # if necessary.
+    root_bazel_files_target = "bazel_root_files.fuchsia"
+    if "--config=no_sdk" in args.extra_bazel_args:
+        root_bazel_files_target = "bazel_root_files.no_sdk"
+
+    root_symlink = os.path.join(
+        args.workspace_dir, "fuchsia_build_generated/bazel_root_files"
+    )
+    root_target = os.readlink(root_symlink)
+    if root_target != root_bazel_files_target:
+        os.remove(root_symlink)
+        os.symlink(root_bazel_files_target, root_symlink)
+
     configured_args = args.extra_bazel_args
 
     if any(

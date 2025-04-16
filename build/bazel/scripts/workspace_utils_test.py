@@ -875,5 +875,153 @@ class CheckRegeneratorInputsUpdatesTest(unittest.TestCase):
         self.assertSetEqual(updates, set())
 
 
+class RootFilesVariantGeneratorTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self._td = tempfile.TemporaryDirectory()
+        self._root = Path(self._td.name)
+
+    def tearDown(self) -> None:
+        self._td.cleanup()
+
+    def test_variants(self) -> None:
+        generated = workspace_utils.GeneratedWorkspaceFiles()
+        root_variants = workspace_utils.RootBazelFilesVariantsGenerator(
+            generated
+        )
+
+        self.maxDiff = None
+        self.assertEqual(
+            generated.to_json(),
+            r"""{
+  "workspace/fuchsia_build_generated/bazel_root_files": {
+    "target": "bazel_root_files.fuchsia",
+    "type": "raw_symlink"
+  }
+}""",
+        )
+
+        workspace_bazel_fuchsia = """# Example workspace
+workspace(name = "my_project")
+
+### FUCHSIA_SDK_CUTOFF
+local_repository(
+    name = "fuchsia_idk",
+    path = "ninja_build_dir/sdk/exported/bazel_in_tree_idk"
+)
+"""
+        workspace_bazel_path = self._root / "WORKSPACE.bazel"
+        workspace_bazel_path.write_text(workspace_bazel_fuchsia)
+        root_variants.add_file("WORKSPACE.bazel", workspace_bazel_path)
+
+        build_bazel_fuchsia = """# Example build file
+
+package(visibility = ["//visibility:public"])
+
+### FUCHSIA_SDK_CUTOFF
+load("@rules_fuchsia//fuchsia:defs.bzl", "fuchsia_debug_symbols")
+
+fuchsia_debug_symbols(
+   name = "debug_symbols",
+   source_search_root = "//:BUILD.bazel",
+   build_id_dirs = [ "//:.build-id" ]
+)
+"""
+        root_variants.add_content(
+            "BUILD.bazel",
+            build_bazel_fuchsia,
+            self._root / "toplevel.BUILD.bazel",
+        )
+
+        bazelrc_template = """# A test .bazelrc file
+build --platforms=//build/bazel/platforms:{platform}
+
+### FUCHSIA_SDK_CUTOFF
+build --@rules_sdk//fuchsia:fuchsia_sdk_toolchain=@fuchsia_sdk//:fuchsia_sdk_toolchain
+"""
+        bazelrc_template_path = self._root / "template.bazelrc"
+        bazelrc_template_path.write_text(bazelrc_template)
+        root_variants.add_template_expansion(
+            ".bazelrc", bazelrc_template_path, platform="host"
+        )
+
+        entries = json.loads(generated.to_json())
+
+        def check_entry(name: str, expected: dict[str, str]) -> None:
+            self.assertDictEqual(entries[name], expected)
+
+        EXPECTED_ENTRIES = {
+            # First the root symlinks that go through the bazel_root_files symlinks.
+            "workspace/.bazelrc": {
+                "target": "fuchsia_build_generated/bazel_root_files/.bazelrc",
+                "type": "raw_symlink",
+            },
+            "workspace/BUILD.bazel": {
+                "target": "fuchsia_build_generated/bazel_root_files/BUILD.bazel",
+                "type": "raw_symlink",
+            },
+            "workspace/WORKSPACE.bazel": {
+                "target": "fuchsia_build_generated/bazel_root_files/WORKSPACE.bazel",
+                "type": "raw_symlink",
+            },
+            # Second, the bazel_root_files symlink.
+            "workspace/fuchsia_build_generated/bazel_root_files": {
+                "target": "bazel_root_files.fuchsia",
+                "type": "raw_symlink",
+            },
+            # Third, the Fuchsia-specific variants
+            "workspace/fuchsia_build_generated/bazel_root_files.fuchsia/.bazelrc": {
+                "content": """# A test .bazelrc file
+build --platforms=//build/bazel/platforms:host
+
+### FUCHSIA_SDK_CUTOFF
+build --@rules_sdk//fuchsia:fuchsia_sdk_toolchain=@fuchsia_sdk//:fuchsia_sdk_toolchain
+""",
+                "type": "file",
+            },
+            "workspace/fuchsia_build_generated/bazel_root_files.fuchsia/BUILD.bazel": {
+                "content": build_bazel_fuchsia,
+                "type": "file",
+            },
+            "workspace/fuchsia_build_generated/bazel_root_files.fuchsia/WORKSPACE.bazel": {
+                "target": f"{workspace_bazel_path}",
+                "type": "symlink",
+            },
+            # Fourth, the no-sdk variants.
+            "workspace/fuchsia_build_generated/bazel_root_files.no_sdk/.bazelrc": {
+                "content": """# A test .bazelrc file
+build --platforms=//build/bazel/platforms:host
+
+""",
+                "type": "file",
+            },
+            "workspace/fuchsia_build_generated/bazel_root_files.no_sdk/BUILD.bazel": {
+                "content": """# Example build file
+
+package(visibility = ["//visibility:public"])
+
+""",
+                "type": "file",
+            },
+            "workspace/fuchsia_build_generated/bazel_root_files.no_sdk/WORKSPACE.bazel": {
+                "content": """# Example workspace
+workspace(name = "my_project")
+
+""",
+                "type": "file",
+            },
+        }
+
+        for entry_name, expected_value in EXPECTED_ENTRIES.items():
+            self.assertTrue(
+                entry_name in entries,
+                msg=f"Missing entry {entry_name}, got {entries.keys()} instead!",
+            )
+            self.assertDictEqual(
+                entries[entry_name],
+                expected_value,
+                msg=f"Invalid value for entry {entry_name}",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -11,6 +11,7 @@ stamp_group(
     deps = [
         "//build/bazel/examples/hello_cpp",
         "//build/bazel/examples/hello_fuchsia",
+        "//build/bazel/examples/hello_no_sdk",
         "//build/bazel/examples/hello_python",
         "//build/bazel/examples/hello_rust",
         "//build/bazel/examples/hello_world",

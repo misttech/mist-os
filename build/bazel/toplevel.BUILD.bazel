@@ -9,10 +9,6 @@ See //build/bazel/README.md for details about this file.
 
 load("@fuchsia_build_config//:defs.bzl", "build_config")
 load(
-    "@rules_fuchsia//fuchsia:defs.bzl",
-    "fuchsia_devicetree_toolchain_info",
-)
-load(
     "//:build/bazel/toolchains/linux_sysroot.bzl",
     "linux_sysroot_headers",
     "linux_sysroot_libs",
@@ -105,6 +101,12 @@ filegroup(
     name = "rtc_driver_bib_set",
     srcs = glob(["prebuilt/drivers/rtc/pcf8563/board_input_bundle_set/rtc_set/**/*"]),
     visibility = ["//visibility:public"],
+)
+
+### FUCHSIA_SDK_CUTOFF
+load(
+    "@rules_fuchsia//fuchsia:defs.bzl",
+    "fuchsia_devicetree_toolchain_info",
 )
 
 fuchsia_devicetree_toolchain_info(

@@ -4,12 +4,13 @@
 
 import("//build/bazel/bazel_build_action.gni")
 
-bazel_build_action("hello_world") {
-  bazel_target = ":hello_world"
+bazel_build_action("hello_no_sdk") {
+  no_sdk = true
+  bazel_target = ":hello_no_sdk"
   copy_outputs = [
     {
       bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}"
-      ninja = "hello_world_from_bazel"
+      ninja = "hello_no_sdk_from_bazel"
     },
   ]
 }

@@ -156,6 +156,8 @@ group("tests") {
   testonly = true
   deps = [
     "bazel_sdk:tests",
+    "examples/hello_no_sdk",
+    "examples/hello_world",
     "fuchsia_idk:tests",
     "scripts:tests",
   ]
@@ -197,7 +199,8 @@ group("bazel_action_allowlist") {
     "//build/bazel/bazel_sdk:verify_fuchsia_sdk_repository",
     "//build/bazel/bazel_sdk/docs:docs.bazel_build_group",
     "//build/bazel/examples:examples",
-    "//build/bazel/examples/hello_world:hello_world",
+    "//build/bazel/examples/hello_no_sdk",
+    "//build/bazel/examples/hello_world",
   ]
 
   visibility += [ "//vendor/*" ]

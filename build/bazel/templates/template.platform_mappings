@@ -73,6 +73,8 @@ platforms:
     --cpu=aarch64
     --crosstool_top=@prebuilt_clang//:host_clang_mac_arm64
 
+### FUCHSIA_SDK_CUTOFF
+
   # Fuchsia platforms
   //build/bazel/platforms:fuchsia_x64
     --cpu=k8

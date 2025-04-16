@@ -473,6 +473,143 @@ class GeneratedWorkspaceFiles(object):
         return True
 
 
+class RootBazelFilesVariantsGenerator(object):
+    """Generate fuchsia and no-sdk variants of root Bazel files.
+
+    This generates variants of root Bazel files like WORKSPACE.bazel
+    or .bazelrc in two separate directories, i.e.:
+
+    - workspace/fuchsia_build_generated/bazel_root_files.fuchsia
+    - workspace/fuchsia_build_generated/bazel_root_files.no_sdk
+
+    In addition to this, workspace/fuchsia_build_generated/bazel_root_files
+    will be a single symlink pointing to one of these directories, and
+    updated by `fx bazel, `fx bazel-no-sdk` or `bazel_action.py` on
+    demand.
+
+    The root files themselves (e.g. workspace/WORKSPACE.bazel) will be
+    symlinks crossing the root_bazel_files symlink to access their
+    target (e.g.
+    workspace/fuchsia_build_generated/root_bazel_files/WORKSPACE.bazel)
+
+    This allows using a single symlink redirection to manage several
+    root files all at once.
+
+    Usage is:
+      - Create instance, passing a GeneratedWorkspaceFiles instance.
+
+      - Call add_file_content() to add variants for a root file
+        based from the content of a single input path.
+
+      - Call add_template_expansion() to add variants for a root file
+        based on expansion of an input template file instead.
+    """
+
+    # The line prefix used to determine where to cut an input file or template
+    # expansion to generate the corresponding no-sdk variant.
+    FUCHSIA_SDK_CUTOFF = "### FUCHSIA_SDK_CUTOFF"
+
+    def __init__(self, generated: GeneratedWorkspaceFiles) -> None:
+        # The name of the root filenames that need variants.
+        self._generated = generated
+        self._root_filenames: set[str] = set()
+        self._root_files_symlink = (
+            "workspace/fuchsia_build_generated/bazel_root_files"
+        )
+        self._fuchsia_root_files_dir = f"{self._root_files_symlink}.fuchsia"
+        self._no_sdk_root_files_dir = f"{self._root_files_symlink}.no_sdk"
+
+        # Make the symlink point to the Fuchsia variants dir by default.
+        self._generated.record_raw_symlink(
+            self._root_files_symlink, "bazel_root_files.fuchsia"
+        )
+
+        self._fuchsia_sdk_cutoff_prefix = "### FUCHSIA_SDK_CUTOFF"
+
+    def filter_no_sdk_content(
+        self, content: str, input_path: str | Path
+    ) -> str:
+        """Remove Fuchsia-specific definitions from an input file.
+
+        This files the line that starts with FUCHSIA_CUTOFF_PREFIX then
+        removes it, as well as all following lines, from the output.
+
+        Args:
+            content: input content.
+            input_path: input file path (used only for errors).
+        Returns:
+            Input content, with Fuchsia definitions removed.
+        Raises:
+            AssertionError if the input does not include fuchsia_cutoff_prefix.
+        """
+        cutoff_index = content.find(self.FUCHSIA_SDK_CUTOFF)
+        assert (
+            cutoff_index >= 0
+        ), f"Missing marker prefix [{self.FUCHSIA_SDK_CUTOFF}] in {input_path}"
+        return content[:cutoff_index]
+
+    def add_file(self, root_filename: str, input_path: Path) -> None:
+        self._add_root_filename(root_filename)
+
+        # Write the Fuchsia variant of the file.
+        self._generated.record_symlink(
+            f"{self._fuchsia_root_files_dir}/{root_filename}", input_path
+        )
+
+        # Write the no-sdk variant of the file.
+        content = self._generated.read_text_file(input_path)
+        self._generated.record_file_content(
+            f"{self._no_sdk_root_files_dir}/{root_filename}",
+            self.filter_no_sdk_content(content, input_path),
+        )
+
+    def add_content(
+        self, root_filename: str, content: str, input_path: str | Path
+    ) -> None:
+        self._add_root_filename(root_filename)
+
+        # Write the Fuchsia variant of the file.
+        self._generated.record_file_content(
+            f"{self._fuchsia_root_files_dir}/{root_filename}", content
+        )
+
+        # Write the no-sdk variant of the file.
+        self._generated.record_file_content(
+            f"{self._no_sdk_root_files_dir}/{root_filename}",
+            self.filter_no_sdk_content(content, input_path),
+        )
+
+    def add_template_expansion(
+        self, root_filename: str, template_path: Path, **kwargs: T.Any
+    ) -> None:
+        self._add_root_filename(root_filename)
+
+        # Expand template and write Fuchsia variant.
+        content = self._generated.read_text_file(template_path).format(**kwargs)
+        self._generated.record_file_content(
+            f"{self._fuchsia_root_files_dir}/{root_filename}",
+            content,
+        )
+
+        # Write the no-sdk variant of the file.
+        self._generated.record_file_content(
+            f"{self._no_sdk_root_files_dir}/{root_filename}",
+            self.filter_no_sdk_content(content, template_path),
+        )
+
+    def _add_root_filename(self, root_filename: str) -> None:
+        assert (
+            root_filename not in self._root_filenames
+        ), f"Root filename {root_filename} is already in the set!"
+        self._root_filenames.add(root_filename)
+
+        # Top-level symlink goes through the bazel_root_files symlink.
+        self._generated.record_raw_symlink(
+            f"workspace/{root_filename}",
+            f"fuchsia_build_generated/bazel_root_files/{root_filename}",
+        )
+
+
 def record_fuchsia_workspace(
     generated: GeneratedWorkspaceFiles,
     top_dir: Path,
@@ -541,6 +678,8 @@ def record_fuchsia_workspace(
   Git binary path:        {git_bin_path}"""
         )
 
+    variants_generator = RootBazelFilesVariantsGenerator(generated)
+
     def expand_template_file(
         generated: GeneratedWorkspaceFiles, filename: str, **kwargs: T.Any
     ) -> str:
@@ -585,14 +724,40 @@ def record_fuchsia_workspace(
             fuchsia_dir / "build" / "bazel" / "toplevel.MODULE.bazel",
         )
     else:
-        generated.record_symlink(
-            "workspace/WORKSPACE.bazel",
+        # Generate two distinct Bazel workspace definition files.
+        #
+        # - WORKSPACE.no_sdk.bazel + no_sdk.bazelrc:
+        #
+        #   Omits any repository definition related to the IDK and the SDK.
+        #   I.e. there is no @fuchsia_in_tree_idk or @fuchsia_sdk repository
+        #   in this workspace. This allows building Bazel targets immediately
+        #   after `fx gen`, as long as they do not reference labels pointing
+        #   to @fuchsia_sdk or @fuchsia_in_tree_idk. This is used to implement
+        #   `fx bazel-no-sdk` and the `no_sdk = true` attribute in the GN
+        #   bazel_action() template.
+        #
+        # - WORKSPACE.fuchsia.bazel + fuchsia.bazelrc:
+        #
+        #   Contains the full set of repository definitions, which currently
+        #   require the IDK to be built with Ninja before being able to use the
+        #   workspace, even for simpler queries. Used to implement `fx bazel`
+        #   and the GN bazel_action() without `no_sdk = true`.
+        #
+        # The WORKSPACE.bazel and .bazelrc files are simple symlinks to either
+        # one of these set of files, and will be adjusted before invoking Bazel
+        # by `fx bazel`, `fx bazel-no-sdk` and `bazel_action.py`.
+        #
+
+        # This file contains all definitions, with a special marker line.
+        # workspace/WORKSPACE.fuchsia.bazel is a symlink to it, then its
+        # content is processed and cut to generate workspace/WORKSPACE.no_sdk.bazel.
+        variants_generator.add_file(
+            "WORKSPACE.bazel",
             fuchsia_dir / "build" / "bazel" / "toplevel.WORKSPACE.bazel",
         )
 
-    generated.record_symlink(
-        "workspace/BUILD.bazel",
-        fuchsia_dir / "build" / "bazel" / "toplevel.BUILD.bazel",
+    variants_generator.add_file(
+        "BUILD.bazel", fuchsia_dir / "build" / "bazel" / "toplevel.BUILD.bazel"
     )
 
     # Generate top-level symlinks
@@ -629,13 +794,12 @@ def record_fuchsia_workspace(
     host_cpu = get_host_arch()
     host_tag = get_host_tag()
 
-    record_expanded_template(
-        generated,
-        "workspace/platform_mappings",
-        "template.platform_mappings",
-        host_os=host_os,
+    variants_generator.add_template_expansion(
+        "platform_mappings",
+        templates_dir / "template.platform_mappings",
+        bazel_host_cpu=_BAZEL_CPU_MAP.get(host_cpu, host_cpu),
         host_cpu=host_cpu,
-        bazel_host_cpu=_BAZEL_CPU_MAP[host_cpu],
+        host_os=host_os,
     )
 
     # Generate the content of .bazelrc
@@ -648,13 +812,14 @@ def record_fuchsia_workspace(
         execution_log_file=f"{logs_dir_from_workspace}/exec_log.pb.zstd",
     )
 
-    if not enable_bzlmod:
-        bazelrc_content += """
-# Disable BzlMod, i.e. support for MODULE.bazel files, now that Bazel 7.0
-# enables BzlMod by default.
-common --enable_bzlmod=false
-"""
-    generated.record_file_content("workspace/.bazelrc", bazelrc_content)
+    if enable_bzlmod:
+        bazelrc_content = bazelrc_content.replace(
+            "--enable_bzlmod=false", "--enable_bzlmod=true"
+        ).replace("--enable_workspace=true", "--enable_workspace=false")
+
+    variants_generator.add_content(
+        ".bazelrc", bazelrc_content, templates_dir / "template.bazelrc"
+    )
 
     # Generate wrapper script in topdir/bazel that invokes Bazel with the right --output_base.
 
