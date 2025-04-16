@@ -93,7 +93,7 @@ are responsible for proxying the PDEV and I2C protocols to the audio driver.
 
 ## Platform Device Protocol
 
-The [platform device protocol](/sdk/banjo/fuchsia.hardware.platform.device/platform-device.fidl)
+The [platform device protocol](/sdk/fidl/fuchsia.hardware.platform.device/platform-device.fidl)
 (`ZX_PROTOCOL_PDEV`) is the main protocol provided by the platform bus to
 platform device drivers. This protocol provides access to resources like MMIO ranges, interrupts,
 BTIs, and SMC ranges to the platform device driver. Rather than requesting MMIOs and interrupts by
