@@ -395,6 +395,9 @@ pub async fn discovery_loop(config: DiscoveryConfig, checker: impl MdnsEnabledCh
     let checker_strong = Rc::new(checker);
     let checker = Rc::downgrade(&checker_strong);
 
+    let mut recv_ipv4_task: Option<Task<()>> = None;
+    let mut recv_ipv6_task: Option<Task<()>> = None;
+
     loop {
         let should_wait = match checker.upgrade() {
             Some(c) => !c.enabled().await,
@@ -417,7 +420,12 @@ pub async fn discovery_loop(config: DiscoveryConfig, checker: impl MdnsEnabledCh
                     let _ = propagate_bind_event(&sock, &mdns_protocol).await;
                     let sock = Rc::new(sock);
                     v4_listen_socket = Rc::downgrade(&sock);
-                    Task::local(recv_loop(sock, mdns_protocol.clone(), checker.clone())).detach();
+                    let rcv_task =
+                        Task::local(recv_loop(sock, mdns_protocol.clone(), checker.clone()));
+                    if recv_ipv4_task.is_some() {
+                        tracing::warn!("the IpV4 listen socket was none but we had a task receiving data on it. Replacing the old task")
+                    }
+                    recv_ipv4_task.replace(rcv_task);
                     should_log_v4_listen_error = true;
                 }
                 Err(err) => {
@@ -432,14 +440,19 @@ pub async fn discovery_loop(config: DiscoveryConfig, checker: impl MdnsEnabledCh
             }
         }
 
-        if v6_listen_socket.upgrade().is_none() {
+        if v6_listen_socket.upgrade().is_none() && recv_ipv6_task.is_none() {
             match make_listen_socket((MDNS_MCAST_V6, mdns_port).into())
                 .context("make_listen_socket for IPv6")
             {
                 Ok(sock) => {
                     let sock = Rc::new(sock);
                     v6_listen_socket = Rc::downgrade(&sock);
-                    Task::local(recv_loop(sock, mdns_protocol.clone(), checker.clone())).detach();
+                    let rcv_task =
+                        Task::local(recv_loop(sock, mdns_protocol.clone(), checker.clone()));
+                    if recv_ipv6_task.is_some() {
+                        tracing::warn!("the IpV6 listen socket was none but we had a task receiving data on it. Replacing the old task")
+                    }
+                    recv_ipv6_task.replace(rcv_task);
                     should_log_v6_listen_error = true;
                 }
                 Err(err) => {
