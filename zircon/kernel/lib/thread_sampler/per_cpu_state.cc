@@ -5,7 +5,8 @@
 #include <lib/thread_sampler/per_cpu_state.h>
 
 namespace sampler::internal {
-zx::result<> PerCpuState::SetUp(const zx_sampler_config_t& config, PinnedVmObject pinned_memory) {
+zx::result<> PerCpuState::SetUp(const zx_sampler_config_t& config, PinnedVmObject pinned_memory,
+                                cpu_num_t cpu_number) {
   const char* name = "sampler_buffer";
 
   auto mapping_result = VmAspace::kernel_aspace()->RootVmar()->CreateVmMapping(
@@ -32,6 +33,7 @@ zx::result<> PerCpuState::SetUp(const zx_sampler_config_t& config, PinnedVmObjec
   writer = internal::BufferWriter{ptr, end, ktl::move(mapping_result->mapping),
                                   ktl::move(pinned_memory)};
   period_ = config.period;
+  cpu_number_ = cpu_number;
   return zx::ok();
 }
 
@@ -39,6 +41,9 @@ zx::result<> PerCpuState::SetUp(const zx_sampler_config_t& config, PinnedVmObjec
 //
 // Returns false if a pending write was not set because writes are not enabled.
 [[nodiscard]] bool PerCpuState::SetPendingWrite() {
+  // TODO(https://fxbug.dev/410034543): Make this compatible with Timer Migration
+  DEBUG_ASSERT(arch_ints_disabled());
+  ASSERT(arch_curr_cpu_num() == cpu_number_);
   // We could be racing with a "DisableWrites" here. We need to atomically set the kPendingWrite
   // bit, but only if someone hasn't come along and reset the kWritesEnabled bit from under us.
   //
@@ -94,6 +99,10 @@ bool PerCpuState::PendingTimer() const {
 }
 
 void PerCpuState::SetTimer() {
+  // TODO(https://fxbug.dev/410034543): Make this compatible with Timer Migration
+  DEBUG_ASSERT(arch_ints_disabled());
+  ASSERT(arch_curr_cpu_num() == cpu_number_);
+
   // We need to be mindful here. We're effectively setting two delayed calls and we need to ensure
   // that we don't accidentally destroy the state from under them if we end the sampling session
   // while they are in flight.
@@ -131,7 +140,7 @@ void PerCpuState::SetTimer() {
     // Writers disable interrupts while they are writing, we should never observe a kPendingWrite
     // bit unless we read the atomic from a different CPU than the writer. Since we set the timer on
     // the same CPU the writer is on, we should never see this set.
-    ZX_ASSERT((expected & kPendingWrite) == 0);
+    ASSERT((expected & kPendingWrite) == 0);
 
     // If writes aren't enabled, we need to reset the kPendingTimerBit so that the stop operation
     // knows there are no more timers on this cpu.

@@ -48,7 +48,8 @@ class PerCpuState {
  public:
   constexpr PerCpuState() = default;
 
-  zx::result<> SetUp(const zx_sampler_config_t& config, PinnedVmObject pinned_memory);
+  zx::result<> SetUp(const zx_sampler_config_t& config, PinnedVmObject pinned_memory,
+                     cpu_num_t cpu_number);
 
   // Atomically mark a pending write to the write state iff writes are enabled and returns true.
   //
@@ -82,6 +83,9 @@ class PerCpuState {
  private:
   BufferWriter writer;
   Timer timer;
+  // Cache the cpu we're intended for so that we can ensure we're only accessed by that specific
+  // CPU.
+  cpu_num_t cpu_number_;
   zx_duration_mono_t period_{0};
 
   // Bit-wise AND with |write_state_| to read if there is a current write
