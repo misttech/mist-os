@@ -211,6 +211,7 @@ GIT_FILTER=(
   ":(top,exclude)src/devices/tools/fidlgen_banjo/tests"
   ":(top,exclude)src/devices/tools/fidlgen_banjo/src/backends/templates/rust"
   ":(top,exclude)build/bazel/fuchsia_idk/validation_data"
+  ":(top,exclude)build/sdk/generate_prebuild_idk/validation_data"
   ":(exclude)*/goldens/*"
 )
 

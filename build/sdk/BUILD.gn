@@ -11,6 +11,7 @@ group("tests") {
 
   deps = [
     "generate_idk:tests",
+    "generate_prebuild_idk:tests",
     "generate_version_history:tests",
     "meta:tests($host_toolchain)",
     "sdk_common:tests",

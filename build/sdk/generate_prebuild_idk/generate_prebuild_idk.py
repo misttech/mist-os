@@ -3,7 +3,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""Convert an IDK prebuild manifest into an IDK."""
+"""Convert an IDK prebuild manifest into an IDK.
+
+Currently works on prebuild metadata for an IDK collection but generates files
+that match the corresponding IDK for a single (unmerged) collection. See
+https://fxbug.dev/408003238 for discussion of some differences.
+"""
 
 import argparse
 import collections
@@ -194,7 +199,9 @@ class PrebuildMap(object):
             "experimental_python_e2e_test": self._meta_for_experimental_python_e2e_test,
             "version_history": self._meta_for_version_history,
             "none": self._meta_for_noop,
-            # TODO(https://fxbug.dev/338009514): Support Fuchsia packages.
+            # TODO(https://fxbug.dev/338009514): Add support for Fuchsia
+            # packages and add a package to `test_collection.json` along with
+            # expected output to `validation_data/expected_idk/`.
         }.get(info["atom_type"], None)
         return generator(info) if generator else None
 

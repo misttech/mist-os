@@ -75,6 +75,14 @@
             },
             {
                 "notes": [
+                    "Exempt the IDK validation test source directory structure."
+                ],
+                "paths": [
+                    "build/sdk/generate_prebuild_idk/validation_data/input_fuchsia_dir"
+                ]
+            },
+            {
+                "notes": [
                     "Exempt CTF releases from the license checker"
                 ],
                 "paths": [
