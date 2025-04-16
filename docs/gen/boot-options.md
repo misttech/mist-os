@@ -313,6 +313,31 @@ This option configures kernel eviction to run continually in the background to t
 keep the system out of memory pressure, as opposed to triggering one-shot eviction only at
 memory pressure state transitions.
 
+### kernel.oom.eviction-delay-ms=\<uint64_t>
+
+**Default:** `0x1388`
+
+This option specifies the duration (in milliseconds) by which the kernel delays eviction when
+eviction is required by a change in memory pressure state. This delay allows userspace components
+responding to memory pressure to reclaim memory first, avoiding thrash due to interference with
+kernel eviction.
+
+### kernel.oom.evict-with-min-target=\<bool>
+
+**Default:** `true`
+
+This option specifies whether the kernel should also evict a minimum amount of memory along with
+trying to meet the target free memory goal. If userspace also frees memory in response to memory
+pressure, this ensures some fairness by having kernel eviction share the load.
+
+### kernel.oom.eviction-delta-at-oom-mb=\<uint64_t>
+
+**Default:** `0xa`
+
+This option specifies the granularity (in MB) at which the kernel will try to synchronously evict
+memory to avoid entering the out-of-memory state. Note that this value is independent of the
+kernel.oom.evict-with-min-target, and they do not influence each other.
+
 ### kernel.oom.hysteresis-seconds=\<uint64_t>
 
 **Default:** `0xa`

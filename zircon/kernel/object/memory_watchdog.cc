@@ -223,9 +223,9 @@ void MemoryWatchdog::WorkerThread() {
       // Keep trying to perform eviction for as long as we are evicting non-zero pages and we remain
       // in the out of memory state.
       while (mem_event_idx_ == PressureLevel::kOutOfMemory) {
-        uint64_t evicted_pages =
-            pmm_evictor()->EvictSynchronous(MB * 10, Evictor::EvictionLevel::IncludeNewest,
-                                            Evictor::Output::NoPrint, Evictor::TriggerReason::OOM);
+        uint64_t evicted_pages = pmm_evictor()->EvictSynchronous(
+            MB * gBootOptions->oom_eviction_delta_at_oom_mb, Evictor::EvictionLevel::IncludeNewest,
+            Evictor::Output::NoPrint, Evictor::TriggerReason::OOM);
         if (evicted_pages == 0) {
           printf("memory-pressure: found no pages to evict\n");
           break;
@@ -263,12 +263,15 @@ void MemoryWatchdog::WorkerThread() {
         // timer was canceled before it was scheduled on a cpu, i.e. an eviction was outstanding.
         bool eviction_was_outstanding = eviction_trigger_.Cancel();
 
-        const uint64_t free_mem = pmm_count_free_pages() * PAGE_SIZE;
-        // Set the minimum amount to free as half the amount required to reach our desired free
-        // memory level. This minimum ensures that even if the user reduces memory in reaction to
-        // this signal we will always attempt to free a bit.
-        // TODO: measure and fine tune this over time as user space evolves.
-        min_free_target_ = free_mem < free_mem_target_ ? (free_mem_target_ - free_mem) / 2 : 0;
+        if (gBootOptions->oom_evict_with_min_target) {
+          const uint64_t free_mem = pmm_count_free_pages() * PAGE_SIZE;
+          // Set the minimum amount to free as half the amount required to reach our desired free
+          // memory level. This minimum ensures that even if the user reduces memory in reaction to
+          // this signal we will always attempt to free a bit.
+          min_free_target_ = free_mem < free_mem_target_ ? (free_mem_target_ - free_mem) / 2 : 0;
+        } else {
+          min_free_target_ = 0;
+        }
 
         // If eviction was outstanding when we canceled the eviction trigger, trigger eviction
         // immediately without any delay. We are here because of a rapid allocation spike which
@@ -279,7 +282,7 @@ void MemoryWatchdog::WorkerThread() {
         // release memory and the eviction running before the end of the hysteresis period.
         eviction_trigger_.SetOneshot(
             (eviction_was_outstanding ? time_now
-                                      : zx_time_add_duration(time_now, hysteresis_seconds_ / 2)),
+                                      : zx_time_add_duration(time_now, eviction_delay_ms_)),
             EvictionTriggerCallback, this);
       } else if (eviction_strategy_ == EvictionStrategy::Continuous &&
                  mem_event_idx_ > max_eviction_level_) {
@@ -496,6 +499,7 @@ void MemoryWatchdog::Init(Executor* executor) {
     free_mem_target_ = mem_watermarks_[max_eviction_level_] + watermark_debounce_;
 
     hysteresis_seconds_ = ZX_SEC(gBootOptions->oom_hysteresis_seconds);
+    eviction_delay_ms_ = ZX_MSEC(gBootOptions->oom_eviction_delay_ms);
 
     printf(
         "memory-pressure: memory watermarks - OutOfMemory: %zuMB, Critical: %zuMB, Warning: %zuMB, "
@@ -504,19 +508,19 @@ void MemoryWatchdog::Init(Executor* executor) {
         mem_watermarks_[PressureLevel::kCritical] / MB,
         mem_watermarks_[PressureLevel::kWarning] / MB, watermark_debounce_ / MB);
 
-    printf("memory-pressure: eviction trigger level - %s\n",
-           PressureLevelToString(max_eviction_level_));
+    printf("memory-pressure: hysteresis interval - %ld seconds\n", hysteresis_seconds_ / ZX_SEC(1));
 
     if (gBootOptions->oom_evict_continuous) {
       eviction_strategy_ = EvictionStrategy::Continuous;
       pmm_page_queues()->SetAgingEvent(&mem_state_signal_);
-      printf("memory-pressure: eviction strategy - continuous\n");
     } else {
       eviction_strategy_ = EvictionStrategy::OneShot;
-      printf("memory-pressure: eviction strategy - one-shot\n");
     }
 
-    printf("memory-pressure: hysteresis interval - %ld seconds\n", hysteresis_seconds_ / ZX_SEC(1));
+    printf("memory-pressure: eviction: level - %s, strategy - %s, delay - %ld ms\n",
+           PressureLevelToString(max_eviction_level_),
+           gBootOptions->oom_evict_continuous ? "continuous" : "one-shot",
+           eviction_delay_ms_ / ZX_MSEC(1));
 
     printf("memory-pressure: ImminentOutOfMemory watermark - %zuMB\n",
            mem_watermarks_[PressureLevel::kImminentOutOfMemory] / MB);

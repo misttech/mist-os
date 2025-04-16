@@ -80,6 +80,10 @@ class MemoryWatchdog {
   // Used to delay signaling memory level transitions in the case of rapid changes.
   zx_duration_mono_t hysteresis_seconds_ = ZX_SEC(10);
 
+  // Used to delay eviction when going from a pressure level that does not require eviction to one
+  // that does.
+  zx_duration_mono_t eviction_delay_ms_ = ZX_MSEC(5000);
+
   // Tracks last time the memory state was evaluated (and signaled if required).
   zx_instant_mono_t prev_mem_state_eval_time_ = ZX_TIME_INFINITE_PAST;
 

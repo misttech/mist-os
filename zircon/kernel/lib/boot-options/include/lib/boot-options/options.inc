@@ -277,6 +277,26 @@ keep the system out of memory pressure, as opposed to triggering one-shot evicti
 memory pressure state transitions.
 )""")
 
+DEFINE_OPTION("kernel.oom.eviction-delay-ms", uint64_t, oom_eviction_delay_ms, {5000}, R"""(
+This option specifies the duration (in milliseconds) by which the kernel delays eviction when
+eviction is required by a change in memory pressure state. This delay allows userspace components
+responding to memory pressure to reclaim memory first, avoiding thrash due to interference with
+kernel eviction.
+)""")
+
+DEFINE_OPTION("kernel.oom.evict-with-min-target", bool, oom_evict_with_min_target, {true}, R"""(
+This option specifies whether the kernel should also evict a minimum amount of memory along with
+trying to meet the target free memory goal. If userspace also frees memory in response to memory
+pressure, this ensures some fairness by having kernel eviction share the load.
+)""")
+
+DEFINE_OPTION("kernel.oom.eviction-delta-at-oom-mb", uint64_t, oom_eviction_delta_at_oom_mb, {10},
+              R"""(
+This option specifies the granularity (in MB) at which the kernel will try to synchronously evict
+memory to avoid entering the out-of-memory state. Note that this value is independent of the
+kernel.oom.evict-with-min-target, and they do not influence each other.
+)""")
+
 DEFINE_OPTION("kernel.oom.hysteresis-seconds", uint64_t, oom_hysteresis_seconds, {10}, R"""(
 This option specifies the hysteresis interval (in seconds) between memory
 pressure state transitions. Note that hysteresis is only applicable for
