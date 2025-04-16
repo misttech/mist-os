@@ -108,32 +108,34 @@ fuchsia_virtualaudio::Configuration VirtualAudioComposite::GetDefaultConfig() {
 zx::result<std::unique_ptr<VirtualAudioComposite>> VirtualAudioComposite::Create(
     InstanceId instance_id, fuchsia_virtualaudio::Configuration config,
     async_dispatcher_t* dispatcher, fidl::ServerEnd<fuchsia_virtualaudio::Device> server,
-    OnDeviceBindingClosed on_binding_closed, AddOwnedChild add_owned_child) {
+    OnDeviceBindingClosed on_binding_closed,
+    fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent) {
   auto device = std::make_unique<VirtualAudioComposite>(
       instance_id, std::move(config), dispatcher, std::move(server), std::move(on_binding_closed));
-  if (zx::result result = device->Init(std::move(add_owned_child)); result.is_error()) {
-    FDF_LOG(ERROR, "Failed to initialize virtual audio composite device: %s",
-            result.status_string());
+  if (zx::result result = device->Init(parent); result.is_error()) {
+    fdf::error("Failed to initialize virtual audio composite device: {}", result);
     return result.take_error();
   }
   return zx::ok(std::move(device));
 }
 
-zx::result<> VirtualAudioComposite::Init(AddOwnedChild add_owned_child) {
+zx::result<> VirtualAudioComposite::Init(
+    fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent) {
   std::string child_node_name = "virtual-audio-composite-" + std::to_string(instance_id_);
 
   zx::result connector = devfs_connector_.Bind(dispatcher_);
   if (connector.is_error()) {
-    FDF_LOG(ERROR, "Failed to bind devfs connector: %s", connector.status_string());
+    fdf::error("Failed to bind devfs connector: {}", connector);
     return connector.take_error();
   }
 
   fuchsia_driver_framework::DevfsAddArgs devfs_args{
       {.connector = std::move(connector.value()), .class_name{kClassName}}};
 
-  zx::result child = add_owned_child(child_node_name, devfs_args);
+  zx::result child =
+      fdf::AddOwnedChild(parent, *fdf::Logger::GlobalInstance(), child_node_name, devfs_args);
   if (child.is_error()) {
-    FDF_LOG(ERROR, "Failed to add owned child: %s", child.status_string());
+    fdf::error("Failed to add owned child: {}", child);
     return child.take_error();
   }
   child_.emplace(std::move(child.value()));
@@ -152,7 +154,7 @@ fuchsia_virtualaudio::RingBuffer& VirtualAudioComposite::GetRingBuffer(uint64_t 
 
 void VirtualAudioComposite::GetFormat(GetFormatCompleter::Sync& completer) {
   if (!ring_buffer_format_.has_value() || !ring_buffer_format_->pcm_format().has_value()) {
-    FDF_LOG(WARNING, "Ring buffer not initialized");
+    fdf::warn("Ring buffer not initialized");
     completer.Reply(fit::error(fuchsia_virtualaudio::Error::kNoRingBuffer));
     return;
   }
@@ -176,7 +178,7 @@ void VirtualAudioComposite::GetFormat(GetFormatCompleter::Sync& completer) {
 
 void VirtualAudioComposite::GetBuffer(GetBufferCompleter::Sync& completer) {
   if (!ring_buffer_vmo_.is_valid()) {
-    FDF_LOG(WARNING, "Ring buffer not initialized");
+    fdf::warn("Ring buffer not initialized");
     completer.Reply(fit::error(fuchsia_virtualaudio::Error::kNoRingBuffer));
     return;
   }
@@ -185,7 +187,7 @@ void VirtualAudioComposite::GetBuffer(GetBufferCompleter::Sync& completer) {
   zx_status_t status = ring_buffer_vmo_.duplicate(
       ZX_RIGHT_TRANSFER | ZX_RIGHT_READ | ZX_RIGHT_WRITE | ZX_RIGHT_MAP, &dup_vmo);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to create ring buffer: %s", zx_status_get_string(status));
+    fdf::error("Failed to create ring buffer: {}", zx_status_get_string(status));
     completer.Reply(fit::error(fuchsia_virtualaudio::Error::kNoRingBuffer));
     return;
   }
@@ -200,7 +202,7 @@ void VirtualAudioComposite::GetBuffer(GetBufferCompleter::Sync& completer) {
 
 void VirtualAudioComposite::Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) {
   if (composite_binding_.has_value()) {
-    FDF_LOG(ERROR, "Already bound");
+    fdf::error("Already bound");
     request.composite_protocol().Close(ZX_ERR_ALREADY_BOUND);
     return;
   }
@@ -409,7 +411,7 @@ void VirtualAudioComposite::GetRingBufferFormats(GetRingBufferFormatsRequest& re
 void VirtualAudioComposite::OnRingBufferClosed(fidl::UnbindInfo info) {
   // Do not log canceled cases; these happen particularly frequently in certain test cases.
   if (info.status() != ZX_ERR_CANCELED) {
-    FDF_LOG(INFO, "Ring buffer channel closing: %s", info.FormatDescription().c_str());
+    fdf::info("Ring buffer channel closing: {}", info.FormatDescription().c_str());
   }
   ResetRingBuffer();
 }
@@ -506,7 +508,7 @@ void VirtualAudioComposite::GetVmo(GetVmoRequest& request, GetVmoCompleter::Sync
                             ->OnBufferCreated(std::move(duplicate_vmo_for_va),
                                               num_ring_buffer_frames_, notifications_per_ring_);
   if (result.status() != ZX_OK) {
-    FDF_LOG(WARNING, "Failed to send OnBufferCreated event: %s", result.status_string());
+    fdf::warn("Failed to send OnBufferCreated event: {}", result);
   }
 
   fuchsia_hardware_audio::RingBufferGetVmoResponse response;
@@ -518,12 +520,12 @@ void VirtualAudioComposite::GetVmo(GetVmoRequest& request, GetVmoCompleter::Sync
 
 void VirtualAudioComposite::Start(StartCompleter::Sync& completer) {
   if (!ring_buffer_vmo_fetched_) {
-    FDF_LOG(ERROR, "Cannot start the ring buffer before retrieving the VMO");
+    fdf::error("Cannot start the ring buffer before retrieving the VMO");
     completer.Close(ZX_ERR_BAD_STATE);
     return;
   }
   if (ring_buffer_started_) {
-    FDF_LOG(ERROR, "Cannot start the ring buffer if already started");
+    fdf::error("Cannot start the ring buffer if already started");
     completer.Close(ZX_ERR_BAD_STATE);
     return;
   }
@@ -532,7 +534,7 @@ void VirtualAudioComposite::Start(StartCompleter::Sync& completer) {
 
   fidl::Status result = fidl::WireSendEvent(device_binding_)->OnStart(now);
   if (result.status() != ZX_OK) {
-    FDF_LOG(WARNING, "Failed to send OnStart event: %s", result.status_string());
+    fdf::warn("Failed to send OnStart event: {}", result);
   }
 
   ring_buffer_started_ = true;
@@ -541,12 +543,12 @@ void VirtualAudioComposite::Start(StartCompleter::Sync& completer) {
 
 void VirtualAudioComposite::Stop(StopCompleter::Sync& completer) {
   if (!ring_buffer_vmo_fetched_) {
-    FDF_LOG(ERROR, "Cannot start the ring buffer before retrieving the VMO");
+    fdf::error("Cannot start the ring buffer before retrieving the VMO");
     completer.Close(ZX_ERR_BAD_STATE);
     return;
   }
   if (!ring_buffer_started_) {
-    FDF_LOG(INFO, "Stop called while stopped; doing nothing");
+    fdf::info("Stop called while stopped; doing nothing");
     completer.Reply();
     return;
   }
@@ -554,7 +556,7 @@ void VirtualAudioComposite::Stop(StopCompleter::Sync& completer) {
   // TODO(https://fxbug.dev/42075676): Add support for 'stop' position, now we always report 0.
   fidl::Status result = fidl::WireSendEvent(device_binding_)->OnStop(now, 0);
   if (result.status() != ZX_OK) {
-    FDF_LOG(WARNING, "Failed to send OnStop event: %s", result.status_string());
+    fdf::warn("Failed to send OnStop event: {}", result);
   }
 
   ring_buffer_started_ = false;
@@ -601,7 +603,7 @@ void VirtualAudioComposite::WatchDelayInfo(WatchDelayInfoCompleter::Sync& comple
   } else {
     // The client called WatchDelayInfo when another hanging get was pending.
     // This is an error condition and hence we unbind the channel.
-    FDF_LOG(ERROR, "WatchDelayInfo called when another hanging get was pending, unbinding");
+    fdf::error("WatchDelayInfo called when another hanging get was pending, unbinding");
     should_reply_to_delay_request_ = true;
     delay_info_completer_.reset();
     completer.Close(ZX_ERR_BAD_STATE);
@@ -616,8 +618,7 @@ void VirtualAudioComposite::SetActiveChannels(
   const uint64_t max_channel_bitmask =
       (1 << ring_buffer_format_->pcm_format()->number_of_channels()) - 1;
   if (request.active_channels_bitmask() > max_channel_bitmask) {
-    FDF_LOG(WARNING, "%p: SetActiveChannels(0x%04zx) is out-of-range", this,
-            request.active_channels_bitmask());
+    fdf::warn("SetActiveChannels({:#016x}) is out-of-range", request.active_channels_bitmask());
     completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
     return;
   }
@@ -631,11 +632,11 @@ void VirtualAudioComposite::SetActiveChannels(
 
 void VirtualAudioComposite::OnSignalProcessingClosed(fidl::UnbindInfo info) {
   if (info.is_peer_closed()) {
-    FDF_LOG(INFO, "Client disconnected");
+    fdf::info("Client disconnected");
   } else if (!info.is_user_initiated()) {
     // Do not log canceled cases; these happen particularly frequently in certain test cases.
     if (info.status() != ZX_ERR_CANCELED) {
-      FDF_LOG(ERROR, "Client connection unbound: %s", info.status_string());
+      fdf::error("Client connection unbound: {}", info.status_string());
     }
   }
   if (signal_) {
@@ -655,7 +656,7 @@ void VirtualAudioComposite::OnSignalProcessingClosed(fidl::UnbindInfo info) {
 void VirtualAudioComposite::SignalProcessingConnect(
     SignalProcessingConnectRequest& request, SignalProcessingConnectCompleter::Sync& completer) {
   if (signal_) {
-    FDF_LOG(ERROR, "Signal processing already bound");
+    fdf::error("Signal processing already bound");
     request.protocol().Close(ZX_ERR_ALREADY_BOUND);
     return;
   }
@@ -700,8 +701,7 @@ void VirtualAudioComposite::WatchElementState(WatchElementStateRequest& request,
       index = 1;
       break;
     default:
-      FDF_LOG(ERROR, "Invalid processing element id %lu, unbinding",
-              request.processing_element_id());
+      fdf::error("Invalid processing element id %lu, unbinding", request.processing_element_id());
       completer.Close(ZX_ERR_INVALID_ARGS);
       return;
   }
@@ -721,7 +721,7 @@ void VirtualAudioComposite::WatchElementState(WatchElementStateRequest& request,
   } else {
     // The client called WatchElementState when another hanging get was pending for the same id.
     // This is an error condition and hence we unbind the channel.
-    FDF_LOG(ERROR, "WatchElementState called when another hanging get was pending, unbinding");
+    fdf::error("WatchElementState called when another hanging get was pending, unbinding");
     watch_element_state_needs_reply_[0] = true;
     watch_element_state_needs_reply_[1] = true;
     watch_element_state_completers_[0].reset();
@@ -769,7 +769,7 @@ void VirtualAudioComposite::WatchTopology(WatchTopologyCompleter::Sync& complete
   } else if (watch_topology_completer_.has_value()) {
     // The client called WatchTopology when another hanging get was pending.
     // This is an error condition and hence we unbind the channel.
-    FDF_LOG(ERROR, "WatchTopology was re-called while the previous call was still pending");
+    fdf::error("WatchTopology was re-called while the previous call was still pending");
     watch_topology_needs_reply_ = true;
     watch_topology_completer_.reset();
     completer.Close(ZX_ERR_BAD_STATE);
@@ -795,14 +795,14 @@ void VirtualAudioComposite::SetTopology(SetTopologyRequest& request,
 void VirtualAudioComposite::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  FDF_LOG(ERROR, "VirtualAudioComposite::handle_unknown_method (RingBuffer) ordinal %zu",
-          metadata.method_ordinal);
+  fdf::error("VirtualAudioComposite::handle_unknown_method (RingBuffer) ordinal %zu",
+             metadata.method_ordinal);
 }
 void VirtualAudioComposite::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  FDF_LOG(ERROR, "VirtualAudioComposite::handle_unknown_method (SignalProcessing) ordinal %zu",
-          metadata.method_ordinal);
+  fdf::error("VirtualAudioComposite::handle_unknown_method (SignalProcessing) ordinal %zu",
+             metadata.method_ordinal);
 }
 
 void VirtualAudioComposite::Serve(

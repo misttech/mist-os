@@ -21,8 +21,6 @@ class VirtualAudioComposite
  public:
   using InstanceId = uint64_t;
   using OnDeviceBindingClosed = fit::callback<void(fidl::UnbindInfo)>;
-  using AddOwnedChild = fit::callback<zx::result<fdf::OwnedChildNode>(
-      std::string_view child_node_name, fuchsia_driver_framework::DevfsAddArgs& devfs_args)>;
 
   static constexpr std::string_view kClassName = "audio-composite";
 
@@ -31,7 +29,8 @@ class VirtualAudioComposite
   static zx::result<std::unique_ptr<VirtualAudioComposite>> Create(
       InstanceId instance_id, fuchsia_virtualaudio::Configuration config,
       async_dispatcher_t* dispatcher, fidl::ServerEnd<fuchsia_virtualaudio::Device> server,
-      OnDeviceBindingClosed on_binding_closed, AddOwnedChild add_owned_child);
+      OnDeviceBindingClosed on_binding_closed,
+      fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent);
 
   VirtualAudioComposite(InstanceId instance_id, fuchsia_virtualaudio::Configuration config,
                         async_dispatcher_t* dispatcher,
@@ -42,7 +41,7 @@ class VirtualAudioComposite
         device_binding_(dispatcher_, std::move(server), this, std::move(on_device_binding_closed)),
         instance_id_(instance_id) {}
 
-  zx::result<> Init(AddOwnedChild add_owned_child);
+  zx::result<> Init(fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent);
 
  private:
   static constexpr fuchsia_hardware_audio::TopologyId kTopologyId = 789;
