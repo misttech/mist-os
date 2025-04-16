@@ -244,7 +244,7 @@ typed-builder = "0.10.0"
 unic-char-range = "0.9"
 unic-ucd-block = "0.9"
 unicase = "2.8.1"
-unicode-segmentation = "1.10"
+unicode-segmentation = "1.12"
 unicode-width = "0.2.0"
 unicode-xid = "0.2.0"
 untrusted = "0.7.1"
@@ -1117,7 +1117,7 @@ license_files = ["LICENSE-APACHE"]
 [gn.package.unicode-normalization."0.1.19"]
 license_files = ["LICENSE-APACHE"]
 
-[gn.package.unicode-segmentation."1.10.1"]
+[gn.package.unicode-segmentation."1.12.0"]
 license_files = ["LICENSE-APACHE"]
 
 [gn.package.unicode-width."0.1.14"]

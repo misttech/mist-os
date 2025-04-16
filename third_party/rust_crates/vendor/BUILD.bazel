@@ -3115,14 +3115,14 @@ alias(
 )
 
 alias(
-    name = "unicode-segmentation-1.10.1",
-    actual = "//third_party/rust_crates/vendor/unicode-segmentation-1.10.1:unicode_segmentation",
+    name = "unicode-segmentation-1.12.0",
+    actual = "//third_party/rust_crates/vendor/unicode-segmentation-1.12.0:unicode_segmentation",
     tags = ["manual"],
 )
 
 alias(
     name = "unicode-segmentation",
-    actual = "//third_party/rust_crates/vendor/unicode-segmentation-1.10.1:unicode_segmentation",
+    actual = "//third_party/rust_crates/vendor/unicode-segmentation-1.12.0:unicode_segmentation",
     tags = ["manual"],
 )
 

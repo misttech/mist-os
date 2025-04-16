@@ -25,6 +25,7 @@ use crate::tables::word::WordCat;
 ///
 /// [`unicode_words`]: trait.UnicodeSegmentation.html#tymethod.unicode_words
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
+#[derive(Debug)]
 pub struct UnicodeWords<'a> {
     inner: Filter<UWordBounds<'a>, fn(&&str) -> bool>,
 }
@@ -35,6 +36,11 @@ impl<'a> Iterator for UnicodeWords<'a> {
     #[inline]
     fn next(&mut self) -> Option<&'a str> {
         self.inner.next()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
     }
 }
 impl<'a> DoubleEndedIterator for UnicodeWords<'a> {
@@ -57,7 +63,9 @@ impl<'a> DoubleEndedIterator for UnicodeWords<'a> {
 ///
 /// [`unicode_word_indices`]: trait.UnicodeSegmentation.html#tymethod.unicode_word_indices
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
+#[derive(Debug)]
 pub struct UnicodeWordIndices<'a> {
+    #[allow(clippy::type_complexity)]
     inner: Filter<UWordBoundIndices<'a>, fn(&(usize, &str)) -> bool>,
 }
 
@@ -67,6 +75,11 @@ impl<'a> Iterator for UnicodeWordIndices<'a> {
     #[inline]
     fn next(&mut self) -> Option<(usize, &'a str)> {
         self.inner.next()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
     }
 }
 impl<'a> DoubleEndedIterator for UnicodeWordIndices<'a> {
@@ -84,7 +97,7 @@ impl<'a> DoubleEndedIterator for UnicodeWordIndices<'a> {
 ///
 /// [`split_word_bounds`]: trait.UnicodeSegmentation.html#tymethod.split_word_bounds
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct UWordBounds<'a> {
     string: &'a str,
     cat: Option<WordCat>,
@@ -98,7 +111,7 @@ pub struct UWordBounds<'a> {
 ///
 /// [`split_word_bound_indices`]: trait.UnicodeSegmentation.html#tymethod.split_word_bound_indices
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct UWordBoundIndices<'a> {
     start_offset: usize,
     iter: UWordBounds<'a>,
@@ -200,7 +213,7 @@ impl<'a> Iterator for UWordBounds<'a> {
         use self::FormatExtendType::*;
         use self::UWordBoundsState::*;
         use crate::tables::word as wd;
-        if self.string.len() == 0 {
+        if self.string.is_empty() {
             return None;
         }
 
@@ -256,17 +269,15 @@ impl<'a> Iterator for UWordBounds<'a> {
             // state enum; the state enum represents the last non-zwj state encountered.
             // When prev_zwj is true, for the purposes of WB3c, we are in the Zwj state,
             // however we are in the previous state for the purposes of all other rules.
-            if prev_zwj {
-                if is_emoji(ch) {
-                    state = Emoji;
-                    continue;
-                }
+            if prev_zwj && is_emoji(ch) {
+                state = Emoji;
+                continue;
             }
             // Don't use `continue` in this match without updating `cat`
             state = match state {
                 Start if cat == wd::WC_CR => {
                     idx += match self.get_next_cat(idx) {
-                        Some(ncat) if ncat == wd::WC_LF => 1, // rule WB3
+                        Some(wd::WC_LF) => 1, // rule WB3
                         _ => 0,
                     };
                     break; // rule WB3a
@@ -431,7 +442,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
         use self::FormatExtendType::*;
         use self::UWordBoundsState::*;
         use crate::tables::word as wd;
-        if self.string.len() == 0 {
+        if self.string.is_empty() {
             return None;
         }
 
@@ -467,10 +478,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
             if cat == wd::WC_Extend || cat == wd::WC_Format || (cat == wd::WC_ZWJ && state != Zwj) {
                 // WB3c has more priority so we should not
                 // fold in that case
-                if match state {
-                    FormatExtend(_) | Start => false,
-                    _ => true,
-                } {
+                if !matches!(state, FormatExtend(_) | Start) {
                     saveidx = previdx;
                     savestate = state;
                     state = FormatExtend(AcceptNone);
@@ -508,7 +516,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                         if state == Start {
                             if cat == wd::WC_LF {
                                 idx -= match self.get_prev_cat(idx) {
-                                    Some(pcat) if pcat == wd::WC_CR => 1, // rule WB3
+                                    Some(wd::WC_CR) => 1, // rule WB3
                                     _ => 0,
                                 };
                             }
@@ -710,7 +718,7 @@ impl<'a> UWordBounds<'a> {
 }
 
 #[inline]
-pub fn new_word_bounds<'b>(s: &'b str) -> UWordBounds<'b> {
+pub fn new_word_bounds(s: &str) -> UWordBounds<'_> {
     UWordBounds {
         string: s,
         cat: None,
@@ -719,7 +727,7 @@ pub fn new_word_bounds<'b>(s: &'b str) -> UWordBounds<'b> {
 }
 
 #[inline]
-pub fn new_word_bound_indices<'b>(s: &'b str) -> UWordBoundIndices<'b> {
+pub fn new_word_bound_indices(s: &str) -> UWordBoundIndices<'_> {
     UWordBoundIndices {
         start_offset: s.as_ptr() as usize,
         iter: new_word_bounds(s),
@@ -730,11 +738,11 @@ pub fn new_word_bound_indices<'b>(s: &'b str) -> UWordBoundIndices<'b> {
 fn has_alphanumeric(s: &&str) -> bool {
     use crate::tables::util::is_alphanumeric;
 
-    s.chars().any(|c| is_alphanumeric(c))
+    s.chars().any(is_alphanumeric)
 }
 
 #[inline]
-pub fn new_unicode_words<'b>(s: &'b str) -> UnicodeWords<'b> {
+pub fn new_unicode_words(s: &str) -> UnicodeWords<'_> {
     use super::UnicodeSegmentation;
 
     UnicodeWords {
@@ -743,12 +751,29 @@ pub fn new_unicode_words<'b>(s: &'b str) -> UnicodeWords<'b> {
 }
 
 #[inline]
-pub fn new_unicode_word_indices<'b>(s: &'b str) -> UnicodeWordIndices<'b> {
+pub fn new_unicode_word_indices(s: &str) -> UnicodeWordIndices<'_> {
     use super::UnicodeSegmentation;
 
     UnicodeWordIndices {
         inner: s
             .split_word_bound_indices()
             .filter(|(_, c)| has_alphanumeric(c)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_syriac_abbr_mark() {
+        use crate::tables::word as wd;
+        let (_, _, cat) = wd::word_category('\u{70f}');
+        assert_eq!(cat, wd::WC_ALetter);
+    }
+
+    #[test]
+    fn test_end_of_ayah_cat() {
+        use crate::tables::word as wd;
+        let (_, _, cat) = wd::word_category('\u{6dd}');
+        assert_eq!(cat, wd::WC_Numeric);
     }
 }

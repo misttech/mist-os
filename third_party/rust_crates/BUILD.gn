@@ -1197,7 +1197,7 @@ if (current_os == "fuchsia") {
 }
 
 group("unicode-segmentation") {
-  public_deps = [ ":unicode-segmentation-v1_10_1" ]
+  public_deps = [ ":unicode-segmentation-v1_12_0" ]
 }
 
 group("unicode-width") {
@@ -7369,7 +7369,7 @@ rust_library("heck-v0_3_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":unicode-segmentation-v1_10_1" ]
+  deps += [ ":unicode-segmentation-v1_12_0" ]
 
   rustenv = []
 
@@ -14458,7 +14458,7 @@ rust_library("rustyline-v2_1_0") {
   deps += [ ":memchr-v2_7_4" ]
   deps += [ ":libc-v0_2_171" ]
   deps += [ ":log-v0_4_22" ]
-  deps += [ ":unicode-segmentation-v1_10_1" ]
+  deps += [ ":unicode-segmentation-v1_12_0" ]
   deps += [ ":unicode-width-v0_1_14" ]
   if (true && !(current_os == "fuchsia")) {
     deps += [ ":nix-v0_26_2" ]
@@ -18404,16 +18404,16 @@ rust_library("unicode-normalization-v0_1_19") {
   applicable_licenses = [ ":unicode-normalization-v0_1_19.license" ]
 }
 
-license("unicode-segmentation-v1_10_1.license") {
+license("unicode-segmentation-v1_12_0.license") {
   public_package_name = "unicode_segmentation"
-  license_files = [ "//third_party/rust_crates/vendor/unicode-segmentation-1.10.1/LICENSE-APACHE" ]
+  license_files = [ "//third_party/rust_crates/vendor/unicode-segmentation-1.12.0/LICENSE-APACHE" ]
 }
 
-rust_library("unicode-segmentation-v1_10_1") {
+rust_library("unicode-segmentation-v1_12_0") {
   crate_name = "unicode_segmentation"
   crate_root =
-      "//third_party/rust_crates/vendor/unicode-segmentation-1.10.1/src/lib.rs"
-  output_name = "unicode_segmentation-ea66ef824508562"
+      "//third_party/rust_crates/vendor/unicode-segmentation-1.12.0/src/lib.rs"
+  output_name = "unicode_segmentation-933954bbda862039"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -18423,13 +18423,13 @@ rust_library("unicode-segmentation-v1_10_1") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=ea66ef824508562",
-    "-Cextra-filename=-ea66ef824508562",
+    "-Cmetadata=933954bbda862039",
+    "-Cextra-filename=-933954bbda862039",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":unicode-segmentation-v1_10_1.license" ]
+  applicable_licenses = [ ":unicode-segmentation-v1_12_0.license" ]
 }
 
 license("unicode-width-v0_1_14.license") {
