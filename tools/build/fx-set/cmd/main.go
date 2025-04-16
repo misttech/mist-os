@@ -157,7 +157,6 @@ func mainImpl(ctx context.Context) error {
 	if err := fx.run(ctx, "use", buildDir); err != nil {
 		return fmt.Errorf("failed to set build directory: %w", err)
 	}
-
 	return nil
 }
 
@@ -233,12 +232,14 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 
 	flagSet.BoolVar(&cmd.skipLocalArgs, "skip-local-args", false, "")
 
-	var autoDir bool
+	var autoDir = true
+	var deprecatedAutoDir bool //did the user use the flag
+	var providedBuildDir bool  //did the user set a --dir
 
 	// Help strings don't matter because `fx set -h` uses the help text from
 	// //tools/devshell/set, which should be kept up to date with these flags.
 	flagSet.BoolVar(&cmd.verbose, "verbose", false, "")
-	flagSet.BoolVar(&autoDir, "auto-dir", false, "")
+	flagSet.BoolVar(&deprecatedAutoDir, "auto-dir", false, "")
 	flagSet.StringVar(&cmd.fintParamsPath, "fint-params-path", "", "")
 	flagSet.BoolVar(&cmd.useCcache, "ccache", false, "")
 	flagSet.BoolVar(&cmd.noCcache, "no-ccache", false, "")
@@ -291,18 +292,35 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 		return nil, fmt.Errorf(message)
 	}
 
-	if cmd.buildDir == "" {
-		cmd.buildDir = defaultBuildDir
-	} else if autoDir {
-		return nil, fmt.Errorf("'fx --dir' and 'fx set --auto-dir' are mutually exclusive")
+	if cmd.buildDir != "" {
+		userSpecifiedPath := cmd.checkoutDir + "/" + cmd.buildDir
+		fmt.Printf(userSpecifiedPath + "\n")
+		// if the user explicitly wants to use out/default for their buildDir
+		if cmd.buildDir == "out/default" {
+			// if we had been using out/default as a symlink, unlink it
+			symlink, err := isSymlink(userSpecifiedPath)
+			if err != nil {
+				return nil, fmt.Errorf(err.Error())
+			}
+			if symlink {
+				fmt.Printf(("It's a symlink, removing"))
+				if _, err := os.Lstat(userSpecifiedPath); err == nil {
+					if err := os.Remove(userSpecifiedPath); err != nil {
+						fmt.Errorf("failed to unlink: %+v", err)
+					}
+				} else {
+					fmt.Errorf("failed to check symlink: %+v", err)
+				}
+			}
+		}
+		providedBuildDir = true
+		autoDir = false
 	}
 
 	// If a fint params file was specified then no other arguments are required,
 	// so no need to validate them.
 	if cmd.fintParamsPath != "" {
-		if autoDir {
-			return nil, fmt.Errorf("--auto-dir is not supported with --fint-params-path")
-		}
+		autoDir = false
 		return cmd, nil
 	}
 
@@ -333,9 +351,7 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	if autoDir {
 		for _, variant := range cmd.variants {
 			if strings.Contains(variant, "/") {
-				return nil, fmt.Errorf(
-					"--auto-dir only works with simple catch-all --variant switches; choose your " +
-						"own directory name with fx --dir for a complex configuration")
+				return nil, fmt.Errorf("This variant builds cannot be automatically named. Please specify a directory name with fx --dir")
 			}
 		}
 		nameComponents := []string{productDotBoard}
@@ -347,7 +363,16 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 		}
 		cmd.buildDir = filepath.Join("out", strings.Join(nameComponents, "-"))
 	}
-
+	// TODO: b/401633163
+	message := "[INFO]\t2025-4-8\tb/401633163\n" +
+		"* --auto-dir is now default for fx set and the flag is deprecated for removal in\n  30 days\n" +
+		"* For backwards compatibility, out/default is a symbolic link pointing to \n  the active build directory (" + cmd.buildDir + ")\n" +
+		"* Pre-existing out/default build dir will be preserved at\n  out/default-migrated\n"
+	if !deprecatedAutoDir && !providedBuildDir { //someone who was relying on out/default
+		message += "* To continue to use a regular out/default as a build directory specify:\n  fx --dir out/default set [...]\n"
+	}
+	message += "The build directory for this build is " + cmd.buildDir + "\n"
+	fmt.Printf(message)
 	return cmd, nil
 }
 
@@ -588,4 +613,20 @@ func canAccessRbe(checkoutDir string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+// isSymlink returns true if the path is a symlink,
+// it returns false if the path doesn't exist.
+func isSymlink(path string) (bool, error) {
+	fileInfo, err := os.Lstat(path)
+
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("error checking path %s: %w", path, err)
+	}
+
+	isLink := fileInfo.Mode()&os.ModeSymlink != 0
+	return isLink, nil
 }

@@ -512,6 +512,23 @@ def main() -> int:
 
     create_convenience_symlinks()
 
+    # These symlinks point out/default to the active build directory for
+    # developer convenience
+    if build_dir.name != "default":
+        out_default = fuchsia_dir / "out" / "default"
+        # if out/default was previously a hard directory
+        if out_default.exists() and not out_default.is_symlink():
+            old_dir = out_default
+            new_dir = old_dir.parent / (old_dir.name + "-migrated")
+            counter = 1
+            while os.path.exists(new_dir):
+                new_dir = old_dir.parent / f"{old_dir.name}-migrated{counter}"
+                counter += 1
+            old_dir.rename(new_dir)
+            print(f"[INFO] Moved out/default to out/{new_dir.name}")
+        # make out/dir a symlink of the buildDir for backwards compatibility
+        make_relative_symlink(out_default, build_dir)
+
     log("Done.")
     return 0
 

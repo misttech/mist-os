@@ -40,6 +40,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
+				buildDir:      "out/core.x64",
 				includeClippy: true,
 			},
 		},
@@ -59,6 +60,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
+				buildDir:      "out/core.x64",
 				includeClippy: true,
 				verbose:       true,
 			},
@@ -69,6 +71,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:          "core",
 				board:            "x64",
+				buildDir:         "out/core.x64",
 				includeClippy:    true,
 				universePackages: []string{"u1", "u2", "u3", "u4"},
 			},
@@ -89,6 +92,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
+				buildDir:      "out/core.x64",
 				includeClippy: true,
 				testLabels:    []string{"b1", "b2", "b3", "b4"},
 			},
@@ -99,18 +103,9 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
+				buildDir:      "out/core.x64",
 				includeClippy: true,
 				hostLabels:    []string{"h1", "h2", "h3", "h4"},
-			},
-		},
-		{
-			name: "variants",
-			args: []string{"core.x64", "--variant", "kasan,profile", "--variant", "ubsan"},
-			expected: setArgs{
-				product:       "core",
-				board:         "x64",
-				includeClippy: true,
-				variants:      []string{"kasan", "profile", "ubsan"},
 			},
 		},
 		{
@@ -119,6 +114,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:        "core",
 				board:          "x64",
+				buildDir:       "out/core.x64",
 				includeClippy:  true,
 				fuzzSanitizers: []string{"asan", "ubsan", "kasan"},
 			},
@@ -129,20 +125,11 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
+				buildDir:      "out/core.x64",
 				includeClippy: true,
 				// --args values shouldn't be split at commas, since commas can
 				// be part of the args themselves.
 				gnArgs: []string{`foo=["bar", "baz"]`, "x=5"},
-			},
-		},
-		{
-			name: "release",
-			args: []string{"core.x64", "--release"},
-			expected: setArgs{
-				product:       "core",
-				board:         "x64",
-				includeClippy: true,
-				isRelease:     true,
 			},
 		},
 		{
@@ -178,17 +165,8 @@ func TestParseArgsAndEnv(t *testing.T) {
 			},
 		},
 		{
-			name: "rejects --dir and --auto-dir",
-			args: []string{"core.x64", "--auto-dir"},
-			env: map[string]string{
-				// fx sets this env var if the top-level --dir flag is set.
-				buildDirEnvVar: "/usr/foo/fuchsia/out/foo",
-			},
-			expectErr: true,
-		},
-		{
-			name: "auto dir",
-			args: []string{"bringup.arm64", "--auto-dir"},
+			name: "autodir",
+			args: []string{"bringup.arm64"},
 			expected: setArgs{
 				product:       "bringup",
 				board:         "arm64",
@@ -197,8 +175,8 @@ func TestParseArgsAndEnv(t *testing.T) {
 			},
 		},
 		{
-			name: "auto dir with variants",
-			args: []string{"core.x64", "--auto-dir", "--variant", "profile,kasan", "--variant", "ubsan"},
+			name: "autodir with variants",
+			args: []string{"core.x64", "--variant", "profile,kasan", "--variant", "ubsan"},
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
@@ -208,8 +186,8 @@ func TestParseArgsAndEnv(t *testing.T) {
 			},
 		},
 		{
-			name: "auto dir and release",
-			args: []string{"core.x64", "--auto-dir", "--variant", "foo", "--release"},
+			name: "autodir and release",
+			args: []string{"core.x64", "--variant", "foo", "--release"},
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
@@ -220,8 +198,8 @@ func TestParseArgsAndEnv(t *testing.T) {
 			},
 		},
 		{
-			name:      "auto dir with complex variants",
-			args:      []string{"core.x64", "--auto-dir", "--variant", "asan-fuzzer/foo"},
+			name:      "autodir with complex variants",
+			args:      []string{"core.x64", "--variant", "asan-fuzzer/foo"},
 			expectErr: true,
 		},
 		{
@@ -230,6 +208,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
+				buildDir:      "out/core.x64",
 				includeClippy: false,
 				cargoTOMLGen:  true,
 			},
@@ -240,6 +219,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
+				buildDir:      "out/core.x64",
 				includeClippy: true,
 				ideFiles:      []string{"json", "vs"},
 			},
@@ -250,6 +230,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:        "core",
 				board:          "x64",
+				buildDir:       "out/core.x64",
 				jsonIDEScripts: []string{"//foo.py", "//bar.py"},
 				includeClippy:  true,
 			},
@@ -260,6 +241,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
+				buildDir:      "out/core.x64",
 				includeClippy: true,
 				rbeMode:       "auto",
 			},
@@ -270,6 +252,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
+				buildDir:      "out/core.x64",
 				includeClippy: true,
 				rbeMode:       "off",
 			},
@@ -280,6 +263,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
+				buildDir:      "out/core.x64",
 				includeClippy: true,
 				rbeMode:       "cloudtop",
 			},
@@ -291,9 +275,6 @@ func TestParseArgsAndEnv(t *testing.T) {
 			checkoutDir := t.TempDir()
 			tc.expected.checkoutDir = checkoutDir
 
-			if tc.expected.buildDir == "" {
-				tc.expected.buildDir = defaultBuildDir
-			}
 			if tc.expected.rbeMode == "" {
 				tc.expected.rbeMode = defaultRbeMode
 			}
