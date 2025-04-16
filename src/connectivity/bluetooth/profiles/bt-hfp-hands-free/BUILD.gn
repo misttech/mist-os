@@ -47,6 +47,7 @@ rustc_binary("bin") {
     "src/hfp.rs",
     "src/hfp/tests.rs",
     "src/main.rs",
+    "src/one_to_one.rs",
     "src/peer.rs",
     "src/peer/ag_indicators.rs",
     "src/peer/at_connection.rs",

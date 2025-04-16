@@ -14,6 +14,7 @@ use crate::hfp::Hfp;
 mod config;
 mod features;
 mod hfp;
+mod one_to_one;
 mod peer;
 mod profile;
 mod service_definition;
