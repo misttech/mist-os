@@ -18,6 +18,22 @@ const B: usize = 6;
 /// The capacity of nodes in the btree.
 const NODE_CAPACITY: usize = 2 * B;
 
+/// A trait for types that can calculate the gap between two values.
+pub trait Gap {
+    /// Measure the gap between two values.
+    fn measure_gap(&self, other: &Self) -> u64;
+}
+
+impl Gap for u32 {
+    fn measure_gap(&self, other: &Self) -> u64 {
+        if *self > *other {
+            (*self - *other) as u64
+        } else {
+            (*other - *self) as u64
+        }
+    }
+}
+
 /// A location inside the btree.
 #[derive(Debug, Default, Clone, Copy)]
 struct Cursor {
@@ -178,7 +194,10 @@ fn binary_search<K: Ord>(key: &K, keys: &ArrayVec<Range<K>, NODE_CAPACITY>) -> u
 /// the `i`th entry in the values array. The balancing rules of the btree ensure that every
 /// non-root leaf has between N and N/2 entries populated.
 #[derive(Clone)]
-struct NodeLeaf<K: Ord + Copy, V: Clone> {
+struct NodeLeaf<K: Ord + Copy + Gap, V: Clone> {
+    /// The maximum gap between keys in this leaf node.
+    max_gap: u64,
+
     /// The keys stored in this leaf node.
     ///
     /// We store the key in a dense array to improve cache performance during lookups. We often
@@ -193,7 +212,7 @@ struct NodeLeaf<K: Ord + Copy, V: Clone> {
 /// Shows the map structure of the leaf node.
 impl<K, V> Debug for NodeLeaf<K, V>
 where
-    K: Debug + Ord + Copy,
+    K: Debug + Ord + Copy + Gap,
     V: Debug + Clone,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -202,7 +221,7 @@ where
 }
 
 /// The result of performing an insertion into a btree node.
-enum InsertResult<K: Ord + Copy, V: Clone> {
+enum InsertResult<K: Ord + Copy + Gap, V: Clone> {
     /// The value was successfully inserted into an empty slot.
     Inserted,
 
@@ -220,7 +239,7 @@ enum InsertResult<K: Ord + Copy, V: Clone> {
 }
 
 /// State information returned from the removal operation.
-struct RemoveState<K: Ord + Copy, V: Clone> {
+struct RemoveState<K: Ord + Copy + Gap, V: Clone> {
     /// The minimal key for this subtree, if available.
     ///
     /// If the minimal key for this subtree is not available, then the minimal key is guaranteed
@@ -235,7 +254,7 @@ struct RemoveState<K: Ord + Copy, V: Clone> {
 ///
 /// The root of the CowTree converts this result value into `Option<T>`, per the usual map
 /// interface.
-enum RemoveResult<K: Ord + Copy, V: Clone> {
+enum RemoveResult<K: Ord + Copy + Gap, V: Clone> {
     /// The key the client asked to remove was not found in the map.
     NotFound,
 
@@ -256,14 +275,21 @@ enum RemoveResult<K: Ord + Copy, V: Clone> {
 
 impl<K, V> NodeLeaf<K, V>
 where
-    K: Ord + Copy,
+    K: Ord + Copy + Gap,
     V: Clone,
 {
+    /// Create a new leaf node.
+    fn new(keys: ArrayVec<Range<K>, NODE_CAPACITY>, values: ArrayVec<V, NODE_CAPACITY>) -> Self {
+        let mut node = Self { max_gap: 0, keys, values };
+        node.update_max_gap();
+        node
+    }
+
     /// Create an empty leaf node.
     ///
     /// Empty leaf nodes are used only at the root of the tree.
     fn empty() -> Self {
-        Self { keys: ArrayVec::new(), values: ArrayVec::new() }
+        Self { max_gap: 0, keys: ArrayVec::new(), values: ArrayVec::new() }
     }
 
     /// Gets the index in this leaf that corresponds to the given cursor.
@@ -319,26 +345,50 @@ where
         }
     }
 
+    /// Update the maximum gap for this node.
+    fn update_max_gap(&mut self) {
+        let mut max_gap = 0;
+        for i in 0..self.keys.len() {
+            if i + 1 < self.keys.len() {
+                max_gap = max_gap.max(self.keys[i].end.measure_gap(&self.keys[i + 1].start));
+            }
+        }
+        self.max_gap = max_gap;
+    }
+
+    /// Measure the gap between the last key in this node and the first key in the other node.
+    fn measure_gap(&self, other: &Self) -> u64 {
+        // We know that `self.keys` is not empty because this function is only called when there is
+        // more than one leaf node. The only situation in which `self.keys` is empty is when the
+        // tree is empty, in which case there is only a single empty leaf node.
+        self.keys[self.keys.len() - 1].end.measure_gap(&other.keys[0].start)
+    }
+
+    /// Get the range of keys in this node.
+    fn key_range(&self) -> Range<K> {
+        self.keys[0].start..self.keys[self.keys.len() - 1].end
+    }
+
     /// Insert the given entry at the location indicated by `cursor`.
     ///
     /// Inserting a value into a leaf node might cause this node to split into two leaf nodes.
     fn insert(&mut self, mut cursor: Cursor, range: Range<K>, value: V) -> InsertResult<K, V> {
         let index = cursor.pop().expect("valid cursor");
-        if self.keys.len() == NODE_CAPACITY {
+        let result = if self.keys.len() == NODE_CAPACITY {
             if index == NODE_CAPACITY {
                 let mut keys = ArrayVec::new();
                 let mut values = ArrayVec::new();
                 let key = range.start;
                 keys.push(range);
                 values.push(value);
-                return InsertResult::SplitLeaf(key, Arc::new(Self { keys, values }));
+                return InsertResult::SplitLeaf(key, Arc::new(Self::new(keys, values)));
             }
             let middle = NODE_CAPACITY / 2;
             assert!(middle > 0);
-            let mut right = Self {
-                keys: self.keys.drain(middle..).collect(),
-                values: self.values.drain(middle..).collect(),
-            };
+            let mut right = Self::new(
+                self.keys.drain(middle..).collect(),
+                self.values.drain(middle..).collect(),
+            );
             if index <= middle {
                 self.keys.insert(index, range);
                 self.values.insert(index, value);
@@ -351,7 +401,9 @@ where
             self.keys.insert(index, range);
             self.values.insert(index, value);
             InsertResult::Inserted
-        }
+        };
+        self.update_max_gap();
+        result
     }
 
     /// Remove the entry indicated by `cursor`.
@@ -360,6 +412,7 @@ where
             self.keys.remove(index);
             let removed_value = self.values.remove(index);
             let maybe_split_key = self.keys.first().map(|range| range.start);
+            self.update_max_gap();
             if self.keys.len() < NODE_CAPACITY / 2 {
                 RemoveResult::Underflow(RemoveState { maybe_split_key, removed_value })
             } else {
@@ -369,11 +422,43 @@ where
             RemoveResult::NotFound
         }
     }
+
+    /// Find a gap that is at least as large as the given gap and is less than the given upper bound.
+    ///
+    /// Returns the end of the gap, which might above or below the node.
+    fn find_gap_end(&self, gap: u64, upper_bound: &K) -> K {
+        if self.keys.is_empty() {
+            return *upper_bound;
+        }
+
+        let node_end = &self.keys[self.keys.len() - 1].end;
+        if node_end <= upper_bound && node_end.measure_gap(upper_bound) >= gap {
+            return *upper_bound;
+        }
+
+        if self.max_gap >= gap {
+            for (i, _key) in self.keys.iter().enumerate().rev() {
+                if i > 0 {
+                    let start = &self.keys[i - 1].end;
+                    if start >= upper_bound {
+                        continue;
+                    }
+                    let end = upper_bound.min(&self.keys[i].start);
+                    if start.measure_gap(end) >= gap {
+                        return *end;
+                    }
+                }
+            }
+        }
+
+        let node_start = &self.keys[0].start;
+        *upper_bound.min(node_start)
+    }
 }
 
 /// The children of an internal node in the btree.
 #[derive(Clone, Debug)]
-enum ChildList<K: Ord + Copy, V: Clone> {
+enum ChildList<K: Ord + Copy + Gap, V: Clone> {
     /// Used when an internal node has leaf nodes as children.
     Leaf(ArrayVec<Arc<NodeLeaf<K, V>>, NODE_CAPACITY>),
 
@@ -383,7 +468,7 @@ enum ChildList<K: Ord + Copy, V: Clone> {
 
 impl<K, V> ChildList<K, V>
 where
-    K: Ord + Copy,
+    K: Ord + Copy + Gap,
     V: Clone,
 {
     /// Create a child list that has no children.
@@ -423,6 +508,19 @@ where
         match self {
             ChildList::Leaf(children) => NodeRef::Leaf(&children[i]),
             ChildList::Internal(children) => NodeRef::Internal(&children[i]),
+        }
+    }
+
+    /// Get the range of keys in the subtree rooted at this node.
+    fn subtree_key_range(&self) -> Range<K> {
+        match self {
+            ChildList::Leaf(children) => {
+                children[0].key_range().start..children[children.len() - 1].key_range().end
+            }
+            ChildList::Internal(children) => {
+                children[0].subtree_key_range.start
+                    ..children[children.len() - 1].subtree_key_range.end
+            }
         }
     }
 
@@ -496,7 +594,13 @@ where
 
 /// An internal node in the btree.
 #[derive(Clone, Debug)]
-struct NodeInternal<K: Ord + Copy, V: Clone> {
+struct NodeInternal<K: Ord + Copy + Gap, V: Clone> {
+    /// The maximum gap between keys in this internal node.
+    max_gap: u64,
+
+    /// The range of keys stored in the subtree rooted at this node.
+    subtree_key_range: Range<K>,
+
     /// A cache of the keys that partition the keys in the children.
     /// The key at index `i` is the smallest key stored in the subtree
     /// of the `i`+1 child.
@@ -529,9 +633,17 @@ fn get_two_mut<T>(slice: &mut [T], i: usize, j: usize) -> (&mut T, &mut T) {
 
 impl<K, V> NodeInternal<K, V>
 where
-    K: Ord + Copy,
+    K: Ord + Copy + Gap,
     V: Clone,
 {
+    /// Create a new internal node.
+    fn new(keys: ArrayVec<K, NODE_CAPACITY>, children: ChildList<K, V>) -> Self {
+        let mut node =
+            Self { max_gap: 0, subtree_key_range: children.subtree_key_range(), keys, children };
+        node.update_max_gap();
+        node
+    }
+
     /// The index of the child that might contain the given key.
     ///
     /// Searches the cached keys at this node to determine which child node might contain the given
@@ -596,6 +708,36 @@ where
         cursor.push(index);
     }
 
+    /// Update the maximum gap for this node.
+    fn update_max_gap(&mut self) {
+        let mut max_gap = 0;
+        match &self.children {
+            ChildList::Leaf(children) => {
+                for i in 0..children.len() {
+                    max_gap = max_gap.max(children[i].max_gap);
+                    if i < children.len() - 1 {
+                        max_gap = max_gap.max(children[i].measure_gap(&children[i + 1]));
+                    }
+                }
+            }
+            ChildList::Internal(children) => {
+                for i in 0..children.len() {
+                    max_gap = max_gap.max(children[i].max_gap);
+                    if i < children.len() - 1 {
+                        max_gap = max_gap.max(children[i].measure_gap(&children[i + 1]));
+                    }
+                }
+            }
+        }
+        self.subtree_key_range = self.children.subtree_key_range();
+        self.max_gap = max_gap;
+    }
+
+    /// Measure the gap between the last key in this node and the first key in the other node.
+    fn measure_gap(&self, other: &Self) -> u64 {
+        self.subtree_key_range.end.measure_gap(&other.subtree_key_range.start)
+    }
+
     /// Insert the given child node at `index` in this node.
     ///
     /// `key` must be the smallest key that occurs in the `child` subtree.
@@ -607,15 +749,13 @@ where
             if index == NODE_CAPACITY {
                 let mut children = self.children.new_empty();
                 children.insert(0, child);
-                let right = Self { keys: ArrayVec::new(), children };
+                let right = Self::new(ArrayVec::new(), children);
                 return InsertResult::SplitInternal(key, Arc::new(right));
             }
             let middle = NODE_CAPACITY / 2;
             assert!(middle > 0);
-            let mut internal = Self {
-                keys: self.keys.drain(middle..).collect(),
-                children: self.children.split_off(middle),
-            };
+            let mut internal =
+                Self::new(self.keys.drain(middle..).collect(), self.children.split_off(middle));
             let split_key = self.keys.pop().unwrap();
             if index < middle {
                 self.keys.insert(index, key);
@@ -649,13 +789,15 @@ where
                 Arc::make_mut(&mut children[index]).insert(cursor, range, value)
             }
         };
-        match result {
+        let result = match result {
             InsertResult::Inserted => InsertResult::Inserted,
             InsertResult::SplitLeaf(key, right) => self.insert_child(index, key, Node::Leaf(right)),
             InsertResult::SplitInternal(key, right) => {
                 self.insert_child(index, key, Node::Internal(right))
             }
-        }
+        };
+        self.update_max_gap();
+        result
     }
 
     /// Determine whether to rebalance the child with the given index to the left or to the right.
@@ -795,6 +937,7 @@ where
                         maybe_split_key = None;
                     }
                 }
+                self.update_max_gap();
                 RemoveResult::Removed(RemoveState { maybe_split_key, removed_value })
             }
             RemoveResult::Underflow(RemoveState { mut maybe_split_key, removed_value }) => {
@@ -805,6 +948,7 @@ where
                     }
                 }
                 self.rebalance_child(index);
+                self.update_max_gap();
                 if self.children.len() < NODE_CAPACITY / 2 {
                     RemoveResult::Underflow(RemoveState { maybe_split_key, removed_value })
                 } else {
@@ -813,11 +957,67 @@ where
             }
         }
     }
+
+    /// Find a gap that is at least as large as the given gap and is less than the given upper bound.
+    ///
+    /// Returns the end of the gap, which might above or below the node.
+    fn find_gap_end(&self, gap: u64, upper_bound: &K) -> K {
+        let node_start = &self.subtree_key_range.start;
+        if node_start > upper_bound {
+            return *upper_bound;
+        }
+
+        let node_end = &self.subtree_key_range.end;
+        if node_end <= upper_bound && node_end.measure_gap(upper_bound) >= gap {
+            return *upper_bound;
+        }
+
+        if self.max_gap >= gap {
+            match &self.children {
+                ChildList::Leaf(children) => {
+                    let mut child_upper_bound = *upper_bound;
+                    for (i, child) in children.iter().enumerate().rev() {
+                        if child.key_range().start >= *upper_bound {
+                            continue;
+                        }
+                        let end = child.find_gap_end(gap, &child_upper_bound);
+                        if i > 0 {
+                            let start = children[i - 1].key_range().end;
+                            if start.measure_gap(&end) < gap {
+                                child_upper_bound = start;
+                                continue;
+                            }
+                        }
+                        return end;
+                    }
+                }
+                ChildList::Internal(children) => {
+                    let mut child_upper_bound = *upper_bound;
+                    for (i, child) in children.iter().enumerate().rev() {
+                        if child.subtree_key_range.start >= *upper_bound {
+                            continue;
+                        }
+                        let end = child.find_gap_end(gap, &child_upper_bound);
+                        if i > 0 {
+                            let start = children[i - 1].subtree_key_range.end;
+                            if start.measure_gap(&end) < gap {
+                                child_upper_bound = start;
+                                continue;
+                            }
+                        }
+                        return end;
+                    }
+                }
+            }
+        }
+
+        *node_start
+    }
 }
 
 /// A node in the btree.
 #[derive(Clone, Debug)]
-enum Node<K: Ord + Copy, V: Clone> {
+enum Node<K: Ord + Copy + Gap, V: Clone> {
     /// An internal node.
     Internal(Arc<NodeInternal<K, V>>),
 
@@ -827,7 +1027,7 @@ enum Node<K: Ord + Copy, V: Clone> {
 
 impl<K, V> Node<K, V>
 where
-    K: Ord + Copy,
+    K: Ord + Copy + Gap,
     V: Clone,
 {
     /// The number of children stored at this node.
@@ -904,11 +1104,21 @@ where
             Node::Leaf(node) => node.find(key, position, cursor),
         }
     }
+
+    /// Find a gap that is at least as large as the given gap and is less than the given upper bound.
+    ///
+    /// Returns the end of the gap, which might above or below the node.
+    fn find_gap_end(&self, gap: u64, upper_bound: &K) -> K {
+        match self {
+            Node::Leaf(node) => node.find_gap_end(gap, upper_bound),
+            Node::Internal(node) => node.find_gap_end(gap, upper_bound),
+        }
+    }
 }
 
 /// A node in the btree.
 #[derive(Clone, Debug)]
-enum NodeRef<'a, K: Ord + Copy, V: Clone> {
+enum NodeRef<'a, K: Ord + Copy + Gap, V: Clone> {
     /// An internal node.
     Internal(&'a Arc<NodeInternal<K, V>>),
 
@@ -918,7 +1128,7 @@ enum NodeRef<'a, K: Ord + Copy, V: Clone> {
 
 impl<'a, K, V> NodeRef<'a, K, V>
 where
-    K: Ord + Copy,
+    K: Ord + Copy + Gap,
     V: Clone,
 {
     /// The number of children stored at this node.
@@ -932,7 +1142,7 @@ where
 
 /// An iterator over the key-value pairs stored in a RangeMap2.
 #[derive(Debug)]
-pub struct Iter<'a, K: Ord + Copy, V: Clone> {
+pub struct Iter<'a, K: Ord + Copy + Gap, V: Clone> {
     /// The state of the forward iteration.
     ///
     /// The cursor points to the next entry to enumerate.
@@ -950,7 +1160,7 @@ pub struct Iter<'a, K: Ord + Copy, V: Clone> {
 
 impl<'a, K, V> Iter<'a, K, V>
 where
-    K: Ord + Copy,
+    K: Ord + Copy + Gap,
     V: Clone,
 {
     /// Whether the iterator is complete.
@@ -963,7 +1173,7 @@ where
 
 impl<'a, K, V> Iterator for Iter<'a, K, V>
 where
-    K: Ord + Copy,
+    K: Ord + Copy + Gap,
     V: Clone,
 {
     type Item = (&'a Range<K>, &'a V);
@@ -1000,7 +1210,7 @@ where
 
 impl<'a, K, V> DoubleEndedIterator for Iter<'a, K, V>
 where
-    K: Ord + Copy,
+    K: Ord + Copy + Gap,
     V: Clone,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -1038,7 +1248,7 @@ where
 /// This map can be cloned efficiently. If the map is modified after being cloned, the relevant
 /// parts of the map's internal structure will be copied lazily.
 #[derive(Clone, Debug)]
-pub struct RangeMap2<K: Ord + Copy, V: Clone + Eq> {
+pub struct RangeMap2<K: Ord + Copy + Gap, V: Clone + Eq> {
     /// The root node of the tree.
     ///
     /// The root node is either a leaf of an internal node, depending on the number of entries in
@@ -1048,7 +1258,7 @@ pub struct RangeMap2<K: Ord + Copy, V: Clone + Eq> {
 
 impl<K, V> Default for RangeMap2<K, V>
 where
-    K: Ord + Copy,
+    K: Ord + Copy + Gap,
     V: Clone + Eq,
 {
     fn default() -> Self {
@@ -1058,7 +1268,7 @@ where
 
 impl<K, V> RangeMap2<K, V>
 where
-    K: Ord + Copy,
+    K: Ord + Copy + Gap,
     V: Clone + Eq,
 {
     /// Whether this map contains any entries.
@@ -1108,6 +1318,13 @@ where
         let cursor = self.find(key, CursorPosition::Left);
         self.get_if_contains_key(key, cursor)
             .map(|(range, value)| (cursor, range.clone(), value.clone()))
+    }
+
+    /// Find a gap that is at least as large as the given gap and is less than the given upper bound.
+    ///
+    /// Returns the end of the gap, which might above or below the entries in the map.
+    pub fn find_gap_end(&self, gap: u64, upper_bound: &K) -> K {
+        self.node.find_gap_end(gap, upper_bound)
     }
 
     /// Remove the entry with the given key from the map.
@@ -1182,10 +1399,8 @@ where
                 };
                 children.push(left);
                 children.push(right);
-                self.node = Node::Internal(Arc::new(NodeInternal {
-                    keys,
-                    children: ChildList::Leaf(children),
-                }));
+                self.node =
+                    Node::Internal(Arc::new(NodeInternal::new(keys, ChildList::Leaf(children))));
                 None
             }
             InsertResult::SplitInternal(key, right) => {
@@ -1197,10 +1412,9 @@ where
                 };
                 children.push(left);
                 children.push(right);
-                self.node = Node::Internal(Arc::new(NodeInternal {
-                    keys,
-                    children: ChildList::Internal(children),
-                }));
+                let mut new_internal = NodeInternal::new(keys, ChildList::Internal(children));
+                new_internal.update_max_gap();
+                self.node = Node::Internal(Arc::new(new_internal));
                 None
             }
         }
@@ -1328,6 +1542,7 @@ where
         self.range(..key)
     }
 
+    /// Iterate over the ranges in the map that intersect the given range.
     pub fn intersection(
         &self,
         range: impl Borrow<Range<K>>,
@@ -1954,5 +2169,133 @@ mod test {
             let key_after_split = critical_range.start + 1;
             assert_eq!(map.get(key_after_split), Some((&spanning_range, &value)));
         }
+    }
+
+    #[::fuchsia::test]
+    fn test_find_gap_end_empty() {
+        let map = RangeMap2::<u32, i32>::default();
+        assert_eq!(map.find_gap_end(10, &100), 100);
+    }
+
+    #[::fuchsia::test]
+    fn test_find_gap_end_single_range() {
+        let mut map = RangeMap2::<u32, i32>::default();
+        map.insert(10..20, 1);
+        assert_eq!(map.find_gap_end(10, &100), 100);
+    }
+
+    #[::fuchsia::test]
+    fn test_find_gap_end_multiple_ranges() {
+        let mut map = RangeMap2::<u32, i32>::default();
+        map.insert(10..20, 1);
+        map.insert(40..50, 2);
+        map.insert(60..70, 3);
+
+        // Test finding gaps of various sizes
+        assert_eq!(map.find_gap_end(5, &80), 80);
+        assert_eq!(map.find_gap_end(10, &80), 80);
+        assert_eq!(map.find_gap_end(11, &80), 40);
+        assert_eq!(map.find_gap_end(20, &80), 40);
+        assert_eq!(map.find_gap_end(21, &80), 10);
+
+        // Test finding gaps of various sizes with a lower bound
+        assert_eq!(map.find_gap_end(5, &10), 10);
+        assert_eq!(map.find_gap_end(5, &20), 10);
+        assert_eq!(map.find_gap_end(5, &30), 30);
+        assert_eq!(map.find_gap_end(5, &40), 40);
+        assert_eq!(map.find_gap_end(5, &50), 40);
+        assert_eq!(map.find_gap_end(5, &60), 60);
+        assert_eq!(map.find_gap_end(5, &70), 60);
+        assert_eq!(map.find_gap_end(5, &80), 80);
+        assert_eq!(map.find_gap_end(5, &90), 90);
+        assert_eq!(map.find_gap_end(5, &100), 100);
+    }
+
+    #[::fuchsia::test]
+    fn test_find_gap_end_rightmost() {
+        let mut map = RangeMap2::<u32, i32>::default();
+        map.insert(10..20, 1);
+        map.insert(30..40, 2);
+        map.insert(50..60, 3);
+        map.insert(70..80, 4);
+
+        // All gaps are size 10, should find the rightmost one
+        assert_eq!(map.find_gap_end(10, &10), 10);
+        assert_eq!(map.find_gap_end(10, &20), 10);
+        assert_eq!(map.find_gap_end(10, &30), 30);
+        assert_eq!(map.find_gap_end(10, &40), 30);
+        assert_eq!(map.find_gap_end(10, &50), 50);
+        assert_eq!(map.find_gap_end(10, &60), 50);
+        assert_eq!(map.find_gap_end(10, &70), 70);
+        assert_eq!(map.find_gap_end(10, &80), 70);
+        assert_eq!(map.find_gap_end(10, &90), 90);
+        assert_eq!(map.find_gap_end(10, &100), 100);
+    }
+
+    #[::fuchsia::test]
+    fn test_find_gap_end_large_map() {
+        let mut map = RangeMap2::<u32, i32>::default();
+        let num_entries = 1000;
+
+        fn range_for(i: u32) -> Range<u32> {
+            let start = i * (8000 - i) as u32;
+            let end = start + 10;
+            start..end
+        }
+
+        // Insert ranges with decreasing gap sizes
+        for i in 0..num_entries {
+            map.insert(range_for(i), i as i32);
+        }
+
+        let upper_bound = range_for(num_entries - 1).end;
+
+        for i in 0..num_entries - 1 {
+            let current_range = range_for(i);
+            let next_range = range_for(i + 1);
+            let gap_size = current_range.end.measure_gap(&next_range.start);
+            assert_eq!(map.find_gap_end(gap_size, &upper_bound), next_range.start);
+        }
+    }
+
+    #[::fuchsia::test]
+    fn test_find_gap_end_after_removal() {
+        let mut map = RangeMap2::<u32, i32>::default();
+        map.insert(10..20, 1);
+        map.insert(30..40, 2);
+        map.insert(50..60, 3);
+
+        assert_eq!(map.find_gap_end(12, &60), 10);
+
+        map.remove(30..35);
+        assert_eq!(map.find_gap_end(12, &60), 35);
+    }
+
+    #[::fuchsia::test]
+    fn test_find_gap_end_adjacent_ranges() {
+        let mut map = RangeMap2::<u32, i32>::default();
+        map.insert(10..20, 1);
+        map.insert(20..30, 2);
+        map.insert(30..40, 3);
+
+        // No gaps between ranges
+        assert_eq!(map.find_gap_end(1, &100), 100);
+    }
+
+    #[::fuchsia::test]
+    fn test_find_gap_end_merging() {
+        let mut map = RangeMap2::<u32, i32>::default();
+        map.insert(10..20, 1);
+        map.insert(30..40, 2);
+        map.insert(50..60, 2); // Same value as previous range
+
+        // Initially should find the last gap
+        assert_eq!(map.find_gap_end(10, &100), 100);
+
+        // Merge the last two ranges
+        map.insert(40..50, 1);
+
+        // Now should find the first gap
+        assert_eq!(map.find_gap_end(10, &100), 100);
     }
 }
