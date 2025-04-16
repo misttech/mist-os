@@ -299,12 +299,12 @@ impl Topology {
         )
     }
 
-    pub fn remove_element(&mut self, element_id: &ElementID) {
+    pub fn remove_element(&mut self, element_id: &ElementID) -> Option<Element> {
         if self.unsatisfiable_element_id != *element_id {
             self.invalidate_dependent_elements(element_id);
-            if let Some(element) = self.elements.remove(element_id) {
-                self.inspect().on_remove_element(element);
-            }
+            self.elements.remove(element_id)
+        } else {
+            None
         }
     }
 
