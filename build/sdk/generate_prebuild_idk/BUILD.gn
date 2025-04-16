@@ -16,7 +16,29 @@ action("generate_prebuild_idk_integration_test") {
   testonly = true
   script =
       "//build/sdk/generate_prebuild_idk/generate_prebuild_idk_validation.py"
-  inputs = [ "generate_prebuild_idk.py" ]
+  inputs = [
+    "generate_prebuild_idk.py",
+
+    # Accessed by generate_prebuild_idk.py.
+    "//build/sdk/generate_version_history/__init__.py",
+    "//third_party/pyyaml/src/lib/yaml/__init__.py",
+    "//third_party/pyyaml/src/lib/yaml/composer.py",
+    "//third_party/pyyaml/src/lib/yaml/constructor.py",
+    "//third_party/pyyaml/src/lib/yaml/cyaml.py",
+    "//third_party/pyyaml/src/lib/yaml/dumper.py",
+    "//third_party/pyyaml/src/lib/yaml/emitter.py",
+    "//third_party/pyyaml/src/lib/yaml/error.py",
+    "//third_party/pyyaml/src/lib/yaml/events.py",
+    "//third_party/pyyaml/src/lib/yaml/loader.py",
+    "//third_party/pyyaml/src/lib/yaml/nodes.py",
+    "//third_party/pyyaml/src/lib/yaml/parser.py",
+    "//third_party/pyyaml/src/lib/yaml/reader.py",
+    "//third_party/pyyaml/src/lib/yaml/representer.py",
+    "//third_party/pyyaml/src/lib/yaml/resolver.py",
+    "//third_party/pyyaml/src/lib/yaml/scanner.py",
+    "//third_party/pyyaml/src/lib/yaml/serializer.py",
+    "//third_party/pyyaml/src/lib/yaml/tokens.py",
+  ]
   outputs = [ "$target_out_dir/$target_name.check" ]
   args = [
     "--quiet",

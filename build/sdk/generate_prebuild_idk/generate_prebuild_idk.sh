@@ -38,5 +38,4 @@ host_tag="${host_os}-${host_cpu}"
 
 PREBUILT_PYTHON_PATH=${FUCHSIA_SOURCE_DIR}/prebuilt/third_party/python3/${host_tag}/bin/python3
 export PYTHONDONTWRITEBYTECODE=1
-export PYTHONPATH="${FUCHSIA_SOURCE_DIR}/build/sdk":"${FUCHSIA_SOURCE_DIR}/third_party/pyyaml/src/lib"
 exec "$PREBUILT_PYTHON_PATH" -S "${SCRIPT_DIR}/${SCRIPT_NAME%.sh}.py" "$@"

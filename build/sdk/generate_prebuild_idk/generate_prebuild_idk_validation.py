@@ -18,6 +18,9 @@ from pathlib import Path
 _SCRIPT_DIR = Path(__file__).parent
 sys.path.insert(0, str(_SCRIPT_DIR))
 
+# Assume the script is in //build/sdk/generate_prebuild_idk/.
+_FUCHSIA_ROOT_DIR = _SCRIPT_DIR.parent.parent.parent
+
 
 # TODO(https://fxbug.dev/338009514): Share with
 # //build/bazel/fuchsia_idk/generate_repository_validation.py.
@@ -86,9 +89,6 @@ def compare_directories(
 
 
 def main() -> int:
-    # Assume this script is under //build/sdk/
-    _real_fuchsia_source_dir = Path(__file__).parent.parent.parent.parent
-
     _generate_idk_script = _SCRIPT_DIR / "generate_prebuild_idk.py"
     _test_data_dir = _SCRIPT_DIR / "validation_data"
     _input_fuchsia_source_dir = _test_data_dir / "input_fuchsia_dir"
@@ -112,8 +112,9 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.hermetic_inputs_file:
-        # Handle --hermetic_inputs_file here, results must be relative
-        # to the current directory.
+        # Generate a file containing the list of hermetic inputs. Results must
+        # be relative to the current working directory.
+
         implicit_inputs = []
         for root, subdirs, subfiles in os.walk(_test_data_dir):
             for subfile in subfiles:
@@ -130,9 +131,6 @@ def main() -> int:
     )
     output_idk_dir = Path(temp_dir.name)
 
-    generate_prebuild_env = {
-        "PYTHONPATH": f"{_real_fuchsia_source_dir}/third_party/pyyaml/src/lib"
-    }
     generate_prebuild_command_args = [
         sys.executable,
         "-S",
@@ -145,7 +143,6 @@ def main() -> int:
 
     ret = subprocess.run(
         generate_prebuild_command_args,
-        env=generate_prebuild_env,
     )
     ret.check_returncode()
 

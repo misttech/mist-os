@@ -21,14 +21,17 @@ import sys
 import typing as T
 from pathlib import Path
 
-import yaml
-
+# Assume the script is in //build/sdk/generate_prebuild_idk/.
 _SCRIPT_DIR = Path(__file__).parent
+_FUCHSIA_ROOT_DIR = _SCRIPT_DIR.parent.parent.parent
 
 # The directory that contains module dependencies for this script.
 sys.path.insert(0, str(_SCRIPT_DIR / ".."))
+# For yaml.
+sys.path.insert(0, str(_FUCHSIA_ROOT_DIR / "third_party/pyyaml/src/lib"))
 
 import generate_version_history
+import yaml
 
 AtomInfo: T.TypeAlias = T.Dict[str, T.Any]
 MetaJson: T.TypeAlias = T.Dict[str, T.Any]
@@ -543,7 +546,7 @@ def main() -> int:
         "--output-dir",
         type=Path,
         help=(
-            "Path to the output directory for generated files. "
+            "Path to the directory in which to write the IDK. "
             "A new directory will be created at this location."
             "Any existing directory will be deleted."
         ),
@@ -569,77 +572,135 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    if not args.fuchsia_source_dir:
-        # Assume this script is under //build/sdk/generate_prebuild_idk/.
-        args.fuchsia_source_dir = Path(__file__).parent.parent.parent.parent
-
     with args.prebuild_manifest.open() as f:
         prebuild_manifest = json.load(f)
 
-    prebuild_map = PrebuildMap(prebuild_manifest)
-    prebuild_map.set_fuchsia_source_dir(args.fuchsia_source_dir)
-    prebuild_map.set_build_dir(args.build_dir)
+    generator = IdkGenerator(
+        prebuild_manifest, args.build_dir, args.fuchsia_source_dir
+    )
 
-    meta_files: T.Dict[str, MetaJson] = {}
-
-    unhandled_labels = set()
-
-    collection_meta_path = None
-    collection_parts: list[dict[str, T.Any]] = []
-    atom_files: list[dict[str, str]] = []
-
-    for info in prebuild_map.values():
-        meta_json, additional_atom_files = prebuild_map.get_meta(info)
-        assert meta_json or not additional_atom_files
-        if meta_json:
-            meta_path = info["atom_meta"]["dest"]
-            meta_files[meta_path] = meta_json
-
-            if info["atom_type"] == "collection":
-                assert (
-                    not collection_meta_path
-                ), "More than one collection info provided."
-                collection_meta_path = meta_path
-            else:
-                collection_parts.append(
-                    {
-                        "meta": meta_path,
-                        "stable": info["is_stable"],
-                        "type": info["atom_type"],
-                    }
-                )
-                atom_files += info["atom_files"]
-
-            if additional_atom_files:
-                atom_files += additional_atom_files
-        elif info["atom_type"] != "none":
-            unhandled_labels.add(info["atom_label"])
-
-    if unhandled_labels:
-        print(
-            "ERROR: Unhandled labels:\n%s\n"
-            % "\n".join(sorted(unhandled_labels))
-        )
-        return 1
-
-    collection_parts.sort(key=lambda a: (a["meta"], a["type"]))
-
-    # Generate the IDK manifest.
-    assert collection_meta_path, "Collection info must be provided."
-    meta_files[collection_meta_path]["parts"] = collection_parts
+    result = generator.GenerateMetaFileContents()
+    if result != 0:
+        return result
 
     if args.check:
+        result = generator.VerifyMetaFileContentsAgainstNinjaGeneratedFiles()
+        if result != 0:
+            return result
+
+    if args.output_dir:
+        result = generator.WriteIdkContentsToDirectory(args.output_dir)
+        if result != 0:
+            return result
+
+    return 0
+
+
+class IdkGenerator(object):
+    def __init__(
+        self,
+        prebuild_manifest: T.Sequence[AtomInfo],
+        build_dir: Path,
+        fuchsia_source_dir: T.Optional[Path],
+    ):
+        self._meta_files: T.Dict[str, MetaJson] = {}
+        self._atom_files: list[dict[str, str]] = []
+
+        self._build_dir = build_dir
+
+        if not fuchsia_source_dir:
+            # Assume this script is under //build/sdk/generate_prebuild_idk/.
+            fuchsia_source_dir = Path(__file__).parent.parent.parent.parent
+
+        self._prebuild_map = PrebuildMap(prebuild_manifest)
+        self._prebuild_map.set_fuchsia_source_dir(fuchsia_source_dir)
+        self._prebuild_map.set_build_dir(build_dir)
+
+    def GenerateMetaFileContents(self) -> int:
+        """Processes the data in `self._prebuild_map`.
+
+        Populates `self._meta_files` with the contents of meta files and
+        `self._atom_files` with files to be copied.
+
+        Must be called before other methods and may only be called one time.
+
+        Returns:
+            0 upon success and a positive integer otherwise.
+        """
+        assert not self._meta_files and not self._atom_files
+
+        unhandled_labels = set()
+        collection_meta_path = None
+        collection_parts: list[dict[str, T.Any]] = []
+
+        for info in self._prebuild_map.values():
+            meta_json, additional_atom_files = self._prebuild_map.get_meta(info)
+            assert meta_json or not additional_atom_files
+            if meta_json:
+                meta_path = info["atom_meta"]["dest"]
+                self._meta_files[meta_path] = meta_json
+
+                if info["atom_type"] == "collection":
+                    assert (
+                        not collection_meta_path
+                    ), "More than one collection info provided."
+                    collection_meta_path = meta_path
+                else:
+                    collection_parts.append(
+                        {
+                            "meta": meta_path,
+                            "stable": info["is_stable"],
+                            "type": info["atom_type"],
+                        }
+                    )
+                    self._atom_files += info["atom_files"]
+
+                if additional_atom_files:
+                    self._atom_files += additional_atom_files
+            elif info["atom_type"] != "none":
+                unhandled_labels.add(info["atom_label"])
+
+        if unhandled_labels:
+            print(
+                "ERROR: Unhandled labels:\n%s\n"
+                % "\n".join(sorted(unhandled_labels))
+            )
+            return 1
+
+        collection_parts.sort(key=lambda a: (a["meta"], a["type"]))
+
+        # Generate the IDK manifest.
+        assert collection_meta_path, "Collection info must be provided."
+        self._meta_files[collection_meta_path]["parts"] = collection_parts
+
+        return 0
+
+    def VerifyMetaFileContentsAgainstNinjaGeneratedFiles(self) -> int:
+        """Verifies the meta file content generated from prebuild data against
+        the files generated by the Ninja build.
+
+        The IDK collection corresponding to the prebuild manifest must have been
+        successfully built since any changes were made.
+
+        The reference files are identified by the "atom_meta_json_file" fields
+        in the prebuild metadata.
+
+        Returns:
+            0 when no differences are found and a positive integer otherwise.
+        """
+        assert self._meta_files
+
         failed = False
-        for atom_label, info in prebuild_map.items():
+        for atom_label, info in self._prebuild_map.items():
             meta_path = info["atom_meta"]["dest"]
-            meta_json = meta_files.get(meta_path)
+            meta_json = self._meta_files.get(meta_path)
             if meta_json is None:
                 continue
 
             meta_json_content = json.dumps(meta_json, sort_keys=True, indent=2)
 
             reference_json = info["atom_meta_json_file"]
-            reference_path = Path(args.build_dir / reference_json)
+            reference_path = Path(self._build_dir / reference_json)
             if not reference_path.exists():
                 print(
                     f"ERROR: Missing build file: {reference_path}",
@@ -683,21 +744,36 @@ def main() -> int:
                 "PASS: All generated metadata files have the same contents as "
                 "the corresponding Ninja-built files."
             )
+            return 0
 
-    if args.output_dir:
-        temp_out_dir = Path(f"{args.output_dir}.tmp")
+    def WriteIdkContentsToDirectory(self, output_dir: Path) -> int:
+        """Writes the generated contents to `output_dir`.
+
+        Writes the metadata in `self._meta_files` to files and creates symlinks
+        for each `self._atom_files`.
+
+        Args:
+            output_dir: Path to the directory in which to write the IDK.
+            A new directory will be created at this location.
+            Any existing directory will be deleted.
+        Returns:
+            0 upon success and a positive integer otherwise.
+        """
+        assert self._meta_files
+
+        temp_out_dir = Path(f"{output_dir}.tmp")
         if temp_out_dir.exists():
             shutil.rmtree(temp_out_dir)
 
-        for meta_path, meta_json in meta_files.items():
+        for meta_path, meta_json in self._meta_files.items():
             dest_path = temp_out_dir / meta_path
             dest_path.parent.mkdir(parents=True, exist_ok=True)
-            with dest_path.open("w") as f:
-                json.dump(meta_json, f, sort_keys=True, indent=2)
+            with dest_path.open("w") as file:
+                json.dump(meta_json, file, sort_keys=True, indent=2)
 
         # Create symlinks for all "atom_files".
-        for f in atom_files:
-            target_path = args.build_dir / f["source"]
+        for f in self._atom_files:
+            target_path = self._build_dir / f["source"]
             # The target directory must exist even if the file does not.
             target_path.parent.mkdir(parents=True, exist_ok=True)
             dst_path = temp_out_dir / f["dest"]
@@ -711,11 +787,10 @@ def main() -> int:
                 )
                 return 1
 
-        if args.output_dir.exists():
-            shutil.rmtree(args.output_dir)
-        os.rename(temp_out_dir, args.output_dir)
-
-    return 0
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+        os.rename(temp_out_dir, output_dir)
+        return 0
 
 
 if __name__ == "__main__":
