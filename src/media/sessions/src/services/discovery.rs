@@ -216,7 +216,7 @@ impl Discovery {
             info!(
                 tag = LOG_TAG;
                 concat!(
-                    "Usage {:?} was interrputed; will pause the players ",
+                    "Usage {:?} was interrupted; will pause the players ",
                     "that requested to be paused on interruption.",
                 ),
                 usage
@@ -230,7 +230,10 @@ impl Discovery {
                 for (id, player) in self.players.inner_mut().iter() {
                     if player.usage_to_pause_on_interruption() == Some(usage) && player.is_active()
                     {
-                        let _ = player.pause();
+                        let pause_error = player.pause();
+                        if pause_error.is_err() {
+                            info!(tag = LOG_TAG; "Received pause error {:?}", pause_error.err());
+                        }
                         interrupted.insert(*id);
                     }
                 }
@@ -240,7 +243,10 @@ impl Discovery {
                     if interrupted.remove(&id)
                         && player.usage_to_pause_on_interruption() == Some(usage)
                     {
-                        let _ = player.play();
+                        let play_error = player.play();
+                        if play_error.is_err() {
+                            info!(tag = LOG_TAG; "Received play error {:?}", play_error.err());
+                        }
                     }
                 }
             }
