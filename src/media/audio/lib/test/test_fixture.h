@@ -11,8 +11,6 @@
 #include <zircon/errors.h>
 
 #include <deque>
-#include <initializer_list>
-#include <optional>
 #include <unordered_map>
 
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
@@ -57,13 +55,13 @@ class TestFixture : public ::gtest::RealLoopFixture {
   // the given name will be included in the test failure message. The InterfacePtr must
   // live for the duration of this TestFixture.
   template <class T>
-  void AddErrorHandler(fidl::InterfacePtr<T>& ptr, std::string name) {
+  void AddErrorHandler(fidl::InterfacePtr<T>& ptr, const std::string& name) {
     auto [h, cb] = NewErrorHandler(name);
     ptr.set_error_handler(std::move(cb));
     error_handlers_[ptr.channel().get()] = h;
   }
   template <class T>
-  void AddErrorHandler(fidl::Binding<T>& binding, std::string name) {
+  void AddErrorHandler(fidl::Binding<T>& binding, const std::string& name) {
     auto [h, cb] = NewErrorHandler(name);
     binding.set_error_handler(std::move(cb));
     error_handlers_[binding.channel().get()] = h;
@@ -98,7 +96,7 @@ class TestFixture : public ::gtest::RealLoopFixture {
   auto AddCallbackUnordered(const std::string& name, Callable callback);
 
   // Add an unexpected callback. The test will fail if this callback is triggered.
-  auto AddUnexpectedCallback(const std::string& name) {
+  static auto AddUnexpectedCallback(const std::string& name) {
     return [name](auto&&...) { ADD_FAILURE() << "Got unexpected callback " << name; };
   }
 
@@ -122,7 +120,7 @@ class TestFixture : public ::gtest::RealLoopFixture {
   // Shorthand to expect many disconnect errors.
   void ExpectDisconnects(const std::vector<std::shared_ptr<ErrorHandler>>& errors) {
     std::vector<std::shared_ptr<ErrorHandler>> handlers;
-    for (auto eh : errors) {
+    for (const auto& eh : errors) {
       eh->expected_error_code = ZX_ERR_PEER_CLOSED;
     }
     ExpectErrors(errors);
