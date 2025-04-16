@@ -612,6 +612,13 @@ fn scalar_u32_field(offset: usize) -> FieldDescriptor {
     FieldDescriptor { offset, field_type: FieldType::Scalar { size: std::mem::size_of::<u32>() } }
 }
 
+fn scalar_u32_mut_field(offset: usize) -> FieldDescriptor {
+    FieldDescriptor {
+        offset,
+        field_type: FieldType::MutableScalar { size: std::mem::size_of::<u32>() },
+    }
+}
+
 fn scalar_u64_field(offset: usize) -> FieldDescriptor {
     FieldDescriptor { offset, field_type: FieldType::Scalar { size: std::mem::size_of::<u64>() } }
 }
@@ -663,8 +670,11 @@ pub static SCHED_ARG_TYPE: LazyLock<Type> = LazyLock::new(|| {
     ptr_to_struct_type(
         SK_BUF_ID.clone(),
         vec![
-            // All fields from the start of `__sk_buff` to `cb` are read-only scalars.
-            scalar_range(0, offset_of!(__sk_buff, cb)),
+            // All fields from the start of `__sk_buff` to `cb` are read-only scalars, except mark
+            // that is read-write.
+            scalar_range(0, offset_of!(__sk_buff, mark)),
+            scalar_u32_mut_field(offset_of!(__sk_buff, mark)),
+            scalar_range(offset_of!(__sk_buff, queue_mapping), offset_of!(__sk_buff, cb)),
             // `cb` is a mutable array.
             scalar_mut_range(offset_of!(__sk_buff, cb), offset_of!(__sk_buff, hash)),
             scalar_u32_field(offset_of!(__sk_buff, hash)),
@@ -685,8 +695,11 @@ pub static CGROUP_SKB_SK_BUF_TYPE: LazyLock<Type> = LazyLock::new(|| {
     ptr_to_struct_type(
         SK_BUF_ID.clone(),
         vec![
-            // All fields from the start of `__sk_buff` to `cb` are read-only scalars.
-            scalar_range(0, offset_of!(__sk_buff, cb)),
+            // All fields from the start of `__sk_buff` to `cb` are read-only scalars, except mark
+            // that is read-write.
+            scalar_range(0, offset_of!(__sk_buff, mark)),
+            scalar_u32_mut_field(offset_of!(__sk_buff, mark)),
+            scalar_range(offset_of!(__sk_buff, queue_mapping), offset_of!(__sk_buff, cb)),
             // `cb` is a mutable array.
             scalar_mut_range(offset_of!(__sk_buff, cb), offset_of!(__sk_buff, hash)),
             scalar_u32_field(offset_of!(__sk_buff, hash)),
