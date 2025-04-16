@@ -12,14 +12,6 @@
     },
     use: [
         {
-            // For /dev/class/gpu, /dev/class/gpu-performance-counters, and /dev/sys/platform/pt/PCI0/bus/00:02.0/00:02.0/intel-gpu-core
-            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
-            // been migrated to services. The service capability has been added below.
-            directory: "dev-class",
-            rights: [ "r*" ],
-            path: "/dev/class",
-        },
-        {
             // This service replaces the directory capability above.
             service: [
                 "fuchsia.gpu.magma.PerformanceCounterService",
