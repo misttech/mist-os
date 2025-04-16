@@ -80,6 +80,11 @@ impl FileOps for TraceMarkerFile {
                                 .push((name.to_string(), now));
                         }
                         ATraceEvent::End { pid } => {
+                            let pid = if pid != 0 {
+                                pid
+                            } else {
+                                current_task.get_pid().try_into().unwrap_or(pid)
+                            };
                             if let Some(stack) = event_stacks.get_mut(&pid) {
                                 if let Some((name, start_time)) = stack.pop() {
                                     context.write_duration_with_inline_name(&name, start_time, &[]);
@@ -177,11 +182,14 @@ impl<'a> ATraceEvent<'a> {
         match event_type {
             "B" => {
                 let pid = chunks.next()?.parse::<u64>().ok()?;
-                let name = chunks.next()?;
+                // It is ok to have an unnamed begin event, so insert a default name.
+                let name = chunks.next().unwrap_or("[empty name]");
                 Some(ATraceEvent::Begin { pid, name })
             }
             "E" => {
-                let pid = chunks.next()?.parse::<u64>().ok()?;
+                // End thread scoped event. Since it is thread scoped, it is OK to not have the TGID
+                // not present.
+                let pid = chunks.next().unwrap_or("0").parse::<u64>().unwrap_or(0);
                 Some(ATraceEvent::End { pid })
             }
             "I" => {
@@ -241,11 +249,22 @@ mod tests {
             ATraceEvent::parse("B|1636|slice_name"),
             Some(ATraceEvent::Begin { pid: 1636, name: "slice_name" }),
         );
+
+        let no_name_event = ATraceEvent::parse("B|1166");
+        match no_name_event {
+            Some(ATraceEvent::Begin { pid: 1166, .. }) => (),
+            _ => panic!("Unexpected parsing result: {no_name_event:?} from \"B|1166\""),
+        };
+
         assert_eq!(ATraceEvent::parse("E|1636"), Some(ATraceEvent::End { pid: 1636 }),);
         assert_eq!(
             ATraceEvent::parse("I|1636|instant_name"),
             Some(ATraceEvent::Instant { name: "instant_name" }),
         );
+
+        assert_eq!(ATraceEvent::parse("E|"), Some(ATraceEvent::End { pid: 0 }));
+        assert_eq!(ATraceEvent::parse("E"), Some(ATraceEvent::End { pid: 0 }));
+
         assert_eq!(
             ATraceEvent::parse("S|1636|async_name|123"),
             Some(ATraceEvent::AsyncBegin { name: "async_name", correlation_id: 123 }),
