@@ -713,9 +713,8 @@ if (!is_host) {
     visibility = [
       ":bazel_in_tree_idk",
       ":sdk",
-      "//:bazel_workspace",
     ]
-    subbuilds_visibility = [ ":bazel_in_tree_idk" ]
+    subbuilds_visibility = []  # There are no sub-builds.
 
     non_sdk_deps_build_tests_for_all_builds =
         _common_non_sdk_deps_build_tests_for_all_builds
@@ -1285,11 +1284,14 @@ if (current_toolchain == default_toolchain) {
   # This exposes a subset of the atoms in the complete "fuchsia" IDK.
   # By default it only provides binaries for the current `target_cpu`
   # architecture and the "PLATFORM" API level.
-  idk("bazel_in_tree_idk") {
+  #
+  # The exported directory is populated with metadata and symlinks at GN gen
+  # time by regenerator, so this target just ensures that all the targets of the
+  # symlinks have been built.
+  group("bazel_in_tree_idk") {
     visibility = []
     visibility = [
       ":bazel_in_tree_idk_tests_${target_cpu}",
-      "//:ninja_subbuilds",
       "//build/bazel:fuchsia_in_tree_idk.hash",
       "//build/bazel:generate_main_workspace",
       "//build/bazel/bazel_sdk:bazel_in_tree_idk.bazel_input",
@@ -1306,21 +1308,8 @@ if (current_toolchain == default_toolchain) {
       ":fuchsia_collection",
     ]
 
-    output_name = "bazel_in_tree_idk"
-    sdk_collection_label = "//sdk:in_tree_collection"
-    idk_subbuilds_label = "//sdk:in_tree_collection_subbuilds"
-    idk_subbuilds_prefix = "idk_subbuild.in_tree_collection_for_subbuilds"
-
-    target_cpus = [ target_cpu ]
-
-    api_levels = []  # `PLATFORM` artifacts will be used as `HEAD`
-
-    # TODO(https://fxbug.dev/306723826): Deal with the fact that the mac builders
-    # are too slow to enable this setting, and therefore the mac IDK won't have
-    # per-api-level prebuilts.
-    if (host_os == "mac") {
-      api_levels = []
-    }
+    # Building the collection should be enough to satisfy all symlinks.
+    deps = [ "//sdk:in_tree_collection" ]
   }
 
   # Run the Bazel SDK test suite against the content of
@@ -1332,7 +1321,7 @@ if (current_toolchain == default_toolchain) {
     target_cpus = [ target_cpu ]
 
     idk_exported_target = "//sdk:bazel_in_tree_idk"
-    idk_exported_path = "$root_build_dir/sdk/exported/bazel_in_tree_idk"
+    idk_exported_path = "$root_build_dir/regenerator_outputs/bazel_in_tree_idk"
 
     # For now, nothing should depend on this except
     # //:root_targets to ensure it can be launched manually

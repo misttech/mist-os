@@ -20,13 +20,17 @@ import build_tests_json
 
 _SCRIPT_DIR = Path(__file__).parent
 
-# The directory that contains helper python modules for this script.
+# The directory that contains helper Python modules for this script.
 _BUILD_BAZEL_SCRIPTS = _SCRIPT_DIR / ".." / "build" / "bazel" / "scripts"
+# The directory that contains Python modules related to the IDK.
+_BUILD_SDK_SCRIPTS = _SCRIPT_DIR / ".." / "build" / "sdk"
 sys.path.insert(0, str(_BUILD_BAZEL_SCRIPTS))
+sys.path.insert(0, str(_BUILD_SDK_SCRIPTS))
 
 import compute_content_hash
 import remote_services_utils
 import workspace_utils
+from generate_prebuild_idk import generate_prebuild_idk
 
 _DEFAULT_HOST_TAG = "linux-x64"
 
@@ -305,6 +309,37 @@ def main() -> int:
         # From this point forward, an error will cause this script to run again
         # on the next fx build. This is because build.ninja has been patched
         # and build.ninja.stamp will be deleted upon error.
+
+        log(
+            "Generating IDK export directory for Bazel in-tree SDK from GN prebuild metadata."
+        )
+
+        with Path(
+            f"{build_dir}/sdk/prebuild/in_tree_collection.json"
+        ).open() as f:
+            prebuild_manifest = json.load(f)
+
+        idk_generator = generate_prebuild_idk.IdkGenerator(
+            prebuild_manifest, build_dir, fuchsia_dir
+        )
+
+        result = idk_generator.GenerateMetaFileContents()
+        if result != 0:
+            print(
+                "ERROR: Failed to generate in-tree IDK meta file contents from prebuild metadata!",
+                file=sys.stderr,
+            )
+            return result
+
+        result = idk_generator.WriteIdkContentsToDirectory(
+            Path(f"{build_dir}/regenerator_outputs/bazel_in_tree_idk")
+        )
+        if result != 0:
+            print(
+                "ERROR: Failed to generate in-tree IDK export directory from prebuild metadata!",
+                file=sys.stderr,
+            )
+            return result
 
         # The list of extra inputs to add to the Ninja build plan.
         extra_ninja_build_inputs: T.Set[Path] = set()

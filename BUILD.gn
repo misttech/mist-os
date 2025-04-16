@@ -999,7 +999,6 @@ build_api_module("ninja_subbuilds") {
   testonly = true
   data_keys = [ "ninja_subbuilds" ]
   deps = [
-           "//sdk:bazel_in_tree_idk",
            "//sdk:final_fuchsia_idk",
            "//sdk/ctf:ctf_subbuild",
          ] + sdk_archive_labels

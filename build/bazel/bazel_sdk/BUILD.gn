@@ -22,7 +22,7 @@ import("//build/sdk/sdk_collection.gni")
 
 bazel_input_directory("bazel_in_tree_idk.bazel_input") {
   generator = "//sdk:bazel_in_tree_idk"
-  output_directory = "$root_build_dir/sdk/exported/bazel_in_tree_idk"
+  output_directory = "$root_build_dir/regenerator_outputs/bazel_in_tree_idk"
 }
 
 # Generate a symlink to the @fuchsia_sdk//:BUILD.bazel file to ensure

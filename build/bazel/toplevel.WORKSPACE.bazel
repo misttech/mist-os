@@ -321,7 +321,7 @@ fuchsia_internal_only_idk_hash_label = "//:fuchsia_build_generated/fuchsia_inter
 # generate the @fuchsia_in_tree_idk:final_idk target.
 fuchsia_idk_repository(
     name = "fuchsia_in_tree_idk",
-    idk_export_dir = "%s/sdk/exported/bazel_in_tree_idk" % ninja_output_dir,
+    idk_export_dir = "%s/regenerator_outputs/bazel_in_tree_idk" % ninja_output_dir,
     ninja_build_dir = ninja_output_dir,
     python_executable = "prebuilt/third_party/python3/%s/bin/python3" % fuchsia_host_tag,
     content_hash_file = fuchsia_in_tree_idk_hash_label,
