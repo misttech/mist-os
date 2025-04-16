@@ -364,7 +364,10 @@ template("_test_link") {
                              "verify_abi",
                            ])
 
-    public_deps += [ "//sdk/lib/ld:standalone" ]
+    if (toolchain_environment != "user") {
+      public_deps += [ "//sdk/lib/ld:standalone" ]
+    }
+
     deps += [ ":test-module.deps" ]
 
     if (is_linux) {
@@ -627,7 +630,7 @@ source_set("test-ubsan") {
   visibility = [ ":*" ]
   testonly = true
 
-  if (is_ubsan) {
+  if (is_ubsan && toolchain_environment != "user") {
     sources = [
       "test-ubsan.cc",
       "test-ubsan.h",
@@ -888,6 +891,12 @@ test_loadable_module("tls-dep-module") {
 
 # This is the same as tls-dep but using TLSDESC, with no __tls_get_addr.
 test_shared_library("tls-desc-dep") {
+  visibility = [
+    ":*",
+    "//sdk/lib/dl/test/*",
+    "//zircon/system/ulib/c/*",
+  ]
+
   public = [ "tls-dep.h" ]
   sources = [ "tls-dep.cc" ]
   configs = [ "//build/config:tlsdesc" ]

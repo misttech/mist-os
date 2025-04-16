@@ -179,6 +179,16 @@ int AddModule(dl_phdr_info* phdr_info, size_t size, void* data) {
   DecodedModule decoded = DecodeModule(*phdr_info);
   gModuleStorage.push_back(decoded.abi_module);
   if (decoded.tls_module) {
+    Elf::size_type distance = *decoded.tls_offset;
+    if constexpr (elfldltl::TlsTraits<>::kTlsNegative) {
+      distance = -distance;  // The size is included in the negated offset.
+    } else {
+      distance += decoded.tls_module->tls_size();
+    }
+    auto& layout = *static_cast<elfldltl::TlsLayout<>*>(data);
+    layout = {std::max(layout.size_bytes(), distance),
+              std::max(layout.alignment(), decoded.tls_module->tls_alignment())};
+
     assert(decoded.abi_module.tls_modid > 0);
     ptrdiff_t idx = static_cast<ptrdiff_t>(decoded.abi_module.tls_modid) - 1;
     gTlsModuleStorage.insert(gTlsModuleStorage.begin() + idx, *decoded.tls_module);
@@ -191,7 +201,8 @@ int AddModule(dl_phdr_info* phdr_info, size_t size, void* data) {
 // decodes the modules that are loaded with this test program to fill out abi
 // information and returns the finished abi object to the caller.
 abi::Abi<> PopulateLdAbi() {
-  ZX_ASSERT(!dl_iterate_phdr(AddModule, nullptr));
+  elfldltl::TlsLayout<> tls_layout;
+  ZX_ASSERT(!dl_iterate_phdr(AddModule, &tls_layout));
 
   // Connect the link_map list pointers for each abi module and assign a
   // symbolizer_modid.
@@ -208,13 +219,15 @@ abi::Abi<> PopulateLdAbi() {
 
   return {
       .loaded_modules{&gModuleStorage.front()},
+      .loaded_modules_count{gModuleStorage.size()},
       .static_tls_modules{gTlsModuleStorage},
       .static_tls_offsets{gTlsOffsetStorage},
+      .static_tls_layout{tls_layout},
   };
 }
 
 }  // namespace
 
-const abi::Abi<>& gStartupLdAbi = PopulateLdAbi();
+const abi::Abi<> gStartupLdAbi = PopulateLdAbi();
 
 }  // namespace ld::testing

@@ -48,6 +48,28 @@ class PageRoundedSize {
     return other;
   }
 
+  constexpr PageRoundedSize& operator*=(size_t other) {
+    rounded_size_ *= other;
+    return *this;
+  }
+
+  constexpr PageRoundedSize operator*(size_t other) const {
+    PageRoundedSize result;
+    result.rounded_size_ = rounded_size_ * other;
+    return result;
+  }
+
+  constexpr PageRoundedSize& operator/=(size_t other) {
+    rounded_size_ /= other;
+    return *this;
+  }
+
+  constexpr PageRoundedSize operator/(size_t other) const {
+    PageRoundedSize result;
+    result.rounded_size_ = rounded_size_ / other;
+    return result;
+  }
+
   constexpr bool operator==(const PageRoundedSize&) const = default;
 
   constexpr auto operator<=>(const PageRoundedSize&) const = default;

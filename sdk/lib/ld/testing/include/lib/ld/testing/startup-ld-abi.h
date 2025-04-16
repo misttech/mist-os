@@ -19,7 +19,7 @@ namespace [[gnu::visibility("hidden")]] testing {
 // before this one and use `dlopen` to load modules that are later unloaded,
 // some dangling pointers will be left here.  Test code must not use `dlopen`
 // in static constructors.
-extern const abi::Abi<>& gStartupLdAbi;
+extern const abi::Abi<> gStartupLdAbi;
 
 }  // namespace testing
 }  // namespace ld

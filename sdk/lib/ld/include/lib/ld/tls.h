@@ -6,6 +6,7 @@
 #define LIB_LD_TLS_H_
 
 #include <bit>
+#include <cassert>
 #include <cstddef>
 
 #include "abi.h"
@@ -136,7 +137,10 @@ inline void TlsInitialExecDataInit(const typename abi::Abi<Elf, AbiTraits>& abi,
     const auto& module = abi.static_tls_modules[i];
     const size_type modid = static_cast<size_type>(i + 1);
     const ptrdiff_t offset = TlsInitialExecOffset(abi, modid);
-    std::span segment = block.subspan(tp_offset + offset, module.tls_size());
+    const size_t start = tp_offset + offset;
+    assert(start <= block.size_bytes());
+    assert(block.size_bytes() - start >= module.tls_size());
+    std::span segment = block.subspan(start, module.tls_size());
     TlsModuleInit(module, segment, known_zero);
   }
 }

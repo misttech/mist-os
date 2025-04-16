@@ -8,14 +8,47 @@ import("../libc.gni")
 # This is only included in the new implementation.
 libc_source_set("threads") {
   sources = []
+  libc_deps = [ ":thread-allocator" ]
+}
+
+# This doesn't need to be libc_source_set() because it's just a header.
+source_set("shadow-call-stack") {
+  public = [ "shadow-call-stack.h" ]
+  sources = []
+}
+
+libc_source_set("thread-allocator") {
+  public = [ "thread-allocator.h" ]
+  libc_public_deps = [ "../zircon:vmar" ]
+  public_deps = [
+    ":shadow-call-stack",
+    "//src/lib/elfldltl:headers",
+    "//zircon/system/ulib/zx",
+  ]
+  sources = [ "thread-allocator.cc" ]
+  deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
 }
 
 group("unittests") {
   testonly = true
-  deps = []
+  deps = [ ":thread-allocator-tests" ]
 }
 
-libc_source_set("mutex") {
+libc_test("thread-allocator-tests") {
+  sources = [ "thread-allocator-tests.cc" ]
+  include_dirs = [ "//sdk/lib/ld/test/modules" ]
+  deps = [
+    ":thread-allocator.testonly",
+    "//sdk/lib/fit",
+    "//sdk/lib/ld:headers",
+    "//sdk/lib/ld/test/modules:tls-desc-dep.shared_library",
+    "//sdk/lib/ld/testing:ld-abi-testing",
+    "//src/lib/elfldltl",
+    "//zircon/third_party/ulib/musl:musl_internal",
+  ]
+}
+
+source_set("mutex") {
   public = [ "mutex.h" ]
   public_deps = [ "//zircon/system/ulib/sync:sync-cpp" ]
   sources = []

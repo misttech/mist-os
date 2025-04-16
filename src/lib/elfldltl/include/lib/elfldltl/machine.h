@@ -290,6 +290,12 @@ concept TlsTraitsApi = requires {
   // has the offset closest to zero that is aligned to p_align and >= p_memsz.
   { std::bool_constant<Traits::kTlsNegative>{} };
 
+  // If true, the ABI requires that the thread pointer (at offset zero) point
+  // to a pointer with the same value as the thread pointer itself.  This is
+  // only required on machines like x86 where it hasn't always been trivial to
+  // read the thread pointer's value rather than only do a load relative to it.
+  { std::bool_constant<Traits::kTpSelfPointer>{} };
+
   // This bias is subtracted from the offset for a kTlsRelative relocation.
   // It's then added back in again by the `__tls_get_addr` code.  In Local
   // Dynamic cases, there is no kTlsRelative relocation emitted and instead the
@@ -315,6 +321,7 @@ struct TlsTraitsImpl<Elf, ElfMachine::kNone> {
 
   static constexpr size_type kTlsLocalExecOffset = 0;
   static constexpr bool kTlsNegative = false;
+  static constexpr bool kTpSelfPointer = false;
   static constexpr size_type kTlsRelativeBias = 0;
 };
 
@@ -338,10 +345,11 @@ struct TlsTraitsImpl<Elf, ElfMachine::kRiscv> : public TlsTraits<Elf, ElfMachine
   static constexpr size_type kTlsRelativeBias = 0x800;
 };
 
-// x86 puts TLS below TP.
+// x86 puts TLS below TP and requires *$tp = $tp.
 template <class Elf>
 struct TlsTraitsImpl<Elf, ElfMachine::k386> : public TlsTraits<Elf, ElfMachine::kNone> {
   static constexpr bool kTlsNegative = true;
+  static constexpr bool kTpSelfPointer = true;
 };
 
 // x86-64 uses 64-bit GOT entries even for ILP32.
