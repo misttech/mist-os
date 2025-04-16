@@ -140,10 +140,15 @@ void AdminTest::RequestRingBufferChannel() {
     if (ring_buffer_id().has_value()) {
       composite()->CreateRingBuffer(
           *ring_buffer_id(), std::move(rb_format), ring_buffer_handle.NewRequest(),
-          AddCallback("CreateRingBuffer",
-                      [](fuchsia::hardware::audio::Composite_CreateRingBuffer_Result result) {
-                        EXPECT_FALSE(result.is_err());
-                      }));
+          // Unlike in other driver types, Composite::CreateRingBuffer has a completion. However,
+          // a client need not actually wait for this completion before using the ring_buffer.
+          // For sequences such as Composite::CreateRingBuffer > RingBuffer::GetProperties,
+          // relax the required ordering of completion receipts.
+          AddCallbackUnordered(
+              "CreateRingBuffer",
+              [](fuchsia::hardware::audio::Composite_CreateRingBuffer_Result result) {
+                EXPECT_FALSE(result.is_err());
+              }));
       if (!composite().is_bound()) {
         FAIL() << "Composite failed to get ring buffer channel";
       }
