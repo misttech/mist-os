@@ -160,10 +160,20 @@ def main() -> int:
             % ("\n  ".join(sorted(left_only)))
         )
     if right_only:
-        errors.append(
-            "Unexpected files in the output IDK:\n  %s\n"
-            % ("\n  ".join(sorted(right_only)))
-        )
+        # For now, ignore symlinks that are only in the output directory.
+        all_are_symlinks = True
+        for f in right_only:
+            if not (output_idk_dir / f).is_symlink():
+                all_are_symlinks = False
+
+        if all_are_symlinks:
+            if not args.quiet:
+                print("Ignoring symlinks found only in the output directory.")
+        else:
+            errors.append(
+                "Unexpected files in the output IDK:\n  %s\n"
+                % ("\n  ".join(sorted(right_only)))
+            )
     if diff_files:
         errors.append("Differences between golden and output IDK:")
         for file_name in diff_files:

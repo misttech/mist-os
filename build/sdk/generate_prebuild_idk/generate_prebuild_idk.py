@@ -554,6 +554,7 @@ def main() -> int:
 
     collection_meta_path = None
     collection_parts: list[dict[str, T.Any]] = []
+    atom_files: list[dict[str, str]] = []
 
     for info in prebuild_map.values():
         meta_json = prebuild_map.get_meta(info)
@@ -574,6 +575,7 @@ def main() -> int:
                         "type": info["atom_type"],
                     }
                 )
+                atom_files += info["atom_files"]
         elif info["atom_type"] != "none":
             unhandled_labels.add(info["atom_label"])
 
@@ -657,6 +659,24 @@ def main() -> int:
             with dest_path.open("w") as f:
                 json.dump(meta_json, f, sort_keys=True, indent=2)
 
+        # Create symlinks for all "atom_files".
+        for f in atom_files:
+            target_path = args.build_dir / f["source"]
+            # The target directory must exist even if the file does not.
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            dst_path = temp_out_dir / f["dest"]
+            dst_path.parent.mkdir(parents=True, exist_ok=True)
+
+            try:
+                os.symlink(target_path, dst_path)
+            except FileExistsError as e:
+                print(
+                    f"ERROR: File path '{dst_path}' is specified multiple times in one or more manifests:\n{e}"
+                )
+                return 1
+
+        if args.output_dir.exists():
+            shutil.rmtree(args.output_dir)
         os.rename(temp_out_dir, args.output_dir)
 
     return 0
