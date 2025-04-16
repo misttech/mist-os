@@ -643,6 +643,9 @@ impl Type {
                     ))
                 }
             }
+            (_, Type::Releasable { inner, .. }) => {
+                inner.match_parameter_type(context, parameter_type, index, next)
+            }
 
             _ => Err(format!("incorrect parameter for index {index} at pc {}", context.pc)),
         }
