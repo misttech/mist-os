@@ -210,6 +210,7 @@
                 "fuchsia.bluetooth.avrcp.test.PeerManagerExt",
                 "fuchsia.bluetooth.deviceid.DeviceIdentification",
                 "fuchsia.bluetooth.fastpair.Provider",
+                "fuchsia.bluetooth.hfp.HandsFree",
                 "fuchsia.bluetooth.hfp.Hfp",
                 "fuchsia.bluetooth.hfp.test.HfpTest",
                 "fuchsia.bluetooth.internal.a2dp.Controller",

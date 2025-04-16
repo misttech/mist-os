@@ -410,6 +410,12 @@
             source_availability: "unknown",
         },
         {
+            protocol: "fuchsia.bluetooth.hfp.HandsFree",
+            from: "#bt-hfp-hands-free",
+            to: "#sshd-host",
+            source_availability: "unknown",
+        },
+        {
             protocol: "fuchsia.bluetooth.hfp.Hfp",
             from: "#bt-hfp-audio-gateway",
             to: "#sshd-host",
