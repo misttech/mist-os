@@ -37,7 +37,7 @@ impl Writer {
         Self::new_buffers(test_writer.stdout.clone(), test_writer.stderr.clone())
     }
 
-    pub fn stderr(&mut self) -> &'_ mut Box<dyn Write> {
+    pub fn stderr(&mut self) -> &mut dyn Write {
         &mut self.stderr
     }
 }

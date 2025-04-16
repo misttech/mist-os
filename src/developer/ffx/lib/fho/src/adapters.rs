@@ -136,7 +136,7 @@ pub(crate) mod tests {
             false
         }
 
-        fn stderr(&mut self) -> &'_ mut Box<dyn std::io::Write> {
+        fn stderr(&mut self) -> &mut dyn std::io::Write {
             todo!()
         }
 

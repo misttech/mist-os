@@ -142,7 +142,7 @@ where
         self.machine_writer.item(value)
     }
 
-    fn stderr(&mut self) -> &'_ mut Box<dyn Write> {
+    fn stderr(&mut self) -> &mut dyn Write {
         self.machine_writer.stderr()
     }
 }

@@ -48,7 +48,7 @@ impl<T> JsonWriter<T> {
         self.simple_writer
     }
 
-    pub fn stderr(&mut self) -> &'_ mut Box<dyn Write> {
+    pub fn stderr(&mut self) -> &mut dyn Write {
         self.simple_writer.stderr()
     }
 }
@@ -159,7 +159,7 @@ where
         self.format.is_some()
     }
 
-    fn stderr(&mut self) -> &'_ mut Box<dyn Write> {
+    fn stderr(&mut self) -> &mut dyn Write {
         self.stderr()
     }
 
