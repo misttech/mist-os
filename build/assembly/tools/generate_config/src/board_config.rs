@@ -308,7 +308,8 @@ mod tests {
             configuration: Default::default(),
             kernel: Default::default(),
             platform: Default::default(),
-            tee_trusted_app_guids: Default::default(),
+            global_platform_tee_trusted_app_guids: Default::default(),
+            ..Default::default()
         };
         board.write_to_dir(&board_path, None::<Utf8PathBuf>).unwrap();
 

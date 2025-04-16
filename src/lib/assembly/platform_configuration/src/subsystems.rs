@@ -58,7 +58,7 @@ mod storage;
 mod swd;
 mod sysmem;
 mod system_sounds;
-mod tee_clients;
+mod tee;
 mod thermal;
 mod timekeeper;
 mod trusted_apps;
@@ -536,15 +536,12 @@ fn configure_subsystems(
     )
     .context("Configuring the 'usb' subsystem")?;
 
-    tee_clients::TeeClientsConfig::define_configuration(
-        &context_base.for_subsystem("tee_clients"),
-        &(
-            &product.tee_clients,
-            &context_base.for_subsystem("tee_clients").board_info.tee_trusted_app_guids,
-        ),
+    tee::TeeConfig::define_configuration(
+        &context_base.for_subsystem("tee"),
+        &(&product.tee, &product.tee_clients),
         builder,
     )
-    .context("configuring the 'tee_clients' subsystem")?;
+    .context("configuring the 'tee' subsystem")?;
 
     Ok(())
 }

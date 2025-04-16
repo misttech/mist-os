@@ -99,6 +99,15 @@ pub struct BoardInformation {
     /// GUIDs for the TAs provided by this board's TEE driver.
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub global_platform_tee_trusted_app_guids: Vec<uuid::Uuid>,
+
+    /// GUIDs for the TAs provided by this board's TEE driver.
+    ///
+    /// NOTE: This is the deprecated name for
+    /// `BoardInformation::global_platform_tee_trusted_app_guids`. At most one of the two fields
+    /// may be non-empty.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tee_trusted_app_guids: Vec<uuid::Uuid>,
 
     /// Release version that this board config corresponds to.

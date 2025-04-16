@@ -3,14 +3,54 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context as _};
 use assembly_config_schema::assembly_config::{
     CompiledComponentDefinition, CompiledPackageDefinition,
 };
-use assembly_config_schema::product_config::TeeClient as ProductTeeClient;
+use assembly_config_schema::product_config::{
+    GlobalPlatformTee, GlobalPlatformTeeClient, ProprietaryTee, Tee,
+};
+use assembly_config_schema::BoardInformation;
 use assembly_constants::{BlobfsCompiledPackageDestination, CompiledPackageDestination, FileEntry};
 use fuchsia_url::AbsoluteComponentUrl;
-use std::io::Write;
+use std::io::Write as _;
+
+pub(crate) struct TeeConfig;
+impl DefineSubsystemConfiguration<(&Tee, &Vec<GlobalPlatformTeeClient>)> for TeeConfig {
+    fn define_configuration(
+        context: &ConfigurationContext<'_>,
+        product_config: &(&Tee, &Vec<GlobalPlatformTeeClient>),
+        builder: &mut dyn ConfigurationBuilder,
+    ) -> anyhow::Result<()> {
+        let global_platform_trusted_app_guids =
+            get_global_platform_tee_trusted_app_guids(context.board_info)?;
+        let (tee, transitional_tee_clients) = *product_config;
+        if tee != &Tee::Undefined && !transitional_tee_clients.is_empty() {
+            bail!("Conflicting TEE configuration: product configuration may contain `tee` or `tee_clients`, but not both");
+        }
+
+        match tee {
+            Tee::NoTee => Ok(()),
+            Tee::Undefined => define_global_platform_tee_configuration(
+                context,
+                transitional_tee_clients,
+                global_platform_trusted_app_guids,
+                builder,
+            ),
+            Tee::GlobalPlatform(GlobalPlatformTee { clients: tee_clients }) => {
+                define_global_platform_tee_configuration(
+                    context,
+                    tee_clients,
+                    global_platform_trusted_app_guids,
+                    builder,
+                )
+            }
+            Tee::Proprietary(proprietary_tee) => {
+                define_proprietary_tee_configuration(context, proprietary_tee, builder)
+            }
+        }
+    }
+}
 
 #[derive(serde::Serialize)]
 struct TeeManagerConfig {
@@ -21,38 +61,35 @@ fn create_name(name: &str) -> Result<cml::Name, anyhow::Error> {
     cml::Name::new(name).with_context(|| format!("Invalid name: {}", name))
 }
 
-pub(crate) struct TeeClientsConfig;
-impl DefineSubsystemConfiguration<(&Vec<ProductTeeClient>, &Vec<uuid::Uuid>)> for TeeClientsConfig {
-    fn define_configuration(
-        context: &ConfigurationContext<'_>,
-        product_config: &(&Vec<ProductTeeClient>, &Vec<uuid::Uuid>),
-        builder: &mut dyn ConfigurationBuilder,
-    ) -> anyhow::Result<()> {
-        let (product_config, tee_trusted_app_guids) = product_config;
-        match context.feature_set_level {
-            // tee_manager and clients only exist in systems that have the core realm
-            FeatureSupportLevel::Embeddable | FeatureSupportLevel::Bootstrap => return Ok(()),
-            FeatureSupportLevel::Utility | FeatureSupportLevel::Standard => {}
-        }
-
-        // Configure the tee_manager based on whether the board provided GUIDs
-        // to serve from it.
-        if !tee_trusted_app_guids.is_empty() {
-            create_tee_manager(tee_trusted_app_guids, context, builder)?;
-        }
-
-        // Hook up the clients of the tee_manager that the product has
-        // registered to run under the session.
-        if !product_config.is_empty() {
-            create_tee_clients(product_config, context, builder)?;
-        }
-
-        Ok(())
+fn define_global_platform_tee_configuration(
+    context: &ConfigurationContext<'_>,
+    product_config: &Vec<GlobalPlatformTeeClient>,
+    tee_trusted_app_guids: &Vec<uuid::Uuid>,
+    builder: &mut dyn ConfigurationBuilder,
+) -> anyhow::Result<()> {
+    match context.feature_set_level {
+        // tee_manager and clients only exist in systems that have the core realm
+        FeatureSupportLevel::Embeddable | FeatureSupportLevel::Bootstrap => return Ok(()),
+        FeatureSupportLevel::Utility | FeatureSupportLevel::Standard => {}
     }
+
+    // Configure the tee_manager based on whether the board provided GUIDs
+    // to serve from it.
+    if !tee_trusted_app_guids.is_empty() {
+        create_tee_manager(tee_trusted_app_guids, context, builder)?;
+    }
+
+    // Hook up the clients of the tee_manager that the product has
+    // registered to run under the session.
+    if !product_config.is_empty() {
+        create_tee_clients(product_config, context, builder)?;
+    }
+
+    Ok(())
 }
 
 fn create_tee_manager(
-    tee_trusted_app_guids: &&Vec<uuid::Uuid>,
+    tee_trusted_app_guids: &Vec<uuid::Uuid>,
     context: &ConfigurationContext<'_>,
     builder: &mut dyn ConfigurationBuilder,
 ) -> Result<(), anyhow::Error> {
@@ -134,7 +171,7 @@ fn create_tee_manager(
 }
 
 fn create_tee_clients(
-    product_config: &&Vec<ProductTeeClient>,
+    product_config: &Vec<GlobalPlatformTeeClient>,
     context: &ConfigurationContext<'_>,
     builder: &mut dyn ConfigurationBuilder,
 ) -> Result<(), anyhow::Error> {
@@ -163,7 +200,7 @@ fn create_tee_clients(
         },
     ];
 
-    for tee_client in *product_config {
+    for tee_client in product_config {
         let component_url = AbsoluteComponentUrl::parse(&tee_client.component_url)?;
         let component_name = create_name(
             component_url
@@ -319,13 +356,82 @@ fn create_tee_clients(
     Ok(())
 }
 
+fn get_global_platform_tee_trusted_app_guids(
+    board_info: &BoardInformation,
+) -> anyhow::Result<&Vec<uuid::Uuid>> {
+    if !board_info.global_platform_tee_trusted_app_guids.is_empty()
+        && !board_info.tee_trusted_app_guids.is_empty()
+    {
+        bail!("Cannot set both `global_platform_tee_trusted_app_guids` and deprecated `tee_trusted_app_guids`");
+    }
+
+    Ok(if board_info.tee_trusted_app_guids.is_empty() {
+        &board_info.global_platform_tee_trusted_app_guids
+    } else {
+        &board_info.tee_trusted_app_guids
+    })
+}
+
+fn define_proprietary_tee_configuration(
+    _context: &ConfigurationContext<'_>,
+    _proprietary_tee: &ProprietaryTee,
+    _builder: &mut dyn ConfigurationBuilder,
+) -> anyhow::Result<()> {
+    bail!("NOT IMPLEMENTED: Proprietary TEE assembly strategy");
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::subsystems::ConfigurationBuilderImpl;
     use assembly_config_schema::product_config::{TeeClientConfigData, TeeClientFeatures};
+    use assembly_config_schema::BoardInformation;
+    use assembly_images_config::BoardFilesystemConfig;
     use camino::Utf8PathBuf;
     use std::collections::BTreeMap;
+    use std::sync::LazyLock;
+
+    static BOARD_INFO_WITH_GLOBAL_PLATFORM_TEE_TRUSTED_APP_GUIDS: LazyLock<BoardInformation> =
+        LazyLock::new(|| BoardInformation {
+            name: "Test Board".into(),
+            provided_features: vec![],
+            input_bundles: Default::default(),
+            filesystems: BoardFilesystemConfig::default(),
+            global_platform_tee_trusted_app_guids: vec![uuid::Uuid::parse_str(
+                "9105f952-86db-4808-bc0e-8a4172e11843",
+            )
+            .unwrap()],
+            ..Default::default()
+        });
+
+    static BOARD_INFO_WITH_TEE_TRUSTED_APP_GUIDS: LazyLock<BoardInformation> =
+        LazyLock::new(|| BoardInformation {
+            name: "Test Board".into(),
+            provided_features: vec![],
+            input_bundles: Default::default(),
+            filesystems: BoardFilesystemConfig::default(),
+            tee_trusted_app_guids: vec![uuid::Uuid::parse_str(
+                "9105f952-86db-4808-bc0e-8a4172e11843",
+            )
+            .unwrap()],
+            ..Default::default()
+        });
+
+    static BOARD_INFO_WITH_GLOBAL_PLATFORM_TEE_TRUSTED_APP_GUIDS_AND_TEE_TRUSTED_APP_GUIDS:
+        LazyLock<BoardInformation> = LazyLock::new(|| BoardInformation {
+        name: "Test Board".into(),
+        provided_features: vec![],
+        input_bundles: Default::default(),
+        filesystems: BoardFilesystemConfig::default(),
+        global_platform_tee_trusted_app_guids: vec![uuid::Uuid::parse_str(
+            "9105f952-86db-4808-bc0e-8a4172e11843",
+        )
+        .unwrap()],
+        tee_trusted_app_guids: vec![
+            uuid::Uuid::parse_str("9105f952-86db-4808-bc0e-8a4172e11843").unwrap()
+        ],
+        ..Default::default()
+    });
 
     #[test]
     // This test is a change detector, but we actually want to observe changes
@@ -334,9 +440,10 @@ mod tests {
     fn test_tee_clients() {
         let (context, tee_client_config, tee_trusted_app_guids, mut builder) = setup_test();
 
-        TeeClientsConfig::define_configuration(
+        define_global_platform_tee_configuration(
             &context,
-            &(&tee_client_config, &tee_trusted_app_guids),
+            &tee_client_config,
+            &tee_trusted_app_guids,
             &mut builder,
         )
         .expect("defining tee_clients configuration");
@@ -463,9 +570,10 @@ mod tests {
     #[test]
     fn test_tee_manager() {
         let (context, tee_client_config, tee_trusted_app_guids, mut builder) = setup_test();
-        TeeClientsConfig::define_configuration(
+        define_global_platform_tee_configuration(
             &context,
-            &(&tee_client_config, &tee_trusted_app_guids),
+            &tee_client_config,
+            &tee_trusted_app_guids,
             &mut builder,
         )
         .expect("defining tee_clients configuration");
@@ -570,13 +678,13 @@ mod tests {
 
     fn setup_test() -> (
         ConfigurationContext<'static>,
-        Vec<ProductTeeClient>,
+        Vec<GlobalPlatformTeeClient>,
         Vec<uuid::Uuid>,
         ConfigurationBuilderImpl,
     ) {
         let context = ConfigurationContext::default_for_tests();
 
-        let tee_client_config = vec![ProductTeeClient {
+        let tee_client_config = vec![GlobalPlatformTeeClient {
             component_url: "fuchsia-pkg://fuchsia.com/tee-clients/test-app#meta/test-app.cm"
                 .to_string(),
             guids: vec!["1234".to_string(), "5678".to_string()],
@@ -602,5 +710,139 @@ mod tests {
 
         let builder = ConfigurationBuilderImpl::default();
         (context, tee_client_config, tee_trusted_app_guids, builder)
+    }
+
+    #[test]
+    fn valid_transitional_config() {
+        let tee_clients = non_empty_tee_clients();
+        for context in
+            [context_with_global_platform_trusted_app_guids(), context_with_tee_trusted_app_guids()]
+        {
+            let mut builder = ConfigurationBuilderImpl::default();
+            TeeConfig::define_configuration(
+                &context,
+                &(&Default::default(), &tee_clients),
+                &mut builder,
+            )
+            .expect("default (undefined) `tee` and `tee_clients` together is valid");
+        }
+    }
+
+    #[test]
+    fn invalid_transitional_config() {
+        let tee_clients = non_empty_tee_clients();
+        for tee_config in [
+            Tee::NoTee,
+            Tee::GlobalPlatform(Default::default()),
+            Tee::Proprietary(proprietary_tee()),
+        ] {
+            for context in [
+                context_with_global_platform_trusted_app_guids(),
+                context_with_tee_trusted_app_guids(),
+            ] {
+                let mut builder = ConfigurationBuilderImpl::default();
+                TeeConfig::define_configuration(
+                    &context,
+                    &(&tee_config, &tee_clients),
+                    &mut builder,
+                )
+                .expect_err("`tee` and `tee_clients` together is invalid");
+            }
+        }
+
+        let mut builder = ConfigurationBuilderImpl::default();
+        TeeConfig::define_configuration(
+            &context_with_global_platform_trusted_app_guids_and_tee_trusted_app_guids(),
+            &(&Default::default(), &Default::default()),
+            &mut builder,
+        )
+        .expect_err(
+            "`global_platform_trusted_app_guids` and `tee_trusted_app_guids` together is invalid",
+        );
+    }
+
+    #[test]
+    fn valid_strategy_config() {
+        for tee_config in [
+            Tee::NoTee,
+            Tee::GlobalPlatform(Default::default()),
+            // Not yet implemented:
+            // Tee::Proprietary(proprietary_tee()),
+        ] {
+            for context in [
+                context_with_global_platform_trusted_app_guids(),
+                context_with_tee_trusted_app_guids(),
+            ] {
+                let mut builder = ConfigurationBuilderImpl::default();
+                TeeConfig::define_configuration(
+                    &context,
+                    &(&tee_config, &Default::default()),
+                    &mut builder,
+                )
+                .expect("defined `tee` and empty `tee_clients` together is valid");
+            }
+        }
+    }
+
+    #[test]
+    fn proprietary_strategy_not_yet_implemented() {
+        for context in
+            [context_with_global_platform_trusted_app_guids(), context_with_tee_trusted_app_guids()]
+        {
+            let mut builder = ConfigurationBuilderImpl::default();
+            TeeConfig::define_configuration(
+                &context,
+                &(&Tee::Proprietary(proprietary_tee()), &Default::default()),
+                &mut builder,
+            )
+            .expect_err("proprietary TEE strategy not yet implemented");
+        }
+    }
+
+    fn proprietary_tee() -> ProprietaryTee {
+        ProprietaryTee {
+            tee_manager_url: String::from("fuchsia-pkg://test.fuchsia.com/my_tee#my_tm.cm"),
+        }
+    }
+
+    fn non_empty_tee_clients() -> Vec<GlobalPlatformTeeClient> {
+        vec![GlobalPlatformTeeClient {
+            component_url: "fuchsia-pkg://test.fuchsia.com/tee-clients/test-app#meta/test-app.cm"
+                .to_string(),
+            guids: vec!["1234".to_string(), "5678".to_string()],
+            additional_required_protocols: vec!["fuchsia.foo.bar".to_string()],
+            capabilities: vec!["fuchsia.baz.bang".to_string()],
+            config_data: Some(TeeClientConfigData {
+                files: BTreeMap::from([
+                    ("foo".to_string(), "bar".into()),
+                    ("baz".to_string(), "qux".into()),
+                ]),
+            }),
+            additional_required_features: TeeClientFeatures {
+                tmp_storage: true,
+                persistent_storage: true,
+                securemem: true,
+            },
+        }]
+    }
+
+    fn context_with_global_platform_trusted_app_guids() -> ConfigurationContext<'static> {
+        let mut context = ConfigurationContext::default_for_tests();
+        context.board_info = &*BOARD_INFO_WITH_GLOBAL_PLATFORM_TEE_TRUSTED_APP_GUIDS;
+        context
+    }
+
+    fn context_with_tee_trusted_app_guids() -> ConfigurationContext<'static> {
+        let mut context = ConfigurationContext::default_for_tests();
+        context.board_info = &*BOARD_INFO_WITH_TEE_TRUSTED_APP_GUIDS;
+        context
+    }
+
+    fn context_with_global_platform_trusted_app_guids_and_tee_trusted_app_guids(
+    ) -> ConfigurationContext<'static> {
+        let mut context = ConfigurationContext::default_for_tests();
+        context.board_info =
+            &*BOARD_INFO_WITH_GLOBAL_PLATFORM_TEE_TRUSTED_APP_GUIDS_AND_TEE_TRUSTED_APP_GUIDS;
+        context
     }
 }
