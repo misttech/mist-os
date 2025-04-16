@@ -5,6 +5,7 @@ library test.conformance;
 
 type EmptyTable = table {};
 
+@bindings_denylist("rust_next")
 type StructOfEmptyTable = struct {
     table EmptyTable;
 };
@@ -87,12 +88,14 @@ type TableFieldOutOfLineStruct = struct {
 
 type TableFieldUnknown = table {};
 
+@bindings_denylist("rust_next")
 type TableFieldUnknownStruct = struct {
     t TableFieldUnknown;
 };
 
 type TableFieldUnknownResource = resource table {};
 
+@bindings_denylist("rust_next")
 type TableFieldUnknownResourceStruct = resource struct {
     t TableFieldUnknownResource;
 };

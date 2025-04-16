@@ -95,6 +95,7 @@ type MultipleHandleSubtypes = resource struct {
 
 type EmptyResourceTable = resource table {};
 
+@bindings_denylist("rust_next")
 type EmptyResourceTableStruct = resource struct {
     table EmptyResourceTable;
 };

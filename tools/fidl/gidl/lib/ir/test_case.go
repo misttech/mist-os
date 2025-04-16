@@ -84,6 +84,7 @@ const (
 	LanguageReference         Language = "reference"
 	LanguageRust              Language = "rust"
 	LanguageRustCodec         Language = "rust_codec"
+	LanguageRustNext          Language = "rust_next"
 )
 
 func AllLanguages() []Language {
@@ -101,6 +102,7 @@ func AllLanguages() []Language {
 		LanguagePython,
 		LanguageReference,
 		LanguageRust,
+		LanguageRustNext,
 	}
 }
 

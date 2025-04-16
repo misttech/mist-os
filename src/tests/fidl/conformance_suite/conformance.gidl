@@ -28,6 +28,7 @@ decode_failure("UnconsumedBytesOutOfLine") {
 }
 
 decode_failure("PayloadTooSmall") {
+    bindings_denylist = [rust_next],
     type = EmptyStruct,
     bytes = {
         v2 = [0x00],

@@ -17,6 +17,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/backend/reference"
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/backend/rust"
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/backend/rust_codec"
+	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/backend/rust_next"
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/lib/cli"
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/lib/ir"
 )
@@ -32,6 +33,7 @@ var generators = map[ir.OutputType]map[ir.Language]cli.Generator{
 		ir.LanguagePython:       python.GenerateConformanceTests,
 		ir.LanguageRust:         rust.GenerateConformanceTests,
 		ir.LanguageRustCodec:    rust_codec.GenerateConformanceTests,
+		ir.LanguageRustNext:     rust_next.GenerateConformanceTests,
 	},
 	ir.OutputTypeBenchmark: {
 		ir.LanguageCpp:         cpp.GenerateBenchmarks,

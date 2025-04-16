@@ -83,14 +83,14 @@ impl Buffer {
         Self::default()
     }
 
-    /// Retrieve the handles for conformance testing.
-    pub fn handles_for_conformance_test(&self) -> &[Handle] {
+    /// Retrieve the handles.
+    pub fn handles(&self) -> &[Handle] {
         &self.handles
     }
 
-    /// Retrieve the chunks for conformance testing.
-    pub fn chunks_for_conformance_test(&self) -> &[Chunk] {
-        &self.chunks
+    /// Retrieve the bytes.
+    pub fn bytes(&self) -> Vec<u8> {
+        self.chunks.iter().flat_map(|chunk| chunk.to_le_bytes()).collect()
     }
 }
 

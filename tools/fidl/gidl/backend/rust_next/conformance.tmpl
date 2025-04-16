@@ -1,0 +1,58 @@
+{{/*
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+*/}}
+
+#![cfg(test)]
+#![allow(unused_imports)]
+#![allow(invalid_from_utf8)]
+
+use {
+    assert_matches::assert_matches,
+    fidl_next::{Chunk, Decode, DecoderExt as _, Encode, EncoderExt as _, Owned, WireU64},
+    fidl_next::fuchsia::channel::Buffer,
+    fidl_next_test_conformance as test_conformance,
+    zerocopy::IntoBytes,
+    zx_status::Status,
+    zx_types as zx_types,
+    gidl_util::{
+        HandleDef, HandleSubtype, copy_handle, create_handles, decode_value,
+        get_handle_koid, get_info_handle_valid, repeat, select_handle_infos,
+        select_raw_handle_infos, to_zx_handle_disposition_t,
+    },
+    std::convert::TryFrom,
+};
+
+
+{{ range .EncodeSuccessCases }}
+    {{ if not .IsResource }}
+        #[test]
+        fn test_{{ .Name }}_encode() {
+            {{- if .HandleDefs }}
+                let handle_defs = create_handles(&{{ .HandleDefs }});
+            {{- end }}
+            let mut value = {{ .Value }};
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&{{ .Bytes }}, buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    {{ else }}
+        // TODO: {{ .Name }}_encode
+    {{ end }}
+{{ end }}
+
+{{ range .DecodeSuccessCases }}
+    // TODO: {{ .Name }}_decode
+{{ end }}
+
+{{ range .EncodeFailureCases }}
+// TODO: {{ .Name }}_encode_failure
+{{ end }}
+
+{{ range .DecodeFailureCases }}
+// TODO: {{ .Name }}_decode_failure
+{{ end }}
+
