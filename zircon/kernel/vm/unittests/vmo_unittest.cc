@@ -4010,8 +4010,8 @@ static bool vmo_skip_range_update_test() {
     }
     // Perform the requested range update.
     {
+      VmCowPages::DeferredOps deferred(hidden_parent.get());
       Guard<VmoLockType> guard{hidden_parent->lock()};
-      VmCowPages::DeferredOps deferred(hidden_parent.get(), VmCowPages::DeferredOps::LockedTag{});
       const VmCowRange range_update =
           VmCowRange(range.page_start * PAGE_SIZE, range.num_pages * PAGE_SIZE);
       hidden_parent->RangeChangeUpdateLocked(range_update, VmCowPages::RangeChangeOp::Unmap,

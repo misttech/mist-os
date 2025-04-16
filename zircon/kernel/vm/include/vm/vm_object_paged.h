@@ -368,12 +368,6 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   // require one.
   VmCowPages::DeferredOps MakeDeferredOps() { return VmCowPages::DeferredOps(cow_pages_.get()); }
 
-  // TODO(https://fxbug.dev/338300943): This is a temporary method to allow constructing a
-  // |DeferredOps| under the lock. See the related comments on |DeferredOps::LockedTag|.
-  VmCowPages::DeferredOps MakeDeferredOpsLocked() TA_REQ(lock()) {
-    return VmCowPages::DeferredOps(cow_pages_.get(), VmCowPages::DeferredOps::LockedTag{});
-  }
-
  private:
   // private constructor (use Create())
   VmObjectPaged(uint32_t options, fbl::RefPtr<VmHierarchyState> hierarchy_state,

@@ -2099,13 +2099,6 @@ class VmCowPages::DeferredOps {
   // without the lock held. It is the callers responsibility to ensure the pointer remains valid
   // over the lifetime of the object.
   explicit DeferredOps(VmCowPages* self) TA_EXCL(self->lock());
-  // TODO(https://fxbug.dev/338300943): This is a transitional constructor to allow for the range
-  // change updates, and by extension this helper object, to be gradually moved outside the lock.
-  // Using this constructor instructs the DeferredOps that the lock is already held during both
-  // construction and destruction and it should not attempt to reacquire.
-  struct LockedTag {};
-  DeferredOps(VmCowPages* self, LockedTag tag) TA_REQ(self->lock())
-      : locked_range_update_(true), self_(self) {}
   ~DeferredOps();
 
   DeferredOps(const DeferredOps&) = delete;
@@ -2130,9 +2123,6 @@ class VmCowPages::DeferredOps {
     DEBUG_ASSERT(self == self_);
     return freed_list_;
   }
-
-  // TODO(https://fxbug.dev/338300943): Tracks whether the locked temporary constructor was used.
-  bool locked_range_update_ = false;
 
   // A reference to the VmCowPages for any deferred operations to be run against.
   VmCowPages* const self_;

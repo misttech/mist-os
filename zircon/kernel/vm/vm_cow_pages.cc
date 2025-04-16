@@ -7010,20 +7010,12 @@ VmCowPages::DeferredOps::DeferredOps(VmCowPages* self) : self_(self) {
 }
 
 VmCowPages::DeferredOps::~DeferredOps() {
-  if (locked_range_update_) {
-    AssertHeld(self_->lock_ref());
-    if (range_op_.has_value()) {
-      self_->RangeChangeUpdateCowChildrenLocked(range_op_->range, range_op_->op);
-    }
-    freed_list_.FreePages(self_);
-  } else {
-    if (range_op_.has_value()) {
-      LockedPtr self(self_, VmLockAcquireMode::First);
-      VmCowPages::RangeChangeUpdateCowChildren(ktl::move(self), range_op_->range, range_op_->op);
-    }
-    // The pages must be freed *after* any range update is performed.
-    freed_list_.FreePages(self_);
+  if (range_op_.has_value()) {
+    LockedPtr self(self_, VmLockAcquireMode::First);
+    VmCowPages::RangeChangeUpdateCowChildren(ktl::move(self), range_op_->range, range_op_->op);
   }
+  // The pages must be freed *after* any range update is performed.
+  freed_list_.FreePages(self_);
 }
 
 void VmCowPages::DeferredOps::AddRange(VmCowPages* self, VmCowRange range, RangeChangeOp op) {
