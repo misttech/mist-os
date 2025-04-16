@@ -31,6 +31,7 @@ class AmlPwmRegulator : public fidl::WireServer<fuchsia_hardware_vreg::Vreg> {
   // Vreg Implementation.
   void SetVoltageStep(SetVoltageStepRequestView request,
                       SetVoltageStepCompleter::Sync& completer) override;
+  void SetState(SetStateRequestView request, SetStateCompleter::Sync& completer) override;
   void GetVoltageStep(GetVoltageStepCompleter::Sync& completer) override;
   void GetRegulatorParams(GetRegulatorParamsCompleter::Sync& completer) override;
   void Enable(EnableCompleter::Sync& completer) override;

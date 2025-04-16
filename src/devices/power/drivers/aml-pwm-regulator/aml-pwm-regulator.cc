@@ -86,6 +86,10 @@ void AmlPwmRegulator::SetVoltageStep(SetVoltageStepRequestView request,
   completer.ReplySuccess();
 }
 
+void AmlPwmRegulator::SetState(SetStateRequestView request, SetStateCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
 void AmlPwmRegulator::GetVoltageStep(GetVoltageStepCompleter::Sync& completer) {
   completer.ReplySuccess(current_step_);
 }
