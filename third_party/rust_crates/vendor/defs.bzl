@@ -444,7 +444,6 @@ _NORMAL_DEPENDENCIES = {
             "rutabaga_gfx": Label("//third_party/rust_crates/vendor/rutabaga_gfx-0.1.3:rutabaga_gfx"),
             "schemars": Label("//third_party/rust_crates/vendor/schemars-0.8.10:schemars"),
             "scopeguard": Label("//third_party/rust_crates/vendor/scopeguard-1.2.0:scopeguard"),
-            "scrypt": Label("//third_party/rust_crates/vendor/scrypt-0.10.0:scrypt"),
             "serde": Label("//third_party/rust_crates/vendor/serde-1.0.204:serde"),
             "serde_json": Label("//third_party/rust_crates/vendor/serde_json-1.0.128:serde_json"),
             "serde_json5": Label("//third_party/rust_crates/vendor/serde_json5-0.2.1:serde_json5"),

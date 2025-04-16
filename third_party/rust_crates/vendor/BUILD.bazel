@@ -2419,18 +2419,6 @@ alias(
 )
 
 alias(
-    name = "scrypt-0.10.0",
-    actual = "//third_party/rust_crates/vendor/scrypt-0.10.0:scrypt",
-    tags = ["manual"],
-)
-
-alias(
-    name = "scrypt",
-    actual = "//third_party/rust_crates/vendor/scrypt-0.10.0:scrypt",
-    tags = ["manual"],
-)
-
-alias(
     name = "sec1-0.7.3",
     actual = "//third_party/rust_crates/vendor/sec1-0.7.3:sec1",
     tags = ["manual"],

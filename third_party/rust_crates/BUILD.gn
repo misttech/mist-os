@@ -910,10 +910,6 @@ group("scopeguard") {
   public_deps = [ ":scopeguard-v1_2_0" ]
 }
 
-group("scrypt") {
-  public_deps = [ ":scrypt-v0_10_0" ]
-}
-
 if (current_os == "fuchsia") {
   group("sec1") {
     public_deps = [ ":sec1-v0_7_3" ]
@@ -2600,7 +2596,6 @@ rust_library("base64ct-v1_6_0") {
     "-Cmetadata=ba441f89d782df0a",
     "-Cextra-filename=-ba441f89d782df0a",
     "--cfg=feature=\"alloc\"",
-    "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
@@ -11119,42 +11114,6 @@ rust_library("parking_lot_core-v0_9_9") {
   applicable_licenses = [ ":parking_lot_core-v0_9_9.license" ]
 }
 
-license("password-hash-v0_4_2.license") {
-  public_package_name = "password_hash"
-  license_files = [
-    "//third_party/rust_crates/vendor/password-hash-0.4.2/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/password-hash-0.4.2/LICENSE-MIT",
-  ]
-}
-
-rust_library("password-hash-v0_4_2") {
-  crate_name = "password_hash"
-  crate_root = "//third_party/rust_crates/vendor/password-hash-0.4.2/src/lib.rs"
-  output_name = "password_hash-6a058f9191c6a2ed"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":base64ct-v1_6_0" ]
-  deps += [ ":rand_core-v0_6_4" ]
-  deps += [ ":subtle-v2_6_1" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2021",
-    "-Cmetadata=6a058f9191c6a2ed",
-    "-Cextra-filename=-6a058f9191c6a2ed",
-    "--cfg=feature=\"alloc\"",
-    "--cfg=feature=\"rand_core\"",
-    "--cfg=feature=\"std\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":password-hash-v0_4_2.license" ]
-}
-
 license("paste-v1_0_15.license") {
   public_package_name = "paste"
   license_files = [
@@ -11215,37 +11174,6 @@ rust_library("pathdiff-v0_2_1") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":pathdiff-v0_2_1.license" ]
-}
-
-license("pbkdf2-v0_11_0.license") {
-  public_package_name = "pbkdf2"
-  license_files = [
-    "//third_party/rust_crates/vendor/pbkdf2-0.11.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/pbkdf2-0.11.0/LICENSE-MIT",
-  ]
-}
-
-rust_library("pbkdf2-v0_11_0") {
-  crate_name = "pbkdf2"
-  crate_root = "//third_party/rust_crates/vendor/pbkdf2-0.11.0/src/lib.rs"
-  output_name = "pbkdf2-d9fbdc66c07f60c2"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":digest-v0_10_7" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2021",
-    "-Cmetadata=d9fbdc66c07f60c2",
-    "-Cextra-filename=-d9fbdc66c07f60c2",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":pbkdf2-v0_11_0.license" ]
 }
 
 license("pem-v0_8_3.license") {
@@ -14555,37 +14483,6 @@ rust_library("ryu-v1_0_3") {
   applicable_licenses = [ ":ryu-v1_0_3.license" ]
 }
 
-license("salsa20-v0_10_2.license") {
-  public_package_name = "salsa20"
-  license_files = [
-    "//third_party/rust_crates/vendor/salsa20-0.10.2/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/salsa20-0.10.2/LICENSE-MIT",
-  ]
-}
-
-rust_library("salsa20-v0_10_2") {
-  crate_name = "salsa20"
-  crate_root = "//third_party/rust_crates/vendor/salsa20-0.10.2/src/lib.rs"
-  output_name = "salsa20-967e4f57c272066a"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":cipher-v0_4_4" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2021",
-    "-Cmetadata=967e4f57c272066a",
-    "-Cextra-filename=-967e4f57c272066a",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":salsa20-v0_10_2.license" ]
-}
-
 license("same-file-v1_0_4.license") {
   public_package_name = "same_file"
   license_files =
@@ -14815,46 +14712,6 @@ rust_library("scopeguard-v1_2_0") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":scopeguard-v1_2_0.license" ]
-}
-
-license("scrypt-v0_10_0.license") {
-  public_package_name = "scrypt"
-  license_files = [
-    "//third_party/rust_crates/vendor/scrypt-0.10.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/scrypt-0.10.0/LICENSE-MIT",
-  ]
-}
-
-rust_library("scrypt-v0_10_0") {
-  crate_name = "scrypt"
-  crate_root = "//third_party/rust_crates/vendor/scrypt-0.10.0/src/lib.rs"
-  output_name = "scrypt-d329cdafd03dc331"
-  configs += [ "//build/config:optimize_speed" ]
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":hmac-v0_12_1" ]
-  deps += [ ":password-hash-v0_4_2" ]
-  deps += [ ":pbkdf2-v0_11_0" ]
-  deps += [ ":salsa20-v0_10_2" ]
-  deps += [ ":sha2-v0_10_6" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2021",
-    "-Cmetadata=d329cdafd03dc331",
-    "-Cextra-filename=-d329cdafd03dc331",
-    "--cfg=feature=\"default\"",
-    "--cfg=feature=\"password-hash\"",
-    "--cfg=feature=\"simple\"",
-    "--cfg=feature=\"std\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":scrypt-v0_10_0.license" ]
 }
 
 license("sct-v0_7_1.license") {
