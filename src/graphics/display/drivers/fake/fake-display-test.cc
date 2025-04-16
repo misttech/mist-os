@@ -813,12 +813,6 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureSolidColorFill) {
   auto [capture_collection_client, capture_token] =
       std::move(new_capture_buffer_collection_result.value());
 
-  zx::result<BufferCollectionAndToken> new_framebuffer_buffer_collection_result =
-      CreateBufferCollection();
-  ASSERT_OK(new_framebuffer_buffer_collection_result);
-  auto [framebuffer_collection_client, framebuffer_token] =
-      std::move(new_framebuffer_buffer_collection_result.value());
-
   engine_info_t banjo_engine_info;
   fake_display_->DisplayEngineCompleteCoordinatorConnection(&engine_listener_banjo_protocol_,
                                                             &banjo_engine_info);
@@ -827,13 +821,8 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureSolidColorFill) {
   constexpr display::DriverBufferCollectionId kCaptureBufferCollectionId(1);
   constexpr uint64_t kBanjoCaptureBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kCaptureBufferCollectionId);
-  constexpr display::DriverBufferCollectionId kFramebufferBufferCollectionId(2);
-  constexpr uint64_t kBanjoFramebufferBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kFramebufferBufferCollectionId);
   EXPECT_OK(fake_display_->DisplayEngineImportBufferCollection(kBanjoCaptureBufferCollectionId,
                                                                capture_token.TakeChannel()));
-  EXPECT_OK(fake_display_->DisplayEngineImportBufferCollection(kBanjoFramebufferBufferCollectionId,
-                                                               framebuffer_token.TakeChannel()));
 
   const auto kPixelFormat = PixelFormatAndModifier(fuchsia_images2::PixelFormat::kB8G8R8A8,
                                                    fuchsia_images2::PixelFormatModifier::kLinear);
@@ -847,11 +836,6 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureSolidColorFill) {
 
   // Set BufferCollection buffer memory constraints from the display driver's
   // end.
-  static constexpr image_buffer_usage_t kDisplayUsage = {
-      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-  };
-  EXPECT_OK(fake_display_->DisplayEngineSetBufferCollectionConstraints(
-      &kDisplayUsage, kBanjoFramebufferBufferCollectionId));
   static constexpr image_buffer_usage_t kCaptureUsage = {
       .tiling_type = IMAGE_TILING_TYPE_CAPTURE,
   };
