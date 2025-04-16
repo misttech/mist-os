@@ -779,6 +779,8 @@ build_api_module("fidl_python_dirs") {
   testonly = true
   data_keys = [ "fidl_python_output" ]
   deps = [
+    ":host",
+    ":tests",
     "//build/images/updates:packages",
     "//sdk",
   ]
