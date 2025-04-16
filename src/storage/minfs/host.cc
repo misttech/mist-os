@@ -40,7 +40,6 @@ zx_status_t do_stat(const fbl::RefPtr<fs::Vnode>& vn, struct stat* s) {
     s->st_mode = static_cast<mode_t>(*a->mode);
     s->st_size = static_cast<off_t>(*a->content_size);
     s->st_ino = *a->id;
-    s->st_ctime = static_cast<time_t>(*a->creation_time);
     s->st_mtime = static_cast<time_t>(*a->modification_time);
   }
   return a.status_value();

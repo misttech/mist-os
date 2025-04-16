@@ -310,10 +310,14 @@ zx::result<fs::VnodeAttributes> VnodeF2fs::GetAttributes() const {
   a.content_size = vmo_manager().GetContentSize();
   a.storage_size = GetBlocks() * kBlockSize;
   a.link_count = nlink_;
+  const auto &atime = GetTime<Timestamps::AccessTime>();
   const auto &btime = GetTime<Timestamps::BirthTime>();
   const auto &mtime = GetTime<Timestamps::ModificationTime>();
+  const auto &ctime = GetTime<Timestamps::ChangeTime>();
   a.creation_time = zx_time_add_duration(ZX_SEC(btime.tv_sec), btime.tv_nsec);
   a.modification_time = zx_time_add_duration(ZX_SEC(mtime.tv_sec), mtime.tv_nsec);
+  a.change_time = zx_time_add_duration(ZX_SEC(ctime.tv_sec), ctime.tv_nsec);
+  a.access_time = zx_time_add_duration(ZX_SEC(atime.tv_sec), atime.tv_nsec);
 
   return zx::ok(a);
 }

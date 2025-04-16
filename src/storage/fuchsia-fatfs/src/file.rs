@@ -7,7 +7,9 @@ use crate::filesystem::{FatFilesystem, FatFilesystemInner};
 use crate::node::Node;
 use crate::refs::FatfsFileRef;
 use crate::types::File;
-use crate::util::{dos_to_unix_time, fatfs_error_to_status, unix_to_dos_time};
+use crate::util::{
+    dos_date_to_unix_time, dos_to_unix_time, fatfs_error_to_status, unix_to_dos_time,
+};
 use fidl_fuchsia_io as fio;
 use fuchsia_sync::RwLock;
 use std::cell::UnsafeCell;
@@ -194,7 +196,6 @@ impl Node for FatFile {
 }
 
 impl vfs::node::Node for FatFile {
-    // TODO(https://fxbug.dev/324112547): add new io2 attributes, e.g. change time, access time.
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
@@ -204,6 +205,7 @@ impl vfs::node::Node for FatFile {
         let content_size = file.len() as u64;
         let creation_time = dos_to_unix_time(file.created());
         let modification_time = dos_to_unix_time(file.modified());
+        let access_time = dos_date_to_unix_time(file.accessed());
 
         // Figure out the storage size by rounding content_size up to the nearest
         // multiple of cluster_size.
@@ -212,7 +214,11 @@ impl vfs::node::Node for FatFile {
 
         Ok(attributes!(
             requested_attributes,
-            Mutable { creation_time: creation_time, modification_time: modification_time },
+            Mutable {
+                creation_time: creation_time,
+                modification_time: modification_time,
+                access_time: access_time
+            },
             Immutable {
                 protocols: fio::NodeProtocolKinds::FILE,
                 abilities: fio::Operations::GET_ATTRIBUTES

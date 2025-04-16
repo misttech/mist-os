@@ -185,8 +185,7 @@ TEST_P(AttrTest, ParentModificationTimeUpdatedCorrectly) {
   ASSERT_EQ(mkdir(parent.c_str(), 0666), 0);
   ASSERT_EQ(mkdir(parent2.c_str(), 0666), 0);
 
-  // Ensure the parent directory's create + modified times
-  // were initialized correctly.
+  // Ensure the parent directory's status change and modified times were initialized correctly.
   struct stat statb;
   ASSERT_EQ(stat(parent.c_str(), &statb), 0);
   ASSERT_GT(ToNanoSeconds(statb.st_ctim), now);
@@ -291,6 +290,30 @@ TEST_P(AttrTest, SetModificationTimeOfDirtyFile) {
 
   ASSERT_EQ(close(fd), 0);
   ASSERT_EQ(unlink(file.c_str()), 0);
+}
+
+// POSIX stat reports ctime (time of last status change). Not all filesystems supports this, but we
+// don't want to report an empty or zero value. If so, stat will fake ctime with modification time.
+TEST_P(AttrTest, ChangeTimeIsNonZero) {
+  const std::string parent = GetPath("parent");
+  ASSERT_EQ(mkdir(parent.c_str(), 0666), 0);
+  struct stat stat_dir;
+  ASSERT_EQ(stat(parent.c_str(), &stat_dir), 0);
+  ASSERT_GT(ToNanoSeconds(stat_dir.st_ctim), 0);
+  ASSERT_EQ(ToNanoSeconds(stat_dir.st_ctim), ToNanoSeconds(stat_dir.st_mtim));
+
+  const std::string child = GetPath("parent/child");
+  int fd = open(child.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+  ASSERT_GT(fd, 0);
+  struct stat stat_file;
+  ASSERT_EQ(stat(parent.c_str(), &stat_file), 0);
+  // ctime should not be zero.
+  ASSERT_GT(ToNanoSeconds(stat_file.st_ctim), 0);
+  ASSERT_EQ(ToNanoSeconds(stat_file.st_ctim), ToNanoSeconds(stat_file.st_mtim));
+
+  // Clean up
+  ASSERT_EQ(unlink(child.c_str()), 0);
+  ASSERT_EQ(rmdir(parent.c_str()), 0);
 }
 
 INSTANTIATE_TEST_SUITE_P(/*no prefix*/, AttrTest, testing::ValuesIn(AllTestFilesystems()),

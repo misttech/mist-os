@@ -6,7 +6,9 @@ use crate::filesystem::{FatFilesystem, FatFilesystemInner};
 use crate::node::{Closer, FatNode, Node, WeakFatNode};
 use crate::refs::{FatfsDirRef, FatfsFileRef};
 use crate::types::{Dir, DirEntry, File};
-use crate::util::{dos_to_unix_time, fatfs_error_to_status, unix_to_dos_time};
+use crate::util::{
+    dos_date_to_unix_time, dos_to_unix_time, fatfs_error_to_status, unix_to_dos_time,
+};
 use fatfs::validate_filename;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
@@ -840,7 +842,6 @@ impl GetEntryInfo for FatDirectory {
 }
 
 impl vfs::node::Node for FatDirectory {
-    // TODO(https://fxbug.dev/324112547): add new io2 attributes, e.g. change time, access time.
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
@@ -850,10 +851,15 @@ impl vfs::node::Node for FatDirectory {
 
         let creation_time = dos_to_unix_time(dir.created());
         let modification_time = dos_to_unix_time(dir.modified());
+        let access_time = dos_date_to_unix_time(dir.accessed());
 
         Ok(attributes!(
             requested_attributes,
-            Mutable { creation_time: creation_time, modification_time: modification_time },
+            Mutable {
+                creation_time: creation_time,
+                modification_time: modification_time,
+                access_time: access_time
+            },
             Immutable {
                 protocols: fio::NodeProtocolKinds::DIRECTORY,
                 abilities: fio::Operations::GET_ATTRIBUTES

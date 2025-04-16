@@ -4,13 +4,22 @@
 
 use chrono::offset::TimeZone;
 use chrono::Local;
-use fatfs::{DateTime, FatfsError};
+use fatfs::{Date, DateTime, FatfsError, Time};
 use std::io::{self, ErrorKind};
 use zx::Status;
 
 /// Returns the equivalent of the given DOS time as ns past the unix epoch.
 pub fn dos_to_unix_time(dos_time: DateTime) -> u64 {
     let datetime = chrono::DateTime::<Local>::from(dos_time);
+    datetime.timestamp_nanos_opt().unwrap() as u64
+}
+
+/// Returns the equivalent of the given DOS time as ns past the unix epoch.
+pub fn dos_date_to_unix_time(dos_date: Date) -> u64 {
+    let datetime = chrono::DateTime::<Local>::from(DateTime {
+        date: dos_date,
+        time: Time { hour: 0, min: 0, sec: 0, millis: 0 },
+    });
     datetime.timestamp_nanos_opt().unwrap() as u64
 }
 
