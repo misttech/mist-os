@@ -34,7 +34,10 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             }
         }
         match (&context.board_info.kernel.serial_mode, &context.build_type) {
-            (SerialMode::NoOutput, _) => {}
+            (SerialMode::NoOutput, &BuildType::User) => {
+                builder.kernel_arg(KernelArg::Serial("none".to_string()))
+            }
+            (SerialMode::NoOutput, &BuildType::UserDebug | &BuildType::Eng) => {}
             (SerialMode::Legacy, &BuildType::UserDebug | &BuildType::User) => {
                 println!("Serial cannot be enabled on user or userdebug builds. Not enabling.");
             }
