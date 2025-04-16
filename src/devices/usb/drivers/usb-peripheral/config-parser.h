@@ -93,7 +93,7 @@ class PeripheralConfigParser {
 
  private:
   // Helper function for determining the pid and product description.
-  zx_status_t SetCompositeProductDescription(uint16_t pid);
+  zx_status_t SetCompositeProductDescription(uint16_t pid, const std::string_view& desc);
 
   uint16_t pid_ = 0;
   std::string product_desc_;
