@@ -1344,7 +1344,7 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
   node_ref_.emplace(dispatcher_, std::move(server_end), this,
                     [](Node* node, fidl::UnbindInfo info) { node->OnNodeServerUnbound(info); });
 
-  LOGF(INFO, "Binding %.*s to  %s", static_cast<int>(url.size()), url.data(), name().c_str());
+  LOGF(INFO, "Binding %.*s to %s", static_cast<int>(url.size()), url.data(), name().c_str());
   // Start the driver within the driver host.
   auto driver_endpoints = fidl::Endpoints<fuchsia_driver_host::Driver>::Create();
 
