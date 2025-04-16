@@ -573,6 +573,11 @@
             to: "#cobalt_system_metrics",
         },
         {
+            protocol: "fuchsia.sysinfo.SysInfo",
+            from: "parent",
+            to: "#mdns",
+        },
+        {
             protocol: "fuchsia.settings.Privacy",
             from: "#setui_service",
             to: "#cobalt",

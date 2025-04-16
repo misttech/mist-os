@@ -56,6 +56,9 @@ const char kSchema[] = R"({
           "media": {
             "type": "string",
             "enum": ["wired", "wireless", "both"]
+          },
+          "include_serial": {
+            "type": "boolean"
           }
         },
         "required": ["service","port"]
@@ -75,6 +78,7 @@ const char kSchema[] = R"({
 const char kPortKey[] = "port";
 const char kPerformHostNameProbeKey[] = "perform_host_name_probe";
 const char kPublicationsKey[] = "publications";
+const char kIncludeSerialKey[] = "include_serial";
 const char kServiceKey[] = "service";
 const char kInstanceKey[] = "instance";
 const char kTextKey[] = "text";
@@ -93,8 +97,8 @@ const char kAltServicesKey[] = "alt_services";
 const char Config::kConfigDir[] = "/config/data";
 const char Config::kBootConfigDir[] = "/boot/data/mdns";
 
-void Config::ReadConfigFiles(const std::string& local_host_name, const std::string& boot_config_dir,
-                             const std::string& config_dir) {
+void Config::ReadConfigFiles(const std::string& local_host_name, const std::string& serial,
+                             const std::string& boot_config_dir, const std::string& config_dir) {
   FX_DCHECK(MdnsNames::IsValidHostName(local_host_name));
 
   auto schema_result = json_parser::InitSchema(kSchema);
@@ -109,31 +113,31 @@ void Config::ReadConfigFiles(const std::string& local_host_name, const std::stri
   // Read boot configuration first. This enables the emulator to pass along additional txt records
   // withe the _fuchsia record.
   parser_.ParseFromDirectory(
-      boot_config_dir, [this, &schema, &local_host_name](rapidjson::Document document) {
+      boot_config_dir, [this, &schema, &local_host_name, &serial](rapidjson::Document document) {
         auto validation_result = json_parser::ValidateSchema(document, schema);
         if (validation_result.is_error()) {
           parser_.ReportError(validation_result.error_value());
           return;
         }
 
-        IntegrateDocument(document, local_host_name);
+        IntegrateDocument(document, local_host_name, serial);
       });
 
   // Read the default configuration.
   parser_.ParseFromDirectory(
-      config_dir, [this, &schema, &local_host_name](rapidjson::Document document) {
+      config_dir, [this, &schema, &local_host_name, &serial](rapidjson::Document document) {
         auto validation_result = json_parser::ValidateSchema(document, schema);
         if (validation_result.is_error()) {
           parser_.ReportError(validation_result.error_value());
           return;
         }
 
-        IntegrateDocument(document, local_host_name);
+        IntegrateDocument(document, local_host_name, serial);
       });
 }
 
 void Config::IntegrateDocument(const rapidjson::Document& document,
-                               const std::string& local_host_name) {
+                               const std::string& local_host_name, const std::string& serial) {
   FX_DCHECK(document.IsObject());
 
   if (document.HasMember(kPerformHostNameProbeKey)) {
@@ -147,7 +151,7 @@ void Config::IntegrateDocument(const rapidjson::Document& document,
   if (document.HasMember(kPublicationsKey)) {
     FX_DCHECK(document[kPublicationsKey].IsArray());
     for (const auto& item : document[kPublicationsKey].GetArray()) {
-      IntegratePublication(item, local_host_name);
+      IntegratePublication(item, local_host_name, serial);
       if (parser_.HasError()) {
         return;
       }
@@ -171,8 +175,8 @@ void Config::IntegrateDocument(const rapidjson::Document& document,
   }
 }
 
-void Config::IntegratePublication(const rapidjson::Value& value,
-                                  const std::string& local_host_name) {
+void Config::IntegratePublication(const rapidjson::Value& value, const std::string& local_host_name,
+                                  const std::string& serial) {
   FX_DCHECK(value.IsObject());
   FX_DCHECK(value.HasMember(kServiceKey));
   FX_DCHECK(value[kServiceKey].IsString());
@@ -223,7 +227,6 @@ void Config::IntegratePublication(const rapidjson::Value& value,
                                 .str());
         return;
       }
-
       text.push_back(item.GetString());
     }
   }
@@ -232,6 +235,19 @@ void Config::IntegratePublication(const rapidjson::Value& value,
   if (value.HasMember(kPerformProbeKey)) {
     FX_DCHECK(value[kPerformProbeKey].IsBool());
     perform_probe = value[kPerformProbeKey].GetBool();
+  }
+
+  bool include_serial = false;
+  if (value.HasMember(kIncludeSerialKey)) {
+    FX_DCHECK(value[kIncludeSerialKey].IsBool());
+    include_serial = value[kIncludeSerialKey].GetBool();
+  }
+
+  if (include_serial && serial != "") {
+    text.push_back("serial=" + serial);
+  } else {
+    FX_LOGS(WARNING) << "We were requested to include the serial number in our mDNS "
+                     << "broadcasts, but no serial number was provided. Continuing without.";
   }
 
   Media media = Media::kBoth;

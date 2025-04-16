@@ -17,6 +17,7 @@ namespace test {
 const char kTestDir[] = "/tmp/mdns_config_test";
 const char kBootTestDir[] = "/tmp/mdns_config_boot_test";
 const char kHostName[] = "test-host-name";
+const char kSerialNumber[] = "0123456789";
 
 bool WriteFile(const std::string& file, const std::string& to_write,
                const std::string& directory = kTestDir) {
@@ -78,7 +79,7 @@ TEST(ConfigTest, OneValidFile) {
   })"));
 
   Config under_test;
-  under_test.ReadConfigFiles(kHostName, kTestDir);
+  under_test.ReadConfigFiles(kHostName, kSerialNumber, kTestDir);
   EXPECT_TRUE(under_test.valid());
   EXPECT_EQ("", under_test.error());
   EXPECT_FALSE(under_test.perform_host_name_probe());
@@ -109,7 +110,7 @@ TEST(ConfigTest, OneInvalidFile) {
   })"));
 
   Config under_test;
-  under_test.ReadConfigFiles(kHostName, kTestDir);
+  under_test.ReadConfigFiles(kHostName, kSerialNumber, kTestDir);
   EXPECT_FALSE(under_test.valid());
   EXPECT_NE("", under_test.error());
 
@@ -130,7 +131,7 @@ TEST(ConfigTest, OneValidOneInvalidFile) {
   })"));
 
   Config under_test;
-  under_test.ReadConfigFiles(kHostName, kTestDir);
+  under_test.ReadConfigFiles(kHostName, kSerialNumber, kTestDir);
   EXPECT_FALSE(under_test.valid());
   EXPECT_NE("", under_test.error());
 
@@ -153,7 +154,7 @@ TEST(ConfigTest, TwoValidFiles) {
   })"));
 
   Config under_test;
-  under_test.ReadConfigFiles(kHostName, kTestDir);
+  under_test.ReadConfigFiles(kHostName, kSerialNumber, kTestDir);
   EXPECT_TRUE(under_test.valid());
   EXPECT_EQ("", under_test.error());
   EXPECT_FALSE(under_test.perform_host_name_probe());
@@ -196,7 +197,7 @@ TEST(ConfigTest, TwoConflictingValidFiles) {
   })"));
 
   Config under_test;
-  under_test.ReadConfigFiles(kHostName, kTestDir);
+  under_test.ReadConfigFiles(kHostName, kSerialNumber, kTestDir);
   EXPECT_FALSE(under_test.valid());
   EXPECT_NE("", under_test.error());
 
@@ -215,7 +216,7 @@ TEST(ConfigTest, EmptyBootConfigDir) {
   })"));
 
   Config under_test;
-  under_test.ReadConfigFiles(kHostName, kBootTestDir, kTestDir);
+  under_test.ReadConfigFiles(kHostName, kSerialNumber, kBootTestDir, kTestDir);
   EXPECT_TRUE(under_test.valid());
   EXPECT_EQ("", under_test.error());
 
@@ -245,7 +246,7 @@ TEST(ConfigTest, OverrideBootConfigDir) {
                         kBootTestDir));
 
   Config under_test;
-  under_test.ReadConfigFiles(kHostName, kBootTestDir, kTestDir);
+  under_test.ReadConfigFiles(kHostName, kSerialNumber, kBootTestDir, kTestDir);
   EXPECT_TRUE(under_test.valid());
   EXPECT_EQ("", under_test.error());
 
@@ -267,7 +268,7 @@ TEST(ConfigTest, OverrideBootConfigDir) {
                            .media_ = Media::kBoth}) == under_test.publications()[1]);
 
   Config under_test_reversed;
-  under_test_reversed.ReadConfigFiles(kHostName, kTestDir, kBootTestDir);
+  under_test_reversed.ReadConfigFiles(kHostName, kSerialNumber, kTestDir, kBootTestDir);
   EXPECT_TRUE(under_test_reversed.valid());
   EXPECT_EQ("", under_test_reversed.error());
 
@@ -292,6 +293,78 @@ TEST(ConfigTest, OverrideBootConfigDir) {
 
   EXPECT_TRUE(files::DeletePath(kTestDir, true));
   EXPECT_TRUE(files::DeletePath(kBootTestDir, true));
+}
+
+TEST(ConfigTest, IncludesSerialSuccess) {
+  EXPECT_TRUE(files::CreateDirectory(kTestDir));
+  EXPECT_TRUE(WriteFile("valid", R"({
+    "perform_host_name_probe": false,
+    "publications" : [
+      {"service" : "_fuchsia._udp.", "port" : 5353, "perform_probe" : false,
+       "include_serial": true,
+       "text": ["chins=2", "thumbs=10"], "media": "wireless"}
+    ],
+    "alt_services": [ "_altsvc1._udp.", "_altsvc2._tcp." ]
+  })"));
+
+  Config under_test;
+  under_test.ReadConfigFiles(kHostName, kSerialNumber, kTestDir);
+  EXPECT_TRUE(under_test.valid());
+  EXPECT_EQ("", under_test.error());
+  EXPECT_FALSE(under_test.perform_host_name_probe());
+  EXPECT_EQ(1u, under_test.publications().size());
+  EXPECT_TRUE((Config::Publication{
+                  .service_ = "_fuchsia._udp.",
+                  .instance_ = kHostName,
+                  .publication_ = std::make_unique<Mdns::Publication>(Mdns::Publication{
+                      .port_ = inet::IpPort::From_uint16_t(5353),
+                      .text_ = {fidl::To<std::vector<uint8_t>>(std::string("chins=2")),
+                                fidl::To<std::vector<uint8_t>>(std::string("thumbs=10")),
+                                fidl::To<std::vector<uint8_t>>(std::string("serial=0123456789"))}}),
+                  .perform_probe_ = false,
+                  .media_ = Media::kWireless}) == under_test.publications()[0]);
+  EXPECT_EQ(2u, under_test.alt_services().size());
+  EXPECT_EQ("_altsvc1._udp.", under_test.alt_services()[0]);
+  EXPECT_EQ("_altsvc2._tcp.", under_test.alt_services()[1]);
+
+  EXPECT_TRUE(files::DeletePath(kTestDir, true));
+}
+
+TEST(ConfigTest, IncludesSerialWithNoSerial) {
+  EXPECT_TRUE(files::CreateDirectory(kTestDir));
+  EXPECT_TRUE(WriteFile("valid", R"({
+    "perform_host_name_probe": false,
+    "publications" : [
+      {"service" : "_fuchsia._udp.", "port" : 5353, "perform_probe" : false,
+       "include_serial": true,
+       "text": ["chins=2", "thumbs=10"], "media": "wireless"}
+    ],
+    "alt_services": [ "_altsvc1._udp.", "_altsvc2._tcp." ]
+  })"));
+
+  Config under_test;
+  under_test.ReadConfigFiles(kHostName, "", kTestDir);
+  EXPECT_TRUE(under_test.valid());
+  EXPECT_EQ("", under_test.error());
+  EXPECT_FALSE(under_test.perform_host_name_probe());
+  EXPECT_EQ(1u, under_test.publications().size());
+  EXPECT_TRUE(
+      (Config::Publication{.service_ = "_fuchsia._udp.",
+                           .instance_ = kHostName,
+                           .publication_ = std::make_unique<Mdns::Publication>(Mdns::Publication{
+                               .port_ = inet::IpPort::From_uint16_t(5353),
+                               .text_ =
+                                   {
+                                       fidl::To<std::vector<uint8_t>>(std::string("chins=2")),
+                                       fidl::To<std::vector<uint8_t>>(std::string("thumbs=10")),
+                                   }}),
+                           .perform_probe_ = false,
+                           .media_ = Media::kWireless}) == under_test.publications()[0]);
+  EXPECT_EQ(2u, under_test.alt_services().size());
+  EXPECT_EQ("_altsvc1._udp.", under_test.alt_services()[0]);
+  EXPECT_EQ("_altsvc2._tcp.", under_test.alt_services()[1]);
+
+  EXPECT_TRUE(files::DeletePath(kTestDir, true));
 }
 
 }  // namespace test

@@ -127,6 +127,7 @@ source_set("source_set") {
     "//sdk/fidl/fuchsia.net:fuchsia.net_hlcpp",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_hlcpp",
     "//sdk/fidl/fuchsia.net.mdns:fuchsia.net.mdns_hlcpp",
+    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_hlcpp",
     "//sdk/lib/fit",
     "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/sys/cpp",

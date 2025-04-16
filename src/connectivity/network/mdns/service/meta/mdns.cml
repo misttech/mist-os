@@ -32,6 +32,7 @@
                 "fuchsia.device.NameProvider",
                 "fuchsia.net.name.Lookup",
                 "fuchsia.posix.socket.Provider",
+                "fuchsia.sysinfo.SysInfo",
             ],
         },
         {
