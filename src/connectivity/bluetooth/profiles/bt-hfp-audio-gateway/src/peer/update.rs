@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use at_commands as at;
+use bt_hfp::codec_id::CodecId;
 use std::iter::once;
 
 use super::calls::Call;
@@ -13,7 +14,7 @@ use super::procedure::query_current_calls::build_clcc_response;
 use super::procedure::subscriber_number_information::build_cnum_response;
 use super::procedure::ProcedureRequest;
 
-use crate::features::{AgFeatures, CodecId};
+use crate::features::AgFeatures;
 
 // TODO(https://fxbug.dev/42153736): Add multiparty support.
 // TODO(https://fxbug.dev/42153738): Add Explicit Call Transfer support.

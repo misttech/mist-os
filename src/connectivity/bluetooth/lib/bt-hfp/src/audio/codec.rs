@@ -4,6 +4,7 @@
 
 use anyhow::anyhow;
 use fuchsia_audio_device::codec;
+use fuchsia_audio_device::codec::CodecRequest;
 use fuchsia_bluetooth::types::{peer_audio_stream_id, PeerId};
 use fuchsia_sync::Mutex;
 use futures::stream::BoxStream;
@@ -15,51 +16,55 @@ use {
     fuchsia_async as fasync,
 };
 
-use super::{AudioControl, AudioControlEvent, AudioError, HF_INPUT_UUID};
-use crate::sco_connector::ScoConnection;
-use crate::CodecId;
+use super::{Control, ControlEvent, Error, HF_INPUT_UUID};
+use crate::codec_id::CodecId;
+use crate::sco;
 
 #[derive(Default)]
-struct CodecAudioControlInner {
+struct CodecControlInner {
     start_request:
         Option<Box<dyn FnOnce(std::result::Result<zx::MonotonicInstant, zx::Status>) + Send>>,
     stop_request:
         Option<Box<dyn FnOnce(std::result::Result<zx::MonotonicInstant, zx::Status>) + Send>>,
 }
 
-pub struct CodecAudioControl {
+// Control that is connected to a Codec device registered with an
+/// AudioDeviceRegistry component.  The AudioDeviceRegistry can request that we
+/// start and/or stop the audio in-band which will send the request on to the
+/// HFP task to initiate Audio Connection Setup when no call is in progress.
+pub struct CodecControl {
     provider: audio_device::ProviderProxy,
     codec_task: Option<fasync::Task<()>>,
-    events_sender: futures::channel::mpsc::Sender<AudioControlEvent>,
-    events_receiver: Mutex<Option<futures::channel::mpsc::Receiver<AudioControlEvent>>>,
+    events_sender: futures::channel::mpsc::Sender<ControlEvent>,
+    events_receiver: Mutex<Option<futures::channel::mpsc::Receiver<ControlEvent>>>,
     codec_id: Option<CodecId>,
-    connection: Option<ScoConnection>,
+    connection: Option<sco::Connection>,
     connected_peer: Option<PeerId>,
-    inner: Arc<Mutex<CodecAudioControlInner>>,
+    inner: Arc<Mutex<CodecControlInner>>,
 }
 
-impl AudioControl for CodecAudioControl {
+impl Control for CodecControl {
     fn start(
         &mut self,
         id: PeerId,
-        connection: ScoConnection,
-        codec: crate::features::CodecId,
-    ) -> Result<(), AudioError> {
+        connection: sco::Connection,
+        codec: crate::codec_id::CodecId,
+    ) -> Result<(), Error> {
         if self.connection.is_some() {
-            return Err(AudioError::AlreadyStarted);
+            return Err(Error::AlreadyStarted);
         }
         if Some(codec) != self.codec_id {
-            return Err(AudioError::UnsupportedParameters {
+            return Err(Error::UnsupportedParameters {
                 source: anyhow!("CodecId must match connected CodecId"),
             });
         }
         if Some(id) != self.connected_peer {
-            return Err(AudioError::UnsupportedParameters {
+            return Err(Error::UnsupportedParameters {
                 source: anyhow!("Can't start a non-connected peer"),
             });
         };
         let Some(start_request) = self.inner.lock().start_request.take() else {
-            return Err(AudioError::UnsupportedParameters {
+            return Err(Error::UnsupportedParameters {
                 source: anyhow!("Can only start in response to request"),
             });
         };
@@ -68,17 +73,17 @@ impl AudioControl for CodecAudioControl {
         Ok(())
     }
 
-    fn stop(&mut self, id: PeerId) -> Result<(), AudioError> {
+    fn stop(&mut self, id: PeerId) -> Result<(), Error> {
         if self.connection.is_none() {
-            return Err(AudioError::NotStarted);
+            return Err(Error::NotStarted);
         }
         if Some(id) != self.connected_peer {
-            return Err(AudioError::UnsupportedParameters {
+            return Err(Error::UnsupportedParameters {
                 source: anyhow!("Can't stop a non-connected peer"),
             });
         }
         let Some(stop_request) = self.inner.lock().stop_request.take() else {
-            return Err(AudioError::UnsupportedParameters {
+            return Err(Error::UnsupportedParameters {
                 source: anyhow!("Can only stop in response to request"),
             });
         };
@@ -122,19 +127,19 @@ impl AudioControl for CodecAudioControl {
         self.connected_peer = None;
     }
 
-    fn take_events(&self) -> BoxStream<'static, AudioControlEvent> {
+    fn take_events(&self) -> BoxStream<'static, ControlEvent> {
         self.events_receiver.lock().take().unwrap().boxed()
     }
 
-    fn failed_request(&self, request: AudioControlEvent, _error: AudioError) {
+    fn failed_request(&self, request: ControlEvent, _error: Error) {
         match request {
-            AudioControlEvent::RequestStart { id: _ } => {
+            ControlEvent::RequestStart { id: _ } => {
                 let Some(start_request) = self.inner.lock().start_request.take() else {
                     return;
                 };
                 start_request(Err(zx::Status::INTERNAL));
             }
-            AudioControlEvent::RequestStop { id: _ } => {
+            ControlEvent::RequestStop { id: _ } => {
                 let Some(stop_request) = self.inner.lock().start_request.take() else {
                     return;
                 };
@@ -151,8 +156,8 @@ async fn codec_task(
     mut codec: codec::SoftCodec,
     supported_formats: audio::DaiSupportedFormats,
     client: fidl::endpoints::ClientEnd<audio::CodecMarker>,
-    mut event_sender: futures::channel::mpsc::Sender<AudioControlEvent>,
-    inner: Arc<Mutex<CodecAudioControlInner>>,
+    mut event_sender: futures::channel::mpsc::Sender<ControlEvent>,
+    inner: Arc<Mutex<CodecControlInner>>,
 ) {
     let result = provider
         .add_device(audio_device::ProviderAddDeviceRequest {
@@ -177,14 +182,13 @@ async fn codec_task(
     while let Some(event) = codec.next().await {
         let Ok(event) = event else {
             let _ = event_sender
-                .send(AudioControlEvent::Stopped {
+                .send(ControlEvent::Stopped {
                     id,
-                    error: Some(AudioError::audio_core(event.err().unwrap().into())),
+                    error: Some(Error::audio_core(event.err().unwrap().into())),
                 })
                 .await;
             return;
         };
-        use fuchsia_audio_device::codec::CodecRequest;
         info!("Codec request: {event:?}");
         let audio_event = match event {
             CodecRequest::SetFormat { format, responder } => {
@@ -207,7 +211,7 @@ async fn codec_task(
                     continue;
                 }
                 inner.lock().start_request = Some(responder);
-                AudioControlEvent::RequestStart { id }
+                ControlEvent::RequestStart { id }
             }
             CodecRequest::Stop { responder } => {
                 if inner.lock().stop_request.is_some() {
@@ -215,7 +219,7 @@ async fn codec_task(
                     continue;
                 }
                 inner.lock().stop_request = Some(responder);
-                AudioControlEvent::RequestStop { id }
+                ControlEvent::RequestStop { id }
             }
         };
         let _ = event_sender.send(audio_event).await;
@@ -223,7 +227,7 @@ async fn codec_task(
     warn!("Codec device finished, dropping..!");
 }
 
-impl CodecAudioControl {
+impl CodecControl {
     pub fn new(provider: audio_device::ProviderProxy) -> Self {
         let (events_sender, receiver) = futures::channel::mpsc::channel(1);
         Self {
@@ -248,16 +252,16 @@ mod tests {
     use futures::task::{Context, Poll};
     use futures::FutureExt;
 
-    use crate::sco_connector::tests::connection_for_codec;
+    use crate::sco::test_utils::connection_for_codec;
 
     async fn codec_setup_connected<F, Fut>(_test_name: &str, test: F)
     where
-        F: FnOnce(audio::CodecProxy, CodecAudioControl) -> Fut,
+        F: FnOnce(audio::CodecProxy, CodecControl) -> Fut,
         Fut: futures::Future<Output = ()>,
     {
         let (provider_proxy, mut provider_requests) =
             fidl::endpoints::create_proxy_and_stream::<audio_device::ProviderMarker>();
-        let mut codec = CodecAudioControl::new(provider_proxy);
+        let mut codec = CodecControl::new(provider_proxy);
 
         codec.connect(PeerId(1), &[CodecId::MSBC]);
 
@@ -290,7 +294,7 @@ mod tests {
 
     #[fixture(codec_setup_connected)]
     #[fuchsia::test]
-    async fn publishes_on_connect(codec_client: audio::CodecProxy, codec: CodecAudioControl) {
+    async fn publishes_on_connect(codec_client: audio::CodecProxy, codec: CodecControl) {
         let _properties = codec_client.get_properties().await.unwrap();
         let audio::CodecGetDaiFormatsResult::Ok(formats) =
             codec_client.get_dai_formats().await.unwrap()
@@ -306,19 +310,19 @@ mod tests {
 
     #[fixture(codec_setup_connected)]
     #[fuchsia::test]
-    async fn removed_on_disconnect(codec_client: audio::CodecProxy, mut codec: CodecAudioControl) {
+    async fn removed_on_disconnect(codec_client: audio::CodecProxy, mut codec: CodecControl) {
         codec.disconnect(PeerId(1));
         let _ = codec_client.on_closed().await;
     }
 
     #[fixture(codec_setup_connected)]
     #[fuchsia::test]
-    async fn start_request_lifetime(codec_client: audio::CodecProxy, mut codec: CodecAudioControl) {
+    async fn start_request_lifetime(codec_client: audio::CodecProxy, mut codec: CodecControl) {
         let mut event_stream = codec.take_events();
         // start without a request should fail
         let (connection, _stream) = connection_for_codec(PeerId(1), CodecId::MSBC, false);
         let start_result = codec.start(PeerId(1), connection, CodecId::MSBC);
-        let Err(AudioError::UnsupportedParameters { .. }) = start_result else {
+        let Err(Error::UnsupportedParameters { .. }) = start_result else {
             panic!("Expected error from start before request");
         };
 
@@ -329,7 +333,7 @@ mod tests {
             panic!("Expected start to be pending");
         };
 
-        let Some(AudioControlEvent::RequestStart { id }) = event_stream.next().await else {
+        let Some(ControlEvent::RequestStart { id }) = event_stream.next().await else {
             panic!("Expected start request from event stream");
         };
         assert_eq!(id, PeerId(1));
@@ -337,7 +341,7 @@ mod tests {
         // starting with a non-MSBC codec fails, and doesn't complete the future.
         let (connection, _stream) = connection_for_codec(PeerId(1), CodecId::CVSD, false);
         let start_result = codec.start(PeerId(1), connection, CodecId::CVSD);
-        let Err(AudioError::UnsupportedParameters { .. }) = start_result else {
+        let Err(Error::UnsupportedParameters { .. }) = start_result else {
             panic!("Expected error from start before request");
         };
         assert_eq!(wake_count.get(), 0);
@@ -353,24 +357,24 @@ mod tests {
         // Starting after started is no good either.
         let (connection, _stream) = connection_for_codec(PeerId(1), CodecId::MSBC, false);
         let start_result = codec.start(PeerId(1), connection, CodecId::MSBC);
-        let Err(AudioError::AlreadyStarted) = start_result else {
+        let Err(Error::AlreadyStarted) = start_result else {
             panic!("Expected error from start while started");
         };
     }
 
     #[fixture(codec_setup_connected)]
     #[fuchsia::test]
-    async fn stop_request_lifetime(codec_client: audio::CodecProxy, mut codec: CodecAudioControl) {
+    async fn stop_request_lifetime(codec_client: audio::CodecProxy, mut codec: CodecControl) {
         let mut event_stream = codec.take_events();
         // can't stop before we are started
-        let Err(AudioError::NotStarted) = codec.stop(PeerId(1)) else {
+        let Err(Error::NotStarted) = codec.stop(PeerId(1)) else {
             panic!("Expected to not be able tp start when stopped");
         };
 
         // request comes in
         let start_fut = codec_client.start();
 
-        let Some(AudioControlEvent::RequestStart { .. }) = event_stream.next().await else {
+        let Some(ControlEvent::RequestStart { .. }) = event_stream.next().await else {
             panic!("Expected start request from event stream");
         };
 
@@ -380,7 +384,7 @@ mod tests {
         let _ = start_fut.await.expect("start to succeed");
 
         // can't stop without a request
-        let Err(AudioError::UnsupportedParameters { .. }) = codec.stop(PeerId(1)) else {
+        let Err(Error::UnsupportedParameters { .. }) = codec.stop(PeerId(1)) else {
             panic!("expected to not be able to stop without a request");
         };
 
@@ -391,7 +395,7 @@ mod tests {
             panic!("Expected stop to be pending");
         };
 
-        let Some(AudioControlEvent::RequestStop { id }) = event_stream.next().await else {
+        let Some(ControlEvent::RequestStop { id }) = event_stream.next().await else {
             panic!("Expected stop request from event stream");
         };
         assert_eq!(id, PeerId(1));
@@ -407,7 +411,7 @@ mod tests {
         };
         // back to being able to not stop it again
 
-        let Err(AudioError::NotStarted) = codec.stop(PeerId(1)) else {
+        let Err(Error::NotStarted) = codec.stop(PeerId(1)) else {
             panic!("Expected to not be able tp start when stopped");
         };
     }

@@ -4,7 +4,7 @@
 
 use async_utils::hanging_get::error::HangingGetServerError;
 use bt_hfp::call::list as call_list;
-use fidl_fuchsia_bluetooth_bredr as bredr;
+use bt_hfp::sco;
 use fidl_fuchsia_bluetooth_hfp::CallState;
 use profile_client::Error as ProfileError;
 use std::error::Error as StdError;
@@ -56,41 +56,8 @@ pub enum CallError {
     None(Vec<CallState>),
 }
 
-/// A failure occurred connecting SCO to a peer.
-#[derive(Debug, Error)]
-pub enum ScoConnectError {
-    #[error("SCO connection failed")]
-    ScoFailed,
-    #[error("SCO connection canceled by new connection request or server")]
-    ScoCanceled,
-    #[error("SCO connection provided invalid arguments")]
-    ScoInvalidArguments,
-    #[error("Profile client error: {:?}", source)]
-    ProfileClient {
-        #[from]
-        source: ProfileError,
-    },
-    #[error("FIDL error: {:?}", source)]
-    Fidl {
-        #[from]
-        source: fidl::Error,
-    },
-}
-
-impl From<ScoConnectError> for Error {
-    fn from(x: ScoConnectError) -> Self {
+impl From<sco::ConnectError> for Error {
+    fn from(x: sco::ConnectError) -> Self {
         Self::sco_connection(x)
-    }
-}
-
-impl From<bredr::ScoErrorCode> for ScoConnectError {
-    fn from(err: bredr::ScoErrorCode) -> Self {
-        match err {
-            bredr::ScoErrorCode::Cancelled => Self::ScoCanceled,
-            bredr::ScoErrorCode::Failure => Self::ScoFailed,
-            bredr::ScoErrorCode::InvalidArguments => Self::ScoInvalidArguments,
-            bredr::ScoErrorCode::ParametersRejected => Self::ScoFailed,
-            _ => Self::ScoFailed,
-        }
     }
 }

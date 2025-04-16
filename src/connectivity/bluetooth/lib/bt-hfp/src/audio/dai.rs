@@ -13,21 +13,28 @@ use futures::StreamExt;
 use log::{info, warn};
 use media::AudioDeviceEnumeratorProxy;
 
-use crate::audio::{AudioControl, AudioControlEvent, AudioError, HF_INPUT_UUID, HF_OUTPUT_UUID};
-use crate::sco_connector::ScoConnection;
-use crate::CodecId;
+use crate::audio::{HF_INPUT_UUID, HF_OUTPUT_UUID};
+use crate::codec_id::CodecId;
+use crate::sco;
 
-pub struct DaiAudioControl {
+use super::{Control, ControlEvent, Error};
+
+/// Control that connects the Audio start / stop to a Digital Audio Interface
+/// device, which is added to an AudioCore configured Fuchsia Audio system.  The
+/// DAI driver provides the ring buffer and is connected to the controller,
+/// providing audio without encoding in-band.  This Control cannot start audio
+/// without a call in progress.
+pub struct DaiControl {
     output: DaiAudioDevice,
     input: DaiAudioDevice,
     audio_core: media::AudioDeviceEnumeratorProxy,
-    active_connection: Option<ScoConnection>,
-    sender: Mutex<futures::channel::mpsc::Sender<AudioControlEvent>>,
+    active_connection: Option<sco::Connection>,
+    sender: Mutex<futures::channel::mpsc::Sender<ControlEvent>>,
 }
 
-impl DaiAudioControl {
-    pub async fn discover(proxy: AudioDeviceEnumeratorProxy) -> Result<Self, AudioError> {
-        let devices = dai::find_devices().await.or(Err(AudioError::DiscoveryFailed))?;
+impl DaiControl {
+    pub async fn discover(proxy: AudioDeviceEnumeratorProxy) -> Result<Self, Error> {
+        let devices = dai::find_devices().await.or(Err(Error::DiscoveryFailed))?;
         Self::setup(devices, proxy).await
     }
 
@@ -35,7 +42,7 @@ impl DaiAudioControl {
     pub(crate) async fn setup(
         devices: Vec<DigitalAudioInterface>,
         proxy: media::AudioDeviceEnumeratorProxy,
-    ) -> Result<Self, AudioError> {
+    ) -> Result<Self, Error> {
         let mut input_dai = None;
         let mut output_dai = None;
 
@@ -50,17 +57,17 @@ impl DaiAudioControl {
                 }
                 Ok(props) => props,
             };
-            let dai_input = props.is_input.ok_or(AudioError::DiscoveryFailed)?;
+            let dai_input = props.is_input.ok_or(Error::DiscoveryFailed)?;
             if input_dai.is_none() && dai_input {
                 let dai_device = DaiAudioDevice::build(device).await.map_err(|e| {
                     warn!("Couldn't build a DAI input audio device: {e:?}");
-                    AudioError::DiscoveryFailed
+                    Error::DiscoveryFailed
                 })?;
                 input_dai = Some(dai_device);
             } else if output_dai.is_none() && !dai_input {
                 let dai_device = DaiAudioDevice::build(device).await.map_err(|e| {
                     warn!("Couldn't build a DAI output audio device: {e:?}");
-                    AudioError::DiscoveryFailed
+                    Error::DiscoveryFailed
                 })?;
                 output_dai = Some(dai_device);
             }
@@ -71,7 +78,7 @@ impl DaiAudioControl {
         }
 
         info!("Couldn't find the correct combination of DAI devices");
-        Err(AudioError::DiscoveryFailed)
+        Err(Error::DiscoveryFailed)
     }
 
     pub fn build(
@@ -119,16 +126,16 @@ impl DaiAudioControl {
     }
 }
 
-impl AudioControl for DaiAudioControl {
+impl Control for DaiControl {
     fn start(
         &mut self,
         id: PeerId,
-        connection: ScoConnection,
+        connection: sco::Connection,
         _codec: CodecId,
-    ) -> Result<(), AudioError> {
+    ) -> Result<(), Error> {
         if self.active_connection.is_some() {
             // Can only handle one connection at once
-            return Err(AudioError::AlreadyStarted);
+            return Err(Error::AlreadyStarted);
         }
         // I/O bandwidth is matched to frame rate but includes both source and sink, so the
         // audio frame rate is half that.
@@ -136,7 +143,7 @@ impl AudioControl for DaiAudioControl {
             32000 => 16000,
             16000 => 8000,
             _ => {
-                return Err(AudioError::UnsupportedParameters {
+                return Err(Error::UnsupportedParameters {
                     source: format_err!("Unsupported frame_rate"),
                 })
             }
@@ -148,25 +155,25 @@ impl AudioControl for DaiAudioControl {
             valid_bits_per_sample: 16,
             frame_rate,
         };
-        self.start_device(&id, true, pcm_format.clone()).map_err(AudioError::audio_core)?;
+        self.start_device(&id, true, pcm_format.clone()).map_err(Error::audio_core)?;
         if let Err(e) = self.start_device(&id, false, pcm_format) {
             // Stop the input device, so we have only two states: started and not started.
             self.input.stop();
-            return Err(AudioError::audio_core(e));
+            return Err(Error::audio_core(e));
         }
         self.active_connection = Some(connection);
-        let _ = self.sender.lock().try_send(AudioControlEvent::Started { id });
+        let _ = self.sender.get_mut().try_send(ControlEvent::Started { id });
         Ok(())
     }
 
-    fn stop(&mut self, id: PeerId) -> Result<(), AudioError> {
+    fn stop(&mut self, id: PeerId) -> Result<(), Error> {
         if !self.active_connection.as_ref().is_some_and(|c| c.peer_id == id) {
-            return Err(AudioError::NotStarted);
+            return Err(Error::NotStarted);
         };
         self.active_connection = None;
         self.output.stop();
         self.input.stop();
-        let _ = self.sender.lock().try_send(AudioControlEvent::Stopped { id, error: None });
+        let _ = self.sender.get_mut().try_send(ControlEvent::Stopped { id, error: None });
         Ok(())
     }
 
@@ -178,14 +185,14 @@ impl AudioControl for DaiAudioControl {
         let _ = self.stop(id);
     }
 
-    fn take_events(&self) -> BoxStream<'static, AudioControlEvent> {
+    fn take_events(&self) -> BoxStream<'static, ControlEvent> {
         let (sender, receiver) = futures::channel::mpsc::channel(1);
         let mut lock = self.sender.lock();
         *lock = sender;
         receiver.boxed()
     }
 
-    fn failed_request(&self, _request: AudioControlEvent, _error: AudioError) {
+    fn failed_request(&self, _request: ControlEvent, _error: Error) {
         // We do not send requests, so do nothing here.
     }
 }
@@ -199,27 +206,27 @@ mod tests {
     use futures::channel::mpsc;
     use futures::SinkExt;
 
-    use crate::sco_connector::tests::connection_for_codec;
+    use crate::sco::test_utils::connection_for_codec;
 
     #[fuchsia::test]
     async fn fails_if_all_devices_not_found() {
         let (proxy, _requests) =
             fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
 
-        let setup_result = DaiAudioControl::setup(vec![], proxy.clone()).await;
-        assert!(matches!(setup_result, Err(AudioError::DiscoveryFailed)));
+        let setup_result = DaiControl::setup(vec![], proxy.clone()).await;
+        assert!(matches!(setup_result, Err(Error::DiscoveryFailed)));
 
         let (input, _handle) = dai::test::test_digital_audio_interface(true);
-        let setup_result = DaiAudioControl::setup(vec![input], proxy.clone()).await;
-        assert!(matches!(setup_result, Err(AudioError::DiscoveryFailed)));
+        let setup_result = DaiControl::setup(vec![input], proxy.clone()).await;
+        assert!(matches!(setup_result, Err(Error::DiscoveryFailed)));
 
         let (output, _handle) = dai::test::test_digital_audio_interface(false);
-        let setup_result = DaiAudioControl::setup(vec![output], proxy.clone()).await;
-        assert!(matches!(setup_result, Err(AudioError::DiscoveryFailed)));
+        let setup_result = DaiControl::setup(vec![output], proxy.clone()).await;
+        assert!(matches!(setup_result, Err(Error::DiscoveryFailed)));
 
         let (input, _handle) = dai::test::test_digital_audio_interface(true);
         let (output, _handle) = dai::test::test_digital_audio_interface(false);
-        let _audio = DaiAudioControl::setup(vec![input, output], proxy.clone()).await.unwrap();
+        let _audio = DaiControl::setup(vec![input, output], proxy.clone()).await.unwrap();
     }
 
     const TEST_PEER: PeerId = PeerId(0);
@@ -235,7 +242,7 @@ mod tests {
 
         let (input, _input_handle) = dai::test::test_digital_audio_interface(true);
         let (output, _output_handle) = dai::test::test_digital_audio_interface(false);
-        let mut audio = DaiAudioControl::setup(vec![input, output], proxy.clone()).await.unwrap();
+        let mut audio = DaiControl::setup(vec![input, output], proxy.clone()).await.unwrap();
         let mut events = audio.take_events();
 
         let (connection, _stream) = connection_for_codec(TEST_PEER, CodecId::CVSD, false);
@@ -249,7 +256,7 @@ mod tests {
 
         // A started event should have been delivered to indicate it's started.
         match events.next().await {
-            Some(AudioControlEvent::Started { id }) => assert_eq!(TEST_PEER, id),
+            Some(ControlEvent::Started { id }) => assert_eq!(TEST_PEER, id),
             x => panic!("Expected a Started event and got {x:?}"),
         };
 
@@ -260,7 +267,7 @@ mod tests {
         let request = stream2.next().await;
         assert!(request.is_none());
 
-        // Can't start a connection for another peer either, DaiAudioControl only supports one
+        // Can't start a connection for another peer either, DaiControl only supports one
         // active peer at a time.
         let (connection, mut stream2) = connection_for_codec(OTHER_PEER, CodecId::CVSD, false);
         let result = audio.start(OTHER_PEER, connection, CodecId::CVSD);
@@ -280,7 +287,7 @@ mod tests {
 
         let (input, input_handle) = dai::test::test_digital_audio_interface(true);
         let (output, output_handle) = dai::test::test_digital_audio_interface(false);
-        let mut audio = DaiAudioControl::setup(vec![input, output], proxy.clone()).await.unwrap();
+        let mut audio = DaiControl::setup(vec![input, output], proxy.clone()).await.unwrap();
         let mut events = audio.take_events();
 
         let _ = audio.stop(OTHER_PEER).expect_err("stopping without starting is an error");
@@ -302,7 +309,7 @@ mod tests {
 
         // A started event should have been delivered to indicate it's started.
         match events.next().await {
-            Some(AudioControlEvent::Started { id }) => assert_eq!(TEST_PEER, id),
+            Some(ControlEvent::Started { id }) => assert_eq!(TEST_PEER, id),
             x => panic!("Expected a Started event and got {x:?}"),
         };
 
@@ -317,7 +324,7 @@ mod tests {
 
         // and send a stopped for successful stops.
         match events.next().await {
-            Some(AudioControlEvent::Stopped { id, error: None }) => {
+            Some(ControlEvent::Stopped { id, error: None }) => {
                 assert_eq!(TEST_PEER, id);
             }
             x => panic!("Expected a non-error Stopped event and got {x:?}"),

@@ -5,6 +5,7 @@
 use async_helpers::maybe_stream::MaybeStream;
 use async_utils::stream::FutureMap;
 use battery_client::{BatteryClient, BatteryClientError, BatteryInfo};
+use bt_hfp::{audio, sco};
 use fidl::endpoints::{Proxy, ServerEnd};
 use fidl_fuchsia_bluetooth_hfp::{CallManagerProxy, PeerHandlerMarker};
 use fuchsia_bluetooth::profile::find_service_classes;
@@ -22,13 +23,11 @@ use std::matches;
 use std::sync::Arc;
 use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_hfp_test as hfp_test};
 
-use crate::audio::{AudioControl, AudioControlEvent};
 use crate::config::AudioGatewayFeatureSupport;
 use crate::error::Error;
 use crate::inspect::{CallManagerInspect, HfpInspect};
 use crate::peer::indicators::battery_level_to_battchg_value;
 use crate::peer::{ConnectionBehavior, Peer, PeerImpl};
-use crate::sco_connector::ScoConnector;
 
 #[derive(Debug)]
 pub enum Event {
@@ -55,14 +54,14 @@ pub struct Hfp {
     test_requests: Receiver<hfp_test::HfpTestRequest>,
     connection_behavior: ConnectionBehavior,
     /// A shared audio controller, to start and route audio devices for peers.
-    audio: Arc<Mutex<Box<dyn AudioControl>>>,
+    audio: Arc<Mutex<Box<dyn audio::Control>>>,
     /// Provides Hfp with battery updates from the `fuchsia.power.battery.BatteryManager` protocol -
     /// these are battery updates about the local (Fuchsia) device.
     battery_client: MaybeStream<BatteryClient>,
     internal_events_rx: Receiver<Event>,
     internal_events_tx: Sender<Event>,
     inspect_node: HfpInspect,
-    sco_connector: ScoConnector,
+    sco_connector: sco::Connector,
 }
 
 impl Inspect for &mut Hfp {
@@ -81,10 +80,10 @@ impl Hfp {
         profile_client: ProfileClient,
         profile_svc: bredr::ProfileProxy,
         battery_client: Option<BatteryClient>,
-        audio: Box<dyn AudioControl>,
+        audio: Box<dyn audio::Control>,
         call_manager_registration: Receiver<CallManagerProxy>,
         config: AudioGatewayFeatureSupport,
-        sco_connector: ScoConnector,
+        sco_connector: sco::Connector,
         test_requests: Receiver<hfp_test::HfpTestRequest>,
     ) -> Self {
         let (internal_events_tx, internal_events_rx) = mpsc::channel(1);
@@ -225,8 +224,8 @@ impl Hfp {
         }
     }
 
-    /// Handle a single `AudioControlEvent` from the audio control.
-    async fn handle_audio_event(&mut self, event: AudioControlEvent) -> Result<(), Error> {
+    /// Handle a single `audio::ControlEvent` from the audio control.
+    async fn handle_audio_event(&mut self, event: audio::ControlEvent) -> Result<(), Error> {
         let peer_id = event.id();
         let peer = self.find_or_create_peer(peer_id).await?;
         peer.audio_event(event).await?;
@@ -345,7 +344,6 @@ impl CallManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use assert_matches::assert_matches;
     use async_test_helpers::run_while;
     use async_utils::PollExt;
@@ -366,7 +364,6 @@ mod tests {
         fidl_fuchsia_power_battery as fpower, fuchsia_async as fasync,
     };
 
-    use crate::audio::TestAudioControl;
     use crate::peer::fake::PeerFake;
     use crate::peer::PeerRequest;
     use crate::profile::test_server::{setup_profile_and_test_server, LocalProfileTestServer};
@@ -384,13 +381,13 @@ mod tests {
         let (_tx, rx1) = mpsc::channel(1);
         let (_, rx2) = mpsc::channel(1);
 
-        let sco_connector = ScoConnector::build(profile_svc.clone(), HashSet::new());
+        let sco_connector = sco::Connector::build(profile_svc.clone(), HashSet::new());
 
         let hfp = Hfp::new(
             profile,
             profile_svc,
             Some(battery_client),
-            Box::new(TestAudioControl::default()),
+            Box::new(audio::TestControl::default()),
             rx1,
             AudioGatewayFeatureSupport::default(),
             sco_connector,
@@ -414,7 +411,7 @@ mod tests {
         sender.send(proxy).await.expect("Hfp to receive the proxy");
 
         let (_, rx) = mpsc::channel(1);
-        let sco_connector = ScoConnector::build(profile_svc.clone(), HashSet::new());
+        let sco_connector = sco::Connector::build(profile_svc.clone(), HashSet::new());
 
         // Run hfp in a background task since we are testing that the profile server observes the
         // expected behavior when interacting with hfp.
@@ -422,7 +419,7 @@ mod tests {
             profile,
             profile_svc,
             Some(battery_client),
-            Box::new(TestAudioControl::default()),
+            Box::new(audio::TestControl::default()),
             receiver,
             AudioGatewayFeatureSupport::default(),
             sco_connector,
@@ -456,7 +453,7 @@ mod tests {
 
         let (mut sender, receiver) = mpsc::channel(1);
         exec.run_singlethreaded(sender.send(proxy)).expect("Hfp to receive the proxy");
-        let sco_connector = ScoConnector::build(profile_svc.clone(), HashSet::new());
+        let sco_connector = sco::Connector::build(profile_svc.clone(), HashSet::new());
 
         let (_, rx) = mpsc::channel(1);
 
@@ -466,7 +463,7 @@ mod tests {
             profile,
             profile_svc,
             Some(battery_client),
-            Box::new(TestAudioControl::default()),
+            Box::new(audio::TestControl::default()),
             receiver,
             AudioGatewayFeatureSupport::default(),
             sco_connector,
@@ -515,7 +512,7 @@ mod tests {
             TestBatteryManager::make_battery_client_with_test_manager().await;
 
         let (mut sender, receiver) = mpsc::channel(1);
-        let sco_connector = ScoConnector::build(profile_svc.clone(), HashSet::new());
+        let sco_connector = sco::Connector::build(profile_svc.clone(), HashSet::new());
 
         let (_, rx) = mpsc::channel(1);
 
@@ -525,7 +522,7 @@ mod tests {
             profile,
             profile_svc,
             Some(battery_client),
-            Box::new(TestAudioControl::default()),
+            Box::new(audio::TestControl::default()),
             receiver,
             AudioGatewayFeatureSupport::default(),
             sco_connector,
@@ -561,7 +558,7 @@ mod tests {
         sender.send(proxy).await.expect("Hfp to receive the proxy");
 
         let (_, rx) = mpsc::channel(1);
-        let sco_connector = ScoConnector::build(profile_svc.clone(), HashSet::new());
+        let sco_connector = sco::Connector::build(profile_svc.clone(), HashSet::new());
 
         // Run hfp in a background task since we are testing that the profile server observes the
         // expected behavior when interacting with hfp.
@@ -569,7 +566,7 @@ mod tests {
             profile,
             profile_svc,
             Some(battery_client),
-            Box::new(TestAudioControl::default()),
+            Box::new(audio::TestControl::default()),
             receiver,
             AudioGatewayFeatureSupport::default(),
             sco_connector,
@@ -617,7 +614,7 @@ mod tests {
         sender.try_send(proxy).expect("Hfp to receive the proxy");
 
         let (_, rx) = mpsc::channel(1);
-        let sco_connector = ScoConnector::build(profile_svc.clone(), HashSet::new());
+        let sco_connector = sco::Connector::build(profile_svc.clone(), HashSet::new());
 
         // Run hfp in a background task since we are testing that the profile server observes the
         // expected behavior when interacting with hfp.
@@ -625,7 +622,7 @@ mod tests {
             profile,
             profile_svc,
             Some(battery_client),
-            Box::new(TestAudioControl::default()),
+            Box::new(audio::TestControl::default()),
             receiver,
             AudioGatewayFeatureSupport::default(),
             sco_connector,
@@ -746,7 +743,7 @@ mod tests {
             TestBatteryManager::make_battery_client_with_test_manager().await;
         let (_call_mgr_tx, call_mgr_rx) = mpsc::channel(1);
         let (mut test_tx, test_rx) = mpsc::channel(1);
-        let sco_connector = ScoConnector::build(profile_svc.clone(), HashSet::new());
+        let sco_connector = sco::Connector::build(profile_svc.clone(), HashSet::new());
 
         // Run hfp in a background task since we are testing that the correct battery level is
         // propagated to the `peer_receiver`.
@@ -754,7 +751,7 @@ mod tests {
             profile,
             profile_svc,
             Some(battery_client),
-            Box::new(TestAudioControl::default()),
+            Box::new(audio::TestControl::default()),
             call_mgr_rx,
             AudioGatewayFeatureSupport::default(),
             sco_connector,
@@ -794,7 +791,7 @@ mod tests {
         let (_sender, receiver) = mpsc::channel(1);
 
         let (_tx, rx) = mpsc::channel(1);
-        let sco_connector = ScoConnector::build(profile_svc.clone(), HashSet::new());
+        let sco_connector = sco::Connector::build(profile_svc.clone(), HashSet::new());
 
         // Run hfp in a background task since we are testing that the profile server observes the
         // expected behavior when interacting with hfp.
@@ -802,7 +799,7 @@ mod tests {
             profile,
             profile_svc,
             Some(battery_client),
-            Box::new(TestAudioControl::default()),
+            Box::new(audio::TestControl::default()),
             receiver,
             AudioGatewayFeatureSupport::default(),
             sco_connector,
@@ -839,7 +836,7 @@ mod tests {
             TestBatteryManager::make_battery_client_with_test_manager().await;
         let (_call_mgr_tx, call_mgr_rx) = mpsc::channel(1);
         let (mut test_tx, test_rx) = mpsc::channel(1);
-        let sco_connector = ScoConnector::build(profile_svc.clone(), HashSet::new());
+        let sco_connector = sco::Connector::build(profile_svc.clone(), HashSet::new());
 
         // Run hfp in a background task since we are testing that the correct behavior is
         // propagated to the `peer_receiver`.
@@ -847,7 +844,7 @@ mod tests {
             profile,
             profile_svc,
             Some(battery_client),
-            Box::new(TestAudioControl::default()),
+            Box::new(audio::TestControl::default()),
             call_mgr_rx,
             AudioGatewayFeatureSupport::default(),
             sco_connector,
@@ -894,13 +891,13 @@ mod tests {
             TestBatteryManager::make_battery_client_with_test_manager().await;
         let (_tx, rx1) = mpsc::channel(1);
         let (_, rx2) = mpsc::channel(1);
-        let sco_connector = ScoConnector::build(profile_svc.clone(), HashSet::new());
+        let sco_connector = sco::Connector::build(profile_svc.clone(), HashSet::new());
 
         let mut hfp = Hfp::new(
             profile,
             profile_svc,
             Some(battery_client),
-            Box::new(TestAudioControl::default()),
+            Box::new(audio::TestControl::default()),
             rx1,
             AudioGatewayFeatureSupport::default(),
             sco_connector,

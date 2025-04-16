@@ -5,6 +5,8 @@
 
 use anyhow::{anyhow, Context, Error};
 use battery_client::BatteryClient;
+use bt_hfp::codec_id::CodecId;
+use bt_hfp::{audio, sco};
 use fidl_fuchsia_media as media;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect_derive::Inspect;
@@ -15,14 +17,10 @@ use std::collections::HashSet;
 use std::pin::pin;
 
 use crate::config::AudioGatewayFeatureSupport;
-use crate::features::CodecId;
 use crate::fidl_service::run_services;
 use crate::hfp::Hfp;
 use crate::profile::register_audio_gateway;
-use crate::sco_connector::ScoConnector;
 
-mod a2dp;
-mod audio;
 mod config;
 mod error;
 mod features;
@@ -31,10 +29,9 @@ mod hfp;
 mod inspect;
 mod peer;
 mod profile;
-mod sco_connector;
 mod service_definitions;
 
-fn controller_codecs(config: &hfp_profile_config::Config) -> HashSet<features::CodecId> {
+fn controller_codecs(config: &hfp_profile_config::Config) -> HashSet<CodecId> {
     let mut controller_codecs = HashSet::new();
     if config.controller_encoding_cvsd {
         let _ = controller_codecs.insert(CodecId::CVSD);
@@ -47,22 +44,21 @@ fn controller_codecs(config: &hfp_profile_config::Config) -> HashSet<features::C
 
 async fn setup_audio(
     config: &hfp_profile_config::Config,
-    controller_codecs: HashSet<features::CodecId>,
-) -> Result<Box<dyn audio::AudioControl>, Error> {
+    controller_codecs: HashSet<CodecId>,
+) -> Result<Box<dyn audio::Control>, Error> {
     if config.offload_type == "dai" {
         let audio_proxy =
             fuchsia_component::client::connect_to_protocol::<media::AudioDeviceEnumeratorMarker>()
                 .with_context(|| format!("Error connecting to audio_core"))?;
         Ok(Box::new(
-            audio::PartialOffloadAudioControl::setup_audio_core(audio_proxy, controller_codecs)
-                .await?,
+            audio::PartialOffloadControl::setup_audio_core(audio_proxy, controller_codecs).await?,
         ))
     } else if config.offload_type == "codec" {
         let provider = fuchsia_component::client::connect_to_protocol::<
             fidl_fuchsia_audio_device::ProviderMarker,
         >()
         .with_context(|| format!("Error connecting to audio_device_registry"))?;
-        let codec = audio::CodecAudioControl::new(provider);
+        let codec = audio::CodecControl::new(provider);
         Ok(Box::new(codec))
     } else {
         error!(r#type = config.offload_type.as_str(); "Unrecognized offload type");
@@ -100,7 +96,7 @@ async fn main() -> Result<(), Error> {
     let (call_manager_sender, call_manager_receiver) = mpsc::channel(1);
     let (test_request_sender, test_request_receiver) = mpsc::channel(1);
 
-    let sco_connector = ScoConnector::build(profile_svc.clone(), controller_codecs);
+    let sco_connector = sco::Connector::build(profile_svc.clone(), controller_codecs);
 
     let mut hfp = Hfp::new(
         profile_client,

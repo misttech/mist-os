@@ -469,8 +469,8 @@ impl SlcProcedureState for SlcErrorState {
 mod tests {
     use super::*;
 
-    use crate::features::CodecId;
     use assert_matches::assert_matches;
+    use bt_hfp::codec_id::CodecId;
 
     #[test]
     fn supported_features_received_transition_to_codec_negotiation() {

@@ -18,18 +18,12 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
     "//sdk/fidl/fuchsia.bluetooth.hfp:fuchsia.bluetooth.hfp_rust",
     "//sdk/fidl/fuchsia.bluetooth.hfp.test:fuchsia.bluetooth.hfp.test_rust",
-    "//sdk/fidl/fuchsia.bluetooth.internal.a2dp:fuchsia.bluetooth.internal.a2dp_rust",
-    "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_rust",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//sdk/rust/zx",
     "//src/connectivity/bluetooth/lib/async-helpers",
     "//src/connectivity/bluetooth/lib/battery-client",
-    "//src/connectivity/bluetooth/lib/bt-a2dp",
     "//src/connectivity/bluetooth/lib/bt-hfp",
     "//src/connectivity/bluetooth/lib/bt-rfcomm",
-    "//src/connectivity/bluetooth/lib/fuchsia-audio-codec",
-    "//src/connectivity/bluetooth/lib/fuchsia-audio-dai",
-    "//src/connectivity/bluetooth/lib/fuchsia-audio-device",
     "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
     "//src/connectivity/bluetooth/lib/profile-client",
     "//src/connectivity/bluetooth/lib/vigil",
@@ -60,18 +54,11 @@ rustc_binary("bin") {
     "//src/connectivity/bluetooth/testing/test-battery-manager",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/test_util",
-    "//src/lib/testing/fixture",
     "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:futures-test",
     "//third_party/rust_crates:proptest",
   ]
 
   sources = [
-    "src/a2dp.rs",
-    "src/audio.rs",
-    "src/audio/codec.rs",
-    "src/audio/dai.rs",
-    "src/audio/inband.rs",
     "src/config.rs",
     "src/error.rs",
     "src/features.rs",
@@ -109,13 +96,11 @@ rustc_binary("bin") {
     "src/peer/procedure/volume_control.rs",
     "src/peer/procedure/volume_synchronization.rs",
     "src/peer/ringer.rs",
-    "src/peer/sco_state.rs",
     "src/peer/service_level_connection.rs",
     "src/peer/slc_request.rs",
     "src/peer/task.rs",
     "src/peer/update.rs",
     "src/profile.rs",
-    "src/sco_connector.rs",
     "src/service_definitions.rs",
   ]
 
@@ -192,38 +177,7 @@ fuchsia_test_package("bt-hfp-audio-gateway-tests") {
   subpackages = [ "//src/media/codec:codec_factory_test" ]
 }
 
-rustc_test("bt_hfp_a2dp_controller_bin") {
-  edition = "2021"
-  output_name = "bt_hfp_a2dp_controller_tests"
-  features = [ "test_a2dp_controller" ]
-  source_root = "src/a2dp.rs"
-
-  deps = [
-    "//sdk/fidl/fuchsia.bluetooth.internal.a2dp:fuchsia.bluetooth.internal.a2dp_rust",
-    "//sdk/rust/zx",
-    "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
-    "//src/lib/async-utils",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia",
-    "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-component",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:log",
-  ]
-
-  sources = [ "src/a2dp.rs" ]
-
-  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
-}
-
-fuchsia_unittest_package("bt-hfp-a2dp-controller-tests") {
-  deps = [ ":bt_hfp_a2dp_controller_bin" ]
-}
-
 group("tests") {
   testonly = true
-  deps = [
-    ":bt-hfp-a2dp-controller-tests",
-    ":bt-hfp-audio-gateway-tests",
-  ]
+  deps = [ ":bt-hfp-audio-gateway-tests" ]
 }

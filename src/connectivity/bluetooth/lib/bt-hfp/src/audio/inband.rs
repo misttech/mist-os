@@ -16,17 +16,17 @@ use media::AudioDeviceEnumeratorProxy;
 use std::pin::pin;
 use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_media as media, fuchsia_async as fasync};
 
-use crate::audio::{AudioControl, AudioControlEvent, AudioError, HF_INPUT_UUID, HF_OUTPUT_UUID};
-use crate::sco_connector::ScoConnection;
-use crate::CodecId;
+use crate::audio::{Control, ControlEvent, Error, HF_INPUT_UUID, HF_OUTPUT_UUID};
+use crate::codec_id::CodecId;
+use crate::sco;
 
-/// AudioControl for inband audio, i.e. encoding and decoding audio before sending them
+/// Audio Control for inband audio, i.e. encoding and decoding audio before sending them
 /// to the controller via HCI (in contrast to offloaded audio).
-pub struct InbandAudioControl {
+pub struct InbandControl {
     audio_core: media::AudioDeviceEnumeratorProxy,
     session_task: Option<(PeerId, fasync::Task<()>)>,
-    event_sender: Mutex<futures::channel::mpsc::Sender<AudioControlEvent>>,
-    stream: Mutex<Option<futures::channel::mpsc::Receiver<AudioControlEvent>>>,
+    event_sender: Mutex<futures::channel::mpsc::Sender<ControlEvent>>,
+    stream: Mutex<Option<futures::channel::mpsc::Receiver<ControlEvent>>>,
 }
 
 // Setup for a running AudioSession.
@@ -36,30 +36,30 @@ pub struct InbandAudioControl {
 struct AudioSession {
     audio_frame_sink: AudioFrameSink,
     audio_frame_stream: AudioFrameStream,
-    sco: ScoConnection,
+    sco: sco::Connection,
     codec: CodecId,
     decoder: StreamProcessor,
     encoder: StreamProcessor,
-    event_sender: futures::channel::mpsc::Sender<AudioControlEvent>,
+    event_sender: futures::channel::mpsc::Sender<ControlEvent>,
 }
 
 impl AudioSession {
     fn setup(
-        connection: ScoConnection,
+        connection: sco::Connection,
         codec: CodecId,
         audio_frame_sink: AudioFrameSink,
         audio_frame_stream: AudioFrameStream,
-        event_sender: futures::channel::mpsc::Sender<AudioControlEvent>,
-    ) -> Result<Self, AudioError> {
+        event_sender: futures::channel::mpsc::Sender<ControlEvent>,
+    ) -> Result<Self, Error> {
         if !codec.is_supported() {
-            return Err(AudioError::UnsupportedParameters {
+            return Err(Error::UnsupportedParameters {
                 source: format_err!("unsupported codec {codec}"),
             });
         }
         let decoder = StreamProcessor::create_decoder(codec.mime_type()?, Some(codec.oob_bytes()))
-            .map_err(|e| AudioError::audio_core(format_err!("creating decoder: {e:?}")))?;
+            .map_err(|e| Error::audio_core(format_err!("creating decoder: {e:?}")))?;
         let encoder = StreamProcessor::create_encoder(codec.try_into()?, codec.try_into()?)
-            .map_err(|e| AudioError::audio_core(format_err!("creating encoder: {e:?}")))?;
+            .map_err(|e| Error::audio_core(format_err!("creating encoder: {e:?}")))?;
         Ok(Self {
             sco: connection,
             decoder,
@@ -75,7 +75,7 @@ impl AudioSession {
         mut encoded_stream: StreamProcessorOutputStream,
         proxy: bredr::ScoConnectionProxy,
         codec: CodecId,
-    ) -> AudioError {
+    ) -> Error {
         // Pre-allocate the packet vector and reuse to avoid allocating for every packet.
         let packet: Vec<u8> = vec![0; 60]; // SCO has 60 byte packets
         let mut request =
@@ -118,38 +118,35 @@ impl AudioSession {
                 }
                 Some(Err(e)) => {
                     warn!("Error in encoding: {e:?}");
-                    return AudioError::audio_core(format_err!("Couldn't read encoded: {e:?}"));
+                    return Error::audio_core(format_err!("Couldn't read encoded: {e:?}"));
                 }
                 None => {
                     warn!("Error in encoding: Stream is ended!");
-                    return AudioError::audio_core(format_err!("Encoder stream ended early"));
+                    return Error::audio_core(format_err!("Encoder stream ended early"));
                 }
             }
         }
     }
 
-    async fn pcm_to_encoder(
-        mut encoder: StreamProcessor,
-        mut stream: AudioFrameStream,
-    ) -> AudioError {
+    async fn pcm_to_encoder(mut encoder: StreamProcessor, mut stream: AudioFrameStream) -> Error {
         loop {
             match stream.next().await {
                 Some(Ok(pcm)) => {
                     if let Err(e) = encoder.write_all(pcm.as_slice()).await {
-                        return AudioError::audio_core(format_err!("write to encoder: {e:?}"));
+                        return Error::audio_core(format_err!("write to encoder: {e:?}"));
                     }
                     // Packets should be exactly the right size.
                     if let Err(e) = encoder.flush().await {
-                        return AudioError::audio_core(format_err!("flush encoder: {e:?}"));
+                        return Error::audio_core(format_err!("flush encoder: {e:?}"));
                     }
                 }
                 Some(Err(e)) => {
                     warn!("Audio output error: {e:?}");
-                    return AudioError::audio_core(format_err!("output error: {e:?}"));
+                    return Error::audio_core(format_err!("output error: {e:?}"));
                 }
                 None => {
                     warn!("Ran out of audio input!");
-                    return AudioError::audio_core(format_err!("Audio input end"));
+                    return Error::audio_core(format_err!("Audio input end"));
                 }
             }
         }
@@ -158,7 +155,7 @@ impl AudioSession {
     async fn decoder_to_pcm(
         mut decoded_stream: StreamProcessorOutputStream,
         mut sink: AudioFrameSink,
-    ) -> AudioError {
+    ) -> Error {
         let mut decoded_packets = 0;
         loop {
             match decoded_stream.next().await {
@@ -172,16 +169,16 @@ impl AudioSession {
                     }
                     if let Err(e) = sink.write_all(decoded.as_slice()).await {
                         warn!("Error sending to sink: {e:?}");
-                        return AudioError::audio_core(format_err!("send to sink: {e:?}"));
+                        return Error::audio_core(format_err!("send to sink: {e:?}"));
                     }
                 }
                 Some(Err(e)) => {
                     warn!("Error in decoding: {e:?}");
-                    return AudioError::audio_core(format_err!("Couldn't read decoder: {e:?}"));
+                    return Error::audio_core(format_err!("Couldn't read decoder: {e:?}"));
                 }
                 None => {
                     warn!("Error in decoding: Stream is ended!");
-                    return AudioError::audio_core(format_err!("Decoder stream ended early"));
+                    return Error::audio_core(format_err!("Decoder stream ended early"));
                 }
             }
         }
@@ -191,11 +188,11 @@ impl AudioSession {
         proxy: bredr::ScoConnectionProxy,
         mut decoder: StreamProcessor,
         codec: CodecId,
-    ) -> AudioError {
+    ) -> Error {
         loop {
             let data = match proxy.read().await {
                 Ok(bredr::ScoConnectionReadResponse { data: Some(data), .. }) => data,
-                Ok(_) => return AudioError::audio_core(format_err!("Invalid Read response")),
+                Ok(_) => return Error::audio_core(format_err!("Invalid Read response")),
                 Err(e) => return e.into(),
             };
             let packet = match codec {
@@ -213,18 +210,18 @@ impl AudioSession {
                     packet
                 }
                 _ => {
-                    return AudioError::UnsupportedParameters {
+                    return Error::UnsupportedParameters {
                         source: format_err!("Unknown CodecId: {codec:?}"),
                     }
                 }
             };
             if let Err(e) = decoder.write_all(packet).await {
-                return AudioError::audio_core(format_err!("Failed to write to decoder: {e:?}"));
+                return Error::audio_core(format_err!("Failed to write to decoder: {e:?}"));
             }
             // TODO(https://fxbug.dev/42073275): buffer some packets before flushing instead of flushing on
             // every one.
             if let Err(e) = decoder.flush().await {
-                return AudioError::audio_core(format_err!("Failed to flush decoder: {e:?}"));
+                return Error::audio_core(format_err!("Failed to flush decoder: {e:?}"));
             }
         }
     }
@@ -256,8 +253,7 @@ impl AudioSession {
             e = sco_read.fuse() => { warn!(e:?; "SCO read to decoder"); e},
             e = decoder_to_sink.fuse() => { warn!(e:?; "SCO decoder to PCM"); e},
         };
-        let _ =
-            self.event_sender.try_send(AudioControlEvent::Stopped { id: peer_id, error: Some(e) });
+        let _ = self.event_sender.try_send(ControlEvent::Stopped { id: peer_id, error: Some(e) });
     }
 
     fn start(self) -> fasync::Task<()> {
@@ -265,8 +261,8 @@ impl AudioSession {
     }
 }
 
-impl InbandAudioControl {
-    pub fn create(proxy: AudioDeviceEnumeratorProxy) -> Result<Self, AudioError> {
+impl InbandControl {
+    pub fn create(proxy: AudioDeviceEnumeratorProxy) -> Result<Self, Error> {
         let (sender, receiver) = futures::channel::mpsc::channel(1);
         Ok(Self {
             audio_core: proxy,
@@ -294,11 +290,7 @@ impl InbandAudioControl {
     // This must be a multiple of 7.5ms for the CVSD encoder to not have any remainder bytes.
     const AUDIO_BUFFER_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(15);
 
-    fn start_input(
-        &mut self,
-        peer_id: PeerId,
-        codec_id: CodecId,
-    ) -> Result<AudioFrameSink, AudioError> {
+    fn start_input(&mut self, peer_id: PeerId, codec_id: CodecId) -> Result<AudioFrameSink, Error> {
         let audio_dev_id = peer_audio_stream_id(peer_id, HF_INPUT_UUID);
         let (client, sink) = SoftStreamConfig::create_input(
             &audio_dev_id,
@@ -308,7 +300,7 @@ impl InbandAudioControl {
             codec_id.try_into()?,
             Self::AUDIO_BUFFER_DURATION,
         )
-        .map_err(|e| AudioError::audio_core(format_err!("Couldn't create input: {e:?}")))?;
+        .map_err(|e| Error::audio_core(format_err!("Couldn't create input: {e:?}")))?;
 
         self.audio_core.add_device_by_channel(super::DEVICE_NAME, true, client)?;
         Ok(sink)
@@ -318,7 +310,7 @@ impl InbandAudioControl {
         &mut self,
         peer_id: PeerId,
         codec_id: CodecId,
-    ) -> Result<AudioFrameStream, AudioError> {
+    ) -> Result<AudioFrameStream, Error> {
         let audio_dev_id = peer_audio_stream_id(peer_id, HF_OUTPUT_UUID);
         let (client, stream) = SoftStreamConfig::create_output(
             &audio_dev_id,
@@ -329,24 +321,24 @@ impl InbandAudioControl {
             Self::AUDIO_BUFFER_DURATION,
             zx::MonotonicDuration::from_millis(0),
         )
-        .map_err(|e| AudioError::audio_core(format_err!("Couldn't create output: {e:?}")))?;
+        .map_err(|e| Error::audio_core(format_err!("Couldn't create output: {e:?}")))?;
         self.audio_core.add_device_by_channel(super::DEVICE_NAME, false, client)?;
         Ok(stream)
     }
 }
 
-impl AudioControl for InbandAudioControl {
+impl Control for InbandControl {
     fn start(
         &mut self,
         id: PeerId,
-        connection: ScoConnection,
+        connection: sco::Connection,
         codec: CodecId,
-    ) -> Result<(), AudioError> {
+    ) -> Result<(), Error> {
         if let Some(running) = self.running_id() {
             if running == id {
-                return Err(AudioError::AlreadyStarted);
+                return Err(Error::AlreadyStarted);
             }
-            return Err(AudioError::UnsupportedParameters {
+            return Err(Error::UnsupportedParameters {
                 source: format_err!("Only one peer can be started inband at once"),
             });
         }
@@ -363,12 +355,12 @@ impl AudioControl for InbandAudioControl {
         Ok(())
     }
 
-    fn stop(&mut self, id: PeerId) -> Result<(), AudioError> {
+    fn stop(&mut self, id: PeerId) -> Result<(), Error> {
         if self.running_id() != Some(id) {
-            return Err(AudioError::NotStarted);
+            return Err(Error::NotStarted);
         }
         self.session_task = None;
-        let _ = self.event_sender.lock().try_send(AudioControlEvent::Stopped { id, error: None });
+        let _ = self.event_sender.get_mut().try_send(ControlEvent::Stopped { id, error: None });
         Ok(())
     }
 
@@ -380,11 +372,11 @@ impl AudioControl for InbandAudioControl {
         let _ = self.stop(id);
     }
 
-    fn take_events(&self) -> BoxStream<'static, AudioControlEvent> {
+    fn take_events(&self) -> BoxStream<'static, ControlEvent> {
         self.stream.lock().take().unwrap().boxed()
     }
 
-    fn failed_request(&self, _request: AudioControlEvent, _error: AudioError) {
+    fn failed_request(&self, _request: ControlEvent, _error: Error) {
         // We send no requests, so ignore this.
     }
 }
@@ -395,7 +387,7 @@ mod tests {
 
     use fidl_fuchsia_bluetooth_bredr::ScoConnectionRequestStream;
 
-    use crate::sco_connector::tests::connection_for_codec;
+    use crate::sco::test_utils::connection_for_codec;
 
     /// A "Zero input response" SBC packet.  This is what SBC encodes to (with the MSBC settings)
     /// when passed a flat input at zero.  Each packet represents 7.5 milliseconds of audio.
@@ -443,7 +435,7 @@ mod tests {
     async fn reads_audio_from_connection() {
         let (proxy, _audio_enumerator_requests) =
             fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
-        let mut control = InbandAudioControl::create(proxy).unwrap();
+        let mut control = InbandControl::create(proxy).unwrap();
 
         let (connection, mut sco_request_stream) =
             connection_for_codec(PeerId(1), CodecId::MSBC, true);
@@ -483,7 +475,7 @@ mod tests {
     async fn audio_setup_error_bad_codec() {
         let (proxy, _) =
             fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
-        let mut control = InbandAudioControl::create(proxy).unwrap();
+        let mut control = InbandControl::create(proxy).unwrap();
 
         let (connection, _sco_request_stream) =
             connection_for_codec(PeerId(1), CodecId::MSBC, true);
@@ -496,7 +488,7 @@ mod tests {
         use fidl_fuchsia_hardware_audio as audio;
         let (proxy, mut audio_enumerator_requests) =
             fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
-        let mut control = InbandAudioControl::create(proxy).unwrap();
+        let mut control = InbandControl::create(proxy).unwrap();
 
         let (connection, mut sco_request_stream) =
             connection_for_codec(PeerId(1), CodecId::MSBC, true);
@@ -591,7 +583,7 @@ mod tests {
         use fidl_fuchsia_hardware_audio as audio;
         let (proxy, mut audio_enumerator_requests) =
             fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
-        let mut control = InbandAudioControl::create(proxy).unwrap();
+        let mut control = InbandControl::create(proxy).unwrap();
 
         let (connection, mut sco_request_stream) =
             connection_for_codec(PeerId(1), CodecId::MSBC, true);
@@ -670,7 +662,7 @@ mod tests {
         use fidl_fuchsia_hardware_audio as audio;
         let (proxy, mut audio_enumerator_requests) =
             fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
-        let mut control = InbandAudioControl::create(proxy).unwrap();
+        let mut control = InbandControl::create(proxy).unwrap();
 
         let (connection, mut sco_request_stream) =
             connection_for_codec(PeerId(1), CodecId::CVSD, true);
@@ -739,7 +731,7 @@ mod tests {
         use fidl_fuchsia_hardware_audio as audio;
         let (proxy, mut audio_enumerator_requests) =
             fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
-        let mut control = InbandAudioControl::create(proxy).unwrap();
+        let mut control = InbandControl::create(proxy).unwrap();
 
         let (connection, mut sco_request_stream) =
             connection_for_codec(PeerId(1), CodecId::MSBC, true);
@@ -808,7 +800,7 @@ mod tests {
     async fn audio_output_error_sends_to_events() {
         let (proxy, mut audio_enumerator_requests) =
             fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>();
-        let mut control = InbandAudioControl::create(proxy).unwrap();
+        let mut control = InbandControl::create(proxy).unwrap();
         let mut events = control.take_events();
 
         let (connection, _sco_request_stream) =
@@ -840,7 +832,7 @@ mod tests {
 
         // Events should produce an error because there was an issue with audio output.
         match events.next().await {
-            Some(AudioControlEvent::Stopped { id, error: Some(_) }) => {
+            Some(ControlEvent::Stopped { id, error: Some(_) }) => {
                 assert_eq!(PeerId(1), id);
             }
             x => panic!("Expected the peer to have error stop, but got {x:?}"),

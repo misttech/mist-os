@@ -11,11 +11,11 @@ use std::sync::Arc;
 use thiserror::Error;
 use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_media as media};
 
-use crate::features::CodecId;
-use crate::sco_connector::ScoConnection;
+use crate::codec_id::CodecId;
+use crate::sco;
 
 #[derive(Error, Debug)]
-pub enum AudioError {
+pub enum Error {
     #[error("Parameters aren't supported {:?}", .source)]
     UnsupportedParameters { source: anyhow::Error },
     #[error("Audio is already started")]
@@ -32,20 +32,20 @@ pub enum AudioError {
     InProgress { description: String },
 }
 
-impl AudioError {
+impl Error {
     fn audio_core(e: anyhow::Error) -> Self {
         Self::AudioCore { source: e }
     }
 }
 
 mod dai;
-use dai::DaiAudioControl;
+use dai::DaiControl;
 
 mod inband;
-use inband::InbandAudioControl;
+use inband::InbandControl;
 
 mod codec;
-pub use codec::CodecAudioControl;
+pub use codec::CodecControl;
 
 const DEVICE_NAME: &'static str = "Bluetooth HFP";
 
@@ -56,40 +56,40 @@ const HF_OUTPUT_UUID: Uuid =
     Uuid::new16(bredr::ServiceClassProfileIdentifier::HandsfreeAudioGateway.into_primitive());
 
 #[derive(Debug)]
-pub enum AudioControlEvent {
-    /// Request from AudioControl to start the audio for a connected Peer.
-    /// AudioControl::start() or AudioControl::failed_request() should be called after this event
-    /// has been received; incompatible calls may return `AudioError::InProgress`.
+pub enum ControlEvent {
+    /// Request from Control to start the audio for a connected Peer.
+    /// Control::start() or Control::failed_request() should be called after this event
+    /// has been received; incompatible calls may return `Error::InProgress`.
     RequestStart { id: PeerId },
-    /// Request from the AudioControl to stop the audio to a connected Peer.
+    /// Request from the Control to stop the audio to a connected Peer.
     /// Any calls for which audio is currently routed to the HF for this peer will be transferred
     /// to the AG.
-    /// AudioControl::stop() should be called after this event has been received; incompatible
-    /// calls made in this state may return `AudioError::InProgress`
-    /// Note that AudioControl::failed_request() may not be called for this event (audio can
+    /// Control::stop() should be called after this event has been received; incompatible
+    /// calls made in this state may return `Error::InProgress`
+    /// Note that Control::failed_request() may not be called for this event (audio can
     /// always be stopped)
     RequestStop { id: PeerId },
     /// Event produced when an audio path has been started and audio is flowing to/from the peer.
     Started { id: PeerId },
     /// Event produced when the audio path has been stopped and audio is not flowing to/from the
     /// peer.
-    /// This event can be spontaeously produced by the AudioControl implementation to indicate an
+    /// This event can be spontaeously produced by the Control implementation to indicate an
     /// error in the audio path (either during or after a requested start).
-    Stopped { id: PeerId, error: Option<AudioError> },
+    Stopped { id: PeerId, error: Option<Error> },
 }
 
-impl AudioControlEvent {
+impl ControlEvent {
     pub fn id(&self) -> PeerId {
         match self {
-            AudioControlEvent::RequestStart { id } => *id,
-            AudioControlEvent::RequestStop { id } => *id,
-            AudioControlEvent::Started { id } => *id,
-            AudioControlEvent::Stopped { id, error: _ } => *id,
+            ControlEvent::RequestStart { id } => *id,
+            ControlEvent::RequestStop { id } => *id,
+            ControlEvent::Started { id } => *id,
+            ControlEvent::Stopped { id, error: _ } => *id,
         }
     }
 }
 
-pub trait AudioControl: Send {
+pub trait Control: Send {
     /// Send to indicate when connected to a peer. `supported_codecs` indicates the set of codecs which are
     /// communicated from the peer.  Depending on the audio control implementation,
     /// this may add a (stopped) media device.  Audio control implementations can request audio be started
@@ -97,56 +97,56 @@ pub trait AudioControl: Send {
     fn connect(&mut self, id: PeerId, supported_codecs: &[CodecId]);
 
     /// Send to indicate that a peer has been disconnected.  This shall tear down any audio path
-    /// set up for the peer and send a `AudioControlEvent::Stopped` for each.  This shall be idempotent
+    /// set up for the peer and send a `ControlEvent::Stopped` for each.  This shall be idempotent
     /// (calling disconnect on a disconnected PeerId does nothing)
     fn disconnect(&mut self, id: PeerId);
 
     /// Request to start sending audio to the peer.  If the request succeeds `Ok(())` will be
-    /// returned, but audio may not be started until a `AudioControlEvent::Started` event is
+    /// returned, but audio may not be started until a `ControlEvent::Started` event is
     /// produced in the events.
     fn start(
         &mut self,
         id: PeerId,
-        connection: ScoConnection,
+        connection: sco::Connection,
         codec: CodecId,
-    ) -> Result<(), AudioError>;
+    ) -> Result<(), Error>;
 
     /// Request to stop the audio to a peer.
-    /// If the Audio is not started, an Err(AudioError::NotStarted) will be returned.
+    /// If the Audio is not started, an Err(Error::NotStarted) will be returned.
     /// If the requests succeeds `Ok(())` will be returned but audio may not be stopped until a
-    /// `AudioControlEvent::Stopped` is produced in the events.
-    fn stop(&mut self, id: PeerId) -> Result<(), AudioError>;
+    /// `ControlEvent::Stopped` is produced in the events.
+    fn stop(&mut self, id: PeerId) -> Result<(), Error>;
 
     /// Get a stream of the events produced by this audio control.
     /// May panic if the event stream has already been taken.
-    fn take_events(&self) -> BoxStream<'static, AudioControlEvent>;
+    fn take_events(&self) -> BoxStream<'static, ControlEvent>;
 
     /// Respond with failure to a request from the event stream.
     /// `request` should be the request that failed.  If a request was not made by this audio
     /// control the failure shall be ignored.
-    fn failed_request(&self, request: AudioControlEvent, error: AudioError);
+    fn failed_request(&self, request: ControlEvent, error: Error);
 }
 
-/// An AudioControl that either sends the audio directly to the controller (using an offload
-/// AudioControl) or encodes audio locally and sends it in the SCO channel, depending on
+/// A Control that either sends the audio directly to the controller (using an offload
+/// Control) or encodes audio locally and sends it in the SCO channel, depending on
 /// whether the codec is in the list of offload-supported codecs.
-pub struct PartialOffloadAudioControl {
+pub struct PartialOffloadControl {
     offload_codecids: HashSet<CodecId>,
     /// Used to control when the audio can be sent offloaded
-    offload: Box<dyn AudioControl>,
+    offload: Box<dyn Control>,
     /// Used to encode audio locally and send inband
-    inband: InbandAudioControl,
+    inband: InbandControl,
     /// The set of started peers. Value is true if the audio encoding is handled by the controller.
     started: HashMap<PeerId, bool>,
 }
 
-impl PartialOffloadAudioControl {
+impl PartialOffloadControl {
     pub async fn setup_audio_core(
         audio_proxy: media::AudioDeviceEnumeratorProxy,
         offload_supported: HashSet<CodecId>,
-    ) -> Result<Self, AudioError> {
-        let dai = DaiAudioControl::discover(audio_proxy.clone()).await?;
-        let inband = InbandAudioControl::create(audio_proxy)?;
+    ) -> Result<Self, Error> {
+        let dai = DaiControl::discover(audio_proxy.clone()).await?;
+        let inband = InbandControl::create(audio_proxy)?;
         Ok(Self {
             offload_codecids: offload_supported,
             offload: Box::new(dai),
@@ -156,15 +156,15 @@ impl PartialOffloadAudioControl {
     }
 }
 
-impl AudioControl for PartialOffloadAudioControl {
+impl Control for PartialOffloadControl {
     fn start(
         &mut self,
         id: PeerId,
-        connection: ScoConnection,
+        connection: sco::Connection,
         codec: CodecId,
-    ) -> Result<(), AudioError> {
+    ) -> Result<(), Error> {
         if self.started.contains_key(&id) {
-            return Err(AudioError::AlreadyStarted);
+            return Err(Error::AlreadyStarted);
         }
         let result = if self.offload_codecids.contains(&codec) {
             self.offload.start(id, connection, codec)
@@ -177,9 +177,9 @@ impl AudioControl for PartialOffloadAudioControl {
         result
     }
 
-    fn stop(&mut self, id: PeerId) -> Result<(), AudioError> {
+    fn stop(&mut self, id: PeerId) -> Result<(), Error> {
         let stop_result = match self.started.get(&id) {
-            None => return Err(AudioError::NotStarted),
+            None => return Err(Error::NotStarted),
             Some(true) => self.offload.stop(id),
             Some(false) => self.inband.stop(id),
         };
@@ -203,38 +203,37 @@ impl AudioControl for PartialOffloadAudioControl {
         self.offload.disconnect(id);
     }
 
-    fn take_events(&self) -> BoxStream<'static, AudioControlEvent> {
+    fn take_events(&self) -> BoxStream<'static, ControlEvent> {
         let inband_events = self.inband.take_events();
         let controller_events = self.offload.take_events();
         futures::stream::select_all([inband_events, controller_events]).boxed()
     }
 
-    fn failed_request(&self, request: AudioControlEvent, error: AudioError) {
-        // We only support requests from the controller AudioControl (inband does not make
+    fn failed_request(&self, request: ControlEvent, error: Error) {
+        // We only support requests from the controller Control (inband does not make
         // requests).
         self.offload.failed_request(request, error);
     }
 }
 
-struct TestAudioControlInner {
+struct TestControlInner {
     started: HashSet<PeerId>,
     connected: HashMap<PeerId, HashSet<CodecId>>,
-    connections: HashMap<PeerId, ScoConnection>,
-    event_sender: futures::channel::mpsc::Sender<AudioControlEvent>,
+    connections: HashMap<PeerId, sco::Connection>,
+    event_sender: futures::channel::mpsc::Sender<ControlEvent>,
 }
 
 #[derive(Clone)]
-pub struct TestAudioControl {
-    inner: Arc<Mutex<TestAudioControlInner>>,
+pub struct TestControl {
+    inner: Arc<Mutex<TestControlInner>>,
 }
 
-#[cfg(test)]
-impl TestAudioControl {
-    pub fn unexpected_stop(&self, id: PeerId, error: AudioError) {
+impl TestControl {
+    pub fn unexpected_stop(&self, id: PeerId, error: Error) {
         let mut lock = self.inner.lock();
         let _ = lock.started.remove(&id);
         let _ = lock.connections.remove(&id);
-        let _ = lock.event_sender.try_send(AudioControlEvent::Stopped { id, error: Some(error) });
+        let _ = lock.event_sender.try_send(ControlEvent::Stopped { id, error: Some(error) });
     }
 
     pub fn is_started(&self, id: PeerId) -> bool {
@@ -248,12 +247,12 @@ impl TestAudioControl {
     }
 }
 
-impl Default for TestAudioControl {
+impl Default for TestControl {
     fn default() -> Self {
         // Make a disconnected sender, we do not care about whether it succeeds.
         let (event_sender, _) = futures::channel::mpsc::channel(0);
         Self {
-            inner: Arc::new(Mutex::new(TestAudioControlInner {
+            inner: Arc::new(Mutex::new(TestControlInner {
                 started: Default::default(),
                 connected: Default::default(),
                 connections: Default::default(),
@@ -263,29 +262,29 @@ impl Default for TestAudioControl {
     }
 }
 
-impl AudioControl for TestAudioControl {
+impl Control for TestControl {
     fn start(
         &mut self,
         id: PeerId,
-        connection: ScoConnection,
+        connection: sco::Connection,
         _codec: CodecId,
-    ) -> Result<(), AudioError> {
+    ) -> Result<(), Error> {
         let mut lock = self.inner.lock();
         if !lock.started.insert(id) {
-            return Err(AudioError::AlreadyStarted);
+            return Err(Error::AlreadyStarted);
         }
         let _ = lock.connections.insert(id, connection);
-        let _ = lock.event_sender.try_send(AudioControlEvent::Started { id });
+        let _ = lock.event_sender.try_send(ControlEvent::Started { id });
         Ok(())
     }
 
-    fn stop(&mut self, id: PeerId) -> Result<(), AudioError> {
+    fn stop(&mut self, id: PeerId) -> Result<(), Error> {
         let mut lock = self.inner.lock();
         if !lock.started.remove(&id) {
-            return Err(AudioError::NotStarted);
+            return Err(Error::NotStarted);
         }
         let _ = lock.connections.remove(&id);
-        let _ = lock.event_sender.try_send(AudioControlEvent::Stopped { id, error: None });
+        let _ = lock.event_sender.try_send(ControlEvent::Stopped { id, error: None });
         Ok(())
     }
 
@@ -300,7 +299,7 @@ impl AudioControl for TestAudioControl {
         let _ = lock.connected.remove(&id);
     }
 
-    fn take_events(&self) -> BoxStream<'static, AudioControlEvent> {
+    fn take_events(&self) -> BoxStream<'static, ControlEvent> {
         let mut lock = self.inner.lock();
         // Replace the sender.
         let (sender, receiver) = futures::channel::mpsc::channel(1);
@@ -308,7 +307,7 @@ impl AudioControl for TestAudioControl {
         receiver.boxed()
     }
 
-    fn failed_request(&self, _request: AudioControlEvent, _error: AudioError) {
+    fn failed_request(&self, _request: ControlEvent, _error: Error) {
         // Nothing to do here for the moment
     }
 }

@@ -11,19 +11,18 @@ use std::fmt;
 use vigil::Vigil;
 
 use crate::a2dp;
-use crate::error::ScoConnectError;
-use crate::sco_connector::ScoConnection;
+use crate::sco::{ConnectError, Connection};
 
 #[derive(Debug)]
-pub struct ScoActive {
+pub struct Active {
     pub params: ValidScoConnectionParameters,
     on_closed: Shared<BoxFuture<'static, ()>>,
     // Stored (but unused) here to keep A2DP in a paused state.
     _pause_token: a2dp::PauseToken,
 }
 
-impl ScoActive {
-    pub fn new(connection: &ScoConnection, pause_token: a2dp::PauseToken) -> Self {
+impl Active {
+    pub fn new(connection: &Connection, pause_token: a2dp::PauseToken) -> Self {
         let on_closed = connection.on_closed().boxed().shared();
         Self { params: connection.params.clone(), on_closed, _pause_token: pause_token }
     }
@@ -33,8 +32,8 @@ impl ScoActive {
     }
 }
 
-impl Unit for ScoActive {
-    type Data = <ScoConnection as Unit>::Data;
+impl Unit for Active {
+    type Data = <Connection as Unit>::Data;
     fn inspect_create(&self, parent: &inspect::Node, name: impl AsRef<str>) -> Self::Data {
         self.params.inspect_create(parent, name)
     }
@@ -44,24 +43,28 @@ impl Unit for ScoActive {
     }
 }
 
-pub enum ScoState {
+#[derive(Default)]
+pub enum State {
     /// No call is in progress.
+    #[default]
     Inactive,
-    /// A call has been made active, and we are negotiating codecs before setting up the SCO connection.
-    /// This state prevents a race where the call has been made active but SCO not yet set up, and the peer
-    /// task, seeing that the connection is not Active, attempts to set up the SCO connection a second time,
+    /// A call has been made active, and we are negotiating codecs before setting up the SCO
+    /// connection. This state prevents a race in the AG where the call has been made active but
+    /// SCO not yet set up, and the AG peer task, seeing that the connection is not Active,
+    /// attempts to set up the SCO connection a second time,
     SettingUp,
-    /// The HF has closed the remote SCO connection so we are waiting for the call to be set transferred to AG.
-    /// This state prevents a race where the SCO connection has been torn down but the call not yet set to inactive
-    /// by the call manager, so the peer task attempts to mark the call as inactive a second time.
+    /// The HF has closed the remote SCO connection so we are waiting for the call to be set
+    /// transferred to AG. This state prevents a race in the AG where the SCO connection has been
+    /// torn down but the call not yet set to inactive by the call manager, so the peer task
+    /// attempts to mark the call as inactive a second time.
     TearingDown,
     /// A call is transferred to the AG and we are waiting for the HF to initiate a SCO connection.
-    AwaitingRemote(BoxFuture<'static, Result<ScoConnection, ScoConnectError>>),
+    AwaitingRemote(BoxFuture<'static, Result<Connection, ConnectError>>),
     /// A call is active an dso is the SCO connection.
-    Active(Vigil<ScoActive>),
+    Active(Vigil<Active>),
 }
 
-impl ScoState {
+impl State {
     pub fn is_active(&self) -> bool {
         match self {
             Self::Active(_) => true,
@@ -71,7 +74,7 @@ impl ScoState {
 
     pub fn on_connected<'a>(
         &'a mut self,
-    ) -> impl Future<Output = Result<ScoConnection, ScoConnectError>> + FusedFuture + 'a {
+    ) -> impl Future<Output = Result<Connection, ConnectError>> + FusedFuture + 'a {
         match self {
             Self::AwaitingRemote(ref mut fut) => fut.fuse(),
             _ => Fuse::terminated(),
@@ -79,38 +82,32 @@ impl ScoState {
     }
 }
 
-impl Default for ScoState {
-    fn default() -> Self {
-        Self::Inactive
-    }
-}
-
-impl fmt::Debug for ScoState {
+impl fmt::Debug for State {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ScoState::Inactive => write!(f, "Inactive"),
-            ScoState::SettingUp => write!(f, "SettingUp"),
-            ScoState::TearingDown => write!(f, "TearingDown"),
-            ScoState::AwaitingRemote(_) => write!(f, "AwaitingRemote"),
-            ScoState::Active(active) => write!(f, "Active({:?})", active),
+            State::Inactive => write!(f, "Inactive"),
+            State::SettingUp => write!(f, "SettingUp"),
+            State::TearingDown => write!(f, "TearingDown"),
+            State::AwaitingRemote(_) => write!(f, "AwaitingRemote"),
+            State::Active(active) => write!(f, "Active({:?})", active),
         }
     }
 }
 
-impl std::fmt::Display for ScoState {
+impl std::fmt::Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let state = match &self {
-            ScoState::Inactive => "Inactive",
-            ScoState::SettingUp => "SettingUp",
-            ScoState::TearingDown => "TearingDown",
-            ScoState::AwaitingRemote(_) => "AwaitingRemote",
-            ScoState::Active(_) => "Active",
+            State::Inactive => "Inactive",
+            State::SettingUp => "SettingUp",
+            State::TearingDown => "TearingDown",
+            State::AwaitingRemote(_) => "AwaitingRemote",
+            State::Active(_) => "Active",
         };
         write!(f, "{}", state)
     }
 }
 
-impl Unit for ScoState {
+impl Unit for State {
     type Data = inspect::Node;
     fn inspect_create(&self, parent: &inspect::Node, name: impl AsRef<str>) -> Self::Data {
         let mut node = parent.create_child(String::from(name.as_ref()));
@@ -121,14 +118,14 @@ impl Unit for ScoState {
     fn inspect_update(&self, data: &mut Self::Data) {
         data.clear_recorded();
         data.record_string("status", &format!("{}", self));
-        if let ScoState::Active(active) = &self {
+        if let State::Active(active) = &self {
             let node = active.inspect_create(data, "parameters");
             data.record(node);
         }
     }
 }
 
-pub type InspectableScoState = IValue<ScoState>;
+pub type InspectableState = IValue<State>;
 
 #[cfg(test)]
 mod tests {
@@ -144,7 +141,7 @@ mod tests {
         let inspect = inspect::Inspector::default();
 
         let mut state =
-            InspectableScoState::default().with_inspect(inspect.root(), "sco_connection").unwrap();
+            InspectableState::default().with_inspect(inspect.root(), "sco_connection").unwrap();
         // Default inspect tree.
         assert_data_tree!(inspect, root: {
             sco_connection: {
@@ -152,14 +149,14 @@ mod tests {
             }
         });
 
-        state.iset(ScoState::SettingUp);
+        state.iset(State::SettingUp);
         assert_data_tree!(inspect, root: {
             sco_connection: {
                 status: "SettingUp",
             }
         });
 
-        state.iset(ScoState::AwaitingRemote(Box::pin(async { Err(ScoConnectError::ScoFailed) })));
+        state.iset(State::AwaitingRemote(Box::pin(async { Err(ConnectError::Failed) })));
         assert_data_tree!(inspect, root: {
             sco_connection: {
                 status: "AwaitingRemote",
@@ -180,9 +177,9 @@ mod tests {
         };
         let (sco_proxy, _sco_stream) =
             fidl::endpoints::create_proxy_and_stream::<bredr::ScoConnectionMarker>();
-        let connection = ScoConnection::build(PeerId(1), params, sco_proxy);
-        let vigil = Vigil::new(ScoActive::new(&connection, None));
-        state.iset(ScoState::Active(vigil));
+        let connection = Connection::build(PeerId(1), params, sco_proxy);
+        let vigil = Vigil::new(Active::new(&connection, None));
+        state.iset(State::Active(vigil));
         assert_data_tree!(inspect, root: {
             sco_connection: {
                 status: "Active",
@@ -200,7 +197,7 @@ mod tests {
             }
         });
 
-        state.iset(ScoState::TearingDown);
+        state.iset(State::TearingDown);
         assert_data_tree!(inspect, root: {
             sco_connection: {
                 status: "TearingDown",

@@ -4,6 +4,8 @@
 
 use anyhow::format_err;
 use async_utils::hanging_get::client::HangingGetStream;
+use bt_hfp::codec_id::CodecId;
+use bt_hfp::{a2dp, audio, sco};
 use bt_rfcomm::profile::{rfcomm_connect_parameters, server_channel_from_protocol};
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fidl_fuchsia_bluetooth_hfp::{NetworkInformation, PeerHandlerProxy};
@@ -28,19 +30,15 @@ use super::gain_control::GainControl;
 use super::indicators::{AgIndicator, AgIndicators, HfIndicator};
 use super::procedure::ProcedureMarker;
 use super::ringer::Ringer;
-use super::sco_state::{InspectableScoState, ScoActive, ScoState};
 use super::service_level_connection::ServiceLevelConnection;
 use super::slc_request::SlcRequest;
 use super::update::AgUpdate;
 use super::{ConnectionBehavior, PeerRequest};
 
-use crate::audio::{AudioControl, AudioControlEvent};
 use crate::config::AudioGatewayFeatureSupport;
 use crate::error::Error;
-use crate::features::CodecId;
+use crate::hfp;
 use crate::inspect::PeerTaskInspect;
-use crate::sco_connector::{ScoConnection, ScoConnector};
-use crate::{a2dp, hfp};
 
 const CONNECTION_INIT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
@@ -62,10 +60,10 @@ pub(super) struct PeerTask {
     gain_control: GainControl,
     connection: ServiceLevelConnection,
     a2dp_control: a2dp::Control,
-    sco_connector: ScoConnector,
-    sco_state: InspectableScoState,
+    sco_connector: sco::Connector,
+    sco_state: sco::InspectableState,
     ringer: Ringer,
-    audio_control: Arc<Mutex<Box<dyn AudioControl>>>,
+    audio_control: Arc<Mutex<Box<dyn audio::Control>>>,
     audio_without_call: bool,
     hfp_sender: Sender<hfp::Event>,
     manager_id: Option<hfp::ManagerConnectionId>,
@@ -84,11 +82,11 @@ impl PeerTask {
     pub fn new(
         id: PeerId,
         profile_proxy: bredr::ProfileProxy,
-        audio_control: Arc<Mutex<Box<dyn AudioControl>>>,
+        audio_control: Arc<Mutex<Box<dyn audio::Control>>>,
         local_config: AudioGatewayFeatureSupport,
         connection_behavior: ConnectionBehavior,
         hfp_sender: Sender<hfp::Event>,
-        sco_connector: ScoConnector,
+        sco_connector: sco::Connector,
     ) -> Result<Self, Error> {
         let connection = ServiceLevelConnection::with_init_timeout(fuchsia_async::Timer::new(
             CONNECTION_INIT_TIMEOUT,
@@ -110,7 +108,7 @@ impl PeerTask {
             connection,
             a2dp_control,
             sco_connector,
-            sco_state: InspectableScoState::default(),
+            sco_state: sco::InspectableState::default(),
             ringer: Ringer::default(),
             audio_control,
             audio_without_call: false,
@@ -123,11 +121,11 @@ impl PeerTask {
     pub fn spawn(
         id: PeerId,
         profile_proxy: bredr::ProfileProxy,
-        audio_control: Arc<Mutex<Box<dyn AudioControl>>>,
+        audio_control: Arc<Mutex<Box<dyn audio::Control>>>,
         local_config: AudioGatewayFeatureSupport,
         connection_behavior: ConnectionBehavior,
         hfp_sender: Sender<hfp::Event>,
-        sco_connector: ScoConnector,
+        sco_connector: sco::Connector,
         inspect: &inspect::Node,
     ) -> Result<(Task<()>, Sender<PeerRequest>), Error> {
         let (sender, receiver) = mpsc::channel(0);
@@ -222,28 +220,28 @@ impl PeerTask {
         }
     }
 
-    async fn on_audio_event(&mut self, event: AudioControlEvent) -> Result<(), Error> {
+    async fn on_audio_event(&mut self, event: audio::ControlEvent) -> Result<(), Error> {
         info!(event:?; "Audio Event received");
         if event.id() != self.id {
             info!(our_id:% = self.id, event_id:% = event.id(); "AudioEvent for a peer that is not us, ignoring.");
             return Ok(());
         }
         match event {
-            AudioControlEvent::Stopped { id, error } => {
+            audio::ControlEvent::Stopped { id, error } => {
                 if error.is_some() {
                     info!(peer_id:% = id; "Audio Stopped with error {error:?}, closing SCO");
                     if self.sco_state.is_active() {
-                        self.sco_state.iset(ScoState::TearingDown);
+                        self.sco_state.iset(sco::State::TearingDown);
                         if let Err(err) = self.calls.transfer_to_ag() {
                             warn!("Transfer to AG failed with {:} for peer {}", err, self.id)
                         }
                     }
                 }
             }
-            AudioControlEvent::RequestStart { id: _ } => {
+            audio::ControlEvent::RequestStart { id: _ } => {
                 self.audio_without_call = true;
             }
-            AudioControlEvent::RequestStop { id: _ } => {
+            audio::ControlEvent::RequestStop { id: _ } => {
                 // We must stop, so transfer any active call to the AG
                 let _ = self.calls.transfer_to_ag();
                 self.audio_without_call = false;
@@ -517,7 +515,7 @@ impl PeerTask {
                 if self.sco_state.is_active() {
                     warn!(peer:% = self.id; "SCO setup request when SCO state was active");
                     // Drop existing SCO connection.
-                    self.sco_state.iset(ScoState::SettingUp);
+                    self.sco_state.iset(sco::State::SettingUp);
                 }
                 // TODO(https://fxbug.dev/42152169): Because we may need to send an OK response to the HF
                 // just before setting up the synchronous connection, we send it here by routing
@@ -656,7 +654,7 @@ impl PeerTask {
                 _ = active_sco_closed_fut => {
                     drop(sco_state);
                     info!(peer:% = self.id; "Handling SCO Connection closed, transferring call to AG");
-                    self.sco_state.iset(ScoState::TearingDown);
+                    self.sco_state.iset(sco::State::TearingDown);
                     let call_transfer_res = self.calls.transfer_to_ag();
                     if let Err(err) = call_transfer_res {
                         warn!("Transfer to AG failed with {:} for peer {}", err, self.id)
@@ -757,36 +755,36 @@ impl PeerTask {
         if call_active || self.audio_without_call {
             match previous_sco_state {
                 // A call just started, so set up SCO.
-                ScoState::Inactive
+                sco::State::Inactive
                 // A call was just transferred to the HF, so set up SCO.
-                | ScoState::AwaitingRemote(_)
+                | sco::State::AwaitingRemote(_)
                 => {
                     self.initiate_codec_negotiation(None).await;
-                    self.sco_state.iset(ScoState::SettingUp);
+                    self.sco_state.iset(sco::State::SettingUp);
                 },
                 // We are negotiating codecs; wait for that to finish before starting the SCO
                 // connection, so do nothing.
-                ScoState::SettingUp
+                sco::State::SettingUp
                 // The SCO connection was closed by the peer and we requested the call manager set
                 // that call as transferred to AG,  but we are waiting on the call manager to do
                 // so, so do nothing.
-                | ScoState::TearingDown
+                | sco::State::TearingDown
                 // A call is active and we have a SCO connection, so do nothing.
-                | ScoState::Active(_) => {},
+                | sco::State::Active(_) => {},
             }
         } else if call_transferred {
             // If a call is transferred to the AG, we should be waiting for a connection from the
             // HF to transfer it back.
-            if let ScoState::AwaitingRemote(_) = previous_sco_state {
+            if let sco::State::AwaitingRemote(_) = previous_sco_state {
                 // Already waiting for a SCO connection, nothing to do.
                 info!("update_sco_state: already awaiting");
                 return Ok(());
             }
             let fut = self.sco_connector.accept(self.id.clone(), self.get_codecs());
-            self.sco_state.iset(ScoState::AwaitingRemote(Box::pin(fut)));
+            self.sco_state.iset(sco::State::AwaitingRemote(Box::pin(fut)));
         } else {
             // No call in progress and we don't prefer to have audio setup without a call, drop
-            self.sco_state.iset(ScoState::Inactive);
+            self.sco_state.iset(sco::State::Inactive);
         };
 
         info!(id:% = self.id, sco_state:? = self.sco_state; "update_sco_state: finished");
@@ -794,7 +792,10 @@ impl PeerTask {
         Ok(())
     }
 
-    async fn finish_sco_connection(&mut self, sco_connection: ScoConnection) -> Result<(), Error> {
+    async fn finish_sco_connection(
+        &mut self,
+        sco_connection: sco::Connection,
+    ) -> Result<(), Error> {
         let peer_id = self.id.clone();
         info!(peer_id:%; "Finishing SCO connection");
         let res = self.a2dp_control.pause(Some(peer_id)).await;
@@ -808,7 +809,7 @@ impl PeerTask {
                 token
             }
         };
-        let vigil = Vigil::new(ScoActive::new(&sco_connection, pause_token));
+        let vigil = Vigil::new(sco::Active::new(&sco_connection, pause_token));
         {
             let mut audio = self.audio_control.lock();
             let codec_id = self.codec_for_parameter_set(&sco_connection.params.parameter_set);
@@ -830,7 +831,7 @@ impl PeerTask {
             }
         });
         info!(peer_id:%, vigil:?; "Done finish_sco_connection");
-        self.sco_state.iset(ScoState::Active(vigil));
+        self.sco_state.iset(sco::State::Active(vigil));
 
         Ok(())
     }
@@ -845,7 +846,7 @@ impl PeerTask {
 
     fn on_active_sco_closed(&self) -> impl Future<Output = ()> + 'static {
         match &*self.sco_state {
-            ScoState::Active(connection) => connection.on_closed().left_future(),
+            sco::State::Active(connection) => connection.on_closed().left_future(),
             _ => future::pending().right_future(),
         }
     }
@@ -936,6 +937,7 @@ mod tests {
     use async_test_helpers::run_while;
     use async_utils::PollExt;
     use at_commands::{self as at, SerDe};
+    use bt_hfp::audio;
     use bt_hfp::call::Number;
     use bt_rfcomm::profile::build_rfcomm_protocol;
     use bt_rfcomm::ServerChannel;
@@ -954,7 +956,6 @@ mod tests {
     use std::collections::HashSet;
     use std::pin::pin;
 
-    use crate::audio::{AudioError, TestAudioControl};
     use crate::features::{AgFeatures, HfFeatures};
     use crate::peer::indicators::{AgIndicatorsReporting, HfIndicators};
     use crate::peer::service_level_connection::tests::{
@@ -996,13 +997,13 @@ mod tests {
         Sender<PeerRequest>,
         mpsc::Receiver<PeerRequest>,
         ProfileRequestStream,
-        TestAudioControl,
+        audio::TestControl,
     ) {
         let (sender, receiver) = mpsc::channel(1);
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ProfileMarker>();
-        let test_audio = TestAudioControl::default();
-        let sco_connector = ScoConnector::build(proxy.clone(), HashSet::new());
-        let audio: Arc<Mutex<Box<dyn AudioControl>>> =
+        let test_audio = audio::TestControl::default();
+        let sco_connector = sco::Connector::build(proxy.clone(), HashSet::new());
+        let audio: Arc<Mutex<Box<dyn audio::Control>>> =
             Arc::new(Mutex::new(Box::new(test_audio.clone())));
         let mut audio_events = audio.lock().take_events();
         fasync::Task::spawn({
@@ -2180,7 +2181,7 @@ mod tests {
         // Unexpectedly stop the audio. Event should come through the task channel.
         test_audio_control.unexpected_stop(
             PeerId(1),
-            AudioError::AudioCore { source: anyhow::format_err!("Whoops") },
+            audio::Error::AudioCore { source: anyhow::format_err!("Whoops") },
         );
         assert!(!test_audio_control.is_started(PeerId(1)));
 

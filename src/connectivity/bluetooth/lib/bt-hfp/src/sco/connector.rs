@@ -2,62 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::endpoints::Proxy;
-use fuchsia_bluetooth::profile::ValidScoConnectionParameters;
 use fuchsia_bluetooth::types::PeerId;
-use fuchsia_inspect_derive::Unit;
-use futures::{Future, FutureExt, StreamExt};
+use futures::{Future, StreamExt};
 use log::{debug, info, warn};
 use std::collections::HashSet;
 use {fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr};
 
-use crate::error::ScoConnectError;
-use crate::features::CodecId;
+use crate::codec_id::CodecId;
 
-/// The components of an active SCO connection.
-/// Dropping this struct will close the SCO connection.
-#[derive(Debug)]
-pub struct ScoConnection {
-    /// The peer this is connected to.
-    pub peer_id: PeerId,
-    /// The parameters that this connection was set up with.
-    pub params: ValidScoConnectionParameters,
-    /// Proxy for this connection.  Used to read/write to the connection.
-    pub proxy: bredr::ScoConnectionProxy,
-}
-
-impl Unit for ScoConnection {
-    type Data = <ValidScoConnectionParameters as Unit>::Data;
-    fn inspect_create(&self, parent: &fuchsia_inspect::Node, name: impl AsRef<str>) -> Self::Data {
-        self.params.inspect_create(parent, name)
-    }
-
-    fn inspect_update(&self, data: &mut Self::Data) {
-        self.params.inspect_update(data)
-    }
-}
-
-impl ScoConnection {
-    pub fn on_closed(&self) -> impl Future<Output = ()> + 'static {
-        self.proxy.on_closed().extend_lifetime().map(|_| ())
-    }
-
-    pub fn is_closed(&self) -> bool {
-        self.proxy.is_closed()
-    }
-
-    #[cfg(test)]
-    pub fn build(
-        peer_id: PeerId,
-        params: bredr::ScoConnectionParameters,
-        proxy: bredr::ScoConnectionProxy,
-    ) -> Self {
-        ScoConnection { peer_id, params: params.try_into().unwrap(), proxy }
-    }
-}
+use super::{ConnectError, Connection};
 
 #[derive(Clone)]
-pub struct ScoConnector {
+pub struct Connector {
     proxy: bredr::ProfileProxy,
     controller_codecs: HashSet<CodecId>,
 }
@@ -154,12 +110,12 @@ pub(crate) fn parameter_sets_for_codec(
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
-enum ScoInitiatorRole {
+enum InitiatorRole {
     Initiate,
     Accept,
 }
 
-impl ScoConnector {
+impl Connector {
     pub fn build(proxy: bredr::ProfileProxy, controller_codecs: HashSet<CodecId>) -> Self {
         Self { proxy, controller_codecs }
     }
@@ -167,14 +123,14 @@ impl ScoConnector {
     async fn setup_sco_connection(
         profile_proxy: bredr::ProfileProxy,
         peer_id: PeerId,
-        role: ScoInitiatorRole,
+        role: InitiatorRole,
         params: Vec<bredr::ScoConnectionParameters>,
-    ) -> Result<ScoConnection, ScoConnectError> {
+    ) -> Result<Connection, ConnectError> {
         let (connection_proxy, server) =
             fidl::endpoints::create_proxy::<bredr::ScoConnectionMarker>();
         profile_proxy.connect_sco(bredr::ProfileConnectScoRequest {
             peer_id: Some(peer_id.into()),
-            initiator: Some(role == ScoInitiatorRole::Initiate),
+            initiator: Some(role == InitiatorRole::Initiate),
             params: Some(params),
             connection: Some(server),
             ..Default::default()
@@ -185,22 +141,22 @@ impl ScoConnector {
                 match payload {
                     bredr::ScoConnectionOnConnectionCompleteRequest::ConnectedParams(params) => {
                         let params =
-                            params.try_into().map_err(|_| ScoConnectError::ScoInvalidArguments)?;
-                        Ok(ScoConnection { peer_id, params, proxy: connection_proxy })
+                            params.try_into().map_err(|_| ConnectError::InvalidArguments)?;
+                        Ok(Connection { peer_id, params, proxy: connection_proxy })
                     }
                     bredr::ScoConnectionOnConnectionCompleteRequest::Error(err) => Err(err.into()),
                     _ => {
                         warn!("Received unknown ScoConnectionOnConnectionCompleteRequest");
-                        Err(ScoConnectError::ScoCanceled)
+                        Err(ConnectError::Canceled)
                     }
                 }
             }
             Some(Ok(bredr::ScoConnectionEvent::_UnknownEvent { .. })) => {
                 warn!("Received unknown ScoConnectionEvent");
-                Err(ScoConnectError::ScoCanceled)
+                Err(ConnectError::Canceled)
             }
             Some(Err(e)) => Err(e.into()),
-            None => Err(ScoConnectError::ScoCanceled),
+            None => Err(ConnectError::Canceled),
         }
     }
 
@@ -216,7 +172,7 @@ impl ScoConnector {
         &self,
         peer_id: PeerId,
         codecs: Vec<CodecId>,
-    ) -> impl Future<Output = Result<ScoConnection, ScoConnectError>> + 'static {
+    ) -> impl Future<Output = Result<Connection, ConnectError>> + 'static {
         let params = self.parameters_for_codecs(codecs);
         info!(peer_id:%, params:?; "Initiating SCO connection");
 
@@ -226,13 +182,13 @@ impl ScoConnector {
                 let result = Self::setup_sco_connection(
                     proxy.clone(),
                     peer_id,
-                    ScoInitiatorRole::Initiate,
+                    InitiatorRole::Initiate,
                     vec![param.clone()],
                 )
                 .await;
                 match &result {
                     // Return early if there is a FIDL issue, or we succeeded.
-                    Err(ScoConnectError::Fidl { .. }) | Ok(_) => return result,
+                    Err(ConnectError::Fidl { .. }) | Ok(_) => return result,
                     // Otherwise continue to try the next params.
                     Err(e) => {
                         debug!(peer_id:%, param:?, e:?; "Connection failed, trying next set..")
@@ -240,7 +196,7 @@ impl ScoConnector {
                 }
             }
             info!(peer_id:%; "Exhausted SCO connection parameters");
-            Err(ScoConnectError::ScoFailed)
+            Err(ConnectError::Failed)
         }
     }
 
@@ -248,21 +204,19 @@ impl ScoConnector {
         &self,
         peer_id: PeerId,
         codecs: Vec<CodecId>,
-    ) -> impl Future<Output = Result<ScoConnection, ScoConnectError>> + 'static {
+    ) -> impl Future<Output = Result<Connection, ConnectError>> + 'static {
         let params = self.parameters_for_codecs(codecs);
         info!(peer_id:%, params:?; "Accepting SCO connection");
 
         let proxy = self.proxy.clone();
-        Self::setup_sco_connection(proxy, peer_id, ScoInitiatorRole::Accept, params)
+        Self::setup_sco_connection(proxy, peer_id, InitiatorRole::Accept, params)
     }
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
+pub mod test {
     use super::*;
 
-    use crate::profile::test_server::setup_profile_and_test_server;
-    use bredr::ScoConnectionMarker;
     use fidl_fuchsia_bluetooth_bredr::HfpParameterSet;
 
     #[track_caller]
@@ -270,10 +224,11 @@ pub(crate) mod tests {
         peer_id: PeerId,
         codec_id: CodecId,
         in_band: bool,
-    ) -> (ScoConnection, bredr::ScoConnectionRequestStream) {
+    ) -> (Connection, bredr::ScoConnectionRequestStream) {
         let sco_params = parameter_sets_for_codec(codec_id, in_band).pop().unwrap();
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ScoConnectionMarker>();
-        let connection = ScoConnection::build(peer_id, sco_params, proxy);
+        let (proxy, stream) =
+            fidl::endpoints::create_proxy_and_stream::<bredr::ScoConnectionMarker>();
+        let connection = Connection::build(peer_id, sco_params, proxy);
         (connection, stream)
     }
 
@@ -283,8 +238,9 @@ pub(crate) mod tests {
         let all_codecs = vec![CodecId::MSBC, CodecId::CVSD];
 
         // Out-of-band SCO.
-        let (_, profile_svc, _) = setup_profile_and_test_server();
-        let sco = ScoConnector::build(profile_svc.clone(), all_codecs.iter().cloned().collect());
+        let test_profile_server::TestProfileServerEndpoints { proxy: profile_svc, .. } =
+            test_profile_server::TestProfileServer::new(None, None);
+        let sco = Connector::build(profile_svc.clone(), all_codecs.iter().cloned().collect());
         let res = sco.parameters_for_codecs(all_codecs.clone());
         assert_eq!(res.len(), 4);
         assert_eq!(
@@ -315,7 +271,7 @@ pub(crate) mod tests {
         );
 
         // All In-band SCO.
-        let sco = ScoConnector::build(profile_svc.clone(), HashSet::new());
+        let sco = Connector::build(profile_svc.clone(), HashSet::new());
         let res = sco.parameters_for_codecs(all_codecs.clone());
         assert_eq!(res.len(), 4);
         assert_eq!(
@@ -354,7 +310,7 @@ pub(crate) mod tests {
 
         // Mix of in-band and offloaded SCO
         let only_cvsd_set = [CodecId::CVSD].iter().cloned().collect();
-        let sco = ScoConnector::build(profile_svc.clone(), only_cvsd_set);
+        let sco = Connector::build(profile_svc.clone(), only_cvsd_set);
         let res = sco.parameters_for_codecs(all_codecs);
         assert_eq!(res.len(), 4);
         assert_eq!(
