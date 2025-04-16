@@ -2161,5 +2161,24 @@
     "is_stable": true,
     "write_stable_true_to_meta_json": false,
     "atom_type": "loadable_module"
+  },
+  {
+    "atom_id": "27.99991231.0.1",
+    "atom_label": "//sdk:fuchsia_collection_prebuild_info",
+    "atom_meta": {
+      "dest": "meta/manifest.json"
+    },
+    "atom_meta_json_file": "sdk/exported/fuchsia_collection/meta/manifest.json",
+    "atom_type": "collection",
+    "prebuild_info": {
+      "arch": {
+        "host": "x86_64-linux-gnu",
+        "target": [
+          "x64"
+        ]
+      },
+      "root": "..",
+      "schema_version": "1"
+    }
   }
 ]

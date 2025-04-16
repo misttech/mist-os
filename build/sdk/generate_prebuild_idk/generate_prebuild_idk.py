@@ -199,6 +199,7 @@ class PrebuildMap(object):
             "experimental_python_e2e_test": self._meta_for_experimental_python_e2e_test,
             "version_history": self._meta_for_version_history,
             "none": self._meta_for_noop,
+            "collection": self._meta_for_collection,
             # TODO(https://fxbug.dev/338009514): Add support for Fuchsia
             # packages and add a package to `test_collection.json` along with
             # expected output to `validation_data/expected_idk/`.
@@ -487,6 +488,16 @@ class PrebuildMap(object):
     def _meta_for_noop(self, info: AtomInfo) -> None:
         return None
 
+    def _meta_for_collection(self, info: AtomInfo) -> MetaJson:
+        prebuild = info["prebuild_info"]
+        return {
+            "arch": prebuild["arch"],
+            "id": info["atom_id"],
+            "parts": list[dict[str, T.Any]],
+            "root": prebuild["root"],
+            "schema_version": prebuild["schema_version"],
+        }
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -541,11 +552,28 @@ def main() -> int:
 
     unhandled_labels = set()
 
+    collection_meta_path = None
+    collection_parts: list[dict[str, T.Any]] = []
+
     for info in prebuild_map.values():
         meta_json = prebuild_map.get_meta(info)
         if meta_json:
             meta_path = info["atom_meta"]["dest"]
             meta_files[meta_path] = meta_json
+
+            if info["atom_type"] == "collection":
+                assert (
+                    not collection_meta_path
+                ), "More than one collection info provided."
+                collection_meta_path = meta_path
+            else:
+                collection_parts.append(
+                    {
+                        "meta": meta_path,
+                        "stable": info["is_stable"],
+                        "type": info["atom_type"],
+                    }
+                )
         elif info["atom_type"] != "none":
             unhandled_labels.add(info["atom_label"])
 
@@ -555,6 +583,12 @@ def main() -> int:
             % "\n".join(sorted(unhandled_labels))
         )
         return 1
+
+    collection_parts.sort(key=lambda a: (a["meta"], a["type"]))
+
+    # Generate the IDK manifest.
+    assert collection_meta_path, "Collection info must be provided."
+    meta_files[collection_meta_path]["parts"] = collection_parts
 
     if args.check:
         failed = False

@@ -54,7 +54,7 @@ template("sdk_noop_atom") {
     }
     atom_meta_json_file = rebase_path(meta_file, root_build_dir)
     atom_files = []
-    atom_stable = false
+    is_stable = false
   }
 
   generated_file(meta_target_name) {

@@ -141,6 +141,14 @@ action("invoke_clidoc") {
         dest_folder = "tools/sdk"
       },
     ]
+
+    # Do not include `_idk_host_tools_label` in the prebuild data. This target
+    # is a dependency of an IDK collection that already depends on
+    # `_idk_host_tools_label`'s dependencies, so they are already included. In
+    # addition, `_idk_host_tools_label` is an IDK collection, and including it
+    # would result in multiple  "collection" entries in the prebuild data, which
+    # is not allowed.
+    idk_atom_prebuild_info_barrier = deps - [ _idk_host_tools_label ]
   }
 
   inputs = [

@@ -80,6 +80,7 @@ template("sdk_collection") {
     final_manifest = "${target_name}_final_manifest"
     local_manifest = "${target_name}_molecule"
     main = target_name
+    collection_prebuild_info = "${target_name}_prebuild_info"
     prebuild_manifest = "${target_name}_prebuild_manifest"
     idk_meta_manifest_json = "${target_name}_idk_meta_manifest_json"
     tarmaker_manifest = "${target_name}_tarmaker_manifest"
@@ -89,6 +90,9 @@ template("sdk_collection") {
   }
 
   files = {
+    # Location of the final collection.
+    exported_collection_dir = "${root_out_dir}/sdk/exported/${collection_name}"
+
     # Internal manifests.
     # TODO(https://fxbug.dev/317385989): Eliminate `final_manifest` once ffx
     # no longer depends on a manifest at that location.
@@ -245,7 +249,7 @@ template("sdk_collection") {
     }
   }
 
-  # Populate the content of the $BUILD_DIR/sdk/exported/{name}/
+  # Populate the content of the $BUILD_DIR/sdk/exported/{collection_name}/
   # directory from the content of the archive (tarmaker) manifest.
   action(targets.export) {
     forward_variables_from(invoker, [ "testonly" ])
@@ -254,7 +258,7 @@ template("sdk_collection") {
 
     inputs = [ files.tarmaker_manifest ]
 
-    _out_dir = "${root_out_dir}/sdk/exported/${collection_name}"
+    _out_dir = files.exported_collection_dir
     _stamp_file = "${target_gen_dir}/${target_name}.exported"
 
     outputs = [
@@ -280,11 +284,42 @@ template("sdk_collection") {
     deps = [ ":${targets.tarmaker_manifest}" ]
   }
 
+  # Adds prebuild metadata that is used to generate the collection manifest. The
+  # main target cannot do this because it depends on the
+  # `idk_prebuild_manifest()` instance, which must depend on the target with
+  # this metadata..
+  group(targets.collection_prebuild_info) {
+    metadata = {
+      idk_atom_prebuild_info = [
+        {
+          if (defined(invoker.id) && invoker.id != "") {
+            atom_id = invoker.id
+          }
+          atom_label = get_label_info(":${target_name}", "label_no_toolchain")
+          atom_type = "collection"
+          atom_meta = {
+            dest = files.collection_manifest_relative_path
+          }
+          atom_meta_json_file =
+              rebase_path(files.idk_meta_manifest_json, root_build_dir)
+          prebuild_info = {
+            arch = {
+              host = host_triple
+              target = [ target_triple ]
+            }
+            schema_version = sdk_metadata_schema_version
+            root = ".."  # Hard-coded in build/sdk/create_molecule_manifest.py.
+          }
+        },
+      ]
+    }
+  }
+
   idk_prebuild_manifest(targets.prebuild_manifest) {
     forward_variables_from(invoker, [ "testonly" ])
     visibility = [ ":${targets.main}" ]
     output = files.prebuild_manifest
-    deps = all_collection_deps
+    deps = all_collection_deps + [ ":${targets.collection_prebuild_info}" ]
   }
 
   group(targets.main) {

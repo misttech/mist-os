@@ -363,6 +363,7 @@ template("sdk_atom") {
         },
       ]
     }
+    is_stable = is_stable
     write_stable_true_to_meta_json = add_stable_true_to_meta_json
   }
 
