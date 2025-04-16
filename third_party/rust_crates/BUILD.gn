@@ -537,7 +537,7 @@ group("macro_rules_attribute") {
 }
 
 group("maplit") {
-  public_deps = [ ":maplit-v1_0_1" ]
+  public_deps = [ ":maplit-v1_0_2" ]
 }
 
 group("maybe-owned") {
@@ -9004,18 +9004,18 @@ rust_proc_macro("macro_rules_attribute-proc_macro-v0_1_3") {
   applicable_licenses = [ ":macro_rules_attribute-proc_macro-v0_1_3.license" ]
 }
 
-license("maplit-v1_0_1.license") {
+license("maplit-v1_0_2.license") {
   public_package_name = "maplit"
   license_files = [
-    "//third_party/rust_crates/vendor/maplit-1.0.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/maplit-1.0.1/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/maplit-1.0.2/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/maplit-1.0.2/LICENSE-MIT",
   ]
 }
 
-rust_library("maplit-v1_0_1") {
+rust_library("maplit-v1_0_2") {
   crate_name = "maplit"
-  crate_root = "//third_party/rust_crates/vendor/maplit-1.0.1/src/lib.rs"
-  output_name = "maplit-42f6d562ec404170"
+  crate_root = "//third_party/rust_crates/vendor/maplit-1.0.2/src/lib.rs"
+  output_name = "maplit-34518b1427f94055"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -9025,13 +9025,13 @@ rust_library("maplit-v1_0_1") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=42f6d562ec404170",
-    "-Cextra-filename=-42f6d562ec404170",
+    "-Cmetadata=34518b1427f94055",
+    "-Cextra-filename=-34518b1427f94055",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":maplit-v1_0_1.license" ]
+  applicable_licenses = [ ":maplit-v1_0_2.license" ]
 }
 
 license("matchers-v0_1_0.license") {

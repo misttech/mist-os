@@ -1471,14 +1471,14 @@ alias(
 )
 
 alias(
-    name = "maplit-1.0.1",
-    actual = "//third_party/rust_crates/vendor/maplit-1.0.1:maplit",
+    name = "maplit-1.0.2",
+    actual = "//third_party/rust_crates/vendor/maplit-1.0.2:maplit",
     tags = ["manual"],
 )
 
 alias(
     name = "maplit",
-    actual = "//third_party/rust_crates/vendor/maplit-1.0.1:maplit",
+    actual = "//third_party/rust_crates/vendor/maplit-1.0.2:maplit",
     tags = ["manual"],
 )
 
