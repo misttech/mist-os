@@ -50,16 +50,16 @@ template("sdk_python_mobly_test") {
 
   _sdk_name = invoker.sdk_name
 
+  # IDK-bound targets cannot depend on `testonly` targets so instead of
+  # depending on the main python_mobly_test() target which is a host_test()
+  # with `testonly` hardcoded to true, we can instead depend on the
+  # `.binary_and_config` group target for bundling purposes.
   _full_test_label = get_label_info(invoker.test_label, "label_no_toolchain")
+  _full_test_bundle_label = "${_full_test_label}.binary_and_config"
 
-  _labels = {
-    # IDK-bound targets cannot depend on `testonly` targets so instead of
-    # depending on the main python_mobly_test() target which is a host_test()
-    # with `testonly` hardcoded to true, we can instead depend on the
-    # `.binary_and_config` group target for bundling purposes.
-    full_test_bundle = "${_full_test_label}.binary_and_config"
-
+  _targets = {
     meta_json_and_file_list = "${target_name}_metadata_and_file_list"
+    test_sources_list = "${target_name}_test_sources"
   }
 
   _files = {
@@ -67,25 +67,24 @@ template("sdk_python_mobly_test") {
         "${target_gen_dir}/${target_name}_metadata_and_file_list.sdk_meta.json"
     file_list =
         "${target_gen_dir}/${target_name}_metadata_and_file_list.mapping.txt"
+    test_sources_list = "${target_gen_dir}/${target_name}_test_sources.json"
   }
 
-  _test_sources_target = "${target_name}_test_sources"
-  _test_sources_file = "${target_gen_dir}/${target_name}_test_sources.json"
-  generated_file(_test_sources_target) {
-    visibility = [ ":${_labels.meta_json_and_file_list}" ]
+  generated_file(_targets.test_sources_list) {
+    visibility = [ ":${_targets.meta_json_and_file_list}" ]
 
-    public_deps = [ _labels.full_test_bundle ]
+    public_deps = [ _full_test_bundle_label ]
 
-    outputs = [ _test_sources_file ]
+    outputs = [ _files.test_sources_list ]
     output_conversion = "json"
     data_keys = [ "hermetic_test_sources" ]
   }
 
-  python_action(_labels.meta_json_and_file_list) {
+  python_action(_targets.meta_json_and_file_list) {
     visibility = [ ":*" ]
     binary_label = "//build/python:gen_sdk_metadata_and_file_sources"
 
-    inputs = [ _test_sources_file ]
+    inputs = [ _files.test_sources_list ]
 
     outputs = [
       _files.file_list,
@@ -98,7 +97,7 @@ template("sdk_python_mobly_test") {
       "--out-sources",
       rebase_path(_files.file_list, root_build_dir),
       "--test-sources-list",
-      rebase_path(_test_sources_file, root_build_dir),
+      rebase_path(_files.test_sources_list, root_build_dir),
       "--name",
       _sdk_name,
       "--root",
@@ -106,8 +105,8 @@ template("sdk_python_mobly_test") {
     ]
 
     deps = [
-      ":${_test_sources_target}",
-      _labels.full_test_bundle,
+      ":${_targets.test_sources_list}",
+      _full_test_bundle_label,
     ]
   }
 
@@ -127,9 +126,17 @@ template("sdk_python_mobly_test") {
       schema = "experimental_python_e2e_test"
       dest = "python/${_sdk_name}/meta.json"
       source = _files.meta_json
+      source_prebuild_info = {
+        name = _sdk_name
+        file_base = "python/${_sdk_name}"
+        api_level = "unversioned"
+        test_sources_list =
+            "GN_GENERATED(" +
+            rebase_path(_files.test_sources_list, root_build_dir) + ")"
+      }
     }
 
-    non_sdk_deps = [ ":${_labels.meta_json_and_file_list}" ]
+    non_sdk_deps = [ ":${_targets.meta_json_and_file_list}" ]
 
     file_list = _files.file_list
 

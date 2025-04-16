@@ -375,6 +375,18 @@ template("sdk_source_set") {
     deps = sdk_deps
   }
 
+  # LINT.IfChange
+  _prebuild_info = {
+    include_dir = include_dest
+    sources = sdk_metadata_sources
+    headers = sdk_metadata_headers
+    deps = sdk_deps
+    library_name = sdk_name
+    file_base = sdk_root_path
+  }
+
+  # LINT.ThenChange(//build/sdk/idk_prebuild_manifest.gni)
+
   sdk_atom(sdk_target_name) {
     # As described at the top of this file, this atom does NOT build the
     # underlying source files.
@@ -421,6 +433,7 @@ template("sdk_source_set") {
 
     meta = {
       source = metadata_file
+      source_prebuild_info = _prebuild_info
       dest = "$sdk_root_path/meta.json"
       schema = "cc_source_library"
       stable = is_stable

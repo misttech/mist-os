@@ -75,6 +75,15 @@ template("sdk_version_history") {
       dest = "version_history.json"
       source = _files.compiled
       schema = "version_history"
+      source_prebuild_info = {
+        source = rebase_path(invoker.source, root_build_dir)
+        daily_commit_timestamp_file = rebase_path(
+                "//build/info/jiri_generated/integration_daily_commit_stamp.txt",
+                root_build_dir)
+        daily_commit_hash_file = rebase_path(
+                "//build/info/jiri_generated/integration_daily_commit_hash.txt",
+                root_build_dir)
+      }
       type = "version_history"
     }
     non_sdk_deps = [ ":${_labels.compile}" ]

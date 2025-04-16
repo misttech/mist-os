@@ -39,11 +39,34 @@ template("sdk_noop_atom") {
 
   meta_target_name = "${target_name}_meta"
   meta_file = "${target_gen_dir}/${target_name}.meta.json"
+
+  if (defined(invoker.id)) {
+    _atom_id = invoker.id
+  } else {
+    _atom_id = target_name
+  }
+  _idk_atom_prebuild_info = {
+    atom_id = _atom_id
+    atom_label = get_label_info(":${target_name}", "label_no_toolchain")
+    atom_type = "none"
+    atom_meta = {
+      dest = ""
+    }
+    atom_meta_json_file = rebase_path(meta_file, root_build_dir)
+    atom_files = []
+    atom_stable = false
+  }
+
   generated_file(meta_target_name) {
     contents = {
     }
     outputs = [ meta_file ]
     output_conversion = "json"
+
+    metadata = {
+      # Used by idk_prebuild_manifest() template.
+      idk_atom_prebuild_info = [ _idk_atom_prebuild_info ]
+    }
   }
 
   manifest_file = "${target_gen_dir}/${target_name}.sdk"

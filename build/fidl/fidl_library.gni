@@ -679,6 +679,17 @@ template("fidl_library") {
       deps = sdk_deps
     }
 
+    _prebuild_info = {
+      library_name = library_name
+      file_base = file_base
+      deps = []
+      if (defined(invoker.public_deps)) {
+        foreach(dep, invoker.public_deps) {
+          deps += [ get_label_info(dep, "label_no_toolchain") + "_sdk" ]
+        }
+      }
+    }
+
     sdk_atom("${target_name}_sdk") {
       forward_variables_from(invoker,
                              [
@@ -711,6 +722,7 @@ template("fidl_library") {
 
       meta = {
         source = sdk_meta_file
+        source_prebuild_info = _prebuild_info
         dest = "$file_base/meta.json"
         schema = "fidl_library"
         stable = is_stable

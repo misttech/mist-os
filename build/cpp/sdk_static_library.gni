@@ -361,6 +361,29 @@ template("sdk_static_library") {
     deps = sdk_deps + [ static_lib_target ]
   }
 
+  # LINT.IfChange
+  _prebuild_info = {
+    atom_label =
+        get_label_info(":${manifest_target_name}", "label_no_toolchain")
+    format = "static"
+    include_dir = include_dest
+    library_name = sdk_name
+    file_base = sdk_root_path
+    headers = sdk_metadata_headers
+    generator_label =
+        get_label_info(":${main_target_name}", "label_with_toolchain")
+    binaries = [
+      {
+        api_level = override_target_api_level
+        arch = target_cpu
+        link_lib = link_lib
+      },
+    ]
+    deps = sdk_deps
+  }
+
+  # LINT.ThenChange(//build/sdk/idk_prebuild_manifest.gni)
+
   # Exempt internal libraries from pragma verification.
   should_verify_pragma = !is_internal
   if (should_verify_pragma) {
@@ -405,6 +428,7 @@ template("sdk_static_library") {
 
     meta = {
       source = metadata_file
+      source_prebuild_info = _prebuild_info
       dest = "${sdk_root_path}/meta.json"
       schema = "cc_prebuilt_library"
     }

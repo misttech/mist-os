@@ -432,6 +432,15 @@ if (current_toolchain == dart_toolchain) {
 
         meta = {
           source = metadata_file
+          source_prebuild_info = {
+            library_name = package_name
+            file_base = file_base
+            sources = sdk_sources
+            third_party_specs =
+                rebase_path(third_party_pubspecs, root_build_dir)
+            null_safe = defined(invoker.null_safe) && invoker.null_safe
+            deps = sdk_deps
+          }
           dest = "$file_base/meta.json"
           schema = "dart_library"
         }

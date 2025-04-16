@@ -484,6 +484,33 @@ template("sdk_shared_library") {
     deps = sdk_deps + [ shared_lib_target ]
   }
 
+  # LINT.IfChange
+  _prebuild_info = {
+    atom_label = get_label_info(":${main_target_name}", "label_no_toolchain")
+    generator_label = get_label_info(shared_lib_target, "label_with_toolchain")
+    format = "shared"
+    include_dir = include_dest
+    library_name = atom_name
+    file_base = sdk_root_path
+    headers = sdk_metadata_headers
+    binaries = [
+      {
+        api_level = override_target_api_level
+        arch = target_cpu
+        dist_lib = dist_lib
+        dist_path = "lib/${lib_name}"
+        link_lib = link_lib
+        debug_lib = debug_lib
+      },
+    ]
+    deps = sdk_deps
+    if (defined(invoker.symbols_api)) {
+      ifs = get_path_info(invoker.symbols_api, "file")
+    }
+  }
+
+  # LINT.ThenChange(//build/sdk/idk_prebuild_manifest.gni)
+
   verify_pragma_once(verify_pragma_target_name) {
     headers = all_headers
   }
@@ -535,6 +562,7 @@ template("sdk_shared_library") {
 
     meta = {
       source = metadata_file
+      source_prebuild_info = _prebuild_info
       dest = "${sdk_root_path}/meta.json"
       schema = "cc_prebuilt_library"
     }

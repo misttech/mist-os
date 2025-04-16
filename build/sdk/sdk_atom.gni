@@ -266,9 +266,6 @@ template("sdk_atom") {
     add_stable_true_to_meta_json = false
   }
 
-  # TODO(https://fxbug.dev/338009514): Remove when using this value.
-  not_needed([ "add_stable_true_to_meta_json" ])
-
   is_type_not_requiring_compatibility =
       _types_not_requiring_compatibility + [ type ] - [ type ] !=
       _types_not_requiring_compatibility
@@ -341,6 +338,34 @@ template("sdk_atom") {
   # included in the final IDK as its `meta.json` at `meta.dest`.
   meta_file_for_idk = "$target_gen_dir/$target_name.meta.json"
 
+  _idk_atom_prebuild_info = {
+    atom_id = invoker.id
+    atom_label = get_label_info(":${target_name}", "label_no_toolchain")
+    atom_type = type
+    atom_meta = {
+      forward_variables_from(meta,
+                             "*",
+                             [
+                               "source",
+                               "source_prebuild_info",
+                             ])
+    }
+    atom_meta_json_file = rebase_path(meta_file_for_idk, root_build_dir)
+    if (defined(meta.source_prebuild_info)) {
+      prebuild_info = meta.source_prebuild_info
+    }
+    atom_files = []
+    foreach(file, files) {
+      atom_files += [
+        {
+          source = rebase_path(file.source, root_build_dir)
+          dest = file.dest
+        },
+      ]
+    }
+    write_stable_true_to_meta_json = add_stable_true_to_meta_json
+  }
+
   assert(defined(meta.source) != defined(meta.value),
          "Exactly one of `meta.source` and `meta.value` must be set.")
   if (defined(meta.value)) {
@@ -355,6 +380,11 @@ template("sdk_atom") {
     target_providing_meta_file_for_idk = [ ":$meta_generated_file_target" ]
   } else {
     meta_copy_target_name = "${target_name}_meta_copy"
+    assert(defined(meta.source), "Meta scope needs a source or value")
+    if (!defined(meta.source_prebuild_info)) {
+      print(get_label_info(":$target_name", "label_no_toolchain") +
+            ": No meta.source_prebuild_info argument!")
+    }
 
     # Copy the file to a canonical location for access by other rules.
     # TODO(https://fxbug.dev/42131074): instead, make sure that all atoms generate their metadata
@@ -464,8 +494,7 @@ template("sdk_atom") {
   # This manifest is only used at build time to generate the IDK. The actual
   # manifest for this atom in the IDK is `meta_file_for_idk`.
   python_action(target_name) {
-    forward_variables_from(invoker,
-                           _default_forward_from_invoker + [ "metadata" ])
+    forward_variables_from(invoker, _default_forward_from_invoker)
 
     manifest = "$target_gen_dir/$target_name.sdk"
     areas_file = "//docs/contribute/governance/areas/_areas.yaml"
@@ -521,6 +550,21 @@ template("sdk_atom") {
         "--file-list",
         rebase_path(invoker.file_list, root_build_dir),
       ]
+    }
+
+    metadata = {
+      if (defined(invoker.metadata)) {
+        forward_variables_from(invoker.metadata,
+                               "*",
+                               [ "idk_atom_prebuild_info" ])
+      }
+
+      if (category == "partner") {
+        # Used by idk_prebuild_manifest() template.
+        idk_atom_prebuild_info = [ _idk_atom_prebuild_info ]
+      } else {
+        not_needed([ "_idk_atom_prebuild_info" ])
+      }
     }
 
     # The manifest output contains the output directory.

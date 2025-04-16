@@ -527,6 +527,11 @@ if (!is_host) {
           # remove this dependency.
           if (main_target_name == "in_tree_collection") {
             non_sdk_deps = [ ":core" ]
+
+            # Do not include atoms in core in the prebuild data.
+            metadata = {
+              idk_atom_prebuild_info_barrier = deps
+            }
           }
         }
 

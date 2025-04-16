@@ -65,6 +65,7 @@ template("sdk_molecule") {
     forward_variables_from(invoker,
                            [
                              "assert_no_deps",
+                             "metadata",
                              "testonly",
                              "visibility",
                            ])
