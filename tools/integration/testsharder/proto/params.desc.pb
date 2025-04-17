@@ -1,6 +1,6 @@
 
-¹
-params.prototestshardergoogle/protobuf/duration.proto"µ
+í
+params.prototestshardergoogle/protobuf/duration.proto"é
 Params)
 environment_tags (	RenvironmentTagsB
 target_duration (2.google.protobuf.DurationRtargetDuration+
@@ -17,4 +17,5 @@ image_deps	 (R	imageDeps
 per_shard_package_repos (RperShardPackageRepos.
 cache_test_packages (RcacheTestPackages.
 product_bundle_name (	RproductBundleName>
-shard_timeout (2.google.protobuf.DurationRshardTimeoutB<Z:go.fuchsia.dev/fuchsia/tools/integration/testsharder/protobproto3
+shard_timeout (2.google.protobuf.DurationRshardTimeout2
+disabled_device_types (	RdisabledDeviceTypesB<Z:go.fuchsia.dev/fuchsia/tools/integration/testsharder/protobproto3

@@ -17,7 +17,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "2000"
                     }
-                ]
+                ],
+                "metadata": {}
             },
             {
                 "name": "fuchsia-pkg://fuchsia.com/fast3#meta/fast3.cm",
@@ -34,7 +35,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "2000"
                     }
-                ]
+                ],
+                "metadata": {}
             },
             {
                 "name": "fuchsia-pkg://fuchsia.com/fast2#meta/fast2.cm",
@@ -51,7 +53,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "2000"
                     }
-                ]
+                ],
+                "metadata": {}
             }
         ],
         "environment": {
@@ -61,6 +64,11 @@
             },
             "virtual_device_spec": {
                 "name": ""
+            },
+            "gpt_uefi_disk": {
+                "name": "",
+                "vbmeta_key_path": "",
+                "vbmeta_key_metadata_path": ""
             }
         },
         "deps": [
@@ -108,7 +116,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "300000"
                     }
-                ]
+                ],
+                "metadata": {}
             }
         ],
         "environment": {
@@ -118,6 +127,11 @@
             },
             "virtual_device_spec": {
                 "name": ""
+            },
+            "gpt_uefi_disk": {
+                "name": "",
+                "vbmeta_key_path": "",
+                "vbmeta_key_metadata_path": ""
             }
         },
         "deps": [

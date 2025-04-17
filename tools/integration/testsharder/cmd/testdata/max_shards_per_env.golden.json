@@ -20,7 +20,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "240000"
                     }
-                ]
+                ],
+                "metadata": {}
             },
             {
                 "name": "fuchsia-pkg://fuchsia.com/nonhermetic1#meta/nonhermetic1.cm",
@@ -40,7 +41,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "240000"
                     }
-                ]
+                ],
+                "metadata": {}
             }
         ],
         "environment": {
@@ -50,6 +52,11 @@
             },
             "virtual_device_spec": {
                 "name": ""
+            },
+            "gpt_uefi_disk": {
+                "name": "",
+                "vbmeta_key_path": "",
+                "vbmeta_key_metadata_path": ""
             }
         },
         "deps": [
@@ -101,7 +108,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "240000"
                     }
-                ]
+                ],
+                "metadata": {}
             },
             {
                 "name": "fuchsia-pkg://fuchsia.com/affected1#meta/affected1.cm",
@@ -122,7 +130,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "240000"
                     }
-                ]
+                ],
+                "metadata": {}
             }
         ],
         "environment": {
@@ -132,6 +141,11 @@
             },
             "virtual_device_spec": {
                 "name": ""
+            },
+            "gpt_uefi_disk": {
+                "name": "",
+                "vbmeta_key_path": "",
+                "vbmeta_key_metadata_path": ""
             }
         },
         "deps": [
@@ -183,7 +197,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "240000"
                     }
-                ]
+                ],
+                "metadata": {}
             },
             {
                 "name": "fuchsia-pkg://fuchsia.com/affected2#meta/affected2.cm",
@@ -204,7 +219,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "240000"
                     }
-                ]
+                ],
+                "metadata": {}
             }
         ],
         "environment": {
@@ -214,6 +230,11 @@
             },
             "virtual_device_spec": {
                 "name": ""
+            },
+            "gpt_uefi_disk": {
+                "name": "",
+                "vbmeta_key_path": "",
+                "vbmeta_key_metadata_path": ""
             }
         },
         "deps": [
@@ -264,7 +285,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "240000"
                     }
-                ]
+                ],
+                "metadata": {}
             },
             {
                 "name": "fuchsia-pkg://fuchsia.com/unaffected2#meta/unaffected2.cm",
@@ -284,7 +306,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "240000"
                     }
-                ]
+                ],
+                "metadata": {}
             }
         ],
         "environment": {
@@ -294,6 +317,11 @@
             },
             "virtual_device_spec": {
                 "name": ""
+            },
+            "gpt_uefi_disk": {
+                "name": "",
+                "vbmeta_key_path": "",
+                "vbmeta_key_metadata_path": ""
             }
         },
         "timeout_secs": 0,
@@ -303,6 +331,7 @@
                     "name": "fuchsia-pkg://fuchsia.com/unaffected1#meta/unaffected1.cm",
                     "gn_label": "//src/something:unaffected1(//build/toolchain/fuchsia:x64)",
                     "output_files": null,
+                    "output_dir": "",
                     "result": "SKIP",
                     "cases": null,
                     "start_time": "0001-01-01T00:00:00Z",
@@ -318,12 +347,14 @@
                             "key": "expected_duration_milliseconds",
                             "value": "240000"
                         }
-                    ]
+                    ],
+                    "metadata": {}
                 },
                 {
                     "name": "fuchsia-pkg://fuchsia.com/unaffected2#meta/unaffected2.cm",
                     "gn_label": "//src/something:unaffected2(//build/toolchain/fuchsia:x64)",
                     "output_files": null,
+                    "output_dir": "",
                     "result": "SKIP",
                     "cases": null,
                     "start_time": "0001-01-01T00:00:00Z",
@@ -339,7 +370,8 @@
                             "key": "expected_duration_milliseconds",
                             "value": "240000"
                         }
-                    ]
+                    ],
+                    "metadata": {}
                 }
             ]
         },

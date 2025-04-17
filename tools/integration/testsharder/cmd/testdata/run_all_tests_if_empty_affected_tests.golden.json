@@ -20,7 +20,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "0"
                     }
-                ]
+                ],
+                "metadata": {}
             },
             {
                 "name": "fuchsia-pkg://fuchsia.com/unaffected-nonhermetic-test#meta/unaffected-nonhermetic-test.cm",
@@ -40,7 +41,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "0"
                     }
-                ]
+                ],
+                "metadata": {}
             }
         ],
         "environment": {
@@ -50,6 +52,11 @@
             },
             "virtual_device_spec": {
                 "name": ""
+            },
+            "gpt_uefi_disk": {
+                "name": "",
+                "vbmeta_key_path": "",
+                "vbmeta_key_metadata_path": ""
             }
         },
         "deps": [
@@ -100,7 +107,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "0"
                     }
-                ]
+                ],
+                "metadata": {}
             },
             {
                 "name": "fuchsia-pkg://fuchsia.com/unaffected-hermetic-test#meta/unaffected-hermetic-test.cm",
@@ -120,7 +128,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "0"
                     }
-                ]
+                ],
+                "metadata": {}
             }
         ],
         "environment": {
@@ -130,6 +139,11 @@
             },
             "virtual_device_spec": {
                 "name": ""
+            },
+            "gpt_uefi_disk": {
+                "name": "",
+                "vbmeta_key_path": "",
+                "vbmeta_key_metadata_path": ""
             }
         },
         "deps": [

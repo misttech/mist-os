@@ -22,6 +22,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder/proto"
 	"go.fuchsia.dev/fuchsia/tools/lib/color"
+	"go.fuchsia.dev/fuchsia/tools/lib/flagmisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/hostplatform"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 
@@ -48,6 +49,7 @@ type testsharderFlags struct {
 	testsharderParamsFile       string
 	depsFile                    string
 	ignoreMultiplyIsolatedLimit bool
+	allowedDeviceTypes          flagmisc.StringsValue
 }
 
 func parseFlags() testsharderFlags {
@@ -63,6 +65,7 @@ func parseFlags() testsharderFlags {
 	flag.StringVar(&flags.testsharderParamsFile, "params-file", "", "path to the testsharder params file")
 	flag.StringVar(&flags.depsFile, "deps-file", "", "path to a file to write all the builder deps to in the format expected from `cas archive -paths-json`.")
 	flag.BoolVar(&flags.ignoreMultiplyIsolatedLimit, "ignore-multiply-limit", false, "whether to ignore the limit on multiplied runs per isolated test")
+	flag.Var(&flags.allowedDeviceTypes, "allowed-device-type", "the device types to run tests on. If disabled_device_types is set in the testsharder params, that will take precedence.")
 
 	flag.Usage = usage
 
@@ -209,6 +212,22 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		}
 	}
 	shards := testsharder.MakeShards(m.TestSpecs(), testListEntries, opts, metadataMap)
+
+	var shardsToRun []*testsharder.Shard
+	for _, s := range shards {
+		if s.Env.Dimensions.DeviceType() == "" {
+			shardsToRun = append(shardsToRun, s)
+			continue
+		}
+		if slices.Contains(params.DisabledDeviceTypes, s.Env.Dimensions.DeviceType()) {
+			logger.Debugf(ctx, "skipping shard %s with disabled device type: %s", s.Name, s.Env.Dimensions.DeviceType())
+			continue
+		}
+		if len(flags.allowedDeviceTypes) == 0 || slices.Contains(flags.allowedDeviceTypes, s.Env.Dimensions.DeviceType()) {
+			shardsToRun = append(shardsToRun, s)
+		}
+	}
+	shards = shardsToRun
 
 	if perTestTimeout > 0 {
 		testsharder.ApplyTestTimeouts(shards, perTestTimeout)
