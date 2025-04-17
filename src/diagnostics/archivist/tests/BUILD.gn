@@ -6,10 +6,7 @@ import("//build/components.gni")
 
 group("tests") {
   testonly = true
-  deps = [
-    "integration:tests",
-    "logs:tests",
-  ]
+  deps = [ "integration:tests" ]
 }
 
 group("build-only") {
