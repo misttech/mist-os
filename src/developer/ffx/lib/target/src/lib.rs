@@ -5,8 +5,8 @@ use addr::TargetIpAddr;
 use anyhow::{Context as _, Result};
 use compat_info::CompatibilityInfo;
 use errors::ffx_bail;
-use ffx_config::keys::TARGET_DEFAULT_KEY;
-use ffx_config::EnvironmentContext;
+use ffx_config::keys::{STATELESS_DEFAULT_TARGET_CONFIGURATION, TARGET_DEFAULT_KEY};
+use ffx_config::{ConfigError, ConfigLevel, EnvironmentContext};
 use fidl::endpoints::create_proxy;
 use fidl::prelude::*;
 use fidl_fuchsia_developer_ffx::{
@@ -488,6 +488,26 @@ pub async fn knock_target_daemonless(
         .map_err(|e| KnockError::NonCriticalError(e.into()))?
 }
 
+/// Get the target specifier, bypassing stateful configuration
+/// (i.e. ConfigLevel::{User, Build, Global}).
+/// Should be gated behind the `STATELESS_DEFAULT_TARGET_CONFIGURATION`
+/// experimental config flag.
+fn get_target_specifier_stateless(
+    context: &EnvironmentContext,
+) -> Result<Option<String>, ConfigError> {
+    match context
+        .query(TARGET_DEFAULT_KEY)
+        .level(Some(ConfigLevel::Runtime))
+        .get_optional::<Option<String>>()
+    {
+        Ok(None) => context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::Default))
+            .get_optional::<Option<String>>(),
+        runtime_result => runtime_result,
+    }
+}
+
 /// Get the target specifier.  This uses the normal config mechanism which
 /// supports flexible config values: it can be a string naming the target, or
 /// a list of strings, in which case the first valid entry is used. (The most
@@ -499,8 +519,18 @@ pub async fn knock_target_daemonless(
 /// for the purposes of error messages, etc.  E.g. The repo server only works if
 /// an explicit _name_ is provided.  In other contexts, it is valid for the specifier
 /// to be a substring, a network address, etc.
+/// If the `STATELESS_DEFAULT_TARGET_CONFIGURATION` config value is enabled,
+/// only ConfigLevel::{Runtime, Default} will be queried, effectively omitting
+/// default targets set by `ffx config set`/`ffx target default set`.
 pub async fn get_target_specifier(context: &EnvironmentContext) -> Result<Option<String>> {
-    let target_spec = context.get_optional(TARGET_DEFAULT_KEY)?;
+    // TODO(https://fxbug.dev/394619603): Remove the stateful codepath and
+    // cleanup this feature flag once we finish this migration.
+    let target_spec = if context.get(STATELESS_DEFAULT_TARGET_CONFIGURATION)? {
+        get_target_specifier_stateless(context)
+    } else {
+        context.get_optional(TARGET_DEFAULT_KEY)
+    }?;
+
     match target_spec {
         Some(ref target) => info!("Target specifier: ['{target:?}']"),
         None => debug!("No target specified"),
@@ -568,8 +598,140 @@ mod test {
     use super::*;
     use ffx_command_error::bug;
     use ffx_config::macro_deps::serde_json::Value;
-    use ffx_config::{test_env, test_init, ConfigLevel};
+    use ffx_config::{test_env, test_init, ConfigLevel, TestEnv};
     use futures_lite::future::{pending, ready};
+    use tempfile::tempdir;
+
+    async fn set_stateless_feature_flag(env: &TestEnv) {
+        env.context
+            .query(STATELESS_DEFAULT_TARGET_CONFIGURATION)
+            .level(Some(ConfigLevel::User))
+            .set(Value::Bool(true))
+            .await
+            .unwrap();
+    }
+
+    #[fuchsia::test]
+    async fn test_get_target_specifier_unset_stateless() {
+        // Explicitly initialize the test with no env vars.
+        // That way, $FUCHSIA_NODENAME and $FUCHSIA_DEVICE_ADDR are both unset.
+        let env = test_env().build().await.unwrap();
+        set_stateless_feature_flag(&env).await;
+
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
+        assert_eq!(target_spec, None);
+    }
+
+    #[fuchsia::test]
+    async fn test_get_target_specifier_from_env_stateless() {
+        let env =
+            test_env().env_var("FUCHSIA_NODENAME", "stateless-default").build().await.unwrap();
+        set_stateless_feature_flag(&env).await;
+
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
+        assert_eq!(target_spec, Some("stateless-default".into()));
+    }
+
+    #[fuchsia::test]
+    async fn test_get_target_specifier_bypasses_state_stateless() {
+        let build_dir = tempdir().expect("temp dir");
+        let env = test_env().in_tree(build_dir.path()).build().await.unwrap();
+        set_stateless_feature_flag(&env).await;
+
+        // Set stateful configuration.
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(Value::String("stateful-user-default".to_owned()))
+            .await
+            .unwrap();
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::Build))
+            .set(Value::String("stateful-build-default".to_owned()))
+            .await
+            .unwrap();
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::Global))
+            .set(Value::String("stateful-global-default".to_owned()))
+            .await
+            .unwrap();
+
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
+        assert_eq!(target_spec, None);
+    }
+
+    #[fuchsia::test]
+    async fn test_get_target_specifier_from_env_bypasses_state_stateless() {
+        let build_dir = tempdir().expect("temp dir");
+        let env = test_env()
+            .env_var("FUCHSIA_NODENAME", "stateless-default")
+            .in_tree(build_dir.path())
+            .build()
+            .await
+            .unwrap();
+        set_stateless_feature_flag(&env).await;
+
+        // Set stateful configuration.
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(Value::String("stateful-user-default".to_owned()))
+            .await
+            .unwrap();
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::Build))
+            .set(Value::String("stateful-build-default".to_owned()))
+            .await
+            .unwrap();
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::Global))
+            .set(Value::String("stateful-global-default".to_owned()))
+            .await
+            .unwrap();
+
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
+        assert_eq!(target_spec, Some("stateless-default".into()));
+    }
+
+    #[fuchsia::test]
+    async fn test_get_target_specifier_from_all_sources_stateless() {
+        let build_dir = tempdir().expect("temp dir");
+        let env = test_env()
+            .env_var("FUCHSIA_NODENAME", "stateless-env-default")
+            .runtime_config(TARGET_DEFAULT_KEY, "stateless-runtime-default")
+            .in_tree(build_dir.path())
+            .build()
+            .await
+            .unwrap();
+        set_stateless_feature_flag(&env).await;
+
+        // Set stateful configuration.
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(Value::String("stateful-user-default".to_owned()))
+            .await
+            .unwrap();
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::Build))
+            .set(Value::String("stateful-build-default".to_owned()))
+            .await
+            .unwrap();
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::Global))
+            .set(Value::String("stateful-global-default".to_owned()))
+            .await
+            .unwrap();
+
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
+        assert_eq!(target_spec, Some("stateless-runtime-default".into()));
+    }
 
     #[fuchsia::test]
     async fn test_get_empty_default_target() {

@@ -28,7 +28,7 @@ use target_errors::FfxTargetError;
 
 use crate::connection::Connection;
 use crate::ssh_connector::SshConnector;
-use crate::UNSPECIFIED_TARGET_NAME;
+use crate::{get_target_specifier, UNSPECIFIED_TARGET_NAME};
 
 const CONFIG_TARGET_SSH_TIMEOUT: &str = "target.host_pipe_ssh_timeout";
 const CONFIG_LOCAL_DISCOVERY_TIMEOUT: &str = "discovery.timeout";
@@ -794,7 +794,7 @@ impl TryFromEnvContext for Resolution {
     ) -> LocalBoxFuture<'a, ffx_command_error::Result<Self>> {
         Box::pin(async {
             let unspecified_target = UNSPECIFIED_TARGET_NAME.to_owned();
-            let target_spec = Option::<String>::try_from_env_context(env).await?;
+            let target_spec = get_target_specifier(env).await?;
             let target_spec_unwrapped = if env.is_strict() {
                 target_spec.as_ref().ok_or(user_error!(
                     "You must specify a target via `-t <target_name>` before any command arguments"

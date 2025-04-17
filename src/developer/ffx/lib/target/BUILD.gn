@@ -56,6 +56,7 @@ rustc_library("lib") {
   test_deps = [
     "//src/lib/fuchsia",
     "//third_party/rust_crates:mockall",
+    "//third_party/rust_crates:tempfile",
   ]
 
   sources = [

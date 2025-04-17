@@ -5,7 +5,7 @@
 use async_lock::{Mutex, MutexGuard};
 use ffx_command_error::{bug, user_error, Error, Result};
 use ffx_config::{EnvironmentContext, TryFromEnvContext};
-use ffx_target::{Connection, ConnectionError, TargetConnector};
+use ffx_target::{get_target_specifier, Connection, ConnectionError, TargetConnector};
 use fho::DirectConnector;
 use futures::future::LocalBoxFuture;
 use std::net::SocketAddr;
@@ -48,7 +48,7 @@ pub struct NetworkConnector<T: TryFromEnvContext + TargetConnector> {
 
 impl<T: TryFromEnvContext + TargetConnector> NetworkConnector<T> {
     pub async fn new(env: &EnvironmentContext) -> Result<Self> {
-        let target_spec = Option::<String>::try_from_env_context(env).await?;
+        let target_spec = get_target_specifier(env).await?;
         Ok(Self {
             env: env.clone(),
             connection: Default::default(),

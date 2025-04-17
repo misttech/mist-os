@@ -30,6 +30,7 @@
         "timeout_secs": 10.1
     },
     "target": {
+        "stateless_default_configuration": false,
         "default": [
             "$FUCHSIA_DEVICE_ADDR",
             "$FUCHSIA_NODENAME"
