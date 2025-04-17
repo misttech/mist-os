@@ -441,6 +441,10 @@ func fuchsiaLogChecks() []FailureModeCheck {
 			Type:   syslogType,
 		},
 		&stringInLogCheck{
+			String: "honeydew.errors.HealthCheckError: health check failed on",
+			Type:   swarmingOutputType,
+		},
+		&stringInLogCheck{
 			// LINT.IfChange(blob_write_failure)
 			String: "failed to write blob",
 			// LINT.ThenChange(/src/storage/fxfs/platform/src/fuchsia/fxblob/writer.rs:blob_write_failure)
