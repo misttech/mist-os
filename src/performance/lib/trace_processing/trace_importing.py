@@ -220,6 +220,32 @@ def convert_trace_file_to_json(
     return output_path
 
 
+def create_model_from_trace_file_path(
+    trace_path: str | os.PathLike[Any],
+    compressed_input: bool = False,
+    trace2json_path: str | os.PathLike[Any] | None = None,
+) -> trace_model.Model:
+    """Converts the specified trace file to JSON.
+
+    Args:
+      trace_path: The path to the trace file to convert.
+      trace2json_path: The path to the trace2json executable. When unset, find
+          at a runtime_deps/trace2json location in a parent directory.
+      compressed_input: Whether the input file is compressed.
+
+    Raises:
+      subprocess.CalledProcessError: The trace2json process returned an error.
+
+    Returns:
+        A Model object.
+    """
+    return create_model_from_file_path(
+        convert_trace_file_to_json(
+            trace_path, compressed_input, False, trace2json_path
+        )
+    )
+
+
 def create_model_from_file_path(
     path: str | os.PathLike[Any],
 ) -> trace_model.Model:
