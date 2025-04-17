@@ -18,7 +18,7 @@ pub use arrays::{FsUseType, XpermsBitmap};
 pub use index::FsUseLabelAndType;
 pub use security_context::{SecurityContext, SecurityContextError};
 
-use crate::{self as sc, FsNodeClass, KernelClass, NullessByteStr};
+use crate as sc;
 use anyhow::Context as _;
 use error::ParseError;
 use index::PolicyIndex;
@@ -57,9 +57,17 @@ pub struct SensitivityId(NonZeroU32);
 #[derive(Copy, Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
 pub struct CategoryId(NonZeroU32);
 
-/// Identifies a class within a policy.
+/// Identifies a class within a policy. Note that `ClassId`s may be created for arbitrary Ids
+/// supplied by userspace, so implementation should never assume that a `ClassId` must be valid.
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct ClassId(NonZeroU32);
+
+impl ClassId {
+    /// Returns a `ClassId` with the specified `id`.
+    pub fn new(id: NonZeroU32) -> Self {
+        Self(id)
+    }
+}
 
 impl Into<u32> for ClassId {
     fn into(self) -> u32 {
@@ -328,7 +336,10 @@ impl<PS: ParseStrategy> Policy<PS> {
 
     /// If there is an fs_use statement for the given filesystem type, returns the associated
     /// [`SecurityContext`] and [`FsUseType`].
-    pub fn fs_use_label_and_type(&self, fs_type: NullessByteStr<'_>) -> Option<FsUseLabelAndType> {
+    pub fn fs_use_label_and_type(
+        &self,
+        fs_type: sc::NullessByteStr<'_>,
+    ) -> Option<FsUseLabelAndType> {
         self.0.fs_use_label_and_type(fs_type)
     }
 
@@ -336,8 +347,8 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// [`SecurityContext`].
     pub fn genfscon_label_for_fs_and_path(
         &self,
-        fs_type: NullessByteStr<'_>,
-        node_path: NullessByteStr<'_>,
+        fs_type: sc::NullessByteStr<'_>,
+        node_path: sc::NullessByteStr<'_>,
         class_id: Option<ClassId>,
     ) -> Option<SecurityContext> {
         self.0.genfscon_label_for_fs_and_path(fs_type, node_path, class_id)
@@ -352,7 +363,7 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// Returns a [`SecurityContext`] with fields parsed from the supplied Security Context string.
     pub fn parse_security_context(
         &self,
-        security_context: NullessByteStr<'_>,
+        security_context: sc::NullessByteStr<'_>,
     ) -> Result<security_context::SecurityContext, security_context::SecurityContextError> {
         security_context::SecurityContext::parse(&self.0, security_context)
     }
@@ -378,9 +389,9 @@ impl<PS: ParseStrategy> Policy<PS> {
         &self,
         source: &SecurityContext,
         target: &SecurityContext,
-        class: &FsNodeClass,
+        class: impl Into<sc::FsNodeClass>,
     ) -> SecurityContext {
-        self.0.new_file_security_context(source, target, class)
+        self.0.new_file_security_context(source, target, class.into())
     }
 
     /// Returns the security context that should be applied to a newly created file-like SELinux
@@ -392,10 +403,10 @@ impl<PS: ParseStrategy> Policy<PS> {
         &self,
         source: &SecurityContext,
         target: &SecurityContext,
-        class: &FsNodeClass,
-        name: NullessByteStr<'_>,
+        class: impl Into<sc::FsNodeClass>,
+        name: sc::NullessByteStr<'_>,
     ) -> Option<SecurityContext> {
-        self.0.new_file_security_context_by_name(source, target, class, name)
+        self.0.new_file_security_context_by_name(source, target, class.into(), name)
     }
 
     /// Returns the security context that should be applied to a newly created SELinux
@@ -410,12 +421,12 @@ impl<PS: ParseStrategy> Policy<PS> {
         &self,
         source: &SecurityContext,
         target: &SecurityContext,
-        class: &KernelClass,
+        class: impl Into<sc::ObjectClass>,
     ) -> SecurityContext {
         self.0.new_security_context(
             source,
             target,
-            class,
+            class.into(),
             source.role(),
             source.type_(),
             source.low_level(),
@@ -442,9 +453,9 @@ impl<PS: ParseStrategy> Policy<PS> {
         &self,
         source_context: &SecurityContext,
         target_context: &SecurityContext,
-        object_class: &sc::KernelClass,
+        object_class: impl Into<sc::ObjectClass>,
     ) -> AccessDecision {
-        if let Some(target_class) = self.0.class(&object_class) {
+        if let Some(target_class) = self.0.class(object_class.into()) {
             self.0.parsed_policy().compute_access_decision(
                 source_context,
                 target_context,
@@ -455,25 +466,6 @@ impl<PS: ParseStrategy> Policy<PS> {
         }
     }
 
-    /// Computes the access vector that associates type `source_type_name` and
-    /// `target_type_name` via an explicit `allow [...];` statement in the
-    /// binary policy, subject to any matching constraint statements. Computes
-    /// `AccessVector::NONE` if no such statement exists. This is the "custom"
-    /// form of this API because `target_class_name` is associated with a
-    /// [`crate::ObjectClass::Custom`] value.
-    pub fn compute_access_decision_custom(
-        &self,
-        source_context: &SecurityContext,
-        target_context: &SecurityContext,
-        target_class_name: &str,
-    ) -> AccessDecision {
-        self.0.parsed_policy().compute_access_decision_custom(
-            source_context,
-            target_context,
-            target_class_name,
-        )
-    }
-
     /// Computes the ioctl extended permissions that should be allowed, audited when allowed, and
     /// audited when denied, for a given source context, target context, target class, and ioctl
     /// prefix byte.
@@ -481,10 +473,10 @@ impl<PS: ParseStrategy> Policy<PS> {
         &self,
         source_context: &SecurityContext,
         target_context: &SecurityContext,
-        object_class: &sc::KernelClass,
+        object_class: impl Into<sc::ObjectClass>,
         ioctl_prefix: u8,
     ) -> IoctlAccessDecision {
-        if let Some(target_class) = self.0.class(&object_class) {
+        if let Some(target_class) = self.0.class(object_class.into()) {
             self.0.parsed_policy().compute_ioctl_access_decision(
                 source_context,
                 target_context,
@@ -494,25 +486,6 @@ impl<PS: ParseStrategy> Policy<PS> {
         } else {
             IoctlAccessDecision::DENY_ALL
         }
-    }
-
-    /// Computes the ioctl extended permissions that should be allowed, audited when allowed, and
-    /// audited when denied, for a given source context, target context, target_class, and ioctl
-    /// prefix byte. This is the "custom" form of this API because `target_class_name` is associated
-    /// with a [`crate::ObjectClass::Custom`] value.
-    pub fn compute_ioctl_access_decision_custom(
-        &self,
-        source_context: &SecurityContext,
-        target_context: &SecurityContext,
-        target_class_name: &str,
-        ioctl_prefix: u8,
-    ) -> IoctlAccessDecision {
-        self.0.parsed_policy().compute_ioctl_access_decision_custom(
-            source_context,
-            target_context,
-            target_class_name,
-            ioctl_prefix,
-        )
     }
 
     pub fn is_bounded_by(&self, bounded_type: TypeId, parent_type: TypeId) -> bool {
@@ -954,10 +927,7 @@ pub(super) mod tests {
 
     use crate::policy::metadata::HandleUnknown;
     use crate::policy::{parse_policy_by_reference, parse_policy_by_value, SecurityContext};
-    use crate::{
-        ClassPermission as _, FileClass, InitialSid, KernelClass, KernelPermission,
-        ProcessPermission,
-    };
+    use crate::{FileClass, InitialSid, KernelClass};
 
     use serde::Deserialize;
     use std::ops::Shl;
@@ -968,50 +938,32 @@ pub(super) mod tests {
     /// # Panics
     /// If supplied with type Ids not previously obtained from the `Policy` itself; validation
     /// ensures that all such Ids have corresponding definitions.
+    /// If either of `target_class` or `permission` cannot be resolved in the policy.
     fn is_explicitly_allowed<PS: ParseStrategy>(
         policy: &Policy<PS>,
         source_type: TypeId,
         target_type: TypeId,
-        permission: sc::KernelPermission,
-    ) -> Result<bool, &'static str> {
-        let object_class = permission.class();
-        let target_class = policy.0.class(&object_class).ok_or("class lookup failed")?;
-        let permission = policy.0.permission(&permission).ok_or("permission lookup failed")?;
-        let access_decision = policy.0.parsed_policy().compute_explicitly_allowed(
-            source_type,
-            target_type,
-            target_class,
-        );
-        let permission_bit = AccessVector::from_class_permission_id(permission.id());
-        Ok(permission_bit == access_decision.allow & permission_bit)
-    }
-
-    /// Returns whether the input types are explicitly granted `permission` via an `allow [...];`
-    /// policy statement, when the target class and permission name are specified as strings.
-    ///
-    /// # Panics
-    /// If supplied with type Ids not previously obtained from the `Policy` itself; validation
-    /// ensures that all such Ids have corresponding definitions.
-    fn is_explicitly_allowed_custom<PS: ParseStrategy>(
-        policy: &Policy<PS>,
-        source_type: TypeId,
-        target_type: TypeId,
-        target_class_name: &str,
-        permission_name: &str,
-    ) -> Result<bool, &'static str> {
-        let (permission_id, _) = policy
-            .find_class_permissions_by_name(target_class_name)
-            .or(Err("class name lookup failed"))?
-            .into_iter()
-            .find(|(_, name)| name == permission_name.as_bytes())
-            .ok_or("permission name lookup failed")?;
-        let access_decision = policy.0.parsed_policy().compute_explicitly_allowed_custom(
-            source_type,
-            target_type,
-            target_class_name,
-        );
-        let permission_bit = AccessVector::from_class_permission_id(permission_id);
-        Ok(permission_bit == access_decision.allow & permission_bit)
+        target_class: &str,
+        permission: &str,
+    ) -> bool {
+        let class = policy
+            .0
+            .parsed_policy()
+            .classes()
+            .iter()
+            .find(|class| class.name_bytes() == target_class.as_bytes())
+            .expect("class not found");
+        let class_permissions = policy
+            .find_class_permissions_by_name(target_class)
+            .expect("class permissions not found");
+        let (permission_id, _) = class_permissions
+            .iter()
+            .find(|(_, name)| permission.as_bytes() == name)
+            .expect("permission not found");
+        let permission_bit = AccessVector::from_class_permission_id(*permission_id);
+        let access_decision =
+            policy.0.parsed_policy().compute_explicitly_allowed(source_type, target_type, class);
+        permission_bit == access_decision.allow & permission_bit
     }
 
     #[derive(Debug, Deserialize)]
@@ -1110,13 +1062,7 @@ pub(super) mod tests {
 
         let unconfined_t = policy.type_id_by_name("unconfined_t").expect("look up type id");
 
-        assert!(is_explicitly_allowed(
-            &policy,
-            unconfined_t,
-            unconfined_t,
-            KernelPermission::Process(ProcessPermission::Fork),
-        )
-        .expect("check for `allow unconfined_t unconfined_t:process fork;"));
+        assert!(is_explicitly_allowed(&policy, unconfined_t, unconfined_t, "process", "fork",));
     }
 
     #[test]
@@ -1146,8 +1092,7 @@ pub(super) mod tests {
         let a_t = policy.type_id_by_name("a_t").expect("look up type id");
         let b_t = policy.type_id_by_name("b_t").expect("look up type id");
 
-        assert!(is_explicitly_allowed_custom(&policy, a_t, b_t, "class0", "perm0")
-            .expect("query well-formed"));
+        assert!(is_explicitly_allowed(&policy, a_t, b_t, "class0", "perm0"));
     }
 
     #[test]
@@ -1162,8 +1107,7 @@ pub(super) mod tests {
         let a_t = policy.type_id_by_name("a_t").expect("look up type id");
         let b_t = policy.type_id_by_name("b_t").expect("look up type id");
 
-        assert!(!is_explicitly_allowed_custom(&policy, a_t, b_t, "class0", "perm0")
-            .expect("query well-formed"));
+        assert!(!is_explicitly_allowed(&policy, a_t, b_t, "class0", "perm0"));
     }
 
     #[test]
@@ -1178,8 +1122,7 @@ pub(super) mod tests {
         let a_t = policy.type_id_by_name("a_t").expect("look up type id");
         let b_t = policy.type_id_by_name("b_t").expect("look up type id");
 
-        assert!(is_explicitly_allowed_custom(&policy, a_t, b_t, "class0", "perm0")
-            .expect("query well-formed"));
+        assert!(is_explicitly_allowed(&policy, a_t, b_t, "class0", "perm0"));
     }
 
     #[test]
@@ -1195,8 +1138,7 @@ pub(super) mod tests {
         let a_t = policy.type_id_by_name("a_t").expect("look up type id");
         let b_t = policy.type_id_by_name("b_t").expect("look up type id");
 
-        assert!(!is_explicitly_allowed_custom(&policy, a_t, b_t, "class0", "perm0")
-            .expect("query well-formed"));
+        assert!(!is_explicitly_allowed(&policy, a_t, b_t, "class0", "perm0"));
     }
 
     #[test]
@@ -1212,8 +1154,7 @@ pub(super) mod tests {
         let a_t = policy.type_id_by_name("a_t").expect("look up type id");
         let b_t = policy.type_id_by_name("b_t").expect("look up type id");
 
-        assert!(is_explicitly_allowed_custom(&policy, a_t, b_t, "class0", "perm0")
-            .expect("query well-formed"));
+        assert!(is_explicitly_allowed(&policy, a_t, b_t, "class0", "perm0"));
     }
 
     #[test]
@@ -1229,8 +1170,7 @@ pub(super) mod tests {
         let a_t = policy.type_id_by_name("a_t").expect("look up type id");
         let b_t = policy.type_id_by_name("b_t").expect("look up type id");
 
-        assert!(!is_explicitly_allowed_custom(&policy, a_t, b_t, "class0", "perm0")
-            .expect("query well-formed"));
+        assert!(!is_explicitly_allowed(&policy, a_t, b_t, "class0", "perm0"));
     }
 
     #[test]
@@ -1243,8 +1183,15 @@ pub(super) mod tests {
 
         let a_t = policy.type_id_by_name("a_t").expect("look up type id");
 
+        let class = policy
+            .0
+            .parsed_policy()
+            .classes()
+            .iter()
+            .find(|class| class.name_bytes() == b"class0")
+            .expect("class not found");
         let raw_access_vector =
-            policy.0.parsed_policy().compute_explicitly_allowed_custom(a_t, a_t, "class0").allow.0;
+            policy.0.parsed_policy().compute_explicitly_allowed(a_t, a_t, class).allow.0;
 
         // Two separate attributes are each allowed one permission on `[attr] self:class0`. Both
         // attributes are associated with "a_t". No other `allow` statements appear in the policy
@@ -1270,7 +1217,7 @@ pub(super) mod tests {
         let decision_satisfied = policy.compute_access_decision(
             &source_context,
             &target_context_satisfied,
-            &KernelClass::File,
+            KernelClass::File,
         );
         // The class `file` has 4 permissions, 3 of which are explicitly
         // allowed for this target context. All of those permissions satisfy all
@@ -1283,85 +1230,11 @@ pub(super) mod tests {
         let decision_unsatisfied = policy.compute_access_decision(
             &source_context,
             &target_context_unsatisfied,
-            &KernelClass::File,
+            KernelClass::File,
         );
         // Two of the explicitly-allowed permissions fail to satisfy a matching
         // constraint. Only 1 is allowed in the final access decision.
         assert_eq!(decision_unsatisfied.allow, AccessVector(4));
-    }
-
-    #[test]
-    fn compute_access_decision_custom_with_mlsconstrain() {
-        let policy_bytes =
-            include_bytes!("../../testdata/micro_policies/allow_with_constraints_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
-            .expect("parse policy")
-            .validate()
-            .expect("validate policy");
-
-        let source_context: SecurityContext = policy
-            .parse_security_context(b"user0:object_r:type0:s0-s0".into())
-            .expect("create source security context");
-
-        let target_context_satisfied: SecurityContext = source_context.clone();
-        let decision_satisfied = policy.compute_access_decision_custom(
-            &source_context,
-            &target_context_satisfied,
-            "class_mlsconstrain",
-        );
-        // The class `class_mlsconstrain` has 3 permissions, 2 of which are explicitly
-        // allowed for this target context. Both of those permissions satisfy all
-        // matching constraints.
-        assert_eq!(decision_satisfied.allow, AccessVector(3));
-
-        let target_context_unsatisfied: SecurityContext = policy
-            .parse_security_context(b"user1:object_r:type0:s0:c0-s0:c0".into())
-            .expect("create target security context failing a constraint");
-        let decision_unsatisfied = policy.compute_access_decision_custom(
-            &source_context,
-            &target_context_unsatisfied,
-            "class_mlsconstrain",
-        );
-        // One of the explicitly-allowed permissions fails to satisfy a matching
-        // constraint.
-        assert_eq!(decision_unsatisfied.allow, AccessVector(2));
-    }
-
-    #[test]
-    fn compute_access_decision_custom_with_constrain() {
-        let policy_bytes =
-            include_bytes!("../../testdata/micro_policies/allow_with_constraints_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
-            .expect("parse policy")
-            .validate()
-            .expect("validate policy");
-
-        let source_context: SecurityContext = policy
-            .parse_security_context(b"user0:object_r:type0:s0-s0".into())
-            .expect("create source security context");
-
-        let target_context_satisfied: SecurityContext = source_context.clone();
-        let decision_satisfied = policy.compute_access_decision_custom(
-            &source_context,
-            &target_context_satisfied,
-            "class_mlsconstrain",
-        );
-        // The class `class_constrain` has 3 permissions, 2 of which are explicitly
-        // allowed for this target context. Both of those permissions satisfy all
-        // matching constraints.
-        assert_eq!(decision_satisfied.allow, AccessVector(3));
-
-        let target_context_unsatisfied: SecurityContext = policy
-            .parse_security_context(b"user1:object_r:type0:s0:c0-s0:c0".into())
-            .expect("create target security context failing a constraint");
-        let decision_unsatisfied = policy.compute_access_decision_custom(
-            &source_context,
-            &target_context_unsatisfied,
-            "class_constrain",
-        );
-        // One of the explicitly-allowed permissions fails to satisfy a matching
-        // constraint.
-        assert_eq!(decision_unsatisfied.allow, AccessVector(2));
     }
 
     #[test]
@@ -1397,7 +1270,7 @@ pub(super) mod tests {
         let decision_single = policy.compute_ioctl_access_decision(
             &source_context,
             &target_context_matched,
-            &KernelClass::File,
+            KernelClass::File,
             0xab,
         );
 
@@ -1415,7 +1288,7 @@ pub(super) mod tests {
         let decision_range = policy.compute_ioctl_access_decision(
             &source_context,
             &target_context_matched,
-            &KernelClass::File,
+            KernelClass::File,
             0x10,
         );
         let expected_decision_range = IoctlAccessDecision {
@@ -1448,42 +1321,11 @@ pub(super) mod tests {
             let decision = policy.compute_ioctl_access_decision(
                 &source_context,
                 &target_context_unmatched,
-                &KernelClass::File,
+                KernelClass::File,
                 prefix,
             );
             assert_eq!(decision, IoctlAccessDecision::ALLOW_ALL);
         }
-    }
-
-    #[test]
-    fn compute_ioctl_access_decision_custom() {
-        let policy_bytes = include_bytes!("../../testdata/micro_policies/allowxperm_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice())
-            .expect("parse policy")
-            .validate()
-            .expect("validate policy");
-
-        let source_context: SecurityContext = policy
-            .parse_security_context(b"user0:object_r:type0:s0-s0".into())
-            .expect("create source security context");
-
-        // xperm-related rules for `class_two_ioctls_same_range`:
-        //
-        // `allowxperm type0 self:class_two_ioctls_same_range ioctl { 0x1234 0x1256 };`
-        let target_context: SecurityContext = source_context.clone();
-        let decision = policy.compute_ioctl_access_decision_custom(
-            &source_context,
-            &target_context,
-            "class_two_ioctls_same_range",
-            0x12,
-        );
-
-        let expected_decision = IoctlAccessDecision {
-            allow: xperms_bitmap_from_elements(&[0x34, 0x56]),
-            auditallow: XpermsBitmap::NONE,
-            auditdeny: XpermsBitmap::ALL,
-        };
-        assert_eq!(decision, expected_decision);
     }
 
     #[test]
@@ -1501,7 +1343,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_file_security_context(&source, &target, &FileClass::File.into());
+        let actual = policy.new_file_security_context(&source, &target, FileClass::File);
         let expected: SecurityContext = policy
             .parse_security_context(b"source_u:object_r:target_t:s0:c0".into())
             .expect("valid expected security context");
@@ -1524,7 +1366,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_security_context(&source, &target, &KernelClass::Process);
+        let actual = policy.new_security_context(&source, &target, KernelClass::Process);
 
         assert_eq!(source, actual);
     }
@@ -1544,7 +1386,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c0-s1:c0.c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_file_security_context(&source, &target, &FileClass::File.into());
+        let actual = policy.new_file_security_context(&source, &target, FileClass::File);
         let expected: SecurityContext = policy
             .parse_security_context(b"target_u:source_r:source_t:s1:c0-s1:c0.c1".into())
             .expect("valid expected security context");
@@ -1567,7 +1409,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c0-s1:c0.c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_security_context(&source, &target, &KernelClass::Process);
+        let actual = policy.new_security_context(&source, &target, KernelClass::Process);
         let expected: SecurityContext = policy
             .parse_security_context(b"target_u:source_r:source_t:s1:c0-s1:c0.c1".into())
             .expect("valid expected security context");
@@ -1590,7 +1432,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_file_security_context(&source, &target, &FileClass::File.into());
+        let actual = policy.new_file_security_context(&source, &target, FileClass::File);
         let expected: SecurityContext = policy
             .parse_security_context(b"source_u:transition_r:target_t:s0:c0".into())
             .expect("valid expected security context");
@@ -1613,7 +1455,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_security_context(&source, &target, &KernelClass::Process);
+        let actual = policy.new_security_context(&source, &target, KernelClass::Process);
         let expected: SecurityContext = policy
             .parse_security_context(b"source_u:transition_r:source_t:s0:c0-s2:c0.c1".into())
             .expect("valid expected security context");
@@ -1639,7 +1481,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_file_security_context(&source, &target, &FileClass::File.into());
+        let actual = policy.new_file_security_context(&source, &target, FileClass::File);
 
         // TODO(http://b/334968228): Update expectation once role validation is implemented.
         assert!(policy.validate_security_context(&actual).is_err());
@@ -1660,7 +1502,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_file_security_context(&source, &target, &FileClass::File.into());
+        let actual = policy.new_file_security_context(&source, &target, FileClass::File);
         let expected: SecurityContext = policy
             .parse_security_context(b"source_u:object_r:transition_t:s0:c0".into())
             .expect("valid expected security context");
@@ -1683,7 +1525,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_security_context(&source, &target, &KernelClass::Process);
+        let actual = policy.new_security_context(&source, &target, KernelClass::Process);
         let expected: SecurityContext = policy
             .parse_security_context(b"source_u:source_r:transition_t:s0:c0-s2:c0.c1".into())
             .expect("valid expected security context");
@@ -1706,7 +1548,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_file_security_context(&source, &target, &FileClass::File.into());
+        let actual = policy.new_file_security_context(&source, &target, FileClass::File);
         let expected: SecurityContext = policy
             .parse_security_context(b"source_u:object_r:target_t:s1:c1-s2:c1.c2".into())
             .expect("valid expected security context");
@@ -1729,7 +1571,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_security_context(&source, &target, &KernelClass::Process);
+        let actual = policy.new_security_context(&source, &target, KernelClass::Process);
         let expected: SecurityContext = policy
             .parse_security_context(b"source_u:source_r:source_t:s1:c1-s2:c1.c2".into())
             .expect("valid expected security context");

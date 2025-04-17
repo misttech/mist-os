@@ -17,8 +17,8 @@ use crate::sid_table::SidTable;
 use crate::sync::Mutex;
 use crate::{
     ClassPermission, FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions,
-    FsNodeClass, InitialSid, KernelClass, KernelPermission, NullessByteStr, ObjectClass,
-    SeLinuxStatus, SeLinuxStatusPublisher, SecurityId,
+    FsNodeClass, InitialSid, KernelPermission, NullessByteStr, ObjectClass, SeLinuxStatus,
+    SeLinuxStatusPublisher, SecurityId,
 };
 
 use crate::FileSystemMountSids;
@@ -480,7 +480,7 @@ impl SecurityServer {
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: KernelClass,
+        target_class: impl Into<ObjectClass>,
     ) -> Result<SecurityId, anyhow::Error> {
         let mut locked_state = self.state.lock();
         let active_policy = locked_state.expect_active_policy_mut();
@@ -489,13 +489,15 @@ impl SecurityServer {
         let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
         let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
 
+        let security_context = active_policy.parsed.new_security_context(
+            source_context,
+            target_context,
+            target_class.into(),
+        );
+
         active_policy
             .sid_table
-            .security_context_to_sid(&active_policy.parsed.new_security_context(
-                source_context,
-                target_context,
-                &target_class,
-            ))
+            .security_context_to_sid(&security_context)
             .map_err(anyhow::Error::from)
             .context("computing new security context from policy")
     }
@@ -519,24 +521,20 @@ impl Query for SecurityServer {
         let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
         let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
 
-        match target_class {
-            ObjectClass::System(target_class) => {
-                let mut decision = active_policy.parsed.compute_access_decision(
-                    &source_context,
-                    &target_context,
-                    &target_class,
-                );
-                decision.todo_bug = active_policy.exceptions.lookup(
-                    source_context.type_(),
-                    target_context.type_(),
-                    target_class,
-                );
-                decision
-            }
-            ObjectClass::Custom(target_class) => active_policy
-                .parsed
-                .compute_access_decision_custom(&source_context, &target_context, &target_class),
+        let mut decision = active_policy.parsed.compute_access_decision(
+            &source_context,
+            &target_context,
+            target_class,
+        );
+        // TODO: Update the exceptions mechanism to support non-kernel classes.
+        if let ObjectClass::Kernel(kernel_class) = target_class {
+            decision.todo_bug = active_policy.exceptions.lookup(
+                source_context.type_(),
+                target_context.type_(),
+                kernel_class,
+            );
         }
+        decision
     }
 
     fn compute_new_fs_node_sid(
@@ -557,7 +555,7 @@ impl Query for SecurityServer {
         let new_file_context = active_policy.parsed.new_file_security_context(
             source_context,
             target_context,
-            &fs_node_class,
+            fs_node_class,
         );
 
         active_policy
@@ -585,7 +583,7 @@ impl Query for SecurityServer {
         let new_file_context = active_policy.parsed.new_file_security_context_by_name(
             source_context,
             target_context,
-            &fs_node_class,
+            fs_node_class,
             fs_node_name,
         )?;
 
@@ -610,24 +608,12 @@ impl Query for SecurityServer {
         let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
         let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
 
-        match target_class {
-            ObjectClass::System(target_class) => {
-                active_policy.parsed.compute_ioctl_access_decision(
-                    &source_context,
-                    &target_context,
-                    &target_class,
-                    ioctl_prefix,
-                )
-            }
-            ObjectClass::Custom(target_class) => {
-                active_policy.parsed.compute_ioctl_access_decision_custom(
-                    &source_context,
-                    &target_context,
-                    &target_class,
-                    ioctl_prefix,
-                )
-            }
-        }
+        active_policy.parsed.compute_ioctl_access_decision(
+            &source_context,
+            &target_context,
+            target_class,
+            ioctl_prefix,
+        )
     }
 }
 
@@ -670,7 +656,8 @@ mod tests {
     use super::*;
     use crate::permission_check::PermissionCheckResult;
     use crate::{
-        CommonFsNodePermission, DirPermission, FileClass, FilePermission, ProcessPermission,
+        CommonFsNodePermission, DirPermission, FileClass, FilePermission, KernelClass,
+        ProcessPermission,
     };
     use std::num::NonZeroU64;
 

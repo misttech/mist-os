@@ -15,6 +15,7 @@ mod sid_table;
 mod sync;
 
 use policy::arrays::FsUseType;
+use policy::ClassId;
 
 use std::num::NonZeroU32;
 
@@ -31,14 +32,26 @@ impl SecurityId {
     }
 }
 
-/// A class that may appear in SELinux policy or an access vector cache query.
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+/// Identifies a specific class by its policy-defined Id, or as a kernel object class enum Id.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum ObjectClass {
-    /// A well-known class used in the SELinux system, such as `process` or `file`.
-    System(KernelClass),
-    /// A custom class that only has meaning in policies that define class with the given string
-    /// name.
-    Custom(String),
+    /// Refers to a well-known SELinux kernel object class (e.g. "process", "file", "capability").
+    Kernel(KernelClass),
+    /// Refers to a policy-defined class by its policy-defined numeric Id. This is most commonly
+    /// used when handling queries from userspace, which refer to classes by-Id.
+    ClassId(ClassId),
+}
+
+impl From<ClassId> for ObjectClass {
+    fn from(id: ClassId) -> Self {
+        Self::ClassId(id)
+    }
+}
+
+impl<T: Into<KernelClass>> From<T> for ObjectClass {
+    fn from(class: T) -> Self {
+        Self::Kernel(class.into())
+    }
 }
 
 /// Declares an `enum` and implements an `all_variants()` API for it.
@@ -208,18 +221,6 @@ impl KernelClass {
             Self::VSockSocket => "vsock_socket",
             // keep-sorted end
         }
-    }
-}
-
-impl From<KernelClass> for ObjectClass {
-    fn from(object_class: KernelClass) -> Self {
-        Self::System(object_class)
-    }
-}
-
-impl From<String> for ObjectClass {
-    fn from(name: String) -> Self {
-        Self::Custom(name)
     }
 }
 
@@ -1470,13 +1471,14 @@ mod tests {
 
     #[test]
     fn object_class_permissions() {
-        assert_eq!(ObjectClass::Custom(String::from("my_class")), String::from("my_class").into());
+        let test_class_id = ClassId::new(NonZeroU32::new(20).unwrap());
+        assert_eq!(ObjectClass::ClassId(test_class_id), test_class_id.into());
         for variant in ProcessPermission::all_variants().into_iter() {
             assert_eq!(KernelClass::Process, variant.class());
             assert_eq!("process", variant.class().name());
             let permission: KernelPermission = variant.clone().into();
             assert_eq!(KernelPermission::Process(variant.clone()), permission);
-            assert_eq!(ObjectClass::System(KernelClass::Process), variant.class().into());
+            assert_eq!(ObjectClass::Kernel(KernelClass::Process), variant.class().into());
         }
     }
 
