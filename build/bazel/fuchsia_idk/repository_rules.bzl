@@ -71,10 +71,6 @@ def _fuchsia_idk_repository(repo_ctx):
 
     repo_ctx.file("WORKSPACE.bazel", "workspace(name = \"{name}\")\n".format(name = repo_ctx.name))
     repo_ctx.file("MODULE.bazel", "module(name = \"{name}\", version = \"1\")\n".format(name = repo_ctx.name))
-    repo_ctx.symlink(
-        "%s/build/bazel/fuchsia_idk/generate_final_idk.bzl" % repo_ctx.workspace_root,
-        "generate_final_idk.bzl",
-    )
 
     #repo_ctx.symlink(repo_ctx.path(Label("@//:build/bazel/fuchsia_idk/repository.BUILD.bazel")), "BUILD.bazel")
     repo_ctx.symlink(idk_export_dir_path, "ninja_idk_export_dir_symlink")

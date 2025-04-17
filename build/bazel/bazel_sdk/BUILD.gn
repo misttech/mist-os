@@ -75,25 +75,7 @@ run_fuchsia_bazel_sdk_tests("bazel_sdk_tests") {
   target_cpus = [ target_cpu ]
 }
 
-# Run the Bazel SDK test suite against the content of the Bazel
-# //build/bazel/bazel_sdk:final_fuchsia_in_tree_sdk target, which
-# is the SDK usable directly in external Bazel workspaces (unlike
-# the content of @fuchsia_sdk, see README.md in this directory for
-# more details). This is called as many times as the number of CPU
-# architectures supported by //sdk:bazel_in_tree_idk target.
-#
-# NOTE: This is not incrementally correct at the moment!!
-#
-run_fuchsia_bazel_sdk_tests("final_fuchsia_in_tree_sdk.validation") {
-  target_cpus = [ target_cpu ]
-  fuchsia_sdk_path = "$target_gen_dir/../fuchsia_sdk"
-  fuchsia_sdk_target = "//build/bazel:final_fuchsia_in_tree_sdk"
-}
-
 group("tests") {
   testonly = true
-  deps = [
-    ":bazel_sdk_tests",
-    ":final_fuchsia_in_tree_sdk.validation",
-  ]
+  deps = [ ":bazel_sdk_tests" ]
 }

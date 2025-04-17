@@ -176,61 +176,6 @@ that only prebuilts for the current `target_cpu` architecture and
 It is populated by parsing the content of the
 `@fuchsia_internal_only_idk` repository.
 
-### The final Fuchsia in-tree SDK
-
-Calling `fx build generate_fuchsia_sdk_repository` will create a symlink
-in `$(fx get-build-dir)/gen/build/bazel/fuchsia_sdk` pointing to a directory
-whose content can be used directly in any _external_ Bazel repository.
-
-This is useful for at least two use cases:
-
-- Running the Bazel SDK test suite, which has its own workspace under
-  `//build/bazel_sdk/tests`, which is critical to verify that all the
-  rules and target declarations provided work as expected.
-
-- Possibly developing drivers or other Fuchsia software in `fuchsia.git`
-  using the developer workflows provided by the Bazel SDK rules, which
-  differ considerably from what `fx` can support, while still being
-  able to access internal atoms at the `HEAD` API level, something that
-  is not possible using the Fuchsia Bazel SDK.
-
-In both cases, this means setting up a separate Bazel workspace, and
-using a directive such as:
-
-  ```
-  local_repository(
-      name = "fuchsia_sdk",
-      path = "/path/to/generated/fuchsia_sdk",
-  )
-  ```
-
-Or using a `--repository_override=fuchsia_sdk=/path/to/generated/fuchsia_sdk`
-option when invoking Bazel.
-
-The GN target actually builds the `//build/bazel/bazel_sdk:final_fuchsia_in_tree_sdk`
-target, then sets up the symlink in the Ninja output directory to point to its
-content directly.
-
-### The final Fuchsia in-tree IDK
-
-The bazel `@fuchsia_in_tree_idk//:final_idk` target builds a directory
-that contains an IDK export directory with the same atoms and binaries
-as `@fuchsia_in_tree_idk`, but following the official IDK layout.
-
-In other words, this undoes the work performed by `fuchsia_idk_repository`
-by removing all Bazel target labels from metadata files. Fortunately, doing
-so is pretty simple.
-
-This is used as input for the target building the final Fuchsia
-in-tree SDK.
-
-Note that at the moment, its content should be identical to the
-Ninja-generated in-tree IDK, but this will change in the future:
-IDK atom definitions will be gradually moved from the GN graph to the
-Bazel one. At the end of this migration, the `fuchsia_idk_repository()` rule
-will disappear entirely. However, the in-tree IDK will still be needed to
-generate the final Fuchsia in-tree SDK.
-
 # Existing dependencies
 
 The following diagram illustrates the dependencies between the items
@@ -257,18 +202,6 @@ GN Build Graph                                       |  Bazel Workspace
     //sdk:bazel_in_tree_idk                          |
                     |                                |
                     `----------[fuchsia_idk_repository()]-----> @fuchsia_in_tree_idk ---[fuchsia_sdk_repository()]---> @fuchsia_sdk
-                                                     |                   |
-                                                     |                   |
-                                                     |            [[final_idk()]]
-                                                     |                   |
-                                                     |                   v
-                                                     |    @fuchsia_in_tree_idk//:final_idk
-                                                     |                   |
-                                                     |                   |
-                                                     |      [[fuchsia_sdk_repository()]]
-  //build/bazel:generate_fuchsia_sdk_repository      |                   |
-          |                                          |                   v
-          `------------------symlink---------------------> //build/bazel/bazel_sdk:final_fuchsia_in_tree_sdk
                                                      |
                                                      |
   Bazel In-Tree Internal IDK                         |

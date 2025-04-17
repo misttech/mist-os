@@ -163,8 +163,7 @@ declare_args() {
 #     the timestamp in the Bazel output base, which the symlink point to, are never
 #     guaranteed to be consistent.
 #
-#     This is useful to use the symlinks after the build complete. For an
-#     example, see //build/bazel:generate_final_fuchsia_in_tree_idk
+#     This is useful to use the symlinks after the build complete.
 #
 #     NOTE: This feature is a special case and is not available to wrappers
 #     like `bazel_build_action()` intentionally, in order to limit its usage.

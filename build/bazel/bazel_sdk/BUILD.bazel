@@ -49,14 +49,6 @@ py_binary(
     main = "compare_bazel_sdks.py",
 )
 
-# An alias to @fuchsia_idk//:final_idk because the GN bazel_action()
-# template does not support listing targets that belong to repository
-# rules in its `bazel_targets` argument.
-alias(
-    name = "final_fuchsia_in_tree_idk",
-    actual = "@fuchsia_in_tree_idk//:final_idk",
-)
-
 generate_bazel_sdk(
     name = "bazel_in_tree_sdk",
     idk_export_dir = "@gn_targets//sdk:bazel_in_tree_idk",
@@ -84,33 +76,5 @@ genrule(
 compare_bazel_sdk_contents(
     name = "verify_fuchsia_sdk_repository",
     first_sdk = "@fuchsia_sdk//:WORKSPACE.bazel",
-    second_sdk = ":bazel_in_tree_sdk",
-)
-
-# Generate the final Fuchsia Bazel SDK from the final Fuchsia platform IDK.
-#
-# This contains the same SDK atoms as the platform build's @fuchsia_sdk repository,
-# but does not include references to @fuchsia_platform_idk, and is directly usable
-# in out-of-tree workspaces, e.g. with a project WORKSPACE directive such as:
-#
-# ```
-# local_repository(
-#    name = "fuchsia_sdk",
-#    path = "/path/to/final_fuchsia_sdk",
-# )
-# ```
-#
-generate_bazel_sdk(
-    name = "final_fuchsia_in_tree_sdk",
-    idk_export_label = "@fuchsia_in_tree_idk//:final_idk",
-)
-
-# Compare the content of :final_fuchsia_in_tree_sdk with the one generated
-# by parsing the Ninja-generated in-tree IDK. Success means that
-# the Ninja IDK -> @fuchsia_in_tree_idk -> final_fuchsia_in_tree_idk -> final_fuchsia_in_tree_sdk
-# transformations are correct.
-compare_bazel_sdk_contents(
-    name = "verify_final_fuchsia_in_tree_sdk",
-    first_sdk = ":final_fuchsia_in_tree_sdk",
     second_sdk = ":bazel_in_tree_sdk",
 )

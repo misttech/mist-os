@@ -31,18 +31,22 @@ group("generate_main_workspace") {
   deps += [ "//sdk:bazel_internal_only_idk" ]
 }
 
-# Generate a symlink to the @fuchsia_sdk repository, after ensuring it was
-# properly populated by Bazel. The symlink has a stable path of
-# $BAZEL_TOPDIR/fuchsia_sdk while the actual location of the repository
-# depends on Bazel internals (e.g. whether BzlMod is enabled or not).
-# TODO(https://fxbug.dev/406603905): Migrate to "//sdk:fuchsia_sdk_head_only".
+# Generates an SDK that only supports targeting `HEAD` for the default
+# `target_cpu` in `$BUILD_DIR/obj/sdk/final_fuchsia_sdk_head_only/`.
+# This is provided for compatibility with existing documentation. The
+# documentation may assume a different output directory than the dependency
+# produces and should thus be updated to reference that dependency and its
+# output directory directly.
 group("generate_fuchsia_sdk_repository") {
-  deps = [
-    ":final_fuchsia_in_tree_sdk",
+  # There should be no internal dependencies on this target.
+  visibility = [
+    "//:root_targets",
 
-    # Generates an SDK in `$BUILD_DIR/obj/sdk/final_fuchsia_sdk_head_only/`.
-    "//sdk:final_fuchsia_sdk_head_only",
+    # TODO(https://fxbug.dev/406603905): Remove after updating dependencies.
+    "//vendor/*",
   ]
+
+  deps = [ "//sdk:final_fuchsia_sdk_head_only" ]
 }
 
 # LINT.IfChange
@@ -57,62 +61,6 @@ generate_content_hash_file("fuchsia_internal_only_idk.hash") {
 }
 
 # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
-
-# Generate a symlink that points to the final version of the in-tree IDK
-# Nothing should depend on this directly, as it should only be used
-# to run the Bazel SDK Test suite, see //build/bazel_sdk/tests/README.md
-bazel_action("final_fuchsia_in_tree_idk") {
-  command = "build"
-
-  # NOTE: The list item below should be @fuchsia_in_tree_idk//:final_idk
-  # but bazel_action() does not support Bazel target labels that belong
-  # to an external repository. To work around this, an alias() target
-  # is created in //build/bazel/bazel_sdk:BUILD.bazel, and the
-  # `bazel` path in the scope below is explicit instead of using
-  # substitution expressions such as {{BAZEL_TARGET_OUT_DIR}}.
-  bazel_targets = [ "//build/bazel/bazel_sdk:final_fuchsia_in_tree_idk" ]
-  deps = [ "//build/bazel/bazel_sdk:bazel_in_tree_idk.bazel_input" ]
-
-  # We want the symlink to appear as gen/build/bazel/fuchsia_in_idk
-  ninja_base_dir = target_gen_dir
-
-  final_symlink_outputs = [
-    {
-      bazel = "bazel-bin/external/fuchsia_in_tree_idk/final_idk"
-      ninja = "fuchsia_in_tree_idk"
-    },
-  ]
-}
-
-# Generate a symlink that points to the final version of the Bazel SDK
-# used by the platform build.
-bazel_action("final_fuchsia_in_tree_sdk") {
-  command = "build"
-  bazel_targets = [
-    "//build/bazel/bazel_sdk:final_fuchsia_in_tree_sdk",
-    "//build/bazel/bazel_sdk:verify_final_fuchsia_in_tree_sdk",
-  ]
-  deps = [ "//build/bazel/bazel_sdk:bazel_in_tree_idk.bazel_input" ]
-
-  # We want the symlink to appear as $BUILD_DIR/gen/build/bazel/fuchsia_sdk
-  ninja_base_dir = target_gen_dir
-
-  final_symlink_outputs = [
-    {
-      bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}"
-      ninja = "fuchsia_sdk"
-    },
-  ]
-
-  metadata = {
-    # Used by the //:bazel_sdk_info build API module target.
-    bazel_sdk_info = [
-      {
-        location = rebase_path("$target_gen_dir/fuchsia_sdk", root_build_dir)
-      },
-    ]
-  }
-}
 
 # Write the content of bazel_content_hash_definitions to a JSON file
 # at `gn gen` time.
@@ -192,8 +140,6 @@ group("bazel_action_allowlist") {
 
   # Bazel build related targets
   visibility += [
-    "//build/bazel:final_fuchsia_in_tree_idk",
-    "//build/bazel:final_fuchsia_in_tree_sdk",
     "//build/bazel/assembly:verify_assembly_configs.bazel_build_group",
     "//build/bazel/bazel_sdk:in_tree_fuchsia_sdk",
     "//build/bazel/bazel_sdk:verify_fuchsia_sdk_repository",

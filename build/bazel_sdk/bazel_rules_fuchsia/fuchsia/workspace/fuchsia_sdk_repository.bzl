@@ -11,19 +11,18 @@ load(
     "resolve_repository_labels",
 )
 
-# Environment variable used to set a local Fuchsia Platform tree build output
-# directory. If this variable is set, it should point to
+# Environment variable used to set a local Fuchsia SDK directory. If this
+#  variable is set, it should point to
+# <FUCHSIA_DIR>/out/<BUILD_DIR> where "fuchsia_sdk" is built.
+
+_LOCAL_FUCHSIA_SDK_DIRECTORY = "LOCAL_FUCHSIA_SDK_DIRECTORY"
+
+# Environment variable used to set a local Fuchsia IDK output directory. If this
+# variable is set, it should point to the root of a Fuchsia IDK
 # <FUCHSIA_DIR>/out/<BUILD_DIR> where "fuchsia_sdk" is built. In particular we
 # will look for
 #
-#     <LOCAL_FUCHSIA_PLATFORM_BUILD>/gen/build/bazel/fuchsia_sdk
-#
-# This can be produced with a 'fx build generate_fuchsia_sdk_repository' command
-# in a Fuchsia Platform tree.
-
-_LOCAL_FUCHSIA_PLATFORM_BUILD = "LOCAL_FUCHSIA_PLATFORM_BUILD"
-_LOCAL_BUILD_SDK_PATH = "gen/build/bazel/fuchsia_sdk"
-
+#     <LOCAL_FUCHSIA_IDK_DIRECTORY>/"meta/manifest.json"
 _LOCAL_FUCHSIA_IDK_DIRECTORY = "LOCAL_FUCHSIA_IDK_DIRECTORY"
 
 def _instantiate_local_path(ctx, manifests):
@@ -39,7 +38,7 @@ def _instantiate_local_path(ctx, manifests):
             ctx.report_progress("Copying local SDK from %s" % local_sdk_path)
             local_sdk = ctx.path(local_sdk_path)
         if not local_sdk.exists:
-            fail("Cannot find SDK in local Fuchsia build: %s\n\nPlease build it with\n\n\t\t'fx build generate_fuchsia_sdk_repository'" % local_sdk)
+            fail("Cannot find SDK in local directory: %s\n\nPlease build it with\n\n\t\t'fx build //sdk:final_fuchsia_sdk' or similar." % local_sdk)
 
         manifests.append({"root": "%s/." % local_sdk, "manifest": "meta/manifest.json"})
 
@@ -48,15 +47,14 @@ def _instantiate_local_path(ctx, manifests):
         ctx.path(ctx.attr.local_sdk_version_file)
 
 def _instantiate_local_env(ctx):
-    # Copies the fuchsia_sdk from a local Fuchsia platform build.
-    local_fuchsia_dir = ctx.os.environ.get(_LOCAL_FUCHSIA_PLATFORM_BUILD)
+    local_fuchsia_sdk = ctx.os.environ.get(_LOCAL_FUCHSIA_SDK_DIRECTORY)
 
     # buildifier: disable=print
-    print("WARNING: using local SDK from %s" % local_fuchsia_dir)
-    local_sdk = ctx.path("%s/%s" % (local_fuchsia_dir, _LOCAL_BUILD_SDK_PATH))
-    ctx.report_progress("Copying local fuchsia_sdk from %s" % local_fuchsia_dir)
+    print("WARNING: using local SDK from %s" % local_fuchsia_sdk)
+    local_sdk = ctx.path(local_fuchsia_sdk)
+    ctx.report_progress("Copying local fuchsia_sdk from %s" % local_sdk)
     if not local_sdk.exists:
-        fail("Cannot find SDK in local Fuchsia build.Please build it with\n\n\t\t'fx build generate_fuchsia_sdk_repository'\n\nor unset variable %s: %s" % (_LOCAL_FUCHSIA_PLATFORM_BUILD, local_fuchsia_dir))
+        fail("Cannot find SDK in local directory: %s\n\nPlease build it with\n\n\t\t'fx build //sdk:final_fuchsia_sdk' or similar or unset variable '%s'." % (local_sdk, _LOCAL_FUCHSIA_SDK_DIRECTORY))
     ctx.symlink(local_sdk, ".")
 
 def _instantiate_local_idk(ctx, manifests):
@@ -140,7 +138,7 @@ def _get_starlark_runtime_for(ctx, copy_content_strategy):
     )
 
 def _fuchsia_sdk_repository_impl(ctx):
-    if _LOCAL_FUCHSIA_PLATFORM_BUILD in ctx.os.environ:
+    if _LOCAL_FUCHSIA_SDK_DIRECTORY in ctx.os.environ:
         copy_content_strategy = "copy"
         _instantiate_local_env(ctx)
         return
@@ -169,7 +167,7 @@ fuchsia_sdk_repository = repository_rule(
 Loads a particular version of the Fuchsia IDK.
 """,
     implementation = _fuchsia_sdk_repository_impl,
-    environ = [_LOCAL_FUCHSIA_PLATFORM_BUILD],
+    environ = [_LOCAL_FUCHSIA_SDK_DIRECTORY],
     configure = True,
     attrs = {
         "parent_sdk": attr.label(

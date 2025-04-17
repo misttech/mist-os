@@ -16,10 +16,6 @@ The test suite can be run against three types of inputs:
   Fuchsia build, are validated before uploading them to cloud
   storage.
 
-  This can also be used to run the test suite against the
-  final Fuchsia in-tree SDK, as defined in
-  `//build/bazel/bazel_sdk/README.md`.
-
 - The content of the `@fuchsia_sdk` repository in the Fuchsia
   in-tree platform build, which itself depends on the content
   of the `@fuchsia_in_tree_idk` repository.
@@ -39,13 +35,6 @@ The simplest way to run the test suite is to use the following
 
   Note that no tests are ever run against the `@sdk_internal`
   repository of the in-tree Bazel workspace.
-
-- `fx build //build/bazel/bazel_sdk:final_fuchsia_sdk.validation`
-
-  Build the final Fuchsia in-tree SDK, which mirrors the content
-  of `@fuchsia_sdk` in a directly usable form, then run the test
-  suiteagainst it. In terms of test and feature coverage, this should
-  be equivalent to building `bazel_sdk_tests`.
 
 - `fx build //sdk:final_fuchsia_idk.validation`:
 
@@ -102,33 +91,19 @@ scripts/bazel_test.py \
     --test_target=:build_only_tests -- --test_output=streamed
 ```
 
-Alternatively, run it against the final Fuchsia in-tree IDK,
-which is only useful for Fuchsia build developers:
-
-```
-# Prepare the final Fuchsia in-tree IDK
-fx build //build/bazel:final_fuchsia_in_tree_idk
-LOCAL_IDK="$(fx get-build-dir)/gen/build/bazel/fuchsia_in_tree_idk"
-
-# Run the full test suite
-scripts/bazel_test.py \
-    --fuchsia_idk_directory="${LOCAL_IDK}" \
-    --target_cpu=x64
-
-```
-
 ### Running against a local Bazel SDK directory (not `@fuchsia_sdk`):
 
+Run against a minimal Fuchsia Bazel SDK:
 ```
 # Generate the final Fuchsia in-tree SDK
-fx build generate_fuchsia_sdk_repository
-LOCAL_SDK="$(fx get-build-dir)/gen/build/bazel/fuchsia_sdk"
+fx build //sdk:final_fuchsia_sdk_head_only
+LOCAL_SDK="$(fx get-build-dir)/obj/sdk/final_fuchsia_sdk_head_only"
 
 # Run the full test suite
 scripts/bazel_test.py --fuchsia_sdk_directory="${LOCAL_SDK}"
 ```
 
-Alternatively, run it against the Fuchsia Bazel SDK
+Alternatively, run against the full Fuchsia Bazel SDK:
 ```
 # Generate the Fuchsia Bazel SDK (beware: this takes > 20minutes)
 fx build //sdk:final_fuchsia_sdk
@@ -141,9 +116,7 @@ scripts/bazel_test.py --fuchsia_sdk_directory="${LOCAL_SDK}"
 ### Running against the in-tree `@fuchsia_sdk` repository:
 
 Note that this is only needed by Fuchsia developers modifying the Bazel rules
-or the content of the in-tree IDK/SDK. Testing against the final
-Fuchsia in-tree SDK, as described in the previous section, should be
-equivalent:
+or the content of the in-tree IDK/SDK.
 
 ```
 # Prepare the @fuchsia_sdk repository. Only needed once per `jiri update`
@@ -169,39 +142,12 @@ after some necessary preparation.
 ### Running against a local IDK:
 
 This requires setting the `LOCAL_FUCHSIA_IDK_DIRECTORY` environment
-variable when calling Bazel. For example, when using the final in-tree IDK:
-
-```sh
-fx build //build/bazel:final_fuchsia_in_tree_idk
-IDK="$(fx get-build-dir)/gen/build/bazel/fuchsia_in_tree_idk"
-LOCAL_FUCHSIA_IDK_DIRECTORY="${IDK}" bazel test --config=fuchsia_x64 :tests
-```
-
-Or for the Fuchsia IDK:
+variable when calling Bazel. For example, when using the Fuchsia IDK:
 
 ```
 fx build //sdk:final_fuchsia_idk.exported
 IDK="$(fx get-build-dir)/sdk/exported/final_fuchsia_idk
 LOCAL_FUCHSIA_IDK_DIRECTORY="${IDK}" bazel test --config=fuchsia_x64 :tests
-```
-
-### Running against the final Fuchsia in-tree SDK:
-
-This is the simplest and recommended way. It requires setting the
-`LOCAL_FUCHSIA_PLATFORM_BUILD` environment variable to your Fuchsia build
-directory as in:
-
-```sh
-# Preparation steps (only do this once)
-cd /work/fuchsia
-fx set minimal.x64
-
-# Do this after each `jiri update` or modifying the SDK
-fx build generate_fuchsia_sdk_repository
-
-# Run the test suite
-cd build/bazel_sdk/tests
-LOCAL_FUCHSIA_PLATFORM_BUILD=$(fx get-build-dir) bazel test --config=fuchsia_x64 :tests
 ```
 
 ### Running against the `@fuchsia_sdk` repository:

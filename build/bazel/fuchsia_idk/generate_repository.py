@@ -13,19 +13,6 @@ For now, these targets only map to filegroup() targets that wrap
 a symlink to the actual Ninja artifact. Later, these will point to
 actual Bazel actions to build the corresponding file on demand
 directly in the Bazel graph.
-
-Note that the top-level BUILD.bazel file in the repository will
-also include a Bazel target named "final_idk" which generates,
-at build time, an IDK export directory with the same content,
-but whose metadata files do not include any target labels.
-
-Such a repository can be distributed out-of-tree to third-party
-SDK produces, or to run the Fuchsia Bazel SDK test suite locally,
-but must be built explicitly before, e.g. with:
-
-```
-fx bazel build @fuchsia_idk//:final_idk
-```
 """
 
 import argparse
@@ -274,26 +261,6 @@ class OutputIdk(object):
             file_path = self._output_dir / file_relpath
             file_path.parent.mkdir(parents=True, exist_ok=True)
             file_path.write_text(content)
-
-        # Update the top-level BUILD.bazel file to generate
-        # a final IDK directory, if needed.
-        bazel_build_path = self._output_dir / "BUILD.bazel"
-        bazel_build = bazel_build_path.read_text()
-        bazel_build += """
-# buildifier: disable=load-on-top
-load(":generate_final_idk.bzl", "generate_final_idk")
-
-generate_final_idk(
-    name = "final_idk",
-    files_to_copy = {files_to_copy},
-    manifest = "meta/manifest.json",
-    meta_files_to_copy = {meta_files_to_copy},
-)
-""".format(
-            files_to_copy=_to_starlark_string_dict(self._final_files),
-            meta_files_to_copy=_to_starlark_string_dict(self._final_metas),
-        )
-        bazel_build_path.write_text(bazel_build)
 
 
 class PathRewriter(object):

@@ -104,10 +104,6 @@ template("generate_private_test_workspace") {
     ]
     outputs = [ depfile ]
 
-    deps = [ "//build/bazel:generate_fuchsia_sdk_repository(//build/toolchain/fuchsia:x64)" ]
-
-    #data_deps = [ "//build/bazel:generate_fuchsia_sdk_repository(//build/toolchain/fuchsia:x64)" ]
-
     args = [
       "--copy-list",
       rebase_path(copy_list_filename, root_build_dir),

@@ -317,8 +317,7 @@ fuchsia_internal_only_idk_hash_label = "//:fuchsia_build_generated/fuchsia_inter
 # LINT.ThenChange(BUILD.gn)
 
 # A repository that wraps //sdk:bazel_in_tree_idk in the Bazel graph.
-# This is used to populate the @fuchsia_sdk repository as well as
-# generate the @fuchsia_in_tree_idk:final_idk target.
+# This is used to populate the @fuchsia_sdk repository.
 fuchsia_idk_repository(
     name = "fuchsia_in_tree_idk",
     idk_export_dir = "%s/regenerator_outputs/bazel_in_tree_idk" % ninja_output_dir,

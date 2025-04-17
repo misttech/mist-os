@@ -708,6 +708,7 @@ def main() -> int:
     else:
         target_cpu = ""
         if check_fuchsia_build_dir():
+            assert fuchsia_build_dir
             args_json = fuchsia_build_dir / "args.json"
             if args_json.exists():
                 with open(args_json) as f:
@@ -823,6 +824,8 @@ def main() -> int:
     explicit_fuchsia_sdk = None
     explicit_fuchsia_in_tree_idk = None
     if input_mode == _INPUT_MODE_IN_TREE:
+        assert fuchsia_build_dir
+
         # The in-tree @fuchsia_sdk references labels in @fuchsia_in_tree_idk
         # so both need to be overridden.
         explicit_fuchsia_sdk = (
@@ -1031,12 +1034,12 @@ def main() -> int:
         ] = workspace_clang_version_file
 
     if input_mode == _INPUT_MODE_SDK:
-        # Pass the location of the Fuchsia build directory to the
+        # Pass the location of the Fuchsia SDK to the
         # @fuchsia_sdk repository rule. Note that using --action_env will
         # not work because this option only affects Bazel actions, and
         # not repository rules.
-        bazel_env["LOCAL_FUCHSIA_PLATFORM_BUILD"] = str(
-            fuchsia_build_dir.resolve()
+        bazel_env["LOCAL_FUCHSIA_SDK_DIRECTORY"] = str(
+            args.fuchsia_sdk_directory.resolve()
         )
     elif input_mode == _INPUT_MODE_IDK:
         # Pass the location of the Fuchsia IDK archive to the @fuchsia_sdk
