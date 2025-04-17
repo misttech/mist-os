@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// TODO(https://fxbug.dev/410430313): Figure out how to manage clippy configs for targets that are
+// building in both GN and Bazel.
+#![warn(clippy::all)]
+
 use fuchsia_async::TimeoutExt;
 use futures::future::BoxFuture;
 use futures::lock::Mutex;

@@ -1,0 +1,33 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
+load("//build/tools/bazel2gn/bazel_rules:defs.bzl", "rustc_binary", "sdk_host_tool")
+
+rustc_binary(
+    name = "fake-omaha-client",
+    srcs = [
+        "src/main.rs",
+    ],
+    edition = "2021",
+    target_compatible_with = HOST_CONSTRAINTS,
+    with_unit_tests = True,
+    deps = [
+        "//src/lib/fuchsia-async",
+        "//src/lib/fuchsia-hyper",
+        "//third_party/rust_crates/vendor:argh",
+        "//third_party/rust_crates/vendor:futures",
+        "//third_party/rust_crates/vendor:hyper",
+        "//third_party/rust_crates/vendor:hyper-rustls",
+        "//third_party/rust_crates/vendor:omaha_client",
+    ],
+)
+
+sdk_host_tool(
+    name = "bin_sdk",
+    category = "partner",
+    output_name = "fake-omaha-client",
+    target_compatible_with = HOST_CONSTRAINTS,
+    deps = [":fake-omaha-client"],
+)
