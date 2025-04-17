@@ -301,7 +301,7 @@ where
     }
 }
 
-pub fn recommended_watcher<F>(event_handler: F) -> Result<MdnsWatcher>
+pub fn recommended_watcher<F>(event_handler: F) -> MdnsWatcher
 where
     F: MdnsEventHandler,
 {
@@ -321,7 +321,7 @@ impl MdnsWatcher {
         discovery_interval: Duration,
         query_interval: Duration,
         ttl: u32,
-    ) -> Result<Self>
+    ) -> Self
     where
         F: MdnsEventHandler,
     {
@@ -347,7 +347,7 @@ impl MdnsWatcher {
 
         res.drain_task.replace(Task::local(handle_events_loop(receiver, events_out)));
 
-        Ok(res)
+        res
     }
 }
 

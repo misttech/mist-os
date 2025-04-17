@@ -326,16 +326,16 @@ where
     }
 }
 
-pub fn recommended_watcher<F>(event_handler: F) -> Result<FastbootUsbWatcher>
+pub fn recommended_watcher<F>(event_handler: F) -> FastbootUsbWatcher
 where
     F: FastbootEventHandler,
 {
-    Ok(FastbootUsbWatcher::new(
+    FastbootUsbWatcher::new(
         event_handler,
         find_serial_numbers,
         UnversionedFastbootUsbTester {},
         Duration::from_secs(1),
-    ))
+    )
 }
 
 impl FastbootUsbWatcher {

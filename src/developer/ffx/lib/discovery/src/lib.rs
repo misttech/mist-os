@@ -222,7 +222,7 @@ where
             if let Some(event) = event {
                 let _ = mdns_sender.unbounded_send(event);
             }
-        })?)
+        }))
     } else {
         None
     };
@@ -241,7 +241,7 @@ where
                 Err(e) => Err(anyhow!(e)),
             };
             let _ = fastboot_sender.unbounded_send(event);
-        })?)
+        }))
     } else {
         None
     };
@@ -260,7 +260,7 @@ where
                 Err(e) => Err(anyhow!(e)),
             };
             let _ = manual_targets_sender.unbounded_send(event);
-        })?)
+        }))
     } else {
         None
     };

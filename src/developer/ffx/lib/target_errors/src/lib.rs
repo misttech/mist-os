@@ -28,7 +28,7 @@ pub enum FfxTargetError {
     #[error("{}", match .err {
             DaemonError::Timeout => format!("Timeout attempting to reach target {}", target_string(.target)),
             DaemonError::TargetCacheEmpty => format!("No devices found."),
-            DaemonError::TargetAmbiguous => format!("Target specification {} matched multiple targets. Use `ffx target list` to list known targets, and use a more specific matcher.", target_string(.target)),
+            DaemonError::TargetAmbiguous => format!("Target specification {} matched multiple targets. Use `ffx target list` to list known targets, and use a more specific target query.", target_string(.target)),
             DaemonError::TargetNotFound => format!("Target {} was not found.", target_string(.target)),
             DaemonError::ProtocolNotFound => "The requested ffx service was not found. Run `ffx doctor --restart-daemon`.".to_string(),
             DaemonError::ProtocolOpenError => "The requested ffx service failed to open. Run `ffx doctor --restart-daemon`.".to_string(),
@@ -42,13 +42,13 @@ pub enum FfxTargetError {
             OpenTargetError::QueryAmbiguous => {
                 match target_string(.target) {
                     target if target == UNSPECIFIED_TARGET_NAME => format!("More than one device/emulator found. Use `ffx target list` to list known targets and specify one with the `-t` or `--target` flag."),
-                    target => format!("Target specification {} matched multiple targets. Use `ffx target list` to list known targets, and use a more specific matcher.", target),
+                    target => format!("Target specification {} matched multiple targets. Use `ffx target list` to list known targets, and use a more specific target query.", target),
                 }
             },
             OpenTargetError::TargetNotFound => {
                 match target_string(.target) {
                     target if target == UNSPECIFIED_TARGET_NAME => format!("No devices/emulators found. Please ensure the device you want to use is connected and reachable, or an emulator is started."),
-                    target => format!("Target specification {} was not found. Use `ffx target list` to list known targets, and use a different matcher.", .target),
+                    target => format!("Target specification {} was not found. Use `ffx target list` to list known targets, and use a different target query.", .target),
                 }
             }
         })]

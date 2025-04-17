@@ -88,16 +88,16 @@ impl ManualTargetTester for TcpOpenManualTargetTester {
     }
 }
 
-pub fn recommended_watcher<F>(event_handler: F) -> Result<ManualTargetWatcher>
+pub fn recommended_watcher<F>(event_handler: F) -> ManualTargetWatcher
 where
     F: ManualTargetEventHandler,
 {
-    Ok(ManualTargetWatcher::new(
+    ManualTargetWatcher::new(
         event_handler,
         Config::default(),
         TcpOpenManualTargetTester {},
         Duration::from_secs(1),
-    ))
+    )
 }
 
 pub struct ManualTargetWatcher {
