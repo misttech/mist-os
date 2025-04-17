@@ -3139,14 +3139,14 @@ alias(
 )
 
 alias(
-    name = "untrusted-0.7.1",
-    actual = "//third_party/rust_crates/vendor/untrusted-0.7.1:untrusted",
+    name = "untrusted-0.9.0",
+    actual = "//third_party/rust_crates/vendor/untrusted-0.9.0:untrusted",
     tags = ["manual"],
 )
 
 alias(
     name = "untrusted",
-    actual = "//third_party/rust_crates/vendor/untrusted-0.7.1:untrusted",
+    actual = "//third_party/rust_crates/vendor/untrusted-0.9.0:untrusted",
     tags = ["manual"],
 )
 

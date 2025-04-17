@@ -246,7 +246,7 @@ unicase = "2.8.1"
 unicode-segmentation = "1.12"
 unicode-width = "0.2.0"
 unicode-xid = "0.2.0"
-untrusted = "0.7.1"
+untrusted = "0.9"
 url = "2.3"
 utf8parse = "0.2.2"
 uuid = { version = "1.1.2", features = ["serde", "v4"] } # move ?

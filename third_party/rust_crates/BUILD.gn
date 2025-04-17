@@ -1205,7 +1205,7 @@ group("unicode-xid") {
 }
 
 group("untrusted") {
-  public_deps = [ ":untrusted-v0_7_1" ]
+  public_deps = [ ":untrusted-v0_9_0" ]
 }
 
 group("url") {
