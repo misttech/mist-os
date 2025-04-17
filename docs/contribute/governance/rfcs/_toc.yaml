@@ -554,3 +554,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0268_sdk_category_updates.md
   - title: "RFC-0269: Measuring Memory Stalls"
     path: /docs/contribute/governance/rfcs/0269_measuring_memory_stalls.md
+  - title: "RFC-0270: Zircon Virtual Interrupt Signals"
+    path: /docs/contribute/governance/rfcs/0270_zircon_virtual_interrupt_signals.md
