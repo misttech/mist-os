@@ -545,7 +545,7 @@ group("maybe-owned") {
 }
 
 group("md-5") {
-  public_deps = [ ":md-5-v0_10_5" ]
+  public_deps = [ ":md-5-v0_10_6" ]
 
   visibility = md5_visibility
 }
@@ -9114,21 +9114,22 @@ rust_library("maybe-owned-v0_3_4") {
   applicable_licenses = [ ":maybe-owned-v0_3_4.license" ]
 }
 
-license("md-5-v0_10_5.license") {
+license("md-5-v0_10_6.license") {
   public_package_name = "md5"
   license_files = [
-    "//third_party/rust_crates/vendor/md-5-0.10.5/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/md-5-0.10.5/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/md-5-0.10.6/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/md-5-0.10.6/LICENSE-MIT",
   ]
 }
 
-rust_library("md-5-v0_10_5") {
+rust_library("md-5-v0_10_6") {
   crate_name = "md5"
-  crate_root = "//third_party/rust_crates/vendor/md-5-0.10.5/src/lib.rs"
-  output_name = "md5-ad61f69e6a163720"
+  crate_root = "//third_party/rust_crates/vendor/md-5-0.10.6/src/lib.rs"
+  output_name = "md5-d3f4a0812055641e"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
+  deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":digest-v0_10_7" ]
 
   rustenv = []
@@ -9136,15 +9137,15 @@ rust_library("md-5-v0_10_5") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=ad61f69e6a163720",
-    "-Cextra-filename=-ad61f69e6a163720",
+    "-Cmetadata=d3f4a0812055641e",
+    "-Cextra-filename=-d3f4a0812055641e",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":md-5-v0_10_5.license" ]
+  applicable_licenses = [ ":md-5-v0_10_6.license" ]
 }
 
 license("memchr-v2_7_4.license") {

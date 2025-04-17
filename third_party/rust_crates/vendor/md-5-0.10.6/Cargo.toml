@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "md-5"
-version = "0.10.5"
+version = "0.10.6"
 authors = ["RustCrypto Developers"]
 description = "MD5 hash function"
 documentation = "https://docs.rs/md-5"
@@ -33,11 +33,14 @@ repository = "https://github.com/RustCrypto/hashes"
 [lib]
 name = "md5"
 
+[dependencies.cfg-if]
+version = "1.0"
+
 [dependencies.digest]
-version = "0.10.4"
+version = "0.10.7"
 
 [dev-dependencies.digest]
-version = "0.10.4"
+version = "0.10.7"
 features = ["dev"]
 
 [dev-dependencies.hex-literal]
@@ -46,6 +49,8 @@ version = "0.2.2"
 [features]
 asm = ["md5-asm"]
 default = ["std"]
+force-soft = []
+loongarch64_asm = []
 oid = ["digest/oid"]
 std = ["digest/std"]
 

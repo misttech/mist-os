@@ -1495,14 +1495,14 @@ alias(
 )
 
 alias(
-    name = "md-5-0.10.5",
-    actual = "//third_party/rust_crates/vendor/md-5-0.10.5:md5",
+    name = "md-5-0.10.6",
+    actual = "//third_party/rust_crates/vendor/md-5-0.10.6:md5",
     tags = ["manual"],
 )
 
 alias(
     name = "md-5",
-    actual = "//third_party/rust_crates/vendor/md-5-0.10.5:md5",
+    actual = "//third_party/rust_crates/vendor/md-5-0.10.6:md5",
     tags = ["manual"],
 )
 

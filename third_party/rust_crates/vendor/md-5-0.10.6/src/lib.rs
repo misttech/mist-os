@@ -30,15 +30,10 @@
 )]
 #![warn(missing_docs, rust_2018_idioms)]
 
-#[cfg(all(feature = "asm", any(target_arch = "x86", target_arch = "x86_64")))]
-extern crate md5_asm as compress;
-
-#[cfg(not(all(feature = "asm", any(target_arch = "x86", target_arch = "x86_64"))))]
-mod compress;
-
 pub use digest::{self, Digest};
 
-use compress::compress;
+mod compress;
+pub(crate) mod consts;
 
 use core::{fmt, slice::from_ref};
 #[cfg(feature = "oid")]
@@ -52,6 +47,7 @@ use digest::{
     typenum::{Unsigned, U16, U64},
     HashMarker, Output,
 };
+
 /// Core MD5 hasher state.
 #[derive(Clone)]
 pub struct Md5Core {
@@ -77,7 +73,7 @@ impl UpdateCore for Md5Core {
     #[inline]
     fn update_blocks(&mut self, blocks: &[Block<Self>]) {
         self.block_len = self.block_len.wrapping_add(blocks.len() as u64);
-        compress(&mut self.state, convert(blocks))
+        compress::compress(&mut self.state, convert(blocks))
     }
 }
 
@@ -90,7 +86,9 @@ impl FixedOutputCore for Md5Core {
             .wrapping_add(buffer.get_pos() as u64)
             .wrapping_mul(8);
         let mut s = self.state;
-        buffer.len64_padding_le(bit_len, |b| compress(&mut s, convert(from_ref(b))));
+        buffer.len64_padding_le(bit_len, |b| {
+            compress::compress(&mut s, convert(from_ref(b)))
+        });
         for (chunk, v) in out.chunks_exact_mut(4).zip(s.iter()) {
             chunk.copy_from_slice(&v.to_le_bytes());
         }
@@ -102,7 +100,7 @@ impl Default for Md5Core {
     fn default() -> Self {
         Self {
             block_len: 0,
-            state: [0x6745_2301, 0xEFCD_AB89, 0x98BA_DCFE, 0x1032_5476],
+            state: consts::STATE_INIT,
         }
     }
 }

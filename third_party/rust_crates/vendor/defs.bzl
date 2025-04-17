@@ -394,7 +394,7 @@ _NORMAL_DEPENDENCIES = {
             "macro_rules_attribute": Label("//third_party/rust_crates/vendor/macro_rules_attribute-0.1.3:macro_rules_attribute"),
             "maplit": Label("//third_party/rust_crates/vendor/maplit-1.0.2:maplit"),
             "maybe-owned": Label("//third_party/rust_crates/vendor/maybe-owned-0.3.4:maybe_owned"),
-            "md-5": Label("//third_party/rust_crates/vendor/md-5-0.10.5:md5"),
+            "md-5": Label("//third_party/rust_crates/vendor/md-5-0.10.6:md5"),
             "memchr": Label("//third_party/rust_crates/vendor/memchr-2.7.4:memchr"),
             "memoffset": Label("//third_party/rust_crates/vendor/memoffset-0.9.1:memoffset"),
             "miniz_oxide": Label("//third_party/rust_crates/vendor/miniz_oxide-0.3.6:miniz_oxide"),
