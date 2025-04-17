@@ -107,6 +107,7 @@ bitflags! {
 
         // Iob
         const IOB_PEER_CLOSED = ZX_IOB_PEER_CLOSED;
+        const IOB_SHARED_REGION_UPDATED = ZX_IOB_SHARED_REGION_UPDATED;
 
         // Job
         const JOB_TERMINATED   = ZX_JOB_TERMINATED;

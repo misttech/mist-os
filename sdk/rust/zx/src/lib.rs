@@ -50,6 +50,10 @@ mod vmar;
 mod vmo;
 mod wait;
 
+pub mod vdso_next {
+    pub use super::iob::vdso_next::*;
+}
+
 pub use self::bti::*;
 pub use self::channel::*;
 pub use self::clock::*;

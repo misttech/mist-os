@@ -379,6 +379,7 @@ multiconst!(zx_signals_t, [
 
     // Iob
     ZX_IOB_PEER_CLOSED           = ZX_OBJECT_PEER_CLOSED;
+    ZX_IOB_SHARED_REGION_UPDATED = ZX_OBJECT_SIGNAL_3;
 
     // Job
     ZX_JOB_TERMINATED           = ZX_OBJECT_SIGNAL_3;
@@ -2579,6 +2580,7 @@ pub struct zx_iob_region_t {
 
 multiconst!(zx_iob_region_type_t, [
     ZX_IOB_REGION_TYPE_PRIVATE = 0;
+    ZX_IOB_REGION_TYPE_SHARED = 1;
 ]);
 
 multiconst!(zx_iob_access_t, [
@@ -2593,14 +2595,30 @@ multiconst!(zx_iob_access_t, [
 ]);
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Copy, Clone)]
 pub struct zx_iob_discipline_t {
     pub r#type: zx_iob_discipline_type_t,
-    pub reserved: [u32; 16],
+    pub extension: zx_iob_discipline_extension_t,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union zx_iob_discipline_extension_t {
+    // This is in vdso-next.
+    pub ring_buffer: zx_iob_discipline_mediated_write_ring_buffer_t,
+    pub reserved: [PadByte; 64],
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct zx_iob_discipline_mediated_write_ring_buffer_t {
+    pub tag: u64,
+    pub padding: [PadByte; 56],
 }
 
 multiconst!(zx_iob_discipline_type_t, [
     ZX_IOB_DISCIPLINE_TYPE_NONE = 0;
+    ZX_IOB_DISCIPLINE_TYPE_MEDIATED_WRITE_RING_BUFFER = 2;
 ]);
 
 #[repr(C)]
@@ -2611,8 +2629,17 @@ pub struct zx_iob_region_private_t {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
+pub struct zx_iob_region_shared_t {
+    pub options: u32,
+    pub shared_region: zx_handle_t,
+    pub padding: [PadByte; 24],
+}
+
+#[repr(C)]
 pub union zx_iob_region_extension_t {
     pub private_region: zx_iob_region_private_t,
+    pub shared_region: zx_iob_region_shared_t,
     pub max_extension: [u8; 32],
 }
 

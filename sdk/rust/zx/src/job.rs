@@ -341,7 +341,7 @@ mod tests {
     use std::collections::HashSet;
     use std::ffi::CString;
     use zx::{
-        sys, AsHandleRef, Instant, Job, JobAction, JobCondition, JobCriticalOptions,
+        sys, AsHandleRef, Instant, JobAction, JobCondition, JobCriticalOptions,
         JobDefaultTimerMode, JobInfo, JobPolicy, JobPolicyOption, Koid, MonotonicDuration, Signals,
         Task,
     };
@@ -450,6 +450,8 @@ mod tests {
         );
     }
 
+    // The vdso_next tests don't have permission to create raw processes.
+    #[cfg(not(feature = "vdso_next"))]
     #[test]
     fn create_and_report_processes() {
         let fresh_job =
@@ -483,6 +485,8 @@ mod tests {
         );
     }
 
+    // The vdso_next tests don't have permission to create raw processes.
+    #[cfg(not(feature = "vdso_next"))]
     #[test]
     fn get_child_from_koid() {
         let fresh_job =
@@ -491,8 +495,9 @@ mod tests {
         let mut reported_job_koids = fresh_job.children().unwrap();
         assert_eq!(reported_job_koids.len(), 1);
         let reported_job_koid = reported_job_koids.remove(0);
-        let reported_job_handle =
-            Job::from(fresh_job.get_child(&reported_job_koid, zx::Rights::SAME_RIGHTS).unwrap());
+        let reported_job_handle = zx::Job::from(
+            fresh_job.get_child(&reported_job_koid, zx::Rights::SAME_RIGHTS).unwrap(),
+        );
         assert_eq!(reported_job_handle.get_koid(), created_job.get_koid());
 
         // We can even create a process on the handle we got back, and test ProcessKoid
