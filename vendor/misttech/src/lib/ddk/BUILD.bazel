@@ -1,0 +1,33 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Library that exports the metadata.h file  to support the transition
+# to DFv2.
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "ddk_metadata",
+    hdrs = [
+        "include/lib/ddk/metadata.h",
+    ],
+    includes = [
+        "include",
+    ],
+    target_compatible_with = ["@platforms//os:fuchsia"],
+    deps = [
+        "@fuchsia_sdk//pkg/zbi-format",
+    ],
+)
+
+cc_library(
+    name = "ddk_buttons_metadata",
+    hdrs = [
+        "include/ddk/metadata/buttons.h",
+    ],
+    includes = [
+        "include",
+    ],
+    target_compatible_with = ["@platforms//os:fuchsia"],
+)
