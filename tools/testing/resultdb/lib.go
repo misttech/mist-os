@@ -256,6 +256,15 @@ func testDetailsToResultSink(tags []*resultpb.StringPair, testDetail *runtests.T
 			},
 		}
 	}
+	if len(testDetail.Metadata.Owners) > 0 {
+		listOfOwners := testDetail.Metadata.Owners
+		truncatedListOfOwners := listOfOwners
+		if len(listOfOwners) > 5 {
+			truncatedListOfOwners = listOfOwners[:5]
+		}
+		owners := strings.Join(truncatedListOfOwners, ",")
+		r.Tags = append(r.Tags, &resultpb.StringPair{Key: "owners", Value: owners})
+	}
 	return &r, testsSkipped, nil
 }
 

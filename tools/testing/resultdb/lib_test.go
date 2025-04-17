@@ -83,7 +83,8 @@ func TestSetTestDetailsToResultSink(t *testing.T) {
 	// 3. test_case_count:value
 	// 4. affected:value
 	// 5. is_top_level_test:value
-	if len(tags) != 5 {
+	// 6. owners:value
+	if len(tags) != 6 {
 		t.Errorf("tags(%v) contains unexpected values.", tags)
 	}
 
@@ -92,6 +93,7 @@ func TestSetTestDetailsToResultSink(t *testing.T) {
 	checkTagValue(t, tags, "test_case_count", "7")
 	checkTagValue(t, tags, "affected", "false")
 	checkTagValue(t, tags, "is_top_level_test", "true")
+	checkTagValue(t, tags, "owners", "carverforbes@google.com,testgoogler@google.com")
 
 	if len(result.Artifacts) != 2 {
 		t.Errorf("Got %d artifacts, want 2", len(result.Artifacts))
@@ -152,7 +154,8 @@ func TestSetTestDetailsToResultSink_DefaultFailureReason_ExceedsMaxSize(t *testi
 	// 3. test_case_count:value
 	// 4. affected:value
 	// 5. is_top_level_test:value
-	if len(tags) != 5 {
+	// 6. owners:value
+	if len(tags) != 6 {
 		t.Errorf("tags(%v) contains unexpected values.", tags)
 	}
 
@@ -161,6 +164,7 @@ func TestSetTestDetailsToResultSink_DefaultFailureReason_ExceedsMaxSize(t *testi
 	checkTagValue(t, tags, "test_case_count", "205")
 	checkTagValue(t, tags, "affected", "false")
 	checkTagValue(t, tags, "is_top_level_test", "true")
+	checkTagValue(t, tags, "owners", "carverforbes@google.com,testgoogler@google.com")
 
 	if len(result.Artifacts) != 2 {
 		t.Errorf("Got %d artifacts, want 2", len(result.Artifacts))
