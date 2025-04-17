@@ -79,7 +79,7 @@ func execute(ctx context.Context, serialLogPath string, stdout io.Writer) error 
 			if ctx.Err() != nil {
 				// LINT.IfChange(timed_out)
 				return fmt.Errorf("timed out before success string %q was read from serial", successString)
-				// LINT.ThenChange(/tools/testing/tefmocheck/string_in_log_check.go:seriallistener_timed_out)
+				// LINT.ThenChange(/tools/testing/tefmocheck/string_in_log_check.go:seriallistener_timed_out,/tools/testing/tefmocheck/string_in_log_check.go:seriallistener_timed_out_exception)
 			}
 			if !errors.Is(err, io.EOF) {
 				return fmt.Errorf("error trying to read from serial log: %w", err)

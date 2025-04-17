@@ -545,7 +545,7 @@ func fuchsiaLogChecks() []FailureModeCheck {
 				SkipAllPassedTests: true,
 				AlwaysFlake:        true,
 				ExceptBlocks: []*logBlock{
-					// LINT.IfChange(seriallistener_timed_out)
+					// LINT.IfChange(seriallistener_timed_out_exception)
 					{startString: "seriallistener FATAL: timed out before success string", endString: "was read from serial"},
 					// LINT.ThenChange(/tools/testing/seriallistener/cmd/main.go:timed_out)
 				},
