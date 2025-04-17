@@ -28,13 +28,19 @@ pub fn init() {
     }
 }
 
+pub fn init_with_log_severity(min_severity: u8) {
+    unsafe {
+        init_cpp_logging(min_severity);
+    }
+}
+
 // Mirrored from //sdk/lib/syslog/structured_backend/fuchsia_syslog.h
-const FUCHSIA_LOG_TRACE: u8 = 0x10;
-const FUCHSIA_LOG_DEBUG: u8 = 0x20;
-const FUCHSIA_LOG_INFO: u8 = 0x30;
-const FUCHSIA_LOG_WARNING: u8 = 0x40;
-const FUCHSIA_LOG_ERROR: u8 = 0x50;
-const FUCHSIA_LOG_FATAL: u8 = 0x60;
+pub const FUCHSIA_LOG_TRACE: u8 = 0x10;
+pub const FUCHSIA_LOG_DEBUG: u8 = 0x20;
+pub const FUCHSIA_LOG_INFO: u8 = 0x30;
+pub const FUCHSIA_LOG_WARNING: u8 = 0x40;
+pub const FUCHSIA_LOG_ERROR: u8 = 0x50;
+pub const FUCHSIA_LOG_FATAL: u8 = 0x60;
 
 extern "C" {
     fn init_cpp_logging(min_severity: u8);
@@ -42,6 +48,7 @@ extern "C" {
 
 #[cfg(test)]
 mod tests {
+    use crate::FUCHSIA_LOG_TRACE;
     use diagnostics_reader::{ArchiveReader, Severity};
     use futures::StreamExt;
 
@@ -56,6 +63,27 @@ mod tests {
     #[fuchsia::test(logging_minimum_severity = "TRACE")]
     async fn cpp_trace_log_appears_after_init() {
         super::init();
+        let mut logs = ArchiveReader::logs().snapshot_then_subscribe().unwrap();
+
+        // SAFETY: basic FFI call with no invariants
+        unsafe { emit_trace_log_for_testing() };
+
+        let message = loop {
+            let message = logs.next().await.unwrap().unwrap();
+            if message.msg().unwrap() == "TRACE TEST MESSAGE FROM C++"
+                && message.severity() == Severity::Trace
+            {
+                break message;
+            }
+        };
+        assert_eq!(message.moniker.to_string(), ".", "messages must come from this component");
+        let file_path = message.file_path().unwrap();
+        assert!(file_path.ends_with(".cc"), "messages must come from C++, got {file_path}");
+    }
+
+    #[fuchsia::test]
+    async fn cpp_log_appears_after_init_with_log_severity_trace() {
+        super::init_with_log_severity(FUCHSIA_LOG_TRACE);
         let mut logs = ArchiveReader::logs().snapshot_then_subscribe().unwrap();
 
         // SAFETY: basic FFI call with no invariants
