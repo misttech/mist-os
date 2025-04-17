@@ -11,7 +11,7 @@ group("platform") {
 
 zx_library("platform-bus") {
   sources = [
-    "bind.cc",
+    #"bind.cc",
     "platform-bus.cc",
   ]
   deps = [

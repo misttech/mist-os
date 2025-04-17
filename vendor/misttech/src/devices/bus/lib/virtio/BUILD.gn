@@ -38,8 +38,8 @@ source_set("virtio-common") {
   ]
   public_deps = [
     ":virtio-headers",
-    "//src/lib/ddk:ddk-hw-headers",
     "//vendor/misttech/src/devices/bus/drivers/platform:platform-bus.headers",
+    "//vendor/misttech/src/lib/ddk:ddk-hw-headers",
     "//zircon/kernel/dev/pcie:headers",
     "//zircon/kernel/object:headers",
   ]

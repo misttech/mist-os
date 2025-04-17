@@ -6,12 +6,16 @@
 #define SRC_LIB_DDKTL_INCLUDE_DDKTL_DEVICE_INTERNAL_H_
 
 #include <lib/ddk/device.h>
+#ifndef __mist_os__
 #include <lib/fdf/cpp/channel.h>
+#endif
 
 #include <string>
 #include <type_traits>
 
+#ifndef __mist_os__
 #include <ddktl/fidl.h>
+#endif
 #include <ddktl/init-txn.h>
 #include <ddktl/resume-txn.h>
 #include <ddktl/suspend-txn.h>
@@ -243,6 +247,7 @@ constexpr void CheckReleasable() {
                 "'void DdkRelease()'.");
 }
 
+#ifndef __mist_os__
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN(has_ddk_service_connect, DdkServiceConnect);
 
 template <typename D>
@@ -254,6 +259,7 @@ constexpr void CheckServiceConnectable() {
                 "DdkServiceConnect must be a public non-static member function with signature "
                 "'zx_status_t DdkServiceConnect(const char*, fdf::Channel)'.");
 }
+#endif
 
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN(has_ddk_suspend, DdkSuspend);
 

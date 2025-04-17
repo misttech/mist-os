@@ -1,3 +1,4 @@
+# Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 # Copyright 2019 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -47,7 +48,7 @@ source_set("ddktl") {
     "//zircon/system/ulib/zx",
 
     # <ddktl/fidl.h> has #include <ddk/device.h>
-    "//src/lib/ddk",
+    "//vendor/misttech/src/lib/ddk",
   ]
 
   if (is_fuchsia) {
@@ -77,10 +78,19 @@ source_set("ddktl") {
 
   deps = [
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//src/lib/ddk",
+    "//vendor/misttech/src/lib/ddk",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zx",
   ]
+
+  if (is_mistos) {
+    sources -= [ "fidl.cc" ]
+    public_deps -= [ "//sdk/lib/fidl/cpp/wire" ]
+    deps -= [
+      "//sdk/lib/driver/runtime:driver_runtime_cpp",
+      "//zircon/system/ulib/sync",
+    ]
+  }
 
   #  ________  _________  ________  ________
   # |\   ____\|\___   ___\\   __  \|\   __  \

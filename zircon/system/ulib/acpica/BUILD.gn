@@ -72,7 +72,7 @@ if (is_fuchsia) {
 
     configs += [
       "//build/config:default_include_dirs",
-      "//src/lib/ddk:include",
+      "//vendor/misttech/src/lib/ddk:include",
     ]
   }
 } else {

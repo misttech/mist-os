@@ -3,9 +3,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-#import("//build/components.gni")
-#import("//build/testing/cc_test_executable.gni")
-
 source_set("cpp") {
   sources = [
     "network_device_client.cc",
@@ -17,15 +14,8 @@ source_set("cpp") {
   public_deps = [
     "//sdk/fidl/mistos.hardware.network:mistos.hardware.network_banjo_cpp",
     "//sdk/fidl/mistos.hardware.network.driver:mistos.hardware.network.driver_banjo_cpp",
-
-    #"//sdk/lib/async:async-cpp",
-    #"//sdk/lib/async-default",
-    # "//sdk/lib/async-loop:async-loop-cpp",
-    # "//sdk/lib/syslog/cpp",
     "//src/connectivity/lib/network-device/buffer_descriptor",
-
-    #"//src/lib/fxl",
-    "//src/lib/ddktl",
+    "//vendor/misttech/src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl:fzl_kernel",
   ]
@@ -35,5 +25,4 @@ source_set("cpp") {
 
 group("tests") {
   testonly = true
-  #deps = [ ":netdev-cpp-client-tests" ]
 }
