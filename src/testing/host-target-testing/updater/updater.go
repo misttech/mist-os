@@ -225,20 +225,34 @@ func updateCheckNow(
 
 		ch := c.DisconnectionListener()
 
-		if err := ffxTool.TargetUpdateChannelSet(ctx, "trigger-ota"); err != nil {
+		cmd := []string{
+			"/bin/update",
+			"channel",
+			"set",
+			"trigger-ota",
+		}
+		if err := c.Run(ctx, cmd, os.Stdout, os.Stderr); err != nil {
 			logger.Warningf(ctx, "update channel set failed: %v. This probably indicates the device is running an old version of system-update-checker.", err)
 		}
 
-		s, err := ffxTool.TargetUpdateCheckNowMonitor(ctx)
-		stdout := string(s)
-		logger.Debugf(ctx, "Output from check-now monitor: %s", stdout)
+		cmd = []string{
+			"/bin/update",
+			"check-now",
+			"--monitor",
+		}
+
+		var stdout bytes.Buffer
+		err = c.Run(ctx, cmd, &stdout, os.Stderr)
+		logger.Debugf(ctx, "Output from check-now monitor: %s", stdout.String())
 		if err == nil && checkForUnkownFirmware {
 			// FIXME(https://fxbug.dev/42077484): We wouldn't have to ignore disconnects
 			// if we could trigger an update without it automatically rebooting.
 			err = checkSyslogForUnknownFirmware(ctx, c)
 		}
 
-		for _, line := range strings.Split(stdout, "\n") {
+		scanner := bufio.NewScanner(&stdout)
+		for scanner.Scan() {
+			line := scanner.Text()
 			if strings.Contains(line, "InstallationDeferredByPolicy") {
 				logger.Debugf(ctx, "InstallationDeferredByPolicy state detected, forcing reboot")
 				if err := c.RunReboot(ctx); err != nil {
@@ -323,7 +337,13 @@ func (u *SystemUpdater) Update(
 	updatePackageUrl := fmt.Sprintf("fuchsia-pkg://%s/%s", repoName, dstUpdate.Path())
 	logger.Infof(ctx, "Downloading OTA %q", updatePackageUrl)
 
-	if err := ffxTool.TargetUpdateForceInstallNoReboot(ctx, fmt.Sprintf("%q", updatePackageUrl)); err != nil {
+	cmd := []string{
+		"update",
+		"force-install",
+		"--reboot", "false",
+		fmt.Sprintf("%q", updatePackageUrl),
+	}
+	if err := c.Run(ctx, cmd, os.Stdout, os.Stderr); err != nil {
 		return fmt.Errorf("failed to run system updater: %w", err)
 	}
 
@@ -343,7 +363,7 @@ func (u *SystemUpdater) Update(
 	logger.Infof(ctx, "Reboot complete in %s", time.Now().Sub(startTime))
 
 	startTime = time.Now()
-	cmd := []string{"/bin/update", "wait-for-commit"}
+	cmd = []string{"/bin/update", "wait-for-commit"}
 	if err := c.Run(ctx, cmd, os.Stdout, os.Stderr); err != nil {
 		logger.Warningf(ctx, "update wait-for-commit failed: %v", err)
 	}
