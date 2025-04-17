@@ -568,75 +568,29 @@ mod test {
     use super::*;
     use ffx_command_error::bug;
     use ffx_config::macro_deps::serde_json::Value;
-    use ffx_config::{test_init, ConfigLevel};
+    use ffx_config::{test_env, test_init, ConfigLevel};
     use futures_lite::future::{pending, ready};
 
     #[fuchsia::test]
-    async fn test_target_wait_too_short_timeout() {
-        let (proxy, _server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>();
-        let res = knock_target_with_timeout(&proxy, rcs::RCS_KNOCK_TIMEOUT).await;
-        assert!(res.is_err());
-        let res = knock_target_with_timeout(
-            &proxy,
-            rcs::RCS_KNOCK_TIMEOUT.checked_sub(Duration::new(0, 1)).unwrap(),
-        )
-        .await;
-        assert!(res.is_err());
-    }
-
-    #[fuchsia::test]
     async fn test_get_empty_default_target() {
-        let env = test_init().await.unwrap();
-        // Just in case, we need to remove the env variables mentioned
-        // in the default config for "default.target". Because of the way
-        // EnvironmentContext::env_var() works, we need to remove it from both
-        // the context and the actual environment.
-        const NODENAME_KEY: &str = "FUCHSIA_NODENAME";
-        const ADDR_KEY: &str = "FUCHSIA_DEVICE_ADDR";
-        let mut context = env.context.clone();
+        // Explicitly initialize the test with no env vars.
+        // That way, $FUCHSIA_NODENAME and $FUCHSIA_DEVICE_ADDR are both unset.
+        let env = test_env().build().await.unwrap();
 
-        context.remove_var(NODENAME_KEY);
-        let fuchsia_nodename = std::env::var_os(NODENAME_KEY);
-        if fuchsia_nodename.is_some() {
-            // UNSAFE: remove_var() should not be called in multithreaded
-            // environments; this test is explicitly marked as single-threaded,
-            // so it is safe.
-            unsafe {
-                std::env::remove_var(NODENAME_KEY);
-            }
-        }
-        context.remove_var(ADDR_KEY);
-        let fuchsia_device_addr = std::env::var_os(ADDR_KEY);
-        if fuchsia_device_addr.is_some() {
-            // UNSAFE: remove_var() should not be called in multithreaded
-            // environments; this test is explicitly marked as single-threaded,
-            // so it is safe.
-            unsafe {
-                std::env::remove_var(ADDR_KEY);
-            }
-        }
-        let target_spec = get_target_specifier(&context).await.unwrap();
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
         assert_eq!(target_spec, None);
-        if let Some(nodename) = fuchsia_nodename {
-            // UNSAFE: set_var() should not be called in multithreaded
-            // environments; this test is explicitly marked as single-threaded,
-            // so it is safe.
-            unsafe {
-                std::env::set_var(NODENAME_KEY, &nodename);
-            }
-        }
-        if let Some(device_addr) = fuchsia_device_addr {
-            // UNSAFE: set_var() should not be called in multithreaded
-            // environments; this test is explicitly marked as single-threaded,
-            // so it is safe.
-            unsafe {
-                std::env::set_var(ADDR_KEY, &device_addr);
-            }
-        }
     }
 
     #[fuchsia::test]
-    async fn test_set_default_target() {
+    async fn test_get_default_target_from_env() {
+        let env = test_env().env_var("FUCHSIA_NODENAME", "foo-123").build().await.unwrap();
+
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
+        assert_eq!(target_spec, Some("foo-123".to_owned()));
+    }
+
+    #[fuchsia::test]
+    async fn test_get_default_target_from_config() {
         let env = test_init().await.unwrap();
         env.context
             .query(TARGET_DEFAULT_KEY)
@@ -647,6 +601,21 @@ mod test {
 
         let target_spec = get_target_specifier(&env.context).await.unwrap();
         assert_eq!(target_spec, Some("some_target".to_owned()));
+    }
+
+    #[fuchsia::test]
+    async fn test_get_default_target_from_runtime() {
+        let env =
+            test_env().runtime_config(TARGET_DEFAULT_KEY, "runtime-target").build().await.unwrap();
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(Value::String("some_target".to_owned()))
+            .await
+            .unwrap();
+
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
+        assert_eq!(target_spec, Some("runtime-target".to_owned()));
     }
 
     #[fuchsia::test]
@@ -682,8 +651,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_default_env_present() {
-        std::env::set_var("MY_LITTLE_TMPKEY", "t1");
-        let env = test_init().await.unwrap();
+        let env = test_env().env_var("MY_LITTLE_TMPKEY", "t1").build().await.unwrap();
         let ts: Vec<Value> =
             ["$MY_LITTLE_TMPKEY", "t2"].iter().map(|s| Value::String(s.to_string())).collect();
         env.context
@@ -695,7 +663,19 @@ mod test {
 
         let target_spec = get_target_specifier(&env.context).await.unwrap();
         assert_eq!(target_spec, Some("t1".to_owned()));
-        std::env::remove_var("MY_LITTLE_TMPKEY");
+    }
+
+    #[fuchsia::test]
+    async fn test_target_wait_too_short_timeout() {
+        let (proxy, _server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>();
+        let res = knock_target_with_timeout(&proxy, rcs::RCS_KNOCK_TIMEOUT).await;
+        assert!(res.is_err());
+        let res = knock_target_with_timeout(
+            &proxy,
+            rcs::RCS_KNOCK_TIMEOUT.checked_sub(Duration::new(0, 1)).unwrap(),
+        )
+        .await;
+        assert!(res.is_err());
     }
 
     #[fuchsia::test]

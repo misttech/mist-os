@@ -173,18 +173,14 @@ async fn ensure_unset_at_level(context: &EnvironmentContext, level: ConfigLevel)
 #[cfg(test)]
 mod test {
     use super::*;
-    use ffx_config::environment::EnvVars;
+    use ffx_config::{test_env, test_init};
     use ffx_target_default_args::*;
     use ffx_writer::TestBuffers;
     use tempfile::tempdir;
 
-    fn env_vars<'a>(vars: impl IntoIterator<Item = (&'a str, &'a str)>) -> EnvVars {
-        vars.into_iter().map(|tuple| (tuple.0.to_owned(), tuple.1.to_owned())).collect()
-    }
-
     #[fuchsia::test]
     async fn test_get_no_default() -> Result<()> {
-        let env = ffx_config::test_init().await.unwrap();
+        let env = test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let mut writer = SimpleWriter::new_test(&test_buffers);
 
@@ -204,7 +200,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_get_configuration() -> Result<()> {
-        let env = ffx_config::test_init().await.unwrap();
+        let env = test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let mut writer = SimpleWriter::new_test(&test_buffers);
 
@@ -231,10 +227,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_get_env_fuchsia_nodename() -> Result<()> {
-        let env =
-            ffx_config::test_init_with_env(env_vars([("FUCHSIA_NODENAME", "bar-target")]), None)
-                .await
-                .unwrap();
+        let env = test_env().env_var("FUCHSIA_NODENAME", "bar-target").build().await.unwrap();
         let test_buffers = TestBuffers::default();
         let mut writer = SimpleWriter::new_test(&test_buffers);
 
@@ -254,10 +247,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_get_env_fuchsia_device_addr() -> Result<()> {
-        let env =
-            ffx_config::test_init_with_env(env_vars([("FUCHSIA_DEVICE_ADDR", "baz-target")]), None)
-                .await
-                .unwrap();
+        let env = test_env().env_var("FUCHSIA_DEVICE_ADDR", "baz-target").build().await.unwrap();
         let test_buffers = TestBuffers::default();
         let mut writer = SimpleWriter::new_test(&test_buffers);
 
@@ -277,12 +267,12 @@ mod test {
 
     #[fuchsia::test]
     async fn test_get_env_and_configuration() -> Result<()> {
-        let env = ffx_config::test_init_with_env(
-            env_vars([("FUCHSIA_NODENAME", "env1-target"), ("FUCHSIA_DEVICE_ADDR", "env2-target")]),
-            None,
-        )
-        .await
-        .unwrap();
+        let env = test_env()
+            .env_var("FUCHSIA_NODENAME", "env1-target")
+            .env_var("FUCHSIA_DEVICE_ADDR", "env2-target")
+            .build()
+            .await
+            .unwrap();
         let test_buffers = TestBuffers::default();
         let mut writer = SimpleWriter::new_test(&test_buffers);
 
@@ -309,7 +299,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_set() -> Result<()> {
-        let env = ffx_config::test_init().await.unwrap();
+        let env = test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let mut writer = SimpleWriter::new_test(&test_buffers);
 
@@ -343,7 +333,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_unset_no_config_no_env() -> Result<()> {
-        let env = ffx_config::test_init().await.unwrap();
+        let env = test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let mut writer = SimpleWriter::new_test(&test_buffers);
 
@@ -364,12 +354,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_unset_no_config_fuchsia_nodename_isolated() -> Result<()> {
-        let env = ffx_config::test_init_with_env(
-            env_vars([("FUCHSIA_NODENAME", "foo-unset-target")]),
-            None,
-        )
-        .await
-        .unwrap();
+        let env = test_env().env_var("FUCHSIA_NODENAME", "foo-unset-target").build().await.unwrap();
         let test_buffers = TestBuffers::default();
         let mut writer = SimpleWriter::new_test(&test_buffers);
 
@@ -398,12 +383,12 @@ mod test {
     #[fuchsia::test]
     async fn test_unset_no_config_fuchsia_device_addr_in_tree() -> Result<()> {
         let test_build_dir = tempdir().expect("output directory");
-        let env = ffx_config::test_init_with_env(
-            env_vars([("FUCHSIA_DEVICE_ADDR", "bar-unset-target")]),
-            Some(test_build_dir.path()),
-        )
-        .await
-        .unwrap();
+        let env = test_env()
+            .env_var("FUCHSIA_DEVICE_ADDR", "bar-unset-target")
+            .in_tree(test_build_dir.path())
+            .build()
+            .await
+            .unwrap();
         let test_buffers = TestBuffers::default();
         let mut writer = SimpleWriter::new_test(&test_buffers);
 
@@ -431,7 +416,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_unset_with_config_no_env() -> Result<()> {
-        let env = ffx_config::test_init().await.unwrap();
+        let env = test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let mut writer = SimpleWriter::new_test(&test_buffers);
 
@@ -468,15 +453,13 @@ mod test {
     #[fuchsia::test]
     async fn test_unset_with_config_both_envs_in_tree() -> Result<()> {
         let test_build_dir = tempdir().expect("output directory");
-        let env = ffx_config::test_init_with_env(
-            env_vars([
-                ("FUCHSIA_NODENAME", "baz-unset-target1"),
-                ("FUCHSIA_DEVICE_ADDR", "baz-unset-target2"),
-            ]),
-            Some(test_build_dir.path()),
-        )
-        .await
-        .unwrap();
+        let env = test_env()
+            .env_var("FUCHSIA_NODENAME", "baz-unset-target1")
+            .env_var("FUCHSIA_DEVICE_ADDR", "baz-unset-target2")
+            .in_tree(test_build_dir.path())
+            .build()
+            .await
+            .unwrap();
         let test_buffers = TestBuffers::default();
         let mut writer = SimpleWriter::new_test(&test_buffers);
 
@@ -521,15 +504,12 @@ mod test {
 
     #[fuchsia::test]
     async fn test_unset_with_config_both_envs_isolated() -> Result<()> {
-        let env = ffx_config::test_init_with_env(
-            env_vars([
-                ("FUCHSIA_NODENAME", "baz-unset-target1"),
-                ("FUCHSIA_DEVICE_ADDR", "baz-unset-target2"),
-            ]),
-            None,
-        )
-        .await
-        .unwrap();
+        let env = test_env()
+            .env_var("FUCHSIA_NODENAME", "baz-unset-target1")
+            .env_var("FUCHSIA_DEVICE_ADDR", "baz-unset-target2")
+            .build()
+            .await
+            .unwrap();
         let test_buffers = TestBuffers::default();
         let mut writer = SimpleWriter::new_test(&test_buffers);
 
@@ -575,7 +555,7 @@ mod test {
     #[fuchsia::test]
     async fn test_unset_with_config_all_levels() -> Result<()> {
         let test_build_dir = tempdir().expect("output directory");
-        let env = ffx_config::test_init_in_tree(&test_build_dir.path()).await.unwrap();
+        let env = test_env().in_tree(&test_build_dir.path()).build().await.unwrap();
         let test_buffers = TestBuffers::default();
         let mut writer = SimpleWriter::new_test(&test_buffers);
 

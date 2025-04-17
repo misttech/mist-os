@@ -219,7 +219,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffx_config::environment::test_init_in_tree;
+    use ffx_config::environment::test_env;
     use ffx_config::ConfigLevel;
     use std::fs::File;
     use tempfile::TempDir;
@@ -229,7 +229,7 @@ mod tests {
         let test_dir = TempDir::new().expect("output directory");
         let build_dir =
             Utf8Path::from_path(test_dir.path()).expect("cannot convert builddir to Utf8Path");
-        let _env = test_init_in_tree(&test_dir.path()).await.unwrap();
+        let _env = test_env().in_tree(&test_dir.path()).build().await.unwrap();
 
         let empty_pb: Option<String> = None;
         // If no product bundle path provided and no config return None

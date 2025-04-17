@@ -22,7 +22,7 @@ use std::sync::Arc;
 use thiserror::Error;
 
 /// A name for the type used as an environment variable mapping for isolation override
-pub type EnvVars = HashMap<String, String>;
+pub(crate) type EnvVars = HashMap<String, String>;
 
 /// Contextual information about where this instance of ffx is running
 #[derive(Clone, Debug)]

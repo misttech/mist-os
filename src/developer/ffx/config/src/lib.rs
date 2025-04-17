@@ -38,9 +38,7 @@ pub use api::query::{ConfigQuery, SelectMode};
 pub use api::ConfigError;
 pub use config_macros::FfxConfigBacked;
 
-pub use environment::{
-    test_init, test_init_in_tree, test_init_with_env, Environment, EnvironmentContext, TestEnv,
-};
+pub use environment::{test_env, test_init, Environment, EnvironmentContext, TestEnv};
 pub use sdk::{self, Sdk, SdkRoot};
 pub use storage::{AssertNoEnv, AssertNoEnvError, ConfigMap};
 

@@ -1184,7 +1184,11 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_serve_impl_validate_args_in_tree() {
         let build_dir = tempfile::tempdir().expect("temp dir");
-        let env = ffx_config::test_init_in_tree(build_dir.path()).await.expect("in-tree test env");
+        let env = ffx_config::test_env()
+            .in_tree(build_dir.path())
+            .build()
+            .await
+            .expect("in-tree test env");
         let cmd = StartCommand {
             repository: None,
             trusted_root: None,
