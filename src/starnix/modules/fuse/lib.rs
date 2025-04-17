@@ -2197,6 +2197,7 @@ bitflags::bitflags! {
         const SETXATTR_EXT = uapi::FUSE_SETXATTR_EXT as u64;
         const POSIX_ACL = uapi::FUSE_POSIX_ACL as u64;
         const PASSTHROUGH = uapi::FUSE_PASSTHROUGH as u64;
+        const INIT_EXT = uapi::FUSE_INIT_EXT as u64;
     }
 }
 
