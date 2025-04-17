@@ -149,11 +149,12 @@ template("idk") {
     }
   }
 
-  # This can happen when only building for the default API level and current target_cpu.
-  not_needed([
-               "_subbuilds_dir_prefix",
-               "_subbuilds_target_prefix",
-             ])
+  if (target_cpu == current_cpu && invoker.api_levels == []) {
+    not_needed([
+                 "_subbuilds_dir_prefix",
+                 "_subbuilds_target_prefix",
+               ])
+  }
 
   if (host_cpu == "x64") {
     host_triple_cpu = "x86_64"
