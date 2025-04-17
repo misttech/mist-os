@@ -365,6 +365,8 @@ struct SocketState {
     send_timeout: Option<zx::MonotonicDuration>,
 
     /// The socket's mark. Can get and set with SO_MARK.
+    // TODO(https://fxbug.dev/410631890): Remove this when the netstack handles
+    // socket marks.
     mark: u32,
 }
 
@@ -555,7 +557,10 @@ impl Socket {
             SOL_SOCKET => match optname {
                 SO_RCVTIMEO => self.state.lock().receive_timeout = read_timeval()?,
                 SO_SNDTIMEO => self.state.lock().send_timeout = read_timeval()?,
-                SO_MARK => {
+                // When the feature isn't enabled, we use the local state to store
+                // the mark, otherwise the default branch will let netstack handle
+                // the mark.
+                SO_MARK if !current_task.task.kernel().features.netstack_mark => {
                     self.state.lock().mark = current_task.read_object(user_opt.try_into()?)?;
                 }
                 _ => self.ops.setsockopt(
@@ -602,7 +607,12 @@ impl Socket {
                     TimeValPtr::into_bytes(current_task, timeval_from_duration(duration))
                         .map_err(|_| errno!(EINVAL))?
                 }
-                SO_MARK => self.state.lock().mark.as_bytes().to_owned(),
+                // When the feature isn't enabled, we get the mark from the local
+                // state, otherwise the default branch will let netstack handle
+                // the mark.
+                SO_MARK if !current_task.task.kernel().features.netstack_mark => {
+                    self.state.lock().mark.as_bytes().to_owned()
+                }
                 _ => {
                     self.ops.getsockopt(&mut locked, self, current_task, level, optname, optlen)?
                 }

@@ -585,7 +585,7 @@ impl SocketOps for ZxioBackedSocket {
                 // Retrieves the `zxio_socket_mark` from the domain.
                 let optlen = self
                     .zxio
-                    .getsockopt_slice(level, optname, &mut optval)
+                    .getsockopt_slice(level, SO_FUCHSIA_MARK, &mut optval)
                     .map_err(|status| from_status_like_fdio!(status))?
                     .map_err(|out_code| errno_from_zxio_code!(out_code))?;
                 if optlen as usize != size_of::<zxio_socket_mark>() {
