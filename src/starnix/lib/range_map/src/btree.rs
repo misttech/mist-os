@@ -345,15 +345,27 @@ where
         }
     }
 
-    /// Update the maximum gap for this node.
-    fn update_max_gap(&mut self) {
+    /// Compute the maximum gap for this node.
+    fn compute_max_gap(&self) -> u64 {
         let mut max_gap = 0;
         for i in 0..self.keys.len() {
             if i + 1 < self.keys.len() {
                 max_gap = max_gap.max(self.keys[i].end.measure_gap(&self.keys[i + 1].start));
             }
         }
-        self.max_gap = max_gap;
+        max_gap
+    }
+
+    /// Validates that the cached max_gap value matches what we would compute now.
+    #[cfg(test)]
+    fn validate_max_gap(&self) -> bool {
+        let computed = self.compute_max_gap();
+        computed == self.max_gap
+    }
+
+    /// Update the maximum gap for this node.
+    fn update_max_gap(&mut self) {
+        self.max_gap = self.compute_max_gap();
     }
 
     /// Measure the gap between the last key in this node and the first key in the other node.
@@ -395,6 +407,7 @@ where
             } else {
                 right.keys.insert(index - middle, range);
                 right.values.insert(index - middle, value);
+                right.update_max_gap();
             }
             InsertResult::SplitLeaf(right.keys[0].start, Arc::new(right))
         } else {
@@ -708,8 +721,8 @@ where
         cursor.push(index);
     }
 
-    /// Update the maximum gap for this node.
-    fn update_max_gap(&mut self) {
+    /// Compute the maximum gap for this node.
+    fn compute_max_gap(&self) -> u64 {
         let mut max_gap = 0;
         match &self.children {
             ChildList::Leaf(children) => {
@@ -729,8 +742,42 @@ where
                 }
             }
         }
+        max_gap
+    }
+
+    /// Validates that the cached max_gap value matches what we would compute now,
+    /// and recursively validates all children.
+    #[cfg(test)]
+    fn validate_max_gap(&self) -> bool {
+        let computed = self.compute_max_gap();
+        if computed != self.max_gap {
+            return false;
+        }
+
+        // Recursively validate children
+        match &self.children {
+            ChildList::Leaf(children) => {
+                for child in children {
+                    if !child.validate_max_gap() {
+                        return false;
+                    }
+                }
+            }
+            ChildList::Internal(children) => {
+                for child in children {
+                    if !child.validate_max_gap() {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
+    }
+
+    /// Update the maximum gap for this node.
+    fn update_max_gap(&mut self) {
         self.subtree_key_range = self.children.subtree_key_range();
-        self.max_gap = max_gap;
+        self.max_gap = self.compute_max_gap();
     }
 
     /// Measure the gap between the last key in this node and the first key in the other node.
@@ -766,6 +813,7 @@ where
             }
             debug_assert!(self.keys.len() + 1 == self.children.len());
             debug_assert!(internal.keys.len() + 1 == internal.children.len());
+            internal.update_max_gap();
             InsertResult::SplitInternal(split_key, Arc::new(internal))
         } else {
             self.keys.insert(index, key);
@@ -822,7 +870,6 @@ where
             }
         }
     }
-
     /// Rebalance the child at the given index.
     ///
     /// If the child and its neighbor are sufficiently small, this function will merge them into a
@@ -843,6 +890,7 @@ where
                     // Merge the right node into the left node.
                     left_node.keys.extend(right_shared_node.keys.iter().cloned());
                     left_node.values.extend(right_shared_node.values.iter().cloned());
+                    left_node.update_max_gap();
                     self.keys.remove(left);
                     self.children.remove(right);
                 } else {
@@ -866,6 +914,8 @@ where
                         values.extend(right_node.values.iter().cloned());
                         right_node.values = values;
                     }
+                    left_node.update_max_gap();
+                    right_node.update_max_gap();
                     // Update the split key to reflect the new division between the nodes.
                     self.keys[left] = right_node.keys[0].start;
                 }
@@ -879,6 +929,7 @@ where
                     left_node.keys.push(old_split_key.clone());
                     left_node.keys.extend(right_shared_node.keys.iter().cloned());
                     left_node.children.extend(&right_shared_node.children);
+                    left_node.update_max_gap();
                     debug_assert!(left_node.keys.len() + 1 == left_node.children.len());
                     self.keys.remove(left);
                     self.children.remove(right);
@@ -914,6 +965,8 @@ where
                         debug_assert!(left_node.keys.len() + 1 == left_node.children.len());
                         debug_assert!(right_node.keys.len() + 1 == right_node.children.len());
                     }
+                    left_node.update_max_gap();
+                    right_node.update_max_gap();
                     // Update the split key to reflect the new division between the nodes.
                     self.keys[left] = split_key;
                 }
@@ -1112,6 +1165,14 @@ where
         match self {
             Node::Leaf(node) => node.find_gap_end(gap, upper_bound),
             Node::Internal(node) => node.find_gap_end(gap, upper_bound),
+        }
+    }
+
+    #[cfg(test)]
+    fn validate_max_gap(&self) -> bool {
+        match self {
+            Node::Leaf(node) => node.validate_max_gap(),
+            Node::Internal(node) => node.validate_max_gap(),
         }
     }
 }
@@ -1382,6 +1443,9 @@ where
             removed_values.push(self.remove_at(cursor).expect("entry should exist"));
         }
 
+        #[cfg(test)]
+        assert!(self.validate_max_gap());
+
         removed_values
     }
 
@@ -1467,6 +1531,9 @@ where
         }
 
         self.insert_range_internal(range, value);
+
+        #[cfg(test)]
+        assert!(self.validate_max_gap());
     }
 
     /// Remove the entry with the given cursor from the map.
@@ -1549,6 +1616,11 @@ where
     ) -> impl DoubleEndedIterator<Item = (&Range<K>, &V)> {
         let range = range.borrow();
         self.range(range.start..range.end)
+    }
+
+    #[cfg(test)]
+    fn validate_max_gap(&self) -> bool {
+        self.node.validate_max_gap()
     }
 }
 
