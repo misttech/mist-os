@@ -189,6 +189,22 @@ C(UFFDIO_COPY_MODE_WP);
 C(UFFDIO_ZEROPAGE_MODE_DONTWAKE);
 C(UFFDIO_CONTINUE_MODE_DONTWAKE);
 
+// Ioctls that can be done on a perf event fd:
+// Should match //third_party/android/platform/bionic/libc/kernel/uapi/linux/perf_event.h
+// and https://man7.org/linux/man-pages/man2/perf_event_open.2.html
+C(PERF_EVENT_IOC_ENABLE);
+C(PERF_EVENT_IOC_DISABLE);
+C(PERF_EVENT_IOC_REFRESH);
+C(PERF_EVENT_IOC_RESET);
+C(PERF_EVENT_IOC_PERIOD);
+C(PERF_EVENT_IOC_SET_OUTPUT);
+C(PERF_EVENT_IOC_SET_FILTER);
+C(PERF_EVENT_IOC_ID);
+C(PERF_EVENT_IOC_SET_BPF);
+C(PERF_EVENT_IOC_PAUSE_OUTPUT);
+C(PERF_EVENT_IOC_QUERY_BPF);
+C(PERF_EVENT_IOC_MODIFY_ATTRIBUTES);
+
 typedef struct new_utsname utsname;
 typedef __kernel_gid_t gid_t;
 typedef __kernel_ino_t ino_t;

@@ -6,7 +6,7 @@ use crate::security;
 use bstr::ByteSlice;
 use fuchsia_component::client::connect_to_protocol_sync;
 use linux_uapi::LINUX_REBOOT_CMD_POWER_OFF;
-use starnix_sync::{Locked, Unlocked};
+use starnix_sync::{Locked, RwLock, Unlocked};
 use starnix_uapi::user_address::ArchSpecific;
 use {
     fidl_fuchsia_buildinfo as buildinfo, fidl_fuchsia_hardware_power_statecontrol as fpower,
@@ -45,6 +45,10 @@ use starnix_uapi::{
     LINUX_REBOOT_CMD_HALT, LINUX_REBOOT_CMD_KEXEC, LINUX_REBOOT_CMD_RESTART,
     LINUX_REBOOT_CMD_RESTART2, LINUX_REBOOT_CMD_SW_SUSPEND, LINUX_REBOOT_MAGIC1,
     LINUX_REBOOT_MAGIC2, LINUX_REBOOT_MAGIC2A, LINUX_REBOOT_MAGIC2B, LINUX_REBOOT_MAGIC2C,
+    PERF_EVENT_IOC_DISABLE, PERF_EVENT_IOC_ENABLE, PERF_EVENT_IOC_ID,
+    PERF_EVENT_IOC_MODIFY_ATTRIBUTES, PERF_EVENT_IOC_PAUSE_OUTPUT, PERF_EVENT_IOC_PERIOD,
+    PERF_EVENT_IOC_QUERY_BPF, PERF_EVENT_IOC_REFRESH, PERF_EVENT_IOC_RESET, PERF_EVENT_IOC_SET_BPF,
+    PERF_EVENT_IOC_SET_FILTER, PERF_EVENT_IOC_SET_OUTPUT,
 };
 use std::sync::atomic::{AtomicU64, Ordering};
 use zerocopy::{Immutable, IntoBytes};
@@ -509,7 +513,7 @@ pub fn sys_delete_module(
 // See "Reading results" section of https://man7.org/linux/man-pages/man2/perf_event_open.2.html.
 #[repr(C)]
 #[derive(IntoBytes, Immutable, Default)]
-pub struct ReadFormatData {
+struct ReadFormatData {
     value: u64,
     time_enabled: u64,
     time_running: u64,
@@ -517,11 +521,26 @@ pub struct ReadFormatData {
     _lost: u64,
 }
 
-pub struct PerfEventFile {
+#[derive(Default)]
+struct PerfEventFileState {
+    _attr: perf_event_attr,
+    rf_value: u64, // "count" for the config we passed in for the event.
+    // The most recent timestamp (ns) where we changed into an enabled state
+    // i.e. the most recent time we got an ENABLE ioctl().
+    most_recent_enabled_time: u64,
+    // Sum of all previous enablement segment durations (ns). If we are
+    // currently in an enabled state, explicitly does NOT include the current
+    // segment.
+    total_time_running: u64,
+    rf_id: u64,
+    _rf_lost: u64,
+    disabled: u64,
+}
+
+struct PerfEventFile {
     _pid: pid_t,
     _cpu: i32,
-    _attr: perf_event_attr,
-    read_format_data: ReadFormatData,
+    perf_event_file: RwLock<PerfEventFileState>,
 }
 
 // PerfEventFile object that implements FileOps.
@@ -552,8 +571,45 @@ impl FileOps for PerfEventFile {
             "[perf_event_open] implement remaining error handling"
         );
 
-        let bytes: &[u8; std::mem::size_of::<ReadFormatData>()] =
-            zerocopy::transmute_ref!(&self.read_format_data);
+        // Create/calculate and return the ReadFormatData object.
+        // If we create it earlier we might want to change it and it's immutable once created.
+        let output = {
+            // Once we get the `value` or count from kernel, we can change this to a read()
+            // call instead of write().
+            let mut perf_event_file = self.perf_event_file.write();
+            let mut total_time_running_including_curr = perf_event_file.total_time_running;
+
+            // If enabled, update values. If disabled, don't.
+            if perf_event_file.disabled == 0 {
+                // Calculate the value or "count" of the config we're interested in.
+                // This value should reflect the value we are counting (defined in the config).
+                // E.g. for PERF_COUNT_SW_CPU_CLOCK it would return the value from the CPU clock.
+                // For now we just return rf_value + 1.
+                track_stub!(
+                    TODO("https://fxbug.dev/402938671"),
+                    "[perf_event_open] implement read_format value"
+                );
+                perf_event_file.rf_value += 1;
+
+                // Update time duration.
+                let curr_time = zx::MonotonicInstant::get().into_nanos() as u64;
+                total_time_running_including_curr +=
+                    curr_time - perf_event_file.most_recent_enabled_time;
+            }
+
+            ReadFormatData {
+                value: perf_event_file.rf_value,
+                // Total time (ns) event was enabled and running (currently same as TIME_RUNNING).
+                time_enabled: total_time_running_including_curr,
+                // Total time (ns) event was enabled and running (currently same as TIME_ENABLED).
+                time_running: total_time_running_including_curr,
+                id: perf_event_file.rf_id,
+                ..Default::default()
+            }
+        };
+
+        let bytes: &[u8; std::mem::size_of::<ReadFormatData>()] = zerocopy::transmute_ref!(&output);
+
         data.write(bytes)
     }
 
@@ -562,14 +618,55 @@ impl FileOps for PerfEventFile {
         _locked: &mut Locked<'_, Unlocked>,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        _request: u32,
+        op: u32,
         _arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         track_stub!(
-            TODO("https://fxbug.dev/394960158"),
-            "[perf_event_open] implement perf event functions"
+            TODO("https://fxbug.dev/405463320"),
+            "[perf_event_open] implement PERF_IOC_FLAG_GROUP"
         );
-        error!(ENOSYS)
+        let mut perf_event_file = self.perf_event_file.write();
+        match op {
+            PERF_EVENT_IOC_ENABLE => {
+                if perf_event_file.disabled != 0 {
+                    perf_event_file.disabled = 0; // 0 = false.
+                    perf_event_file.most_recent_enabled_time =
+                        zx::MonotonicInstant::get().into_nanos() as u64;
+                }
+                return Ok(SUCCESS);
+            }
+            PERF_EVENT_IOC_DISABLE => {
+                if perf_event_file.disabled == 0 {
+                    perf_event_file.disabled = 1; // 1 = true.
+
+                    // Update total_time_running now that the segment has ended.
+                    let curr_time = zx::MonotonicInstant::get().into_nanos() as u64;
+                    perf_event_file.total_time_running +=
+                        curr_time - perf_event_file.most_recent_enabled_time;
+                }
+                return Ok(SUCCESS);
+            }
+            PERF_EVENT_IOC_RESET => {
+                perf_event_file.rf_value = 0;
+                return Ok(SUCCESS);
+            }
+            PERF_EVENT_IOC_REFRESH
+            | PERF_EVENT_IOC_PERIOD
+            | PERF_EVENT_IOC_SET_OUTPUT
+            | PERF_EVENT_IOC_SET_FILTER
+            | PERF_EVENT_IOC_ID
+            | PERF_EVENT_IOC_SET_BPF
+            | PERF_EVENT_IOC_PAUSE_OUTPUT
+            | PERF_EVENT_IOC_MODIFY_ATTRIBUTES
+            | PERF_EVENT_IOC_QUERY_BPF => {
+                track_stub!(
+                    TODO("https://fxbug.dev/404941053"),
+                    "[perf_event_open] implement remaining ioctl() calls"
+                );
+                return error!(EINVAL);
+            }
+            _ => error!(ENOTTY),
+        }
     }
 
     fn write(
@@ -613,27 +710,30 @@ pub fn sys_perf_event_open(
     // section of https://man7.org/linux/man-pages/man2/perf_event_open.2.html for a single event.
     // Other features will be added in the future (see below track_stubs).
     let perf_event_attrs: perf_event_attr = current_task.read_object(attr)?;
-    let read_format = perf_event_attrs.read_format;
-    let mut read_format_data = ReadFormatData::default();
-    track_stub!(
-        TODO("https://fxbug.dev/402938671"),
-        "[perf_event_open] implement read_format value"
-    );
-    read_format_data.value = 1;
+    let mut perf_event_file = PerfEventFileState {
+        _attr: perf_event_attrs,
+        disabled: perf_event_attrs.disabled(),
+        rf_value: 0,
+        ..Default::default()
+    };
 
-    if (read_format & perf_event_read_format_PERF_FORMAT_TOTAL_TIME_ENABLED as u64) != 0 {
-        // Total time (ns) the event was enabled and running (currently same as TIME_RUNNING).
-        // Currently this just returns the monotonic time as we don't have a "duration" yet.
-        read_format_data.time_enabled = zx::MonotonicInstant::get().into_nanos() as u64;
-    }
-    if (read_format & perf_event_read_format_PERF_FORMAT_TOTAL_TIME_RUNNING as u64) != 0 {
-        // Total time (ns) the event was enabled and running (currently same as TIME_ENABLED).
-        // Currently this just returns the monotonic time as we don't have a "duration" yet.
-        read_format_data.time_running = zx::MonotonicInstant::get().into_nanos() as u64;
+    let read_format = perf_event_attrs.read_format;
+
+    if (read_format & perf_event_read_format_PERF_FORMAT_TOTAL_TIME_ENABLED as u64) != 0
+        || (read_format & perf_event_read_format_PERF_FORMAT_TOTAL_TIME_RUNNING as u64) != 0
+    {
+        // Only keep track of most_recent_enabled_time if we are currently in ENABLED state,
+        // as otherwise this param shouldn't be used for calculating anything.
+        if perf_event_file.disabled == 0 {
+            perf_event_file.most_recent_enabled_time =
+                zx::MonotonicInstant::get().into_nanos() as u64;
+        }
+        // Initialize this to 0 as we will need to return a time duration later during read().
+        perf_event_file.total_time_running = 0;
     }
     if (read_format & perf_event_read_format_PERF_FORMAT_ID as u64) != 0 {
         // Adds a 64-bit unique value that corresponds to the event group.
-        read_format_data.id = READ_FORMAT_ID_GENERATOR.fetch_add(1, Ordering::Relaxed);
+        perf_event_file.rf_id = READ_FORMAT_ID_GENERATOR.fetch_add(1, Ordering::Relaxed);
     }
     if (read_format & perf_event_read_format_PERF_FORMAT_GROUP as u64) != 0 {
         track_stub!(
@@ -649,9 +749,11 @@ pub fn sys_perf_event_open(
         );
     }
 
-    let perf_event_file =
-        PerfEventFile { _pid: pid, _cpu: cpu, _attr: perf_event_attrs, read_format_data };
-    let file = Box::new(perf_event_file);
+    let file = Box::new(PerfEventFile {
+        _pid: pid,
+        _cpu: cpu,
+        perf_event_file: RwLock::new(perf_event_file),
+    });
     // TODO: https://fxbug.dev/404739824 - Confirm whether to handle this as a "private" node.
     let file_handle = Anon::new_private_file(current_task, file, OpenFlags::RDWR, "[perf_event]");
     let file_descriptor = current_task.add_file(file_handle, FdFlags::empty());
