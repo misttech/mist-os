@@ -675,10 +675,15 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
 
         let config = Borrow::borrow(config);
         let Ipv6DeviceConfiguration {
-            dad_transmits,
             max_router_solicitations: _,
             slaac_config,
-            ip_config: _,
+            ip_config:
+                IpDeviceConfiguration {
+                    unicast_forwarding_enabled: _,
+                    multicast_forwarding_enabled: _,
+                    gmp_enabled: _,
+                    dad_transmits,
+                },
         } = *config;
 
         let ipv6_state = &core_ctx.unlocked_access::<crate::lock_ordering::UnlockedState>().ipv6;
@@ -830,7 +835,7 @@ impl<
         cb(DadStateRef {
             state: DadAddressStateRef { dad_state: dad_state.deref_mut(), core_ctx: &mut core_ctx },
             retrans_timer: &retrans_timer,
-            max_dad_transmits: &config.dad_transmits,
+            max_dad_transmits: &config.ip_config.dad_transmits,
         })
     }
 
@@ -1277,7 +1282,6 @@ impl<
     ) -> O {
         let Self { config, core_ctx } = self;
         let Ipv6DeviceConfiguration {
-            dad_transmits: _,
             max_router_solicitations: _,
             slaac_config: _,
             ip_config: IpDeviceConfiguration { gmp_enabled, .. },

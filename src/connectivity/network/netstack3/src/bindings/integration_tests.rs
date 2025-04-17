@@ -18,7 +18,7 @@ use net_types::ip::{AddrSubnetEither, Ip, IpAddr, IpInvariant, Ipv4, Ipv6};
 use net_types::{SpecifiedAddr, Witness as _};
 use netstack3_core::device::{DeviceId, EthernetLinkDevice};
 use netstack3_core::error::AddressResolutionFailed;
-use netstack3_core::ip::Ipv6DeviceConfigurationUpdate;
+use netstack3_core::ip::{IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate};
 use netstack3_core::neighbor::LinkResolutionResult;
 use netstack3_core::routes::{AddableEntry, AddableEntryEither, AddableMetric, Entry, RawMetric};
 use {
@@ -555,7 +555,10 @@ impl TestSetupBuilder {
                         .update_configuration(
                             &device,
                             Ipv6DeviceConfigurationUpdate {
-                                dad_transmits: Some(None),
+                                ip_config: IpDeviceConfigurationUpdate {
+                                    dad_transmits: Some(None),
+                                    ..Default::default()
+                                },
                                 ..Default::default()
                             },
                         )

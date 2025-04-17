@@ -346,13 +346,16 @@ fn test_dad_duplicate_address_detected_solicitation() {
 
     // Create the devices (will start DAD at the same time).
     let update = Ipv6DeviceConfigurationUpdate {
-        // Doesn't matter as long as we perform DAD.
-        dad_transmits: Some(NonZeroU16::new(1)),
         slaac_config: SlaacConfigurationUpdate {
             stable_address_configuration: Some(StableSlaacAddressConfiguration::ENABLED_WITH_EUI64),
             ..Default::default()
         },
-        ip_config: IpDeviceConfigurationUpdate { ip_enabled: Some(true), ..Default::default() },
+        ip_config: IpDeviceConfigurationUpdate {
+            ip_enabled: Some(true),
+            // Doesn't matter as long as we perform DAD.
+            dad_transmits: Some(NonZeroU16::new(1)),
+            ..Default::default()
+        },
         ..Default::default()
     };
     net.with_context("local", |ctx| {
@@ -439,9 +442,12 @@ fn test_dad_duplicate_address_detected_advertisement() {
 
     // Enable DAD.
     let update = Ipv6DeviceConfigurationUpdate {
-        // Doesn't matter as long as we perform DAD.
-        dad_transmits: Some(NonZeroU16::new(1)),
-        ip_config: IpDeviceConfigurationUpdate { ip_enabled: Some(true), ..Default::default() },
+        ip_config: IpDeviceConfigurationUpdate {
+            ip_enabled: Some(true),
+            // Doesn't matter as long as we perform DAD.
+            dad_transmits: Some(NonZeroU16::new(1)),
+            ..Default::default()
+        },
         ..Default::default()
     };
     let addr = AddrSubnet::<Ipv6Addr, _>::new(local_ip().into(), 128).unwrap();
@@ -540,9 +546,9 @@ fn test_dad_set_ipv6_address_when_ongoing() {
         .update_configuration(
             &dev_id,
             Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(NonZeroU16::new(1)),
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
+                    dad_transmits: Some(NonZeroU16::new(1)),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -588,9 +594,9 @@ fn test_dad_three_transmits_no_conflicts() {
         .update_configuration(
             &dev_id,
             Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(NonZeroU16::new(3)),
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
+                    dad_transmits: Some(NonZeroU16::new(3)),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -620,8 +626,11 @@ fn test_dad_three_transmits_with_conflicts() {
     let remote_device_id = remote_eth_device_id.into();
 
     let update = Ipv6DeviceConfigurationUpdate {
-        dad_transmits: Some(NonZeroU16::new(3)),
-        ip_config: IpDeviceConfigurationUpdate { ip_enabled: Some(true), ..Default::default() },
+        ip_config: IpDeviceConfigurationUpdate {
+            ip_enabled: Some(true),
+            dad_transmits: Some(NonZeroU16::new(3)),
+            ..Default::default()
+        },
         ..Default::default()
     };
     net.with_context("local", |ctx| {
@@ -744,10 +753,10 @@ fn test_dad_multiple_ips_simultaneously() {
         .update_configuration(
             &dev_id,
             Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(NonZeroU16::new(3)),
                 max_router_solicitations: Some(None),
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
+                    dad_transmits: Some(NonZeroU16::new(3)),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -818,10 +827,10 @@ fn test_dad_cancel_when_ip_removed() {
         .update_configuration(
             &dev_id,
             Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(NonZeroU16::new(3)),
                 max_router_solicitations: Some(None),
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
+                    dad_transmits: Some(NonZeroU16::new(3)),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -1496,9 +1505,9 @@ fn test_set_ndp_config_dup_addr_detect_transmits() {
         .update_configuration(
             &device,
             Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(NonZeroU16::new(DUP_ADDR_DETECT_TRANSMITS)),
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
+                    dad_transmits: Some(NonZeroU16::new(DUP_ADDR_DETECT_TRANSMITS)),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -1522,7 +1531,13 @@ fn test_set_ndp_config_dup_addr_detect_transmits() {
         .device_ip::<Ipv6>()
         .update_configuration(
             &device,
-            Ipv6DeviceConfigurationUpdate { dad_transmits: Some(None), ..Default::default() },
+            Ipv6DeviceConfigurationUpdate {
+                ip_config: IpDeviceConfigurationUpdate {
+                    dad_transmits: Some(None),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
         )
         .unwrap();
 
@@ -2164,7 +2179,6 @@ fn test_host_slaac_address_deprecate_while_tentative() {
             &device,
             Ipv6DeviceConfigurationUpdate {
                 // Doesn't matter as long as we perform DAD.
-                dad_transmits: Some(NonZeroU16::new(1)),
                 slaac_config: SlaacConfigurationUpdate {
                     stable_address_configuration: Some(
                         StableSlaacAddressConfiguration::ENABLED_WITH_EUI64,
@@ -2173,6 +2187,7 @@ fn test_host_slaac_address_deprecate_while_tentative() {
                 },
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
+                    dad_transmits: Some(NonZeroU16::new(1)),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -2582,10 +2597,10 @@ fn test_host_slaac_regenerates_address_on_dad_failure(slaac_type: SlaacType) {
             &device,
             Ipv6DeviceConfigurationUpdate {
                 // Doesn't matter as long as we perform DAD.
-                dad_transmits: Some(NonZeroU16::new(1)),
                 slaac_config: slaac_type.config_update(),
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
+                    dad_transmits: Some(NonZeroU16::new(1)),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -2706,10 +2721,10 @@ fn test_host_slaac_gives_up_after_dad_failures(slaac_type: SlaacType) {
             &device,
             Ipv6DeviceConfigurationUpdate {
                 // Doesn't matter as long as we perform DAD.
-                dad_transmits: Some(NonZeroU16::new(1)),
                 slaac_config: slaac_type.config_update(),
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
+                    dad_transmits: Some(NonZeroU16::new(1)),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -2958,9 +2973,9 @@ fn test_host_temporary_slaac_config_update_skips_regen() {
         .update_configuration(
             &device,
             Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(None),
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
+                    dad_transmits: Some(None),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -2991,9 +3006,12 @@ fn test_host_temporary_slaac_config_update_skips_regen() {
         .update_configuration(
             &device,
             Ipv6DeviceConfigurationUpdate {
-                // Perform DAD for later addresses.
-                dad_transmits: Some(NonZeroU16::new(1)),
                 slaac_config,
+                ip_config: IpDeviceConfigurationUpdate {
+                    // Perform DAD for later addresses.
+                    dad_transmits: Some(NonZeroU16::new(1)),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
         )

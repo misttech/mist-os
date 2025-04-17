@@ -242,6 +242,8 @@ pub struct InterfaceConfig<'a> {
     /// Optional default route metric.
     pub metric: Option<u32>,
     /// Number of DAD transmits to use before marking an address as Assigned.
+    // TODO(https://fxbug.dev/42077260): Make it clear this is only IPv6 DAD
+    // transmits.
     pub dad_transmits: Option<u16>,
 }
 

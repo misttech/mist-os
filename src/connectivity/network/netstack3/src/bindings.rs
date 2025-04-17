@@ -93,7 +93,7 @@ use netstack3_core::icmp::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpS
 use netstack3_core::inspect::{InspectableValue, Inspector};
 use netstack3_core::ip::{
     AddIpAddrSubnetError, AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
-    IpLayerEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration,
+    IpLayerEvent, Ipv4DeviceConfiguration, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration,
     Ipv6DeviceConfigurationUpdate, Lifetime, RouterAdvertisementEvent, SlaacConfigurationUpdate,
 };
 use netstack3_core::routes::RawMetric;
@@ -1140,6 +1140,7 @@ impl Netstack {
             unicast_forwarding_enabled: Some(false),
             multicast_forwarding_enabled: Some(false),
             gmp_enabled: Some(false),
+            dad_transmits: Some(None),
         };
 
         let _: Ipv4DeviceConfigurationUpdate = self
@@ -1158,7 +1159,6 @@ impl Netstack {
             .update_configuration(
                 &loopback,
                 Ipv6DeviceConfigurationUpdate {
-                    dad_transmits: Some(None),
                     max_router_solicitations: Some(None),
                     slaac_config: SlaacConfigurationUpdate {
                         stable_address_configuration: None,

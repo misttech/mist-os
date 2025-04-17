@@ -49,6 +49,8 @@ pub struct IpDeviceConfigurationUpdate {
     pub multicast_forwarding_enabled: Option<bool>,
     /// A change in Group Messaging Protocol (GMP) enabled.
     pub gmp_enabled: Option<bool>,
+    /// A change in DAD transmits.
+    pub dad_transmits: Option<Option<NonZeroU16>>,
 }
 
 /// An update to IPv4 device configuration.
@@ -103,6 +105,7 @@ impl<'a, I: IpDeviceIpExt, D: DeviceIdentifier> PendingIpDeviceConfigurationUpda
             gmp_enabled: _,
             unicast_forwarding_enabled,
             multicast_forwarding_enabled,
+            dad_transmits: _,
         } = config.as_ref();
 
         if device_id.is_loopback() {
@@ -142,6 +145,7 @@ where
                     gmp_enabled,
                     unicast_forwarding_enabled,
                     multicast_forwarding_enabled,
+                    dad_transmits,
                 } = ip_config;
                 (
                     get_prev_next_and_update(&mut flags.ip_enabled, ip_enabled),
@@ -154,6 +158,7 @@ where
                         &mut config.ip_config.multicast_forwarding_enabled,
                         multicast_forwarding_enabled,
                     ),
+                    get_prev_next_and_update(&mut config.ip_config.dad_transmits, dad_transmits),
                 )
             };
 
@@ -163,6 +168,7 @@ where
                 gmp_enabled_updates,
                 unicast_forwarding_enabled_updates,
                 multicast_forwarding_enabled_updates,
+                dad_transmits,
             ) = inner.with_configuration_and_flags_mut(device_id, handle_config_and_flags);
 
             let (config, mut core_ctx) = inner.ip_device_configuration_and_ctx();
@@ -206,11 +212,13 @@ where
                 dont_handle_change_and_get_prev(unicast_forwarding_enabled_updates);
             let multicast_forwarding_enabled =
                 dont_handle_change_and_get_prev(multicast_forwarding_enabled_updates);
+            let dad_transmits = dont_handle_change_and_get_prev(dad_transmits);
             let ip_config = IpDeviceConfigurationUpdate {
                 ip_enabled,
                 gmp_enabled,
                 unicast_forwarding_enabled,
                 multicast_forwarding_enabled,
+                dad_transmits,
             };
             Ipv4DeviceConfigurationUpdate { ip_config, igmp_mode }
         })
@@ -220,8 +228,6 @@ where
 /// An update to IPv6 device configuration.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Ipv6DeviceConfigurationUpdate {
-    /// A change in DAD transmits.
-    pub dad_transmits: Option<Option<NonZeroU16>>,
     /// A change in maximum router solicitations.
     pub max_router_solicitations: Option<Option<NonZeroU8>>,
     /// A change in SLAAC configuration.
@@ -256,7 +262,6 @@ where
     ) -> Ipv6DeviceConfigurationUpdate {
         let PendingIpDeviceConfigurationUpdate(
             Ipv6DeviceConfigurationUpdate {
-                dad_transmits,
                 max_router_solicitations,
                 slaac_config,
                 ip_config,
@@ -266,22 +271,22 @@ where
         ) = config;
         self.with_ipv6_device_configuration_mut(device_id, |mut inner| {
             let (
-                dad_transmits_updates,
                 max_router_solicitations_updates,
                 slaac_config_updates,
                 ip_enabled_updates,
                 gmp_enabled_updates,
                 unicast_forwarding_enabled_updates,
                 multicast_forwarding_enabled_updates,
+                dad_transmits,
             ) = inner.with_configuration_and_flags_mut(device_id, |config, flags| {
                 let IpDeviceConfigurationUpdate {
                     ip_enabled,
                     gmp_enabled,
                     unicast_forwarding_enabled,
                     multicast_forwarding_enabled,
+                    dad_transmits,
                 } = ip_config;
                 (
-                    get_prev_next_and_update(&mut config.dad_transmits, dad_transmits),
                     get_prev_next_and_update(
                         &mut config.max_router_solicitations,
                         max_router_solicitations,
@@ -297,13 +302,13 @@ where
                         &mut config.ip_config.multicast_forwarding_enabled,
                         multicast_forwarding_enabled,
                     ),
+                    get_prev_next_and_update(&mut config.ip_config.dad_transmits, dad_transmits),
                 )
             });
 
             let (config, mut core_ctx) = inner.ipv6_device_configuration_and_ctx();
             let core_ctx = &mut core_ctx;
 
-            let dad_transmits = dont_handle_change_and_get_prev(dad_transmits_updates);
             let max_router_solicitations =
                 dont_handle_change_and_get_prev(max_router_solicitations_updates);
 
@@ -367,9 +372,9 @@ where
                 multicast_forwarding_enabled: dont_handle_change_and_get_prev(
                     multicast_forwarding_enabled_updates,
                 ),
+                dad_transmits: dont_handle_change_and_get_prev(dad_transmits),
             };
             Ipv6DeviceConfigurationUpdate {
-                dad_transmits,
                 max_router_solicitations,
                 slaac_config: slaac_config_updates,
                 ip_config,

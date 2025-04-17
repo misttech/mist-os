@@ -3642,22 +3642,43 @@ async fn dad_transmits<N: Netstack>(name: &str) {
     let iface = realm.join_network(&network, "client").await.expect("join network");
 
     let transmits_from_config = |config: finterfaces_admin::Configuration| {
-        config.ipv6.and_then(|ipv6| ipv6.ndp).and_then(|ndp| ndp.dad).and_then(|dad| dad.transmits)
+        let ipv4 = config
+            .ipv4
+            .and_then(|ipv4| ipv4.arp)
+            .and_then(|arp| arp.dad)
+            .and_then(|dad| dad.transmits);
+        let ipv6 = config
+            .ipv6
+            .and_then(|ipv6| ipv6.ndp)
+            .and_then(|ndp| ndp.dad)
+            .and_then(|dad| dad.transmits);
+        (ipv4, ipv6)
     };
 
-    let transmits_to_config = |transmits: u16| finterfaces_admin::Configuration {
-        ipv6: Some(finterfaces_admin::Ipv6Configuration {
-            ndp: Some(finterfaces_admin::NdpConfiguration {
-                dad: Some(finterfaces_admin::DadConfiguration {
-                    transmits: Some(transmits),
+    let transmits_to_config =
+        |ipv4_transmits: u16, ipv6_transmits: u16| finterfaces_admin::Configuration {
+            ipv4: Some(finterfaces_admin::Ipv4Configuration {
+                arp: Some(finterfaces_admin::ArpConfiguration {
+                    dad: Some(finterfaces_admin::DadConfiguration {
+                        transmits: Some(ipv4_transmits),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ipv6: Some(finterfaces_admin::Ipv6Configuration {
+                ndp: Some(finterfaces_admin::NdpConfiguration {
+                    dad: Some(finterfaces_admin::DadConfiguration {
+                        transmits: Some(ipv6_transmits),
+                        ..Default::default()
+                    }),
                     ..Default::default()
                 }),
                 ..Default::default()
             }),
             ..Default::default()
-        }),
-        ..Default::default()
-    };
+        };
 
     let get_transmits = || async {
         transmits_from_config(
@@ -3681,19 +3702,32 @@ async fn dad_transmits<N: Netstack>(name: &str) {
         }
     };
 
-    // Default number of transmits defined in RFC 4862.
-    const DEFAULT_DAD_TRANSMITS: u16 = 1;
-    assert_eq!(get_transmits().await, get_expectation(DEFAULT_DAD_TRANSMITS));
+    // Default number of DAD transmits. Defined in RFC 5227 for IPv4 and
+    // RFC 4862 for IPv6.
+    const DEFAULT_DAD_TRANSMITS_IPV4: u16 = 3;
+    const DEFAULT_DAD_TRANSMITS_IPV6: u16 = 1;
 
-    const WANT_TRANSMITS: u16 = 3;
+    let (initial_ipv4, initial_ipv6) = get_transmits().await;
+    assert_eq!(initial_ipv4, get_expectation(DEFAULT_DAD_TRANSMITS_IPV4));
+    assert_eq!(initial_ipv6, get_expectation(DEFAULT_DAD_TRANSMITS_IPV6));
+
+    // Arbitrary Values, that are distinguishable from one another.
+    const WANT_TRANSMITS_IPV4: u16 = 4;
+    const WANT_TRANSMITS_IPV6: u16 = 6;
     let update = iface
         .control()
-        .set_configuration(&transmits_to_config(WANT_TRANSMITS))
+        .set_configuration(&transmits_to_config(WANT_TRANSMITS_IPV4, WANT_TRANSMITS_IPV6))
         .await
         .expect("set configuration failed")
         .expect("set configuration error");
-    assert_eq!(transmits_from_config(update), get_expectation(DEFAULT_DAD_TRANSMITS));
-    assert_eq!(get_transmits().await, get_expectation(WANT_TRANSMITS));
+
+    let (ipv4_from_update, ipv6_from_update) = transmits_from_config(update);
+    assert_eq!(ipv4_from_update, get_expectation(DEFAULT_DAD_TRANSMITS_IPV4));
+    assert_eq!(ipv6_from_update, get_expectation(DEFAULT_DAD_TRANSMITS_IPV6));
+
+    let (new_ipv4, new_ipv6) = get_transmits().await;
+    assert_eq!(new_ipv4, get_expectation(WANT_TRANSMITS_IPV4));
+    assert_eq!(new_ipv6, get_expectation(WANT_TRANSMITS_IPV6));
 }
 
 #[netstack_test]

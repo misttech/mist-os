@@ -244,9 +244,6 @@ fn enable_disable_ipv6() {
         .update_configuration(
             &device_id,
             Ipv6DeviceConfigurationUpdate {
-                // Doesn't matter as long as we perform DAD and router
-                // solicitation.
-                dad_transmits: Some(NonZeroU16::new(1)),
                 max_router_solicitations: Some(NonZeroU8::new(1)),
                 // Auto-generate a link-local address.
                 slaac_config: SlaacConfigurationUpdate {
@@ -257,6 +254,9 @@ fn enable_disable_ipv6() {
                 },
                 ip_config: IpDeviceConfigurationUpdate {
                     gmp_enabled: Some(true),
+                    // Doesn't matter as long as we perform DAD and router
+                    // solicitation.
+                    dad_transmits: Some(NonZeroU16::new(1)),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -557,6 +557,7 @@ fn forget_learned_network_params_on_disable_ipv6() {
 #[test]
 fn add_ipv6_address_with_dad_disabled() {
     let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
+    // NB: DAD is disabled on the device by default.
     let ethernet_device_id =
         ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
             EthernetCreationProperties {
@@ -568,18 +569,6 @@ fn add_ipv6_address_with_dad_disabled() {
     let ll_addr = Ipv6::TEST_ADDRS.local_mac.to_ipv6_link_local();
     let device_id: DeviceId<FakeBindingsCtx> = ethernet_device_id.into();
     let weak_device_id = device_id.downgrade();
-    let _: Ipv6DeviceConfigurationUpdate = ctx
-        .core_api()
-        .device_ip::<Ipv6>()
-        .update_configuration(
-            &device_id,
-            Ipv6DeviceConfigurationUpdate {
-                // Disable DAD.
-                dad_transmits: None,
-                ..Default::default()
-            },
-        )
-        .unwrap();
 
     // Enable the device
     assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv6>(&device_id, true), false);
@@ -613,6 +602,7 @@ fn add_ipv6_address_with_dad_disabled() {
 #[test]
 fn enable_ipv6_dev_with_dad_disabled() {
     let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
+    // NB: DAD is disabled on the device by default.
     let ethernet_device_id =
         ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
             EthernetCreationProperties {
@@ -624,18 +614,6 @@ fn enable_ipv6_dev_with_dad_disabled() {
     let ll_addr = Ipv6::TEST_ADDRS.local_mac.to_ipv6_link_local();
     let device_id: DeviceId<FakeBindingsCtx> = ethernet_device_id.into();
     let weak_device_id = device_id.downgrade();
-    let _: Ipv6DeviceConfigurationUpdate = ctx
-        .core_api()
-        .device_ip::<Ipv6>()
-        .update_configuration(
-            &device_id,
-            Ipv6DeviceConfigurationUpdate {
-                // Disable DAD.
-                dad_transmits: None,
-                ..Default::default()
-            },
-        )
-        .unwrap();
 
     // Add the address. Because the device is disabled, its assignment state
     // should be `Unavailable`.
@@ -697,7 +675,6 @@ fn notify_on_dad_failure_ipv6() {
         .update_configuration(
             &device_id,
             Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(NonZeroU16::new(1)),
                 max_router_solicitations: Some(NonZeroU8::new(1)),
                 // Auto-generate a link-local address.
                 slaac_config: SlaacConfigurationUpdate {
@@ -708,6 +685,7 @@ fn notify_on_dad_failure_ipv6() {
                 },
                 ip_config: IpDeviceConfigurationUpdate {
                     gmp_enabled: Some(true),
+                    dad_transmits: Some(NonZeroU16::new(1)),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -816,6 +794,7 @@ fn update_ip_device_configuration_err<I: IpExt>() {
                 ),
                 unicast_forwarding_enabled: Some(true),
                 multicast_forwarding_enabled: None,
+                dad_transmits: None,
             }
             .into(),
         )
@@ -859,6 +838,7 @@ fn update_ipv4_configuration_return() {
                     unicast_forwarding_enabled: Some(false),
                     multicast_forwarding_enabled: Some(false),
                     gmp_enabled: Some(true),
+                    dad_transmits: Some(NonZeroU16::new(1)),
                 },
                 igmp_mode: Some(IgmpConfigMode::V1),
             },
@@ -869,6 +849,7 @@ fn update_ipv4_configuration_return() {
                 unicast_forwarding_enabled: Some(false),
                 multicast_forwarding_enabled: Some(false),
                 gmp_enabled: Some(false),
+                dad_transmits: Some(None),
             },
             igmp_mode: Some(IgmpConfigMode::V3),
         }),
@@ -884,6 +865,7 @@ fn update_ipv4_configuration_return() {
                     unicast_forwarding_enabled: Some(true),
                     multicast_forwarding_enabled: Some(true),
                     gmp_enabled: None,
+                    dad_transmits: None,
                 },
                 igmp_mode: None,
             },
@@ -894,6 +876,7 @@ fn update_ipv4_configuration_return() {
                 unicast_forwarding_enabled: Some(false),
                 multicast_forwarding_enabled: Some(false),
                 gmp_enabled: None,
+                dad_transmits: None,
             },
             igmp_mode: None,
         }),
@@ -910,6 +893,7 @@ fn update_ipv4_configuration_return() {
                     unicast_forwarding_enabled: None,
                     multicast_forwarding_enabled: None,
                     gmp_enabled: Some(true),
+                    dad_transmits: None,
                 },
                 igmp_mode: None,
             },
@@ -920,6 +904,7 @@ fn update_ipv4_configuration_return() {
                 unicast_forwarding_enabled: None,
                 multicast_forwarding_enabled: None,
                 gmp_enabled: Some(true),
+                dad_transmits: None,
             },
             igmp_mode: None,
         }),
@@ -935,6 +920,7 @@ fn update_ipv4_configuration_return() {
                     unicast_forwarding_enabled: Some(false),
                     multicast_forwarding_enabled: Some(false),
                     gmp_enabled: Some(false),
+                    dad_transmits: Some(None),
                 },
                 igmp_mode: Some(IgmpConfigMode::V3),
             },
@@ -945,6 +931,7 @@ fn update_ipv4_configuration_return() {
                 unicast_forwarding_enabled: Some(true),
                 multicast_forwarding_enabled: Some(true),
                 gmp_enabled: Some(true),
+                dad_transmits: Some(NonZeroU16::new(1)),
             },
             igmp_mode: Some(IgmpConfigMode::V1),
         }),
@@ -981,7 +968,6 @@ fn update_ipv6_configuration_return() {
         api.update_configuration(
             &device_id,
             Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(NonZeroU16::new(1)),
                 max_router_solicitations: Some(NonZeroU8::new(2)),
                 slaac_config: SlaacConfigurationUpdate {
                     stable_address_configuration: Some(
@@ -996,12 +982,12 @@ fn update_ipv6_configuration_return() {
                     unicast_forwarding_enabled: Some(false),
                     multicast_forwarding_enabled: Some(false),
                     gmp_enabled: Some(true),
+                    dad_transmits: Some(NonZeroU16::new(1)),
                 },
                 mld_mode: Some(MldConfigMode::V1),
             },
         ),
         Ok(Ipv6DeviceConfigurationUpdate {
-            dad_transmits: Some(None),
             max_router_solicitations: Some(None),
             slaac_config: SlaacConfigurationUpdate {
                 stable_address_configuration: Some(StableSlaacAddressConfiguration::Disabled),
@@ -1012,6 +998,7 @@ fn update_ipv6_configuration_return() {
                 unicast_forwarding_enabled: Some(false),
                 multicast_forwarding_enabled: Some(false),
                 gmp_enabled: Some(false),
+                dad_transmits: Some(None),
             },
             mld_mode: Some(MldConfigMode::V2),
         }),
@@ -1022,7 +1009,6 @@ fn update_ipv6_configuration_return() {
         api.update_configuration(
             &device_id,
             Ipv6DeviceConfigurationUpdate {
-                dad_transmits: None,
                 max_router_solicitations: None,
                 slaac_config: SlaacConfigurationUpdate::default(),
                 ip_config: IpDeviceConfigurationUpdate {
@@ -1030,12 +1016,12 @@ fn update_ipv6_configuration_return() {
                     unicast_forwarding_enabled: Some(true),
                     multicast_forwarding_enabled: Some(true),
                     gmp_enabled: None,
+                    dad_transmits: None,
                 },
                 mld_mode: None,
             },
         ),
         Ok(Ipv6DeviceConfigurationUpdate {
-            dad_transmits: None,
             max_router_solicitations: None,
             slaac_config: SlaacConfigurationUpdate::default(),
             ip_config: IpDeviceConfigurationUpdate {
@@ -1043,6 +1029,7 @@ fn update_ipv6_configuration_return() {
                 unicast_forwarding_enabled: Some(false),
                 multicast_forwarding_enabled: Some(false),
                 gmp_enabled: None,
+                dad_transmits: None,
             },
             mld_mode: None,
         }),
@@ -1054,7 +1041,6 @@ fn update_ipv6_configuration_return() {
         api.update_configuration(
             &device_id,
             Ipv6DeviceConfigurationUpdate {
-                dad_transmits: None,
                 max_router_solicitations: None,
                 slaac_config: SlaacConfigurationUpdate::default(),
                 ip_config: IpDeviceConfigurationUpdate {
@@ -1062,12 +1048,12 @@ fn update_ipv6_configuration_return() {
                     unicast_forwarding_enabled: None,
                     multicast_forwarding_enabled: None,
                     gmp_enabled: Some(true),
+                    dad_transmits: None,
                 },
                 mld_mode: None,
             },
         ),
         Ok(Ipv6DeviceConfigurationUpdate {
-            dad_transmits: None,
             max_router_solicitations: None,
             slaac_config: SlaacConfigurationUpdate::default(),
             ip_config: IpDeviceConfigurationUpdate {
@@ -1075,6 +1061,7 @@ fn update_ipv6_configuration_return() {
                 unicast_forwarding_enabled: None,
                 multicast_forwarding_enabled: None,
                 gmp_enabled: Some(true),
+                dad_transmits: None,
             },
             mld_mode: None,
         }),
@@ -1085,7 +1072,6 @@ fn update_ipv6_configuration_return() {
         api.update_configuration(
             &device_id,
             Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(None),
                 max_router_solicitations: Some(None),
                 slaac_config: SlaacConfigurationUpdate {
                     stable_address_configuration: Some(StableSlaacAddressConfiguration::Disabled),
@@ -1098,12 +1084,12 @@ fn update_ipv6_configuration_return() {
                     unicast_forwarding_enabled: Some(false),
                     multicast_forwarding_enabled: Some(false),
                     gmp_enabled: Some(false),
+                    dad_transmits: Some(None),
                 },
                 mld_mode: Some(MldConfigMode::V2),
             },
         ),
         Ok(Ipv6DeviceConfigurationUpdate {
-            dad_transmits: Some(NonZeroU16::new(1)),
             max_router_solicitations: Some(NonZeroU8::new(2)),
             slaac_config: SlaacConfigurationUpdate {
                 stable_address_configuration: Some(
@@ -1118,6 +1104,7 @@ fn update_ipv6_configuration_return() {
                 unicast_forwarding_enabled: Some(true),
                 multicast_forwarding_enabled: Some(true),
                 gmp_enabled: Some(true),
+                dad_transmits: Some(NonZeroU16::new(1)),
             },
             mld_mode: Some(MldConfigMode::V1),
         }),

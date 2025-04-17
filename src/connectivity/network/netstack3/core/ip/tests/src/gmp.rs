@@ -221,10 +221,6 @@ fn test_mldv1_enable_disable_integration() {
             .update_configuration(
                 &device_id,
                 Ipv6DeviceConfigurationUpdate {
-                    // TODO(https://fxbug.dev/42180878): Make sure that DAD resolving
-                    // for a link-local address results in reports sent with a
-                    // specified source address.
-                    dad_transmits: Some(None),
                     max_router_solicitations: Some(None),
                     // Auto-generate a link-local address.
                     slaac_config: SlaacConfigurationUpdate {
@@ -236,6 +232,10 @@ fn test_mldv1_enable_disable_integration() {
                     ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(ip_enabled),
                         gmp_enabled: Some(gmp_enabled),
+                        // TODO(https://fxbug.dev/42180878): Make sure that DAD resolving
+                        // for a link-local address results in reports sent with a
+                        // specified source address.
+                        dad_transmits: Some(None),
                         ..Default::default()
                     },
                     mld_mode: Some(MldConfigMode::V1),

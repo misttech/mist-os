@@ -1315,6 +1315,7 @@ async fn inspect_devices(name: &str) {
                         "GmpEnabled": false,
                         "ForwardingEnabled": false,
                         "MulticastForwardingEnabled": false,
+                        "DadTransmits": 0u64,
                     },
                     GMP: {
                         Mode: "IGMPv3",
@@ -1339,6 +1340,7 @@ async fn inspect_devices(name: &str) {
                         "GmpEnabled": false,
                         "ForwardingEnabled": false,
                         "MulticastForwardingEnabled": false,
+                        "DadTransmits": 0u64,
                     },
                     GMP: {
                         Mode: "MLDv2",
@@ -1531,6 +1533,7 @@ async fn inspect_devices(name: &str) {
                         "GmpEnabled": true,
                         "ForwardingEnabled": false,
                         "MulticastForwardingEnabled": false,
+                        "DadTransmits": 3u64,
                     },
                     GMP: {
                         Mode: "IGMPv3",
@@ -1560,6 +1563,7 @@ async fn inspect_devices(name: &str) {
                         "GmpEnabled": true,
                         "ForwardingEnabled": false,
                         "MulticastForwardingEnabled": false,
+                        "DadTransmits": u16::MAX,
                     },
                     GMP: {
                         Mode: "MLDv2",

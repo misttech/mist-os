@@ -36,7 +36,7 @@ use crate::bindings::devices::TxTask;
 use crate::bindings::util::NeedsDataNotifier;
 use crate::bindings::{
     devices, interfaces_admin, routes, BindingId, BindingsCtx, Ctx, DeviceId,
-    Ipv6DeviceConfiguration, Netstack, DEFAULT_INTERFACE_METRIC,
+    Ipv4DeviceConfiguration, Ipv6DeviceConfiguration, Netstack, DEFAULT_INTERFACE_METRIC,
 };
 
 /// Like [`DeviceId`], but restricted to netdevice devices.
@@ -604,12 +604,25 @@ impl DeviceHandler {
             }
             add_initial_routes(ctx.bindings_ctx(), &core_id).await;
 
-            let ip_config = IpDeviceConfigurationUpdate {
-                ip_enabled: Some(false),
-                unicast_forwarding_enabled: Some(false),
-                multicast_forwarding_enabled: Some(false),
-                gmp_enabled: Some(true),
-            };
+            /// Construct the update to IpDeviceConfiguration to apply for a
+            /// given IP version
+            fn ip_device_config(version: IpVersion) -> IpDeviceConfigurationUpdate {
+                let dad_transmits = match version {
+                    IpVersion::V4 => {
+                        Ipv4DeviceConfiguration::DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS
+                    }
+                    IpVersion::V6 => {
+                        Ipv6DeviceConfiguration::DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS
+                    }
+                };
+                IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(false),
+                    unicast_forwarding_enabled: Some(false),
+                    multicast_forwarding_enabled: Some(false),
+                    gmp_enabled: Some(true),
+                    dad_transmits: Some(Some(dad_transmits)),
+                }
+            }
 
             let _: Ipv6DeviceConfigurationUpdate = ctx
                 .api()
@@ -617,9 +630,6 @@ impl DeviceHandler {
                 .update_configuration(
                     &core_id,
                     Ipv6DeviceConfigurationUpdate {
-                        dad_transmits: Some(Some(
-                            Ipv6DeviceConfiguration::DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS,
-                        )),
                         max_router_solicitations: Some(Some(
                             Ipv6DeviceConfiguration::DEFAULT_MAX_RTR_SOLICITATIONS,
                         )),
@@ -631,7 +641,7 @@ impl DeviceHandler {
                                 TemporarySlaacAddressConfiguration::enabled_with_rfc_defaults(),
                             ),
                         },
-                        ip_config,
+                        ip_config: ip_device_config(IpVersion::V6),
                         mld_mode: None,
                     },
                 )
@@ -641,7 +651,10 @@ impl DeviceHandler {
                 .device_ip::<Ipv4>()
                 .update_configuration(
                     &core_id,
-                    Ipv4DeviceConfigurationUpdate { ip_config, igmp_mode: None },
+                    Ipv4DeviceConfigurationUpdate {
+                        ip_config: ip_device_config(IpVersion::V4),
+                        igmp_mode: None,
+                    },
                 )
                 .unwrap();
 

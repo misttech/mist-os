@@ -1404,8 +1404,6 @@ fn test_no_dispatch_non_ndp_packets_during_ndp_dad() {
         .update_configuration(
             &device,
             Ipv6DeviceConfigurationUpdate {
-                // Doesn't matter as long as DAD is enabled.
-                dad_transmits: Some(NonZeroU16::new(1)),
                 // Auto-generate a link-local address.
                 slaac_config: SlaacConfigurationUpdate {
                     stable_address_configuration: Some(
@@ -1415,6 +1413,8 @@ fn test_no_dispatch_non_ndp_packets_during_ndp_dad() {
                 },
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
+                    // Doesn't matter as long as DAD is enabled.
+                    dad_transmits: Some(NonZeroU16::new(1)),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -1791,8 +1791,6 @@ fn test_receive_ip_packet_action() {
             .update_configuration(
                 &device,
                 Ipv6DeviceConfigurationUpdate {
-                    // Doesn't matter as long as DAD is enabled.
-                    dad_transmits: Some(NonZeroU16::new(1)),
                     // Auto-generate a link-local address.
                     slaac_config: SlaacConfigurationUpdate {
                         stable_address_configuration: Some(
@@ -1802,6 +1800,8 @@ fn test_receive_ip_packet_action() {
                     },
                     ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
+                        // Doesn't matter as long as DAD is enabled.
+                        dad_transmits: Some(NonZeroU16::new(1)),
                         ..Default::default()
                     },
                     ..Default::default()

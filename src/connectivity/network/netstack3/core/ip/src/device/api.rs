@@ -323,10 +323,12 @@ where
                     gmp_enabled,
                     unicast_forwarding_enabled,
                     multicast_forwarding_enabled,
+                    dad_transmits,
                 } = config.as_ref();
                 inspector.record_bool("GmpEnabled", *gmp_enabled);
                 inspector.record_bool("ForwardingEnabled", *unicast_forwarding_enabled);
                 inspector.record_bool("MulticastForwardingEnabled", *multicast_forwarding_enabled);
+                inspector.record_uint("DadTransmits", dad_transmits.map(|t| t.get()).unwrap_or(0));
             })
         });
         inspector.record_child("GMP", |inspector| {

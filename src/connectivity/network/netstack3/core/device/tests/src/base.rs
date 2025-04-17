@@ -205,9 +205,6 @@ fn tx_queue(
         .update_configuration(
             &device,
             Ipv6DeviceConfigurationUpdate {
-                // Enable DAD so that the auto-generated address triggers a DAD
-                // message immediately on interface enable.
-                dad_transmits: Some(Some(NonZeroU16::new(1).unwrap())),
                 // Enable stable addresses so the link-local address is auto-
                 // generated.
                 slaac_config: SlaacConfigurationUpdate {
@@ -218,6 +215,9 @@ fn tx_queue(
                 },
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
+                    // Enable DAD so that the auto-generated address triggers a DAD
+                    // message immediately on interface enable.
+                    dad_transmits: Some(Some(NonZeroU16::new(1).unwrap())),
                     ..Default::default()
                 },
                 ..Default::default()

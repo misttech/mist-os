@@ -578,6 +578,16 @@ pub struct IpDeviceConfiguration {
     ///
     /// Default: `false`.
     pub multicast_forwarding_enabled: bool,
+    /// The number of probes to send as part of Duplicate Address Detection.
+    ///
+    /// For IPv6, this corresponds to NDP's `DupAddrDetectTransmits` parameter
+    /// as defined by RFC 4862 section 5.1.
+    ///
+    /// For IPv4, this corresponds to ACD's `PROBE_NUM` parameter, as defined by
+    /// RFC 5227, section 1.1.
+    ///
+    /// A value of `None` means DAD will not be performed on the interface.
+    pub dad_transmits: Option<NonZeroU16>,
 }
 
 /// Configuration common to all IPv4 devices.
@@ -585,6 +595,12 @@ pub struct IpDeviceConfiguration {
 pub struct Ipv4DeviceConfiguration {
     /// The configuration common to all IP devices.
     pub ip_config: IpDeviceConfiguration,
+}
+
+impl Ipv4DeviceConfiguration {
+    /// The default `PROBE_NUM` value from RFC 5227 Section 1.1.
+    pub const DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS: NonZeroU16 =
+        NonZeroU16::new(3).unwrap();
 }
 
 impl AsRef<IpDeviceConfiguration> for Ipv4DeviceConfiguration {
@@ -602,16 +618,6 @@ impl AsMut<IpDeviceConfiguration> for Ipv4DeviceConfiguration {
 /// Configuration common to all IPv6 devices.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct Ipv6DeviceConfiguration {
-    /// The value for NDP's DupAddrDetectTransmits parameter as defined by
-    /// [RFC 4862 section 5.1].
-    ///
-    /// A value of `None` means DAD will not be performed on the interface.
-    ///
-    /// [RFC 4862 section 5.1]: https://datatracker.ietf.org/doc/html/rfc4862#section-5.1
-    // TODO(https://fxbug.dev/42077260): Move to a common place when IPv4
-    // supports DAD.
-    pub dad_transmits: Option<NonZeroU16>,
-
     /// Value for NDP's `MAX_RTR_SOLICITATIONS` parameter to configure how many
     /// router solicitation messages to send when solicing routers.
     ///

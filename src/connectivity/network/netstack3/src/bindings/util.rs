@@ -18,7 +18,7 @@ use net_types::ip::{
     SubnetEither, SubnetError,
 };
 use net_types::{AddrAndZone, MulticastAddr, SpecifiedAddr, Witness, ZonedAddr};
-use netstack3_core::device::{ArpConfiguration, ArpConfigurationUpdate, DeviceId, WeakDeviceId};
+use netstack3_core::device::{DeviceId, WeakDeviceId};
 use netstack3_core::error::{ExistsError, NotFoundError};
 use netstack3_core::ip::{
     IgmpConfigMode, Lifetime, MldConfigMode, PreferredLifetime, SlaacConfiguration,
@@ -1244,6 +1244,21 @@ impl From<IllegalZeroValueError> for IllegalNonPositiveValueError {
     }
 }
 
+impl IntoFidl<fnet_interfaces_admin::ControlSetConfigurationError>
+    for IllegalNonPositiveValueError
+{
+    fn into_fidl(self) -> fnet_interfaces_admin::ControlSetConfigurationError {
+        match self {
+            IllegalNonPositiveValueError::Zero => {
+                fnet_interfaces_admin::ControlSetConfigurationError::IllegalZeroValue
+            }
+            IllegalNonPositiveValueError::Negative => {
+                fnet_interfaces_admin::ControlSetConfigurationError::IllegalNegativeValue
+            }
+        }
+    }
+}
+
 impl TryFromFidl<u16> for NonZeroU16 {
     type Error = IllegalZeroValueError;
 
@@ -1367,32 +1382,6 @@ fn nud_user_config_to_update(c: NudUserConfig) -> NudUserConfigUpdate {
 impl IntoFidl<fnet_interfaces_admin::NudConfiguration> for NudUserConfig {
     fn into_fidl(self) -> fnet_interfaces_admin::NudConfiguration {
         nud_user_config_to_update(self).into_fidl()
-    }
-}
-
-impl TryFromFidl<fnet_interfaces_admin::ArpConfiguration> for ArpConfigurationUpdate {
-    type Error = IllegalNonPositiveValueError;
-
-    fn try_from_fidl(fidl: fnet_interfaces_admin::ArpConfiguration) -> Result<Self, Self::Error> {
-        let fnet_interfaces_admin::ArpConfiguration { nud, __source_breaking } = fidl;
-        Ok(ArpConfigurationUpdate { nud: nud.map(TryFromFidl::try_from_fidl).transpose()? })
-    }
-}
-
-impl IntoFidl<fnet_interfaces_admin::ArpConfiguration> for ArpConfigurationUpdate {
-    fn into_fidl(self) -> fnet_interfaces_admin::ArpConfiguration {
-        let ArpConfigurationUpdate { nud } = self;
-        fnet_interfaces_admin::ArpConfiguration {
-            nud: nud.map(IntoFidl::into_fidl),
-            __source_breaking: fidl::marker::SourceBreaking,
-        }
-    }
-}
-
-impl IntoFidl<fnet_interfaces_admin::ArpConfiguration> for ArpConfiguration {
-    fn into_fidl(self) -> fnet_interfaces_admin::ArpConfiguration {
-        let ArpConfiguration { nud } = self;
-        ArpConfigurationUpdate { nud: Some(nud_user_config_to_update(nud)) }.into_fidl()
     }
 }
 
