@@ -727,18 +727,6 @@ alias(
 )
 
 alias(
-    name = "derp-0.0.14",
-    actual = "//third_party/rust_crates/vendor/derp-0.0.14:derp",
-    tags = ["manual"],
-)
-
-alias(
-    name = "derp",
-    actual = "//third_party/rust_crates/vendor/derp-0.0.14:derp",
-    tags = ["manual"],
-)
-
-alias(
     name = "difference-2.0.0",
     actual = "//third_party/rust_crates/vendor/difference-2.0.0:difference",
     tags = ["manual"],

@@ -255,10 +255,6 @@ group("derive_builder") {
   public_deps = [ ":derive_builder-v0_11_1" ]
 }
 
-group("derp") {
-  public_deps = [ ":derp-v0_0_14" ]
-}
-
 group("difference") {
   public_deps = [ ":difference-v2_0_0" ]
 }
@@ -5196,34 +5192,6 @@ rust_proc_macro("derive_builder_macro-v0_11_1") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":derive_builder_macro-v0_11_1.license" ]
-}
-
-license("derp-v0_0_14.license") {
-  public_package_name = "derp"
-  license_files = [ "//third_party/rust_crates/vendor/derp-0.0.14/LICENSE" ]
-}
-
-rust_library("derp-v0_0_14") {
-  crate_name = "derp"
-  crate_root = "//third_party/rust_crates/vendor/derp-0.0.14/src/lib.rs"
-  output_name = "derp-8224201ec77eaa7"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":untrusted-v0_7_1" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=8224201ec77eaa7",
-    "-Cextra-filename=-8224201ec77eaa7",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":derp-v0_0_14.license" ]
 }
 
 license("diff-v0_1_13.license") {
@@ -18470,35 +18438,6 @@ rust_library("unsafe-libyaml-v0_2_4") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":unsafe-libyaml-v0_2_4.license" ]
-}
-
-license("untrusted-v0_7_1.license") {
-  public_package_name = "untrusted"
-  license_files =
-      [ "//third_party/rust_crates/vendor/untrusted-0.7.1/LICENSE.txt" ]
-}
-
-rust_library("untrusted-v0_7_1") {
-  crate_name = "untrusted"
-  crate_root =
-      "//third_party/rust_crates/vendor/untrusted-0.7.1/src/untrusted.rs"
-  output_name = "untrusted-645a69efdf6d68fc"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=645a69efdf6d68fc",
-    "-Cextra-filename=-645a69efdf6d68fc",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":untrusted-v0_7_1.license" ]
 }
 
 license("untrusted-v0_9_0.license") {
