@@ -443,8 +443,15 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
 
     #[tracing::instrument]
     async fn set_active(&mut self, slot: &str) -> Result<(), FastbootError> {
+        // Note: the target may not successfully send a response when asked to set active,
+        // so let's use a short time-out, and treat a timeout error as a success.
+        // See b/405436515 for more information.
         let command = Command::SetActive(slot.to_string());
-        match send(command.clone(), self.interface().await?).await.context("sending set_active")? {
+        let reply = handle_timeout_as_okay(
+            send_with_timeout(command.clone(), self.interface().await?, Duration::seconds(3)).await,
+        )
+        .context("set active")?;
+        match reply {
             Reply::Okay(_) => {
                 tracing::debug!("Successfully sent set_active");
                 Ok(())

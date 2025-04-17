@@ -21,6 +21,7 @@ pub mod test_transport;
 
 const MAX_PACKET_SIZE: usize = 64;
 const DEFAULT_READ_TIMEOUT_SECS: i64 = 30;
+const BUFFER_SIZE: usize = 50 * 1024 * 1024; // 50 MB
 
 lazy_static! {
     static ref SEND_LOCK: Mutex<()> = Mutex::new(());
@@ -242,7 +243,7 @@ pub async fn upload_with_read_timeout<T: AsyncRead + AsyncWrite + Unpin, R: Read
             listener.on_started(size.try_into().unwrap()).await?;
             tracing::debug!("fastboot: writing {} bytes", size);
 
-            let mut bytes = [0; 4096];
+            let mut bytes = vec![0; BUFFER_SIZE];
             loop {
                 match buf.read(&mut bytes) {
                     Ok(n) => {
@@ -271,6 +272,7 @@ pub async fn upload_with_read_timeout<T: AsyncRead + AsyncWrite + Unpin, R: Read
                 }
             }
             tracing::debug!("fastboot: completed writing {} bytes", size);
+
             match read_and_log_info_with_timeout(interface, timeout).await {
                 Ok(reply) => {
                     listener.on_finished().await?;
@@ -421,10 +423,7 @@ mod test {
             *queue,
             vec![
                 UploadEvent::OnStarted(14336),
-                UploadEvent::OnProgress(4096),
-                UploadEvent::OnProgress(4096),
-                UploadEvent::OnProgress(4096),
-                UploadEvent::OnProgress(2048),
+                UploadEvent::OnProgress(14336),
                 UploadEvent::OnFinished,
             ]
         );

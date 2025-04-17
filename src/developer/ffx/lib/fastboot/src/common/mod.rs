@@ -385,7 +385,8 @@ pub async fn set_slot_a_active(fastboot_interface: &mut impl FastbootInterface) 
     if fastboot_interface.erase("misc").await.is_err() {
         tracing::debug!("Could not erase misc partition");
     }
-    fastboot_interface.set_active("a").await.map_err(|_| anyhow!("Could not set active slot"))
+    fastboot_interface.set_active("a").await?;
+    Ok(())
 }
 
 pub async fn flash_partitions<F: FileResolver + Sync, P: Partition, T: FastbootInterface>(
