@@ -683,7 +683,7 @@ impl<I: IpExt> RulesWorker<I> {
             >,
         >,
     ) -> Result<Option<TableNeedsCleanup>, Errno> {
-        crate::logging::log_info!("Handling netlink rules request: {req:?}");
+        crate::logging::log_debug!("Handling netlink rules request: {req:?}");
 
         let RuleRequest { args, _ip_version_marker: _, sequence_number, mut client } = req;
 
