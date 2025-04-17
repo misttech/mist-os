@@ -1024,7 +1024,7 @@ This should never be set as a build argument.
 }
   armv7_unknown_linux_gnueabihf = {
   libclang_rt_profile_a = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.profile.a"
-  libunwind_so = "../../../../out/not-default/libunwind.so"
+  libunwind_so = ""
   resource_dir = "lib/clang/21"
   variants = {
   asan = {
@@ -1060,7 +1060,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
-  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
+  clang_rt_cxx = ""
 }
 }
   ubsan = {
@@ -1109,7 +1109,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "lib/clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.lsan.a"
-  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
+  clang_rt_cxx = ""
 }
 }
   tsan = {
@@ -7775,9 +7775,12 @@ From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:206
 
 ### dir_pw_third_party
 
+This is retained for backwards compatibility. Prefer using the pw_external_*
+variables instead.
+
 **Current value (from the default):** `"//third_party/pigweed/src/third_party"`
 
-From //third_party/pigweed/src/modules.gni:25
+From //third_party/pigweed/src/modules.gni:27
 
 ### dir_pw_third_party_boringssl
 
@@ -8827,6 +8830,174 @@ From //build_overrides/pigweed_environment.gni:19
 **Current value (from the default):** `"../../prebuilt/third_party/python/linux-x64/bin"`
 
 From //build_overrides/pigweed_environment.gni:21
+
+### pw_external_abseil_cpp
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/abseil-cpp"`
+
+From //third_party/pigweed/src/modules.gni:39
+
+### pw_external_ambiq
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/ambiq"`
+
+From //third_party/pigweed/src/modules.gni:40
+
+### pw_external_apollo4
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/apollo4"`
+
+From //third_party/pigweed/src/modules.gni:41
+
+### pw_external_arduino
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/arduino"`
+
+From //third_party/pigweed/src/modules.gni:42
+
+### pw_external_boringssl
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/boringssl"`
+
+From //third_party/pigweed/src/modules.gni:44
+
+### pw_external_chre
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/chre"`
+
+From //third_party/pigweed/src/modules.gni:45
+
+### pw_external_chromium_verifier
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/chromium_verifier"`
+
+From //third_party/pigweed/src/modules.gni:47
+
+### pw_external_embos
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/embos"`
+
+From //third_party/pigweed/src/modules.gni:48
+
+### pw_external_emboss
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/emboss"`
+
+From //third_party/pigweed/src/modules.gni:49
+
+### pw_external_freertos
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/freertos"`
+
+From //third_party/pigweed/src/modules.gni:51
+
+### pw_external_fuchsia
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/fuchsia"`
+
+From //third_party/pigweed/src/modules.gni:52
+
+### pw_external_fuzztest
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/fuzztest"`
+
+From //third_party/pigweed/src/modules.gni:54
+
+### pw_external_googletest
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/googletest"`
+
+From //third_party/pigweed/src/modules.gni:56
+
+### pw_external_llvm_builtins
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/llvm_builtins"`
+
+From //third_party/pigweed/src/modules.gni:58
+
+### pw_external_llvm_libc
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/llvm_libc"`
+
+From //third_party/pigweed/src/modules.gni:60
+
+### pw_external_llvm_libcxx
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/llvm_libcxx"`
+
+From //third_party/pigweed/src/modules.gni:62
+
+### pw_external_mbedtls
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/mbedtls"`
+
+From //third_party/pigweed/src/modules.gni:63
+
+### pw_external_mcuxpresso
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/mcuxpresso"`
+
+From //third_party/pigweed/src/modules.gni:65
+
+### pw_external_nanopb
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/nanopb"`
+
+From //third_party/pigweed/src/modules.gni:66
+
+### pw_external_perfetto
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/perfetto"`
+
+From //third_party/pigweed/src/modules.gni:68
+
+### pw_external_pico_sdk
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/pico_sdk"`
+
+From //third_party/pigweed/src/modules.gni:70
+
+### pw_external_protobuf
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/protobuf"`
+
+From //third_party/pigweed/src/modules.gni:72
+
+### pw_external_re2
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/re2"`
+
+From //third_party/pigweed/src/modules.gni:73
+
+### pw_external_repo
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/repo"`
+
+From //third_party/pigweed/src/modules.gni:74
+
+### pw_external_smartfusion_mss
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/smartfusion_mss"`
+
+From //third_party/pigweed/src/modules.gni:76
+
+### pw_external_stm32cube
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/stm32cube"`
+
+From //third_party/pigweed/src/modules.gni:78
+
+### pw_external_threadx
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/threadx"`
+
+From //third_party/pigweed/src/modules.gni:79
+
+### pw_external_tinyusb
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/tinyusb"`
+
+From //third_party/pigweed/src/modules.gni:80
 
 ### pw_function_CONFIG
 
