@@ -218,39 +218,52 @@ zx_status_t UsbPeripheral::Init() {
   // DCI FIDL is not available. Return OK because we could be using Banjo DCI instead.
   // In the future when we remove banjo. This should be an error.
   if (!result.ok()) {
-    zxlogf(DEBUG, "(framework) SetInterface(): %s", result.status_string());
+    zxlogf(DEBUG, "Failed to send SetInterface request: %s", result.status_string());
     return ZX_OK;
   }
   if (result->is_error()) {
-    return (result->error_value() == ZX_ERR_NOT_SUPPORTED) ? ZX_OK : result->error_value();
+    if (result->error_value() == ZX_ERR_NOT_SUPPORTED) {
+      return ZX_OK;
+    }
+    zxlogf(ERROR, "Failed to set interface: %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
   }
   dci_new_valid_ = true;
   return ZX_OK;
 }
 
 zx::result<std::string> UsbPeripheral::GetSerialNumber() {
-  char buffer[256];
-  size_t actual = 0;
+  zx::result serial_number_result =
+      ddk::GetMetadataIfExists<fuchsia_boot_metadata::SerialNumberMetadata>(parent());
+  if (serial_number_result.is_error()) {
+    zxlogf(ERROR, "Failed to get serial number metadata: %s", serial_number_result.status_string());
+    return serial_number_result.take_error();
+  }
   // Return serial number from metadata if present.
-  auto status =
-      device_get_metadata(parent(), DEVICE_METADATA_SERIAL_NUMBER, buffer, sizeof(buffer), &actual);
-  if (status == ZX_OK) {
-    return zx::ok(std::string{buffer, actual});
+  if (serial_number_result.value().has_value()) {
+    auto& metadata = serial_number_result.value().value();
+    if (!metadata.serial_number().has_value()) {
+      zxlogf(ERROR, "Serial number metadata missing serial_number field");
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    return zx::ok(std::move(metadata.serial_number().value()));
   }
 
   // Use MAC address as the next option.
-  zx::result result = ddk::GetMetadataIfExists<fuchsia_boot_metadata::MacAddressMetadata>(parent());
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to get MAC address metadata: %s", result.status_string());
-    return result.take_error();
+  zx::result mac_address_result =
+      ddk::GetMetadataIfExists<fuchsia_boot_metadata::MacAddressMetadata>(parent());
+  if (mac_address_result.is_error()) {
+    zxlogf(ERROR, "Failed to get MAC address metadata: %s", mac_address_result.status_string());
+    return mac_address_result.take_error();
   }
-  if (result.value().has_value()) {
-    const auto& metadata = result.value().value();
+  if (mac_address_result.value().has_value()) {
+    const auto& metadata = mac_address_result.value().value();
     if (!metadata.mac_address().has_value()) {
       zxlogf(ERROR, "MAC address metadata missing mac_address field");
       return zx::error(ZX_ERR_INTERNAL);
     }
     const auto& octets = metadata.mac_address().value().octets();
+    char buffer[13];
     snprintf(buffer, sizeof(buffer), "%02X%02X%02X%02X%02X%02X", octets[0], octets[1], octets[2],
              octets[3], octets[4], octets[5]);
     return zx::ok(std::string{buffer});
