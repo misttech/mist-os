@@ -11,6 +11,7 @@ crates_vendor(
     annotations = CRATE_ANNOTATIONS,
     bazel = "//:bazel",
     buildifier = "//:buildifier",
+    cargo_bazel = "//:cargo-bazel",
     cargo_lockfile = "//third_party/rust_crates:Cargo.lock",
     manifests = ["//third_party/rust_crates:Cargo.toml"],
     mode = "local",
