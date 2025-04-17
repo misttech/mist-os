@@ -4,7 +4,10 @@
 
 use anyhow::Result;
 use errors::ffx_error;
-use {fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_sys2 as fsys};
+use {
+    fdomain_fuchsia_developer_remotecontrol as rc_f, fdomain_fuchsia_sys2 as fsys_f,
+    fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_sys2 as fsys,
+};
 
 /// Obtain the root LifecycleController protocol using the RemoteControl protocol.
 pub async fn connect_to_lifecycle_controller(
@@ -22,6 +25,16 @@ pub async fn connect_to_realm_query(
     rcs_proxy: &rc::RemoteControlProxy,
 ) -> Result<fsys::RealmQueryProxy> {
     let realm_query = rcs::root_realm_query(&rcs_proxy, std::time::Duration::from_secs(15))
+        .await
+        .map_err(|err| ffx_error!("Could not open RealmQuery: {err}"))?;
+    Ok(realm_query)
+}
+
+/// Obtain the root RealmQuery protocol using the RemoteControl protocol.
+pub async fn connect_to_realm_query_f(
+    rcs_proxy: &rc_f::RemoteControlProxy,
+) -> Result<fsys_f::RealmQueryProxy> {
+    let realm_query = rcs_fdomain::root_realm_query(&rcs_proxy, std::time::Duration::from_secs(15))
         .await
         .map_err(|err| ffx_error!("Could not open RealmQuery: {err}"))?;
     Ok(realm_query)
