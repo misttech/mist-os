@@ -12,6 +12,7 @@ rustc_library("cm_fidl_validator") {
   deps = [
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//src/lib/directed_graph",
+    "//src/sys/lib/cm_graph",
     "//src/sys/lib/cm_types",
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:thiserror",
