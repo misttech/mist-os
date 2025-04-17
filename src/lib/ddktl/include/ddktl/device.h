@@ -5,26 +5,20 @@
 #ifndef SRC_LIB_DDKTL_INCLUDE_DDKTL_DEVICE_H_
 #define SRC_LIB_DDKTL_INCLUDE_DDKTL_DEVICE_H_
 
-#ifndef __mist_os__
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#endif
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#ifndef __mist_os__
 #include <lib/fdf/cpp/channel.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/message.h>
 #include <lib/fidl/cpp/wire/traits.h>
 #include <lib/fidl/cpp/wire/wire_messaging.h>
 #include <lib/fidl_driver/cpp/transport.h>
-#endif
 #include <lib/stdcompat/span.h>
-#ifndef __mist_os__
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
-#endif
 #include <zircon/assert.h>
 
 #include <deque>
@@ -32,13 +26,9 @@
 
 #include <ddktl/composite-node-spec.h>
 #include <ddktl/device-internal.h>
-#ifndef __mist_os__
 #include <ddktl/fidl.h>
-#endif
 #include <ddktl/init-txn.h>
-#ifndef __mist_os__
 #include <ddktl/metadata.h>
-#endif
 #include <ddktl/resume-txn.h>
 #include <ddktl/suspend-txn.h>
 #include <ddktl/unbind-txn.h>
@@ -187,7 +177,6 @@ class Unbindable : public base_mixin {
   }
 };
 
-#if 0
 template <typename D, typename Protocol>
 class MessageableInternal : public fidl::WireServer<Protocol>, public base_mixin {
  protected:
@@ -209,7 +198,6 @@ struct Messageable {
   template <typename D>
   using Mixin = MessageableInternal<D, Protocol>;
 };
-#endif
 
 template <typename D>
 class Suspendable : public base_mixin {
@@ -298,7 +286,6 @@ class MadeVisibleable : public base_mixin {
   static void MadeVisible(void* ctx) { static_cast<D*>(ctx)->DdkMadeVisible(); }
 };
 
-#ifndef __mist_os__
 class MetadataList {
  public:
   MetadataList() = default;
@@ -332,7 +319,6 @@ class MetadataList {
   std::vector<std::shared_ptr<std::vector<uint8_t>>> data_list_;
   std::vector<device_metadata_t> metadata_list_;
 };
-#endif
 
 // Factory functions to create a zx_device_str_prop_t.
 inline zx_device_str_prop_t MakeStrProperty(const std::string& key, uint32_t val) {
@@ -375,14 +361,10 @@ class DeviceAddArgs {
   }
 
   DeviceAddArgs& operator=(const DeviceAddArgs& other) {
-#ifndef __mist_os__
     metadata_list_ = other.metadata_list_;
-#endif
     args_ = other.args_;
-#ifndef __mist_os__
     args_.metadata_list = metadata_list_.data();
     args_.metadata_count = metadata_list_.count();
-#endif
     return *this;
   }
 
@@ -413,7 +395,6 @@ class DeviceAddArgs {
     args_.ops = ops;
     return *this;
   }
-#ifndef __mist_os__
   DeviceAddArgs& set_inspect_vmo(zx::vmo inspect_vmo) {
     args_.inspect_vmo = inspect_vmo.release();
     return *this;
@@ -429,7 +410,6 @@ class DeviceAddArgs {
     args_.outgoing_dir_channel = outgoing_dir.release();
     return *this;
   }
-#endif
   DeviceAddArgs& set_fidl_service_offers(cpp20::span<const char*> fidl_service_offers) {
     args_.fidl_service_offers = fidl_service_offers.data();
     args_.fidl_service_offer_count = fidl_service_offers.size();
@@ -445,21 +425,17 @@ class DeviceAddArgs {
     args_.power_state_count = static_cast<uint8_t>(power_states.size());
     return *this;
   }
-#ifndef __mist_os__
   DeviceAddArgs& set_bus_info(std::unique_ptr<fuchsia_driver_framework::BusInfo> bus_info) {
     bus_info_ = std::move(bus_info);
     args_.bus_info = bus_info_.get();
     return *this;
   }
-#endif
 
   const device_add_args_t& get() const { return args_; }
 
  private:
-#ifndef __mist_os__
   MetadataList metadata_list_;
   std::unique_ptr<fuchsia_driver_framework::BusInfo> bus_info_;
-#endif
   device_add_args_t args_ = {};
 };
 
@@ -510,7 +486,6 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
     device_async_remove(dev);
   }
 
-#ifndef __mist_os__
   // AddService allows a driver to advertise a FIDL service.
   // The intended use is for drivers to use this to advertise services to non-drivers.
   // It is only really supported in the compat shim, where it adds the service to the outgoing
@@ -708,7 +683,6 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
     }
     return zx::ok(std::move(endpoints->client));
   }
-#endif
 
   const char* name() const { return this->name_.c_str(); }
 

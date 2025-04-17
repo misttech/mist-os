@@ -58,15 +58,6 @@ static_library("ddk") {
 
   deps = [ "//zircon/system/ulib/sync" ]
 
-  if (is_mistos) {
-    public_deps -= [
-      "//sdk/lib/async:async",
-      "//sdk/lib/driver/runtime:driver_runtime",
-      "//zircon/system/ulib/syslog:syslog-headers",
-    ]
-    deps -= [ "//zircon/system/ulib/sync" ]
-  }
-
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 

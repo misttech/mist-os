@@ -5,19 +5,13 @@
 #ifndef SRC_LIB_DDK_INCLUDE_LIB_DDK_DEVICE_H_
 #define SRC_LIB_DDK_INCLUDE_LIB_DDK_DEVICE_H_
 
-#ifndef __mist_os__
 #include <lib/fdf/types.h>
-#endif
 #include <zircon/compiler.h>
 #include <zircon/fidl.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
 __BEGIN_CDECLS
-
-#if __mist_os__
-typedef zx_handle_t fdf_handle_t;
-#endif
 
 typedef struct zx_device zx_device_t;
 typedef struct zx_driver zx_driver_t;

@@ -82,15 +82,6 @@ source_set("ddktl") {
     "//zircon/system/ulib/zx",
   ]
 
-  if (is_mistos) {
-    sources -= [ "fidl.cc" ]
-    public_deps -= [ "//sdk/lib/fidl/cpp/wire" ]
-    deps -= [
-      "//sdk/lib/driver/runtime:driver_runtime_cpp",
-      "//zircon/system/ulib/sync",
-    ]
-  }
-
   #  ________  _________  ________  ________
   # |\   ____\|\___   ___\\   __  \|\   __  \
   # \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
