@@ -31,9 +31,6 @@ pub struct KernelResources {
 #[derive(Default)]
 struct KernelResourcesBuilder {
     kernel_resources: KernelResources,
-    /// Value of the next resource identifier. It should be incremented each time a new name is
-    /// inserted in `resource_names``.
-    next_resource_name_index: u64,
 }
 
 struct Cache {
@@ -326,11 +323,10 @@ impl KernelResourcesBuilder {
         match self.kernel_resources.resource_names.get(&resource_name.as_bstr().to_string()) {
             Some(name_index) => *name_index,
             None => {
-                let index = self.next_resource_name_index;
+                let index = self.kernel_resources.resource_names.len() as u64;
                 self.kernel_resources
                     .resource_names
                     .insert(resource_name.as_bstr().to_string(), index);
-                self.next_resource_name_index += 1;
                 index
             }
         }
