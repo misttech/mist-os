@@ -37,8 +37,8 @@ To start using developer overrides for assembly:
    you can set your `fx set` command to use this assembly platform
    configuration. For example:
 
-   Note: The value used for `--asembly-override` is the identifier that you used
-   in your `//local/BUILD.gn` file.
+   Note: The value used for `--assembly-override` is the identifier that you
+   used in your `//local/BUILD.gn` file.
 
    ```posix-terminal
    fx set --assembly-override=//local:my_overrides
