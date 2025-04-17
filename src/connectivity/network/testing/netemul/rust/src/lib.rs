@@ -241,10 +241,12 @@ pub struct InterfaceConfig<'a> {
     pub name: Option<Cow<'a, str>>,
     /// Optional default route metric.
     pub metric: Option<u32>,
-    /// Number of DAD transmits to use before marking an address as Assigned.
-    // TODO(https://fxbug.dev/42077260): Make it clear this is only IPv6 DAD
-    // transmits.
-    pub dad_transmits: Option<u16>,
+    /// Number of DAD transmits to use before marking an IPv4 address as
+    /// Assigned.
+    pub ipv4_dad_transmits: Option<u16>,
+    /// Number of DAD transmits to use before marking an IPv6 address as
+    /// Assigned.
+    pub ipv6_dad_transmits: Option<u16>,
 }
 
 /// A realm within a netemul sandbox.
@@ -1003,7 +1005,9 @@ impl<'a> TestEndpoint<'a> {
     pub async fn install(
         &self,
         installer: fnet_interfaces_admin::InstallerProxy,
-        InterfaceConfig { name, metric, dad_transmits }: InterfaceConfig<'_>,
+        InterfaceConfig { name, metric, ipv4_dad_transmits, ipv6_dad_transmits }: InterfaceConfig<
+            '_,
+        >,
     ) -> Result<(u64, Control, fnet_interfaces_admin::DeviceControlProxy)> {
         let name = name.map(|n| {
             truncate_dropping_front(n.into(), fnet_interfaces::INTERFACE_NAME_LENGTH.into())
@@ -1024,9 +1028,15 @@ impl<'a> TestEndpoint<'a> {
                 &fnet_interfaces_admin::Options { name, metric, ..Default::default() },
             )
             .context("create interface")?;
-        if let Some(dad_transmits) = dad_transmits {
-            let _: Option<u16> =
-                set_dad_transmits(&control, dad_transmits).await.context("set dad transmits")?;
+        if let Some(ipv4_dad_transmits) = ipv4_dad_transmits {
+            let _: Option<u16> = set_ipv4_dad_transmits(&control, ipv4_dad_transmits)
+                .await
+                .context("set dad transmits")?;
+        }
+        if let Some(ipv6_dad_transmits) = ipv6_dad_transmits {
+            let _: Option<u16> = set_ipv6_dad_transmits(&control, ipv6_dad_transmits)
+                .await
+                .context("set dad transmits")?;
         }
 
         let id = control.get_id().await.context("get id")?;
@@ -1918,11 +1928,18 @@ impl<'a> TestInterface<'a> {
         }
     }
 
-    /// Sets the number of DAD transmits on this interface.
+    /// Sets the number of IPv6 DAD transmits on this interface.
     ///
     /// Returns the previous configuration value, if reported by the API.
-    pub async fn set_dad_transmits(&self, dad_transmits: u16) -> Result<Option<u16>> {
-        set_dad_transmits(self.control(), dad_transmits).await
+    pub async fn set_ipv4_dad_transmits(&self, dad_transmits: u16) -> Result<Option<u16>> {
+        set_ipv4_dad_transmits(self.control(), dad_transmits).await
+    }
+
+    /// Sets the number of IPv6 DAD transmits on this interface.
+    ///
+    /// Returns the previous configuration value, if reported by the API.
+    pub async fn set_ipv6_dad_transmits(&self, dad_transmits: u16) -> Result<Option<u16>> {
+        set_ipv6_dad_transmits(self.control(), dad_transmits).await
     }
 
     /// Sets whether temporary SLAAC address generation is enabled
@@ -1945,7 +1962,27 @@ impl<'a> TestInterface<'a> {
     }
 }
 
-async fn set_dad_transmits(control: &Control, dad_transmits: u16) -> Result<Option<u16>> {
+async fn set_ipv4_dad_transmits(control: &Control, dad_transmits: u16) -> Result<Option<u16>> {
+    control
+        .set_configuration(&fnet_interfaces_admin::Configuration {
+            ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
+                arp: Some(fnet_interfaces_admin::ArpConfiguration {
+                    dad: Some(fnet_interfaces_admin::DadConfiguration {
+                        transmits: Some(dad_transmits),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+        .await?
+        .map(|config| config.ipv4?.arp?.dad?.transmits)
+        .map_err(|e| anyhow::anyhow!("set configuration error {e:?}"))
+}
+
+async fn set_ipv6_dad_transmits(control: &Control, dad_transmits: u16) -> Result<Option<u16>> {
     control
         .set_configuration(&fnet_interfaces_admin::Configuration {
             ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {

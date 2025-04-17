@@ -539,7 +539,7 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
     // to DAD retransmission time, set the number of DAD transmits very high and
     // restore it later.
     let previous_dad_transmits =
-        iface.set_dad_transmits(u16::MAX).await.expect("set dad transmits");
+        iface.set_ipv6_dad_transmits(u16::MAX).await.expect("set dad transmits");
 
     // Add an address and expect it to fail DAD because we simulate another node
     // performing DAD at the same time.
@@ -561,7 +561,7 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
     // Restore the original DAD transmits value.
     if let Some(previous) = previous_dad_transmits {
         let _: Option<u16> =
-            iface.set_dad_transmits(previous).await.expect("restore dad transmits");
+            iface.set_ipv6_dad_transmits(previous).await.expect("restore dad transmits");
     }
 
     {
@@ -965,7 +965,7 @@ async fn slaac_regeneration_after_dad_failure<N: Netstack>(name: &str) {
             // likelihood of flakes where DAD erroneously succeeds when it should fail. This
             // number is chosen to be high enough to reduce flakiness while not extending
             // the runtime of the test by too much.
-            dad_transmits: Some(4),
+            ipv6_dad_transmits: Some(4),
             ..Default::default()
         },
         &[KnownServiceProvider::SecureStash],

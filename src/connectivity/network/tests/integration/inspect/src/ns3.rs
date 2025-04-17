@@ -1279,8 +1279,8 @@ async fn inspect_devices(name: &str) {
             netemul::new_endpoint_config(max_frame_size, Some(fidl_mac!("02:00:00:00:00:01"))),
             netemul::InterfaceConfig {
                 name: Some(NETDEV_NAME.into()),
-                metric: None,
-                dad_transmits: Some(u16::MAX),
+                ipv6_dad_transmits: Some(u16::MAX),
+                ..Default::default()
             },
         )
         .await

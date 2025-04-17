@@ -4005,7 +4005,7 @@ async fn perform_dad_parameter(
         netstack_testing_common::setup_network_with::<Netstack3, _>(
             &sandbox,
             name,
-            InterfaceConfig { dad_transmits: Some(dad_transmits), ..Default::default() },
+            InterfaceConfig { ipv6_dad_transmits: Some(dad_transmits), ..Default::default() },
             std::iter::empty::<fnetemul::ChildDef>(),
         )
         .await
