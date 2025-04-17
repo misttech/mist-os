@@ -594,11 +594,19 @@ pub fn sys_perf_event_open(
     attr: UserRef<perf_event_attr>,
     pid: pid_t,
     cpu: i32,
-    _group_fd: FdNumber,
+    group_fd: FdNumber,
     _flags: u64,
 ) -> Result<SyscallResult, Errno> {
     if pid == -1 && cpu == -1 {
         return error!(EINVAL);
+    }
+    if group_fd != FdNumber::from_raw(-1) {
+        track_stub!(TODO("https://fxbug.dev/409619971"), "[perf_event_open] implement group_fd");
+        return error!(ENOSYS);
+    }
+    if pid > 0 {
+        track_stub!(TODO("https://fxbug.dev/409621963"), "[perf_event_open] implement pid > 0");
+        return error!(ENOSYS);
     }
 
     // So far, the implementation only sets the read_data_format according to the "Reading results"
