@@ -85,7 +85,9 @@ class PerCpuState {
   Timer timer;
   // Cache the cpu we're intended for so that we can ensure we're only accessed by that specific
   // CPU.
-  cpu_num_t cpu_number_;
+  cpu_num_t cpu_number_{INVALID_CPU};
+
+  // The interval on which sampling will occur.
   zx_duration_mono_t period_{0};
 
   // Bit-wise AND with |write_state_| to read if there is a current write
