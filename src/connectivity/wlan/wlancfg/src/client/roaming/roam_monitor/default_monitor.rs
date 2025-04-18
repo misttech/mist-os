@@ -5,6 +5,7 @@
 use crate::client::roaming::lib::*;
 use crate::client::roaming::roam_monitor::{RoamMonitorApi, RoamTriggerDataOutcome};
 use anyhow::format_err;
+use log::error;
 
 pub struct DefaultRoamMonitor {}
 
@@ -36,6 +37,9 @@ impl RoamMonitorApi for DefaultRoamMonitor {
             request.candidate.to_string_without_pii(),
             request.reasons
         ))
+    }
+    fn notify_of_roam_attempt(&mut self) {
+        error!("Default roam monitor unexpectedly receieved notification of roam attempt");
     }
 }
 #[cfg(test)]

@@ -430,4 +430,5 @@ impl RoamMonitorApi for FakeRoamMonitor {
     fn should_send_roam_request(&self, _request: PolicyRoamRequest) -> Result<bool, anyhow::Error> {
         Ok(self.response_to_should_send_roam_request)
     }
+    fn notify_of_roam_attempt(&mut self) {}
 }

@@ -194,6 +194,12 @@ impl RoamMonitorApi for StationaryMonitor {
         }
         Ok(true)
     }
+
+    fn notify_of_roam_attempt(&mut self) {
+        // Reset scan backoff when a roam is attempted, because we will now be on a new BSS (or
+        // will get disconnected, and this will be irrelevant).
+        self.scan_backoff = MIN_BACKOFF_BETWEEN_ROAM_SCANS;
+    }
 }
 
 #[cfg(test)]
@@ -436,6 +442,60 @@ mod test {
         exec.set_fake_time(fasync::MonotonicInstant::after(
             MAX_BACKOFF_BETWEEN_ROAM_SCANS + fasync::MonotonicDuration::from_seconds(1),
         ));
+        assert_variant!(
+            run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
+            RoamTriggerDataOutcome::RoamSearch { .. }
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_roam_attempt_resets_backoff() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::MonotonicInstant::now());
+
+        // Setup monitor with connection data that would trigger a roam scan due to RSSI below
+        // threshold. Set the EWMA weights to 1 so the values can be easily changed later in tests.
+        let rssi = LOCAL_ROAM_THRESHOLD_RSSI_5G - 1.0;
+        let connection_data = RoamingConnectionData {
+            signal_data: EwmaSignalData::new(rssi, TEST_OK_SNR, 1),
+            ..generate_random_roaming_connection_data()
+        };
+        let trigger_data =
+            RoamTriggerData::SignalReportInd(fidl_internal::SignalReportIndication {
+                rssi_dbm: rssi as i8,
+                snr_db: TEST_OK_SNR as i8,
+            });
+        let mut test_values = setup_test_with_data(connection_data);
+
+        // Run time forward past the minimum backoff time.
+        exec.set_fake_time(
+            fasync::MonotonicInstant::after(MIN_BACKOFF_BETWEEN_ROAM_SCANS)
+                + zx::MonotonicDuration::from_seconds(1),
+        );
+
+        // Send trigger data, and verify that we are told to roam search.
+        assert_variant!(
+            run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
+            RoamTriggerDataOutcome::RoamSearch { .. }
+        );
+
+        // Run time forward past the minimum backoff time.
+        exec.set_fake_time(
+            fasync::MonotonicInstant::after(MIN_BACKOFF_BETWEEN_ROAM_SCANS)
+                + zx::MonotonicDuration::from_seconds(1),
+        );
+
+        // Send trigger data, and verify that we do not roam search, because the backoff has grown.
+        assert_variant!(
+            run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
+            RoamTriggerDataOutcome::Noop
+        );
+
+        // Receive notification of a roam attempt.
+        test_values.monitor.notify_of_roam_attempt();
+
+        // Send trigger data, and verify that we may now roam search, because the backoff has been
+        // reset.
         assert_variant!(
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
             RoamTriggerDataOutcome::RoamSearch { .. }

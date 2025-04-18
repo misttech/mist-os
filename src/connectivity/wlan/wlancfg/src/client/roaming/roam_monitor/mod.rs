@@ -50,6 +50,9 @@ pub trait RoamMonitorApi: Any {
     // Determines if the selected roam candidate is still relevant and provides enough potential
     // improvement to warrant a roam. Returns true if roam request should be sent to state machine.
     fn should_send_roam_request(&self, request: PolicyRoamRequest) -> Result<bool, anyhow::Error>;
+    // Method to inform roam monitor of a roam being attempted, so it may  reset any internal state
+    // as necessary.
+    fn notify_of_roam_attempt(&mut self);
 }
 
 // Service loop that orchestrates interaction between state machine (incoming roam data and outgoing
