@@ -743,3 +743,8 @@
 	url = https://fuchsia.googlesource.com/third_party/github.com/google/snippet-uiautomator
 	name = third_party/github.com/google/snippet-uiautomator
 	ignore = all
+[submodule "third_party/half/src"]
+	path = third_party/half/src
+	url = https://fuchsia.googlesource.com/third_party/half
+	name = third_party/half
+	ignore = all
