@@ -53,7 +53,7 @@ ${FASTBOOT} reboot bootloader
 # the next fastboot command will execute before the host realizes the device is
 # gone which causes the command to fail.
 sleep 4
-
+BOOTLOADER="$(${FASTBOOT} getvar product 2>&1 | grep '^product:' | awk '{print $2}')"
 # Attempt to flash SSH keys. This is only supported on devices running custom
 # Fuchsia firmware, so if it doesn't work just log a warning.
 function push_ssh_keys {
@@ -69,10 +69,14 @@ function push_ssh_keys {
   }
 }
 
-if push_ssh_keys; then
-  fx-info "Successfully provisioned SSH keys via bootloader"
+if [[ "${BOOTLOADER}" == "sorrel" ]]; then
+  if push_ssh_keys; then
+    fx-info "Successfully provisioned SSH keys via bootloader"
+  else
+    fx-warn "Skipping bootloader provisioning of SSH keys"
+  fi
 else
-  fx-warn "Skipping bootloader provisioning of SSH keys"
+  fx-info "Skipping bootloader provisioning of SSH keys because bootloader is ${BOOTLOADER}"
 fi
 
 # Flash the super partition last; some Kola devices exhibit USB instability
