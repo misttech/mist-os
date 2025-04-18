@@ -26,8 +26,8 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
         ) {
             // FFX discovery is not enabled on bootstrap, therefore we do not need the wired
             // udp service.
-            (FeatureSupportLevel::Bootstrap, _, _) => false,
-            (FeatureSupportLevel::Embeddable, _, _) => false,
+            (FeatureSetLevel::Bootstrap, _, _) => false,
+            (FeatureSetLevel::Embeddable, _, _) => false,
 
             // User builds cannot have this service enabled.
             (_, BuildType::User, None) => false,
@@ -59,14 +59,14 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
             &connectivity_config.network.networking,
         ) {
             // bootstrap must not attempt to configure it, it's always None
-            (FeatureSupportLevel::Bootstrap, _, Some(_)) => {
+            (FeatureSetLevel::Bootstrap, _, Some(_)) => {
                 bail!("The configuration of networking is not an option for `bootstrap`")
             }
-            (FeatureSupportLevel::Bootstrap, _, None) => None,
-            (FeatureSupportLevel::Embeddable, _, _) => None,
+            (FeatureSetLevel::Bootstrap, _, None) => None,
+            (FeatureSetLevel::Embeddable, _, _) => None,
 
             // utility, in user mode, only gets networking if requested.
-            (FeatureSupportLevel::Utility, BuildType::User, networking) => networking.as_ref(),
+            (FeatureSetLevel::Utility, BuildType::User, networking) => networking.as_ref(),
 
             // all other combinations get the network package that they request
             (_, _, Some(networking)) => Some(networking),
@@ -278,7 +278,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                         // Ensure we only exclude a policy layer on an Eng build.
                         context.ensure_build_type_and_feature_set_level(
                             &[BuildType::Eng],
-                            &[FeatureSupportLevel::Standard],
+                            &[FeatureSetLevel::Standard],
                             "WLAN Policy None",
                         )?;
 
@@ -368,7 +368,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
 
         if connectivity_config.location.enable_emergency_location_provider {
             ensure!(
-                *context.feature_set_level == FeatureSupportLevel::Standard,
+                *context.feature_set_level == FeatureSetLevel::Standard,
                 "Location services can only be enabled in the 'standard' feature set level."
             );
             builder.platform_bundle("location_emergency");

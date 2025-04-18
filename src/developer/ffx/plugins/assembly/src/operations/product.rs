@@ -8,9 +8,7 @@ use assembly_config_schema::assembly_config::{
     CompiledComponentDefinition, CompiledPackageDefinition,
 };
 use assembly_config_schema::developer_overrides::DeveloperOverrides;
-use assembly_config_schema::{
-    AssemblyConfig, BoardInformation, BoardInputBundle, FeatureSupportLevel,
-};
+use assembly_config_schema::{AssemblyConfig, BoardInformation, BoardInputBundle, FeatureSetLevel};
 use assembly_constants::{BlobfsCompiledPackageDestination, CompiledPackageDestination};
 use assembly_container::AssemblyContainer;
 use assembly_file_relative_path::SupportsFileRelativePaths;
@@ -209,8 +207,8 @@ Resulting product is not supported and may misbehave!
         builder
             .add_board_input_bundle(
                 bundle,
-                platform.feature_set_level == FeatureSupportLevel::Bootstrap
-                    || platform.feature_set_level == FeatureSupportLevel::Embeddable,
+                platform.feature_set_level == FeatureSetLevel::Bootstrap
+                    || platform.feature_set_level == FeatureSetLevel::Embeddable,
             )
             .with_context(|| format!("Adding board input bundle from: {bundle_path}"))?;
     }
@@ -246,9 +244,7 @@ Resulting product is not supported and may misbehave!
     // Add product-specified packages and configuration
     if product.bootfs_files_package.is_some() || !product.packages.bootfs.is_empty() {
         match platform.feature_set_level {
-            FeatureSupportLevel::Empty
-            | FeatureSupportLevel::Embeddable
-            | FeatureSupportLevel::Bootstrap => {
+            FeatureSetLevel::Empty | FeatureSetLevel::Embeddable | FeatureSetLevel::Bootstrap => {
                 // these are the only valid feature set levels for adding these files.
             }
             _ => {

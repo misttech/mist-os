@@ -67,7 +67,7 @@ mod tests {
     #[test]
     fn test_convert_component_urls_to_boot_urls() {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
             board_info: &Default::default(),
             gendir: Default::default(),

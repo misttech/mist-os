@@ -47,7 +47,7 @@ use assembly_util::NamedMap;
 /// represented as `Option::None`, with the other values as an
 /// `Option::Some(value)`.
 #[derive(Debug, PartialEq)]
-pub(crate) enum FeatureSupportLevel {
+pub(crate) enum FeatureSetLevel {
     /// This is a small build of fuchsia which is not meant to support
     /// self-updates, but rather be updated externally. It is meant for truly
     /// memory constrained environments. It includes a minimal subset of
@@ -73,37 +73,31 @@ pub(crate) enum FeatureSupportLevel {
     /// This is the default level unless otherwise specified.
     Standard,
 }
-impl FeatureSupportLevel {
+impl FeatureSetLevel {
     /// Convert a deserialized assembly_config_schema:: FeatureSetLevel into an
     /// `Option<FeatureSetLevel>`, where the `Empty` case becomes `None`.
     pub fn from_deserialized(
-        value: &assembly_config_schema::platform_config::FeatureSupportLevel,
+        value: &assembly_config_schema::platform_config::FeatureSetLevel,
     ) -> Option<Self> {
         match value {
-            assembly_config_schema::FeatureSupportLevel::Empty => None,
-            assembly_config_schema::FeatureSupportLevel::Embeddable => {
-                Some(FeatureSupportLevel::Embeddable)
+            assembly_config_schema::FeatureSetLevel::Empty => None,
+            assembly_config_schema::FeatureSetLevel::Embeddable => {
+                Some(FeatureSetLevel::Embeddable)
             }
-            assembly_config_schema::FeatureSupportLevel::Bootstrap => {
-                Some(FeatureSupportLevel::Bootstrap)
-            }
-            assembly_config_schema::FeatureSupportLevel::Utility => {
-                Some(FeatureSupportLevel::Utility)
-            }
-            assembly_config_schema::FeatureSupportLevel::Standard => {
-                Some(FeatureSupportLevel::Standard)
-            }
+            assembly_config_schema::FeatureSetLevel::Bootstrap => Some(FeatureSetLevel::Bootstrap),
+            assembly_config_schema::FeatureSetLevel::Utility => Some(FeatureSetLevel::Utility),
+            assembly_config_schema::FeatureSetLevel::Standard => Some(FeatureSetLevel::Standard),
         }
     }
 }
 
-impl std::fmt::Display for FeatureSupportLevel {
+impl std::fmt::Display for FeatureSetLevel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FeatureSupportLevel::Embeddable => f.write_str("embeddable"),
-            FeatureSupportLevel::Bootstrap => f.write_str("bootstrap"),
-            FeatureSupportLevel::Utility => f.write_str("utility"),
-            FeatureSupportLevel::Standard => f.write_str("standard"),
+            FeatureSetLevel::Embeddable => f.write_str("embeddable"),
+            FeatureSetLevel::Bootstrap => f.write_str("bootstrap"),
+            FeatureSetLevel::Utility => f.write_str("utility"),
+            FeatureSetLevel::Standard => f.write_str("standard"),
         }
     }
 }
@@ -126,7 +120,7 @@ pub(crate) trait DefineSubsystemConfiguration<T> {
 /// available to all subsystems to use to derive their configuration from.
 #[derive(Debug)]
 pub(crate) struct ConfigurationContext<'a> {
-    pub feature_set_level: &'a FeatureSupportLevel,
+    pub feature_set_level: &'a FeatureSetLevel,
     pub build_type: &'a BuildType,
     pub board_info: &'a BoardInformation,
     pub gendir: Utf8PathBuf,
@@ -145,7 +139,7 @@ impl ConfigurationContext<'_> {
     pub fn ensure_build_type_and_feature_set_level(
         &self,
         build_types: &[BuildType],
-        feature_set_levels: &[FeatureSupportLevel],
+        feature_set_levels: &[FeatureSetLevel],
         item_name: &str,
     ) -> anyhow::Result<()> {
         self.ensure_build_type(build_types, item_name)?;
@@ -184,7 +178,7 @@ impl ConfigurationContext<'_> {
     /// Returns an error if they do not, and Ok(()) if they do.
     pub fn ensure_feature_set_level(
         &self,
-        feature_set_levels: &[FeatureSupportLevel],
+        feature_set_levels: &[FeatureSetLevel],
         item_name: &str,
     ) -> anyhow::Result<()> {
         if !feature_set_levels.contains(self.feature_set_level) {
@@ -928,14 +922,14 @@ impl ConfigurationContext<'_> {
     /// ```
     ///  use crate::subsystems::prelude::*;
     ///  let context = ConfigurationContext {
-    ///      feature_set_level: &FeatureSupportLevel::Standard,
+    ///      feature_set_level: &FeatureSetLevel::Standard,
     ///      build_type: &BuildType::Eng,
     ///      ..Default::default()
     ///  };
     ///  ```
     pub(crate) fn default_for_tests() -> Self {
         Self {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::User,
             board_info: &tests::BOARD_INFORMATION_FOR_TESTS,
             gendir: Utf8PathBuf::from_path_buf(
@@ -1211,7 +1205,7 @@ mod tests {
     #[test]
     fn test_ensure_build_type_and_feature_set() {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Bootstrap,
+            feature_set_level: &FeatureSetLevel::Bootstrap,
             build_type: &BuildType::Eng,
             board_info: &BoardInformation {
                 name: "sample".to_owned(),
@@ -1224,7 +1218,7 @@ mod tests {
         };
         let result = context.ensure_build_type_and_feature_set_level(
             &[BuildType::Eng],
-            &[FeatureSupportLevel::Bootstrap],
+            &[FeatureSetLevel::Bootstrap],
             "feature",
         );
         assert!(result.is_ok());
@@ -1233,7 +1227,7 @@ mod tests {
     #[test]
     fn test_ensure_build_type_and_feature_set_bails_on_bad_build_type() {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Bootstrap,
+            feature_set_level: &FeatureSetLevel::Bootstrap,
             build_type: &BuildType::Eng,
             board_info: &BoardInformation {
                 name: "sample".to_owned(),
@@ -1246,7 +1240,7 @@ mod tests {
         };
         let result = context.ensure_build_type_and_feature_set_level(
             &[BuildType::User, BuildType::UserDebug],
-            &[FeatureSupportLevel::Bootstrap],
+            &[FeatureSetLevel::Bootstrap],
             "My feature",
         );
         assert!(result.is_err());
@@ -1259,7 +1253,7 @@ mod tests {
     #[test]
     fn test_ensure_build_type_and_feature_set_bails_on_bad_feature_set_level() {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Bootstrap,
+            feature_set_level: &FeatureSetLevel::Bootstrap,
             build_type: &BuildType::Eng,
             board_info: &BoardInformation {
                 name: "sample".to_owned(),
@@ -1272,7 +1266,7 @@ mod tests {
         };
         let result = context.ensure_build_type_and_feature_set_level(
             &[BuildType::Eng],
-            &[FeatureSupportLevel::Utility, FeatureSupportLevel::Standard],
+            &[FeatureSetLevel::Utility, FeatureSetLevel::Standard],
             "My feature",
         );
         assert!(result.is_err());

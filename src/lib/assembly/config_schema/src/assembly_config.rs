@@ -218,7 +218,7 @@ mod tests {
     use crate::platform_config::media_config::{
         AudioConfig, AudioDeviceRegistryConfig, PlatformMediaConfig,
     };
-    use crate::platform_config::{BuildType, FeatureSupportLevel};
+    use crate::platform_config::{BuildType, FeatureSetLevel};
     use crate::product_config::ProductPackageDetails;
     use assembly_util as util;
     use fuchsia_pkg::{MetaPackage, PackageManifestBuilder, PackageName};
@@ -240,7 +240,7 @@ mod tests {
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
         let platform = config.platform;
         assert_eq!(platform.build_type, BuildType::Eng);
-        assert_eq!(platform.feature_set_level, FeatureSupportLevel::Standard);
+        assert_eq!(platform.feature_set_level, FeatureSetLevel::Standard);
     }
 
     #[test]
@@ -259,7 +259,7 @@ mod tests {
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
         let platform = config.platform;
         assert_eq!(platform.build_type, BuildType::Eng);
-        assert_eq!(platform.feature_set_level, FeatureSupportLevel::Bootstrap);
+        assert_eq!(platform.feature_set_level, FeatureSetLevel::Bootstrap);
     }
 
     #[test]
@@ -277,7 +277,7 @@ mod tests {
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
         let platform = config.platform;
         assert_eq!(platform.build_type, BuildType::Eng);
-        assert_eq!(platform.feature_set_level, FeatureSupportLevel::Standard);
+        assert_eq!(platform.feature_set_level, FeatureSetLevel::Standard);
     }
 
     #[test]
@@ -296,7 +296,7 @@ mod tests {
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
         let platform = config.platform;
         assert_eq!(platform.build_type, BuildType::Eng);
-        assert_eq!(platform.feature_set_level, FeatureSupportLevel::Empty);
+        assert_eq!(platform.feature_set_level, FeatureSetLevel::Empty);
     }
 
     #[test]

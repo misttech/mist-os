@@ -82,20 +82,20 @@ impl DefineSubsystemConfiguration<SwdConfig> for SwdSubsystemConfig {
             None => {
                 match context.feature_set_level {
                     // Standard has an update checker
-                    FeatureSupportLevel::Standard => {
+                    FeatureSetLevel::Standard => {
                         let update_checker =
                             UpdateChecker::default_by_build_type(context.build_type);
                         Self::set_update_checker(&update_checker, context.build_type, builder)?;
                         Self::set_policy_by_build_type(context.build_type, context, builder)?;
                     }
                     // Utility has no update checker
-                    FeatureSupportLevel::Utility => {
+                    FeatureSetLevel::Utility => {
                         builder.platform_bundle("no_update_checker");
                     }
                     // Bootstrap and Embeddable have neither an update checker nor the system-update
                     // realm, so do not include `no_update_checker` AIB that requires the realm.
-                    FeatureSupportLevel::Bootstrap => {}
-                    FeatureSupportLevel::Embeddable => {}
+                    FeatureSetLevel::Bootstrap => {}
+                    FeatureSetLevel::Embeddable => {}
                 };
             }
         }

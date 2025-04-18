@@ -17,7 +17,7 @@ impl DefineSubsystemConfiguration<SetUiConfig> for SetUiSubsystem {
         builder: &mut dyn ConfigurationBuilder,
     ) -> Result<()> {
         // setui is always added to Standard feature set level system.
-        if *context.feature_set_level == FeatureSupportLevel::Standard {
+        if *context.feature_set_level == FeatureSetLevel::Standard {
             let bundle_name = if config.with_camera { "setui_with_camera" } else { "setui" };
             match config.use_icu {
                 ICUType::Flavored => {

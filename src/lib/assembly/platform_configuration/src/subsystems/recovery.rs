@@ -53,7 +53,7 @@ impl DefineSubsystemConfiguration<(&RecoveryConfig, &VolumeConfig)> for Recovery
                 .context("Adding factory-reset-trigger config data entry")?;
         }
 
-        if *context.feature_set_level == FeatureSupportLevel::Standard
+        if *context.feature_set_level == FeatureSetLevel::Standard
             || config.system_recovery.is_some()
         {
             // factory_reset is required by the standard feature set level, and when system_recovery
@@ -77,7 +77,7 @@ impl DefineSubsystemConfiguration<(&RecoveryConfig, &VolumeConfig)> for Recovery
         )?;
 
         if let Some(system_recovery) = &config.system_recovery {
-            context.ensure_feature_set_level(&[FeatureSupportLevel::Utility], "System Recovery")?;
+            context.ensure_feature_set_level(&[FeatureSetLevel::Utility], "System Recovery")?;
             match system_recovery {
                 SystemRecovery::Fdr => builder.platform_bundle("recovery_fdr"),
             }

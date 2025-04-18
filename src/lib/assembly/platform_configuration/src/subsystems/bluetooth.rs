@@ -36,8 +36,8 @@ impl DefineSubsystemConfiguration<(&BluetoothConfig, &PlatformMediaConfig)>
 
         // Include bt-transport-uart driver through a platform AIB.
         if context.board_info.provides_feature("fuchsia::bt_transport_uart")
-            && (*context.feature_set_level == FeatureSupportLevel::Standard
-                || *context.feature_set_level == FeatureSupportLevel::Utility)
+            && (*context.feature_set_level == FeatureSetLevel::Standard
+                || *context.feature_set_level == FeatureSetLevel::Utility)
         {
             builder.platform_bundle("bt_transport_uart_driver");
         }
@@ -48,7 +48,7 @@ impl DefineSubsystemConfiguration<(&BluetoothConfig, &PlatformMediaConfig)>
 
         // Bluetooth Core & Profile packages can only be added to the Standard platform
         // service level.
-        if *context.feature_set_level != FeatureSupportLevel::Standard {
+        if *context.feature_set_level != FeatureSetLevel::Standard {
             return Err(format_err!(
                 "Bluetooth core & profiles are forbidden on non-Standard service levels"
             ));
@@ -154,7 +154,7 @@ impl DefineSubsystemConfiguration<(&BluetoothConfig, &PlatformMediaConfig)>
             builder.platform_bundle("bluetooth_map_mce");
         }
 
-        if *context.feature_set_level == FeatureSupportLevel::Standard
+        if *context.feature_set_level == FeatureSetLevel::Standard
             && *context.build_type == BuildType::Eng
         {
             builder.platform_bundle("bluetooth_pandora");

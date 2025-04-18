@@ -213,7 +213,7 @@ mod test {
         platform_kernel_config: PlatformKernelConfig,
     ) -> CompletedConfiguration {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
             board_info: &Default::default(),
             gendir: Default::default(),

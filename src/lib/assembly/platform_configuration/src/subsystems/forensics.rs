@@ -63,10 +63,8 @@ impl DefineSubsystemConfiguration<ForensicsConfig> for ForensicsSubsystem {
         }
 
         // Cobalt may be added to anything utility and higher.
-        if matches!(
-            context.feature_set_level,
-            FeatureSupportLevel::Standard | FeatureSupportLevel::Utility
-        ) {
+        if matches!(context.feature_set_level, FeatureSetLevel::Standard | FeatureSetLevel::Utility)
+        {
             util::add_build_type_config_data("cobalt", context, builder)?;
             if let Some(api_key) = &config.cobalt.api_key {
                 builder.package("cobalt").config_data(FileEntry {
@@ -106,7 +104,7 @@ mod test {
         };
 
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
             board_info: &Default::default(),
             gendir: Default::default(),
@@ -133,7 +131,7 @@ mod test {
         };
 
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::User,
             board_info: &Default::default(),
             gendir: Default::default(),
@@ -160,7 +158,7 @@ mod test {
         };
 
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::UserDebug,
             board_info: &Default::default(),
             gendir: Default::default(),

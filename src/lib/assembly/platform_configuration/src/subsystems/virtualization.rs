@@ -16,7 +16,7 @@ impl DefineSubsystemConfiguration<PlatformVirtualizationConfig> for Virtualizati
     ) -> anyhow::Result<()> {
         if virtualization_config.enabled {
             ensure!(
-                *context.feature_set_level == FeatureSupportLevel::Standard,
+                *context.feature_set_level == FeatureSetLevel::Standard,
                 "Virtualization is only supported in the default feature set level"
             );
             builder.platform_bundle("virtualization_support");

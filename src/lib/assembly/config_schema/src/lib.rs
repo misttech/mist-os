@@ -24,6 +24,6 @@ pub use image_assembly_config::{BoardDriverArguments, ImageAssemblyConfig};
 pub use platform_config::example_config::ExampleConfig;
 pub use platform_config::icu_config::{ICUConfig, Revision};
 pub use platform_config::intl_config::IntlConfig;
-pub use platform_config::{BuildType, FeatureSupportLevel};
+pub use platform_config::{BuildType, FeatureSetLevel};
 
 use common::{option_path_schema, vec_path_schema};

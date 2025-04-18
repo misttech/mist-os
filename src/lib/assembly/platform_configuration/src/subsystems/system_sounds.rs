@@ -15,7 +15,7 @@ impl DefineSubsystemConfiguration<SystemSoundsConfig> for SystemSoundsSubsystem 
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         if let Some(earcons) = &system_sounds_config.earcons {
-            context.ensure_feature_set_level(&[FeatureSupportLevel::Standard], "earcons")?;
+            context.ensure_feature_set_level(&[FeatureSetLevel::Standard], "earcons")?;
 
             builder.package("setui_service").optional_config_data_files(vec![
                 (&earcons.bluetooth_connected, "bluetooth-connected.wav"),

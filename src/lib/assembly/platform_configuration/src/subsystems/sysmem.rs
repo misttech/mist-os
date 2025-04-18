@@ -85,7 +85,7 @@ impl DefineSubsystemConfiguration<PlatformSysmemConfig> for SysmemConfig {
         // platform config had format_costs field set - but we always convert to a (possibly-empty)
         // vec (never None even if both inputs had None).
 
-        if *context.feature_set_level == FeatureSupportLevel::Embeddable {
+        if *context.feature_set_level == FeatureSetLevel::Embeddable {
             // At least for now, Embeddable --> zero contiguous or protected memory reservations,
             // ignoring PlatformSysmemConfig::contiguous_memory_size and protected_memory_size.
             builder.set_config_capability(
@@ -289,7 +289,7 @@ mod test {
     #[test]
     fn test_contiguous_memory_size() {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
             board_info: &Default::default(),
             gendir: Default::default(),
@@ -331,7 +331,7 @@ mod test {
     #[test]
     fn test_contiguous_memory_size_percent() {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
             board_info: &Default::default(),
             gendir: Default::default(),
@@ -373,7 +373,7 @@ mod test {
     #[test]
     fn test_contiguous_memory_size_percentage_too_high() {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
             board_info: &Default::default(),
             gendir: Default::default(),
@@ -400,7 +400,7 @@ mod test {
     #[test]
     fn test_protected_memory_size_percentage_too_high() {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
             board_info: &Default::default(),
             gendir: Default::default(),
@@ -427,7 +427,7 @@ mod test {
     #[test]
     fn test_board_defaults_no_platform_overrides() {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
             board_info: &BoardInformation {
                 platform: assembly_config_schema::board_config::PlatformConfig {
@@ -480,7 +480,7 @@ mod test {
     #[test]
     fn test_board_defaults_with_platform_overrides() {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
             board_info: &BoardInformation {
                 platform: assembly_config_schema::board_config::PlatformConfig {
@@ -533,7 +533,7 @@ mod test {
     #[test]
     fn test_no_overrides() {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
             board_info: &BoardInformation {
                 platform: assembly_config_schema::board_config::PlatformConfig {
@@ -703,7 +703,7 @@ mod test {
             .expect("write platform_format_costs_vec");
 
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
             board_info: &BoardInformation {
                 configuration: BoardProvidedConfig {

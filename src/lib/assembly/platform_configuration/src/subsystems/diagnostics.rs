@@ -75,14 +75,14 @@ impl<'a> DefineSubsystemConfiguration<DiagnosticsSubsystemConfig<'a>> for Diagno
         match (context.build_type, context.feature_set_level) {
             // Always clear bind_services for bootstrap (bringup) and utility
             // systems.
-            (_, FeatureSupportLevel::Bootstrap)
-            | (_, FeatureSupportLevel::Embeddable)
-            | (_, FeatureSupportLevel::Utility) => {
+            (_, FeatureSetLevel::Bootstrap)
+            | (_, FeatureSetLevel::Embeddable)
+            | (_, FeatureSetLevel::Utility) => {
                 bind_services.clear();
             }
             // Some services aren't present on user builds.
-            (BuildType::User, FeatureSupportLevel::Standard) => {}
-            (_, FeatureSupportLevel::Standard) => {
+            (BuildType::User, FeatureSetLevel::Standard) => {}
+            (_, FeatureSetLevel::Standard) => {
                 bind_services.insert("fuchsia.component.DetectBinder");
                 bind_services.insert("fuchsia.component.KernelDebugBrokerBinder");
             }
@@ -206,7 +206,7 @@ impl<'a> DefineSubsystemConfiguration<DiagnosticsSubsystemConfig<'a>> for Diagno
 
         let exception_handler_available = matches!(
             context.feature_set_level,
-            FeatureSupportLevel::Utility | FeatureSupportLevel::Standard
+            FeatureSetLevel::Utility | FeatureSetLevel::Standard
         );
         builder.set_config_capability(
             "fuchsia.diagnostics.ExceptionHandlerAvailable",
@@ -214,10 +214,9 @@ impl<'a> DefineSubsystemConfiguration<DiagnosticsSubsystemConfig<'a>> for Diagno
         )?;
 
         match context.feature_set_level {
-            FeatureSupportLevel::Bootstrap
-            | FeatureSupportLevel::Utility
-            | FeatureSupportLevel::Embeddable => {}
-            FeatureSupportLevel::Standard => {
+            FeatureSetLevel::Bootstrap | FeatureSetLevel::Utility | FeatureSetLevel::Embeddable => {
+            }
+            FeatureSetLevel::Standard => {
                 if context.board_info.provides_feature("fuchsia::mali_gpu") {
                     builder.platform_bundle("diagnostics_triage_detect_mali");
                 }
@@ -497,7 +496,7 @@ mod tests {
     fn test_define_configuration_default() {
         let resource_dir = ResourceDir::new();
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
             resource_dir: resource_dir.path(),
             ..ConfigurationContext::default_for_tests()
@@ -550,7 +549,7 @@ mod tests {
     fn test_define_configuration_additional_serial_log_components() {
         let resource_dir = ResourceDir::new();
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
             resource_dir: resource_dir.path(),
             ..ConfigurationContext::default_for_tests()
@@ -585,7 +584,7 @@ mod tests {
     fn test_define_configuration_low_mem() {
         let resource_dir = ResourceDir::new();
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
             resource_dir: resource_dir.path(),
             ..ConfigurationContext::default_for_tests()
@@ -622,7 +621,7 @@ mod tests {
     fn test_default_on_bootstrap() {
         let resource_dir = ResourceDir::new();
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Bootstrap,
+            feature_set_level: &FeatureSetLevel::Bootstrap,
             build_type: &BuildType::Eng,
             resource_dir: resource_dir.path(),
             ..ConfigurationContext::default_for_tests()
@@ -650,7 +649,7 @@ mod tests {
     fn test_default_for_user() {
         let resource_dir = ResourceDir::new();
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::User,
             resource_dir: resource_dir.path(),
             ..ConfigurationContext::default_for_tests()
@@ -691,7 +690,7 @@ mod tests {
         );
 
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::User,
             resource_dir: resource_dir.path(),
             ..ConfigurationContext::default_for_tests()
@@ -729,7 +728,7 @@ mod tests {
         );
 
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::User,
             resource_dir: resource_dir.path(),
             ..ConfigurationContext::default_for_tests()
@@ -760,7 +759,7 @@ mod tests {
     fn test_define_configuration_initial_log_interests() {
         let resource_dir = ResourceDir::new();
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
             resource_dir: resource_dir.path(),
             ..ConfigurationContext::default_for_tests()
@@ -851,7 +850,7 @@ mod tests {
         );
 
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::User,
             resource_dir: resource_dir.path(),
             ..ConfigurationContext::default_for_tests()

@@ -50,13 +50,13 @@ pub struct PlatformConfig {
     /// subsystems.
     #[serde(default)]
     #[serde(skip_serializing_if = "crate::common::is_default")]
-    pub feature_set_level: FeatureSupportLevel,
+    pub feature_set_level: FeatureSetLevel,
 
     /// The RFC-0115 Build Type of the assembled product + platform.
     ///
     /// https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0115_build_types
     ///
-    /// After the FeatureSupportLevel, this is the next most-influential
+    /// After the FeatureSetLevel, this is the next most-influential
     /// determinant of the makeup of the platform.  It selects platform
     /// components and configuration, and is used to disallow various platform
     /// configuration settings when producing Userdebug and User images.
@@ -272,7 +272,7 @@ pub struct PlatformConfig {
 /// used by products' main system.
 #[derive(Debug, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
 #[serde(rename_all = "lowercase")]
-pub enum FeatureSupportLevel {
+pub enum FeatureSetLevel {
     /// THIS IS FOR TESTING AND MIGRATIONS ONLY!
     ///
     /// It creates an assembly with no platform.

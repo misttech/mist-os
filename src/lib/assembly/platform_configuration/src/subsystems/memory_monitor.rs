@@ -18,7 +18,7 @@ impl DefineSubsystemConfiguration<PlatformMemoryMonitorConfig> for MemoryMonitor
         for version in &memory_monitor_config.memory_monitor_versions {
             match version {
                 MemoryMonitorVersion::Default => {
-                    if *context.feature_set_level != FeatureSupportLevel::Standard {
+                    if *context.feature_set_level != FeatureSetLevel::Standard {
                         continue;
                     }
                     match context.build_type {

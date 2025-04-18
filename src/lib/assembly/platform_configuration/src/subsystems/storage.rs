@@ -20,7 +20,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
     ) -> anyhow::Result<()> {
         if matches!(
             context.feature_set_level,
-            FeatureSupportLevel::Bootstrap | FeatureSupportLevel::Embeddable
+            FeatureSetLevel::Bootstrap | FeatureSetLevel::Embeddable
         ) {
             ensure!(
                 storage_config.filesystems.image_mode == FilesystemImageMode::NoImage,
@@ -30,7 +30,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
 
         // Include legacy paver implementation in all feature sets above "embeddable" if the board
         // doesn't include it. Embeddable doesn't support paving.
-        if *context.feature_set_level != FeatureSupportLevel::Embeddable
+        if *context.feature_set_level != FeatureSetLevel::Embeddable
             && !context.board_info.provides_feature("fuchsia::paver")
         {
             builder.platform_bundle("paver_legacy");
@@ -59,7 +59,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             })
             .context("Adding zxcrypt config to bootfs")?;
 
-        if *context.feature_set_level == FeatureSupportLevel::Embeddable {
+        if *context.feature_set_level == FeatureSetLevel::Embeddable {
             // We don't need fshost in embeddable.
             return Ok(());
         }
@@ -70,7 +70,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
 
         if storage_config.mutable_storage_garbage_collection {
             context.ensure_feature_set_level(
-                &[FeatureSupportLevel::Standard],
+                &[FeatureSetLevel::Standard],
                 "Mutable storage garbage collection",
             )?;
             builder.platform_bundle("storage_cache_manager");

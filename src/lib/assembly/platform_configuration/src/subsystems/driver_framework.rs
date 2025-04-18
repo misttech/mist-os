@@ -40,7 +40,7 @@ impl DefineSubsystemConfiguration<(&DriverFrameworkConfig, &StorageConfig)>
         };
 
         let enable_ephemeral_drivers = match (context.build_type, context.feature_set_level) {
-            (BuildType::Eng, FeatureSupportLevel::Standard) => {
+            (BuildType::Eng, FeatureSetLevel::Standard) => {
                 builder.platform_bundle("full_drivers");
                 true
             }
@@ -49,7 +49,7 @@ impl DefineSubsystemConfiguration<(&DriverFrameworkConfig, &StorageConfig)>
 
         let delay_fallback = matches!(
             context.feature_set_level,
-            FeatureSupportLevel::Utility | FeatureSupportLevel::Standard
+            FeatureSetLevel::Utility | FeatureSetLevel::Standard
         );
 
         let test_fuzzing_config =
@@ -135,7 +135,7 @@ impl DefineSubsystemConfiguration<(&DriverFrameworkConfig, &StorageConfig)>
             software_names.push("ram-disk");
             software_ids.push(bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_RAM_DISK);
         }
-        if *context.feature_set_level == FeatureSupportLevel::Standard
+        if *context.feature_set_level == FeatureSetLevel::Standard
             && *context.build_type == BuildType::Eng
         {
             software_names.push("virtual-audio");
@@ -147,7 +147,7 @@ impl DefineSubsystemConfiguration<(&DriverFrameworkConfig, &StorageConfig)>
         if context.board_info.provides_feature("fuchsia::fake_battery")
             && matches!(
                 context.feature_set_level,
-                FeatureSupportLevel::Utility | FeatureSupportLevel::Standard
+                FeatureSetLevel::Utility | FeatureSetLevel::Standard
             )
         {
             software_names.push("fake-battery");

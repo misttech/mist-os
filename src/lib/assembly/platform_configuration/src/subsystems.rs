@@ -16,7 +16,7 @@ pub(crate) mod prelude {
     #[allow(unused)]
     pub(crate) use crate::common::{
         BoardInformationExt, ComponentConfigBuilderExt, ConfigurationBuilder, ConfigurationContext,
-        DefaultByBuildType, DefineSubsystemConfiguration, FeatureSupportLevel,
+        DefaultByBuildType, DefineSubsystemConfiguration, FeatureSetLevel,
         OptionDefaultByBuildTypeExt,
     };
 
@@ -87,7 +87,7 @@ pub fn define_configuration(
     // The emulator support bundle is always added, even to an empty build.
     builder.platform_bundle("emulator_support");
 
-    let feature_set_level = FeatureSupportLevel::from_deserialized(&platform.feature_set_level);
+    let feature_set_level = FeatureSetLevel::from_deserialized(&platform.feature_set_level);
 
     // Only perform configuration if the feature_set_level is not None (ie, Empty).
     if let Some(feature_set_level) = &feature_set_level {
@@ -124,7 +124,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
     ) -> anyhow::Result<()> {
         // Set up the platform's common AIBs by feature_set_level and build_type.
         for bundle_name in match (context.feature_set_level, context.build_type) {
-            (FeatureSupportLevel::Embeddable, BuildType::Eng) => {
+            (FeatureSetLevel::Embeddable, BuildType::Eng) => {
                 vec![
                     "embeddable",
                     "embeddable_userdebug",
@@ -133,7 +133,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "bootstrap_realm_development_access",
                 ]
             }
-            (FeatureSupportLevel::Embeddable, BuildType::UserDebug) => {
+            (FeatureSetLevel::Embeddable, BuildType::UserDebug) => {
                 vec![
                     "embeddable",
                     "embeddable_userdebug",
@@ -141,10 +141,10 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "bootstrap_realm_development_access",
                 ]
             }
-            (FeatureSupportLevel::Embeddable, BuildType::User) => {
+            (FeatureSetLevel::Embeddable, BuildType::User) => {
                 vec!["embeddable", "component_manager"]
             }
-            (FeatureSupportLevel::Bootstrap, _) => {
+            (FeatureSetLevel::Bootstrap, _) => {
                 vec![
                     "embeddable",
                     "embeddable_userdebug",
@@ -156,7 +156,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "bootstrap_realm_development_access",
                 ]
             }
-            (FeatureSupportLevel::Utility, BuildType::Eng) => {
+            (FeatureSetLevel::Utility, BuildType::Eng) => {
                 vec![
                     "embeddable",
                     "embeddable_userdebug",
@@ -171,7 +171,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "core_realm_eng",
                 ]
             }
-            (FeatureSupportLevel::Utility, BuildType::UserDebug) => {
+            (FeatureSetLevel::Utility, BuildType::UserDebug) => {
                 vec![
                     "embeddable",
                     "embeddable_userdebug",
@@ -184,7 +184,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "core_realm_user_and_userdebug",
                 ]
             }
-            (FeatureSupportLevel::Utility, BuildType::User) => {
+            (FeatureSetLevel::Utility, BuildType::User) => {
                 vec![
                     "embeddable",
                     "component_manager",
@@ -193,7 +193,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "core_realm_user_and_userdebug",
                 ]
             }
-            (FeatureSupportLevel::Standard, BuildType::Eng) => {
+            (FeatureSetLevel::Standard, BuildType::Eng) => {
                 vec![
                     "embeddable",
                     "embeddable_userdebug",
@@ -213,7 +213,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "tracing",
                 ]
             }
-            (FeatureSupportLevel::Standard, BuildType::UserDebug) => {
+            (FeatureSetLevel::Standard, BuildType::UserDebug) => {
                 vec![
                     "embeddable",
                     "embeddable_userdebug",
@@ -229,7 +229,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "standard_userdebug_and_eng",
                 ]
             }
-            (FeatureSupportLevel::Standard, BuildType::User) => {
+            (FeatureSetLevel::Standard, BuildType::User) => {
                 vec![
                     "embeddable",
                     "component_manager",

@@ -69,8 +69,8 @@ fn define_global_platform_tee_configuration(
 ) -> anyhow::Result<()> {
     match context.feature_set_level {
         // tee_manager and clients only exist in systems that have the core realm
-        FeatureSupportLevel::Embeddable | FeatureSupportLevel::Bootstrap => return Ok(()),
-        FeatureSupportLevel::Utility | FeatureSupportLevel::Standard => {}
+        FeatureSetLevel::Embeddable | FeatureSetLevel::Bootstrap => return Ok(()),
+        FeatureSetLevel::Utility | FeatureSetLevel::Standard => {}
     }
 
     // Configure the tee_manager based on whether the board provided GUIDs
