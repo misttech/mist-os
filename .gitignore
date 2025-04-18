@@ -112,6 +112,8 @@ tables_generator_tests_*.txt
 !/third_party/gfxstream/aemu
 /third_party/gfxstream/aemu/src
 !/third_party/golibs
+!/third_party/half
+/third_party/half/src
 !/third_party/rust_crates
 /third_party/rust_crates/mirrors
 !/third_party/jellyfish/
