@@ -117,7 +117,10 @@ enum KernelServices {
 }
 
 #[fuchsia::main(
-    logging_tags = ["starnix"],
+    // Don't add any statically declared tags to reduce right-ward drift in log output. In practice
+    // all logs get tagged with task info that makes it clear from context the log comes from
+    // Starnix.
+    logging_tags = [],
     logging_blocking,
     logging_panic_prefix="\n\n\n\nSTARNIX KERNEL PANIC\n\n\n\n",
 )]
