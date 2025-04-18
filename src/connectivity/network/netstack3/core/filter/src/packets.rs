@@ -6,7 +6,9 @@ use core::borrow::Borrow;
 use core::convert::Infallible as Never;
 use core::num::NonZeroU16;
 
-use net_types::ip::{GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use net_types::ip::{
+    GenericOverIp, Ip, IpAddress, IpInvariant, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
+};
 use netstack3_base::{Options, PayloadLen, SegmentHeader};
 use packet::records::options::OptionSequenceBuilder;
 use packet::{
@@ -34,8 +36,8 @@ use packet_formats::ip::{IpExt, IpPacket as _, IpPacketBuilder, IpProto, Ipv4Pro
 use packet_formats::ipv4::{Ipv4Packet, Ipv4PacketRaw};
 use packet_formats::ipv6::{Ipv6Packet, Ipv6PacketRaw};
 use packet_formats::tcp::options::TcpOption;
-use packet_formats::tcp::{TcpParseArgs, TcpSegment, TcpSegmentBuilderWithOptions, TcpSegmentRaw};
-use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpPacketRaw, UdpParseArgs};
+use packet_formats::tcp::{TcpSegmentBuilderWithOptions, TcpSegmentRaw};
+use packet_formats::udp::{UdpPacketBuilder, UdpPacketRaw};
 use zerocopy::{SplitByteSlice, SplitByteSliceMut};
 
 /// An IP extension trait for the filtering crate.
@@ -295,14 +297,7 @@ impl<B: SplitByteSliceMut> IpPacket<Ipv4> for Ipv4Packet<B> {
         if let Some(packet) = self.transport_packet_mut().transport_packet_mut() {
             packet.update_pseudo_header_src_addr(old, addr);
         }
-        // NB: it is important that we do not update the IP layer header until
-        // after parsing the transport header, because if we change the source
-        // address in the IP header and then attempt to parse the transport
-        // header using that address for checksum validation, parsing will fail.
-        //
-        // TODO(https://fxbug.dev/341340810): use raw packet parsing for all
-        // transport header updates, which is less expensive and would allow
-        // updating the IP and transport headers to be order-independent.
+
         self.set_src_ip_and_update_checksum(addr);
     }
 
@@ -315,15 +310,7 @@ impl<B: SplitByteSliceMut> IpPacket<Ipv4> for Ipv4Packet<B> {
         if let Some(packet) = self.transport_packet_mut().transport_packet_mut() {
             packet.update_pseudo_header_dst_addr(old, addr);
         }
-        // NB: it is important that we do not update the IP layer header until
-        // after parsing the transport header, because if we change the
-        // destination address in the IP header and then attempt to parse the
-        // transport header using that address for checksum validation, parsing
-        // will fail.
-        //
-        // TODO(https://fxbug.dev/341340810): use raw packet parsing for all
-        // transport header updates, which is less expensive and would allow
-        // updating the IP and transport headers to be order-independent.
+
         self.set_dst_ip_and_update_checksum(addr);
     }
 
@@ -337,8 +324,6 @@ impl<B: SplitByteSliceMut> IpPacket<Ipv4> for Ipv4Packet<B> {
 
     fn transport_packet_mut(&mut self) -> Self::TransportPacketMut<'_> {
         ParsedTransportHeaderMut::parse_in_ipv4_packet(
-            self.src_ip(),
-            self.dst_ip(),
             self.proto(),
             SliceBufViewMut::new(self.body_mut()),
         )
@@ -375,14 +360,7 @@ impl<B: SplitByteSliceMut> IpPacket<Ipv6> for Ipv6Packet<B> {
         if let Some(packet) = self.transport_packet_mut().transport_packet_mut() {
             packet.update_pseudo_header_src_addr(old, addr);
         }
-        // NB: it is important that we do not update the IP layer header until
-        // after parsing the transport header, because if we change the source
-        // address in the IP header and then attempt to parse the transport
-        // header using that address for checksum validation, parsing will fail.
-        //
-        // TODO(https://fxbug.dev/341340810): use raw packet parsing for all
-        // transport header updates, which is less expensive and would allow
-        // updating the IP and transport headers to be order-independent.
+
         self.set_src_ip(addr);
     }
 
@@ -395,15 +373,7 @@ impl<B: SplitByteSliceMut> IpPacket<Ipv6> for Ipv6Packet<B> {
         if let Some(packet) = self.transport_packet_mut().transport_packet_mut() {
             packet.update_pseudo_header_dst_addr(old, addr);
         }
-        // NB: it is important that we do not update the IP layer header until
-        // after parsing the transport header, because if we change the
-        // destination address in the IP header and then attempt to parse the
-        // transport header using that address for checksum validation, parsing
-        // will fail.
-        //
-        // TODO(https://fxbug.dev/341340810): use raw packet parsing for all
-        // transport header updates, which is less expensive and would allow
-        // updating the IP and transport headers to be order-independent.
+
         self.set_dst_ip(addr);
     }
 
@@ -417,8 +387,6 @@ impl<B: SplitByteSliceMut> IpPacket<Ipv6> for Ipv6Packet<B> {
 
     fn transport_packet_mut(&mut self) -> Self::TransportPacketMut<'_> {
         ParsedTransportHeaderMut::parse_in_ipv6_packet(
-            self.src_ip(),
-            self.dst_ip(),
             self.proto(),
             SliceBufViewMut::new(self.body_mut()),
         )
@@ -619,14 +587,7 @@ impl<I: IpExt, B: BufferMut> IpPacket<I> for ForwardedPacket<I, B> {
         if let Some(packet) = self.transport_packet_mut().transport_packet_mut() {
             packet.update_pseudo_header_src_addr(old, addr);
         }
-        // NB: it is important that we do not update this until after parsing
-        // the transport header, because if we change the source address and
-        // then attempt to parse the transport header using that address for
-        // checksum validation, parsing will fail.
-        //
-        // TODO(https://fxbug.dev/341340810): use raw packet parsing for all
-        // transport header updates, which is less expensive and would allow
-        // updating the IP and transport headers to be order-independent.
+
         self.src_addr = addr;
     }
 
@@ -654,14 +615,7 @@ impl<I: IpExt, B: BufferMut> IpPacket<I> for ForwardedPacket<I, B> {
         if let Some(packet) = self.transport_packet_mut().transport_packet_mut() {
             packet.update_pseudo_header_dst_addr(old, addr);
         }
-        // NB: it is important that we do not update this until after parsing
-        // the transport header, because if we change the destination address
-        // and then attempt to parse the transport header using that address for
-        // checksum validation, parsing will fail.
-        //
-        // TODO(https://fxbug.dev/341340810): use raw packet parsing for all
-        // transport header updates, which is less expensive and would allow
-        // updating the IP and transport headers to be order-independent.
+
         self.dst_addr = addr;
     }
 
@@ -674,11 +628,9 @@ impl<I: IpExt, B: BufferMut> IpPacket<I> for ForwardedPacket<I, B> {
     }
 
     fn transport_packet_mut(&mut self) -> Self::TransportPacketMut<'_> {
-        let ForwardedPacket { src_addr, dst_addr, protocol, buffer, transport_header_offset } =
+        let ForwardedPacket { src_addr: _, dst_addr: _, protocol, buffer, transport_header_offset } =
             self;
         ParsedTransportHeaderMut::<I>::parse_in_ip_packet(
-            *src_addr,
-            *dst_addr,
             *protocol,
             SliceBufViewMut::new(&mut buffer.as_mut()[*transport_header_offset..]),
         )
@@ -1129,10 +1081,8 @@ impl<I: IpExt, B: BufferMut> MaybeTransportPacketMut<I> for RawIpBody<I, B> {
         Self: 'a;
 
     fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
-        let RawIpBody { protocol, src_addr, dst_addr, body, transport_packet_data: _ } = self;
+        let RawIpBody { protocol, src_addr: _, dst_addr: _, body, transport_packet_data: _ } = self;
         ParsedTransportHeaderMut::<I>::parse_in_ip_packet(
-            *src_addr,
-            *dst_addr,
             *protocol,
             SliceBufViewMut::new(body.as_mut()),
         )
@@ -1285,25 +1235,23 @@ fn parse_icmpv6_header<B: ParseBuffer>(mut body: B) -> Option<TransportPacketDat
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 pub enum ParsedTransportHeaderMut<'a, I: IpExt> {
-    Tcp(TcpSegment<&'a mut [u8]>),
-    Udp(UdpPacket<&'a mut [u8]>),
+    Tcp(TcpSegmentRaw<&'a mut [u8]>),
+    Udp(UdpPacketRaw<&'a mut [u8]>),
     Icmp(I::IcmpPacketTypeRaw<&'a mut [u8]>),
 }
 
 impl<'a> ParsedTransportHeaderMut<'a, Ipv4> {
     fn parse_in_ipv4_packet<BV: BufferViewMut<&'a mut [u8]>>(
-        src_ip: Ipv4Addr,
-        dst_ip: Ipv4Addr,
         proto: Ipv4Proto,
         body: BV,
     ) -> Option<Self> {
         match proto {
             Ipv4Proto::Proto(IpProto::Udp) => {
-                Some(Self::Udp(UdpPacket::parse_mut(body, UdpParseArgs::new(src_ip, dst_ip)).ok()?))
+                Some(Self::Udp(UdpPacketRaw::parse_mut(body, IpVersionMarker::<Ipv4>::new()).ok()?))
             }
-            Ipv4Proto::Proto(IpProto::Tcp) => Some(Self::Tcp(
-                TcpSegment::parse_mut(body, TcpParseArgs::new(src_ip, dst_ip)).ok()?,
-            )),
+            Ipv4Proto::Proto(IpProto::Tcp) => {
+                Some(Self::Tcp(TcpSegmentRaw::parse_mut(body, ()).ok()?))
+            }
             Ipv4Proto::Icmp => Some(Self::Icmp(Icmpv4PacketRaw::parse_mut(body, ()).ok()?)),
             Ipv4Proto::Proto(IpProto::Reserved) | Ipv4Proto::Igmp | Ipv4Proto::Other(_) => None,
         }
@@ -1312,18 +1260,16 @@ impl<'a> ParsedTransportHeaderMut<'a, Ipv4> {
 
 impl<'a> ParsedTransportHeaderMut<'a, Ipv6> {
     fn parse_in_ipv6_packet<BV: BufferViewMut<&'a mut [u8]>>(
-        src_ip: Ipv6Addr,
-        dst_ip: Ipv6Addr,
         proto: Ipv6Proto,
         body: BV,
     ) -> Option<Self> {
         match proto {
             Ipv6Proto::Proto(IpProto::Udp) => {
-                Some(Self::Udp(UdpPacket::parse_mut(body, UdpParseArgs::new(src_ip, dst_ip)).ok()?))
+                Some(Self::Udp(UdpPacketRaw::parse_mut(body, IpVersionMarker::<Ipv6>::new()).ok()?))
             }
-            Ipv6Proto::Proto(IpProto::Tcp) => Some(Self::Tcp(
-                TcpSegment::parse_mut(body, TcpParseArgs::new(src_ip, dst_ip)).ok()?,
-            )),
+            Ipv6Proto::Proto(IpProto::Tcp) => {
+                Some(Self::Tcp(TcpSegmentRaw::parse_mut(body, ()).ok()?))
+            }
             Ipv6Proto::Icmpv6 => Some(Self::Icmp(Icmpv6PacketRaw::parse_mut(body, ()).ok()?)),
             Ipv6Proto::Proto(IpProto::Reserved) | Ipv6Proto::NoNextHeader | Ipv6Proto::Other(_) => {
                 None
@@ -1334,22 +1280,16 @@ impl<'a> ParsedTransportHeaderMut<'a, Ipv6> {
 
 impl<'a, I: IpExt> ParsedTransportHeaderMut<'a, I> {
     fn parse_in_ip_packet<BV: BufferViewMut<&'a mut [u8]>>(
-        src_ip: I::Addr,
-        dst_ip: I::Addr,
         proto: I::Proto,
         body: BV,
     ) -> Option<Self> {
         I::map_ip(
-            (src_ip, dst_ip, proto, IpInvariant(body)),
-            |(src_ip, dst_ip, proto, IpInvariant(body))| {
-                ParsedTransportHeaderMut::<'a, Ipv4>::parse_in_ipv4_packet(
-                    src_ip, dst_ip, proto, body,
-                )
+            (proto, IpInvariant(body)),
+            |(proto, IpInvariant(body))| {
+                ParsedTransportHeaderMut::<'a, Ipv4>::parse_in_ipv4_packet(proto, body)
             },
-            |(src_ip, dst_ip, proto, IpInvariant(body))| {
-                ParsedTransportHeaderMut::<'a, Ipv6>::parse_in_ipv6_packet(
-                    src_ip, dst_ip, proto, body,
-                )
+            |(proto, IpInvariant(body))| {
+                ParsedTransportHeaderMut::<'a, Ipv6>::parse_in_ipv6_packet(proto, body)
             },
         )
     }
@@ -2074,13 +2014,8 @@ mod tests {
         let mut buf = P::make_packet::<I>(I::SRC_IP, I::DST_IP);
         let view = SliceBufViewMut::new(&mut buf);
 
-        let mut packet = ParsedTransportHeaderMut::<I>::parse_in_ip_packet(
-            I::SRC_IP,
-            I::DST_IP,
-            P::proto::<I>(),
-            view,
-        )
-        .expect("parse transport header");
+        let mut packet = ParsedTransportHeaderMut::<I>::parse_in_ip_packet(P::proto::<I>(), view)
+            .expect("parse transport header");
         packet.update_pseudo_header_src_addr(I::SRC_IP, I::SRC_IP_2);
         packet.update_pseudo_header_dst_addr(I::DST_IP, I::DST_IP_2);
         // Drop the packet because it's holding a mutable borrow of `buf` which
@@ -2105,13 +2040,8 @@ mod tests {
         let mut buf = P::make_packet_with_ports::<I>(I::SRC_IP, I::DST_IP, SRC_PORT, DST_PORT);
         let view = SliceBufViewMut::new(&mut buf);
 
-        let mut packet = ParsedTransportHeaderMut::<I>::parse_in_ip_packet(
-            I::SRC_IP,
-            I::DST_IP,
-            P::proto::<I>(),
-            view,
-        )
-        .expect("parse transport header");
+        let mut packet = ParsedTransportHeaderMut::<I>::parse_in_ip_packet(P::proto::<I>(), view)
+            .expect("parse transport header");
         let expected_src_port = if update_src_port {
             packet.set_src_port(SRC_PORT_2);
             SRC_PORT_2
