@@ -6,6 +6,7 @@
 
 #include <debug.h>
 #include <lib/boot-options/boot-options.h>
+#include <lib/fit/defer.h>
 #include <lib/fxt/fields.h>
 #include <lib/fxt/interned_category.h>
 #include <lib/ktrace.h>
@@ -791,6 +792,49 @@ template <>
 zx_status_t KTraceImpl<BufferMode::kPerCpu>::Rewind() {
   // TODO(https://fxbug.dev/404539312): Implement me!
   return ZX_ERR_NOT_SUPPORTED;
+}
+
+template <>
+zx::result<KTraceImpl<BufferMode::kPerCpu>::PendingCommit> KTraceImpl<BufferMode::kPerCpu>::Reserve(
+    uint64_t header) {
+  // Compute the number of bytes we need to reserve from the provided fxt header.
+  const uint32_t num_words = fxt::RecordFields::RecordSize::Get<uint32_t>(header);
+  const uint32_t num_bytes = num_words * sizeof(uint64_t);
+
+  // Disable interrupts.
+  // We have to do this before we check if writes are enabled, otherwise a racing Stop operation
+  // may disable writes and send the IPI it uses to verify that we're done writing before we begin
+  // our write.
+  // We also have to do this before we check which CPU this thread is on, otherwise this thread
+  // could be migrated across CPUs after we check the current CPU number, leading to an invalid,
+  // cross-CPU write.
+  interrupt_saved_state_t saved_state = arch_interrupt_save();
+  auto restore_interrupt_state =
+      fit::defer([&saved_state]() { arch_interrupt_restore(saved_state); });
+
+  // If writes are disabled, then return an error. We return ZX_ERR_BAD_STATE, because this means
+  // that tracing was disabled.
+  //
+  // It is valid for writes to be disabled immediately after this check. This is ok because Stop,
+  // which disables writes, will follow up with an IPI to all cores and wait for those IPIs to
+  // return. Because we disabled interrupts prior to this check, that IPI will not return until
+  // this write operation is complete.
+  if (!WritesEnabled()) {
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
+  // Check which CPU we're running on and Reserve a slot in the appropriate SPSC buffer.
+  const cpu_num_t cpu_num = arch_curr_cpu_num();
+  zx::result<PerCpuBuffer::Reservation> result = percpu_buffers_[cpu_num].Reserve(num_bytes);
+  if (result.is_error()) {
+    return result.take_error();
+  }
+  PendingCommit res(ktl::move(result.value()), saved_state, header);
+
+  // The PendingWrite is now responsible for restoring interrupt state.
+  restore_interrupt_state.cancel();
+
+  return zx::ok(ktl::move(res));
 }
 
 // The InitHook is the same for both the single and per-CPU buffer implementation of KTrace.

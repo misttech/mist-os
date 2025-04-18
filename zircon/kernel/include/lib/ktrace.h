@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_LIB_KTRACE_H_
 #define ZIRCON_KERNEL_INCLUDE_LIB_KTRACE_H_
 
+#include <align.h>
 #include <lib/fxt/interned_category.h>
 #include <lib/fxt/serializer.h>
 #include <lib/fxt/trace_base.h>
@@ -642,6 +643,77 @@ class KTraceImpl {
   using PerCpuBuffer = SpscBuffer<KernelAspaceAllocator>;
 
  public:
+  // PendingCommit encapsulates a pending write to the KTrace buffer.
+  //
+  // This class implements the fxt::Writer::Reservation trait, which is required by the FXT
+  // serializer.
+  //
+  // It is absolutely imperative that interrupts remain disabled for the lifetime of this class.
+  // Enabling interrupts at any point during the lifetime of this class will break the
+  // single-writer invariant of each per-CPU buffer and lead to subtle concurrency bugs that may
+  // manifest as corrupt trace data. Unfortunately, there is no way for us to programmatically
+  // ensure this, so we do our best by asserting that interrupts are disabled in every method of
+  // this class. It is therefore up to the caller to ensure that interrupts are never re-enabled.
+  class PendingCommit {
+   public:
+    ~PendingCommit() {
+      DEBUG_ASSERT(arch_ints_disabled());
+      arch_interrupt_restore(state_);
+    }
+
+    // Disallow copies and move assignment, but allow moves.
+    // Disallowing move assignment allows the saved interrupt state to be const.
+    PendingCommit(const PendingCommit&) = delete;
+    PendingCommit& operator=(const PendingCommit&) = delete;
+    PendingCommit& operator=(PendingCommit&&) = delete;
+    PendingCommit(PendingCommit&& other)
+        : reservation_(ktl::move(other.reservation_)), state_(other.state_) {
+      DEBUG_ASSERT(arch_ints_disabled());
+      other.state_ = kNoopInterruptSavedState;
+    }
+
+    void WriteWord(uint64_t word) {
+      DEBUG_ASSERT(arch_ints_disabled());
+      reservation_.Write(ktl::span<ktl::byte>(reinterpret_cast<ktl::byte*>(&word), sizeof(word)));
+    }
+
+    void WriteBytes(const void* bytes, size_t num_bytes) {
+      DEBUG_ASSERT(arch_ints_disabled());
+      // Write the data provided.
+      reservation_.Write(
+          ktl::span<const ktl::byte>(static_cast<const ktl::byte*>(bytes), num_bytes));
+
+      // Write any padding bytes necessary.
+      constexpr uint8_t kZero[8]{};
+      const size_t aligned_bytes = ALIGN(num_bytes, 8);
+      const size_t num_zeros_to_write = aligned_bytes - num_bytes;
+      if (num_zeros_to_write != 0) {
+        reservation_.Write(ktl::span<const ktl::byte>(reinterpret_cast<const ktl::byte*>(kZero),
+                                                      num_zeros_to_write));
+      }
+    }
+
+    void Commit() {
+      DEBUG_ASSERT(arch_ints_disabled());
+      reservation_.Commit();
+    }
+
+   private:
+    // Only KTraceImpl::Reserve<BufferMode::kPerCpu> should be able to create a PendingCommit.
+    friend class KTraceImpl<BufferMode::kPerCpu>;
+    PendingCommit(PerCpuBuffer::Reservation reservation, interrupt_saved_state_t state,
+                  uint64_t header)
+        : reservation_(ktl::move(reservation)), state_(state) {
+      DEBUG_ASSERT(arch_ints_disabled());
+      WriteWord(header);
+    }
+
+    PerCpuBuffer::Reservation reservation_;
+    interrupt_saved_state_t state_;
+  };
+  using Reservation = ktl::conditional_t<Mode == BufferMode::kSingle,
+                                         internal::KTraceState::PendingCommit, PendingCommit>;
+
   // Control is responsible for starting, stopping, or rewinding the ktrace buffer.
   //
   // The meaning of the options changes based on the action. If the action is to start tracing,
@@ -669,9 +741,7 @@ class KTraceImpl {
   zx::result<size_t> ReadUser(user_out_ptr<void> ptr, uint32_t off, size_t len);
 
   // Reserve reserves a slot in the ring buffer to write a record into.
-  using PendingCommit =
-      std::conditional_t<Mode == BufferMode::kSingle, internal::KTraceState::PendingCommit, void>;
-  zx::result<PendingCommit> Reserve(uint64_t header);
+  zx::result<Reservation> Reserve(uint64_t header);
 
   // Sentinel type for unused arguments.
   struct Unused {};

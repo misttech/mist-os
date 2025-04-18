@@ -4,10 +4,15 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <align.h>
 #include <lib/fxt/interned_category.h>
+#include <lib/fxt/record_types.h>
+#include <lib/fxt/serializer.h>
 #include <lib/ktrace.h>
 #include <lib/unittest/unittest.h>
 #include <lib/zircon-internal/ktrace.h>
+
+#include <arch/ops.h>
 
 // The KTraceTests class is a friend of the KTrace class, which allows it to access private members
 // of that class.
@@ -130,10 +135,96 @@ class KTraceTests {
 
     END_TEST;
   }
+
+  // Test that writes work as expected.
+  static bool TestWrite() {
+    BEGIN_TEST;
+
+    // NOTE: The SpscBuffer tests already verify that writes to a single buffer work as expected,
+    // so we do not duplicate those tests here. Instead, this test verifies KTrace specific write
+    // behaviors, such as:
+    // * Reserve should fail if writes are disabled.
+    // * Reserve should always pick the per-CPU buffer associated with the current CPU to write to.
+    // * Reserve should correctly parse the required slot size from an FXT header.
+    // * PendingCommit should be able to write a single word using WriteWord correctly.
+    // * PendingCommit should be able to write a buffer of bytes using WriteBytes correctly, and it
+    //   should correctly pad to the nearest word.
+
+    // Generate data that we can write into our KTrace buffer. Intentionally generate a non-word
+    // aligned amount to test the padding behavior.
+    //
+    // Words to write with PendingCommit::WriteWord.
+    ktl::array<uint64_t, 29> words;
+    // Bytes to write with PendingCommit::WriteBytes.
+    ktl::array<ktl::byte, 397> bytes;
+    static_assert(bytes.size() % 8 != 0);
+    constexpr size_t unpadded_record_size = sizeof(uint64_t) + (words.size() * 8) + bytes.size();
+    constexpr uint64_t padded_record_size = ALIGN(unpadded_record_size, 8);
+    constexpr uint64_t fxt_header =
+        fxt::MakeHeader(fxt::RecordType::kBlob, fxt::WordSize::FromBytes(unpadded_record_size));
+
+    // Populate the trace record with random data.
+    srand(4);
+    for (uint64_t& word : words) {
+      word = static_cast<uint64_t>(rand());
+    }
+    for (ktl::byte& byte : bytes) {
+      byte = static_cast<ktl::byte>(rand());
+    }
+
+    // Initialize KTrace, but do not start tracing.
+    KTraceImpl<BufferMode::kPerCpu> ktrace(true);
+    const uint32_t total_bufsize = PAGE_SIZE * arch_max_num_cpus();
+    ktrace.Init(total_bufsize, 0u);
+
+    // Verify that attempting to Reserve a slot now fails because tracing has not been started, and
+    // therefore writes are disabled.
+    zx::result<KTraceImpl<BufferMode::kPerCpu>::Reservation> failed = ktrace.Reserve(fxt_header);
+    ASSERT_EQ(ZX_ERR_BAD_STATE, failed.status_value());
+
+    // Start tracing.
+    ASSERT_OK(ktrace.Control(KTRACE_ACTION_START, 0xfff));
+
+    // Successfully reserve a slot.
+    zx::result<KTraceImpl<BufferMode::kPerCpu>::Reservation> res = ktrace.Reserve(fxt_header);
+    ASSERT_OK(res.status_value());
+
+    // Reserve turns off interrupts, so we can get the number of the CPU whose buffer we're writing
+    // to.
+    const cpu_num_t target_cpu = arch_curr_cpu_num();
+
+    // Write the trace record.
+    for (uint64_t word : words) {
+      res->WriteWord(word);
+    }
+    res->WriteBytes(bytes.data(), bytes.size());
+    res->Commit();
+
+    // Read out the data.
+    uint8_t actual[padded_record_size];
+    auto copy_out = [&](uint32_t offset, ktl::span<ktl::byte> src) {
+      memcpy(actual + offset, src.data(), src.size());
+      return ZX_OK;
+    };
+    zx::result<size_t> read_result =
+        ktrace.percpu_buffers_[target_cpu].Read(copy_out, padded_record_size);
+    ASSERT_OK(read_result.status_value());
+    ASSERT_EQ(padded_record_size, read_result.value());
+
+    // Verify that the data is what we expect.
+    uint8_t expected[padded_record_size]{};
+    memcpy(expected, &fxt_header, sizeof(fxt_header));
+    memcpy(expected + sizeof(fxt_header), words.data(), words.size() * 8);
+    memcpy(expected + sizeof(fxt_header) + (words.size() * 8), bytes.data(), bytes.size());
+    ASSERT_BYTES_EQ(expected, actual, padded_record_size);
+
+    END_TEST;
+  }
 };
 
 UNITTEST_START_TESTCASE(ktrace_tests)
 UNITTEST("legacy_categories", KTraceTests::TestLegacyCategories)
 UNITTEST("init_stop", KTraceTests::TestInitStop)
 UNITTEST("start_stop", KTraceTests::TestStartStop)
+UNITTEST("write", KTraceTests::TestWrite)
 UNITTEST_END_TESTCASE(ktrace_tests, "ktrace", "KTrace tests")
