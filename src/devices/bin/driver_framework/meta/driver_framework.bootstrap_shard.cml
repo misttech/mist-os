@@ -165,7 +165,6 @@
         },
         {
             protocol: [
-                "fuchsia.boot.Arguments",
                 "fuchsia.boot.Items",
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.kernel.MexecResource",
@@ -226,11 +225,6 @@
         },
         {
             protocol: "fuchsia.kernel.InfoResource",
-            from: "parent",
-            to: "#boot-drivers",
-        },
-        {
-            protocol: "fuchsia.boot.Arguments",
             from: "parent",
             to: "#boot-drivers",
         },

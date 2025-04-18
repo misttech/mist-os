@@ -21,6 +21,5 @@
             service: [ "fuchsia.hardware.display.engine.Service" ],
             availability: "optional",
         },
-        { protocol: "fuchsia.boot.Arguments" },
     ],
 }
