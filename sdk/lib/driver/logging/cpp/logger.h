@@ -9,20 +9,41 @@
 #include <fidl/fuchsia.logger/cpp/wire_types.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/syslog/structured_backend/cpp/fuchsia_syslog.h>
+#include <lib/syslog/structured_backend/fuchsia_syslog.h>
 #include <lib/zx/socket.h>
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD) && __cplusplus >= 202002L
 #include <format>
 #include <source_location>
-#endif
-#include <span>
 
-#include "lib/syslog/structured_backend/fuchsia_syslog.h"
+#include "internal/panic.h"
+#endif
 
 #define FDF_LOGL(severity, logger, msg...) \
   (logger).logf((FUCHSIA_LOG_##severity), nullptr, __FILE__, __LINE__, msg)
 
 #define FDF_LOG(severity, msg...) FDF_LOGL(severity, *fdf::Logger::GlobalInstance(), msg)
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD) && __cplusplus >= 202002L
+
+#define FDF_ASSERT(x)                                                     \
+  do {                                                                    \
+    if (x) [[likely]] {                                                   \
+      break;                                                              \
+    } else {                                                              \
+      fdf::panic("ASSERT FAILED at ({}:{}): {}", __FILE__, __LINE__, #x); \
+    }                                                                     \
+  } while (0)
+
+#define FDF_ASSERT_MSG(x, msg, msgargs...)                                               \
+  do {                                                                                   \
+    if (x) [[likely]] {                                                                  \
+      break;                                                                             \
+    } else {                                                                             \
+      fdf::panic("ASSERT FAILED at ({}:{}): {}" msg, __FILE__, __LINE__, #x, ##msgargs); \
+    }                                                                                    \
+  } while (0)
+#endif
 
 namespace fdf {
 
@@ -234,6 +255,11 @@ struct fatal {
 
 template <typename... Args>
 fatal(std::format_string<Args...>, Args&&...) -> fatal<Args...>;
+
+template <typename... Args>
+void panic(std::format_string<Args...> fmt, Args&&... args) {
+  fdf_internal::vpanic(fmt.get(), std::make_format_args(args...));
+}
 #endif
 
 }  // namespace fdf

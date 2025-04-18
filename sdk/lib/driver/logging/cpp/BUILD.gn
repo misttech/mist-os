@@ -12,6 +12,7 @@ sdk_source_set("cpp") {
 
   sources = [
     "internal/logger_internal.h",
+    "internal/panic.h",
     "logger.cc",
     "logger.h",
     "structured_logger.h",

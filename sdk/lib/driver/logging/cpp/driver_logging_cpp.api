@@ -1,5 +1,6 @@
 {
   "pkg/driver_logging_cpp/include/lib/driver/logging/cpp/internal/logger_internal.h": "e9afa3ffed955a28f654fb455749bc97",
-  "pkg/driver_logging_cpp/include/lib/driver/logging/cpp/logger.h": "156a97ee8faf2ede174e92a1bc8a6fe7",
+  "pkg/driver_logging_cpp/include/lib/driver/logging/cpp/internal/panic.h": "6eaa00831f10e266177980f9eab62589",
+  "pkg/driver_logging_cpp/include/lib/driver/logging/cpp/logger.h": "93fbe217015cc28c5755a940525a056e",
   "pkg/driver_logging_cpp/include/lib/driver/logging/cpp/structured_logger.h": "ddd5f1417dec14adf3ac40dd777e6b64"
 }
