@@ -271,12 +271,12 @@ pub struct PlatformConfig {
 /// The standard (default) level is `Minimal`. It is the level that should be
 /// used by products' main system.
 #[derive(Debug, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum FeatureSetLevel {
     /// THIS IS FOR TESTING AND MIGRATIONS ONLY!
     ///
     /// It creates an assembly with no platform.
-    Empty,
+    TestNoPlatform,
 
     /// This is a small build of fuchsia which is not meant to support
     /// self-updates, but rather be updated externally. It is meant for truly

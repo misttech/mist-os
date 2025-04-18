@@ -43,7 +43,7 @@ use assembly_util::NamedMap;
 /// directly in the platform configuration of products.
 ///
 /// Note:  This version of the enum does not contain the
-/// `assembly_config_schema::FeatureSetLevel::Empty` option, as that is instead
+/// `assembly_config_schema::FeatureSetLevel::TestNoPlatform` option, as that is instead
 /// represented as `Option::None`, with the other values as an
 /// `Option::Some(value)`.
 #[derive(Debug, PartialEq)]
@@ -80,7 +80,7 @@ impl FeatureSetLevel {
         value: &assembly_config_schema::platform_config::FeatureSetLevel,
     ) -> Option<Self> {
         match value {
-            assembly_config_schema::FeatureSetLevel::Empty => None,
+            assembly_config_schema::FeatureSetLevel::TestNoPlatform => None,
             assembly_config_schema::FeatureSetLevel::Embeddable => {
                 Some(FeatureSetLevel::Embeddable)
             }

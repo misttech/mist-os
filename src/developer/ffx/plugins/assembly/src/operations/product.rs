@@ -244,7 +244,9 @@ Resulting product is not supported and may misbehave!
     // Add product-specified packages and configuration
     if product.bootfs_files_package.is_some() || !product.packages.bootfs.is_empty() {
         match platform.feature_set_level {
-            FeatureSetLevel::Empty | FeatureSetLevel::Embeddable | FeatureSetLevel::Bootstrap => {
+            FeatureSetLevel::TestNoPlatform
+            | FeatureSetLevel::Embeddable
+            | FeatureSetLevel::Bootstrap => {
                 // these are the only valid feature set levels for adding these files.
             }
             _ => {

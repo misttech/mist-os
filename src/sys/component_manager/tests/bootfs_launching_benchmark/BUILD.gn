@@ -94,7 +94,7 @@ if (current_toolchain == default_toolchain) {
     testonly = true
     platform = {
       build_type = "user"
-      feature_set_level = "empty"
+      feature_set_level = "test_no_platform"
       storage = {
         filesystems = {
           image_name = img_name

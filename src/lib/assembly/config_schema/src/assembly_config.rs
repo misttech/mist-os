@@ -285,7 +285,7 @@ mod tests {
         let json5 = r#"
         {
           platform: {
-            feature_set_level: "empty",
+            feature_set_level: "test_no_platform",
             build_type: "eng",
           },
           product: {},
@@ -296,7 +296,7 @@ mod tests {
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
         let platform = config.platform;
         assert_eq!(platform.build_type, BuildType::Eng);
-        assert_eq!(platform.feature_set_level, FeatureSetLevel::Empty);
+        assert_eq!(platform.feature_set_level, FeatureSetLevel::TestNoPlatform);
     }
 
     #[test]
