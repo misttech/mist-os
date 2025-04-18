@@ -8,7 +8,7 @@
 #include <lib/async/time.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include <functional>
+#include "src/ui/scenic/lib/utils/logging.h"
 
 namespace {
 
@@ -103,12 +103,6 @@ std::pair<zx::time, zx::time> DefaultFrameScheduler::ComputePresentationAndWakeu
 void DefaultFrameScheduler::RequestFrame(zx::time requested_presentation_time) {
   FX_DCHECK(HaveUpdatableSessions() || render_continuously_ || !last_frame_is_presented_);
 
-  // Output requested presentation time in milliseconds.
-  // Logging the first few frames to find common startup bugs.
-  if (frame_number_ <= kNumDebugFrames) {
-    FX_LOGS(DEBUG) << "RequestFrame";
-  }
-
   const auto [new_target_presentation_time, new_wakeup_time] =
       ComputePresentationAndWakeupTimesForTargetTime(requested_presentation_time);
 
@@ -117,6 +111,20 @@ void DefaultFrameScheduler::RequestFrame(zx::time requested_presentation_time) {
                  new_target_presentation_time.get() / 1'000'000, "candidate wakeup time",
                  new_wakeup_time.get() / 1'000'000, "current wakeup time",
                  wakeup_time_.get() / 1'000'000);
+
+  // Output requested presentation time in milliseconds.
+  // Logging the first few frames to find common startup bugs.
+  if (frame_number_ <= kNumDebugFrames) {
+    FX_LOGS(DEBUG) << "FrameScheduler::RequestFrame() times requested="
+                   << requested_presentation_time.get()
+                   << "  target=" << new_target_presentation_time.get()
+                   << "  wakeup=" << new_wakeup_time.get();
+  } else {
+    FLATLAND_VERBOSE_LOG << "FrameScheduler::RequestFrame() times requested="
+                         << requested_presentation_time.get()
+                         << "  target=" << new_target_presentation_time.get()
+                         << "  wakeup=" << new_wakeup_time.get();
+  }
 
   // If there is no render waiting we should schedule a frame. Likewise, if newly predicted wake up
   // time is earlier than the current one then we need to reschedule the next wake-up.
@@ -167,8 +175,13 @@ void DefaultFrameScheduler::MaybeRenderFrame(async_dispatcher_t*, async::TaskBas
 
   // Logging the first few frames to find common startup bugs.
   if (frame_number < kNumDebugFrames) {
-    FX_LOGS(DEBUG) << "MaybeRenderFrame target_presentation_time=" << target_presentation_time.get()
-                   << " wakeup_time=" << wakeup_time_.get() << " frame_number=" << frame_number;
+    FX_LOGS(DEBUG) << "FrameScheduler::MaybeRenderFrame() frame_number=" << frame_number
+                   << "  target_presentation_time=" << target_presentation_time.get()
+                   << "  wakeup_time=" << wakeup_time_.get();
+  } else {
+    FLATLAND_VERBOSE_LOG << "FrameScheduler::MaybeRenderFrame() frame_number=" << frame_number
+                         << "  target_presentation_time=" << target_presentation_time.get()
+                         << "  wakeup_time=" << wakeup_time_.get();
   }
 
   // Apply all updates
@@ -189,6 +202,10 @@ void DefaultFrameScheduler::MaybeRenderFrame(async_dispatcher_t*, async::TaskBas
   frame_predictor_->ReportUpdateDuration(zx::duration(update_end_time - update_start_time));
 
   if (!needs_render && last_frame_is_presented_ && !render_continuously_) {
+    FLATLAND_VERBOSE_LOG << "FrameScheduler::MaybeRenderFrame() frame_number=" << frame_number
+                         << "  target_presentation_time=" << target_presentation_time.get()
+                         << "  skipping render because there is nothing to render.";
+
     inspect_wakeups_without_render_.Set(++wakeups_without_render_);
 
     // Nothing to render. Continue with next request in the queue.
@@ -202,6 +219,11 @@ void DefaultFrameScheduler::MaybeRenderFrame(async_dispatcher_t*, async::TaskBas
   // Only one frame is allowed "in flight" at any given. Don't start rendering another frame until
   // the previous frame is on the display.
   if (last_presented_frame_number_ < (frame_number - 1)) {
+    FLATLAND_VERBOSE_LOG << "FrameScheduler::MaybeRenderFrame() frame_number=" << frame_number
+                         << "  target_presentation_time=" << target_presentation_time.get()
+                         << "  skipping render because last_presented_frame_number="
+                         << last_presented_frame_number_ << "  is still in flight";
+
     last_frame_is_presented_ = false;
     return;
   }
@@ -210,8 +232,13 @@ void DefaultFrameScheduler::MaybeRenderFrame(async_dispatcher_t*, async::TaskBas
 
   // Logging the first few frames to find common startup bugs.
   if (frame_number < kNumDebugFrames) {
-    FX_LOGS(INFO) << "Calling RenderFrame target_presentation_time="
-                  << target_presentation_time.get() << " frame_number=" << frame_number;
+    FX_LOGS(INFO) << "FrameScheduler::MaybeRenderFrame() frame_number=" << frame_number
+                  << "  target_presentation_time=" << target_presentation_time.get()
+                  << "  ... calling RenderFrame";
+  } else {
+    FLATLAND_VERBOSE_LOG << "FrameScheduler::MaybeRenderFrame() frame_number=" << frame_number
+                         << "  target_presentation_time=" << target_presentation_time.get()
+                         << "  ... calling RenderFrame";
   }
 
   TRACE_INSTANT("gfx", "Render start", TRACE_SCOPE_PROCESS, "Expected presentation time",
@@ -233,13 +260,14 @@ void DefaultFrameScheduler::MaybeRenderFrame(async_dispatcher_t*, async::TaskBas
 
   inspect_frame_number_.Set(frame_number);
 
+  // Render the frame.
   render_scheduled_frame_(frame_number, target_presentation_time, std::move(on_presented_callback));
-  ++frame_number_;
 
   // Let all Session Updaters know of the timing of the end of RenderFrame().
   on_cpu_work_done_();
 
   // Schedule next frame if any unhandled presents are left.
+  ++frame_number_;
   HandleNextFrameRequest();
 }
 
@@ -253,8 +281,13 @@ void DefaultFrameScheduler::ScheduleUpdateForSession(zx::time requested_presenta
 
   // Logging the first few frames to find common startup bugs.
   if (frame_number_ < kNumDebugFrames) {
-    FX_LOGS(DEBUG) << "ScheduleUpdateForSession session_id: " << id_pair.session_id
-                   << " requested_presentation_time: " << requested_presentation_time.get();
+    FX_LOGS(DEBUG) << "FrameScheduler::ScheduleUpdateForSession() session_id=" << id_pair.session_id
+                   << "  present_id=" << id_pair.present_id
+                   << "  requested_presentation_time=" << requested_presentation_time.get();
+  } else {
+    FLATLAND_VERBOSE_LOG << "FrameScheduler::ScheduleUpdateForSession() session_id="
+                         << id_pair.session_id << "  present_id=" << id_pair.present_id
+                         << "  requested_presentation_time=" << requested_presentation_time.get();
   }
 
   const trace_flow_id_t flow_id = TRACE_NONCE();
@@ -326,7 +359,9 @@ void DefaultFrameScheduler::HandleFramePresented(uint64_t frame_number, zx::time
   FX_DCHECK(vsync_timing_->vsync_interval().get() >= 0);
 
   if (frame_number < kNumDebugFrames) {
-    FX_LOGS(INFO) << "DefaultFrameScheduler::OnFramePresented" << " frame_number=" << frame_number;
+    FX_LOGS(INFO) << "DefaultFrameScheduler::HandleFramePresented() frame_number=" << frame_number;
+  } else {
+    FLATLAND_VERBOSE_LOG << "FrameScheduler::HandleFramePresented() frame_number=" << frame_number;
   }
 
   last_presented_frame_number_ = frame_number;
@@ -423,6 +458,22 @@ std::unordered_map<SessionId, PresentId> DefaultFrameScheduler::CollectUpdatesFo
     }
   }
 
+#if defined(USE_FLATLAND_VERBOSE_LOGGING)
+  if (updates.empty()) {
+    FLATLAND_VERBOSE_LOG << "FrameScheduler::CollectUpdatesForThisFrame() frame_number="
+                         << frame_number_ << "  no updates for target_presentation_time="
+                         << target_presentation_time.get();
+  } else {
+    std::ostringstream oss;
+    for (const auto& [session_id, present_id] : updates) {
+      oss << "\n                    session_id=" << session_id << " present_id=" << present_id;
+    }
+    FLATLAND_VERBOSE_LOG << "FrameScheduler::CollectUpdatesForThisFrame() frame_number="
+                         << frame_number_ << "  updates for target_presentation_time="
+                         << target_presentation_time.get() << oss.str();
+  }
+#endif
+
   return updates;
 }
 
@@ -470,8 +521,12 @@ bool DefaultFrameScheduler::ApplyUpdates(zx::time target_presentation_time, zx::
 
   // Logging the first few frames to find common startup bugs.
   if (frame_number < kNumDebugFrames) {
-    FX_LOGS(DEBUG) << "ApplyScheduledSessionUpdates target_presentation_time="
-                   << target_presentation_time.get() << " frame_number=" << frame_number;
+    FX_LOGS(DEBUG) << "FrameScheduler::ApplyScheduledSessionUpdates() frame_number=" << frame_number
+                   << "  target_presentation_time=" << target_presentation_time.get();
+  } else {
+    FLATLAND_VERBOSE_LOG << "FrameScheduler::ApplyScheduledSessionUpdates() frame_number="
+                         << frame_number
+                         << "  target_presentation_time=" << target_presentation_time.get();
   }
 
   // NOTE: this name is used by scenic_frame_stats.dart

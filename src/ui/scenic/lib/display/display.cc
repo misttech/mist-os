@@ -11,6 +11,8 @@
 #include <lib/trace/event.h>
 #include <zircon/syscalls.h>
 
+#include "src/ui/scenic/lib/utils/logging.h"
+
 namespace scenic_impl {
 namespace display {
 
@@ -66,6 +68,10 @@ void Display::OnVsync(zx::time timestamp,
                 "Vsync interval", vsync_timing_->vsync_interval().get());
 
   if (vsync_callback_) {
+    FLATLAND_VERBOSE_LOG << "Display::OnVsync(): display_id=" << display_id_.value
+                         << "  timestamp=" << timestamp.get()
+                         << "  applied_config_stamp=" << applied_config_stamp.value
+                         << "  ... invoking vsync callback";
     vsync_callback_(timestamp, applied_config_stamp);
   }
 }

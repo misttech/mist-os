@@ -184,7 +184,7 @@ Flatland::Flatland(std::shared_ptr<utils::DispatcherHolder> dispatcher_holder,
       register_mouse_source_(std::move(register_mouse_source)) {
   FX_DCHECK(flatland_presenter_);
 
-  FLATLAND_VERBOSE_LOG << "Flatland new with ID: " << session_id_;
+  FLATLAND_VERBOSE_LOG << "Flatland NEW session_id=" << session_id_ << "  this=" << this;
 }
 
 void Flatland::Bind(fidl::ServerEnd<fuchsia_ui_composition::Flatland> server_end,
@@ -195,7 +195,7 @@ void Flatland::Bind(fidl::ServerEnd<fuchsia_ui_composition::Flatland> server_end
       std::make_unique<BindingData>(this, dispatcher_holder_->dispatcher(), std::move(server_end),
                                     std::move(destroy_instance_function));
 
-  FLATLAND_VERBOSE_LOG << "Flatland with ID: " << session_id_ << "  bound to FIDL channel.";
+  FLATLAND_VERBOSE_LOG << "Flatland session_id=" << session_id_ << " bound to FIDL channel.";
 }
 
 Flatland::BindingData::BindingData(Flatland* flatland, async_dispatcher_t* dispatcher,
@@ -296,7 +296,7 @@ Flatland::~Flatland() {
   // above to succeed.
   flatland_presenter_->RemoveSession(session_id_, std::move(image_release_fence));
 
-  FLATLAND_VERBOSE_LOG << "Flatland destructor ran for ID: " << session_id_;
+  FLATLAND_VERBOSE_LOG << "Flatland DESTROYED session_id=" << session_id_;
 }
 
 void Flatland::Present(PresentRequest& request, PresentCompleter::Sync& completer) {
@@ -322,19 +322,24 @@ void Flatland::Present(fuchsia_ui_composition::PresentArgs args) {
 
   ++present_count_;
 
-  FLATLAND_VERBOSE_LOG << "Flatland::Present() #" << present_count_ << " for " << local_root_ << " "
-                       << this;
-
   // Close any clients that had invalid operations on link protocols.
   if (link_protocol_error_) {
-    error_reporter_->ERROR() << "Link protocol error";
+    const char* kError = "Link protocol error";
+    FLATLAND_VERBOSE_LOG << "Flatland::Present() session_id=" << session_id_
+                         << "  present_count=" << present_count_
+                         << "  closing connection: " << kError;
+    error_reporter_->ERROR() << kError;
     CloseConnection(FlatlandError::kBadHangingGet);
     return;
   }
 
   // Close any clients that call Present() without any present tokens.
   if (present_credits_ == 0) {
-    error_reporter_->ERROR() << "Out of present credits";
+    const char* kError = "Out of present credits";
+    FLATLAND_VERBOSE_LOG << "Flatland::Present() session_id=" << session_id_
+                         << "  present_count=" << present_count_
+                         << "  closing connection: " << kError;
+    error_reporter_->ERROR() << kError;
     CloseConnection(FlatlandError::kNoPresentsRemaining);
     return;
   }
@@ -365,6 +370,9 @@ void Flatland::Present(fuchsia_ui_composition::PresentArgs args) {
   // from the global graph (the latter is the responsibility of the manager that is notified by
   // `BindingData::destroy_instance_function_`).
   if (!data.cyclical_edges.empty()) {
+    FLATLAND_VERBOSE_LOG << "Flatland::Present() session_id=" << session_id_
+                         << "  present_count=" << present_count_
+                         << "  closing connection: Cycle was detected";
     CloseConnection(FlatlandError::kBadOperation);
     return;
   }
@@ -472,6 +480,10 @@ void Flatland::Present(fuchsia_ui_composition::PresentArgs args) {
   // - schedule a frame
   // - notify client when the frame has been presented
   auto present_id = scheduling::GetNextPresentId();
+
+  FLATLAND_VERBOSE_LOG << "Flatland::Present() session_id=" << session_id_
+                       << "  present_count=" << present_count_ << "  present_id=" << present_id;
+
   present2_helper_.RegisterPresent(present_id,
                                    /*present_received_time=*/zx::time(async_now(dispatcher())));
 
@@ -586,8 +598,8 @@ void Flatland::CreateViewHelper(
           impl->ReportLinkProtocolError(error_log);
       });
 
-  FLATLAND_VERBOSE_LOG << "Flatland::CreateView() link-attachment-point: "
-                       << child_transform_handle;
+  FLATLAND_VERBOSE_LOG << "Flatland::CreateView() session_id=" << session_id_
+                       << "  link-attachment-point=" << child_transform_handle;
 
   // This portion of the method is feed-forward. The parent-child relationship between
   // |child_transform_handle| and |local_root_| establishes the Transform hierarchy between the two
@@ -643,6 +655,8 @@ void Flatland::RegisterViewBoundProtocols(fuchsia_ui_composition::ViewBoundProto
 void Flatland::ReleaseView(ReleaseViewCompleter::Sync& completer) { ReleaseView(); }
 
 void Flatland::ReleaseView() {
+  FLATLAND_VERBOSE_LOG << "Flatland::ReleaseView() session_id=" << session_id_;
+
   if (!link_to_parent_) {
     error_reporter_->ERROR() << "ReleaseView failed, no existing parent Link";
     CloseConnection(FlatlandError::kBadOperation);
@@ -706,27 +720,27 @@ void Flatland::CreateTransform(CreateTransformRequest& request,
   CreateTransform(request.transform_id());
 }
 
-void Flatland::CreateTransform(TransformId transform_identifier) {
-  const uint64_t transform_id = transform_identifier.value();
+void Flatland::CreateTransform(TransformId transform_id) {
+  const uint64_t client_transform_id = transform_id.value();
 
-  if (transform_id == kInvalidId) {
-    error_reporter_->ERROR() << "CreateTransform called with transform_id 0";
+  if (client_transform_id == kInvalidId) {
+    error_reporter_->ERROR() << "CreateTransform called with transform_id=" << kInvalidId;
     CloseConnection(FlatlandError::kBadOperation);
     return;
   }
 
-  if (transforms_.count(transform_id)) {
-    error_reporter_->ERROR() << "CreateTransform called with pre-existing transform_id "
-                             << transform_id;
+  if (transforms_.contains(client_transform_id)) {
+    error_reporter_->ERROR() << "CreateTransform called with pre-existing transform_id="
+                             << client_transform_id;
     CloseConnection(FlatlandError::kBadOperation);
     return;
   }
 
-  TransformHandle handle = transform_graph_.CreateTransform();
-  FLATLAND_VERBOSE_LOG << "Flatland::CreateTransform() client-id: " << transform_id
-                       << "  handle: " << handle;
-
-  transforms_.insert({transform_id, handle});
+  TransformHandle transform_handle = transform_graph_.CreateTransform();
+  FLATLAND_VERBOSE_LOG << "Flatland::CreateTransform() session_id=" << session_id_
+                       << "  client_transform_id=" << client_transform_id
+                       << "  transform=" << transform_handle;
+  transforms_.insert({client_transform_id, transform_handle});
 }
 
 void Flatland::SetTranslation(SetTranslationRequest& request,
@@ -736,6 +750,9 @@ void Flatland::SetTranslation(SetTranslationRequest& request,
 
 void Flatland::SetTranslation(TransformId transform_identifier, fuchsia_math::Vec translation) {
   const uint64_t transform_id = transform_identifier.value();
+
+  FLATLAND_VERBOSE_LOG << "Flatland::SetTranslation() session_id=" << session_id_
+                       << "  transform_id=" << transform_id << "  translation= " << translation;
 
   if (transform_id == kInvalidId) {
     error_reporter_->ERROR() << "SetTranslation called with transform_id 0";
@@ -764,6 +781,9 @@ void Flatland::SetOrientation(TransformId transform_identifier,
                               fuchsia_ui_composition::Orientation orientation) {
   const uint64_t transform_id = transform_identifier.value();
 
+  FLATLAND_VERBOSE_LOG << "Flatland::SetOrientation() session_id=" << session_id_
+                       << "  transform_id=" << transform_id << "  orientation=" << orientation;
+
   if (transform_id == kInvalidId) {
     error_reporter_->ERROR() << "SetOrientation called with transform_id 0";
     CloseConnection(FlatlandError::kBadOperation);
@@ -790,6 +810,9 @@ void Flatland::SetScale(TransformId transform_identifier, fuchsia_math::VecF sca
   const uint64_t transform_id = transform_identifier.value();
   const float scale_x = scale.x();
   const float scale_y = scale.y();
+
+  FLATLAND_VERBOSE_LOG << "Flatland::SetScale() session_id=" << session_id_
+                       << "  transform_id=" << transform_id << "  scale=" << scale;
 
   if (transform_id == kInvalidId) {
     error_reporter_->ERROR() << "SetScale called with transform_id 0";
@@ -828,6 +851,9 @@ void Flatland::SetOpacity(SetOpacityRequest& request, SetOpacityCompleter::Sync&
 
 void Flatland::SetOpacity(TransformId transform_identifier, float opacity) {
   const uint64_t transform_id = transform_identifier.value();
+
+  FLATLAND_VERBOSE_LOG << "Flatland::SetOpacity() session_id=" << session_id_
+                       << "  transform_id=" << transform_id << "  opacity=" << opacity;
 
   if (transform_id == kInvalidId) {
     error_reporter_->ERROR() << "SetOpacity called with transform_id 0";
@@ -889,10 +915,14 @@ void Flatland::SetClipBoundary(TransformId transform_identifier,
 
   // If the optional bounds are empty, then remove them.
   if (!bounds) {
+    FLATLAND_VERBOSE_LOG << "Flatland::SetClipBoundary() session_id=" << session_id_
+                         << "  transform_id=" << transform_id << "  ... clearing clip region";
     clip_regions_.erase(transform_kv->second);
     return;
   }
 
+  FLATLAND_VERBOSE_LOG << "Flatland::SetClipBoundary() session_id=" << session_id_
+                       << "  transform_id=" << transform_id << "  rect=" << *bounds;
   SetClipBoundaryInternal(transform_kv->second, *bounds);
 }
 
@@ -1096,24 +1126,28 @@ void Flatland::SetRootTransform(SetRootTransformRequest& request,
   SetRootTransform(request.transform_id());
 }
 
-void Flatland::SetRootTransform(TransformId transform_identifier) {
-  const uint64_t transform_id = transform_identifier.value();
+void Flatland::SetRootTransform(TransformId transform_id) {
+  const uint64_t client_transform_id = transform_id.value();
 
   // SetRootTransform(0) is special -- it only clears the existing root transform.
-  if (transform_id == kInvalidId) {
+  if (client_transform_id == kInvalidId) {
     transform_graph_.ClearChildren(local_root_);
     return;
   }
 
-  const auto global_kv = transforms_.find(transform_id);
+  const auto global_kv = transforms_.find(client_transform_id);
   if (global_kv == transforms_.end()) {
-    error_reporter_->ERROR() << "SetRootTransform failed, transform_id " << transform_id
+    error_reporter_->ERROR() << "SetRootTransform failed, transform_id " << client_transform_id
                              << " not found";
     CloseConnection(FlatlandError::kBadOperation);
     return;
   }
 
   transform_graph_.ClearChildren(local_root_);
+
+  FLATLAND_VERBOSE_LOG << "Flatland::SetRootTransform() session_id=" << session_id_
+                       << "  client_transform_id=" << client_transform_id
+                       << "  transform=" << global_kv->second;
 
   bool added = transform_graph_.AddChild(local_root_, global_kv->second);
   FX_DCHECK(added);
@@ -1133,7 +1167,7 @@ void Flatland::CreateViewport(
     ContentId viewport_id, fuchsia_ui_views::ViewportCreationToken token,
     fuchsia_ui_composition::ViewportProperties properties,
     fidl::ServerEnd<fuchsia_ui_composition::ChildViewWatcher> child_view_watcher) {
-  const uint64_t link_id = viewport_id.value();
+  const uint64_t client_viewport_id = viewport_id.value();
 
   // Attempting to link with an invalid token will never succeed, so its better to fail early and
   // immediately close the link connection.
@@ -1159,14 +1193,15 @@ void Flatland::CreateViewport(
   SetViewportPropertiesMissingDefaults(properties, properties.logical_size().value(),
                                        /*inset*/ {0, 0, 0, 0});
 
-  if (link_id == kInvalidId) {
+  if (client_viewport_id == kInvalidId) {
     error_reporter_->ERROR() << "CreateViewport called with ContentId zero";
     CloseConnection(FlatlandError::kBadOperation);
     return;
   }
 
-  if (content_handles_.count(link_id)) {
-    error_reporter_->ERROR() << "CreateViewport called with existing ContentId " << link_id;
+  if (content_handles_.count(client_viewport_id)) {
+    error_reporter_->ERROR() << "CreateViewport called with existing ContentId "
+                             << client_viewport_id;
     CloseConnection(FlatlandError::kBadOperation);
     return;
   }
@@ -1201,15 +1236,16 @@ void Flatland::CreateViewport(
     FX_DCHECK(child_added);
   }
 
-  FLATLAND_VERBOSE_LOG << "Flatland::CreateViewport() in " << local_root_
-                       << " parent_transform_handle: " << link_to_child.parent_transform_handle
-                       << " internal_link_handle: " << link_to_child.internal_link_handle;
+  FLATLAND_VERBOSE_LOG << "Flatland::CreateViewport() session_id=" << session_id_
+                       << "  client_viewport_id=" << client_viewport_id
+                       << "  parent_transform=" << link_to_child.parent_transform_handle
+                       << "  internal_link_handle=" << link_to_child.internal_link_handle;
 
   // Default the link size to the logical size, which is just an identity scale matrix, so
   // that future logical size changes will result in the correct scale matrix.
   const SizeU size = *properties.logical_size();
 
-  content_handles_[link_id] = link_to_child.parent_transform_handle;
+  content_handles_[client_viewport_id] = link_to_child.parent_transform_handle;
   links_to_children_[link_to_child.parent_transform_handle] = {.link = std::move(link_to_child),
                                                                .properties = std::move(properties)};
 
@@ -1232,15 +1268,16 @@ void Flatland::CreateImage(CreateImageRequest& request, CreateImageCompleter::Sy
 void Flatland::CreateImage(ContentId image_id,
                            fuchsia_ui_composition::BufferCollectionImportToken import_token,
                            uint32_t vmo_index, fuchsia_ui_composition::ImageProperties properties) {
-  if (image_id.value() == kInvalidId) {
+  const uint64_t client_image_id = image_id.value();
+
+  if (client_image_id == kInvalidId) {
     error_reporter_->ERROR() << "CreateImage called with image_id 0";
     CloseConnection(FlatlandError::kBadOperation);
     return;
   }
 
-  if (content_handles_.count(image_id.value())) {
-    error_reporter_->ERROR() << "CreateImage called with pre-existing image_id "
-                             << image_id.value();
+  if (content_handles_.contains(client_image_id)) {
+    error_reporter_->ERROR() << "CreateImage called with pre-existing image_id " << client_image_id;
     CloseConnection(FlatlandError::kBadOperation);
     return;
   }
@@ -1305,7 +1342,7 @@ void Flatland::CreateImage(ContentId image_id,
   // we can now create a handle for it in the transform graph, and add the metadata
   // to our map.
   auto handle = transform_graph_.CreateTransform();
-  content_handles_[image_id.value()] = handle;
+  content_handles_[client_image_id] = handle;
   image_metadatas_[handle] = metadata;
 
   // Set the default sample region of the image to be the full image.
@@ -1315,8 +1352,9 @@ void Flatland::CreateImage(ContentId image_id,
   // Set the default destination region of the image to be the full image.
   SetImageDestinationSize(image_id, properties.size().value());
 
-  FLATLAND_VERBOSE_LOG << "Flatland::CreateImage" << handle << " for " << local_root_
-                       << " size:" << properties.size()->width() << "x"
+  FLATLAND_VERBOSE_LOG << "Flatland::CreateImage() session_id=" << session_id_
+                       << "  image_id=" << client_image_id << "  handle=" << handle
+                       << "  size=" << properties.size()->width() << "x"
                        << properties.size()->height();
 }
 
@@ -1501,6 +1539,9 @@ void Flatland::CreateFilledRect(ContentId rect_identifier) {
   auto handle = transform_graph_.CreateTransform();
   content_handles_[rect_id] = handle;
   image_metadatas_[handle] = metadata;
+
+  FLATLAND_VERBOSE_LOG << "Flatland::CreateFilledRect() session_id=" << session_id_
+                       << "  rect_id=" << rect_id << "  handle=" << handle;
 }
 
 void Flatland::SetSolidFill(SetSolidFillRequest& request, SetSolidFillCompleter::Sync& completer) {
@@ -1527,7 +1568,7 @@ void Flatland::SetSolidFill(ContentId rect_identifier, fuchsia_ui_composition::C
 
   auto image_kv = image_metadatas_.find(content_kv->second);
   if (image_kv == image_metadatas_.end()) {
-    error_reporter_->ERROR() << "Missing metadada for rect with id  " << rect_id;
+    error_reporter_->ERROR() << "Missing metadata for rect with id  " << rect_id;
     CloseConnection(FlatlandError::kBadOperation);
     return;
   }
@@ -1541,6 +1582,11 @@ void Flatland::SetSolidFill(ContentId rect_identifier, fuchsia_ui_composition::C
     CloseConnection(FlatlandError::kBadOperation);
     return;
   }
+
+  FLATLAND_VERBOSE_LOG << "Flatland::SetSolidFill() session_id=" << session_id_
+                       << "  rect_id=" << rect_id << "  handle=" << content_kv->second
+                       << "  rgba=" << color.red() << "," << color.green() << "," << color.blue()
+                       << "," << color.alpha() << "  size=" << size.width() << "x" << size.height();
 
   image_kv->second.blend_mode = color.alpha() < 1.f ? fuchsia_ui_composition::BlendMode::kSrcOver
                                                     : fuchsia_ui_composition::BlendMode::kSrc;
@@ -1711,42 +1757,48 @@ void Flatland::SetContent(SetContentRequest& request, SetContentCompleter::Sync&
 }
 
 void Flatland::SetContent(TransformId transform_identifier, ContentId content_identifier) {
-  const uint64_t transform_id = transform_identifier.value();
-  const uint64_t content_id = content_identifier.value();
+  const uint64_t client_transform_id = transform_identifier.value();
+  const uint64_t client_content_id = content_identifier.value();
 
-  if (transform_id == kInvalidId) {
+  if (client_transform_id == kInvalidId) {
     error_reporter_->ERROR() << "SetContent called with transform_id zero";
     CloseConnection(FlatlandError::kBadOperation);
     return;
   }
 
-  auto transform_kv = transforms_.find(transform_id);
+  auto transform_kv = transforms_.find(client_transform_id);
 
   if (transform_kv == transforms_.end()) {
-    error_reporter_->ERROR() << "SetContent failed, transform_id " << transform_id << " not found";
+    error_reporter_->ERROR() << "SetContent failed, transform_id " << client_transform_id
+                             << " not found";
     CloseConnection(FlatlandError::kBadOperation);
     return;
   }
 
-  if (content_id == kInvalidId) {
+  if (client_content_id == kInvalidId) {
     transform_graph_.ClearPriorityChild(transform_kv->second);
-    FLATLAND_VERBOSE_LOG << "Flatland::SetContent() cleared content for transform: "
-                         << transform_kv->second;
+    FLATLAND_VERBOSE_LOG << "Flatland::SetContent() session_id=" << session_id_
+                         << "  client_transform_id=" << client_transform_id
+                         << "  transform=" << transform_kv->second << "  ... cleared content.";
     return;
   }
 
-  auto handle_kv = content_handles_.find(content_id);
+  auto content_kv = content_handles_.find(client_content_id);
 
-  if (handle_kv == content_handles_.end()) {
-    error_reporter_->ERROR() << "SetContent failed, content_id " << content_id << " not found";
+  if (content_kv == content_handles_.end()) {
+    error_reporter_->ERROR() << "SetContent failed, content_id " << client_content_id
+                             << " not found";
     CloseConnection(FlatlandError::kBadOperation);
     return;
   }
 
-  FLATLAND_VERBOSE_LOG << "Flatland::SetContent(" << transform_kv->second << ","
-                       << handle_kv->second << ")";
+  FLATLAND_VERBOSE_LOG << "Flatland::SetContent() session_id=" << session_id_
+                       << "  client_transform_id=" << client_transform_id
+                       << "  transform=" << transform_kv->second
+                       << "  client_content_id=" << client_content_id
+                       << "  content=" << content_kv->second;
 
-  transform_graph_.SetPriorityChild(transform_kv->second, handle_kv->second);
+  transform_graph_.SetPriorityChild(transform_kv->second, content_kv->second);
 }
 
 void Flatland::SetViewportProperties(SetViewportPropertiesRequest& request,
@@ -1919,19 +1971,19 @@ void Flatland::ReleaseImage(ReleaseImageRequest& request, ReleaseImageCompleter:
   ReleaseImage(request.image_id());
 }
 
-void Flatland::ReleaseImage(ContentId image_identifier) {
-  const uint64_t image_id = image_identifier.value();
+void Flatland::ReleaseImage(ContentId image_id) {
+  const uint64_t client_image_id = image_id.value();
 
-  if (image_id == kInvalidId) {
+  if (client_image_id == kInvalidId) {
     error_reporter_->ERROR() << "ReleaseImage called with image_id zero";
     CloseConnection(FlatlandError::kBadOperation);
     return;
   }
 
-  auto content_kv = content_handles_.find(image_id);
+  auto content_kv = content_handles_.find(client_image_id);
 
   if (content_kv == content_handles_.end()) {
-    error_reporter_->ERROR() << "ReleaseImage failed, image_id " << image_id << " not found";
+    error_reporter_->ERROR() << "ReleaseImage failed, image_id " << client_image_id << " not found";
     CloseConnection(FlatlandError::kBadOperation);
     return;
   }
@@ -1939,20 +1991,22 @@ void Flatland::ReleaseImage(ContentId image_identifier) {
   auto image_kv = image_metadatas_.find(content_kv->second);
 
   if (image_kv == image_metadatas_.end()) {
-    error_reporter_->ERROR() << "ReleaseImage failed, content_id " << image_id
+    error_reporter_->ERROR() << "ReleaseImage failed, content_id " << client_image_id
                              << " is not an Image";
     CloseConnection(FlatlandError::kBadOperation);
     return;
   }
 
-  FLATLAND_VERBOSE_LOG << "Flatland::ReleaseImage" << content_kv->second << " for " << local_root_;
+  FLATLAND_VERBOSE_LOG << "Flatland::ReleaseImage() session_id=" << session_id_
+                       << "  client_image_id=" << client_image_id
+                       << "  image_handle=" << content_kv->second;
 
   bool erased_from_graph = transform_graph_.ReleaseTransform(content_kv->second);
   FX_DCHECK(erased_from_graph);
 
   // Even though the handle is released, it may still be referenced by client Transforms. The
   // image_metadatas_ map preserves the entry until it shows up in the dead_transforms list.
-  content_handles_.erase(image_id);
+  content_handles_.erase(client_image_id);
 }
 
 void Flatland::SetDebugName(SetDebugNameRequest& request, SetDebugNameCompleter::Sync& completer) {
@@ -1969,8 +2023,8 @@ void Flatland::SetDebugName(std::string name) {
   if (!name.empty())
     stream << "Flatland client(" << name << "): ";
 
-  FLATLAND_VERBOSE_LOG << "Flatland::SetDebugName() to " << stream.str() << " for " << local_root_
-                       << " " << this;
+  FLATLAND_VERBOSE_LOG << "Flatland::SetDebugName() session_id=" << session_id_
+                       << "  name: " << name;
 
   error_reporter_->SetPrefix(stream.str());
   debug_name_ = std::move(name);
@@ -1980,6 +2034,9 @@ void Flatland::OnNextFrameBegin(uint32_t additional_present_credits,
                                 FuturePresentationInfos presentation_infos) {
   TRACE_DURATION("gfx", "Flatland::OnNextFrameBegin");
   present_credits_ += additional_present_credits;
+
+  FLATLAND_VERBOSE_LOG << "Flatland::OnNextFrameBegin() session_id=" << session_id_
+                       << "  additional_present_credits=" << additional_present_credits;
 
   // Only send an `OnNextFrameBegin` event if the client has at least one present credit. It is
   // guaranteed that this won't stall clients because the current policy is to always return
@@ -1996,6 +2053,16 @@ void Flatland::OnNextFrameBegin(uint32_t additional_present_credits,
 void Flatland::OnFramePresented(const std::map<scheduling::PresentId, zx::time>& latched_times,
                                 scheduling::PresentTimestamps present_times) {
   TRACE_DURATION("gfx", "Flatland::OnFramePresented");
+
+#if USE_FLATLAND_VERBOSE_LOGGING
+  std::ostringstream oss;
+  oss << "Flatland::OnFramePresented() session_id=" << session_id_;
+  for (const auto& [present_id, time] : latched_times) {
+    oss << "\n         present_id=" << present_id << "  time=" << time.get();
+  }
+  FLATLAND_VERBOSE_LOG << oss.str();
+#endif
+
   // TODO(https://fxbug.dev/42141795): remove `num_presents_allowed` from this event.  Clients
   // should obtain this information from OnPresentProcessedValues().
   present2_helper_.OnPresented(latched_times, present_times, /*num_presents_allowed=*/0);
@@ -2031,7 +2098,8 @@ scheduling::SessionId Flatland::GetSessionId() const { return session_id_; }
 
 void Flatland::OnFidlClosed(fidl::UnbindInfo unbind_info) {
   if (!unbind_info.is_user_initiated()) {
-    FX_LOGS(INFO) << "Flatland::OnFidlClosed() because: " << unbind_info.FormatDescription();
+    FX_LOGS(INFO) << "Flatland::OnFidlClosed() session_id=" << session_id_
+                  << " because: " << unbind_info.FormatDescription();
   }
 
   binding_data_.reset();
@@ -2044,8 +2112,8 @@ void Flatland::ReportLinkProtocolError(const std::string& error_log) {
 
 void Flatland::CloseConnection(FlatlandError error) {
   if (binding_data_) {
-    FLATLAND_VERBOSE_LOG << "Flatland::CloseConnection(" << error
-                         << ")  in session: " << session_id_;
+    FLATLAND_VERBOSE_LOG << "Flatland::CloseConnection() session_id=" << session_id_
+                         << "  error: " << error;
 
     binding_data_->CloseConnection(error);
     binding_data_.reset();

@@ -64,13 +64,13 @@ GlobalImageData ComputeGlobalImageData(const GlobalTopologyData::TopologyVector&
 
   for (uint32_t index = 0; index < global_topology.size(); index++) {
     // Every entry in the global topology comes from an UberStruct.
-    const auto& handle = global_topology[index];
+    const TransformHandle& handle = global_topology[index];
     const auto uber_struct_kv = uber_structs.find(handle.GetInstanceId());
     FX_DCHECK(uber_struct_kv != uber_structs.end());
 
     const auto image_kv = uber_struct_kv->second->images.find(handle);
     if (image_kv != uber_struct_kv->second->images.end()) {
-      auto image = image_kv->second;
+      allocation::ImageMetadata image = image_kv->second;
       image.multiply_color[3] *= opacity_values[index];
       images.push_back(image);
       indices.push_back(index);

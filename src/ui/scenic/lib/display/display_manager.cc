@@ -11,6 +11,8 @@
 #include <lib/fit/function.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include "src/ui/scenic/lib/utils/logging.h"
+
 namespace scenic_impl {
 namespace display {
 
@@ -162,14 +164,26 @@ void DisplayManager::OnVsync(fuchsia_hardware_display_types::wire::DisplayId dis
                              fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp,
                              fuchsia_hardware_display::wire::VsyncAckCookie cookie) {
   if (cookie.value != fuchsia_hardware_display_types::kInvalidDispId) {
+    FX_LOGS(INFO) << "DisplayManager::OnVsync(): acknowledging vsync display_id="
+                  << display_id.value << "  timestamp=" << timestamp.get()
+                  << "  applied_config_stamp=" << applied_config_stamp.value
+                  << "  cookie=" << cookie.value;
     [[maybe_unused]] fidl::OneWayStatus acknowledge_vsync_result =
         default_display_coordinator_->sync()->AcknowledgeVsync(cookie.value);
+  } else {
+    FX_LOGS(INFO) << "DisplayManager::OnVsync(): received vsync display_id=" << display_id.value
+                  << "  timestamp=" << timestamp.get()
+                  << "  applied_config_stamp=" << applied_config_stamp.value << "  with no cookie.";
   }
 
   if (!default_display_) {
+    FLATLAND_VERBOSE_LOG << "DisplayManager::OnVsync(): ignoring vsync, no default display";
     return;
   }
   if (default_display_->display_id().value != display_id.value) {
+    FLATLAND_VERBOSE_LOG << "DisplayManager::OnVsync(): ignoring vsync, display_id="
+                         << display_id.value << "  doesn't match default_display->display_id="
+                         << default_display_->display_id().value;
     return;
   }
   default_display_->OnVsync(timestamp, applied_config_stamp);

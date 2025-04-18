@@ -697,17 +697,17 @@ void App::InitializeHeartbeat(display::Display& display) {
         flatland_manager_->OnFramePresented(latched_times, present_times);
       },
       /*render_scheduled_frame*/
-      [this](auto frame_number, auto presentation_time, auto callback) {
+      [this](auto frame_number, auto presentation_time, auto frame_presented_callback) {
         TRACE_DURATION("gfx", "App render_scheduled_frame");
         FX_CHECK(flatland_frame_count_ + skipped_frame_count_ == frame_number - 1);
         if (auto display = flatland_manager_->GetPrimaryFlatlandDisplayForRendering()) {
           flatland_engine_->RenderScheduledFrame(frame_number, presentation_time, *display,
-                                                 std::move(callback));
+                                                 std::move(frame_presented_callback));
           ++flatland_frame_count_;
         } else {
           FX_LOGS(INFO) << "No FlatlandDisplay; skipping render scheduled frame.";
           skipped_frame_count_++;
-          flatland_engine_->SkipRender(std::move(callback));
+          flatland_engine_->SkipRender(std::move(frame_presented_callback));
         }
       });
 }

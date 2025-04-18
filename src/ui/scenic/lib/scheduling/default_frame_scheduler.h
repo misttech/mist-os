@@ -33,8 +33,8 @@ using OnFramePresented = fit::function<void(
 using RenderScheduledFrame =
     fit::function<void(uint64_t frame_number, zx::time presentation_time, FramePresentedCallback)>;
 
-// TODOs can be found in the frame scheduler epic: https://fxbug.dev/42098599. Any new bugs filed concerning
-// the frame scheduler should be added to it as well.
+// TODOs can be found in the frame scheduler epic: https://fxbug.dev/42098599. Any new bugs filed
+// concerning the frame scheduler should be added to it as well.
 
 // DefaultFrameScheduler is the source of a number of events:
 // - UpdateSessions: Fired when CPU should be done apply any pending updates to the scene graph and
@@ -129,7 +129,7 @@ class DefaultFrameScheduler final : public FrameScheduler {
       zx::time target_presentation_time);
 
   // Prepares all per-present data for later OnFrameRendered and OnFramePresented events.
-  // Returns all the fences from previous presents for each session in |updates|.
+  // Returns all the release fences from previous presents for each session in |updates|.
   std::vector<zx::event> PrepareUpdates(const std::unordered_map<SessionId, PresentId>& updates,
                                         zx::time latched_time, uint64_t frame_number);
 

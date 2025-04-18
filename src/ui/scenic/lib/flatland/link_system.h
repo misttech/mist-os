@@ -85,7 +85,7 @@ class ParentViewportWatcherImpl
   // |fuchsia::ui::composition::ParentViewportWatcher|
   void GetLayout(GetLayoutCompleter::Sync& sync_completer) override {
     if (layout_helper_.HasPendingCallback()) {
-      FX_DCHECK(error_callback_);
+      FX_CHECK(error_callback_);
       error_callback_(
           "GetLayout() called when there is a pending GetLayout() call. Flatland connection "
           "will be closed because of broken flow control.");
@@ -102,7 +102,7 @@ class ParentViewportWatcherImpl
   // |fuchsia_ui_composition::ParentViewportWatcher|
   void GetStatus(GetStatusCompleter::Sync& sync_completer) override {
     if (status_helper_.HasPendingCallback()) {
-      FX_DCHECK(error_callback_);
+      FX_CHECK(error_callback_);
       error_callback_(
           "GetStatus() called when there is a pending GetStatus() call. Flatland connection "
           "will be closed because of broken flow control.");
@@ -176,7 +176,7 @@ class ChildViewWatcherImpl : public fidl::Server<fuchsia_ui_composition::ChildVi
     if (viewref_) {
       // At the time of writing, CONTENT_HAS_PRESENTED is the only possible value.  DCHECK just in
       // case this changes.
-      FX_DCHECK(status == fuchsia::ui::composition::ChildViewStatus::CONTENT_HAS_PRESENTED);
+      FX_CHECK(status == fuchsia::ui::composition::ChildViewStatus::CONTENT_HAS_PRESENTED);
     }
   }
 
@@ -196,7 +196,7 @@ class ChildViewWatcherImpl : public fidl::Server<fuchsia_ui_composition::ChildVi
   // |fuchsia_ui_composition::ChildViewWatcher|
   void GetStatus(GetStatusCompleter::Sync& sync_completer) override {
     if (status_helper_.HasPendingCallback()) {
-      FX_DCHECK(error_callback_);
+      FX_CHECK(error_callback_);
       error_callback_(
           "GetStatus() called when there is a pending GetStatus() call. Flatland connection "
           "will be closed because of broken flow control.");
@@ -213,7 +213,7 @@ class ChildViewWatcherImpl : public fidl::Server<fuchsia_ui_composition::ChildVi
   // |fuchsia_ui_composition::ChildViewWatcher|
   void GetViewRef(GetViewRefCompleter::Sync& sync_completer) override {
     if (viewref_helper_.HasPendingCallback()) {
-      FX_DCHECK(error_callback_);
+      FX_CHECK(error_callback_);
       error_callback_(
           "GetViewRef() called when there is a pending GetViewRef() call. Flatland connection "
           "will be closed because of broken flow control.");

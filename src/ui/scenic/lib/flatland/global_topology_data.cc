@@ -427,15 +427,15 @@ GlobalTopologyData GlobalTopologyData::ComputeGlobalTopologyData(
     const auto& current_entry = vector[iterator_index];
 
     FLATLAND_VERBOSE_LOG << "GlobalTopologyData processing current_entry=" << current_entry.handle
-                         << "  child-count: " << current_entry.child_count;
+                         << "  child-count=" << current_entry.child_count;
     ++iterator_index;
 
     // Mark that a child has been processed for the latest parent.
     if (!parent_counts.empty()) {
-      FLATLAND_VERBOSE_LOG << "GlobalTopologyData       parent_counts size: "
+      FLATLAND_VERBOSE_LOG << "      GlobalTopologyData       parent_counts size="
                            << parent_counts.size()
-                           << "  parent: " << topology_vector[parent_counts.back().parent_index]
-                           << "  remaining-children: " << parent_counts.back().children_left;
+                           << "  parent=" << topology_vector[parent_counts.back().parent_index]
+                           << "  remaining-children=" << parent_counts.back().children_left;
 
       FX_DCHECK(parent_counts.back().children_left > 0);
       --parent_counts.back().children_left;
@@ -456,7 +456,7 @@ GlobalTopologyData GlobalTopologyData::ComputeGlobalTopologyData(
       // If the link doesn't exist, skip the link handle.
       const auto link_kv = links.find(current_entry.handle);
       if (link_kv == links.end()) {
-        FLATLAND_VERBOSE_LOG << "GlobalTopologyData link doesn't exist for handle "
+        FLATLAND_VERBOSE_LOG << "GlobalTopologyData link doesn't exist for handle="
                              << current_entry.handle << ", skipping ";
 
         if (parent_counts.back().children_left == 0) {
@@ -470,7 +470,7 @@ GlobalTopologyData GlobalTopologyData::ComputeGlobalTopologyData(
       // If the link exists but doesn't have an UberStruct, skip the link handle.
       const auto uber_struct_kv = uber_structs.find(link_transform.GetInstanceId());
       if (uber_struct_kv == uber_structs.end()) {
-        FLATLAND_VERBOSE_LOG << "GlobalTopologyData link doesn't exist for instance_id "
+        FLATLAND_VERBOSE_LOG << "GlobalTopologyData link doesn't exist for instance_id="
                              << link_transform.GetInstanceId() << ", skipping";
 
         if (parent_counts.back().children_left == 0) {

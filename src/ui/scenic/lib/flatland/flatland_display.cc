@@ -16,8 +16,9 @@
 
 static void ReportError() {
   // TODO(https://fxbug.dev/42157006): investigate how to propagate errors back to clients.
-  // TODO(https://fxbug.dev/42156567): OK to crash until we have error propagation?  Probably so: better that
-  // clients get feedback that they've done something wrong.  These are all in-tree clients, anyway.
+  // TODO(https://fxbug.dev/42156567): OK to crash until we have error propagation?  Probably so:
+  // better that clients get feedback that they've done something wrong.  These are all in-tree
+  // clients, anyway.
   FX_CHECK(false) << "Crashing on error.";
 }
 
@@ -69,13 +70,15 @@ FlatlandDisplay::FlatlandDisplay(
              const zx_packet_signal_t* signal) { destroy_display_function_(); });
   FX_DCHECK(status == ZX_OK);
 
-  FLATLAND_VERBOSE_LOG << "FlatlandDisplay new with ID: " << session_id_;
+  FLATLAND_VERBOSE_LOG << "FlatlandDisplay NEW session_id=" << session_id_;
 }
 
 FlatlandDisplay::~FlatlandDisplay() {
   // Unlike Flatland, FlatlandDisplay doesn't manage any client images, therefore doesn't need to
   // pass a release fence to RemoveSession().
   flatland_presenter_->RemoveSession(session_id_, std::nullopt);
+
+  FLATLAND_VERBOSE_LOG << "FlatlandDisplay DESTROYED session_id=" << session_id_;
 }
 
 void FlatlandDisplay::SetContent(ViewportCreationToken token,
@@ -88,9 +91,9 @@ void FlatlandDisplay::SetContent(ViewportCreationToken token,
     return;
   }
 
-  // TODO(https://fxbug.dev/42156567): In order to replace content from a previous call to SetContent(), need
-  // to detach from root_transform_, and otherwise clean up.  Flatland::ReleaseViewport() seems like
-  // a good place to start.
+  // TODO(https://fxbug.dev/42156567): In order to replace content from a previous call to
+  // SetContent(), need to detach from root_transform_, and otherwise clean up.
+  // Flatland::ReleaseViewport() seems like a good place to start.
   FX_CHECK(link_to_child_.parent_transform_handle == flatland::TransformHandle())
       << "Replacing FlatlandDisplay content is not yet supported.";
 
@@ -124,7 +127,8 @@ void FlatlandDisplay::SetContent(ViewportCreationToken token,
         FX_CHECK(dispatcher_holder->dispatcher() == async_get_default_dispatcher())
             << "Link protocol error reported on the wrong dispatcher.";
 
-        // TODO(https://fxbug.dev/42157006): FlatlandDisplay currently has no way to notify clients of errors.
+        // TODO(https://fxbug.dev/42157006): FlatlandDisplay currently has no way to notify clients
+        // of errors.
         FX_LOGS(ERROR) << "FlatlandDisplay illegal client usage: " << error_log;
       });
   FX_CHECK(child_transform == link_to_child_.parent_transform_handle);
@@ -140,7 +144,8 @@ void FlatlandDisplay::SetContent(ViewportCreationToken token,
 
   // TODO(https://fxbug.dev/42156567): given this fixed topology, we probably don't need to use
   // ComputeAndCleanup(), we can just stamp something out based on a fixed template.
-  // TODO(https://fxbug.dev/42116832): Decide on a proper limit on compute time for topological sorting.
+  // TODO(https://fxbug.dev/42116832): Decide on a proper limit on compute time for topological
+  // sorting.
   auto data =
       transform_graph_.ComputeAndCleanup(root_transform_, std::numeric_limits<uint64_t>::max());
   FX_DCHECK(data.iterations != std::numeric_limits<uint64_t>::max());
