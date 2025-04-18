@@ -166,7 +166,7 @@ END
 
 function usage {
   cat <<END
-usage: fx [--dir BUILD_DIR] [-d DEVICE_NAME] [-i] [-x] COMMAND [...]
+usage: fx [--dir BUILD_DIR] [-t DEVICE_NAME] [-i] [-x] COMMAND [...]
 END
   shorthelp
 }
@@ -242,10 +242,8 @@ source "${features_sh}" || exit $?
 
 while [[ $# -ne 0 ]]; do
   case $1 in
-    --dir=*|-d=*|--disable=*|--enable=*)
+    --dir=*|-d=*|-t=*|--target=*|--disable=*|--enable=*)
       # Turn --switch=value into --switch value.
-      # Don't handle `-t=*|--target=*` since we want this argument to behave
-      # consistently with ffx `-t|--target` argument parsing.
       arg="$1"
       shift
       set -- "${arg%%=*}" "${arg#*=}" "$@"
