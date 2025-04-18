@@ -49,72 +49,66 @@
         {
           "type": "object",
           "required": [
-            "Ip"
+            "ip",
+            "ssh_port",
+            "type"
           ],
           "properties": {
-            "Ip": {
-              "type": "object",
-              "required": [
-                "ip",
-                "ssh_port"
-              ],
-              "properties": {
-                "ip": {
-                  "type": "string"
-                },
-                "ssh_port": {
-                  "type": "integer",
-                  "format": "uint16",
-                  "minimum": 0.0
-                }
-              }
+            "type": {
+              "type": "string",
+              "enum": [
+                "Ip"
+              ]
+            },
+            "ip": {
+              "type": "string"
+            },
+            "ssh_port": {
+              "type": "integer",
+              "format": "uint16",
+              "minimum": 0.0
             }
-          },
-          "additionalProperties": false
+          }
         },
         {
           "type": "object",
           "required": [
-            "VSock"
+            "cid",
+            "type"
           ],
           "properties": {
-            "VSock": {
-              "type": "object",
-              "required": [
-                "cid"
-              ],
-              "properties": {
-                "cid": {
-                  "type": "integer",
-                  "format": "uint32",
-                  "minimum": 0.0
-                }
-              }
+            "type": {
+              "type": "string",
+              "enum": [
+                "VSock"
+              ]
+            },
+            "cid": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
             }
-          },
-          "additionalProperties": false
+          }
         },
         {
           "type": "object",
           "required": [
-            "Usb"
+            "cid",
+            "type"
           ],
           "properties": {
-            "Usb": {
-              "type": "object",
-              "required": [
-                "cid"
-              ],
-              "properties": {
-                "cid": {
-                  "type": "integer",
-                  "format": "uint32",
-                  "minimum": 0.0
-                }
-              }
+            "type": {
+              "type": "string",
+              "enum": [
+                "Usb"
+              ]
+            },
+            "cid": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
             }
-          },
-          "additionalProperties": false
+          }
         }
       ]
     }

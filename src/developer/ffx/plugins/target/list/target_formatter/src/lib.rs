@@ -392,6 +392,7 @@ macro_rules! make_structs_and_support_functions {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, JsonSchema)]
+#[serde(tag = "type")]
 pub enum JsonTargetAddress {
     Ip { ip: String, ssh_port: u16 },
     VSock { cid: u32 },
