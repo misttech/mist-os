@@ -32,6 +32,20 @@ class TracingAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         super().setup_class()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
 
+    def teardown_test(self) -> None:
+        """teardown_test is called once after running each test.
+
+        It does the following things:
+            * Takes snapshot of all the fuchsia devices and stores it under
+              test case directory if `snapshot_on` test param is set to
+              "teardown_test"
+            * Logs a info message onto device that test case has ended.
+        """
+        # in case if any trace session started by the test cases remains initialized.
+        self.device.tracing.terminate()
+
+        super().teardown_test()
+
     # Mobly enumerates test cases alphabetically, change in order of test cases
     # or their names or mobly enumeration logic can break tests. To avoid this,
     # we call all dependent operations in a single test method.
