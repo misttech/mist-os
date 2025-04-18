@@ -418,7 +418,7 @@ struct SupplicantStaIfaceState {
 struct ConnectionContext {
     stream: fidl_sme::ConnectTransactionEventStream,
     original_bss_desc: Box<BssDescription>,
-    most_recent_connect_time: fasync::MonotonicInstant,
+    most_recent_connect_time: fasync::BootInstant,
     current_rssi_dbm: i8,
     current_snr_db: i8,
     current_channel: Channel,
@@ -509,7 +509,7 @@ async fn handle_client_connect_transactions<C: ClientIface>(
                 match (disconnect_with_ongoing_reconnect.as_ref(), result.is_reconnect) {
                     (Some(info), true) => {
                         if result.code == fidl_fuchsia_wlan_ieee80211::StatusCode::Success {
-                            ctx.most_recent_connect_time = fasync::MonotonicInstant::now();
+                            ctx.most_recent_connect_time = fasync::BootInstant::now();
                             info!("Successfully reconnected after disconnect");
                         } else {
                             send_disconnect_event(
@@ -566,7 +566,7 @@ async fn handle_client_connect_transactions<C: ClientIface>(
             }
             Ok(fidl_sme::ConnectTransactionEvent::OnDisconnect { info }) => {
                 let connected_duration =
-                    fasync::MonotonicInstant::now() - ctx.most_recent_connect_time;
+                    fasync::BootInstant::now() - ctx.most_recent_connect_time;
                 telemetry_sender.send(TelemetryEvent::Disconnect {
                     info: wlan_telemetry::DisconnectInfo {
                         iface_id,
@@ -678,7 +678,7 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                             Some(ConnectionContext {
                                 stream: connected.transaction_stream,
                                 original_bss_desc: connected.bss.clone(),
-                                most_recent_connect_time: fasync::MonotonicInstant::now(),
+                                most_recent_connect_time: fasync::BootInstant::now(),
                                 current_rssi_dbm: connected.bss.rssi_dbm,
                                 current_snr_db: connected.bss.snr_db,
                                 current_channel: connected.bss.channel,
@@ -2413,7 +2413,7 @@ mod tests {
         assert_variant!(
             test_helper.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::Disconnect { info })) => {
-                assert_eq!(info.connected_duration, zx::MonotonicDuration::from_nanos(connection_length_nanos.into()));
+                assert_eq!(info.connected_duration, zx::BootDuration::from_nanos(connection_length_nanos.into()));
                 assert_eq!(info.is_sme_reconnecting, mocked_is_sme_reconnecting);
                 assert_eq!(info.disconnect_source, mocked_disconnect_source);
                 assert_eq!(info.original_bss_desc.ssid, Ssid::try_from("foo").unwrap());
@@ -2485,7 +2485,7 @@ mod tests {
         assert_variant!(
             test_helper.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::Disconnect { info })) => {
-                assert_eq!(info.connected_duration, zx::MonotonicDuration::from_nanos(connection_length_nanos.into()));
+                assert_eq!(info.connected_duration, zx::BootDuration::from_nanos(connection_length_nanos.into()));
                 assert_eq!(info.is_sme_reconnecting, mocked_is_sme_reconnecting);
                 assert_eq!(info.disconnect_source, mocked_disconnect_source);
                 assert_eq!(info.original_bss_desc.ssid, Ssid::try_from("foo").unwrap());
