@@ -1,0 +1,35 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_host_test.gni")
+import("//build/python/python_library.gni")
+import("//build/testing/host_test_data.gni")
+
+if (is_host) {
+  python_library("memory") {
+    testonly = true
+    library_name = "memory"
+    sources = [
+      "__init__.py",
+      "profile.py",
+    ]
+    library_deps = [
+      "//src/performance/lib/trace_processing",
+      "//src/testing/end_to_end/honeydew:honeydew",
+    ]
+    deps = [ "//src/developer/ffx/plugins/profile:ffx_profile_tool_test_data" ]
+  }
+
+  python_host_test("profile_test") {
+    main_source = "tests/profile_test.py"
+    libraries = [ ":memory" ]
+  }
+}
+
+group("tests") {
+  testonly = true
+  if (is_linux) {
+    public_deps = [ ":profile_test($host_toolchain)" ]
+  }
+}
