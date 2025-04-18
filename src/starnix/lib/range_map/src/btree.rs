@@ -793,6 +793,9 @@ where
     fn insert_child(&mut self, index: usize, key: K, child: Node<K, V>) -> InsertResult<K, V> {
         let n = self.children.len();
         if n == NODE_CAPACITY {
+            // TODO: This branch is incorrect. We need to check for NODE_CAPACITY - 1 because the
+            // index indicates the location of the existing child that split, which will never be
+            // beyond the end of the array.
             if index == NODE_CAPACITY {
                 let mut children = self.children.new_empty();
                 children.insert(0, child);
@@ -1640,6 +1643,46 @@ mod test {
     }
 
     #[::fuchsia::test]
+    fn test_is_empty() {
+        let mut map = RangeMap2::<u32, i32>::default();
+
+        // Test empty map
+        assert!(map.is_empty());
+
+        // Test map with 5 entries
+        for i in 0..5 {
+            let start = i * 10;
+            let end = start + 5;
+            map.insert(start..end, i as i32);
+        }
+        assert!(!map.is_empty());
+
+        // Remove all entries
+        for i in 0..5 {
+            let start = i * 10;
+            let end = start + 5;
+            map.remove(start..end);
+        }
+        assert!(map.is_empty());
+
+        // Test map with 50 entries
+        for i in 0..50 {
+            let start = i * 10;
+            let end = start + 5;
+            map.insert(start..end, i as i32);
+        }
+        assert!(!map.is_empty());
+
+        // Remove all entries
+        for i in 0..50 {
+            let start = i * 10;
+            let end = start + 5;
+            map.remove(start..end);
+        }
+        assert!(map.is_empty());
+    }
+
+    #[::fuchsia::test]
     fn test_insert_into_empty() {
         let mut map = RangeMap2::<u32, i32>::default();
 
@@ -2110,6 +2153,53 @@ mod test {
 
         // Verify that the map is empty after multiple insert/remove cycles
         assert!(map.is_empty());
+    }
+
+    #[::fuchsia::test]
+    fn test_leaf_node_split() {
+        let mut map = RangeMap2::<u32, i32>::default();
+
+        // Fill the leaf node to capacity
+        for i in 0..NODE_CAPACITY {
+            let start = i as u32 * 10;
+            let end = start + 5;
+            map.insert(start..end, i as i32);
+        }
+
+        // Verify the initial state
+        assert_eq!(map.node.len(), NODE_CAPACITY);
+
+        {
+            let mut map = map.clone();
+
+            // Insert a value that causes a split in the first half
+            let split_start = 15;
+            let split_end = 20;
+            map.insert(split_start..split_end, -1);
+
+            // Verify the split
+            assert!(matches!(map.node, Node::Internal(_)));
+            if let Node::Internal(internal) = &map.node {
+                assert_eq!(internal.children.len(), 2);
+                assert!(internal.children.size_at(0) >= NODE_CAPACITY / 2);
+                assert!(internal.children.size_at(1) >= NODE_CAPACITY / 2);
+            }
+        }
+
+        {
+            let mut map = map.clone();
+
+            // Insert a value that causes a split in the second half
+            let split_start = (NODE_CAPACITY as u32 * 10) + 5;
+            let split_end = split_start + 5;
+            map.insert(split_start..split_end, -2);
+
+            // Verify the second split
+            if let Node::Internal(internal) = &map.node {
+                assert_eq!(internal.children.len(), 2);
+                assert!(internal.children.size_at(0) >= NODE_CAPACITY / 2);
+            }
+        }
     }
 
     #[::fuchsia::test]
