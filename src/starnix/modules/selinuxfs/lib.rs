@@ -196,6 +196,9 @@ impl SeLinuxFs {
             mode!(IFREG, 0o666),
         );
         dir.entry(current_task, "create", CreateApi::new_node(), mode!(IFREG, 0o666));
+        dir.entry(current_task, "member", MemberApi::new_node(), mode!(IFREG, 0o666));
+        dir.entry(current_task, "relabel", RelabelApi::new_node(), mode!(IFREG, 0o666));
+        dir.entry(current_task, "user", UserApi::new_node(), mode!(IFREG, 0o666));
         dir.entry(
             current_task,
             "load",
@@ -389,6 +392,74 @@ impl SeLinuxApiOps for CreateApi {
     }
     fn api_read(&self) -> Result<Cow<'_, [u8]>, Errno> {
         Ok([].as_ref().into())
+    }
+}
+
+/// "member" API used to determine the Security Context to associate with a new resource instance
+/// based on source, target, and target class and `type_member` rules.
+struct MemberApi;
+
+impl MemberApi {
+    fn new_node() -> impl FsNodeOps {
+        SeLinuxApi::new_node(|| Ok(Self {}))
+    }
+}
+
+impl SeLinuxApiOps for MemberApi {
+    fn api_write_permission() -> SecurityPermission {
+        SecurityPermission::ComputeMember
+    }
+    fn api_write(&self, _data: Vec<u8>) -> Result<(), Errno> {
+        track_stub!(TODO("https://fxbug.dev/399069170"), "selinux member");
+        error!(ENOTSUP)
+    }
+    fn api_read(&self) -> Result<Cow<'_, [u8]>, Errno> {
+        error!(ENOTSUP)
+    }
+}
+
+/// "relabel" API used to determine the Security Context to associate with a new resource instance
+/// based on source, target, and target class and `type_change` rules.
+struct RelabelApi;
+
+impl RelabelApi {
+    fn new_node() -> impl FsNodeOps {
+        SeLinuxApi::new_node(|| Ok(Self {}))
+    }
+}
+
+impl SeLinuxApiOps for RelabelApi {
+    fn api_write_permission() -> SecurityPermission {
+        SecurityPermission::ComputeRelabel
+    }
+    fn api_write(&self, _data: Vec<u8>) -> Result<(), Errno> {
+        track_stub!(TODO("https://fxbug.dev/399069766"), "selinux relabel");
+        error!(ENOTSUP)
+    }
+    fn api_read(&self) -> Result<Cow<'_, [u8]>, Errno> {
+        error!(ENOTSUP)
+    }
+}
+
+/// "user" API used to perform a user decision.
+struct UserApi;
+
+impl UserApi {
+    fn new_node() -> impl FsNodeOps {
+        SeLinuxApi::new_node(|| Ok(Self {}))
+    }
+}
+
+impl SeLinuxApiOps for UserApi {
+    fn api_write_permission() -> SecurityPermission {
+        SecurityPermission::ComputeUser
+    }
+    fn api_write(&self, _data: Vec<u8>) -> Result<(), Errno> {
+        track_stub!(TODO("https://fxbug.dev/411433214"), "selinux user");
+        error!(ENOTSUP)
+    }
+    fn api_read(&self) -> Result<Cow<'_, [u8]>, Errno> {
+        error!(ENOTSUP)
     }
 }
 

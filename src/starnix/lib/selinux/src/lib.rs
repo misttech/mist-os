@@ -1297,8 +1297,14 @@ class_permission_enum! {
         CheckContext("check_context"),
         /// Permission to compute access vectors via the "access" API.
         ComputeAv("compute_av"),
-        /// Permission to compute security contexts for newly created objects via "create".
+        /// Permission to compute security contexts based on `type_transition` rules via "create".
         ComputeCreate("compute_create"),
+        /// Permission to compute security contexts based on `type_member` rules via "member".
+        ComputeMember("compute_member"),
+        /// Permission to compute security contexts based on `type_change` rules via "relabel".
+        ComputeRelabel("compute_relabel"),
+        /// Permission to compute user decisions via "user".
+        ComputeUser("compute_user"),
         /// Permission to load a new binary policy into the kernel via the "load" API.
         LoadPolicy("load_policy"),
         /// Permission to commit booleans to control conditional elements of the policy.
