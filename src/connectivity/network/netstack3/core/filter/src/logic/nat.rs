@@ -27,7 +27,9 @@ use crate::conntrack::{
 };
 use crate::context::{FilterBindingsContext, FilterBindingsTypes, NatContext};
 use crate::logic::{IngressVerdict, Interfaces, RoutineResult, Verdict};
-use crate::packets::{IpPacket, MaybeTransportPacketMut as _, TransportPacketMut as _};
+use crate::packets::{
+    FilterIpExt, IpPacket, MaybeTransportPacketMut as _, TransportPacketMut as _,
+};
 use crate::state::{FilterMarkMetadata, Hook};
 
 /// The NAT configuration for a given conntrack connection.
@@ -191,7 +193,7 @@ pub enum NatType {
     Source,
 }
 
-pub(crate) trait NatHook<I: IpExt> {
+pub(crate) trait NatHook<I: FilterIpExt> {
     type Verdict<R: Debug>: FilterVerdict<R> + Debug;
 
     fn verdict_behavior<R: Debug>(v: Self::Verdict<R>) -> ControlFlow<Self::Verdict<()>, R>;
@@ -271,7 +273,7 @@ pub(crate) enum NatConfigurationResult<I: IpExt, A, BT: FilterBindingsTypes> {
 
 pub(crate) enum IngressHook {}
 
-impl<I: IpExt> NatHook<I> for IngressHook {
+impl<I: FilterIpExt> NatHook<I> for IngressHook {
     type Verdict<R: Debug> = IngressVerdict<I, R>;
 
     fn verdict_behavior<R: Debug>(v: Self::Verdict<R>) -> ControlFlow<Self::Verdict<()>, R> {
@@ -372,7 +374,7 @@ impl<I: IpExt, R> IngressVerdict<I, R> {
 
 pub(crate) enum LocalEgressHook {}
 
-impl<I: IpExt> NatHook<I> for LocalEgressHook {
+impl<I: FilterIpExt> NatHook<I> for LocalEgressHook {
     type Verdict<R: Debug> = Verdict<R>;
 
     fn verdict_behavior<R: Debug>(v: Self::Verdict<R>) -> ControlFlow<Self::Verdict<()>, R> {
@@ -441,7 +443,7 @@ impl<I: IpExt> NatHook<I> for LocalEgressHook {
 
 pub(crate) enum LocalIngressHook {}
 
-impl<I: IpExt> NatHook<I> for LocalIngressHook {
+impl<I: FilterIpExt> NatHook<I> for LocalIngressHook {
     type Verdict<R: Debug> = Verdict<R>;
 
     fn verdict_behavior<R: Debug>(v: Self::Verdict<R>) -> ControlFlow<Self::Verdict<()>, R> {
@@ -502,7 +504,7 @@ impl<I: IpExt> NatHook<I> for LocalIngressHook {
 
 pub(crate) enum EgressHook {}
 
-impl<I: IpExt> NatHook<I> for EgressHook {
+impl<I: FilterIpExt> NatHook<I> for EgressHook {
     type Verdict<R: Debug> = Verdict<R>;
 
     fn verdict_behavior<R: Debug>(v: Self::Verdict<R>) -> ControlFlow<Self::Verdict<()>, R> {
@@ -652,7 +654,7 @@ pub(crate) fn perform_nat<N, I, P, CC, BC>(
 ) -> N::Verdict<()>
 where
     N: NatHook<I>,
-    I: IpExt,
+    I: FilterIpExt,
     P: IpPacket<I>,
     CC: NatContext<I, BC>,
     BC: FilterBindingsContext,
@@ -811,7 +813,7 @@ fn configure_nat<N, I, P, CC, BC>(
 ) -> N::Verdict<NatConfigurationResult<I, CC::WeakAddressId, BC>>
 where
     N: NatHook<I>,
-    I: IpExt,
+    I: FilterIpExt,
     P: IpPacket<I>,
     CC: NatContext<I, BC>,
     BC: FilterBindingsContext,
@@ -840,7 +842,7 @@ fn configure_redirect_nat<N, I, P, CC, BC>(
 ) -> N::Verdict<NatConfigurationResult<I, CC::WeakAddressId, BC>>
 where
     N: NatHook<I>,
-    I: IpExt,
+    I: FilterIpExt,
     P: IpPacket<I>,
     CC: NatContext<I, BC>,
     BC: FilterBindingsContext,
@@ -900,7 +902,7 @@ fn configure_masquerade_nat<I, P, CC, BC>(
     src_port_range: Option<RangeInclusive<NonZeroU16>>,
 ) -> Verdict<NatConfigurationResult<I, CC::WeakAddressId, BC>>
 where
-    I: IpExt,
+    I: FilterIpExt,
     P: IpPacket<I>,
     CC: NatContext<I, BC>,
     BC: FilterBindingsContext,
@@ -1101,7 +1103,7 @@ fn rewrite_packet<I, P, A, BT>(
     packet: &mut P,
 ) -> Verdict
 where
-    I: IpExt,
+    I: FilterIpExt,
     P: IpPacket<I>,
     BT: FilterBindingsTypes,
 {
@@ -1192,7 +1194,7 @@ mod tests {
         }
     }
 
-    impl<I: IpExt, A, BC: FilterBindingsContext> ConnectionExclusive<I, NatConfig<I, A>, BC> {
+    impl<I: FilterIpExt, A, BC: FilterBindingsContext> ConnectionExclusive<I, NatConfig<I, A>, BC> {
         fn from_packet<P: IpPacket<I>>(bindings_ctx: &BC, packet: &P) -> Self {
             let packet = PacketMetadata::new(packet).expect("packet should be trackable");
             ConnectionExclusive::from_deconstructed_packet(bindings_ctx, &packet)
@@ -1547,23 +1549,23 @@ mod tests {
         );
     }
 
-    trait NatHookExt<I: IpExt>: NatHook<I, Verdict<()>: PartialEq> {
+    trait NatHookExt<I: FilterIpExt>: NatHook<I, Verdict<()>: PartialEq> {
         fn interfaces<'a>(interface: &'a FakeDeviceId) -> Interfaces<'a, FakeDeviceId>;
     }
 
-    impl<I: IpExt> NatHookExt<I> for IngressHook {
+    impl<I: FilterIpExt> NatHookExt<I> for IngressHook {
         fn interfaces<'a>(interface: &'a FakeDeviceId) -> Interfaces<'a, FakeDeviceId> {
             Interfaces { ingress: Some(interface), egress: None }
         }
     }
 
-    impl<I: IpExt> NatHookExt<I> for LocalEgressHook {
+    impl<I: FilterIpExt> NatHookExt<I> for LocalEgressHook {
         fn interfaces<'a>(interface: &'a FakeDeviceId) -> Interfaces<'a, FakeDeviceId> {
             Interfaces { ingress: None, egress: Some(interface) }
         }
     }
 
-    impl<I: IpExt> NatHookExt<I> for EgressHook {
+    impl<I: FilterIpExt> NatHookExt<I> for EgressHook {
         fn interfaces<'a>(interface: &'a FakeDeviceId) -> Interfaces<'a, FakeDeviceId> {
             Interfaces { ingress: None, egress: Some(interface) }
         }

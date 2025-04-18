@@ -12,7 +12,7 @@ use net_types::ip::IpAddress;
 use packet_formats::ip::IpExt;
 
 use crate::logic::Interfaces;
-use crate::packets::{IpPacket, MaybeTransportPacket, TransportPacketData};
+use crate::packets::{FilterIpExt, IpPacket, MaybeTransportPacket, TransportPacketData};
 
 /// A matcher for network interfaces.
 #[derive(Clone, Derivative)]
@@ -174,7 +174,7 @@ pub struct PacketMatcher<I: IpExt, DeviceClass> {
     pub transport_protocol: Option<TransportProtocolMatcher<I::Proto>>,
 }
 
-impl<I: IpExt, DeviceClass> PacketMatcher<I, DeviceClass> {
+impl<I: FilterIpExt, DeviceClass> PacketMatcher<I, DeviceClass> {
     pub(crate) fn matches<P: IpPacket<I>, D: InterfaceProperties<DeviceClass>>(
         &self,
         packet: &P,

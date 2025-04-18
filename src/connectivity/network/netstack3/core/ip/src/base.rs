@@ -474,14 +474,14 @@ pub trait BaseTransportIpContext<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
 
 /// A marker trait for the traits required by the transport layer from the IP
 /// layer.
-pub trait TransportIpContext<I: IpExt, BC: TxMetadataBindingsTypes>:
+pub trait TransportIpContext<I: IpExt + FilterIpExt, BC: TxMetadataBindingsTypes>:
     BaseTransportIpContext<I, BC> + IpSocketHandler<I, BC>
 {
 }
 
 impl<I, CC, BC> TransportIpContext<I, BC> for CC
 where
-    I: IpExt,
+    I: IpExt + FilterIpExt,
     CC: BaseTransportIpContext<I, BC> + IpSocketHandler<I, BC>,
     BC: TxMetadataBindingsTypes,
 {
@@ -4412,7 +4412,9 @@ impl<I: IpExt, D> From<SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>>
 ///
 /// NOTE: Due to filtering rules, it is possible that the device provided in
 /// `meta` will not be the device that final IP packet is actually sent from.
-pub trait IpLayerHandler<I: IpExt + FragmentationIpExt, BC>: DeviceIdContext<AnyDevice> {
+pub trait IpLayerHandler<I: IpExt + FragmentationIpExt + FilterIpExt, BC>:
+    DeviceIdContext<AnyDevice>
+{
     /// Encapsulate and send the provided transport packet and from the device
     /// provided in `meta`.
     fn send_ip_packet_from_device<S>(
@@ -4540,7 +4542,7 @@ where
 }
 
 /// Abstracts access to a [`filter::FilterHandler`] for core contexts.
-pub trait FilterHandlerProvider<I: packet_formats::ip::IpExt, BT: FilterBindingsTypes>:
+pub trait FilterHandlerProvider<I: FilterIpExt, BT: FilterBindingsTypes>:
     IpDeviceAddressIdContext<I, DeviceId: filter::InterfaceProperties<BT::DeviceClass>>
 {
     /// The filter handler.
@@ -4646,7 +4648,7 @@ pub(crate) mod testutil {
 
     impl<I, BC, S, Meta, DeviceId> FilterHandlerProvider<I, BC> for FakeCoreCtx<S, Meta, DeviceId>
     where
-        I: packet_formats::ip::IpExt + AssignedAddrIpExt,
+        I: AssignedAddrIpExt + FilterIpExt,
         BC: FilterBindingsContext,
         DeviceId: FakeStrongDeviceId + filter::InterfaceProperties<BC::DeviceClass>,
     {

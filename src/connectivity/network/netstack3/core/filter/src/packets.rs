@@ -71,7 +71,7 @@ impl FilterIpExt for Ipv6 {
 }
 
 /// An IP packet that provides header inspection.
-pub trait IpPacket<I: IpExt> {
+pub trait IpPacket<I: FilterIpExt> {
     /// The type that provides access to transport-layer header inspection, if a
     /// transport header is contained in the body of the IP packet.
     type TransportPacket<'a>: MaybeTransportPacket
@@ -156,14 +156,14 @@ pub trait MaybeTransportPacketMut<I: IpExt> {
 }
 
 /// A serializer that may also be a valid transport layer packet.
-pub trait TransportPacketSerializer<I: IpExt>:
+pub trait TransportPacketSerializer<I: FilterIpExt>:
     Serializer + MaybeTransportPacket + MaybeTransportPacketMut<I>
 {
 }
 
 impl<I, S> TransportPacketSerializer<I> for S
 where
-    I: IpExt,
+    I: FilterIpExt,
     S: Serializer + MaybeTransportPacket + MaybeTransportPacketMut<I>,
 {
 }
@@ -437,7 +437,7 @@ impl<'a, I: IpExt, S> TxPacket<'a, I, S> {
     }
 }
 
-impl<I: IpExt, S: TransportPacketSerializer<I>> IpPacket<I> for TxPacket<'_, I, S> {
+impl<I: FilterIpExt, S: TransportPacketSerializer<I>> IpPacket<I> for TxPacket<'_, I, S> {
     type TransportPacket<'a>
         = &'a S
     where
@@ -553,7 +553,7 @@ impl<I: IpExt, B: BufferMut> Serializer for ForwardedPacket<I, B> {
     }
 }
 
-impl<I: IpExt, B: BufferMut> IpPacket<I> for ForwardedPacket<I, B> {
+impl<I: FilterIpExt, B: BufferMut> IpPacket<I> for ForwardedPacket<I, B> {
     type TransportPacket<'a>
         = &'a Self
     where
@@ -650,7 +650,7 @@ impl<I: IpExt, B: BufferMut> MaybeTransportPacket for ForwardedPacket<I, B> {
     }
 }
 
-impl<I: IpExt, S: TransportPacketSerializer<I>, B: IpPacketBuilder<I>> IpPacket<I>
+impl<I: FilterIpExt, S: TransportPacketSerializer<I>, B: IpPacketBuilder<I>> IpPacket<I>
     for Nested<S, B>
 {
     type TransportPacket<'a>
@@ -1443,7 +1443,7 @@ pub mod testutil {
 
         use super::*;
 
-        pub trait TestIpExt: IpExt {
+        pub trait TestIpExt: FilterIpExt {
             const SRC_IP: Self::Addr;
             const SRC_PORT: u16 = 1234;
             const DST_IP: Self::Addr;
@@ -1492,7 +1492,7 @@ pub mod testutil {
             fn proto() -> I::Proto;
         }
 
-        impl<I: IpExt, T> IpPacket<I> for FakeIpPacket<I, T>
+        impl<I: FilterIpExt, T> IpPacket<I> for FakeIpPacket<I, T>
         where
             for<'a> &'a T: TransportPacketExt<I>,
             for<'a> &'a mut T: MaybeTransportPacketMut<I>,
@@ -1752,32 +1752,32 @@ mod tests {
     const WINDOW_SIZE: u16 = 3u16;
 
     trait Protocol {
-        type Serializer<'a, I: IpExt>: TransportPacketSerializer<I, Buffer: packet::ReusableBuffer>
+        type Serializer<'a, I: FilterIpExt>: TransportPacketSerializer<I, Buffer: packet::ReusableBuffer>
             + MaybeTransportPacketMut<I>
             + Debug
             + PartialEq;
 
         fn proto<I: IpExt>() -> I::Proto;
 
-        fn make_serializer_with_ports<'a, I: IpExt>(
+        fn make_serializer_with_ports<'a, I: FilterIpExt>(
             src_ip: I::Addr,
             dst_ip: I::Addr,
             src_port: NonZeroU16,
             dst_port: NonZeroU16,
         ) -> Self::Serializer<'a, I>;
 
-        fn make_serializer<'a, I: IpExt>(
+        fn make_serializer<'a, I: FilterIpExt>(
             src_ip: I::Addr,
             dst_ip: I::Addr,
         ) -> Self::Serializer<'a, I> {
             Self::make_serializer_with_ports(src_ip, dst_ip, SRC_PORT, DST_PORT)
         }
 
-        fn make_packet<I: IpExt>(src_ip: I::Addr, dst_ip: I::Addr) -> Vec<u8> {
+        fn make_packet<I: FilterIpExt>(src_ip: I::Addr, dst_ip: I::Addr) -> Vec<u8> {
             Self::make_packet_with_ports::<I>(src_ip, dst_ip, SRC_PORT, DST_PORT)
         }
 
-        fn make_packet_with_ports<I: IpExt>(
+        fn make_packet_with_ports<I: FilterIpExt>(
             src_ip: I::Addr,
             dst_ip: I::Addr,
             src_port: NonZeroU16,
@@ -1794,14 +1794,14 @@ mod tests {
     struct Udp;
 
     impl Protocol for Udp {
-        type Serializer<'a, I: IpExt> =
+        type Serializer<'a, I: FilterIpExt> =
             Nested<InnerSerializer<&'a [u8], EmptyBuf>, UdpPacketBuilder<I::Addr>>;
 
         fn proto<I: IpExt>() -> I::Proto {
             IpProto::Udp.into()
         }
 
-        fn make_serializer_with_ports<'a, I: IpExt>(
+        fn make_serializer_with_ports<'a, I: FilterIpExt>(
             src_ip: I::Addr,
             dst_ip: I::Addr,
             src_port: NonZeroU16,
@@ -1866,14 +1866,14 @@ mod tests {
     struct Tcp;
 
     impl Protocol for Tcp {
-        type Serializer<'a, I: IpExt> =
+        type Serializer<'a, I: FilterIpExt> =
             Nested<InnerSerializer<&'a [u8], EmptyBuf>, TcpSegmentBuilder<I::Addr>>;
 
         fn proto<I: IpExt>() -> I::Proto {
             IpProto::Tcp.into()
         }
 
-        fn make_serializer_with_ports<'a, I: IpExt>(
+        fn make_serializer_with_ports<'a, I: FilterIpExt>(
             src_ip: I::Addr,
             dst_ip: I::Addr,
             src_port: NonZeroU16,
@@ -1894,7 +1894,7 @@ mod tests {
     struct IcmpEchoRequest;
 
     impl Protocol for IcmpEchoRequest {
-        type Serializer<'a, I: IpExt> = Nested<
+        type Serializer<'a, I: FilterIpExt> = Nested<
             InnerSerializer<&'a [u8], EmptyBuf>,
             IcmpPacketBuilder<I, icmp::IcmpEchoRequest>,
         >;
@@ -1903,7 +1903,7 @@ mod tests {
             I::map_ip((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6)
         }
 
-        fn make_serializer_with_ports<'a, I: IpExt>(
+        fn make_serializer_with_ports<'a, I: FilterIpExt>(
             src_ip: I::Addr,
             dst_ip: I::Addr,
             src_port: NonZeroU16,
@@ -1921,14 +1921,14 @@ mod tests {
     struct IcmpEchoReply;
 
     impl Protocol for IcmpEchoReply {
-        type Serializer<'a, I: IpExt> =
+        type Serializer<'a, I: FilterIpExt> =
             Nested<InnerSerializer<&'a [u8], EmptyBuf>, IcmpPacketBuilder<I, icmp::IcmpEchoReply>>;
 
         fn proto<I: IpExt>() -> I::Proto {
             I::map_ip((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6)
         }
 
-        fn make_serializer_with_ports<'a, I: IpExt>(
+        fn make_serializer_with_ports<'a, I: FilterIpExt>(
             src_ip: I::Addr,
             dst_ip: I::Addr,
             _src_port: NonZeroU16,
@@ -2153,7 +2153,7 @@ mod tests {
         packet.set_src_port(SRC_PORT_2);
     }
 
-    fn ip_packet<I: IpExt, P: Protocol>(src: I::Addr, dst: I::Addr) -> Buf<Vec<u8>> {
+    fn ip_packet<I: FilterIpExt, P: Protocol>(src: I::Addr, dst: I::Addr) -> Buf<Vec<u8>> {
         Buf::new(P::make_packet::<I>(src, dst), ..)
             .encapsulate(I::PacketBuilder::new(src, dst, /* ttl */ u8::MAX, P::proto::<I>()))
             .serialize_vec_outer()

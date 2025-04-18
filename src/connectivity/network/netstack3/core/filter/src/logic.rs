@@ -15,7 +15,7 @@ use packet_formats::ip::IpExt;
 use crate::conntrack::{Connection, FinalizeConnectionError, GetConnectionError};
 use crate::context::{FilterBindingsContext, FilterBindingsTypes, FilterIpContext};
 use crate::matchers::InterfaceProperties;
-use crate::packets::{IpPacket, MaybeTransportPacket};
+use crate::packets::{FilterIpExt, IpPacket, MaybeTransportPacket};
 use crate::state::{
     Action, FilterIpMetadata, FilterMarkMetadata, Hook, Routine, Rule, TransparentProxy,
 };
@@ -158,7 +158,7 @@ fn check_routine<I, P, D, DeviceClass, M>(
     metadata: &mut M,
 ) -> RoutineResult<I>
 where
-    I: IpExt,
+    I: FilterIpExt,
     P: IpPacket<I>,
     D: InterfaceProperties<DeviceClass>,
     M: FilterMarkMetadata,
@@ -209,7 +209,7 @@ fn check_routines_for_hook<I, P, D, DeviceClass, M>(
     metadata: &mut M,
 ) -> Verdict
 where
-    I: IpExt,
+    I: FilterIpExt,
     P: IpPacket<I>,
     D: InterfaceProperties<DeviceClass>,
     M: FilterMarkMetadata,
@@ -239,7 +239,7 @@ fn check_routines_for_ingress<I, P, D, DeviceClass, M>(
     metadata: &mut M,
 ) -> IngressVerdict<I>
 where
-    I: IpExt,
+    I: FilterIpExt,
     P: IpPacket<I>,
     D: InterfaceProperties<DeviceClass>,
     M: FilterMarkMetadata,
@@ -262,7 +262,7 @@ where
 
 /// An implementation of packet filtering logic, providing entry points at
 /// various stages of packet processing.
-pub trait FilterHandler<I: IpExt, BC: FilterBindingsTypes>:
+pub trait FilterHandler<I: FilterIpExt, BC: FilterBindingsTypes>:
     IpDeviceAddressIdContext<I, DeviceId: InterfaceProperties<BC::DeviceClass>>
 {
     /// The ingress hook intercepts incoming traffic before a routing decision
@@ -344,7 +344,7 @@ impl<CC: DeviceIdContext<AnyDevice>> DeviceIdContext<AnyDevice> for FilterImpl<'
 
 impl<I, CC> IpDeviceAddressIdContext<I> for FilterImpl<'_, CC>
 where
-    I: IpExt,
+    I: FilterIpExt,
     CC: IpDeviceAddressIdContext<I>,
 {
     type AddressId = CC::AddressId;
@@ -353,7 +353,7 @@ where
 
 impl<I, BC, CC> FilterHandler<I, BC> for FilterImpl<'_, CC>
 where
-    I: IpExt,
+    I: FilterIpExt,
     BC: FilterBindingsContext,
     CC: FilterIpContext<I, BC>,
 {
@@ -677,7 +677,7 @@ pub enum FilterTimerId<I: Ip> {
     ConntrackGc(IpVersionMarker<I>),
 }
 
-impl<I: IpExt, BC: FilterBindingsContext, CC: FilterIpContext<I, BC>> HandleableTimer<CC, BC>
+impl<I: FilterIpExt, BC: FilterBindingsContext, CC: FilterIpContext<I, BC>> HandleableTimer<CC, BC>
     for FilterTimerId<I>
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
@@ -727,7 +727,7 @@ pub mod testutil {
 
     impl<I, BC, DeviceId> FilterHandler<I, BC> for NoopImpl<DeviceId>
     where
-        I: IpExt + AssignedAddrIpExt,
+        I: FilterIpExt + AssignedAddrIpExt,
         BC: FilterBindingsContext,
         DeviceId: FakeStrongDeviceId + InterfaceProperties<BC::DeviceClass>,
     {

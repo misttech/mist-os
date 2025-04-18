@@ -24,7 +24,7 @@ use netstack3_base::{
     IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, InstantBindingsTypes, InstantContext,
     IpDeviceAddr, IpExt, Marks, RngContext, TokenBucket, TxMetadataBindingsTypes,
 };
-use netstack3_filter::{self as filter, TransportPacketSerializer};
+use netstack3_filter::{self as filter, FilterIpExt, TransportPacketSerializer};
 use packet::{
     BufferMut, InnerPacketBuilder as _, ParsablePacket as _, ParseBuffer, Serializer,
     TruncateDirection, TruncatingSerializer,
@@ -651,7 +651,9 @@ pub trait EchoTransportContextMarker {}
 
 /// The execution context shared by ICMP(v4) and ICMPv6 for the internal
 /// operations of the IP stack.
-pub trait InnerIcmpContext<I: IpExt, BC: IcmpBindingsTypes>: IpSocketHandler<I, BC> {
+pub trait InnerIcmpContext<I: IpExt + FilterIpExt, BC: IcmpBindingsTypes>:
+    IpSocketHandler<I, BC>
+{
     /// A type implementing [`IpTransportContext`] that handles ICMP Echo
     /// replies.
     type EchoTransportContext: IpTransportContext<I, BC, Self> + EchoTransportContextMarker;
@@ -751,7 +753,7 @@ macro_rules! try_send_error {
 pub enum IcmpIpTransportContext {}
 
 fn receive_ip_transport_icmp_error<
-    I: IpExt,
+    I: IpExt + FilterIpExt,
     CC: InnerIcmpContext<I, BC> + CounterContext<IcmpRxCounters<I>>,
     BC: IcmpBindingsContext,
 >(
@@ -1892,7 +1894,7 @@ fn send_icmp_reply<I, BC, CC, S, F, O>(
     get_body_from_src_ip: F,
     ip_options: &O,
 ) where
-    I: IpExt,
+    I: IpExt + FilterIpExt,
     CC: IpSocketHandler<I, BC> + DeviceIdContext<AnyDevice> + CounterContext<IcmpTxCounters<I>>,
     BC: TxMetadataBindingsTypes,
     S: TransportPacketSerializer<I>,
@@ -3184,7 +3186,7 @@ mod tests {
         }
     }
 
-    impl<I: IpExt> InnerIcmpContext<I, FakeIcmpBindingsCtx<I>> for FakeIcmpCoreCtx<I> {
+    impl<I: IpExt + FilterIpExt> InnerIcmpContext<I, FakeIcmpBindingsCtx<I>> for FakeIcmpCoreCtx<I> {
         type EchoTransportContext = FakeEchoIpTransportContext;
 
         fn receive_icmp_error(
@@ -3472,7 +3474,7 @@ mod tests {
     impl_pmtu_handler!(FakeIcmpCoreCtx<Ipv4>, FakeIcmpBindingsCtx<Ipv4>, Ipv4);
     impl_pmtu_handler!(FakeIcmpCoreCtx<Ipv6>, FakeIcmpBindingsCtx<Ipv6>, Ipv6);
 
-    impl<I: IpExt> IpSocketHandler<I, FakeIcmpBindingsCtx<I>> for FakeIcmpCoreCtx<I> {
+    impl<I: IpExt + FilterIpExt> IpSocketHandler<I, FakeIcmpBindingsCtx<I>> for FakeIcmpCoreCtx<I> {
         fn new_ip_socket<O>(
             &mut self,
             bindings_ctx: &mut FakeIcmpBindingsCtx<I>,

@@ -18,8 +18,8 @@ use netstack3_base::{
     TxMetadataBindingsTypes, WeakDeviceIdentifier,
 };
 use netstack3_filter::{
-    self as filter, FilterBindingsContext, FilterHandler as _, InterfaceProperties, RawIpBody,
-    TransportPacketSerializer,
+    self as filter, FilterBindingsContext, FilterHandler as _, FilterIpExt, InterfaceProperties,
+    RawIpBody, TransportPacketSerializer,
 };
 use netstack3_trace::trace_duration;
 use packet::{BufferMut, PacketConstraints, SerializeError};
@@ -39,7 +39,7 @@ use crate::internal::types::{InternalForwarding, ResolvedRoute, RoutableIpAddr};
 use crate::{HopLimits, NextHop};
 
 /// An execution context defining a type of IP socket.
-pub trait IpSocketHandler<I: IpExt, BC: TxMetadataBindingsTypes>:
+pub trait IpSocketHandler<I: IpExt + FilterIpExt, BC: TxMetadataBindingsTypes>:
     DeviceIdContext<AnyDevice>
 {
     /// Constructs a new [`IpSock`].
@@ -381,7 +381,7 @@ pub trait IpSocketContext<I, BC: IpSocketBindingsContext>:
     DeviceIdContext<AnyDevice, DeviceId: InterfaceProperties<BC::DeviceClass>>
     + FilterHandlerProvider<I, BC>
 where
-    I: IpDeviceStateIpExt + IpExt,
+    I: IpDeviceStateIpExt + IpExt + FilterIpExt,
 {
     /// Returns a route for a socket.
     ///
@@ -793,7 +793,7 @@ fn send_ip_packet<I, S, BC, CC, O>(
     tx_metadata: BC::TxMetadata,
 ) -> Result<(), IpSockSendError>
 where
-    I: IpExt + IpDeviceStateIpExt,
+    I: IpExt + IpDeviceStateIpExt + FilterIpExt,
     S: TransportPacketSerializer<I>,
     S::Buffer: BufferMut,
     BC: IpSocketBindingsContext,
@@ -806,7 +806,7 @@ where
     // Extracted to a function without the serializer parameter to ease code
     // generation.
     fn resolve<
-        I: IpExt + IpDeviceStateIpExt,
+        I: IpExt + IpDeviceStateIpExt + FilterIpExt,
         CC: IpSocketContext<I, BC>,
         BC: IpSocketBindingsContext,
     >(
@@ -1532,7 +1532,7 @@ pub(crate) mod testutil {
 
     impl<I, State, D, Meta, BC> IpSocketHandler<I, BC> for FakeCoreCtx<State, Meta, D>
     where
-        I: IpExt,
+        I: IpExt + FilterIpExt,
         State: InnerFakeIpSocketCtx<I, D>,
         D: FakeStrongDeviceId,
         BC: TxMetadataBindingsTypes,
@@ -1630,7 +1630,7 @@ pub(crate) mod testutil {
 
     impl<I, BC, D, State, Meta> BaseTransportIpContext<I, BC> for FakeCoreCtx<State, Meta, D>
     where
-        I: IpExt,
+        I: IpExt + FilterIpExt,
         D: FakeStrongDeviceId,
         State: InnerFakeIpSocketCtx<I, D>,
         BC: TxMetadataBindingsTypes,

@@ -21,7 +21,7 @@ use netstack3_base::{
     Marks, Mss, NotFoundError, Payload, Segment, SegmentHeader, SeqNum,
     StrongDeviceIdentifier as _, WeakDeviceIdentifier,
 };
-use netstack3_filter::TransportPacketSerializer;
+use netstack3_filter::{FilterIpExt, TransportPacketSerializer};
 use netstack3_ip::socket::{IpSockCreationError, MmsError};
 use netstack3_ip::{
     IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, ReceiveIpPacketMeta,
@@ -30,7 +30,7 @@ use netstack3_ip::{
 use netstack3_trace::trace_duration;
 use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder, Serializer as _};
 use packet_formats::error::ParseError;
-use packet_formats::ip::{IpExt, IpProto};
+use packet_formats::ip::IpProto;
 use packet_formats::tcp::{
     TcpFlowAndSeqNum, TcpOptionsTooLongError, TcpParseArgs, TcpSegment, TcpSegmentBuilder,
     TcpSegmentBuilderWithOptions,
@@ -1141,7 +1141,7 @@ pub(super) fn tcp_serialize_segment<'a, I, P>(
     conn_addr: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
 ) -> impl TransportPacketSerializer<I, Buffer = EmptyBuf> + Debug + 'a
 where
-    I: IpExt,
+    I: FilterIpExt,
     P: InnerPacketBuilder + Debug + Payload + 'a,
 {
     let SegmentHeader { seq, ack, wnd, control, options, push } = header;
@@ -1174,12 +1174,14 @@ where
 #[cfg(test)]
 mod test {
     use ip_test_macro::ip_test;
-    use netstack3_base::testutil::TestIpExt;
     use netstack3_base::{HandshakeOptions, UnscaledWindowSize};
     use packet::ParseBuffer as _;
     use test_case::test_case;
 
     use super::*;
+
+    trait TestIpExt: netstack3_base::testutil::TestIpExt + FilterIpExt {}
+    impl<T> TestIpExt for T where T: netstack3_base::testutil::TestIpExt + FilterIpExt {}
 
     const SEQ: SeqNum = SeqNum::new(12345);
     const ACK: SeqNum = SeqNum::new(67890);

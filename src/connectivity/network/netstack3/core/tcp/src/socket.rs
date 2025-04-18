@@ -59,7 +59,7 @@ use netstack3_base::{
     TimerBindingsTypes, TimerContext, TxMetadataBindingsTypes, WeakDeviceIdentifier,
     ZonedAddressError,
 };
-use netstack3_filter::Tuple;
+use netstack3_filter::{FilterIpExt, Tuple};
 use netstack3_ip::socket::{
     DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSocketHandler,
 };
@@ -101,7 +101,7 @@ impl<I> DualStackIpExt for I where
 
 /// A dual stack IP extension trait for TCP.
 pub trait DualStackBaseIpExt:
-    netstack3_base::socket::DualStackIpExt + SocketIpExt + netstack3_base::IpExt
+    netstack3_base::socket::DualStackIpExt + SocketIpExt + netstack3_base::IpExt + FilterIpExt
 {
     /// For `Ipv4`, this is [`EitherStack<TcpSocketId<Ipv4, _, _>, TcpSocketId<Ipv6, _, _>>`],
     /// and for `Ipv6` it is just `TcpSocketId<Ipv6>`.
@@ -5539,7 +5539,7 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
     segment: Segment<<BC::SendBuffer as SendBuffer>::Payload<'a>>,
     ip_sock_options: &TcpIpSockOptions,
 ) where
-    WireI: IpExt,
+    WireI: IpExt + FilterIpExt,
     SockI: IpExt + DualStackIpExt,
     CC: TcpCounterContext<SockI, D, BC>
         + IpSocketHandler<WireI, BC, DeviceId = D::Strong, WeakDeviceId = D>,

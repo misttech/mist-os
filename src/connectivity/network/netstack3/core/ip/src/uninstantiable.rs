@@ -9,7 +9,7 @@ use netstack3_base::{
     AnyDevice, DeviceIdContext, EitherDeviceId, IpDeviceAddr, IpExt, Mms, TxMetadataBindingsTypes,
     Uninstantiable, UninstantiableWrapper,
 };
-use netstack3_filter::Tuple;
+use netstack3_filter::{FilterIpExt, Tuple};
 
 use crate::internal::base::{BaseTransportIpContext, HopLimits, IpLayerIpExt};
 use crate::internal::device::Ipv6LinkLayerAddr;
@@ -37,8 +37,8 @@ impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> BaseTransportIpContext<I, C>
     }
 }
 
-impl<I: IpExt, BC: TxMetadataBindingsTypes, P: DeviceIdContext<AnyDevice>> IpSocketHandler<I, BC>
-    for UninstantiableWrapper<P>
+impl<I: IpExt + FilterIpExt, BC: TxMetadataBindingsTypes, P: DeviceIdContext<AnyDevice>>
+    IpSocketHandler<I, BC> for UninstantiableWrapper<P>
 {
     fn new_ip_socket<O>(
         &mut self,

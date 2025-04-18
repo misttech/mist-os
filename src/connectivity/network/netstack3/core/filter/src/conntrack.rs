@@ -20,7 +20,7 @@ use packet_formats::ip::{IpExt, IpProto, Ipv4Proto, Ipv6Proto};
 
 use crate::context::{FilterBindingsContext, FilterBindingsTypes};
 use crate::logic::FilterTimerId;
-use crate::packets::{IpPacket, MaybeTransportPacket, TransportPacketData};
+use crate::packets::{FilterIpExt, IpPacket, MaybeTransportPacket, TransportPacketData};
 use netstack3_base::sync::Mutex;
 use netstack3_base::{CoreTimerContext, Inspectable, Inspector, Instant, TimerContext};
 
@@ -325,7 +325,7 @@ impl<
     }
 }
 
-impl<I: IpExt, E: Default, BC: FilterBindingsContext> Table<I, E, BC> {
+impl<I: FilterIpExt, E: Default, BC: FilterBindingsContext> Table<I, E, BC> {
     /// Returns a [`Connection`] for the packet's flow. If a connection does not
     /// currently exist, a new one is created.
     ///
@@ -467,7 +467,7 @@ pub struct Tuple<I: IpExt> {
     pub dst_port_or_id: u16,
 }
 
-impl<I: IpExt> Tuple<I> {
+impl<I: FilterIpExt> Tuple<I> {
     /// Creates a `Tuple` from an `IpPacket`, if possible.
     ///
     /// Returns `None` if the packet doesn't have an inner transport packet.
@@ -959,7 +959,7 @@ impl<I: IpExt, E, BT: FilterBindingsTypes> ConnectionExclusive<I, E, BT> {
     }
 }
 
-impl<I: IpExt, E: Default, BC: FilterBindingsContext> ConnectionExclusive<I, E, BC> {
+impl<I: FilterIpExt, E: Default, BC: FilterBindingsContext> ConnectionExclusive<I, E, BC> {
     pub(crate) fn from_deconstructed_packet(
         bindings_ctx: &BC,
         PacketMetadata { tuple, transport_data }: &PacketMetadata<I>,
@@ -1110,7 +1110,7 @@ pub(crate) struct PacketMetadata<I: IpExt> {
     transport_data: TransportPacketData,
 }
 
-impl<I: IpExt> PacketMetadata<I> {
+impl<I: FilterIpExt> PacketMetadata<I> {
     pub(crate) fn new<P: IpPacket<I>>(packet: &P) -> Option<Self> {
         let transport_packet_data = packet.maybe_transport_packet().transport_packet_data()?;
 
