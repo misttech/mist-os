@@ -40,6 +40,15 @@ class BreakpointObserver {
   // The implementation should not delete the breakpoint from within this callback as other
   // observers may need to be issued and the object will still be on the stack.
   virtual void OnBreakpointUpdateFailure(Breakpoint* breakpoint, const Err& err) {}
+
+  enum What {
+    // Indicates that the breakpoint updated its type.
+    kType = 1,
+  };
+
+  // Indicates that the breakpoint implicitly updated itself. What specifically was updated is
+  // indicated by |what|.
+  virtual void OnBreakpointImplicitUpdate(Breakpoint* breakpoint, What what) {}
 };
 
 }  // namespace zxdb

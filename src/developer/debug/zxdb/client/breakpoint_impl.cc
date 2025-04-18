@@ -10,6 +10,7 @@
 #include <map>
 #include <sstream>
 
+#include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/shared/message_loop.h"
 #include "src/developer/debug/shared/zx_status.h"
@@ -24,6 +25,7 @@
 #include "src/developer/debug/zxdb/common/err.h"
 #include "src/developer/debug/zxdb/expr/permissive_input_location.h"
 #include "src/developer/debug/zxdb/symbols/loaded_module_symbols.h"
+#include "src/developer/debug/zxdb/symbols/module_symbol_status.h"
 #include "src/developer/debug/zxdb/symbols/module_symbols.h"
 #include "src/developer/debug/zxdb/symbols/process_symbols.h"
 #include "src/developer/debug/zxdb/symbols/resolve_options.h"
@@ -206,8 +208,15 @@ void BreakpointImpl::DidLoadModuleSymbols(Process* process, LoadedModuleSymbols*
   ResolveOptions options = GetResolveOptions();
   bool needs_sync = false;
   for (const auto& loc : ExpandPermissiveInputLocationNames(find_context, settings_.locations)) {
-    needs_sync |=
-        procs_[process].AddLocations(this, process, module->ResolveInputLocation(loc, options));
+    auto resolved_locations = module->ResolveInputLocation(loc, options);
+
+    needs_sync |= procs_[process].AddLocations(this, process, resolved_locations);
+
+    if (IsResolvedLocationInStarnixKernel(process, resolved_locations)) {
+      settings_.type = debug_ipc::BreakpointType::kHardware;
+      for (auto& observer : session()->breakpoint_observers())
+        observer.OnBreakpointImplicitUpdate(this, BreakpointObserver::What::kType);
+    }
   }
 
   if (needs_sync) {
@@ -393,10 +402,19 @@ bool BreakpointImpl::RegisterProcess(Process* process) {
   ResolveOptions options = GetResolveOptions();
   FindNameContext find_context(process->GetSymbols());
 
-  changed |=
-      record.AddLocations(this, process,
-                          ResolvePermissiveInputLocations(process->GetSymbols(), options,
-                                                          find_context, settings_.locations));
+  auto resolved_locations = ResolvePermissiveInputLocations(process->GetSymbols(), options,
+                                                            find_context, settings_.locations);
+
+  changed |= record.AddLocations(this, process, resolved_locations);
+
+  if (IsResolvedLocationInStarnixKernel(process, resolved_locations)) {
+    // Explicitly set the type without going through SetSettings to avoid extra unnecessary
+    // syncing since the backend shouldn't even know about this breakpoint yet.
+    settings_.type = debug_ipc::BreakpointType::kHardware;
+    for (auto& observer : session()->breakpoint_observers())
+      observer.OnBreakpointImplicitUpdate(this, BreakpointObserver::What::kType);
+  }
+
   return changed;
 }
 
@@ -423,6 +441,36 @@ ResolveOptions BreakpointImpl::GetResolveOptions() const {
   }
 
   return options;
+}
+
+bool BreakpointImpl::IsResolvedLocationInStarnixKernel(
+    Process* process, const std::vector<Location>& locations) const {
+  const std::vector<ModuleSymbolStatus>& module_status = process->GetSymbols()->GetStatus();
+  for (const auto& location : locations) {
+    if (location.has_symbols()) {
+      const LoadedModuleSymbols* loaded_module =
+          process->GetSymbols()->GetModuleForAddress(location.address());
+
+      FX_DCHECK(loaded_module);
+
+      auto found = std::find_if(module_status.begin(), module_status.end(),
+                                [loaded_module](const ModuleSymbolStatus& status) {
+                                  return loaded_module->load_address() == status.base;
+                                });
+
+      // The starnix_kernel's module name is only "starnix_kernel.cm" in its own process. In other
+      // restricted mode processes that share the same address space, it's called "useralloc".
+      // There's nothing stopping other processes from loading modules into self-allocated storage,
+      // which would also appear with this name, but that's not very prevalant in practice so false
+      // positives here are not expected.
+      if (found != module_status.end() && settings_.type == debug_ipc::BreakpointType::kSoftware &&
+          (found->name == "starnix_kernel.cm" || found->name == "useralloc")) {
+        // TODO(https://fxbug.dev/396421111): Make software breakpoints work for starnix_kernel.
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 bool BreakpointImpl::AllLocationsAddresses() const {

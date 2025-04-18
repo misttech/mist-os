@@ -23,6 +23,7 @@ struct BreakpointStats;
 namespace zxdb {
 
 class BreakpointLocationImpl;
+class Location;
 
 class BreakpointImpl : public Breakpoint,
                        public TargetObserver,
@@ -106,6 +107,11 @@ class BreakpointImpl : public Breakpoint,
 
   // Returns true if all input locations for this breakpoint are addesses.
   bool AllLocationsAddresses() const;
+
+  // Helper for detecting when we're about to install a breakpoint in the starnix_kernel module.
+  // This is fairly hacky, but should be good enough for most cases.
+  bool IsResolvedLocationInStarnixKernel(Process* process,
+                                         const std::vector<Location>& locations) const;
 
   bool is_internal_;
 

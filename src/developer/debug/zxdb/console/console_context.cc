@@ -13,6 +13,7 @@
 
 #include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/zxdb/client/breakpoint.h"
+#include "src/developer/debug/zxdb/client/breakpoint_location.h"
 #include "src/developer/debug/zxdb/client/filter.h"
 #include "src/developer/debug/zxdb/client/frame.h"
 #include "src/developer/debug/zxdb/client/process.h"
@@ -31,6 +32,7 @@
 #include "src/developer/debug/zxdb/console/format_node_console.h"
 #include "src/developer/debug/zxdb/console/format_target.h"
 #include "src/developer/debug/zxdb/console/output_buffer.h"
+#include "src/developer/debug/zxdb/symbols/function.h"
 #include "src/developer/debug/zxdb/symbols/loaded_module_symbols.h"
 #include "src/developer/debug/zxdb/symbols/location.h"
 #include "src/lib/fxl/strings/string_printf.h"
@@ -939,6 +941,48 @@ void ConsoleContext::OnDownloadsStopped(size_t success, size_t fail) {
     Console::get()->Output(
         "\nSome files failed to download. If you think this is in error, please file a bug:\n"
         "https://fxbug.dev/issues/new?component=1389559&template=1849567\n");
+  }
+}
+
+void ConsoleContext::OnBreakpointImplicitUpdate(Breakpoint* breakpoint,
+                                                BreakpointObserver::What what) {
+  if (what == BreakpointObserver::What::kType) {
+    OutputBuffer buf;
+
+    // These are the input locations, which don't necessarily have any resolved symbols, but we
+    // don't care about those here. Instead, we want to spit out the same thing that the user typed
+    // in.
+    const auto& input_locations = breakpoint->GetSettings().locations;
+
+    std::string location_string;
+    for (auto input_loc = input_locations.begin(); location_string.empty(); ++input_loc) {
+      switch (input_loc->type) {
+        case InputLocation::Type::kLine:
+          location_string =
+              fxl::StringPrintf("%s:%d", input_loc->line.file().c_str(), input_loc->line.line());
+          break;
+        case InputLocation::Type::kName:
+          location_string = input_loc->name.GetFullNameNoQual();
+          break;
+        case InputLocation::Type::kAddress:
+          location_string = std::to_string(input_loc->address);
+          break;
+        case InputLocation::Type::kNone:
+          break;
+      }
+    }
+
+    buf.Append(
+        Syntax::kWarning,
+        fxl::StringPrintf(
+            "Software breakpoints in starnix kernel are currently not supported. This breakpoint "
+            "has been converted to a hardware breakpoint.\nHardware breakpoints can be specified "
+            "on the command line:\n\tbreak --type execute %s\nSee `help break` for details and "
+            "follow https://fxbug.dev/396421111 for updates on enabling software breakpoints in "
+            "starnix_kernel.",
+            location_string.c_str()));
+
+    Console::get()->Output(buf);
   }
 }
 

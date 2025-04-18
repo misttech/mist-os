@@ -186,6 +186,7 @@ class ConsoleContext : public ProcessObserver,
   // BreakpointObserver implementation.
   void OnBreakpointMatched(Breakpoint* breakpoint, bool user_requested) override;
   void OnBreakpointUpdateFailure(Breakpoint* breakpoint, const Err& err) override;
+  void OnBreakpointImplicitUpdate(Breakpoint* breakpoint, BreakpointObserver::What what) override;
 
   // ComponentObserver implementation.
   void OnComponentStarted(const std::string& moniker, const std::string& url) override;
