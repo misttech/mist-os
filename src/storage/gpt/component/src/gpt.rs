@@ -107,7 +107,13 @@ impl GptPartition {
                 .gpt
                 .partitions()
                 .get(&self.index)
-                .map(|info| convert_partition_info(info, self.block_client.block_flags()))
+                .map(|info| {
+                    convert_partition_info(
+                        info,
+                        self.block_client.block_flags(),
+                        self.block_client.max_transfer_blocks(),
+                    )
+                })
                 .ok_or(zx::Status::BAD_STATE)
         } else {
             Err(zx::Status::BAD_STATE)
@@ -189,9 +195,11 @@ impl GptPartition {
 fn convert_partition_info(
     info: &gpt::PartitionInfo,
     device_flags: fblock::Flag,
+    max_transfer_blocks: Option<NonZero<u32>>,
 ) -> block_server::DeviceInfo {
     block_server::DeviceInfo::Partition(block_server::PartitionInfo {
         device_flags,
+        max_transfer_blocks,
         block_range: Some(info.start_block..info.start_block + info.num_blocks),
         type_guid: info.type_guid.to_bytes(),
         instance_guid: info.instance_guid.to_bytes(),
@@ -505,6 +513,7 @@ mod tests {
     use fidl::HandleBased as _;
     use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
     use gpt::{Gpt, Guid, PartitionInfo};
+    use std::num::NonZero;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use {
@@ -1196,6 +1205,7 @@ mod tests {
             FakeServerOptions {
                 block_count: Some(8),
                 block_size: 512,
+                max_transfer_blocks: NonZero::new(2),
                 flags: fblock::Flag::READONLY | fblock::Flag::REMOVABLE,
                 ..Default::default()
             },
@@ -1227,6 +1237,7 @@ mod tests {
         assert_eq!(info.block_count, 1);
         assert_eq!(info.block_size, 512);
         assert_eq!(info.flags, fblock::Flag::READONLY | fblock::Flag::REMOVABLE);
+        assert_eq!(info.max_transfer_size, 1024);
 
         let metadata =
             part_block.get_metadata().await.expect("FIDL error").expect("get_metadata failed");

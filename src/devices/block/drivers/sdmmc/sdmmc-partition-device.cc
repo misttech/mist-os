@@ -21,8 +21,10 @@ PartitionDevice::PartitionDevice(SdmmcBlockDevice* sdmmc_parent, const block_inf
                                  EmmcPartition partition)
     : sdmmc_parent_(sdmmc_parent), block_info_(block_info), partition_(partition) {
   block_server::PartitionInfo info{
+      .device_flags = block_info.flags,
       .block_count = block_info.block_count,
       .block_size = block_info.block_size,
+      .max_transfer_size = block_info.max_transfer_size,
   };
   switch (partition_) {
     case USER_DATA_PARTITION: {

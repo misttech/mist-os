@@ -57,6 +57,7 @@ struct PartitionInfo {
   uint8_t instance_guid[16];
   const char *name;
   uint64_t flags;
+  uint32_t max_transfer_size;
 };
 
 using RequestId = uint64_t;

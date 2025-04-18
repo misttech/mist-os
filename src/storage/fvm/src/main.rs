@@ -1120,6 +1120,7 @@ impl Component {
                 &inner.metadata.partitions.get(&partition_index).ok_or(zx::Status::INTERNAL)?;
             DeviceInfo::Partition(PartitionInfo {
                 device_flags: fvm.device.block_flags(),
+                max_transfer_blocks: fvm.device.max_transfer_blocks(),
                 block_range: None, // Supplied via `get_volume_info`.
                 type_guid: partition.type_guid,
                 instance_guid: partition.guid,

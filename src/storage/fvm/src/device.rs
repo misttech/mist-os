@@ -8,6 +8,7 @@ use fidl_fuchsia_hardware_block::Flag;
 use fuchsia_async as fasync;
 use fuchsia_sync::Mutex;
 use std::collections::HashMap;
+use std::num::NonZero;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Weak};
 
@@ -28,6 +29,10 @@ impl<C: BlockClient> DeviceImpl<C> {
 
     pub fn block_flags(&self) -> Flag {
         self.client.block_flags()
+    }
+
+    pub fn max_transfer_blocks(&self) -> Option<NonZero<u32>> {
+        self.client.max_transfer_blocks()
     }
 
     /// Ataches `vmo`.  NOTE: This assumes that the pointer &zx::Vmo will remain stable.

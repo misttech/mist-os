@@ -7,6 +7,7 @@ use block_client::{BlockClient, BufferSlice, MutableBufferSlice, VmoId, WriteOpt
 use fidl_fuchsia_hardware_block as block;
 use fuchsia_sync::Mutex;
 use std::collections::BTreeMap;
+use std::num::NonZero;
 use std::ops::Range;
 use std::sync::atomic::{self, AtomicU32};
 
@@ -167,6 +168,10 @@ impl BlockClient for FakeBlockClient {
 
     fn block_count(&self) -> u64 {
         self.inner.lock().data.len() as u64 / self.block_size as u64
+    }
+
+    fn max_transfer_blocks(&self) -> Option<NonZero<u32>> {
+        None
     }
 
     fn block_flags(&self) -> block::Flag {

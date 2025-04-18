@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 use anyhow::{anyhow, Error};
 use block_protocol::{BlockFifoRequest, BlockFifoResponse};
+use fidl_fuchsia_hardware_block::MAX_TRANSFER_UNBOUNDED;
 use fidl_fuchsia_hardware_block_driver::{BlockIoFlag, BlockOpcode};
 use fuchsia_sync::Mutex;
 use futures::{Future, FutureExt as _, TryStreamExt as _};
@@ -28,11 +29,26 @@ pub enum DeviceInfo {
     Partition(PartitionInfo),
 }
 
+impl DeviceInfo {
+    fn max_transfer_size(&self, block_size: u32) -> u32 {
+        let max_blocks = match self {
+            Self::Block(BlockInfo { max_transfer_blocks, .. }) => max_transfer_blocks,
+            Self::Partition(PartitionInfo { max_transfer_blocks, .. }) => max_transfer_blocks,
+        };
+        if let Some(max_blocks) = max_blocks {
+            max_blocks.get() * block_size
+        } else {
+            MAX_TRANSFER_UNBOUNDED
+        }
+    }
+}
+
 /// Information associated with non-partition block devices.
 #[derive(Clone)]
 pub struct BlockInfo {
     pub device_flags: fblock::Flag,
     pub block_count: u64,
+    pub max_transfer_blocks: Option<NonZero<u32>>,
 }
 
 /// Information associated with a block device that is also a partition.
@@ -40,6 +56,7 @@ pub struct BlockInfo {
 pub struct PartitionInfo {
     /// The device flags reported by the underlying device.
     pub device_flags: fblock::Flag,
+    pub max_transfer_blocks: Option<NonZero<u32>>,
     /// If `block_range` is None, the partition is a volume and may not be contiguous.
     /// In this case, the server will use the `get_volume_info` method to get the count of assigned
     /// slices and use that (along with the slice and block sizes) to determine the block count.
@@ -260,8 +277,9 @@ impl<SM: SessionManager> BlockServer<SM> {
         match request {
             fvolume::VolumeRequest::GetInfo { responder } => match self.device_info().await {
                 Ok(info) => {
+                    let max_transfer_size = info.max_transfer_size(self.block_size);
                     let (block_count, flags) = match info.as_ref() {
-                        DeviceInfo::Block(BlockInfo { block_count, device_flags }) => {
+                        DeviceInfo::Block(BlockInfo { block_count, device_flags, .. }) => {
                             (*block_count, *device_flags)
                         }
                         DeviceInfo::Partition(partition_info) => {
@@ -280,7 +298,7 @@ impl<SM: SessionManager> BlockServer<SM> {
                     responder.send(Ok(&fblock::BlockInfo {
                         block_count,
                         block_size: self.block_size,
-                        max_transfer_size: fblock::MAX_TRANSFER_UNBOUNDED,
+                        max_transfer_size,
                         flags,
                     }))?;
                 }
@@ -964,6 +982,7 @@ mod tests {
     fn test_device_info() -> DeviceInfo {
         DeviceInfo::Partition(PartitionInfo {
             device_flags: fblock::Flag::READONLY,
+            max_transfer_blocks: None,
             block_range: Some(12..34),
             type_guid: [1; 16],
             instance_guid: [2; 16],

@@ -6,6 +6,7 @@ use super::{IntoSessionManager, OffsetMap, Operation, RequestId, RequestTracking
 use anyhow::Error;
 use block_protocol::{BlockFifoRequest, BlockFifoResponse};
 use fidl::endpoints::RequestStream;
+use fidl_fuchsia_hardware_block::MAX_TRANSFER_UNBOUNDED;
 use fuchsia_async::{self as fasync, EHandle};
 use fuchsia_sync::{Condvar, Mutex};
 use futures::stream::{AbortHandle, Abortable};
@@ -364,6 +365,7 @@ pub struct PartitionInfo {
     pub instance_guid: [u8; 16],
     pub name: *const c_char,
     pub flags: u64,
+    pub max_transfer_size: u32,
 }
 
 /// cbindgen:no-export
@@ -387,6 +389,11 @@ impl PartitionInfo {
                 String::from_utf8_lossy(CStr::from_ptr(self.name).to_bytes()).to_string()
             },
             flags: self.flags,
+            max_transfer_blocks: if self.max_transfer_size != MAX_TRANSFER_UNBOUNDED {
+                NonZero::new(self.max_transfer_size / self.block_size)
+            } else {
+                None
+            },
         })
     }
 }

@@ -59,6 +59,7 @@ pub struct FakeServerOptions<'a> {
     pub flags: fblock::Flag,
     pub block_count: Option<u64>,
     pub block_size: u32,
+    pub max_transfer_blocks: Option<NonZero<u32>>,
     pub initial_content: Option<&'a [u8]>,
     pub vmo: Option<zx::Vmo>,
     pub observer: Option<Box<dyn Observer>>,
@@ -70,6 +71,7 @@ impl Default for FakeServerOptions<'_> {
             flags: fblock::Flag::empty(),
             block_count: None,
             block_size: 512,
+            max_transfer_blocks: None,
             initial_content: None,
             vmo: None,
             observer: None,
@@ -103,6 +105,7 @@ impl From<FakeServerOptions<'_>> for FakeServer {
                     flags: options.flags,
                     block_size: options.block_size,
                     block_count: block_count,
+                    max_transfer_blocks: options.max_transfer_blocks,
                     data: vmo,
                     observer: options.observer,
                 }),
@@ -153,6 +156,7 @@ struct Data {
     flags: fblock::Flag,
     block_size: u32,
     block_count: u64,
+    max_transfer_blocks: Option<NonZero<u32>>,
     data: zx::Vmo,
     observer: Option<Box<dyn Observer>>,
 }
@@ -161,6 +165,7 @@ impl Interface for Data {
     async fn get_info(&self) -> Result<Cow<'_, DeviceInfo>, zx::Status> {
         Ok(Cow::Owned(DeviceInfo::Partition(PartitionInfo {
             device_flags: self.flags,
+            max_transfer_blocks: self.max_transfer_blocks.clone(),
             block_range: Some(0..self.block_count),
             type_guid: TYPE_GUID.clone(),
             instance_guid: INSTANCE_GUID.clone(),
