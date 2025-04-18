@@ -18,7 +18,7 @@ use crate::vfs::{
     fileops_impl_noop_sync, fileops_impl_seekless, Anon, FileHandle, FileObject, FileOps,
     FileWriteGuardRef, FsNode, FsNodeInfo, NamespaceNode, SeekTarget,
 };
-use starnix_logging::{log, log_info, track_stub, Level};
+use starnix_logging::{log_info, track_stub, Level};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
@@ -395,8 +395,45 @@ impl FileOps for DevKmsg {
                 KmsgLevel::Debug => (Level::Debug, bytes_after_level),
             },
         };
-        log!(level, tag = "kmsg"; "{}", String::from_utf8_lossy(msg_bytes).trim_end_matches('\n'));
+
+        // We need to create and emit our own log record here, because the log macros will include
+        // a file and line by default if the log message is ERROR level. This file/line is not
+        // relevant to log messages forwarded from userspace, and the kmsg tag is hopefully enough
+        // to distinguish messages forwarded this way.
+        starnix_logging::with_current_task_info(|info| {
+            starnix_logging::logger().log(
+                // The log::RecordBuilder API only allows providing the body of a log message as
+                // format_args!(), which cannot be assigned to bindings if it captures values
+                // (https://doc.rust-lang.org/std/macro.format_args.html#lifetime-limitation).
+                // So this creates the record in the same expression where it is used.
+                &starnix_logging::Record::builder()
+                    .level(level)
+                    .key_values(&[
+                        ("tag", LogOutputTag::Str("kmsg")),
+                        ("tag", LogOutputTag::Display(info)),
+                    ])
+                    .args(format_args!(
+                        "{}",
+                        String::from_utf8_lossy(msg_bytes).trim_end_matches('\n')
+                    ))
+                    .build(),
+            );
+        });
         Ok(bytes.len())
+    }
+}
+
+enum LogOutputTag<'a> {
+    Str(&'a str),
+    Display(&'a dyn std::fmt::Display),
+}
+
+impl<'a> starnix_logging::ToValue for LogOutputTag<'a> {
+    fn to_value(&self) -> starnix_logging::Value<'_> {
+        match self {
+            Self::Str(s) => starnix_logging::Value::from_display(s),
+            Self::Display(d) => starnix_logging::Value::from_dyn_display(d),
+        }
     }
 }
 
