@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 import fnmatch
 import json
-from typing import cast
+from typing import Mapping, TypeAlias, cast
 
 from honeydew.fuchsia_device.fuchsia_device import FuchsiaDevice
 from trace_processing import trace_metrics
@@ -28,16 +28,30 @@ class MemoryProfileMetrics(trace_metrics.ConstantMetricsProcessor):
     )
 
 
+ProcessGroups: TypeAlias = Mapping[str, str]
+"""
+Each entry maps a name for a group of processes to a glob pattern that defines
+which process names should be included in the group.
+"""
+
+
 def capture_and_compute_metrics(
+    process_groups: ProcessGroups,
     dut: FuchsiaDevice,
 ) -> trace_metrics.ConstantMetricsProcessor:
     """Captures kernel and user space memory metrics using `ffx profile memory`.
 
-    Returns a MemoryProfileMetrics instance containing two sets of memory
-    measurements:
-    - Total populated bytes for VMOs assigned to the binder and the starnix
-      kernel. This is private uncompressed memory.
-    - A whole-device memory digest.
+    Args:
+      process_groups: The process groupings for which to report total memory
+        usage metrics that will be tracked for regressions.
+      dut: A FuchsiaDevice instance connected to the device to profile.
+
+    Returns:
+      MemoryProfileMetrics instance containing two sets of memory
+        measurements:
+        - Total populated bytes for VMOs assigned to the specified process
+            groups. This is private uncompressed memory.
+        - A whole-device memory digest.
     """
     profile = json.loads(
         dut.ffx.run(
@@ -46,10 +60,7 @@ def capture_and_compute_metrics(
     )
 
     metrics = []
-    for process_group_name, process_name_pattern in {
-        "starnix_kernel": "starnix_kernel.cm",
-        "binder": "binder:*",
-    }.items():
+    for process_group_name, process_name_pattern in process_groups.items():
         private_populated = sum(
             proc["memory"]["private_populated"]
             for proc in profile["CompleteDigest"]["processes"]

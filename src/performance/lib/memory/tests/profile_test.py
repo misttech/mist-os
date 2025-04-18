@@ -100,7 +100,13 @@ class ProfileTest(unittest.TestCase):
                 }
             }"""
 
-        metrics_processor = profile.capture_and_compute_metrics(dut)
+        metrics_processor = profile.capture_and_compute_metrics(
+            {
+                "starnix_kernel": "starnix_kernel.cm",
+                "binder": "binder:*",
+            },
+            dut,
+        )
 
         model = Mock()
         self.assertEqual(
