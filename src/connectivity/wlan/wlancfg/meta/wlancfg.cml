@@ -42,7 +42,7 @@
         },
         {
             protocol: [
-                "fuchsia.diagnostics.persist.DataPersistence-wlan",
+                "fuchsia.diagnostics.persist.DataPersistence",
                 "fuchsia.location.namedplace.RegulatoryRegionWatcher",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.stash.SecureStore",

@@ -13,6 +13,8 @@ group("dynamic_dictionaries") {
     "//examples/components/dictionaries/*",
     "//src/diagnostics/archivist:*",
     "//src/diagnostics/archivist/tests/integration/realm_factory:*",
+    "//src/diagnostics/persistence:*",
+    "//src/diagnostics/persistence/tests:*",
     "//src/sys/component_manager/tests/*",
   ]
 }

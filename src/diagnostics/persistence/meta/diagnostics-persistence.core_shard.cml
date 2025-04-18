@@ -30,12 +30,19 @@
         },
     ],
     expose: [
+        // The "diagnostics-persist-capabilities" dictionary exposes a
+        // capability for each service configured by a /data/*.persist file on
+        // the device. Most persist files are defined in
+        // //src/diagnostics/config/persistence. Services are exposed as a
+        // capability matching its filename,
+        // "fuchsia.diagnostics.persist.DataPersistence-<service>" for
+        // "<service>.persist".
         {
-            protocol: [
-                "fuchsia.component.PersistenceBinder",
-                "fuchsia.diagnostics.persist.DataPersistence-netstack",
-                "fuchsia.diagnostics.persist.DataPersistence-wlan",
-            ],
+            dictionary: "diagnostics-persist-capabilities",
+            from: "#diagnostics",
+        },
+        {
+            protocol: "fuchsia.component.PersistenceBinder",
             from: "#diagnostics",
         },
     ],

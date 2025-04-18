@@ -12,13 +12,13 @@
     ],
     offer: [
         {
-            from: "parent",
-            to: "#wlancfg",
             config: [
                 "fuchsia.wlan.RecoveryEnabled",
                 "fuchsia.wlan.RecoveryProfile",
                 "fuchsia.wlan.RoamingPolicy",
             ],
+            from: "parent",
+            to: "#wlancfg",
         },
         {
             protocol: "fuchsia.stash.SecureStore",
@@ -53,7 +53,8 @@
         },
         {
             protocol: "fuchsia.diagnostics.persist.DataPersistence-wlan",
-            from: "#diagnostics",
+            from: "#diagnostics/diagnostics-persist-capabilities",
+            as: "fuchsia.diagnostics.persist.DataPersistence",
             to: "#wlancfg",
             source_availability: "unknown",
         },

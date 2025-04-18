@@ -4,7 +4,7 @@
 {
     offer: [
         {
-            protocol: [ "fuchsia.diagnostics.persist.DataPersistence-netstack" ],
+            dictionary: "diagnostics-persist-capabilities",
             from: "#diagnostics",
             to: "#network",
             source_availability: "unknown",

@@ -3,27 +3,10 @@
 // found in the LICENSE file.
 {
     include: [ "//src/diagnostics/persistence/meta/diagnostics-persistence.shard.cml" ],
-    capabilities: [
-        {
-            protocol: [
-                "fuchsia.diagnostics.persist.DataPersistence-netstack",
-                "fuchsia.diagnostics.persist.DataPersistence-wlan",
-            ],
-        },
-    ],
     use: [
         {
             storage: "cache",
             path: "/cache",
-        },
-    ],
-    expose: [
-        {
-            protocol: [
-                "fuchsia.diagnostics.persist.DataPersistence-netstack",
-                "fuchsia.diagnostics.persist.DataPersistence-wlan",
-            ],
-            from: "self",
         },
     ],
 }

@@ -23,9 +23,6 @@ pub use util::sender::TelemetrySender;
 #[cfg(test)]
 mod testing;
 
-// Service name to persist Inspect data across boots
-const PERSISTENCE_SERVICE_PATH: &str = "/svc/fuchsia.diagnostics.persist.DataPersistence-wlan";
-
 #[derive(Debug)]
 pub enum TelemetryEvent {
     ConnectResult {
@@ -89,9 +86,9 @@ pub fn setup_disconnected_cobalt_proxy(
 
 pub fn setup_persistence_req_sender(
 ) -> Result<(auto_persist::PersistenceReqSender, impl Future<Output = ()>), anyhow::Error> {
-    fuchsia_component::client::connect_to_protocol_at_path::<
+    fuchsia_component::client::connect_to_protocol::<
         fidl_fuchsia_diagnostics_persist::DataPersistenceMarker,
-    >(PERSISTENCE_SERVICE_PATH)
+    >()
     .map(auto_persist::create_persistence_req_sender)
 }
 

@@ -46,7 +46,7 @@ func startPersistClient(ctx context.Context, componentCtx *component.Context, cl
 		_ = syslog.FatalTf(persistenceTagName, "failed to create channel: %s", err)
 	}
 	if err := componentCtx.ConnectToProtocolAtPath(
-		"fuchsia.diagnostics.persist.DataPersistence-netstack", persistServerEnd); err != nil {
+		"fuchsia.diagnostics.persist.DataPersistence", persistServerEnd); err != nil {
 		_ = syslog.WarnTf(persistenceTagName, "couldn't connect to persistence service: %s", err)
 		return
 	}

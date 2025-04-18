@@ -11,19 +11,21 @@ mod inspect_server;
 mod persist_server;
 mod scheduler;
 
-use anyhow::{bail, Error};
+use anyhow::{bail, format_err, Context, Error};
 use argh::FromArgs;
 use fetcher::Fetcher;
-use fuchsia_async as fasync;
-use fuchsia_component::server::{ServiceFs, ServiceObj};
+use fidl::endpoints;
+use fuchsia_component::client;
+use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use log::*;
 use persist_server::PersistServer;
 use persistence_config::Config;
 use scheduler::Scheduler;
 use zx::BootInstant;
+use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
 /// The name of the subcommand and the logs-tag.
 pub const PROGRAM_NAME: &str = "persistence";
@@ -59,8 +61,6 @@ pub async fn main(_args: CommandLine) -> Result<(), Error> {
 
     file_handler::forget_old_data(&config);
 
-    let mut fs = ServiceFs::new();
-
     // Create the Inspect fetcher
     let (fetch_requester, _fetcher_task) =
         on_error!(Fetcher::new(&config), "Error initializing fetcher: {}")?;
@@ -69,11 +69,11 @@ pub async fn main(_args: CommandLine) -> Result<(), Error> {
 
     // Add a persistence fidl service for each service defined in the config files.
     let scope = fasync::Scope::new();
-    let service_scope = scope.new_child_with_name("services");
-    spawn_persist_services(&config, &mut fs, scheduler, &service_scope);
+    let services_scope = scope.new_child_with_name("services");
 
-    fs.take_and_serve_directory_handle()?;
-    scope.spawn(fs.collect::<()>());
+    let _service_scopes = spawn_persist_services(&config, scheduler, &services_scope)
+        .await
+        .expect("Error spawning persist services");
 
     // Before serving previous data, wait until the post-boot system update check has finished.
     // Note: We're already accepting persist requests. If we receive a request, store
@@ -112,33 +112,97 @@ pub async fn main(_args: CommandLine) -> Result<(), Error> {
     Ok(())
 }
 
-// Takes a config and adds all the persist services defined in those configs to the servicefs of
-// the component.
-fn spawn_persist_services(
+enum IncomingRequest {
+    Router(fsandbox::DictionaryRouterRequestStream),
+}
+
+// Serve a DataPersistence capability for each service defined in `config` using
+// a dynamic dictionary.
+async fn spawn_persist_services(
     config: &Config,
-    fs: &mut ServiceFs<ServiceObj<'static, ()>>,
     scheduler: Scheduler,
     scope: &fasync::Scope,
-) {
-    let mut started_persist_services = 0;
+) -> Result<Vec<fasync::Scope>, Error> {
+    let store = client::connect_to_protocol::<fsandbox::CapabilityStoreMarker>().unwrap();
+    let id_gen = sandbox::CapabilityIdGenerator::new();
+
+    let services_dict = id_gen.next();
+    store
+        .dictionary_create(services_dict)
+        .await
+        .context("Failed to send FIDL to create dictionary")?
+        .map_err(|e| format_err!("Failed to create dictionary: {e:?}"))?;
+
+    // Register each service with the exposed CFv2 dynamic dictionary.
+    let mut service_scopes = Vec::with_capacity(config.len());
 
     for (service_name, tags) in config {
-        info!("Launching persist service for {service_name}");
-        let unique_service_name =
-            format!("{}-{}", constants::PERSIST_SERVICE_NAME_PREFIX, service_name);
+        let connector_id = id_gen.next();
+        let (receiver, receiver_stream) =
+            endpoints::create_request_stream::<fsandbox::ReceiverMarker>();
 
-        let server = PersistServer::create(
+        store
+            .connector_create(connector_id, receiver)
+            .await
+            .context("Failed to send FIDL to create connector")?
+            .map_err(|e| format_err!("Failed to create connector: {e:?}"))?;
+
+        store
+            .dictionary_insert(
+                services_dict,
+                &fsandbox::DictionaryItem {
+                    key: format!("{}-{}", constants::PERSIST_SERVICE_NAME_PREFIX, service_name),
+                    value: connector_id,
+                },
+            )
+            .await
+            .context(
+                "Failed to send FIDL to insert into diagnostics-persist-capabilities dictionary",
+            )?
+            .map_err(|e| {
+                format_err!(
+                    "Failed to insert into diagnostics-persist-capabilities dictionary: {e:?}"
+                )
+            })?;
+
+        let service_scope = scope.new_child_with_name(service_name);
+        PersistServer::spawn(
             service_name.clone(),
             tags.keys().cloned().collect(),
             scheduler.clone(),
-            // Fault tolerance if only a subset of the service configs fail to initialize.
-            scope.new_child_with_name(&service_name.clone()),
+            &service_scope,
+            receiver_stream,
         );
-        fs.dir("svc").add_fidl_service_at(unique_service_name, move |stream| {
-            server.spawn(stream);
-        });
-        started_persist_services += 1;
+        service_scopes.push(service_scope);
     }
 
-    info!("Started {} persist services", started_persist_services);
+    // Expose the dynamic dictionary.
+    let mut fs = ServiceFs::new();
+    fs.dir("svc").add_fidl_service(IncomingRequest::Router);
+    fs.take_and_serve_directory_handle().expect("Failed to take service directory handle");
+    scope.spawn(fs.for_each_concurrent(None, move |IncomingRequest::Router(mut stream)| {
+        let store = store.clone();
+        let id_gen = id_gen.clone();
+        async move {
+            while let Ok(Some(request)) = stream.try_next().await {
+                match request {
+                    fsandbox::DictionaryRouterRequest::Route { payload: _, responder } => {
+                        let dup_dict_id = id_gen.next();
+                        store.duplicate(services_dict, dup_dict_id).await.unwrap().unwrap();
+                        let capability = store.export(dup_dict_id).await.unwrap().unwrap();
+                        let fsandbox::Capability::Dictionary(dict) = capability else {
+                            panic!("capability was not a dictionary? {capability:?}");
+                        };
+                        let _ = responder
+                            .send(Ok(fsandbox::DictionaryRouterRouteResponse::Dictionary(dict)));
+                    }
+                    fsandbox::DictionaryRouterRequest::_UnknownMethod { ordinal, .. } => {
+                        warn!(ordinal:%; "Unknown DictionaryRouter request");
+                    }
+                }
+            }
+        }
+    }));
+
+    Ok(service_scopes)
 }

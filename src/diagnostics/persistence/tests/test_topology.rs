@@ -5,6 +5,7 @@
 use std::sync::atomic::{AtomicU16, Ordering};
 
 use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_update::ListenerMarker;
 use fidl_test_persistence_factory::ControllerMarker;
 use fuchsia_component_test::{
@@ -113,13 +114,28 @@ pub async fn create() -> RealmInstance {
     builder
         .add_route(
             Route::new()
-                .capability(Capability::protocol_by_name(crate::TEST_PERSISTENCE_SERVICE_NAME))
+                .capability(
+                    Capability::protocol_by_name(
+                        "fuchsia.diagnostics.persist.DataPersistence-test-service",
+                    )
+                    .as_("fuchsia.diagnostics.persist.DataPersistence"),
+                )
+                .from_dictionary("diagnostics-persist-capabilities")
                 .from(&persistence)
                 .to(Ref::parent()),
         )
         .await
-        .expect("Failed to add route for persistence");
+        .expect("Failed to add route for fuchsia.diagnostics.persist.DataPersistence-test-service");
 
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol::<fsandbox::CapabilityStoreMarker>())
+                .from(Ref::framework())
+                .to(&persistence),
+        )
+        .await
+        .expect("Failed to add fuchsia.component.sandbox routes");
     builder
         .add_route(
             Route::new()

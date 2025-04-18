@@ -64,9 +64,6 @@ use {
 
 const REGULATORY_LISTENER_TIMEOUT_SEC: i64 = 30;
 
-// Service name to persist Inspect data across boots
-const PERSISTENCE_SERVICE_PATH: &str = "/svc/fuchsia.diagnostics.persist.DataPersistence-wlan";
-
 async fn serve_fidl(
     ap: AccessPoint,
     configurator: legacy::deprecated_configuration::DeprecatedConfigurator,
@@ -246,9 +243,9 @@ async fn run_all_futures() -> Result<(), Error> {
     let cfg = wlancfg_config::Config::take_from_startup_handle();
     let monitor_svc = fuchsia_component::client::connect_to_protocol::<DeviceMonitorMarker>()
         .context("failed to connect to device monitor")?;
-    let persistence_proxy = fuchsia_component::client::connect_to_protocol_at_path::<
+    let persistence_proxy = fuchsia_component::client::connect_to_protocol::<
         fidl_fuchsia_diagnostics_persist::DataPersistenceMarker,
-    >(PERSISTENCE_SERVICE_PATH);
+    >();
     let (persistence_req_sender, persistence_req_forwarder_fut) = match persistence_proxy {
         Ok(persistence_proxy) => {
             let (s, f) = auto_persist::create_persistence_req_sender(persistence_proxy);

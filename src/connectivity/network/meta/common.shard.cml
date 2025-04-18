@@ -55,7 +55,8 @@
         },
         {
             protocol: [ "fuchsia.diagnostics.persist.DataPersistence-netstack" ],
-            from: "parent",
+            from: "parent/diagnostics-persist-capabilities",
+            as: "fuchsia.diagnostics.persist.DataPersistence",
             to: [ "#netstack" ],
         },
         {

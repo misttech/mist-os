@@ -23,7 +23,8 @@
         },
         {
             protocol: "fuchsia.diagnostics.persist.DataPersistence-wlan",
-            from: "#diagnostics",
+            from: "#diagnostics/diagnostics-persist-capabilities",
+            as: "fuchsia.diagnostics.persist.DataPersistence",
             to: "#wlanix",
         },
         {

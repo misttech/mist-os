@@ -92,8 +92,9 @@ they were persisted.
 ## Route and use the service {#route-service}
 
 Each service-name will be published as
-fuchsia.diagnostics.persist.DataPersistence-service-name. This must be routed
-to any component that will use a tag defined for that service.
+fuchsia.diagnostics.persist.DataPersistence-service-name in the
+"diagnostics-persist-capabilities" dictionary. This must be routed to any
+component that will use a tag defined for that service.
 
 The FIDL protocol for that service is in
 //src/diagnostics/persistence/fidl/persist.fidl. The function call is

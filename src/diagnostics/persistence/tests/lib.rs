@@ -44,9 +44,6 @@ static TIMESTAMP_STRUCT_ENTRIES: [&str; 4] =
 /// condition.
 static KEY_FROM_INSPECT_SOURCE: &str = "integer_1";
 
-pub(crate) const TEST_PERSISTENCE_SERVICE_NAME: &str =
-    "fuchsia.diagnostics.persist.DataPersistence-test-service";
-
 enum Published<'a> {
     Waiting,
     Empty,
@@ -330,12 +327,8 @@ impl TestRealm {
             .connect_to_protocol_at_exposed_dir::<SamplerTestControllerMarker>()
             .unwrap();
         // `persistence` is the connection to ask for new data to be read and persisted.
-        let persistence = instance
-            .root
-            .connect_to_named_protocol_at_exposed_dir::<DataPersistenceMarker>(
-                TEST_PERSISTENCE_SERVICE_NAME,
-            )
-            .unwrap();
+        let persistence =
+            instance.root.connect_to_protocol_at_exposed_dir::<DataPersistenceMarker>().unwrap();
         // `controller` is the connection to send control signals to the test's update-checker mock.
         let controller =
             instance.root.connect_to_protocol_at_exposed_dir::<ControllerMarker>().unwrap();

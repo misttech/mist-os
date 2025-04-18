@@ -15,5 +15,9 @@
             from: "#diagnostics",
             availability: "same_as_target",
         },
+        {
+            dictionary: "diagnostics-persist-capabilities",
+            from: "#diagnostics",
+        },
     ],
 }
