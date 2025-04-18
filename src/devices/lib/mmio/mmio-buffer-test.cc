@@ -40,6 +40,13 @@ zx::vmo DuplicateVmo(const zx::vmo& vmo) {
   return out_vmo;
 }
 
+size_t VmoNumMappings(const zx::vmo& vmo) {
+  zx_info_vmo_t info;
+  zx_status_t status = vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr);
+  ZX_ASSERT_MSG((status == ZX_OK), "getting vmo info failed: %s", zx_status_get_string(status));
+  return info.num_mappings;
+}
+
 TEST(MmioBuffer, CInit) {
   const size_t vmo_sz = zx_system_get_page_size();
   zx::vmo vmo = CreateVmo(vmo_sz);
@@ -73,6 +80,44 @@ TEST(MmioBuffer, CInit) {
   ASSERT_OK(mmio_buffer_init(&mb, 0, vmo_sz, DuplicateVmo(vmo).get(), ZX_CACHE_POLICY_UNCACHED));
   mmio_buffer_release(&mb);
   ASSERT_EQ(mb.vmo, ZX_HANDLE_INVALID);
+}
+
+TEST(MmioBuffer, UnalignedOffsetInitRelease) {
+  const size_t vmo_sz = zx_system_get_page_size();
+  zx::vmo vmo = CreateVmo(vmo_sz);
+  mmio_buffer_t mb = {};
+
+  // Unaligned offset.
+  ASSERT_OK(mmio_buffer_init(&mb, vmo_sz / 2, vmo_sz / 2, DuplicateVmo(vmo).get(),
+                             ZX_CACHE_POLICY_UNCACHED));
+
+  // Ensure the map was successful.
+  ASSERT_EQ(1, VmoNumMappings(vmo));
+
+  mmio_buffer_release(&mb);
+  ASSERT_EQ(ZX_HANDLE_INVALID, mb.vmo);
+
+  // Ensure the unmap was successful.
+  ASSERT_EQ(0, VmoNumMappings(vmo));
+}
+
+TEST(MmioBuffer, UnalignedSizeInitRelease) {
+  const size_t vmo_sz = zx_system_get_page_size();
+  zx::vmo vmo = CreateVmo(vmo_sz);
+  mmio_buffer_t mb = {};
+
+  // Unaligned size.
+  ASSERT_OK(
+      mmio_buffer_init(&mb, 0, vmo_sz / 2, DuplicateVmo(vmo).get(), ZX_CACHE_POLICY_UNCACHED));
+
+  // Ensure the map was successful.
+  ASSERT_EQ(1, VmoNumMappings(vmo));
+
+  mmio_buffer_release(&mb);
+  ASSERT_EQ(ZX_HANDLE_INVALID, mb.vmo);
+
+  // Ensure the unmap was successful.
+  ASSERT_EQ(0, VmoNumMappings(vmo));
 }
 
 TEST(MmioBuffer, CppLifecycle) {
