@@ -493,12 +493,12 @@ impl<B: SplitByteSlice> TcpSegment<B> {
 }
 
 impl<B: SplitByteSliceMut> TcpSegment<B> {
-    /// Set the source port of the UDP packet.
+    /// Set the source port of the TCP packet.
     pub fn set_src_port(&mut self, new: NonZeroU16) {
         self.hdr_prefix.set_src_port(new)
     }
 
-    /// Set the destination port of the UDP packet.
+    /// Set the destination port of the TCP packet.
     pub fn set_dst_port(&mut self, new: NonZeroU16) {
         self.hdr_prefix.set_dst_port(new)
     }
