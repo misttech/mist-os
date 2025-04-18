@@ -39,7 +39,7 @@ pub fn object_wait_many(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AsHandleRef, Duration, Event};
+    use crate::{AsHandleRef, Duration, Event, WaitResult};
 
     #[test]
     fn wait_and_signal() {
@@ -49,7 +49,7 @@ mod tests {
         // Waiting on it without setting any signal should time out.
         assert_eq!(
             event.wait_handle(Signals::USER_0, MonotonicInstant::after(ten_ms)),
-            Err(Status::TIMED_OUT)
+            WaitResult::TimedOut(Signals::empty())
         );
 
         // If we set a signal, we should be able to wait for it.
@@ -69,7 +69,7 @@ mod tests {
         assert!(event.signal_handle(Signals::USER_0, Signals::NONE).is_ok());
         assert_eq!(
             event.wait_handle(Signals::USER_0, MonotonicInstant::after(ten_ms)),
-            Err(Status::TIMED_OUT)
+            WaitResult::TimedOut(Signals::empty())
         );
     }
 

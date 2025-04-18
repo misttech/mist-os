@@ -1247,7 +1247,8 @@ fn validate_recv_msg_postflight_response(
     let validity = validity.as_ref().expect("expected validity present");
     assert_eq!(
         validity
-            .wait_handle(zx::Signals::EVENTPAIR_PEER_CLOSED, zx::MonotonicInstant::INFINITE_PAST),
+            .wait_handle(zx::Signals::EVENTPAIR_PEER_CLOSED, zx::MonotonicInstant::INFINITE_PAST)
+            .to_result(),
         expected_validity,
     );
 }

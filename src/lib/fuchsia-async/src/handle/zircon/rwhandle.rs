@@ -214,7 +214,11 @@ where
         // But having `is_closed` wakeup tasks if it discovered a signal change seems too weird, so
         // we just leave the bitset as-is and let the regular notification mechanism get around to
         // it when it gets around to it.
-        match self.handle.wait_handle(OBJECT_PEER_CLOSED, zx::MonotonicInstant::INFINITE_PAST) {
+        match self
+            .handle
+            .wait_handle(OBJECT_PEER_CLOSED, zx::MonotonicInstant::INFINITE_PAST)
+            .to_result()
+        {
             Ok(_) => true,
             Err(zx::Status::TIMED_OUT) => false,
             Err(status) => {

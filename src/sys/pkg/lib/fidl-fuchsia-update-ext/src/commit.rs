@@ -20,7 +20,10 @@ pub async fn query_commit_status(
     provider: &CommitStatusProviderProxy,
 ) -> Result<CommitStatus, anyhow::Error> {
     let event_pair = provider.is_current_system_committed().await?;
-    match event_pair.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST) {
+    match event_pair
+        .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST)
+        .to_result()
+    {
         Ok(_) => Ok(CommitStatus::Committed),
         Err(zx::Status::TIMED_OUT) => Ok(CommitStatus::Pending),
         Err(status) => Err(anyhow!("unexpected status while asserting signal: {:?}", status)),

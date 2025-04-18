@@ -87,7 +87,8 @@ async fn starting_directory_using_target_component_does_not_start_source() {
         assert_matches!(
             client_end
                 .channel()
-                .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::MonotonicInstant::INFINITE_PAST),
+                .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::MonotonicInstant::INFINITE_PAST)
+                .to_result(),
             Err(zx::Status::TIMED_OUT)
         );
     }

@@ -299,11 +299,15 @@ impl FileOps for TimerFile {
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
-        let observed =
-            match self.timer.as_handle_ref().wait(zx::Signals::TIMER_SIGNALED, zx::Instant::ZERO) {
-                Err(zx::Status::TIMED_OUT) => zx::Signals::empty(),
-                res => res.unwrap(),
-            };
+        let observed = match self
+            .timer
+            .as_handle_ref()
+            .wait(zx::Signals::TIMER_SIGNALED, zx::Instant::ZERO)
+            .to_result()
+        {
+            Err(zx::Status::TIMED_OUT) => zx::Signals::empty(),
+            res => res.unwrap(),
+        };
         Ok(TimerFile::get_events_from_signals(observed))
     }
 }

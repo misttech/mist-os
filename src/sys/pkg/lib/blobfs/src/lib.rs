@@ -447,7 +447,10 @@ impl Client {
 
             // Check that the USER_0 signal has been asserted on the file's event to make sure we
             // return false on the edge case of the blob is current being written.
-            match event.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST) {
+            match event
+                .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST)
+                .to_result()
+            {
                 Ok(_) => true,
                 Err(status) => {
                     if status != Status::TIMED_OUT {

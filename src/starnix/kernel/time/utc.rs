@@ -61,6 +61,7 @@ impl UtcClock {
         match self
             .real_utc_clock
             .wait_handle(zx::Signals::CLOCK_STARTED, zx::MonotonicInstant::INFINITE_PAST)
+            .to_result()
         {
             Ok(e) if e.contains(zx::Signals::CLOCK_STARTED) => true,
             Ok(_) | Err(zx::Status::TIMED_OUT) => false,

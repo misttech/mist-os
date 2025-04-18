@@ -449,19 +449,23 @@ async fn open_for_create_wait_for_signal() -> Result<(), Error> {
     let (blob1, event) = open_blob(&root_dir, BLOB_MERKLE, fio::PERM_READABLE).await?;
     let () = blob0.resize(BLOB_CONTENTS.len() as u64).await?.map_err(Status::from_raw)?;
     assert_matches!(
-        event.wait_handle(
-            zx::Signals::all(),
-            zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(0))
-        ),
+        event
+            .wait_handle(
+                zx::Signals::all(),
+                zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(0))
+            )
+            .to_result(),
         Err(zx::Status::TIMED_OUT)
     );
     write_blob(&blob0, BLOB_CONTENTS).await?;
 
     assert_eq!(
-        event.wait_handle(
-            zx::Signals::all(),
-            zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(0))
-        )?,
+        event
+            .wait_handle(
+                zx::Signals::all(),
+                zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(0))
+            )
+            .to_result()?,
         zx::Signals::USER_0
     );
     verify_blob(&blob1, BLOB_CONTENTS).await?;
@@ -483,19 +487,23 @@ async fn open_resize_wait_for_signal() -> Result<(), Error> {
     let () = blob0.resize(BLOB_CONTENTS.len() as u64).await?.map_err(Status::from_raw)?;
     let (blob1, event) = open_blob(&root_dir, BLOB_MERKLE, fio::PERM_READABLE).await?;
     assert_matches!(
-        event.wait_handle(
-            zx::Signals::all(),
-            zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(0))
-        ),
+        event
+            .wait_handle(
+                zx::Signals::all(),
+                zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(0))
+            )
+            .to_result(),
         Err(zx::Status::TIMED_OUT)
     );
     write_blob(&blob0, BLOB_CONTENTS).await?;
 
     assert_eq!(
-        event.wait_handle(
-            zx::Signals::all(),
-            zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(0))
-        )?,
+        event
+            .wait_handle(
+                zx::Signals::all(),
+                zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(0))
+            )
+            .to_result()?,
         zx::Signals::USER_0
     );
     verify_blob(&blob1, BLOB_CONTENTS).await?;
@@ -521,10 +529,12 @@ async fn empty_blob_readable_after_resize() {
 
     let (blob1, event) = open_blob(&root_dir, &empty_hash, fio::PERM_READABLE).await.unwrap();
     assert_matches!(
-        event.wait_handle(
-            zx::Signals::all(),
-            zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(0))
-        ),
+        event
+            .wait_handle(
+                zx::Signals::all(),
+                zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(0))
+            )
+            .to_result(),
         Ok(zx::Signals::USER_0)
     );
     verify_blob(&blob1, &[]).await.unwrap();

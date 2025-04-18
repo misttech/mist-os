@@ -99,7 +99,7 @@ pub fn zxio_query_events(zxio: &Arc<Zxio>) -> Result<FdEvents, Errno> {
     let observed_signals = if handle.is_invalid() {
         zx::Signals::empty()
     } else {
-        match handle.wait(signals, zx::MonotonicInstant::INFINITE_PAST) {
+        match handle.wait(signals, zx::MonotonicInstant::INFINITE_PAST).to_result() {
             Ok(signals) => signals,
             Err(zx::Status::TIMED_OUT) => zx::Signals::empty(),
             Err(e) => return error!(EIO, e),

@@ -106,6 +106,7 @@ impl FileOps for PidFdFileObject {
         match self
             .terminated_event
             .wait_handle(zx::Signals::EVENTPAIR_PEER_CLOSED, zx::MonotonicInstant::ZERO)
+            .to_result()
         {
             Err(zx::Status::TIMED_OUT) => Ok(FdEvents::empty()),
             Ok(zx::Signals::EVENTPAIR_PEER_CLOSED) => Ok(FdEvents::POLLIN),

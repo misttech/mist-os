@@ -405,7 +405,7 @@ async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Result<Vec<u8>, Ver
         // As all blobs served by a package should already be readable, we assert that USER_0 is
         // already asserted on the event.
         if let Some(event) = event {
-            match event.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(0))) {
+            match event.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(0))) .to_result(){
                 Err(Status::TIMED_OUT) => Err(VerificationError::from(format_err!(
                     "file served by blobfs is not complete/readable as USER_0 signal was not set on the File's event: {}",
                     path

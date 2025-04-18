@@ -23,7 +23,8 @@ impl Read for BlockingSocket {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, IOError> {
         if self.socket.outstanding_read_bytes()? == 0 {
             let wait_sigs = Signals::SOCKET_READABLE | Signals::SOCKET_PEER_CLOSED;
-            let signals = self.socket.wait_handle(wait_sigs, MonotonicInstant::INFINITE)?;
+            let signals =
+                self.socket.wait_handle(wait_sigs, MonotonicInstant::INFINITE).to_result()?;
             if signals.contains(Signals::SOCKET_PEER_CLOSED) {
                 return Err(Status::PEER_CLOSED.into());
             }

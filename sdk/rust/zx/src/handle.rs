@@ -199,7 +199,7 @@ impl<'a, T: HandleBased> Unowned<'a, T> {
         ok(status)
     }
 
-    pub fn wait(&self, signals: Signals, deadline: MonotonicInstant) -> Result<Signals, Status> {
+    pub fn wait(&self, signals: Signals, deadline: MonotonicInstant) -> WaitResult {
         let mut pending = Signals::empty().bits();
         let status = unsafe {
             sys::zx_object_wait_one(
@@ -209,7 +209,13 @@ impl<'a, T: HandleBased> Unowned<'a, T> {
                 &mut pending,
             )
         };
-        ok(status).map(|()| Signals::from_bits_truncate(pending))
+        let signals = Signals::from_bits_truncate(pending);
+        match ok(status) {
+            Ok(()) => WaitResult::Ok(signals),
+            Err(Status::TIMED_OUT) => WaitResult::TimedOut(signals),
+            Err(Status::CANCELED) => WaitResult::Canceled(signals),
+            Err(e) => WaitResult::Err(e),
+        }
     }
 
     #[deprecated = "https://fxbug.dev/410869980: For soft transition. Use wait().to_result() instead"]
@@ -218,7 +224,7 @@ impl<'a, T: HandleBased> Unowned<'a, T> {
         signals: Signals,
         deadline: MonotonicInstant,
     ) -> Result<Signals, Status> {
-        self.wait(signals, deadline)
+        self.wait(signals, deadline).to_result()
     }
 
     pub fn wait_async(
@@ -238,6 +244,91 @@ impl<'a, T: HandleBased> Unowned<'a, T> {
             )
         };
         ok(status)
+    }
+}
+
+/// Result from `HandleRef::wait` and `AsHandleRef::wait_handle`. Conveys the
+/// result of the
+/// [zx_object_wait_one](https://fuchsia.dev/reference/syscalls/object_wait_one)
+/// syscall and the signals that were asserted on the object when the syscall
+/// completed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum WaitResult {
+    /// The syscall completed with `ZX_OK` and the provided signals were observed.
+    Ok(Signals),
+
+    /// The syscall completed with `ZX_ERR_TIMED_OUT` and the provided signals
+    /// were observed. These signals may reflect state changes that occurred
+    /// after the deadline passed, but before the syscall returned.
+    TimedOut(Signals),
+
+    /// The syscall completed with `ZX_ERR_CANCELED` and the provided signals
+    /// were observed. The signals will include `ZX_SIGNAL_HANDLE_CLOSED`.
+    ///
+    /// Note that the state of these signals may be racy and difficult to
+    /// interpret. Often, the correct behavior in this case is to treat this as
+    /// an error.
+    Canceled(Signals),
+
+    /// The syscall completed with a status other than `ZX_OK`, `ZX_ERR_TIMED_OUT`,
+    /// or `ZX_ERR_CANCELED`. No signals are returned in this scenario.
+    Err(Status),
+}
+
+impl WaitResult {
+    /// Convert this `WaitResult` into a `Result<Signals, Status>`. The signals
+    /// are discarded in all cases except `WaitResult::Ok`.
+    pub const fn to_result(self) -> Result<Signals, Status> {
+        match self {
+            WaitResult::Ok(signals) => Ok(signals),
+            WaitResult::TimedOut(_signals) => Err(Status::TIMED_OUT),
+            WaitResult::Canceled(_signals) => Err(Status::CANCELED),
+            WaitResult::Err(status) => Err(status),
+        }
+    }
+
+    // The following definitions are all copied from `std::result::Result`. They
+    // allow a `WaitResult` to be treated like a `Result` in many circumstance. All
+    // simply delegate to `to_result()`.
+
+    #[must_use = "if you intended to assert that this is ok, consider `.unwrap()` instead"]
+    #[inline]
+    pub const fn is_ok(&self) -> bool {
+        self.to_result().is_ok()
+    }
+
+    #[must_use = "if you intended to assert that this is err, consider `.unwrap_err()` instead"]
+    #[inline]
+    pub const fn is_err(&self) -> bool {
+        self.to_result().is_err()
+    }
+
+    #[inline]
+    pub fn map<U, F: FnOnce(Signals) -> U>(self, op: F) -> Result<U, Status> {
+        self.to_result().map(op)
+    }
+
+    #[inline]
+    pub fn map_err<F, O: FnOnce(Status) -> F>(self, op: O) -> Result<Signals, F> {
+        self.to_result().map_err(op)
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn expect(self, msg: &str) -> Signals {
+        self.to_result().expect(msg)
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn expect_err(self, msg: &str) -> Status {
+        self.to_result().expect_err(msg)
+    }
+
+    #[inline(always)]
+    #[track_caller]
+    pub fn unwrap(self) -> Signals {
+        self.to_result().unwrap()
     }
 }
 
@@ -272,7 +363,7 @@ pub trait AsHandleRef {
     /// Waits on a handle. Wraps the
     /// [zx_object_wait_one](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_wait_one.md)
     /// syscall.
-    fn wait_handle(&self, signals: Signals, deadline: MonotonicInstant) -> Result<Signals, Status> {
+    fn wait_handle(&self, signals: Signals, deadline: MonotonicInstant) -> WaitResult {
         self.as_handle_ref().wait(signals, deadline)
     }
 
@@ -442,9 +533,10 @@ pub trait Peered: HandleBased {
     /// errors are propagated.
     fn is_closed(&self) -> Result<bool, Status> {
         match self.wait_handle(Signals::OBJECT_PEER_CLOSED, MonotonicInstant::INFINITE_PAST) {
-            Ok(signals) => Ok(signals.contains(Signals::OBJECT_PEER_CLOSED)),
-            Err(Status::TIMED_OUT) => Ok(false),
-            Err(e) => Err(e),
+            WaitResult::Ok(signals) => Ok(signals.contains(Signals::OBJECT_PEER_CLOSED)),
+            WaitResult::TimedOut(_) => Ok(false),
+            WaitResult::Canceled(_) => Err(Status::CANCELED),
+            WaitResult::Err(e) => Err(e),
         }
     }
 }

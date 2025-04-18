@@ -374,7 +374,9 @@ async fn system_pending_commit(idle_timeout_millis: i64) {
     let event_pair =
         env.commit_status_provider_proxy().is_current_system_committed().await.unwrap();
     assert_eq!(
-        event_pair.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST),
+        event_pair
+            .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST)
+            .to_result(),
         Err(zx::Status::TIMED_OUT)
     );
 
@@ -424,7 +426,9 @@ async fn system_already_committed(idle_timeout_millis: i64) {
     let event_pair =
         env.commit_status_provider_proxy().is_current_system_committed().await.unwrap();
     assert_eq!(
-        event_pair.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST),
+        event_pair
+            .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST)
+            .to_result(),
         Ok(zx::Signals::USER_0)
     );
 }
@@ -441,11 +445,11 @@ async fn multiple_commit_status_provider_requests(idle_timeout_millis: i64) {
     let p1 = env.commit_status_provider_proxy().is_current_system_committed().await.unwrap();
 
     assert_eq!(
-        p0.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST),
+        p0.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST).to_result(),
         Ok(zx::Signals::USER_0)
     );
     assert_eq!(
-        p1.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST),
+        p1.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST).to_result(),
         Ok(zx::Signals::USER_0)
     );
 }
@@ -835,7 +839,9 @@ async fn stop_on_idle_resume_on_use() {
 
     // The signal should still be asserted.
     assert_eq!(
-        event_pair1.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST),
+        event_pair1
+            .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST)
+            .to_result(),
         Ok(zx::Signals::USER_0)
     );
 
@@ -862,14 +868,17 @@ async fn stop_on_idle_resume_on_use() {
 
     // The signal should still be asserted.
     assert_eq!(
-        event_pair2.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST),
+        event_pair2
+            .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST)
+            .to_result(),
         Ok(zx::Signals::USER_0)
     );
 
     // The server's end of the event pair should still be alive.
     assert_eq!(
         event_pair0
-            .wait_handle(zx::Signals::EVENTPAIR_PEER_CLOSED, zx::MonotonicInstant::INFINITE_PAST),
+            .wait_handle(zx::Signals::EVENTPAIR_PEER_CLOSED, zx::MonotonicInstant::INFINITE_PAST)
+            .to_result(),
         Err(zx::Status::TIMED_OUT)
     );
 
