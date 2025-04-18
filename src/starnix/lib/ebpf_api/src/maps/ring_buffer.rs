@@ -122,11 +122,6 @@ impl RingBuffer {
     /// The returns value is a `Pin<Box>`, because the structure is self referencing and is
     /// required never to move in memory.
     pub fn new(schema: &MapSchema, vmo: Option<zx::Vmo>) -> Result<Pin<Box<Self>>, MapError> {
-        if vmo.is_some() {
-            // Ring buffer sharing is not implemented yet.
-            return Err(MapError::Internal);
-        }
-
         if schema.key_size != 0 || schema.value_size != 0 {
             return Err(MapError::InvalidParam);
         }
@@ -186,13 +181,16 @@ impl RingBuffer {
                 }
                 vmo
             }
-            None => zx::Vmo::create(vmo_size as u64).map_err(|e| match e {
-                zx::Status::NO_MEMORY | zx::Status::OUT_OF_RANGE => MapError::NoMemory,
-                _ => MapError::Internal,
-            })?,
+            None => {
+                let vmo = zx::Vmo::create(vmo_size as u64).map_err(|e| match e {
+                    zx::Status::NO_MEMORY | zx::Status::OUT_OF_RANGE => MapError::NoMemory,
+                    _ => MapError::Internal,
+                })?;
+                vmo.set_name(&zx::Name::new_lossy("starnix:bpf")).unwrap();
+                vmo
+            }
         };
 
-        vmo.set_name(&zx::Name::new_lossy("starnix:bpf")).unwrap();
         vmar.map(
             technical_vmo_size,
             &vmo,

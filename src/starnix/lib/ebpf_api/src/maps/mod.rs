@@ -563,4 +563,22 @@ mod test {
         drop(value_ref);
         assert!(map.update(key.clone(), &value, 0).is_ok());
     }
+
+    #[fuchsia::test]
+    fn test_ringbug_sharing() {
+        let schema = MapSchema {
+            map_type: bpf_map_type_BPF_MAP_TYPE_RINGBUF,
+            key_size: 0,
+            value_size: 0,
+            max_entries: 4096 * 2,
+        };
+
+        let map = Map::new(schema, 0).unwrap();
+        map.ringbuf_reserve(8000, 0).expect("ringbuf_reserve failed");
+
+        let map2 = Map::new_shared(map.share().unwrap()).unwrap();
+
+        // Expected to fail since there is no space left.
+        map2.ringbuf_reserve(2000, 0).expect_err("ringbuf_reserve expected to fail");
+    }
 }
