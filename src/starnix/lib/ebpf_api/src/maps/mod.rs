@@ -72,12 +72,12 @@ pub enum MapError {
     Internal,
 }
 
-pub trait MapImpl: Send + Sync + Debug {
+trait MapImpl: Send + Sync + Debug {
     fn lookup<'a>(&'a self, key: &[u8]) -> Option<MapValueRef<'a>>;
     fn update(&self, key: MapKey, value: &[u8], flags: u64) -> Result<(), MapError>;
     fn delete(&self, key: &[u8]) -> Result<(), MapError>;
     fn get_next_key(&self, key: Option<&[u8]>) -> Result<MapKey, MapError>;
-    fn vmo(&self) -> Option<Arc<zx::Vmo>>;
+    fn vmo(&self) -> &Arc<zx::Vmo>;
 
     // Returns true if `POLLIN` is signaled for the map FD. Should be
     // overridden only for ring buffers.
@@ -150,20 +150,21 @@ impl Map {
     }
 
     pub fn share(&self) -> Result<febpf::Map, MapError> {
-        let mut result = febpf::Map::default();
-        result.schema = Some(febpf::MapSchema {
-            type_: bpf_map_type_to_fidl_map_type(self.schema.map_type),
-            key_size: self.schema.key_size,
-            value_size: self.schema.value_size,
-            max_entries: self.schema.max_entries,
-        });
-        result.vmo = Some(
-            self.map_impl
-                .vmo()
-                .and_then(|vmo| (*vmo).duplicate_handle(zx::Rights::SAME_RIGHTS).ok())
-                .ok_or(MapError::Internal)?,
-        );
-        Ok(result)
+        Ok(febpf::Map {
+            schema: Some(febpf::MapSchema {
+                type_: bpf_map_type_to_fidl_map_type(self.schema.map_type),
+                key_size: self.schema.key_size,
+                value_size: self.schema.value_size,
+                max_entries: self.schema.max_entries,
+            }),
+            vmo: Some(
+                self.map_impl
+                    .vmo()
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .map_err(|_| MapError::Internal)?,
+            ),
+            ..Default::default()
+        })
     }
 
     pub fn lookup<'a>(&'a self, key: &[u8]) -> Option<MapValueRef<'a>> {
@@ -195,7 +196,7 @@ impl Map {
         self.map_impl.get_next_key(key)
     }
 
-    pub fn vmo(&self) -> Option<Arc<zx::Vmo>> {
+    pub fn vmo(&self) -> &Arc<zx::Vmo> {
         self.map_impl.vmo()
     }
 

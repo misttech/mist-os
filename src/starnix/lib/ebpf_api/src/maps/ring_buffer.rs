@@ -334,8 +334,8 @@ impl MapImpl for RingBuffer {
         Err(MapError::InvalidParam)
     }
 
-    fn vmo(&self) -> Option<Arc<zx::Vmo>> {
-        Some(self.vmo.clone())
+    fn vmo(&self) -> &Arc<zx::Vmo> {
+        &self.vmo
     }
 
     fn can_read(&self) -> Option<bool> {

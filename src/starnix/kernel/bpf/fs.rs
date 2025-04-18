@@ -68,12 +68,9 @@ impl BpfHandle {
     }
 
     // Returns VMO and schema if this handle references a map.
-    fn get_map_vmo(&self) -> Result<(Arc<zx::Vmo>, MapSchema), Errno> {
+    fn get_map_vmo(&self) -> Result<(&Arc<zx::Vmo>, MapSchema), Errno> {
         match self {
-            Self::Map(ref map) => {
-                let vmo = map.vmo().ok_or_else(|| errno!(ENODEV))?;
-                Ok((vmo, map.schema))
-            }
+            Self::Map(ref map) => Ok((map.vmo(), map.schema)),
             _ => error!(ENODEV),
         }
     }
@@ -220,9 +217,7 @@ impl FileOps for BpfHandle {
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        let Ok((vmo, schema)) = self.get_map_vmo() else {
-            return Some(WaitCanceler::new_noop());
-        };
+        let (vmo, schema) = self.get_map_vmo().ok()?;
 
         // Only ringbuffers can be polled for POLLIN.
         if schema.map_type != bpf_map_type_BPF_MAP_TYPE_RINGBUF

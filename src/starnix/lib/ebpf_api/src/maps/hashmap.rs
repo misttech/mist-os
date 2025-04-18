@@ -704,7 +704,7 @@ impl MapImpl for HashMap {
         Err(MapError::InvalidKey)
     }
 
-    fn vmo(&self) -> Option<Arc<zx::Vmo>> {
-        Some(self.buffer.vmo().clone())
+    fn vmo(&self) -> &Arc<zx::Vmo> {
+        self.buffer.vmo()
     }
 }

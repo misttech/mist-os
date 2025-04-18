@@ -104,8 +104,8 @@ impl MapImpl for Array {
         Ok(MapKey::from_slice(&next_index.to_ne_bytes()))
     }
 
-    fn vmo(&self) -> Option<Arc<zx::Vmo>> {
-        Some(self.buffer.vmo().clone())
+    fn vmo(&self) -> &Arc<zx::Vmo> {
+        self.buffer.vmo()
     }
 }
 
