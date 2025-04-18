@@ -1041,7 +1041,7 @@ This should never be set as a build argument.
   clang_rt = "../../../../out/not-default/libclang_rt.hwasan.so"
 }
   static = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.hwasan.a"
   clang_rt_cxx = "../../../../out/not-default/libclang_rt.hwasan_cxx.a"
 }
 }
@@ -1051,7 +1051,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.lsan.a"
-  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
+  clang_rt_cxx = ""
 }
 }
   tsan = {
@@ -5884,7 +5884,7 @@ From //src/starnix/kernel/args.gni:29
 
 Whether to use CowMap instead of BTreeMap to back RangeMap.
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //src/starnix/lib/range_map/BUILD.gn:7
 
@@ -7786,7 +7786,7 @@ From //third_party/pigweed/src/modules.gni:27
 
 If compiling backends with boringssl, this variable is set to the path to the
 boringssl source code. When set, a pw_source_set for the boringssl library is
-created at "$dir_pw_third_party/boringssl".
+created at "$pw_external_boringssl".
 
 **Current value (from the default):** `""`
 
@@ -9426,7 +9426,7 @@ From //third_party/pigweed/src/pw_sync/backend.gni:41
 
 ### pw_third_party_boringssl_ALIAS
 
-Create a "$dir_pw_third_party/boringssl" target that aliases an existing
+Create a "$pw_external_boringssl" target that aliases an existing
 target. This can be used to fix a diamond dependency conflict if a
 downstream project uses its own boringssl target and cannot be changed to
 use Pigweed's boringssl exclusively.
