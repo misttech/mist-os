@@ -63,8 +63,8 @@ builder configurations (e.g. `sdk-bazel-linux`).
 
 ### The In-Tree IDK
 
-The GN `//sdk:bazel_in_tree_idk` target is used to build an IDK
-that has the same set of atoms as the Fuchsia IDK, but which only
+The GN `//sdk:bazel_in_tree_idk` target is used to build an IDK (actually an IDK
+collection) that has the same set of atoms as the Fuchsia IDK, but which only
 provides prebuilt binaries for the current `target_cpu` architecture,
 and the `HEAD` API level (using artifacts from the main `PLATFORM` build).
 It is only intended to be used to populate the `@fuchsia_sdk` and

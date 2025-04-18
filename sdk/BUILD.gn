@@ -1294,7 +1294,9 @@ if (current_toolchain == default_toolchain) {
       ":bazel_in_tree_idk_tests_${target_cpu}",
       "//build/bazel:fuchsia_in_tree_idk.hash",
       "//build/bazel:generate_main_workspace",
-      "//build/bazel/bazel_sdk:bazel_in_tree_idk.bazel_input",
+      "//build/bazel/bazel_sdk:in_tree_fuchsia_sdk",
+      "//build/bazel/bazel_sdk:in_tree_fuchsia_sdk.bazel_inputs",
+      "//build/bazel/bazel_sdk:ninja_generated_in_tree_idk_for_test.bazel_input",
     ]
 
     assert_no_deps = [
@@ -1312,8 +1314,10 @@ if (current_toolchain == default_toolchain) {
     deps = [ "//sdk:in_tree_collection" ]
   }
 
-  # Run the Bazel SDK test suite against the content of
-  # //sdk:bazel_in_tree_idk. This is only useful for development,
+  # Run the Bazel SDK test suite against the content of the Bazel in-tree IDK,
+  # repository (i.e. @fuchsia_in_tree_idk), which contains symlinks. Depending
+  # on //sdk:bazel_in_tree_idk ensures the targets of those symlinks exist.
+  # This is only useful for development,
   # as the content of the @fuchsia_sdk repository, populated
   # from the same IDK, is already checked by a different suite
   # of tests defined under //build/bazel/bazel_sdk.
