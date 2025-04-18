@@ -1,44 +1,23 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2017 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_LIB_DDKTL_INCLUDE_DDKTL_DEVICE_H_
-#define SRC_LIB_DDKTL_INCLUDE_DDKTL_DEVICE_H_
+#ifndef VENDOR_MISTTECH_SRC_LIB_DDKTL_INCLUDE_DDKTL_DEVICE_H_
+#define VENDOR_MISTTECH_SRC_LIB_DDKTL_INCLUDE_DDKTL_DEVICE_H_
 
-#ifndef __mist_os__
-#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
-#include <lib/component/incoming/cpp/protocol.h>
-#endif
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#ifndef __mist_os__
-#include <lib/fdf/cpp/channel.h>
-#include <lib/fidl/cpp/wire/connect_service.h>
-#include <lib/fidl/cpp/wire/message.h>
-#include <lib/fidl/cpp/wire/traits.h>
-#include <lib/fidl/cpp/wire/wire_messaging.h>
-#include <lib/fidl_driver/cpp/transport.h>
-#endif
 #include <lib/stdcompat/span.h>
-#ifndef __mist_os__
-#include <lib/zx/channel.h>
-#include <lib/zx/result.h>
-#include <lib/zx/vmo.h>
-#endif
 #include <zircon/assert.h>
 
-#include <deque>
+// #include <deque>
+#include <string>
 #include <type_traits>
 
 #include <ddktl/composite-node-spec.h>
 #include <ddktl/device-internal.h>
-#ifndef __mist_os__
-#include <ddktl/fidl.h>
-#endif
 #include <ddktl/init-txn.h>
-#ifndef __mist_os__
-#include <ddktl/metadata.h>
-#endif
 #include <ddktl/resume-txn.h>
 #include <ddktl/suspend-txn.h>
 #include <ddktl/unbind-txn.h>
@@ -335,32 +314,33 @@ class MetadataList {
 #endif
 
 // Factory functions to create a zx_device_str_prop_t.
-inline zx_device_str_prop_t MakeStrProperty(const std::string& key, uint32_t val) {
-  return {key.c_str(), str_prop_int_val(val)};
+inline zx_device_str_prop_t MakeStrProperty(const std::string_view& key, uint32_t val) {
+  return {key.data(), str_prop_int_val(val)};
 }
 
 inline zx_device_str_prop_t MakeStrProperty(const char* key, uint32_t val) {
   return {key, str_prop_int_val(val)};
 }
 
-inline zx_device_str_prop_t MakeStrProperty(const std::string& key, bool val) {
-  return {key.c_str(), str_prop_bool_val(val)};
+inline zx_device_str_prop_t MakeStrProperty(const std::string_view& key, bool val) {
+  return {key.data(), str_prop_bool_val(val)};
 }
 
 inline zx_device_str_prop_t MakeStrProperty(const char* key, bool val) {
   return {key, str_prop_bool_val(val)};
 }
 
-inline zx_device_str_prop_t MakeStrProperty(const std::string& key, const std::string& val) {
-  return {key.c_str(), str_prop_str_val(val.c_str())};
+inline zx_device_str_prop_t MakeStrProperty(const std::string_view& key,
+                                            const std::string_view& val) {
+  return {key.data(), str_prop_str_val(val.data())};
 }
 
-inline zx_device_str_prop_t MakeStrProperty(const char* key, const std::string& val) {
-  return {key, str_prop_str_val(val.c_str())};
+inline zx_device_str_prop_t MakeStrProperty(const char* key, const std::string_view& val) {
+  return {key, str_prop_str_val(val.data())};
 }
 
-inline zx_device_str_prop_t MakeStrProperty(const std::string& key, const char* val) {
-  return {key.c_str(), str_prop_str_val(val)};
+inline zx_device_str_prop_t MakeStrProperty(const std::string_view& key, const char* val) {
+  return {key.data(), str_prop_str_val(val)};
 }
 
 inline zx_device_str_prop_t MakeStrProperty(const char* key, const char* val) {
@@ -429,7 +409,7 @@ class DeviceAddArgs {
     args_.outgoing_dir_channel = outgoing_dir.release();
     return *this;
   }
-#endif
+
   DeviceAddArgs& set_fidl_service_offers(cpp20::span<const char*> fidl_service_offers) {
     args_.fidl_service_offers = fidl_service_offers.data();
     args_.fidl_service_offer_count = fidl_service_offers.size();
@@ -440,6 +420,7 @@ class DeviceAddArgs {
     args_.runtime_service_offer_count = runtime_service_offers.size();
     return *this;
   }
+#endif
   DeviceAddArgs& set_power_states(cpp20::span<const device_power_state_info_t> power_states) {
     args_.power_states = power_states.data();
     args_.power_state_count = static_cast<uint8_t>(power_states.size());
@@ -710,7 +691,7 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
   }
 #endif
 
-  const char* name() const { return this->name_.c_str(); }
+  const char* name() const { return this->name_.data(); }
 
   // The opaque pointer representing this device.
   zx_device_t* zxdev() const { return this->zxdev_; }
@@ -744,4 +725,4 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
 
 }  // namespace ddk
 
-#endif  // SRC_LIB_DDKTL_INCLUDE_DDKTL_DEVICE_H_
+#endif  // VENDOR_MISTTECH_SRC_LIB_DDKTL_INCLUDE_DDKTL_DEVICE_H_

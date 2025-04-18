@@ -1,3 +1,4 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2017 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -6,16 +7,10 @@
 #define SRC_LIB_DDKTL_INCLUDE_DDKTL_DEVICE_INTERNAL_H_
 
 #include <lib/ddk/device.h>
-#ifndef __mist_os__
-#include <lib/fdf/cpp/channel.h>
-#endif
 
 #include <string>
 #include <type_traits>
 
-#ifndef __mist_os__
-#include <ddktl/fidl.h>
-#endif
 #include <ddktl/init-txn.h>
 #include <ddktl/resume-txn.h>
 #include <ddktl/suspend-txn.h>
@@ -118,7 +113,7 @@ class base_device : public Mixins<D>... {
     return ops;
   }();
 
-  std::string name_;
+  std::string_view name_;
   zx_device_t* zxdev_ = nullptr;
   zx_device_t* const parent_;
 };

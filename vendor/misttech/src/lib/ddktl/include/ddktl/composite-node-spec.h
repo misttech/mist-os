@@ -8,6 +8,8 @@
 #include <lib/ddk/device.h>
 #include <lib/stdcompat/span.h>
 
+#include <fbl/vector.h>
+
 namespace ddk {
 
 class BindRule {
@@ -15,7 +17,10 @@ class BindRule {
   static BindRule CreateWithIntList(device_bind_prop_key_t key,
                                     device_bind_rule_condition condition,
                                     cpp20::span<const uint32_t> values) {
-    auto bind_prop_values = std::vector<device_bind_prop_value_t>(values.size());
+    fbl::AllocChecker ac;
+    auto bind_prop_values = fbl::Vector<device_bind_prop_value_t>();
+    bind_prop_values.reserve(values.size(), &ac);
+    ZX_ASSERT(ac.check());
     for (size_t i = 0; i < values.size(); ++i) {
       bind_prop_values[i] = device_bind_prop_int_val(values[i]);
     }
@@ -26,7 +31,10 @@ class BindRule {
   static BindRule CreateWithStringList(device_bind_prop_key_t key,
                                        device_bind_rule_condition condition,
                                        cpp20::span<const char*> values) {
-    auto bind_prop_values = std::vector<device_bind_prop_value_t>(values.size());
+    fbl::AllocChecker ac;
+    auto bind_prop_values = fbl::Vector<device_bind_prop_value_t>();
+    bind_prop_values.reserve(values.size(), &ac);
+    ZX_ASSERT(ac.check());
     for (size_t i = 0; i < values.size(); ++i) {
       bind_prop_values[i] = device_bind_prop_str_val(values[i]);
     }
@@ -36,7 +44,9 @@ class BindRule {
 
   BindRule(device_bind_prop_key_t key, device_bind_rule_condition condition,
            device_bind_prop_value_t value) {
-    value_data_.push_back(value);
+    fbl::AllocChecker ac;
+    value_data_.push_back(value, &ac);
+    ZX_ASSERT(ac.check());
     rule_ = bind_rule_t{
         .key = key,
         .condition = condition,
@@ -46,8 +56,11 @@ class BindRule {
   }
 
   BindRule(device_bind_prop_key_t key, device_bind_rule_condition condition,
-           std::vector<device_bind_prop_value_t> values)
-      : value_data_(values) {
+           fbl::Vector<device_bind_prop_value_t> values)
+      : value_data_(std::move(values)) {
+    fbl::AllocChecker ac;
+    value_data_.reserve(values.size(), &ac);
+    ZX_ASSERT(ac.check());
     rule_ = bind_rule_t{
         .key = key,
         .condition = condition,
@@ -57,9 +70,12 @@ class BindRule {
   }
 
   BindRule& operator=(const BindRule& other) {
-    value_data_.clear();
+    // value_data_.clear();
+    value_data_.reset();
     for (size_t i = 0; i < other.value_data_.size(); ++i) {
-      value_data_.push_back(other.value_data_[i]);
+      fbl::AllocChecker ac;
+      value_data_.push_back(other.value_data_[i], &ac);
+      ZX_ASSERT(ac.check());
     }
 
     rule_ = bind_rule_t{
@@ -76,11 +92,21 @@ class BindRule {
 
   const bind_rule_t& get() const { return rule_; }
 
-  std::vector<device_bind_prop_value_t> value_data() const { return value_data_; }
+  fbl::Vector<device_bind_prop_value_t> value_data() const {
+    fbl::AllocChecker ac;
+    fbl::Vector<device_bind_prop_value_t> copy;
+    copy.reserve(value_data_.size(), &ac);
+    ZX_ASSERT(ac.check());
+    for (size_t i = 0; i < value_data_.size(); ++i) {
+      copy.push_back(value_data_[i], &ac);
+      ZX_ASSERT(ac.check());
+    }
+    return copy;
+  }
 
  private:
   // Contains the data for bind property values.
-  std::vector<device_bind_prop_value_t> value_data_;
+  fbl::Vector<device_bind_prop_value_t> value_data_;
 
   bind_rule_t rule_;
 };
@@ -276,10 +302,10 @@ class CompositeNodeSpec {
   CompositeNodeSpec& operator=(const CompositeNodeSpec& other) {
     specs_ = other.specs_;
 
-    parent_specs_.clear();
-    bind_rules_data_.clear();
-    bind_rules_values_data_.clear();
-    properties_data_.clear();
+    parent_specs_.reset();
+    bind_rules_data_.reset();
+    bind_rules_values_data_.reset();
+    properties_data_.reset();
     for (size_t i = 0; i < other.parent_specs_.size(); ++i) {
       AddParentSpec(other.parent_specs_[i]);
     }
@@ -293,31 +319,41 @@ class CompositeNodeSpec {
   // Add a node to |parent_specs_| and store the property data in |prop_data_|.
   CompositeNodeSpec& AddParentSpec(cpp20::span<const BindRule> rules,
                                    cpp20::span<const device_bind_prop_t> properties) {
+    fbl::AllocChecker ac;
     auto bind_rule_count = rules.size();
-    auto bind_rules = std::vector<bind_rule_t>(bind_rule_count);
+    auto bind_rules = fbl::Vector<bind_rule_t>();
+    bind_rules.reserve(bind_rule_count, &ac);
     for (size_t i = 0; i < bind_rule_count; i++) {
       bind_rules[i] = rules[i].get();
 
       auto bind_rule_values = rules[i].value_data();
       bind_rules[i].values = bind_rule_values.data();
-      bind_rules_values_data_.push_back(std::move(bind_rule_values));
+      bind_rules_values_data_.push_back(std::move(bind_rule_values), &ac);
+      ZX_ASSERT(ac.check());
     }
 
     auto prop_count = properties.size();
-    auto props = std::vector<device_bind_prop_t>();
+    auto props = fbl::Vector<device_bind_prop_t>();
+    props.reserve(prop_count, &ac);
     for (size_t i = 0; i < prop_count; i++) {
-      props.push_back(properties[i]);
+      props.push_back(properties[i], &ac);
+      ZX_ASSERT(ac.check());
     }
 
-    parent_specs_.push_back(parent_spec_t{
-        .bind_rules = bind_rules.data(),
-        .bind_rule_count = bind_rule_count,
-        .properties = props.data(),
-        .property_count = prop_count,
-    });
+    parent_specs_.push_back(
+        parent_spec_t{
+            .bind_rules = bind_rules.data(),
+            .bind_rule_count = bind_rule_count,
+            .properties = props.data(),
+            .property_count = prop_count,
+        },
+        &ac);
+    ZX_ASSERT(ac.check());
 
-    bind_rules_data_.push_back(std::move(bind_rules));
-    properties_data_.push_back(std::move(props));
+    bind_rules_data_.push_back(std::move(bind_rules), &ac);
+    ZX_ASSERT(ac.check());
+    properties_data_.push_back(std::move(props), &ac);
+    ZX_ASSERT(ac.check());
 
     specs_.parents = parent_specs_.data();
     specs_.parent_count = std::size(parent_specs_);
@@ -330,49 +366,60 @@ class CompositeNodeSpec {
  private:
   // Add a node to |parent_specs_| and store the property data in |prop_data_|.
   void AddParentSpec(const parent_spec_t& parent) {
+    fbl::AllocChecker ac;
     auto bind_rule_count = parent.bind_rule_count;
-    auto bind_rules = std::vector<bind_rule_t>(bind_rule_count);
+    auto bind_rules = fbl::Vector<bind_rule_t>();
+    bind_rules.reserve(bind_rule_count, &ac);
     for (size_t i = 0; i < bind_rule_count; i++) {
       auto parent_rules = parent.bind_rules[i];
-      auto bind_rule_values = std::vector<device_bind_prop_value_t>(parent_rules.values_count);
+      auto bind_rule_values = fbl::Vector<device_bind_prop_value_t>();
+      bind_rule_values.reserve(parent_rules.values_count, &ac);
       for (size_t k = 0; k < parent_rules.values_count; k++) {
         bind_rule_values[k] = parent_rules.values[k];
       }
 
       bind_rules[i] = parent_rules;
       bind_rules[i].values = bind_rule_values.data();
-      bind_rules_values_data_.push_back(std::move(bind_rule_values));
+      bind_rules_values_data_.push_back(std::move(bind_rule_values), &ac);
+      ZX_ASSERT(ac.check());
     }
 
     auto property_count = parent.property_count;
-    auto properties = std::vector<device_bind_prop_t>();
+    auto properties = fbl::Vector<device_bind_prop_t>();
+    properties.reserve(property_count, &ac);
     for (size_t i = 0; i < property_count; i++) {
-      properties.push_back(parent.properties[i]);
+      properties.push_back(parent.properties[i], &ac);
+      ZX_ASSERT(ac.check());
     }
 
-    parent_specs_.push_back(parent_spec_t{
-        .bind_rules = bind_rules.data(),
-        .bind_rule_count = bind_rule_count,
-        .properties = properties.data(),
-        .property_count = property_count,
-    });
+    parent_specs_.push_back(
+        parent_spec_t{
+            .bind_rules = bind_rules.data(),
+            .bind_rule_count = bind_rule_count,
+            .properties = properties.data(),
+            .property_count = property_count,
+        },
+        &ac);
+    ZX_ASSERT(ac.check());
     specs_.parents = parent_specs_.data();
     specs_.parent_count = std::size(parent_specs_);
 
-    bind_rules_data_.push_back(std::move(bind_rules));
-    properties_data_.push_back(std::move(properties));
+    bind_rules_data_.push_back(std::move(bind_rules), &ac);
+    ZX_ASSERT(ac.check());
+    properties_data_.push_back(std::move(properties), &ac);
+    ZX_ASSERT(ac.check());
   }
 
-  std::vector<parent_spec_t> parent_specs_;
+  fbl::Vector<parent_spec_t> parent_specs_;
 
   // Stores all the bind rules data in |parent_specs_|.
-  std::vector<std::vector<bind_rule_t>> bind_rules_data_;
+  fbl::Vector<fbl::Vector<bind_rule_t>> bind_rules_data_;
 
   // Store all bind rule values data in |parent_specs_|.
-  std::vector<std::vector<device_bind_prop_value_t>> bind_rules_values_data_;
+  fbl::Vector<fbl::Vector<device_bind_prop_value_t>> bind_rules_values_data_;
 
   // Stores all properties data in |parent_specs_|.
-  std::vector<std::vector<device_bind_prop_t>> properties_data_;
+  fbl::Vector<fbl::Vector<device_bind_prop_t>> properties_data_;
 
   composite_node_spec_t specs_ = {};
 };

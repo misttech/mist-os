@@ -182,6 +182,10 @@ SECTIONS {
     *(.data.rel.ro.lk_init)
     PROVIDE_HIDDEN(__stop_lk_init = .);
 
+    PROVIDE_HIDDEN(__start_mistos_driver_ldr = .);
+    *(.data.rel.ro.driver)
+    PROVIDE_HIDDEN(__stop_mistos_driver_ldr = .);
+
     PROVIDE_HIDDEN(__start_lk_fs = .);
     *(.data.rel.ro.lk_fs)
     PROVIDE_HIDDEN(__stop_lk_fs = .);

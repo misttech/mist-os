@@ -5,19 +5,12 @@
 #ifndef SRC_LIB_DDK_INCLUDE_LIB_DDK_DEVICE_H_
 #define SRC_LIB_DDK_INCLUDE_LIB_DDK_DEVICE_H_
 
-#ifndef __mist_os__
-#include <lib/fdf/types.h>
-#endif
 #include <zircon/compiler.h>
-#include <zircon/fidl.h>
-#include <zircon/syscalls.h>
 #include <zircon/types.h>
 
 __BEGIN_CDECLS
 
-#if __mist_os__
 typedef zx_handle_t fdf_handle_t;
-#endif
 
 typedef struct zx_device zx_device_t;
 typedef struct zx_driver zx_driver_t;
@@ -264,7 +257,7 @@ typedef struct zx_protocol_device {
   // should be copied.
   //
   // This hook will only be executed on the devhost's main thread.
-  void (*message)(void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn);
+  // void (*message)(void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn);
 
   //@ ## child_pre_release
   // The child_pre_release hook is used to signal that a child device

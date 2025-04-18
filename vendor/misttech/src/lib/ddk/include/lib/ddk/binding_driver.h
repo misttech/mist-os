@@ -7,7 +7,7 @@
 
 #include <lib/ddk/binding_priv.h>
 
-#define MISTOS_DRIVER(Driver, Ops, VendorName, Version) \
-  ZIRCON_DRIVER_PRIV(Driver, Ops, VendorName, Version)
+#define MISTOS_DRIVER(Driver, Ops, VendorName, Version, BindCount) \
+  ZIRCON_DRIVER_PRIV(Driver, Ops, VendorName, Version, BindCount)
 
 #endif  // SRC_LIB_DDK_INCLUDE_LIB_DDK_BINDING_DRIVER_H_

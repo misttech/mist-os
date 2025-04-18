@@ -1,13 +1,11 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2016 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_LIB_DDK_INCLUDE_LIB_DDK_DRIVER_H_
-#define SRC_LIB_DDK_INCLUDE_LIB_DDK_DRIVER_H_
+#ifndef VENDOR_MISTTECH_SRC_LIB_DDK_INCLUDE_LIB_DDK_DRIVER_H_
+#define VENDOR_MISTTECH_SRC_LIB_DDK_INCLUDE_LIB_DDK_DRIVER_H_
 
-#ifndef __mist_os__
-#include <lib/async/dispatcher.h>
-#endif
 #include <stdint.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -45,7 +43,8 @@ typedef struct zx_driver_ops {
   // instance in a new device host process
   //
   // This hook will only be executed on the devhost's main thread.
-  zx_status_t (*create)(void* ctx, zx_device_t* parent, const char* name, zx_handle_t rpc_channel);
+  zx_status_t (*create)(void* ctx, zx_device_t* parent,
+                        const char* name /*, zx_handle_t rpc_channel*/);
 
   // Last call before driver is unloaded.
   //
@@ -153,17 +152,6 @@ typedef struct device_add_args {
   // Optional custom protocol operations for this device
   const void* proto_ops;
 
-  // Optional list of fidl services to offer to child driver.
-  // These service will automatically be added as bind properties which may be used in
-  // bind rules.
-  // Only the service instance named "default" will be used.
-  // If provided, the `DEVICE_ADD_MUST_ISOLATE` flag must also be specified, and a proxy will not be
-  // spawned.
-  const char** fidl_service_offers;
-
-  // The number of elements in the above list.
-  size_t fidl_service_offer_count;
-
   // Optional list of runtime services to offer to child driver.
   // Only the service instance named "default" will be used.
   // If provided, the `DEVICE_ADD_MUST_ISOLATE` flag must not be specified.
@@ -176,11 +164,7 @@ typedef struct device_add_args {
   uint32_t flags;
 
   // Optional VMO representing that will get used in devfs inspect tree.
-  zx_handle_t inspect_vmo;
-
-  // Optional client channel end for a fuchsia.io.Directory hosting fidl services specified in
-  // either |fidl_service_offers| or |runtime_service_offers|.
-  zx_handle_t outgoing_dir_channel;
+  void* inspect_vmo;
 
   // Pointer to a fuchsia_driver_framework::BusInfo struct.
   // The exactly type is not encoded to keep this file C friendly.
@@ -216,9 +200,6 @@ struct zx_driver_rec {
   zx_driver_t* driver;
 };
 
-// This global symbol is initialized by the driver loader in devhost
-extern zx_driver_rec_t __zircon_driver_rec__;
-
 zx_status_t device_get_properties(zx_device_t* parent, device_props_args_t* out_args);
 
 zx_status_t device_add_from_driver(zx_driver_t* drv, zx_device_t* parent, device_add_args_t* args,
@@ -238,7 +219,7 @@ zx_status_t device_add_from_driver(zx_driver_t* drv, zx_device_t* parent, device
 // free that memory until the device's |release| hook is called.
 static inline zx_status_t device_add(zx_device_t* parent, device_add_args_t* args,
                                      zx_device_t** out) {
-  return device_add_from_driver(__zircon_driver_rec__.driver, parent, args, out);
+  return device_add_from_driver(nullptr, parent, args, out);
 }
 
 // This is used to signal completion of the device's |init| hook.
@@ -336,71 +317,34 @@ typedef struct zx_device_str_prop {
   zx_device_str_prop_val_t property_value;
 } zx_device_str_prop_t;
 
-zx_handle_t get_mmio_resource(zx_device_t* dev);
+void* get_mmio_resource(zx_device_t* dev);
 
-zx_handle_t get_msi_resource(zx_device_t* dev);
+void* get_msi_resource(zx_device_t* dev);
 
-zx_handle_t get_power_resource(zx_device_t* dev);
+void* get_power_resource(zx_device_t* dev);
 
-zx_handle_t get_ioport_resource(zx_device_t* dev);
+void* get_ioport_resource(zx_device_t* dev);
 
-zx_handle_t get_iommu_resource(zx_device_t* dev);
+void* get_iommu_resource(zx_device_t* dev);
 
-zx_handle_t get_irq_resource(zx_device_t* dev);
+void* get_irq_resource(zx_device_t* dev);
 
-zx_handle_t get_smc_resource(zx_device_t* dev);
+void* get_smc_resource(zx_device_t* dev);
 
-zx_handle_t get_info_resource(zx_device_t* dev);
+void* get_info_resource(zx_device_t* dev);
 
 zx_status_t load_firmware_from_driver(zx_driver_t* drv, zx_device_t* device, const char* path,
-                                      zx_handle_t* fw, size_t* size);
+                                      void** fw, size_t* size);
 
 // Drivers may need to load firmware for a device, typically during the call to
 // bind the device. The devmgr will look for the firmware at the given path
 // relative to system-defined locations for device firmware. The load will be done synchronously,
 // blocking the current thread until the firmware is loaded. Care should be taken when using this
 // call, as it may cause deadlocks if storage is backed by a driver in the same driver host.
-static inline zx_status_t load_firmware(zx_device_t* device, const char* path, zx_handle_t* fw,
+static inline zx_status_t load_firmware(zx_device_t* device, const char* path, void** fw,
                                         size_t* size) {
-  return load_firmware_from_driver(__zircon_driver_rec__.driver, device, path, fw, size);
+  return load_firmware_from_driver(nullptr, device, path, fw, size);
 }
-
-// Opens a connection to the specified FIDL protocol offered by |device|.
-//
-// |device| is typically the parent of the device invoking this function.
-// |protocol_name| can be constructed with
-// fidl::DiscoverableProtocolName<my_protocol_name>.
-// |request| must be the server end of a zircon channel.
-//
-// If you are inside a C++ device class, it may be more convenient to use the
-// DdkConnectFidlProtocol wrapper method from ddktl, which supplies |device| and
-// |protocol_name| automatically.
-zx_status_t device_connect_fidl_protocol(zx_device_t* device, const char* protocol_name,
-                                         zx_handle_t request);
-
-// Opens a connection to the specified FIDL service offered by |device|.
-//
-// |device| is typically the parent of the device invoking this function.
-// |service_name| can be constructed with `my_service_name::Name`.
-// |request| must be the server end of a zircon channel.
-//
-// If you are inside a C++ device class, it may be more convenient to use the
-// DdkConnectFidlProtocol wrapper method from ddktl, which supplies |device| and
-// |service_name| automatically.
-zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const char* service_name,
-                                          const char* protocol_name, zx_handle_t request);
-
-// Opens a connection to the specified FIDL protocol offered by |device|.
-//
-// |device| should be a composite device. |fragment_name| picks out the specific
-// fragment device to use; it must match the fragment name declared in the
-// composite device's bind file.
-//
-// Arguments are otherwise the same as for device_open_fidl_service. The
-// ddktl equivalent is DdkConnectFidlProtocol.
-zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device, const char* fragment_name,
-                                                  const char* service_name,
-                                                  const char* protocol_name, zx_handle_t request);
 
 typedef enum {
   DEVICE_BIND_PROPERTY_KEY_UNDEFINED = 0,
@@ -504,4 +448,4 @@ enum {
 
 __END_CDECLS
 
-#endif  // SRC_LIB_DDK_INCLUDE_LIB_DDK_DRIVER_H_
+#endif  // VENDOR_MISTTECH_SRC_LIB_DDK_INCLUDE_LIB_DDK_DRIVER_H_
