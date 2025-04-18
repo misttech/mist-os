@@ -281,7 +281,6 @@ fidl_library://fidl/fuchsia.hardware.pinimpl
 fidl_library://fidl/fuchsia.hardware.platform.bus (unstable)
 fidl_library://fidl/fuchsia.hardware.platform.device
 fidl_library://fidl/fuchsia.hardware.power (unstable)
-fidl_library://fidl/fuchsia.hardware.powerlevel (unstable)
 fidl_library://fidl/fuchsia.hardware.power.sensor
 fidl_library://fidl/fuchsia.hardware.power.statecontrol
 fidl_library://fidl/fuchsia.hardware.qualcomm.router (unstable)
