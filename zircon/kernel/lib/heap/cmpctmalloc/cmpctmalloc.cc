@@ -161,6 +161,8 @@ static_assert(ZX_DEBUG_ASSERT_IMPLEMENTED, "Expect debug assertions in host buil
 
 #define LOCAL_TRACE_DURATION(label, name, ...)
 #define LOCAL_TRACE_DURATION_END(name)
+#define KTRACE_DURATION_BEGIN(category, label, ...)
+#define KTRACE_DURATION_END(category, label, ...)
 
 class __TA_SCOPED_CAPABILITY LockGuard {
  public:
@@ -917,23 +919,39 @@ NO_ASAN void* cmpct_alloc(size_t size) {
   LOCAL_TRACE_DURATION("locked", trace_lock);
   int bucket = find_nonempty_bucket(start_bucket);
   if (bucket == -1) {
-    // Grow heap by at least 12% if we can.
-    size_t growby =
-        std::min(HEAP_LARGE_ALLOC_BYTES,
-                 std::max(theheap.size >> 3, std::max(kHeapUsableGrowSize, rounded_up)));
+    // The maximum amount the heap should grow by is the maximum of:
+    // * 12% of its total size,
+    // * The kHeapUsableGrowSize, which is the HEAP_GROW_SIZE minus growth overhaead.
+    // * The size of the desired allocation rounded up to the nearest bucket.
+    const size_t max_growth_threshold = std::max({
+        theheap.size >> 3,
+        kHeapUsableGrowSize,
+        rounded_up,
+    });
+    // The actual size we choose to grow by is the minimum of the max_growth_threshold and the
+    // maximum allocation size cmpctmalloc can handle, which is stored in HEAP_LARGE_ALLOC_BYTES.
+    size_t growby = std::min(HEAP_LARGE_ALLOC_BYTES, max_growth_threshold);
     // Validate that our growby calculation is correct, and that if we grew the heap by this amount
     // we would actually satisfy our allocation.
     ZX_DEBUG_ASSERT(growby >= rounded_up);
     // Try to add a new OS allocation to the heap, reducing the size until
     // we succeed or get too small.
+    KTRACE_DURATION_BEGIN("kernel:sched", "heap_grow_with_retries", ("allocation_size", size),
+                          ("starting_search_size", growby));
+    [[maybe_unused]] int attempts = 1;
     while (!heap_grow(growby)) {
       if (growby <= rounded_up) {
         guard.Release();
         heap_report_alloc_failure(rounded_up);
+        KTRACE_DURATION_END("kernel:sched", "heap_grow_with_retries", ("num_attempts", attempts),
+                            ("status", "failed"));
         return NULL;
       }
+      attempts++;
       growby = std::max(growby >> 1, rounded_up);
     }
+    KTRACE_DURATION_END("kernel:sched", "heap_grow_with_retries", ("num_attempts", attempts),
+                        ("status", "success"));
     bucket = find_nonempty_bucket(start_bucket);
     // It should be the case that, since we hold the heap lock, after growing the heap there should
     // be something in our target bucket. However, if there was any confusion in calculating the
