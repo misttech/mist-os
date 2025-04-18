@@ -21,8 +21,7 @@
     use: [
         {
             protocol: [
-                "fuchsia.boot.Items",
-                "fuchsia.driver.framework.CrompositeNodeManager",
+                "fuchsia.driver.framework.CompositeNodeManager",
                 "fuchsia.kernel.IoportResource",
                 "fuchsia.kernel.IrqResource",
                 "fuchsia.kernel.MmioResource",
