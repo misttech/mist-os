@@ -38,10 +38,13 @@ zx_library("platform-bus-x86") {
   configs += [ ":config" ]
   deps = [
     "//src/devices/board/lib/acpi",
-    "//vendor/misttech/src/lib/ddk",
     "//zircon/kernel/lib/init",
     "//zircon/kernel/lib/kpci",
     "//zircon/kernel/phys:handoff",
+
+    #
+    "//vendor/misttech/src/lib/ddk:ddk-deprecated-binding-headers",
+    "//vendor/misttech/src/lib/ddktl",
   ]
 
   configs += [ "//build/config:default_include_dirs" ]

@@ -5,6 +5,8 @@
 
 #include "vendor/misttech/src/devices/board/drivers/x86/x86.h"
 
+#include <lib/ddk/binding_driver.h>
+#include <lib/ddk/driver.h>
 #include <trace.h>
 
 #include <acpica/acpi.h>
@@ -42,7 +44,11 @@ zx_status_t X86::DoInit() {
   return ZX_OK;
 }
 
-zx_status_t X86::Create(void* ctx, ktl::unique_ptr<X86>* out) {
+void X86::DdkInit(ddk::InitTxn txn) {}
+
+void X86::DdkRelease() { delete this; }
+
+zx_status_t X86::Create(void* ctx, zx_device_t* parent, std::unique_ptr<X86>* out) {
   acpi_rsdp = gPhysHandoff->acpi_rsdp.value_or(0);
 
   fbl::AllocChecker ac;
@@ -51,17 +57,17 @@ zx_status_t X86::Create(void* ctx, ktl::unique_ptr<X86>* out) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  *out = ktl::make_unique<X86>(&ac, std::move(acpi));
+  *out = ktl::make_unique<X86>(&ac, parent, std::move(acpi));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
   return ZX_OK;
 }
 
-zx_status_t X86::CreateAndBind(void* ctx) {
+zx_status_t X86::CreateAndBind(void* ctx, zx_device_t* parent) {
   ktl::unique_ptr<X86> board;
 
-  zx_status_t status = Create(ctx, &board);
+  zx_status_t status = Create(ctx, parent, &board);
   if (status != ZX_OK) {
     return status;
   }
@@ -92,8 +98,15 @@ zx_status_t X86::Bind() {
   return ZX_OK;
 }
 
+static zx_driver_ops_t x86_driver_ops = []() {
+  zx_driver_ops_t ops = {};
+  ops.version = DRIVER_OPS_VERSION;
+  ops.bind = X86::CreateAndBind;
+  // ops.run_unit_tests = X86::RunUnitTests;
+  return ops;
+}();
+
 }  // namespace x86
 
-void acpi_bus(uint level) { ZX_ASSERT(x86::X86::CreateAndBind(nullptr) == ZX_OK); }
-
-LK_INIT_HOOK(acpi_bus, acpi_bus, LK_INIT_LEVEL_PLATFORM)
+MISTOS_DRIVER(acpi_bus, x86::x86_driver_ops, "mistos", "0.1", 0)
+MISTOS_DRIVER_END(acpi_bus)
