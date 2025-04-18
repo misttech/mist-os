@@ -55,7 +55,6 @@ rustc_library("starnix_uapi") {
     "//sdk/rust/zx-status",
     "//sdk/rust/zx-types",
     "//src/starnix/lib/linux_uapi",
-    "//src/starnix/lib/range_map",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:bstr",

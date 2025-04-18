@@ -128,16 +128,6 @@ impl TryFrom<UserAddress> for uapi::uaddr32 {
     }
 }
 
-impl range_map::Gap for UserAddress {
-    fn measure_gap(&self, other: &Self) -> u64 {
-        if self.0 > other.0 {
-            self.0 - other.0
-        } else {
-            other.0 - self.0
-        }
-    }
-}
-
 impl ops::Add<u32> for UserAddress {
     type Output = UserAddress;
 

@@ -565,24 +565,27 @@ impl MemoryManagerState {
     // Find the first unused range of addresses that fits a mapping of `length` bytes, searching
     // from `mmap_top` downwards.
     pub fn find_next_unused_range(&self, length: usize) -> Option<UserAddress> {
-        let gap_size = length as u64;
-        let mut upper_bound = self.mmap_top;
+        // Iterate over existing mappings within range, in descending order
+        let mut map_iter = self.mappings.iter_ending_at(self.mmap_top);
+        // Currently considered range. Will be moved downwards if it intersects the current mapping.
+        let mut candidate = Range { start: self.mmap_top.checked_sub(length)?, end: self.mmap_top };
 
         loop {
-            let gap_end = self.mappings.find_gap_end(gap_size, &upper_bound);
-            let candidate = gap_end.checked_sub(length)?;
-
             // Is there a next mapping? If not, the candidate is already good.
-            let Some((occupied_range, mapping)) = self.mappings.get(gap_end) else {
-                return Some(candidate);
+            let Some((occupied_range, mapping)) = map_iter.next_back() else {
+                return Some(candidate.start);
             };
             let occupied_range = mapping.inflate_to_include_guard_pages(occupied_range);
             // If it doesn't overlap, the gap is big enough to fit.
-            if occupied_range.start >= gap_end {
-                return Some(candidate);
+            if occupied_range.end <= candidate.start {
+                return Some(candidate.start);
             }
-            // If there was a mapping in the way, use the start of that range as the upper bound.
-            upper_bound = occupied_range.start;
+            // If there was a mapping in the way, the next range to consider will be `length` bytes
+            // below.
+            candidate = Range {
+                start: occupied_range.start.checked_sub(length)?,
+                end: occupied_range.start,
+            };
         }
     }
 
