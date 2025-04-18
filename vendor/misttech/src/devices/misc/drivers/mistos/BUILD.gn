@@ -1,0 +1,17 @@
+# Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/zircon/migrated_targets.gni")
+
+zx_library("mistos") {
+  sources = [
+    "device.cc",
+    "driver.cc",
+    "init.cc",
+  ]
+  public_deps = [
+    "//vendor/misttech/src/lib/ddk",
+    "//vendor/misttech/src/lib/ddktl",
+  ]
+}
