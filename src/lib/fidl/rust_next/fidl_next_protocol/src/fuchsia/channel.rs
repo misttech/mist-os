@@ -343,7 +343,7 @@ mod tests {
     use fuchsia_async as fasync;
     use zx::Channel;
 
-    use crate::testing::transport::*;
+    use crate::testing::*;
 
     #[fasync::run_singlethreaded(test)]
     async fn close_on_drop() {
