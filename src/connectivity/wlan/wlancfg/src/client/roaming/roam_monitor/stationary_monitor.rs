@@ -27,6 +27,7 @@ const LOCAL_ROAM_THRESHOLD_RSSI_2G: f64 = -72.0;
 const LOCAL_ROAM_THRESHOLD_RSSI_5G: f64 = -75.0;
 
 const MIN_RSSI_IMPROVEMENT_TO_ROAM: f64 = 3.0;
+const MIN_RSSI_DROP_TO_RESET_BACKOFF: f64 = 3.0;
 
 /// Number of previous RSSI measurements to exponentially weigh into average.
 /// TODO(https://fxbug.dev/42165706): Tune smoothing factor.
@@ -131,14 +132,20 @@ impl StationaryMonitor {
         let rssi = self.connection_data.signal_data.ewma_rssi.get();
         if rssi <= rssi_threshold {
             roam_reasons.push(RoamReason::RssiBelowThreshold);
+
+            // Reset scan backoff as RSSI has dropped notably since the last roam scan.
+            if rssi
+                <= self.connection_data.previous_roam_scan_data.rssi
+                    - MIN_RSSI_DROP_TO_RESET_BACKOFF
+            {
+                self.scan_backoff = MIN_BACKOFF_BETWEEN_ROAM_SCANS;
+            }
         }
 
-        // Do not scan if there are no roam reasons, or if the scan backoff has not yet passed.
+        // Do not scan if there are no roam reasons, or if the scan backoff has not yet passed.f
         let now = fasync::MonotonicInstant::now();
         if roam_reasons.is_empty()
-            || now
-                < self.connection_data.previous_roam_scan_data.time_prev_roam_scan
-                    + self.scan_backoff
+            || now < self.connection_data.previous_roam_scan_data.time + self.scan_backoff
         {
             return RoamTriggerDataOutcome::Noop;
         }
@@ -148,9 +155,8 @@ impl StationaryMonitor {
             std::cmp::min(self.scan_backoff * 2_i64, MAX_BACKOFF_BETWEEN_ROAM_SCANS);
 
         // Updated fields for tracking roam scan decisions and initiated roam search.
-        self.connection_data.previous_roam_scan_data.time_prev_roam_scan =
-            fasync::MonotonicInstant::now();
-        self.connection_data.previous_roam_scan_data.rssi_prev_roam_scan = rssi;
+        self.connection_data.previous_roam_scan_data.time = fasync::MonotonicInstant::now();
+        self.connection_data.previous_roam_scan_data.rssi = rssi;
         info!("Initiating roam search for roam reasons: {:?}", &roam_reasons);
 
         RoamTriggerDataOutcome::RoamSearch {
@@ -499,6 +505,74 @@ mod test {
         assert_variant!(
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
             RoamTriggerDataOutcome::RoamSearch { .. }
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_rssi_drop_resets_backoff() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::MonotonicInstant::now());
+
+        // Setup monitor with connection data that would trigger a roam scan due to RSSI below
+        // threshold. Set the EWMA weights to 1 so the values can be easily changed later in tests.
+        let rssi = LOCAL_ROAM_THRESHOLD_RSSI_5G - 1.0;
+        let connection_data = RoamingConnectionData {
+            signal_data: EwmaSignalData::new(rssi, TEST_OK_SNR, 1),
+            ..generate_random_roaming_connection_data()
+        };
+        let trigger_data =
+            RoamTriggerData::SignalReportInd(fidl_internal::SignalReportIndication {
+                rssi_dbm: rssi as i8,
+                snr_db: TEST_OK_SNR as i8,
+            });
+        let mut test_values = setup_test_with_data(connection_data);
+
+        // Run time forward past the minimum backoff time.
+        exec.set_fake_time(
+            fasync::MonotonicInstant::after(MIN_BACKOFF_BETWEEN_ROAM_SCANS)
+                + zx::MonotonicDuration::from_seconds(1),
+        );
+
+        // Send trigger data, and verify that we are told to roam search.
+        assert_variant!(
+            run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
+            RoamTriggerDataOutcome::RoamSearch { .. }
+        );
+
+        // Run time forward past the minimum backoff time again.
+        exec.set_fake_time(
+            fasync::MonotonicInstant::after(MIN_BACKOFF_BETWEEN_ROAM_SCANS)
+                + zx::MonotonicDuration::from_seconds(1),
+        );
+
+        // Send trigger data, and verify that we do not roam scan, because the backoff has extended.
+        assert_variant!(
+            run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
+            RoamTriggerDataOutcome::Noop
+        );
+
+        // Now send trigger data showing the RSSI has dropped significantly, and verify that we
+        // do now roam search because the backoff was reset to the minimum time.
+        let trigger_data =
+            RoamTriggerData::SignalReportInd(fidl_internal::SignalReportIndication {
+                rssi_dbm: (rssi - MIN_RSSI_DROP_TO_RESET_BACKOFF) as i8,
+                snr_db: TEST_OK_SNR as i8,
+            });
+        assert_variant!(
+            run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
+            RoamTriggerDataOutcome::RoamSearch { .. }
+        );
+
+        // Run time forward time, but not past the absolute minimum backoff time .
+        exec.set_fake_time(
+            fasync::MonotonicInstant::after(MIN_BACKOFF_BETWEEN_ROAM_SCANS)
+                - zx::MonotonicDuration::from_seconds(1),
+        );
+        // Now send trigger data showing an _additional_ drop in RSSI, but verify that we do not
+        // not scan as the minimum backoff time has not passed.
+        assert_variant!(
+            run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
+            RoamTriggerDataOutcome::Noop
         );
     }
 
