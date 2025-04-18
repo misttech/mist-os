@@ -164,16 +164,17 @@ void DisplayManager::OnVsync(fuchsia_hardware_display_types::wire::DisplayId dis
                              fuchsia_hardware_display::wire::ConfigStamp applied_config_stamp,
                              fuchsia_hardware_display::wire::VsyncAckCookie cookie) {
   if (cookie.value != fuchsia_hardware_display_types::kInvalidDispId) {
-    FX_LOGS(INFO) << "DisplayManager::OnVsync(): acknowledging vsync display_id="
-                  << display_id.value << "  timestamp=" << timestamp.get()
-                  << "  applied_config_stamp=" << applied_config_stamp.value
-                  << "  cookie=" << cookie.value;
+    FLATLAND_VERBOSE_LOG << "DisplayManager::OnVsync(): acknowledging vsync display_id="
+                         << display_id.value << "  timestamp=" << timestamp.get()
+                         << "  applied_config_stamp=" << applied_config_stamp.value
+                         << "  cookie=" << cookie.value;
     [[maybe_unused]] fidl::OneWayStatus acknowledge_vsync_result =
         default_display_coordinator_->sync()->AcknowledgeVsync(cookie.value);
   } else {
-    FX_LOGS(INFO) << "DisplayManager::OnVsync(): received vsync display_id=" << display_id.value
-                  << "  timestamp=" << timestamp.get()
-                  << "  applied_config_stamp=" << applied_config_stamp.value << "  with no cookie.";
+    FLATLAND_VERBOSE_LOG << "DisplayManager::OnVsync(): received vsync display_id="
+                         << display_id.value << "  timestamp=" << timestamp.get()
+                         << "  applied_config_stamp=" << applied_config_stamp.value
+                         << "  with no cookie.";
   }
 
   if (!default_display_) {
