@@ -10,7 +10,6 @@
 #include <lib/fidl/cpp/enum.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include <cmath>
 #include <optional>
 #include <string>
 
@@ -112,15 +111,16 @@ void BasicTest::RequestSetGain() {
   ASSERT_TRUE(properties().has_value());
   ASSERT_TRUE(properties()->max_gain_db.has_value());
   ASSERT_TRUE(properties()->min_gain_db.has_value());
+
+  // Ensure we've retrieved initial gain settings, so we can restore them after this test case.
+  ASSERT_TRUE(initial_gain_state_.has_value());
+
   if (properties()->max_gain_db == properties()->min_gain_db &&
       !properties()->can_mute.value_or(false) && !properties()->can_agc.value_or(false)) {
     GTEST_SKIP() << "*** Audio " << driver_type() << " has fixed gain ("
                  << initial_gain_state_->gain_db()
                  << " dB) and cannot MUTE or AGC. Skipping SetGain test. ***";
   }
-
-  // Ensure we've retrieved initial gain settings, so we can restore them after this test case.
-  ASSERT_TRUE(initial_gain_state_.has_value());
 
   // Base our new gain settings on the old ones, to avoid existing values.
   fuchsia::hardware::audio::GainState gain_state_to_set;

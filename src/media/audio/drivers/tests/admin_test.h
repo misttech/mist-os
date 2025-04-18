@@ -59,10 +59,12 @@ class AdminTest : public TestBase {
   void ActivateChannelsAndExpectOutcome(uint64_t active_channels_bitmask,
                                         SetActiveChannelsOutcome expected_outcome);
 
-  void RequestRingBufferStart();
+  zx::time RequestRingBufferStart();
+  void RequestRingBufferStartAndExpectCallback();
   void RequestRingBufferStartAndExpectDisconnect(zx_status_t expected_error);
+  void WaitUntilAfterStartTime();
 
-  void RequestRingBufferStop();
+  void RequestRingBufferStopAndExpectCallback();
   void RequestRingBufferStopAndExpectNoPositionNotifications();
   void RequestRingBufferStopAndExpectDisconnect(zx_status_t expected_error);
 
@@ -94,6 +96,9 @@ class AdminTest : public TestBase {
   uint16_t frame_size() const { return frame_size_; }
 
  private:
+  static constexpr zx::duration kRingBufferDisconnectCooldownDuration = zx::msec(100);
+
+  static void CooldownAfterRingBufferDisconnect();
   void RequestRingBufferChannel();
 
   fidl::InterfacePtr<fuchsia::hardware::audio::RingBuffer> ring_buffer_;

@@ -81,6 +81,17 @@ void TestBase::SetUp() {
   }
 }
 
+// Audio drivers can have multiple StreamConfig channels open, but only one can be 'privileged':
+// the one that can in turn create a RingBuffer channel. Each test case starts from scratch,
+// opening and closing channels. If we create a StreamConfig channel before the previous one is
+// cleared, a new StreamConfig channel will not be privileged, and Admin tests will fail.
+//
+// When disconnecting a StreamConfig, there's no signal to wait on before proceeding (potentially
+// immediately executing other tests); insert a 10-ms wait (needing >3.5ms was never observed).
+void TestBase::CooldownAfterDriverDisconnect() {
+  zx::nanosleep(zx::deadline_after(kDriverDisconnectCooldownDuration));
+}
+
 void TestBase::TearDown() {
   if (device_entry().isCodec()) {
     codec_.Unbind();
@@ -101,14 +112,7 @@ void TestBase::TearDown() {
     RunLoopUntil([&complete]() { return complete; });
   }
 
-  // Audio drivers can have multiple StreamConfig channels open, but only one can be 'privileged':
-  // the one that can in turn create a RingBuffer channel. Each test case starts from scratch,
-  // opening and closing channels. If we create a StreamConfig channel before the previous one is
-  // cleared, a new StreamConfig channel will not be privileged and Admin tests will fail.
-  //
-  // When disconnecting a StreamConfig, there's no signal to wait on before proceeding (potentially
-  // immediately executing other tests); insert a 10-ms wait (needing >3.5ms was never observed).
-  zx::nanosleep(zx::deadline_after(zx::msec(10)));
+  CooldownAfterDriverDisconnect();
 
   TestFixture::TearDown();
 }
@@ -492,17 +496,17 @@ bool TestBase::RingBufferElementIsIncoming(fuchsia::hardware::audio::ElementId e
 
 std::optional<bool> TestBase::IsIncoming(
     std::optional<fuchsia::hardware::audio::ElementId> ring_buffer_element_id) {
-  if (device_entry().isDai()) {
-    if (properties_.has_value()) {
-      return properties_->is_input;
-    }
-    ADD_FAILURE() << "Null properties_";
-  }
   if (device_entry().isStreamConfigInput()) {
     return true;
   }
   if (device_entry().isStreamConfigOutput()) {
     return false;
+  }
+  if (device_entry().isDai()) {
+    if (properties_.has_value()) {
+      return properties_->is_input;
+    }
+    ADD_FAILURE() << "Null properties_";
   }
   if (device_entry().isComposite()) {
     if (ring_buffer_element_id.has_value()) {
@@ -756,8 +760,9 @@ void TestBase::SetMinMaxDaiFormats() {
 
     // Save, if less than min.
     auto bit_rate = min_number_of_channels * min_bits_per_sample * min_frame_rate;
-    if (i == 0 || bit_rate < min_dai_format_->number_of_channels *
-                                 min_dai_format_->bits_per_sample * min_dai_format_->frame_rate) {
+    if (i == 0 || !min_dai_format_.has_value() ||
+        (bit_rate < min_dai_format_->number_of_channels * min_dai_format_->bits_per_sample *
+                        min_dai_format_->frame_rate)) {
       min_dai_format_ = fuchsia::hardware::audio::DaiFormat{
           .number_of_channels = min_number_of_channels,
           .channels_to_use_bitmask = (1u << min_number_of_channels) - 1u,
@@ -770,8 +775,9 @@ void TestBase::SetMinMaxDaiFormats() {
     }
     // Save, if more than max.
     bit_rate = max_number_of_channels * max_bits_per_sample * max_frame_rate;
-    if (i == 0 || bit_rate > max_dai_format_->number_of_channels *
-                                 max_dai_format_->bits_per_sample * max_dai_format_->frame_rate) {
+    if (i == 0 || !max_dai_format_.has_value() ||
+        (bit_rate > max_dai_format_->number_of_channels * max_dai_format_->bits_per_sample *
+                        max_dai_format_->frame_rate)) {
       max_dai_format_ = fuchsia::hardware::audio::DaiFormat{
           .number_of_channels = max_number_of_channels,
           .channels_to_use_bitmask = (1u << max_number_of_channels) - 1u,

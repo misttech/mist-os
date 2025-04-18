@@ -334,10 +334,27 @@ void AdminTest::ActivateChannelsAndExpectOutcome(uint64_t active_channels_bitmas
   }
 }
 
+// When disconnecting a RingBuffer, there's no signal to wait on before proceeding (potentially
+// immediately executing other tests); insert a 100-ms wait. This wait is even more important for
+// error cases that cause the RingBuffer to disconnect: without it, subsequent test cases that use
+// the RingBuffer may receive unexpected errors (e.g. ZX_ERR_PEER_CLOSED or ZX_ERR_INVALID_ARGS).
+//
+// We need this wait when testing a "real hardware" driver (i.e. on realtime-capable systems). For
+// this reason a hardcoded time constant, albeit a test antipattern, is (grudgingly) acceptable.
+//
+// TODO(https://fxbug.dev/42064975): investigate why we fail without this delay, fix the
+// drivers/test as necessary, and eliminate this workaround.
+void AdminTest::CooldownAfterRingBufferDisconnect() {
+  zx::nanosleep(zx::deadline_after(kRingBufferDisconnectCooldownDuration));
+}
+
 // Request that the driver start the ring buffer engine, responding with the start_time.
 // This method assumes that GetVmo has previously been called and we are not already started.
-void AdminTest::RequestRingBufferStart() {
-  ASSERT_GT(ring_buffer_frames_, 0u) << "GetVmo must be called before RingBuffer::Start()";
+zx::time AdminTest::RequestRingBufferStart() {
+  if (ring_buffer_frames_ == 0u) {
+    ADD_FAILURE() << "GetVmo must be called before RingBuffer::Start()";
+    return {};
+  }
 
   // Any position notifications that arrive before RingBuffer::Start callback should cause failures.
   ExpectNoPositionNotifications();
@@ -347,6 +364,13 @@ void AdminTest::RequestRingBufferStart() {
     ExpectPositionNotifications();
     start_time_ = zx::time(start_time);
   }));
+  return send_time;
+}
+
+// Request that the driver start the ring buffer engine, responding with the start_time.
+// This method assumes that GetVmo has previously been called and we are not already started.
+void AdminTest::RequestRingBufferStartAndExpectCallback() {
+  auto send_time = RequestRingBufferStart();
 
   ExpectCallbacks();
   if (!HasFailure()) {
@@ -360,10 +384,17 @@ void AdminTest::RequestRingBufferStartAndExpectDisconnect(zx_status_t expected_e
       [](int64_t start_time) { FAIL() << "Received unexpected RingBuffer::Start response"; });
 
   ExpectError(ring_buffer(), expected_error);
+  CooldownAfterRingBufferDisconnect();
+}
+
+// Ensure that the RingBuffer is already running before returning.
+void AdminTest::WaitUntilAfterStartTime() {
+  auto start = start_time();
+  zx::nanosleep(start + zx::msec(1));
 }
 
 // Request that driver stop the ring buffer. This assumes that GetVmo has previously been called.
-void AdminTest::RequestRingBufferStop() {
+void AdminTest::RequestRingBufferStopAndExpectCallback() {
   ASSERT_GT(ring_buffer_frames_, 0u) << "GetVmo must be called before RingBuffer::Stop()";
   ring_buffer_->Stop(AddCallback("RingBuffer::Stop"));
 
@@ -376,6 +407,7 @@ void AdminTest::RequestRingBufferStopAndExpectDisconnect(zx_status_t expected_er
   ring_buffer_->Stop(AddUnexpectedCallback("RingBuffer::Stop - expected disconnect instead"));
 
   ExpectError(ring_buffer(), expected_error);
+  CooldownAfterRingBufferDisconnect();
 }
 
 // After RingBuffer::Stop is called, no position notification should be received.
@@ -451,17 +483,7 @@ void AdminTest::DropRingBuffer() {
     ring_buffer_ = nullptr;
   }
 
-  // When disconnecting a RingBuffer, there's no signal to wait on before proceeding (potentially
-  // immediately executing other tests); insert a 100-ms wait. This wait is even more important for
-  // error cases that cause the RingBuffer to disconnect: without it, subsequent test cases that use
-  // the RingBuffer may receive unexpected errors (e.g. ZX_ERR_PEER_CLOSED or ZX_ERR_INVALID_ARGS).
-  //
-  // We need this wait when testing a "real hardware" driver (i.e. on realtime-capable systems). For
-  // this reason a hardcoded time constant, albeit a test antipattern, is (grudgingly) acceptable.
-  //
-  // TODO(https://fxbug.dev/42064975): investigate why we fail without this delay, fix the
-  // drivers/test as necessary, and eliminate this workaround.
-  zx::nanosleep(zx::deadline_after(zx::msec(100)));
+  CooldownAfterRingBufferDisconnect();
 }
 
 // Validate that the collection of element IDs found in the topology list are complete and correct.
@@ -700,11 +722,11 @@ DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsNoChange, {
   ASSERT_NO_FAILURE_OR_SKIP(
       ActivateChannelsAndExpectOutcome(all_channels_mask, SetActiveChannelsOutcome::SUCCESS));
 
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStart());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStartAndExpectCallback());
   ASSERT_NO_FAILURE_OR_SKIP(
       ActivateChannelsAndExpectOutcome(all_channels_mask, SetActiveChannelsOutcome::NO_CHANGE));
 
-  RequestRingBufferStop();
+  RequestRingBufferStopAndExpectCallback();
   WaitForError();
 });
 
@@ -726,7 +748,7 @@ DEFINE_ADMIN_TEST_CLASS(RingBufferStart, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(32000));
 
-  RequestRingBufferStart();
+  RequestRingBufferStartAndExpectCallback();
   WaitForError();
 });
 
@@ -740,13 +762,28 @@ DEFINE_ADMIN_TEST_CLASS(RingBufferStartBeforeGetVmoShouldDisconnect, {
 });
 
 // ring-buffer FIDL channel should disconnect, with ZX_ERR_BAD_STATE
+DEFINE_ADMIN_TEST_CLASS(RingBufferStartWhileStartingShouldDisconnect, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000));
+
+  // Don't wait for the reported start time, or even the callback itself...
+  auto _ = RequestRingBufferStart();
+  // ...just immediately call again.
+  RequestRingBufferStartAndExpectDisconnect(ZX_ERR_BAD_STATE);
+});
+
+// ring-buffer FIDL channel should disconnect, with ZX_ERR_BAD_STATE
 DEFINE_ADMIN_TEST_CLASS(RingBufferStartWhileStartedShouldDisconnect, {
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000));
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStart());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStartAndExpectCallback());
+  ASSERT_NO_FAILURE_OR_SKIP(WaitUntilAfterStartTime());
 
   RequestRingBufferStartAndExpectDisconnect(ZX_ERR_BAD_STATE);
 });
@@ -758,9 +795,9 @@ DEFINE_ADMIN_TEST_CLASS(RingBufferStop, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStart());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStartAndExpectCallback());
 
-  RequestRingBufferStop();
+  RequestRingBufferStopAndExpectCallback();
   WaitForError();
 });
 
@@ -779,9 +816,9 @@ DEFINE_ADMIN_TEST_CLASS(RingBufferStopWhileStoppedIsPermitted, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStop());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStopAndExpectCallback());
 
-  RequestRingBufferStop();
+  RequestRingBufferStopAndExpectCallback();
   WaitForError();
 });
 
@@ -818,8 +855,8 @@ DEFINE_ADMIN_TEST_CLASS(GetDelayInfoSecondTimeNoResponse, {
   WatchDelayAndExpectNoUpdate();
 
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000));
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStart());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStop());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStartAndExpectCallback());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStopAndExpectCallback());
 
   WaitForError();
 });
@@ -831,7 +868,7 @@ DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterStart, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStart());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStartAndExpectCallback());
 
   WatchDelayAndExpectUpdate();
   WaitForError();
@@ -858,7 +895,7 @@ DEFINE_ADMIN_TEST_CLASS(PositionNotifyNone, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000, 0));
 
   ASSERT_NO_FAILURE_OR_SKIP(ExpectNoPositionNotifications());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStart());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStartAndExpectCallback());
 
   RequestPositionNotification();
   WaitForError();
@@ -872,9 +909,9 @@ DEFINE_ADMIN_TEST_CLASS(PositionNotifyAfterStop, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000));
 
   ASSERT_NO_FAILURE_OR_SKIP(ExpectNoPositionNotifications());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStart());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStartAndExpectCallback());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStop());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStopAndExpectCallback());
 
   RequestPositionNotification();
   WaitForError();
@@ -903,8 +940,8 @@ DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterDroppingFirstRingBuffer, {
   ASSERT_NO_FAILURE_OR_SKIP(WatchDelayAndExpectUpdate());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
   ASSERT_NO_FAILURE_OR_SKIP(WatchDelayAndExpectNoUpdate());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStart());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStop());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStartAndExpectCallback());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStopAndExpectCallback());
   ASSERT_NO_FAILURE_OR_SKIP(DropRingBuffer());
 
   // Dropped first ring buffer, creating second one, reverifying WatchDelayInfo.
@@ -928,18 +965,18 @@ DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsAfterDroppingFirstRingBuffer, {
   uint64_t all_channels_mask = (1 << ring_buffer_pcm_format().number_of_channels) - 1;
   ASSERT_NO_FAILURE_OR_SKIP(
       ActivateChannelsAndExpectOutcome(all_channels_mask, SetActiveChannelsOutcome::SUCCESS));
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStart());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStop());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStartAndExpectCallback());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStopAndExpectCallback());
   ASSERT_NO_FAILURE_OR_SKIP(DropRingBuffer());
 
   // Dropped first ring buffer, creating second one, reverifying SetActiveChannels.
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStart());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStartAndExpectCallback());
   ASSERT_NO_FAILURE_OR_SKIP(ActivateChannelsAndExpectOutcome(0, SetActiveChannelsOutcome::SUCCESS));
 
-  RequestRingBufferStop();
+  RequestRingBufferStopAndExpectCallback();
   WaitForError();
 });
 
@@ -1011,6 +1048,7 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry) {
 
     REGISTER_ADMIN_TEST(RingBufferStart, device_entry);
     REGISTER_ADMIN_TEST(RingBufferStartBeforeGetVmoShouldDisconnect, device_entry);
+    REGISTER_ADMIN_TEST(RingBufferStartWhileStartingShouldDisconnect, device_entry);
     REGISTER_ADMIN_TEST(RingBufferStartWhileStartedShouldDisconnect, device_entry);
     REGISTER_ADMIN_TEST(GetDelayInfoAfterStart, device_entry);
 
@@ -1040,6 +1078,7 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry) {
 
     REGISTER_ADMIN_TEST(RingBufferStart, device_entry);
     REGISTER_ADMIN_TEST(RingBufferStartBeforeGetVmoShouldDisconnect, device_entry);
+    REGISTER_ADMIN_TEST(RingBufferStartWhileStartingShouldDisconnect, device_entry);
     REGISTER_ADMIN_TEST(RingBufferStartWhileStartedShouldDisconnect, device_entry);
     REGISTER_ADMIN_TEST(GetDelayInfoAfterStart, device_entry);
 
@@ -1069,6 +1108,7 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry) {
 
     REGISTER_ADMIN_TEST(RingBufferStart, device_entry);
     REGISTER_ADMIN_TEST(RingBufferStartBeforeGetVmoShouldDisconnect, device_entry);
+    REGISTER_ADMIN_TEST(RingBufferStartWhileStartingShouldDisconnect, device_entry);
     REGISTER_ADMIN_TEST(RingBufferStartWhileStartedShouldDisconnect, device_entry);
     REGISTER_ADMIN_TEST(GetDelayInfoAfterStart, device_entry);
 

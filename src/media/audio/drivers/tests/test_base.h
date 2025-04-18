@@ -220,11 +220,14 @@ class TestBase : public media::audio::test::TestFixture {
 
  private:
   static constexpr zx::duration kWaitForErrorDuration = zx::msec(100);
+  static constexpr zx::duration kDriverDisconnectCooldownDuration = zx::msec(10);
 
-  std::optional<BaseProperties> properties_;
+  static void CooldownAfterDriverDisconnect();
 
   void SetMinMaxRingBufferFormats();
   void SetMinMaxDaiFormats();
+
+  std::optional<BaseProperties> properties_;
 
   std::optional<component_testing::RealmRoot> realm_;
   fuchsia::component::BinderPtr audio_binder_;
@@ -255,6 +258,7 @@ class TestBase : public media::audio::test::TestFixture {
   std::optional<uint64_t> dai_id_;          // DAI interconnect process element id.
 };
 
+// ostream formatting for DriverType
 inline std::ostream& operator<<(std::ostream& out, const DriverType& dev_dir) {
   switch (dev_dir) {
     case DriverType::Codec:
@@ -270,6 +274,7 @@ inline std::ostream& operator<<(std::ostream& out, const DriverType& dev_dir) {
   }
 }
 
+// ostream formatting for DeviceType
 inline std::ostream& operator<<(std::ostream& out, const DeviceType& device_type) {
   switch (device_type) {
     case DeviceType::A2DP:
@@ -281,6 +286,7 @@ inline std::ostream& operator<<(std::ostream& out, const DeviceType& device_type
   }
 }
 
+// ostream formatting for optional<PlugDetectCapabilities>
 inline std::ostream& operator<<(
     std::ostream& out,
     const std::optional<fuchsia::hardware::audio::PlugDetectCapabilities>& plug_caps) {
@@ -295,6 +301,7 @@ inline std::ostream& operator<<(
   }
 }
 
+// ostream formatting for DaiSampleFormat
 inline std::ostream& operator<<(std::ostream& out,
                                 fuchsia::hardware::audio::DaiSampleFormat sample_format) {
   switch (sample_format) {
@@ -309,6 +316,7 @@ inline std::ostream& operator<<(std::ostream& out,
   }
 }
 
+// ostream formatting for DaiFrameFormatStandard
 inline std::ostream& operator<<(std::ostream& out,
                                 fuchsia::hardware::audio::DaiFrameFormatStandard format) {
   switch (format) {
@@ -329,6 +337,7 @@ inline std::ostream& operator<<(std::ostream& out,
   }
 }
 
+// ostream formatting for DaiFrameFormatCustom
 inline std::ostream& operator<<(std::ostream& out,
                                 fuchsia::hardware::audio::DaiFrameFormatCustom format) {
   return (out << "[left_justified " << format.left_justified << ", sclk_on_raising "
@@ -337,6 +346,7 @@ inline std::ostream& operator<<(std::ostream& out,
               << static_cast<uint16_t>(format.frame_sync_size) << "]");
 }
 
+// ostream formatting for DaiFrameFormat
 inline std::ostream& operator<<(std::ostream& out,
                                 fuchsia::hardware::audio::DaiFrameFormat format) {
   if (format.is_frame_format_standard()) {
@@ -349,6 +359,7 @@ inline std::ostream& operator<<(std::ostream& out,
   return (out << "[invalid frame_format union: neither standard nor custom]");
 }
 
+// ostream formatting for optional<UniqueId>
 inline std::ostream& operator<<(std::ostream& out, std::optional<std::array<uint8_t, 16>> id) {
   if (!id.has_value()) {
     return (out << "NONE");
