@@ -53,6 +53,9 @@ Where Linux allows setting a socket's `SO_REUSEPORT` flag at any point,
 including after it has been bound, Netstack3 only allows setting `SO_REUSEPORT`
 on a socket before it is bound to a local address.
 
+TODO(https://fxbug.dev/411702408): This socket option is only supported for UDP
+sockets and not TCP sockets.
+
 ### `SO_BINDTODEVICE`
 
 Netstack3 supports setting the interface on which a socket will send and receive
