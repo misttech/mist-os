@@ -17,7 +17,8 @@ use assembly_config_schema::product_config::{
     ProductConfigData, ProductPackageDetails, ProductPackagesConfig,
 };
 use assembly_config_schema::{
-    BoardInformation, DriverDetails, ImageAssemblyConfig, PackageDetails, PackageSet,
+    BoardInformation, DriverDetails, FeatureSetLevel, ImageAssemblyConfig, PackageDetails,
+    PackageSet,
 };
 use assembly_constants::{
     BootfsDestination, BootfsPackageDestination, FileEntry, PackageDestination,
@@ -112,10 +113,18 @@ pub struct ImageAssemblyConfigBuilder {
 
     /// Optional ImagesConfig to add to the constructed ImageAssembly config
     images_config: Option<ImagesConfig>,
+
+    /// The feature set that this product supports.
+    feature_set_level: FeatureSetLevel,
 }
 
 impl ImageAssemblyConfigBuilder {
-    pub fn new(build_type: BuildType, board_name: String, image_mode: FilesystemImageMode) -> Self {
+    pub fn new(
+        build_type: BuildType,
+        board_name: String,
+        image_mode: FilesystemImageMode,
+        feature_set_level: FeatureSetLevel,
+    ) -> Self {
         Self {
             build_type,
             board_name,
@@ -141,6 +150,7 @@ impl ImageAssemblyConfigBuilder {
             devicetree_overlay: None,
             developer_only_options: None,
             images_config: None,
+            feature_set_level,
         }
     }
 
@@ -866,6 +876,7 @@ impl ImageAssemblyConfigBuilder {
             devicetree_overlay,
             developer_only_options: _,
             images_config,
+            feature_set_level,
         } = self;
 
         if !boot_args.is_empty() {
@@ -1002,7 +1013,7 @@ impl ImageAssemblyConfigBuilder {
         }
 
         // Construct the config capability package.
-        {
+        if feature_set_level != FeatureSetLevel::TestKernelOnly {
             let package_name = "config";
             let outdir = outdir.join(package_name);
             std::fs::create_dir_all(&outdir)
@@ -1110,6 +1121,27 @@ impl ImageAssemblyConfigBuilder {
             devicetree_overlay,
             image_mode,
         };
+
+        if feature_set_level == FeatureSetLevel::TestKernelOnly {
+            anyhow::ensure!(
+                image_mode == FilesystemImageMode::NoImage,
+                "Products using the 'test_kernel_only' feature set level must use image_mode=no_image"
+            );
+            anyhow::ensure!(
+                image_assembly_config.bootfs_packages.is_empty(),
+                format!(
+                    "Bootfs packages are not allowed on 'test_kernel_only' products. Found: {:?}",
+                    image_assembly_config.bootfs_packages
+                )
+            );
+            anyhow::ensure!(
+                image_assembly_config.bootfs_files.is_empty(),
+                format!(
+                    "Bootfs files are not allowed on 'test_kernel_only' products. Found: {:?}",
+                    image_assembly_config.bootfs_files
+                )
+            );
+        }
 
         if image_mode == FilesystemImageMode::NoImage {
             anyhow::ensure!(
@@ -1625,6 +1657,7 @@ mod tests {
             BuildType::Eng,
             "my_board".into(),
             FilesystemImageMode::default(),
+            FeatureSetLevel::Standard,
         );
         builder.add_parsed_bundle(outdir.as_ref().join("minimum_bundle"), minimum_bundle).unwrap();
         builder
@@ -1639,6 +1672,7 @@ mod tests {
             BuildType::Eng,
             "my_board".into(),
             FilesystemImageMode::default(),
+            FeatureSetLevel::Standard,
         );
         builder
             .add_parsed_bundle(
@@ -1695,6 +1729,7 @@ mod tests {
             BuildType::UserDebug,
             "my_board".into(),
             FilesystemImageMode::default(),
+            FeatureSetLevel::Standard,
         );
         builder
             .add_parsed_bundle(
@@ -1746,6 +1781,7 @@ mod tests {
             BuildType::User,
             "my_board".into(),
             FilesystemImageMode::default(),
+            FeatureSetLevel::Standard,
         );
         builder
             .add_parsed_bundle(
@@ -1796,6 +1832,7 @@ mod tests {
             BuildType::Eng,
             "my_board".into(),
             FilesystemImageMode::default(),
+            FeatureSetLevel::Standard,
         );
 
         // Write a file to the temp dir for use with config_data.
@@ -2241,6 +2278,7 @@ mod tests {
             BuildType::Eng,
             "my_board".into(),
             FilesystemImageMode::default(),
+            FeatureSetLevel::Standard,
         );
         assert!(builder.add_parsed_bundle(root, aib).is_err());
     }
@@ -2269,6 +2307,7 @@ mod tests {
             BuildType::Eng,
             "my_board".into(),
             FilesystemImageMode::default(),
+            FeatureSetLevel::Standard,
         );
         builder.add_parsed_bundle(outdir, aib).unwrap();
         assert!(builder.add_parsed_bundle(outdir.join("second"), second_aib).is_err());
@@ -2307,6 +2346,7 @@ mod tests {
             BuildType::Eng,
             "my_board".into(),
             FilesystemImageMode::default(),
+            FeatureSetLevel::Standard,
         );
         assert!(builder.add_parsed_bundle(outdir, aib).is_err());
     }
@@ -2351,6 +2391,7 @@ mod tests {
             BuildType::Eng,
             "my_board".into(),
             FilesystemImageMode::default(),
+            FeatureSetLevel::Standard,
         );
         builder.add_parsed_bundle(outdir, aib).ok();
         builder.add_parsed_bundle(outdir, aib2).ok();
@@ -2395,6 +2436,7 @@ mod tests {
             BuildType::Eng,
             "my_board".into(),
             FilesystemImageMode::default(),
+            FeatureSetLevel::Standard,
         );
         builder.add_parsed_bundle(outdir, aib).ok();
         assert!(builder.add_parsed_bundle(outdir, aib2).is_err());
@@ -2429,6 +2471,7 @@ mod tests {
             BuildType::Eng,
             "my_board".into(),
             FilesystemImageMode::default(),
+            FeatureSetLevel::Standard,
         );
         builder.add_parsed_bundle(root, first_aib).unwrap();
         assert!(builder.add_parsed_bundle(root.join("second"), second_aib).is_err());
@@ -2442,6 +2485,7 @@ mod tests {
             BuildType::Eng,
             "my_board".into(),
             FilesystemImageMode::default(),
+            FeatureSetLevel::Standard,
         );
 
         let board_package_path = root.join("board");
@@ -2487,6 +2531,7 @@ mod tests {
             BuildType::Eng,
             "my_board".into(),
             FilesystemImageMode::default(),
+            FeatureSetLevel::Standard,
         );
 
         builder.add_kernel_args(vec!["arg1=value1".to_owned()]).unwrap();
@@ -2503,6 +2548,7 @@ mod tests {
             BuildType::Eng,
             "my_board".into(),
             FilesystemImageMode::default(),
+            FeatureSetLevel::Standard,
         );
 
         // Provide developer overrides for kernel commandline args

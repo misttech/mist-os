@@ -80,6 +80,7 @@ impl FeatureSetLevel {
         value: &assembly_config_schema::platform_config::FeatureSetLevel,
     ) -> Option<Self> {
         match value {
+            assembly_config_schema::FeatureSetLevel::TestKernelOnly => None,
             assembly_config_schema::FeatureSetLevel::TestNoPlatform => None,
             assembly_config_schema::FeatureSetLevel::Embeddable => {
                 Some(FeatureSetLevel::Embeddable)

@@ -161,8 +161,12 @@ Resulting product is not supported and may misbehave!
     // Now that all the configuration has been determined, create the builder
     // and start doing the work of creating the image assembly config.
     let image_mode = platform.storage.filesystems.image_mode;
-    let mut builder =
-        ImageAssemblyConfigBuilder::new(platform.build_type, board_config.name.clone(), image_mode);
+    let mut builder = ImageAssemblyConfigBuilder::new(
+        platform.build_type,
+        board_config.name.clone(),
+        image_mode,
+        platform.feature_set_level,
+    );
 
     // Set the developer overrides, if any.
     if let Some(developer_overrides) = developer_overrides {
@@ -182,9 +186,11 @@ Resulting product is not supported and may misbehave!
         .with_context(|| format!("Adding kernel input bundle ({kernel_aib_path})"))?;
 
     // Set the info used for BoardDriver arguments.
-    builder
-        .set_board_driver_arguments(&board_config)
-        .context("Setting arguments for the Board Driver")?;
+    if platform.feature_set_level != FeatureSetLevel::TestKernelOnly {
+        builder
+            .set_board_driver_arguments(&board_config)
+            .context("Setting arguments for the Board Driver")?;
+    }
 
     // Set the configuration for the rest of the packages.
     for (package, config) in configuration.package_configs {
@@ -203,14 +209,16 @@ Resulting product is not supported and may misbehave!
     builder.add_configuration_capabilities(configuration.configuration_capabilities)?;
 
     // Add the board's Board Input Bundles, if it has them.
-    for (bundle_path, bundle) in board_input_bundles {
-        builder
-            .add_board_input_bundle(
-                bundle,
-                platform.feature_set_level == FeatureSetLevel::Bootstrap
-                    || platform.feature_set_level == FeatureSetLevel::Embeddable,
-            )
-            .with_context(|| format!("Adding board input bundle from: {bundle_path}"))?;
+    if platform.feature_set_level != FeatureSetLevel::TestKernelOnly {
+        for (bundle_path, bundle) in board_input_bundles {
+            builder
+                .add_board_input_bundle(
+                    bundle,
+                    platform.feature_set_level == FeatureSetLevel::Bootstrap
+                        || platform.feature_set_level == FeatureSetLevel::Embeddable,
+                )
+                .with_context(|| format!("Adding board input bundle from: {bundle_path}"))?;
+        }
     }
 
     // Add the platform Assembly Input Bundles that were chosen by the configuration.

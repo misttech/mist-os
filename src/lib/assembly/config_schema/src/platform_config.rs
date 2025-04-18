@@ -270,10 +270,15 @@ pub struct PlatformConfig {
 ///
 /// The standard (default) level is `Minimal`. It is the level that should be
 /// used by products' main system.
-#[derive(Debug, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Default, JsonSchema, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
 pub enum FeatureSetLevel {
-    /// THIS IS FOR TESTING AND MIGRATIONS ONLY!
+    /// THIS IS FOR TESTING ONLY!
+    ///
+    /// It creates an assembly with no platform, product, or board.
+    TestKernelOnly,
+
+    /// THIS IS FOR TESTING ONLY!
     ///
     /// It creates an assembly with no platform.
     TestNoPlatform,
