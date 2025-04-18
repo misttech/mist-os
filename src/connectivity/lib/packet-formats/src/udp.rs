@@ -43,6 +43,38 @@ struct Header {
     checksum: [u8; 2],
 }
 
+impl Header {
+    fn checksummed(&self) -> bool {
+        self.checksum != U16::ZERO
+    }
+
+    pub fn set_src_port(&mut self, new: u16) {
+        let old = self.src_port;
+        let new = U16::from(new);
+        self.src_port = new;
+        if self.checksummed() {
+            self.checksum =
+                internet_checksum::update(self.checksum, old.as_bytes(), new.as_bytes());
+        }
+    }
+
+    pub fn set_dst_port(&mut self, new: NonZeroU16) {
+        let old = self.dst_port;
+        let new = U16::from(new.get());
+        self.dst_port = new;
+        if self.checksummed() {
+            self.checksum =
+                internet_checksum::update(self.checksum, old.as_bytes(), new.as_bytes());
+        }
+    }
+
+    pub fn update_checksum_pseudo_header_address<A: IpAddress>(&mut self, old: A, new: A) {
+        if self.checksummed() {
+            self.checksum = internet_checksum::update(self.checksum, old.bytes(), new.bytes());
+        }
+    }
+}
+
 /// A UDP packet.
 ///
 /// A `UdpPacket` shares its underlying memory with the byte slice it was parsed
@@ -172,7 +204,7 @@ impl<B: SplitByteSlice> UdpPacket<B> {
     /// IPv6 requires a checksum, and so any UDP packet missing one will fail
     /// validation in `parse`.
     pub fn checksummed(&self) -> bool {
-        self.header.checksum != U16::ZERO
+        self.header.checksummed()
     }
 
     /// Constructs a builder with the same contents as this packet.
@@ -214,32 +246,17 @@ impl<B: SplitByteSlice> UdpPacket<B> {
 impl<B: SplitByteSliceMut> UdpPacket<B> {
     /// Set the source port of the UDP packet.
     pub fn set_src_port(&mut self, new: u16) {
-        let old = self.header.src_port;
-        let new = U16::from(new);
-        self.header.src_port = new;
-        if self.checksummed() {
-            self.header.checksum =
-                internet_checksum::update(self.header.checksum, old.as_bytes(), new.as_bytes());
-        }
+        self.header.set_src_port(new)
     }
 
     /// Set the destination port of the UDP packet.
     pub fn set_dst_port(&mut self, new: NonZeroU16) {
-        let old = self.header.dst_port;
-        let new = U16::from(new.get());
-        self.header.dst_port = new;
-        if self.checksummed() {
-            self.header.checksum =
-                internet_checksum::update(self.header.checksum, old.as_bytes(), new.as_bytes());
-        }
+        self.header.set_dst_port(new);
     }
 
     /// Update the checksum to reflect an updated address in the pseudo header.
     pub fn update_checksum_pseudo_header_address<A: IpAddress>(&mut self, old: A, new: A) {
-        if self.checksummed() {
-            self.header.checksum =
-                internet_checksum::update(self.header.checksum, old.bytes(), new.bytes());
-        }
+        self.header.update_checksum_pseudo_header_address(old, new);
     }
 }
 
@@ -427,6 +444,42 @@ impl<B: SplitByteSlice> UdpPacketRaw<B> {
             .complete()
             .ok()
             .map(|body| ByteSliceInnerPacketBuilder(body).into_serializer().encapsulate(builder))
+    }
+}
+
+impl<B: SplitByteSliceMut> UdpPacketRaw<B> {
+    /// Set the source port of the UDP packet.
+    pub fn set_src_port(&mut self, new: u16) {
+        match &mut self.header {
+            MaybeParsed::Complete(h) => h.set_src_port(new),
+            MaybeParsed::Incomplete(h) => {
+                h.flow.src_port = U16::from(new);
+
+                // We don't have the checksum, so there's nothing to update.
+            }
+        }
+    }
+
+    /// Set the destination port of the UDP packet.
+    pub fn set_dst_port(&mut self, new: NonZeroU16) {
+        match &mut self.header {
+            MaybeParsed::Complete(h) => h.set_dst_port(new),
+            MaybeParsed::Incomplete(h) => {
+                h.flow.dst_port = U16::from(new.get());
+
+                // We don't have the checksum, so there's nothing to update.
+            }
+        }
+    }
+
+    /// Update the checksum to reflect an updated address in the pseudo header.
+    pub fn update_checksum_pseudo_header_address<A: IpAddress>(&mut self, old: A, new: A) {
+        match &mut self.header {
+            MaybeParsed::Complete(h) => h.update_checksum_pseudo_header_address(old, new),
+            MaybeParsed::Incomplete(_) => {
+                // We don't have the checksum, so there's nothing to update.
+            }
+        }
     }
 }
 

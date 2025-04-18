@@ -117,6 +117,24 @@ impl HeaderPrefix {
             window_size: self.window_size.get(),
         }
     }
+
+    pub fn set_src_port(&mut self, new: NonZeroU16) {
+        let old = self.src_port;
+        let new = U16::from(new.get());
+        self.src_port = new;
+        self.checksum = internet_checksum::update(self.checksum, old.as_bytes(), new.as_bytes());
+    }
+
+    pub fn set_dst_port(&mut self, new: NonZeroU16) {
+        let old = self.dst_port;
+        let new = U16::from(new.get());
+        self.dst_port = new;
+        self.checksum = internet_checksum::update(self.checksum, old.as_bytes(), new.as_bytes());
+    }
+
+    pub fn update_checksum_pseudo_header_address<A: IpAddress>(&mut self, old: A, new: A) {
+        self.checksum = internet_checksum::update(self.checksum, old.bytes(), new.bytes());
+    }
 }
 
 mod data_offset_reserved_flags {
@@ -477,26 +495,17 @@ impl<B: SplitByteSlice> TcpSegment<B> {
 impl<B: SplitByteSliceMut> TcpSegment<B> {
     /// Set the source port of the UDP packet.
     pub fn set_src_port(&mut self, new: NonZeroU16) {
-        let old = self.hdr_prefix.src_port;
-        let new = U16::from(new.get());
-        self.hdr_prefix.src_port = new;
-        self.hdr_prefix.checksum =
-            internet_checksum::update(self.hdr_prefix.checksum, old.as_bytes(), new.as_bytes());
+        self.hdr_prefix.set_src_port(new)
     }
 
     /// Set the destination port of the UDP packet.
     pub fn set_dst_port(&mut self, new: NonZeroU16) {
-        let old = self.hdr_prefix.dst_port;
-        let new = U16::from(new.get());
-        self.hdr_prefix.dst_port = new;
-        self.hdr_prefix.checksum =
-            internet_checksum::update(self.hdr_prefix.checksum, old.as_bytes(), new.as_bytes());
+        self.hdr_prefix.set_dst_port(new)
     }
 
     /// Update the checksum to reflect an updated address in the pseudo header.
     pub fn update_checksum_pseudo_header_address<A: IpAddress>(&mut self, old: A, new: A) {
-        self.hdr_prefix.checksum =
-            internet_checksum::update(self.hdr_prefix.checksum, old.bytes(), new.bytes());
+        self.hdr_prefix.update_checksum_pseudo_header_address(old, new)
     }
 }
 
@@ -579,6 +588,44 @@ pub struct TcpSegmentRaw<B: SplitByteSlice> {
     // can store these in an `ArrayVec<u8, MAX_OPTIONS_LEN>` in `builder`.
     options: MaybeParsed<OptionsRaw<B, TcpOptionsImpl>, B>,
     body: B,
+}
+
+impl<B: SplitByteSliceMut> TcpSegmentRaw<B> {
+    /// Set the source port of the TCP packet.
+    pub fn set_src_port(&mut self, new: NonZeroU16) {
+        match &mut self.hdr_prefix {
+            MaybeParsed::Complete(h) => h.set_src_port(new),
+            MaybeParsed::Incomplete(h) => {
+                h.flow.src_port = U16::from(new.get());
+
+                // We don't have the checksum, so there's nothing to update.
+            }
+        }
+    }
+
+    /// Set the destination port of the TCP packet.
+    pub fn set_dst_port(&mut self, new: NonZeroU16) {
+        match &mut self.hdr_prefix {
+            MaybeParsed::Complete(h) => h.set_dst_port(new),
+            MaybeParsed::Incomplete(h) => {
+                h.flow.dst_port = U16::from(new.get());
+
+                // We don't have the checksum, so there's nothing to update.
+            }
+        }
+    }
+
+    /// Update the checksum to reflect an updated address in the pseudo header.
+    pub fn update_checksum_pseudo_header_address<A: IpAddress>(&mut self, old: A, new: A) {
+        match &mut self.hdr_prefix {
+            MaybeParsed::Complete(h) => {
+                h.update_checksum_pseudo_header_address(old, new);
+            }
+            MaybeParsed::Incomplete(_) => {
+                // We don't have the checksum, so there's nothing to update.
+            }
+        }
+    }
 }
 
 impl<B> ParsablePacket<B, ()> for TcpSegmentRaw<B>
