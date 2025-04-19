@@ -7796,7 +7796,7 @@ From //third_party/pigweed/src/third_party/boringssl/boringssl.gni:19
 
 If compiling backends with chre, this variable is set to the path to the
 chre installation. When set, a pw_source_set for the chre library is
-created at "$dir_pw_third_party/chre".
+created at "$pw_external_chre".
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/chre/src"`
 
