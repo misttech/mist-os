@@ -943,11 +943,6 @@ async fn wait_for_init_file(
     // TODO(https://fxbug.dev/42178400): Use inotify machinery to wait for the file.
     loop {
         fasync::Timer::new(fasync::MonotonicDuration::from_millis(100).after_now()).await;
-
-        if current_task.kernel().security_state.access_denial_count() > 0 {
-            return Err(anyhow!("SELinux reported access denials before startup_path was ready"));
-        }
-
         let root = current_task.fs().root();
         let mut context = LookupContext::default();
         match current_task.lookup_path(
