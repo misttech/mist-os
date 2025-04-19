@@ -32,5 +32,8 @@ group("isolated_test_spec_allowlist") {
     "//src/testing/end_to_end/honeydew/honeydew/affordances/rtc/tests/functional_tests:rtc_test",
     "//src/tests/end_to_end/rtc:rtc_conformance_test",
     "//src/tests/end_to_end/rtc:rtc_conformance_test.hermetic",
+
+    # Include any '//vendor/google' tests that require isolation.
+    "//vendor/google/build/testing/isolated:isolated_test_spec_allowlist",
   ]
 }
