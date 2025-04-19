@@ -30,18 +30,29 @@ class BasicTest : public TestBase {
 
   void WatchGainStateAndExpectUpdate();
   void WatchGainStateAndExpectNoUpdate();
-  void RequestSetGain();
+
+  void SetGainStateChange();
+  void SetGainStateNoChange();
+  void SetGainStateNoValues();
+  void SetImpossibleGainDb(float gain_db);
+  void SetImpossibleMute();
+  void SetImpossibleAgc();
 
   void WatchPlugStateAndExpectUpdate();
   void WatchPlugStateAndExpectNoUpdate();
 
+  float min_gain_db() const { return *(properties()->min_gain_db); }
+  float max_gain_db() const { return *(properties()->max_gain_db); }
+
  private:
+  void RequestSetGain(fuchsia::hardware::audio::GainState gain_state);
   void ValidatePlugState(const fuchsia::hardware::audio::PlugState& plug_state);
 
   // BasicTest cannot permanently change device state. Optionals ensure we fetch initial gain
   // state (to later restore it), before calling any method that alters device gain.
   std::optional<fuchsia::hardware::audio::GainState> initial_gain_state_;
-  bool set_gain_state_ = false;
+  // If this is set, it means that we have changed the preexisting gain state of the device.
+  std::optional<fuchsia::hardware::audio::GainState> expected_gain_state_;
 };
 
 }  // namespace media::audio::drivers::test

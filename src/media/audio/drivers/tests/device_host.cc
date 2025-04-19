@@ -126,7 +126,7 @@ void DeviceHost::DetectDevices(bool no_bluetooth, bool no_virtual_audio) {
   if (!no_virtual_audio) {
     auto real_device_count = device_entries().size();
     dev_type = DeviceType::Virtual;
-    AddVirtualDevices();
+    ASSERT_NO_FAILURE_OR_SKIP(AddVirtualDevices());
 
     // If we hang indefinitely here, the test execution environment will eventually timeout.
     auto device_count = real_device_count + virtual_audio_devices_.size();
@@ -172,6 +172,8 @@ void DeviceHost::AddVirtualDevices() {
 
     // Composite has no directionality; for this testing.
     AddVirtualDevice(controller_, fuchsia::virtualaudio::DeviceType::COMPOSITE);
+    // This step might have caused a test case failure, so for subsequent steps we use
+    // ASSERT_NO_FAILURE_OR_SKIP in order to fast-fail.
   }
 
   // Add virtual audio devices using legacy controller.
@@ -207,12 +209,17 @@ void DeviceHost::AddVirtualDevices() {
     }
 
     // For Codec drivers, directionality is not applicable.
-    AddVirtualDevice(legacy_controller_, fuchsia::virtualaudio::DeviceType::CODEC);
+    ASSERT_NO_FAILURE_OR_SKIP(
+        AddVirtualDevice(legacy_controller_, fuchsia::virtualaudio::DeviceType::CODEC));
 
-    AddVirtualDevice(legacy_controller_, fuchsia::virtualaudio::DeviceType::DAI, true);
-    AddVirtualDevice(legacy_controller_, fuchsia::virtualaudio::DeviceType::DAI, false);
-    AddVirtualDevice(legacy_controller_, fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, true);
-    AddVirtualDevice(legacy_controller_, fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, false);
+    ASSERT_NO_FAILURE_OR_SKIP(
+        AddVirtualDevice(legacy_controller_, fuchsia::virtualaudio::DeviceType::DAI, true));
+    ASSERT_NO_FAILURE_OR_SKIP(
+        AddVirtualDevice(legacy_controller_, fuchsia::virtualaudio::DeviceType::DAI, false));
+    ASSERT_NO_FAILURE_OR_SKIP(AddVirtualDevice(
+        legacy_controller_, fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, true));
+    ASSERT_NO_FAILURE_OR_SKIP(AddVirtualDevice(
+        legacy_controller_, fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, false));
   }
 }
 
