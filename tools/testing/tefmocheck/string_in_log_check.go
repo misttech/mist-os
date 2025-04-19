@@ -441,6 +441,12 @@ func fuchsiaLogChecks() []FailureModeCheck {
 			Type:   syslogType,
 		},
 		&stringInLogCheck{
+			// LINT.IfChange(starnix_panic_tefmo)
+			String: "STARNIX KERNEL PANIC",
+			// LINT.ThenChange(//src/starnix/kernel/main.rs:starnix_panic_tefmo)
+			Type: syslogType,
+		},
+		&stringInLogCheck{
 			String: "honeydew.errors.HealthCheckError: health check failed on",
 			Type:   swarmingOutputType,
 		},

@@ -122,7 +122,9 @@ enum KernelServices {
     // Starnix.
     logging_tags = [],
     logging_blocking,
+    // LINT.IfChange(starnix_panic_tefmo)
     logging_panic_prefix="\n\n\n\nSTARNIX KERNEL PANIC\n\n\n\n",
+    // LINT.ThenChange(//tools/testing/tefmocheck/string_in_log_check.go:starnix_panic_tefmo)
 )]
 async fn main() -> Result<(), Error> {
     // Make sure that if this process panics in normal mode that the whole kernel's job is killed.
