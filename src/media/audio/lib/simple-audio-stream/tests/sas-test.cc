@@ -872,8 +872,8 @@ TEST_F(SimpleAudioTest, MultipleChannelsGainState) {
   auto state2 = stream_client2->WatchGainState();
   ASSERT_OK(state1.status());
   ASSERT_OK(state2.status());
-  ASSERT_EQ(0.f, state1.value().gain_state.gain_db());
-  ASSERT_EQ(0.f, state2.value().gain_state.gain_db());
+  ASSERT_EQ(0.0f, state1.value().gain_state.gain_db());
+  ASSERT_EQ(0.0f, state2.value().gain_state.gain_db());
   loop_.Shutdown();
   server->DdkAsyncRemove();
   mock_ddk::ReleaseFlaggedDevices(root_.get());
@@ -907,9 +907,9 @@ TEST_F(SimpleAudioTest, MultipleChannelsGainStateNotify) {
   ASSERT_OK(state1a.status());
   ASSERT_OK(state2a.status());
   ASSERT_OK(state3a.status());
-  ASSERT_EQ(0.f, state1a.value().gain_state.gain_db());
-  ASSERT_EQ(0.f, state2a.value().gain_state.gain_db());
-  ASSERT_EQ(0.f, state3a.value().gain_state.gain_db());
+  ASSERT_EQ(0.0f, state1a.value().gain_state.gain_db());
+  ASSERT_EQ(0.0f, state2a.value().gain_state.gain_db());
+  ASSERT_EQ(0.0f, state3a.value().gain_state.gain_db());
 
   auto f = [](void* arg) -> int {
     zx::nanosleep(zx::deadline_after(zx::msec(100)));

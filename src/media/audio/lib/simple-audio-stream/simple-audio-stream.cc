@@ -15,7 +15,7 @@
 #include <zircon/device/audio.h>
 #include <zircon/errors.h>
 
-#include <cstdint>
+#include <cmath>
 #include <utility>
 
 #include <audio-proto-utils/format-utils.h>
@@ -563,10 +563,17 @@ void SimpleAudioStream::SetGain(audio_fidl::wire::GainState target_state,
     return;
   }
 
-  if (target_state.has_gain_db() && ((target_state.gain_db() < cur_gain_state_.min_gain) ||
-                                     (target_state.gain_db() > cur_gain_state_.max_gain))) {
-    zxlogf(ERROR, "Can't set gain outside valid range\n");
-    return;
+  if (target_state.has_gain_db()) {
+    if (!std::isfinite(target_state.gain_db())) {
+      zxlogf(ERROR, "Can't set gain for invalid float gain_db\n");
+      return;
+    }
+
+    if (target_state.gain_db() < cur_gain_state_.min_gain ||
+        target_state.gain_db() > cur_gain_state_.max_gain) {
+      zxlogf(ERROR, "Can't set gain outside valid range\n");
+      return;
+    }
   }
 
   if (target_state.has_muted()) {
