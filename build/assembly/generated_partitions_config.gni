@@ -249,6 +249,13 @@ template("generated_partitions_config") {
                              "testonly",
                              "visibility",
                            ])
+
+    # The contents of these folders are dynamic, and managed entirely by this
+    # action.  Further, this action will need to delete items from these
+    # directories that are not added back (on an incremental build, if an item
+    # is removed from one of these sets)
+    hermetic_action_ignored_prefixes = [ output_path ]
+
     binary_label = "//build/assembly/scripts:collect_partitions_config"
 
     depfile_path = "$target_out_dir/$target_name.depfile"

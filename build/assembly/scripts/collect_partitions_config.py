@@ -8,6 +8,7 @@ Collects partitions_config.json and referenced files into a portable directory.
 import argparse
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Optional
@@ -38,6 +39,14 @@ def parse_args() -> argparse.Namespace:
 def collect_partitions_config(
     root_dir: str, partitions_config: argparse.FileType
 ) -> tuple[list[str], list[str]]:
+    # Remove the entire previous partitions config if it exists.
+    # This addresses issues in incremental builds where tools may blindly copy
+    # all the contents of this directory, even if the contents are stale, which
+    # might trigger the hermetic action tracer.
+    if os.path.exists(root_dir):
+        shutil.rmtree(root_dir)
+    os.mkdir(root_dir)
+
     config = json.load(partitions_config)
     inputs = [partitions_config.name]
     outputs = []
