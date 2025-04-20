@@ -633,17 +633,27 @@ template("test_spec") {
         # run in isolated mode, so they need not be explicitly included in the
         # isolated allowlist.
         !defined(invoker.product_bundle)) {
-      deps += [ "//build/testing/isolated:isolated_test_spec_allowlist" ]
+      isolated_dir =
+          string_replace(get_label_info(invoker.target, "dir"), "//", "")
+      isolated_split = string_split(isolated_dir, "/")
+      if (isolated_split[0] == "vendor") {
+        # Use the vendor repo's allowlist.
+        deps += [ "//vendor/" + isolated_split[1] +
+                  "/build/testing/isolated:isolated_test_spec_allowlist" ]
+      } else {
+        deps += [ "//build/testing/isolated:isolated_test_spec_allowlist" ]
+      }
     }
     if (defined(invoker.timeout_secs) &&
         # Tests that use product bundles, primarily boot tests, are known to
         # run slower, so they need not be explicitly included in the allowlist.
         !defined(invoker.product_bundle)) {
-      dir = string_replace(get_label_info(invoker.target, "dir"), "//", "")
-      split = string_split(dir, "/")
-      if (split[0] == "vendor") {
+      timeout_secs_dir =
+          string_replace(get_label_info(invoker.target, "dir"), "//", "")
+      timeout_secs_split = string_split(timeout_secs_dir, "/")
+      if (timeout_secs_split[0] == "vendor") {
         # Use the vendor repo's allowlist.
-        deps += [ "//vendor/" + split[1] +
+        deps += [ "//vendor/" + timeout_secs_split[1] +
                   "/build/testing/timeouts:per_test_timeout_allowlist" ]
       } else {
         deps += [ "//build/testing/timeouts:per_test_timeout_allowlist" ]
