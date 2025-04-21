@@ -36,6 +36,8 @@ Set `NINJA_STATUS_REFRESH_MILLIS=t` to change the refresh rate.""",
     """Build service authentication errors?  Troubleshoot with `fx rbe auth`.""",
     """`fx repro BBID` prints instructions on how to reproduce a build from infra.""",
     """`fx format-code` reformats changed code.  Do this before `jiri upload`.""",
+    """`fx test-remote` runs tests in infra with locally built artifacts.
+    go/fx-test-remote-docs for more details.""",
     # ffx
     # editors
     # Infra
