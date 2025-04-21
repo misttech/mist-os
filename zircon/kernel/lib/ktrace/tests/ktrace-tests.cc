@@ -14,6 +14,21 @@
 
 #include <arch/ops.h>
 
+// A test version of the per-CPU KTrace instance that disables diagnostic logs and overrides
+// ReportMetadata. We need to override ReportMetadata in tests because the base version emits trace
+// records containing the names of all live threads and processes in the system to the global ktrace
+// singleton's trace buffer, which we do not want to do in these unit tests.
+class TestKTrace : public KTraceImpl<BufferMode::kPerCpu> {
+ public:
+  explicit TestKTrace() : KTraceImpl<BufferMode::kPerCpu>(true) {}
+  void ReportMetadata() override { report_metadata_count_++; }
+
+  uint32_t report_metadata_count() const { return report_metadata_count_; }
+
+ private:
+  uint32_t report_metadata_count_{0};
+};
+
 // The KTraceTests class is a friend of the KTrace class, which allows it to access private members
 // of that class.
 class KTraceTests {
@@ -51,7 +66,7 @@ class KTraceTests {
   static bool TestInitStop() {
     BEGIN_TEST;
 
-    KTraceImpl<BufferMode::kPerCpu> ktrace(true);
+    TestKTrace ktrace;
     const uint32_t total_bufsize = PAGE_SIZE * arch_max_num_cpus();
 
     // Initialize the buffer with initial categories. Once complete:
@@ -59,21 +74,23 @@ class KTraceTests {
     // * The buffer_size_ and num_buffers_ should be set.
     // * Writes should be enabled.
     // * Categories should be set.
-    // * TODO(rudymathu): Verify that metadata was reported once Writes are implemented.
+    // * Metadata should have been reported.
     ktrace.Init(total_bufsize, 0xff1u);
     ASSERT_NONNULL(ktrace.percpu_buffers_);
     ASSERT_EQ(static_cast<uint32_t>(PAGE_SIZE), ktrace.buffer_size_);
     ASSERT_EQ(arch_max_num_cpus(), ktrace.num_buffers_);
     ASSERT_TRUE(ktrace.WritesEnabled());
     ASSERT_EQ(0xff1u, ktrace.categories_bitmask());
+    ASSERT_EQ(1u, ktrace.report_metadata_count());
 
     // Call Start and verify that:
     // * Writes remain enabled
     // * The categories change.
-    // * TODO(rudymathu): Verify that metadata was not reported once Writes are implemented.
+    // * Metadata was not reported a second time.
     ktrace.Control(KTRACE_ACTION_START, 0x203u);
     ASSERT_TRUE(ktrace.WritesEnabled());
     ASSERT_EQ(0x203u, ktrace.categories_bitmask());
+    ASSERT_EQ(1u, ktrace.report_metadata_count());
 
     // Call Stop and verify that:
     // * The percpu_buffers_ remain allocated.
@@ -91,7 +108,7 @@ class KTraceTests {
   static bool TestStartStop() {
     BEGIN_TEST;
 
-    KTraceImpl<BufferMode::kPerCpu> ktrace(true);
+    TestKTrace ktrace;
     const uint32_t total_bufsize = PAGE_SIZE * arch_max_num_cpus();
 
     // Initialize the buffer with no initial categories. Once complete:
@@ -99,30 +116,34 @@ class KTraceTests {
     // * The buffer_size_ and num_buffers_ should be set.
     // * Writes should be disabled.
     // * Categories should be set to zero.
+    // * Metadata should _not_ have been reported.
     ktrace.Init(total_bufsize, 0u);
     ASSERT_NULL(ktrace.percpu_buffers_);
     ASSERT_EQ(static_cast<uint32_t>(PAGE_SIZE), ktrace.buffer_size_);
     ASSERT_EQ(arch_max_num_cpus(), ktrace.num_buffers_);
     ASSERT_FALSE(ktrace.WritesEnabled());
     ASSERT_EQ(0u, ktrace.categories_bitmask());
+    ASSERT_EQ(0u, ktrace.report_metadata_count());
 
     // Start tracing and verify that:
     // * The per-CPU buffers have been allocated.
-    // * TODO(rudymathu): Verify that metadata was reported once Writes are implemented.
     // * Writes have been enabled.
     // * Categories have been set.
+    // * Metadata was reported.
     ktrace.Control(KTRACE_ACTION_START, 0x1fu);
     ASSERT_NONNULL(ktrace.percpu_buffers_);
     ASSERT_TRUE(ktrace.WritesEnabled());
     ASSERT_EQ(0x1fu, ktrace.categories_bitmask());
+    ASSERT_EQ(1u, ktrace.report_metadata_count());
 
     // Call Start again and verify that:
     // * Writes remain enabled.
     // * The categories change.
-    // * TODO(rudymathu): Verify that metadata was not reported once Writes are implemented.
+    // * Metadata was not reported a second time.
     ktrace.Control(KTRACE_ACTION_START, 0x20u);
     ASSERT_TRUE(ktrace.WritesEnabled());
     ASSERT_EQ(0x20u, ktrace.categories_bitmask());
+    ASSERT_EQ(1u, ktrace.report_metadata_count());
 
     // Stop tracing and verify that:
     // * The percpu_buffers_ remain allocated.
@@ -173,20 +194,20 @@ class KTraceTests {
     }
 
     // Initialize KTrace, but do not start tracing.
-    KTraceImpl<BufferMode::kPerCpu> ktrace(true);
+    TestKTrace ktrace;
     const uint32_t total_bufsize = PAGE_SIZE * arch_max_num_cpus();
     ktrace.Init(total_bufsize, 0u);
 
     // Verify that attempting to Reserve a slot now fails because tracing has not been started, and
     // therefore writes are disabled.
-    zx::result<KTraceImpl<BufferMode::kPerCpu>::Reservation> failed = ktrace.Reserve(fxt_header);
+    zx::result<TestKTrace::Reservation> failed = ktrace.Reserve(fxt_header);
     ASSERT_EQ(ZX_ERR_BAD_STATE, failed.status_value());
 
     // Start tracing.
     ASSERT_OK(ktrace.Control(KTRACE_ACTION_START, 0xfff));
 
     // Successfully reserve a slot.
-    zx::result<KTraceImpl<BufferMode::kPerCpu>::Reservation> res = ktrace.Reserve(fxt_header);
+    zx::result<TestKTrace::Reservation> res = ktrace.Reserve(fxt_header);
     ASSERT_OK(res.status_value());
 
     // Reserve turns off interrupts, so we can get the number of the CPU whose buffer we're writing

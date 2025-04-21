@@ -9,7 +9,9 @@
 
 #include <align.h>
 #include <lib/fxt/interned_category.h>
+#include <lib/fxt/interned_string.h>
 #include <lib/fxt/serializer.h>
+#include <lib/fxt/string_ref.h>
 #include <lib/fxt/trace_base.h>
 #include <lib/ktrace/ktrace_internal.h>
 #include <lib/spsc_buffer/spsc_buffer.h>
@@ -626,6 +628,9 @@ using fxt::Scope;
 using fxt::operator""_category;
 using fxt::operator""_intern;
 
+void ktrace_report_live_threads();
+void ktrace_report_live_processes();
+
 enum class BufferMode {
   kSingle,
   kPerCpu,
@@ -934,13 +939,14 @@ class KTraceImpl {
 
  private:
   friend class KTraceTests;
+  friend class TestKTrace;
 
   // Set this class up as a singleton by:
   // * Making the constructor and destructor private
   // * Preventing copies and moves
   constexpr explicit KTraceImpl(bool disable_diagnostic_logs = false)
       : disable_diagnostic_logs_(disable_diagnostic_logs) {}
-  ~KTraceImpl() = default;
+  virtual ~KTraceImpl() = default;
   KTraceImpl(const KTraceImpl&) = delete;
   KTraceImpl& operator=(const KTraceImpl&) = delete;
   KTraceImpl(KTraceImpl&&) = delete;
@@ -1031,6 +1037,27 @@ class KTraceImpl {
     return (bitmask & categories_bitmask()) != 0;
   }
 
+  // Emits metadata records into the trace buffer.
+  // This method is declared virtual to facilitate testing.
+  virtual void ReportMetadata() {
+    // Emit strings needed to improve readability, such as syscall names, to the trace buffer.
+    fxt::InternedString::RegisterStrings();
+
+    // Emit the KOIDs of each CPU to the trace buffer.
+    const uint32_t max_cpus = arch_max_num_cpus();
+    char name[32];
+    for (uint32_t i = 0; i < max_cpus; i++) {
+      snprintf(name, sizeof(name), "cpu-%u", i);
+      fxt::WriteKernelObjectRecord(&GetInstance(), fxt::Koid(cpu_context_map_.GetCpuKoid(i)),
+                                   ZX_OBJ_TYPE_THREAD, fxt::StringRef{name},
+                                   fxt::Argument{"process"_intern, kNoProcess});
+    }
+
+    // Emit the names of all live processes and threads to the trace buffer.
+    ktrace_report_live_processes();
+    ktrace_report_live_threads();
+  }
+
   // Getter and setter for the categories bitmask.
   // These use acquire-release semantics because the order in which we set the bitmask matters.
   // Specifically, when starting a trace, we want to ensure that all of the trace metadata that we
@@ -1104,8 +1131,5 @@ using KTrace = KTraceImpl<BufferMode::kPerCpu>;
 #else
 using KTrace = KTraceImpl<BufferMode::kSingle>;
 #endif
-
-void ktrace_report_live_threads();
-void ktrace_report_live_processes();
 
 #endif  // ZIRCON_KERNEL_INCLUDE_LIB_KTRACE_H_

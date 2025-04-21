@@ -748,8 +748,8 @@ zx_status_t KTraceImpl<BufferMode::kPerCpu>::Start(uint32_t, uint32_t categories
   // The metadata needs to be emitted before we enable arbitrary categories, otherwise the thread
   // and process records will be interspersed with generic trace records.
   EnableWrites();
-  // TODO(rudymathu): Implement me!!!
-  // ReportMetadata();
+  ReportMetadata();
+
   set_categories_bitmask(categories);
   DiagsPrintf(INFO, "Enabled category mask: 0x%03x\n", categories);
   DiagsPrintf(INFO, "Trace category states:\n");
