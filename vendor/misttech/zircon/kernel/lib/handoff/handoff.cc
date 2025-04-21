@@ -7,7 +7,6 @@
 #include <lib/mistos/zx/vmo.h>
 
 #include <ktl/move.h>
-#include <lk/init.h>
 #include <phys/handoff.h>
 
 namespace {

@@ -12,5 +12,4 @@ zx_library("handoff") {
     "//zircon/kernel/object:headers",
     "//zircon/kernel/phys:handoff",
   ]
-  deps = [ "//zircon/kernel/lib/init" ]
 }
