@@ -75,7 +75,7 @@ impl CopyDirection {
     }
 }
 
-async fn buffered_copy<R, W>(mut from: R, mut to: W, dir: CopyDirection)
+async fn buffered_copy<R, W>(mut from: R, to: W, dir: CopyDirection)
 where
     R: AsyncRead + std::marker::Unpin,
     W: AsyncWrite + std::marker::Unpin,
