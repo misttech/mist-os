@@ -25,12 +25,7 @@ use_bazel_images_only = true
 discoverable_package_labels = [ "//src/developer/debug/debug_agent" ]
 
 # List which product bundles can be built using this build configuration.
-product_bundle_labels = [
-  "//products/microfuchsia",
-  "//products/minimal",
-  "//products/terminal",
-  "//products/workbench",
-]
+product_bundle_labels = [ "//products:product_bundles" ]
 
 # Upload these boards to CIPD.
 assembly_board_configs = [ "//boards" ]
