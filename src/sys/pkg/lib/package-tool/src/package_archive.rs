@@ -169,6 +169,18 @@ pub async fn cmd_package_archive_edit(cmd: PackageArchiveEditCommand) -> Result<
             pkg_builder.name(new_name);
         }
 
+        if let Some(abi) = cmd.unsafe_override_abi_revision {
+            eprintln!(
+                "\
+WARNING: Overriding package ABI revision. Package was built for ABI revision
+0x{}, but now claims to be compatible with ABI revision 0x{}.
+Devices that support ABI revision 0x{} may attempt to run components in
+this package and experience compatibility issues!",
+                pkg_builder.abi_revision, abi, abi
+            );
+            pkg_builder.abi_revision = abi;
+        }
+
         Ok(())
     })
     .await
@@ -320,10 +332,13 @@ mod tests {
     use fuchsia_archive::Utf8Reader;
     use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
+    use version_history::AbiRevision;
 
     const BIN_CONTENTS: &[u8] = b"bin";
     const LIB_CONTENTS: &[u8] = b"lib";
 
+    const ORIGINAL_ABI_REVISION: AbiRevision = AbiRevision::from_u64(0x406C7CA7EF077DB4);
+    const DIFFERENT_ABI_REVISION: AbiRevision = AbiRevision::from_u64(0x410224d48526d927);
     const META_FAR_HASH: &str = "f1a91cbbd41fef65416522a9de7e1d8be0f962ec6371cb747a403cff03d656e6";
     const META_FAR_HASH_WITH_ADDED_FILE: &str =
         "c1f005cbf6e7d71cf1014c2ab8a493b55640ef169aa2b94f211cd0588236f989";
@@ -333,6 +348,8 @@ mod tests {
         "2c8dfa9b2b2b095109ca1e37edb6cbbe16cf474bf4b523247b9aac8a5b66fcac";
     const META_FAR_HASH_WITH_DIFFERENT_NAME: &str =
         "5db1fe0f954a7df31b569b0dd3c6c830a4a8f6b77bba6731347f6b9adfe8bc0f";
+    const META_FAR_HASH_WITH_DIFFERENT_ABI_REVISION: &str =
+        "5840c40916b502e1c04ccba36a17329589d4c9b6e0912da3aa63de70ba77d102";
     const BIN_HASH: &str = "5d202ed772f4de29ecd7bc9a3f20278cd69ae160e36ba8b434512ca45003c7a3";
     const MODIFIED_BIN_HASH: &str =
         "8b9dd6886ff377a19d8716a30a0659897fba5cbdfb43649bf93317fcb6fdb18c";
@@ -346,7 +363,7 @@ mod tests {
     }
 
     fn create_package(pkg_dir: &Utf8Path) -> Package {
-        let mut builder = PackageBuilder::new("some_pkg_name", 0x406C7CA7EF077DB4.into());
+        let mut builder = PackageBuilder::new("some_pkg_name", ORIGINAL_ABI_REVISION);
         builder.add_contents_as_blob("bin", BIN_CONTENTS, pkg_dir).unwrap();
         builder.add_contents_as_blob("lib", LIB_CONTENTS, pkg_dir).unwrap();
 
@@ -810,10 +827,11 @@ mod tests {
             ]),
         );
 
-        // Remove a file from the archive
+        // Null edit.
         cmd_package_archive_edit(PackageArchiveEditCommand {
             archive: archive_path.clone().into(),
             package_name: None,
+            unsafe_override_abi_revision: None,
             output: archive_path.clone().into(),
         })
         .await
@@ -892,10 +910,11 @@ mod tests {
             ]),
         );
 
-        // Remove a file from the archive
+        // Change the package name.
         cmd_package_archive_edit(PackageArchiveEditCommand {
             archive: archive_path.clone().into(),
             package_name: Some("new-package-name".to_string()),
+            unsafe_override_abi_revision: None,
             output: archive_path.clone().into(),
         })
         .await
@@ -924,6 +943,78 @@ mod tests {
                     "source_path": format!("blobs/{META_FAR_HASH_WITH_DIFFERENT_NAME}"),
                     "path": "meta/",
                     "merkle": META_FAR_HASH_WITH_DIFFERENT_NAME,
+                    "size": 16384,
+                },
+                {
+                    "source_path": format!("blobs/{BIN_HASH}"),
+                    "path": "bin",
+                    "merkle": BIN_HASH,
+                    "size": 3,
+                },
+                {
+                    "source_path": format!("blobs/{LIB_HASH}"),
+                    "path": "lib",
+                    "merkle": LIB_HASH,
+                    "size": 3,
+                },
+            ])
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_archive_edit_abi_revision() {
+        let tmp = TempDir::new().unwrap();
+        let root = Utf8Path::from_path(tmp.path()).unwrap();
+
+        let pkg_dir = root.join("pkg");
+        let package = create_package(&pkg_dir);
+
+        // Write the archive.
+        let archive_path = root.join("archive.far");
+        cmd_package_archive_create(PackageArchiveCreateCommand {
+            out: archive_path.clone().into(),
+            root_dir: pkg_dir.to_owned(),
+            package_manifest: package.manifest_path.clone(),
+            depfile: None,
+        })
+        .await
+        .unwrap();
+
+        // Change the ABI stamp.
+        cmd_package_archive_edit(PackageArchiveEditCommand {
+            archive: archive_path.clone().into(),
+            package_name: None,
+            unsafe_override_abi_revision: Some(DIFFERENT_ABI_REVISION),
+            output: archive_path.clone().into(),
+        })
+        .await
+        .unwrap();
+
+        // Extract the archive.
+        let extract_dir = root.join("extract");
+        cmd_package_archive_extract(PackageArchiveExtractCommand {
+            out: extract_dir.clone(),
+            repository: None,
+            archive: archive_path.clone().into(),
+            blobs_json: true,
+            namespace: false,
+        })
+        .await
+        .unwrap();
+
+        let mut extract_contents = read_dir(&extract_dir);
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(
+                &extract_contents.remove(&extract_dir.join(BLOBS_JSON_NAME)).unwrap(),
+            )
+            .unwrap(),
+            serde_json::json!([
+                {
+                    // NOTE(hjfreyer): I've manually verified that this has the
+                    // correct ABI stamp in meta/fuchsia.abi/abi-revision.
+                    "source_path": format!("blobs/{META_FAR_HASH_WITH_DIFFERENT_ABI_REVISION}"),
+                    "path": "meta/",
+                    "merkle": META_FAR_HASH_WITH_DIFFERENT_ABI_REVISION,
                     "size": 16384,
                 },
                 {
