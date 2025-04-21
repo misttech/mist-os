@@ -1092,11 +1092,16 @@ class VmMapping final : public VmAddressRegionOrMapping {
     AssertHeld(object_->lock_ref());
   }
 
+  enum UnmapOptions : uint8_t {
+    kNone = 0u,
+    OnlyHasZeroPages = (1u << 0),
+  };
+
   // Unmap any pages that map the passed in vmo range from the arch aspace.
   // May not intersect with this range.
   // If |only_has_zero_pages| is true then the caller is asserting that it knows that any mappings
   // in the region will only be for the shared zero page.
-  void AspaceUnmapLockedObject(uint64_t offset, uint64_t len, bool only_has_zero_pages) const
+  void AspaceUnmapLockedObject(uint64_t offset, uint64_t len, UnmapOptions options) const
       TA_REQ(object_->lock());
 
   // Removes any writeable mappings for the passed in vmo range from the arch aspace.

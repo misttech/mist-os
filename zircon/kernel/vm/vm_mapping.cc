@@ -452,8 +452,7 @@ bool VmMapping::ObjectRangeToVaddrRange(uint64_t offset, uint64_t len, vaddr_t* 
   return true;
 }
 
-void VmMapping::AspaceUnmapLockedObject(uint64_t offset, uint64_t len,
-                                        bool only_has_zero_pages) const {
+void VmMapping::AspaceUnmapLockedObject(uint64_t offset, uint64_t len, UnmapOptions options) const {
   canary_.Assert();
 
   // NOTE: must be acquired with the vmo lock held, but doesn't need to take
@@ -476,7 +475,8 @@ void VmMapping::AspaceUnmapLockedObject(uint64_t offset, uint64_t len,
   // be updated later. This is safe since the zero page is, by definition, only mapped read only,
   // and is never modified so delaying the update of the mapping cannot cause either any users to
   // see incorrect data, or users to be able to modify an old mapping.
-  if (only_has_zero_pages && currently_faulting_ && currently_faulting_->UnmapRange(offset, len)) {
+  if ((options & UnmapOptions::OnlyHasZeroPages) && currently_faulting_ &&
+      currently_faulting_->UnmapRange(offset, len)) {
     return;
   }
 
