@@ -15,4 +15,4 @@ static const zx_driver_ops_t virtio_ethernet_driver_ops = []() {
   return ops;
 }();
 
-ZIRCON_DRIVER(virtio_ethernet, virtio_ethernet_driver_ops, "zircon", "0.1");
+MISTOS_DRIVER(virtio_ethernet, virtio_ethernet_driver_ops, "zircon", "0.1");

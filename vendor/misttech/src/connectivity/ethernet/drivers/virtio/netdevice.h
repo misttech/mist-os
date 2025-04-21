@@ -32,18 +32,15 @@ using VmoStore = vmo_store::VmoStore<vmo_store::SlabStorage<uint32_t>>;
 
 class NetworkDevice;
 
-// using DeviceType = ddk::Device<NetworkDevice>;
+using DeviceType = ddk::Device<NetworkDevice>;
 class NetworkDevice : public Device,
                       // Mixins for protocol device:
-                      // public DeviceType,
+                      public DeviceType,
                       // Mixin for Network device banjo protocol:
                       public ddk::NetworkDeviceImplProtocol<NetworkDevice, ddk::base_protocol>,
                       public ddk::NetworkPortProtocol<NetworkDevice>,
                       public ddk::MacAddrProtocol<NetworkDevice> {
  public:
-  class Buffer;
-  class BufferData;
-
   // Specifies how many packets can fit in each of the receive and transmit
   // backlogs.
   // Chosen arbitrarily. Larger values will cause increased memory consumption,
@@ -60,11 +57,12 @@ class NetworkDevice : public Device,
   static constexpr uint16_t kRxId = 0u;
   static constexpr uint16_t kTxId = 1u;
 
-  NetworkDevice(fbl::RefPtr<BusTransactionInitiatorDispatcher> bti,
+  NetworkDevice(zx_device_t* device, fbl::RefPtr<BusTransactionInitiatorDispatcher> bti,
                 ktl::unique_ptr<Backend> backend);
   virtual ~NetworkDevice();
 
   zx_status_t Init() override __TA_EXCLUDES(state_lock_);
+  void DdkRelease() __TA_EXCLUDES(state_lock_);
 
   // VirtIO callbacks
   void IrqRingUpdate() override __TA_EXCLUDES(state_lock_);

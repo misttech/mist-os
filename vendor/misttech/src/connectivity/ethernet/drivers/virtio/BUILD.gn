@@ -3,6 +3,17 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/zircon/zx_library.gni")
+
+zx_library("virtio_netdevice-driver") {
+  sources = [ "netdevice_driver.cc" ]
+  deps = [
+    #":virtio_ethernet_bind",
+    ":virtio_netdevice_lib",
+    #"//src/devices/lib/driver",
+  ]
+}
+
 source_set("virtio_netdevice_lib") {
   sources = [
     "netdevice.cc",

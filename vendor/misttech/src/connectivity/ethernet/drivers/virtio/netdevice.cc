@@ -52,9 +52,11 @@ uint16_t MaxVirtqueuePairs(const virtio_net_config& config, bool is_mq_supported
 
 }  // namespace
 
-NetworkDevice::NetworkDevice(fbl::RefPtr<BusTransactionInitiatorDispatcher> bti,
+NetworkDevice::NetworkDevice(zx_device_t* bus_device,
+                             fbl::RefPtr<BusTransactionInitiatorDispatcher> bti,
                              ktl::unique_ptr<Backend> backend)
     : virtio::Device(bti, ktl::move(backend)),
+      DeviceType(bus_device),
       rx_(this),
       tx_(this),
       vmo_store_({
@@ -159,6 +161,15 @@ zx_status_t NetworkDevice::AckFeatures(bool* is_status_supported, bool* is_multi
 
   DriverFeaturesAck(enable_features);
   return ZX_OK;
+}
+
+void NetworkDevice::DdkRelease() {
+  {
+    Guard<BrwLockPi, BrwLockPi::Writer> state_guard(&state_lock_);
+    ifc_.clear();
+  }
+  virtio::Device::Release();
+  delete this;
 }
 
 void NetworkDevice::IrqRingUpdate() {
