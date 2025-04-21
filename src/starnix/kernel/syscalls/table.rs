@@ -88,9 +88,10 @@ pub fn dispatch_syscall(
         sys_tkill, sys_wait4, sys_waitid,
     };
     use crate::syscalls::misc::{
-        sys_delete_module, sys_getrandom, sys_perf_event_open, sys_personality, sys_reboot,
-        sys_sched_yield, sys_setdomainname, sys_sethostname, sys_sysinfo, sys_uname, sys_unknown,
+        sys_delete_module, sys_getrandom, sys_perf_event_open, sys_personality, sys_sched_yield,
+        sys_setdomainname, sys_sethostname, sys_sysinfo, sys_uname, sys_unknown,
     };
+    use crate::syscalls::reboot::sys_reboot;
     use crate::syscalls::time::{
         sys_clock_getres, sys_clock_gettime, sys_clock_nanosleep, sys_getitimer, sys_gettimeofday,
         sys_nanosleep, sys_setitimer, sys_settimeofday, sys_timer_create, sys_timer_delete,
@@ -163,10 +164,10 @@ pub fn dispatch_syscall(
             sys_wait4 as sys_arch32_wait4,
         };
         pub use crate::syscalls::misc::{
-            sys_arch32_perf_event_open, sys_arch32_reboot, sys_arch32_uname,
-            sys_getrandom as sys_arch32_getrandom, sys_personality as sys_arch32_personality,
-            sys_sched_yield as sys_arch32_sched_yield,
+            sys_arch32_perf_event_open, sys_arch32_uname, sys_getrandom as sys_arch32_getrandom,
+            sys_personality as sys_arch32_personality, sys_sched_yield as sys_arch32_sched_yield,
         };
+        pub use crate::syscalls::reboot::sys_arch32_reboot;
         pub use crate::syscalls::time::{
             sys_arch32_clock_getres, sys_arch32_clock_gettime, sys_arch32_clock_gettime64,
             sys_arch32_gettimeofday, sys_arch32_nanosleep, sys_arch32_setitimer,

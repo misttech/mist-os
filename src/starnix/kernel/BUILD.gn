@@ -223,6 +223,7 @@ rustc_library("starnix_core") {
     "signals/types.rs",
     "syscalls/misc.rs",
     "syscalls/mod.rs",
+    "syscalls/reboot.rs",
     "syscalls/table.rs",
     "syscalls/time.rs",
     "task/abstract_socket_namespace.rs",

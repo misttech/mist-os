@@ -5,6 +5,7 @@
 pub mod table;
 
 pub mod misc;
+pub mod reboot;
 pub mod time;
 
 #[cfg(feature = "syscall_stats")]
