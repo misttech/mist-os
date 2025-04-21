@@ -241,6 +241,74 @@ class KTraceTests {
 
     END_TEST;
   }
+
+  static bool TestRewind() {
+    BEGIN_TEST;
+
+    // Initialize a KTrace instance, but do not start tracing.
+    TestKTrace ktrace;
+    const uint32_t total_bufsize = PAGE_SIZE * arch_max_num_cpus();
+    ktrace.Init(total_bufsize, 0u);
+
+    // Verify that Rewind succeeds and does not result in any allocations.
+    ASSERT_OK(ktrace.Control(KTRACE_ACTION_REWIND, 0));
+    ASSERT_NULL(ktrace.percpu_buffers_);
+
+    // Generate data to write into each buffer.
+    // This test also uses this buffer as the output buffer passed to read calls.
+    fbl::AllocChecker ac;
+    ktl::array<ktl::byte, PAGE_SIZE>* data_buffer = new (&ac) ktl::array<ktl::byte, PAGE_SIZE>;
+    ASSERT_TRUE(ac.check());
+    memset(data_buffer->data(), 0xff, data_buffer->size());
+
+    // Start tracing and write data into each per-CPU buffer. These writes use the underlying
+    // SpscBuffer API for simplicity.
+    ASSERT_OK(ktrace.Control(KTRACE_ACTION_START, 0xff));
+    for (uint32_t i = 0; i < arch_max_num_cpus(); i++) {
+      // Reserve and write a record of PAGE_SIZE to fill up the buffer.
+      zx::result<TestKTrace::PerCpuBuffer::Reservation> res =
+          ktrace.percpu_buffers_[i].Reserve(PAGE_SIZE);
+      ASSERT_OK(res.status_value());
+      res->Write(ktl::span<ktl::byte>(data_buffer->data(), data_buffer->size()));
+      res->Commit();
+    }
+
+    // Call Rewind and then verify that:
+    // * Tracing has stopped, and therefore writes are disabled.
+    // * The boot CPU buffer contains a metadata record.
+    // * The remaining CPU buffers are all empty.
+    ASSERT_OK(ktrace.Control(KTRACE_ACTION_REWIND, 0));
+    ASSERT_FALSE(ktrace.WritesEnabled());
+    auto copy_fn = [&](uint32_t offset, ktl::span<ktl::byte> src) {
+      memcpy(data_buffer->data(), src.data(), src.size());
+      return ZX_OK;
+    };
+    for (uint32_t i = 0; i < arch_max_num_cpus(); i++) {
+      const zx::result<size_t> result = ktrace.percpu_buffers_[i].Read(copy_fn, PAGE_SIZE);
+      ASSERT_OK(result.status_value());
+      if (i == BOOT_CPU_ID) {
+        // If this is the boot CPU, we should read only the metadata record.
+        struct FxtMetadata {
+          uint64_t magic;
+          uint64_t init_record_header;
+          zx_ticks_t ticks_per_second;
+        } fxt_metadata = {
+            .magic = 0x0016547846040010,
+            .init_record_header = 0x21,
+            .ticks_per_second = ticks_per_second(),
+        };
+
+        ASSERT_EQ(sizeof(FxtMetadata), result.value());
+        ASSERT_BYTES_EQ(reinterpret_cast<const uint8_t*>(&fxt_metadata),
+                        reinterpret_cast<uint8_t*>(data_buffer->data()), sizeof(FxtMetadata))
+      } else {
+        // Otherwise, we should read out nothing because the buffer is empty.
+        ASSERT_EQ(0ul, result.value());
+      }
+    }
+
+    END_TEST;
+  }
 };
 
 UNITTEST_START_TESTCASE(ktrace_tests)
@@ -248,4 +316,5 @@ UNITTEST("legacy_categories", KTraceTests::TestLegacyCategories)
 UNITTEST("init_stop", KTraceTests::TestInitStop)
 UNITTEST("start_stop", KTraceTests::TestStartStop)
 UNITTEST("write", KTraceTests::TestWrite)
+UNITTEST("rewind", KTraceTests::TestRewind)
 UNITTEST_END_TESTCASE(ktrace_tests, "ktrace", "KTrace tests")

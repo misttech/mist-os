@@ -790,8 +790,58 @@ zx_status_t KTraceImpl<BufferMode::kPerCpu>::Stop() {
 
 template <>
 zx_status_t KTraceImpl<BufferMode::kPerCpu>::Rewind() {
-  // TODO(https://fxbug.dev/404539312): Implement me!
-  return ZX_ERR_NOT_SUPPORTED;
+  // Calling Rewind on an uninitialized KTrace buffer is a no-op.
+  if (!percpu_buffers_) {
+    return ZX_OK;
+  }
+  // Rewind calls Drain on each per-CPU buffer. As mentioned in the doc comments of that method,
+  // it is invalid to call Drain concurrently with a Read, and the method is only guaranteed to
+  // fully empty the buffer if there are no concurrent Write operations. We ensure that these
+  // prerequisites are met by:
+  // 1. Holding the lock_, ensuring that there can be no other readers.
+  // 2. Ensuring writes are disabled to prevent any future writes from starting.
+  // 3. Performing the Drain within an IPI on each core, ensuring that this operation does not
+  //    race with any in-progress writes.
+  writes_enabled_.store(false, ktl::memory_order_release);
+
+  auto run_drain = [](void* arg) {
+    const cpu_num_t curr_cpu = arch_curr_cpu_num();
+    PerCpuBuffer* percpu_buffers = static_cast<PerCpuBuffer*>(arg);
+    PerCpuBuffer& curr_cpu_buffer = percpu_buffers[curr_cpu];
+    curr_cpu_buffer.Drain();
+
+    // If this is not running on the boot CPU, we're done.
+    if (curr_cpu != BOOT_CPU_ID) {
+      return;
+    }
+
+    // FxtMetadata is a type that contains the metadata records that are expected to be at the
+    // beginning of every kernel trace. We place one of these structures in the boot CPU's buffer.
+    struct FxtMetadata {
+      // Magic Record
+      // https://fuchsia.dev/fuchsia-src/reference/tracing/trace-format#magic-number-record
+      uint64_t magic;
+      // Initialization Record
+      // https://fuchsia.dev/fuchsia-src/reference/tracing/trace-format#initialization-record
+      uint64_t init_record_header;
+      zx_ticks_t ticks_per_second;
+    };
+    const FxtMetadata fxt_metadata = {
+        .magic = 0x0016547846040010,
+        .init_record_header = 0x21,
+        .ticks_per_second = ticks_per_second(),
+    };
+
+    // Reserve space for the metadata record.
+    // We just drained this buffer, so this reservation cannot fail.
+    zx::result<PerCpuBuffer::Reservation> res = curr_cpu_buffer.Reserve(sizeof(FxtMetadata));
+    DEBUG_ASSERT(res.is_ok());
+    res->Write(ktl::span<const ktl::byte>(reinterpret_cast<const ktl::byte*>(&fxt_metadata),
+                                          sizeof(fxt_metadata)));
+    res->Commit();
+  };
+  mp_sync_exec(MP_IPI_TARGET_ALL, 0, run_drain, percpu_buffers_.get());
+  return ZX_OK;
 }
 
 template <>
