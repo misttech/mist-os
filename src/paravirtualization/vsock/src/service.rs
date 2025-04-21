@@ -228,13 +228,13 @@ struct State {
 }
 
 impl State {
-    fn device(&self, addr: &addr::Vsock) -> &DeviceProxy {
-        match (addr.remote_cid, &self.guest_vsock_device, &self.loopback_vsock_device) {
-            (VMADDR_CID_LOCAL, _, Some(loopback)) => &loopback,
-            (VMADDR_CID_HOST, Some(guest), _) => &guest,
-            (VMADDR_CID_HOST, None, Some(loopback)) => &loopback,
-            (cid, None, Some(loopback)) if cid == self.local_cid => &loopback,
-            _ => unreachable!("Shouldn't be able to end up here!"),
+    fn device(&self, cid: u32) -> Option<&DeviceProxy> {
+        match (cid, &self.guest_vsock_device, &self.loopback_vsock_device) {
+            (VMADDR_CID_LOCAL, _, Some(loopback)) => Some(&loopback),
+            (VMADDR_CID_HOST, Some(guest), _) => Some(&guest),
+            (VMADDR_CID_HOST, None, Some(loopback)) => Some(&loopback),
+            (cid, None, Some(loopback)) if cid == self.local_cid => Some(&loopback),
+            _ => None,
         }
     }
 }
@@ -299,10 +299,6 @@ impl Vsock {
         // The only way to get here is if our callbacks stream ended, since our notifications
         // cannot disconnect as we are holding a reference to them in |service|.
         Err(format_err!("Driver disconnected"))
-    }
-
-    fn supported_cid(&self, cid: u32) -> bool {
-        cid == VMADDR_CID_HOST || cid == VMADDR_CID_LOCAL || cid == self.borrow().local_cid
     }
 
     // Spawns a new asynchronous task for listening for incoming connections on a port.
@@ -648,10 +644,6 @@ impl Vsock {
         remote_port: u32,
         con: ConnectionTransport,
     ) -> Result<u32, Error> {
-        if !self.supported_cid(remote_cid) {
-            log::info!("Rejecting request to connect to unsupported CID {}", remote_cid);
-            return Err(Error::ConnectionRefused);
-        }
         let data = con.data;
         let con = con.con.into_stream();
         let port = self.clone().alloc_ephemeral_port(remote_cid).ok_or(Error::OutOfPorts)?;
@@ -713,26 +705,42 @@ impl State {
         addr: &addr::Vsock,
         data: zx::Socket,
     ) -> impl Future<Output = Result<(), Error>> {
-        self.device(addr).send_request(&addr.clone(), data).map(map_driver_result)
+        let result = self
+            .device(addr.remote_cid)
+            .ok_or(Error::ConnectionRefused)
+            .and_then(|device| Ok(device.send_request(&addr.clone(), data).map(map_driver_result)));
+        async { result?.await }
     }
     fn send_response(
         &mut self,
         addr: &addr::Vsock,
         data: zx::Socket,
     ) -> impl Future<Output = Result<(), Error>> {
-        self.device(addr).send_response(&addr.clone(), data).map(map_driver_result)
+        let result =
+            self.device(addr.remote_cid).ok_or(Error::ConnectionRefused).and_then(|device| {
+                Ok(device.send_response(&addr.clone(), data).map(map_driver_result))
+            });
+        async { result?.await }
     }
     fn send_rst(
         &mut self,
         addr: &addr::Vsock,
     ) -> impl Future<Output = Result<(), Error>> + 'static {
-        self.device(addr).send_rst(&addr.clone()).map(map_driver_result)
+        let result = self
+            .device(addr.remote_cid)
+            .ok_or(Error::ConnectionRefused)
+            .and_then(|device| Ok(device.send_rst(&addr.clone()).map(map_driver_result)));
+        async { result?.await }
     }
     fn send_shutdown(
         &mut self,
         addr: &addr::Vsock,
     ) -> impl Future<Output = Result<(), Error>> + 'static {
-        self.device(addr).send_shutdown(&addr).map(map_driver_result)
+        let result = self
+            .device(addr.remote_cid)
+            .ok_or(Error::ConnectionRefused)
+            .and_then(|device| Ok(device.send_shutdown(&addr.clone()).map(map_driver_result)));
+        async { result?.await }
     }
 
     // Processes a single callback from the `device`. This is intended to be used by
