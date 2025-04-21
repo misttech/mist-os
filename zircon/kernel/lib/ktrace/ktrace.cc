@@ -887,6 +887,53 @@ zx::result<KTraceImpl<BufferMode::kPerCpu>::PendingCommit> KTraceImpl<BufferMode
   return zx::ok(ktl::move(res));
 }
 
+template <>
+zx::result<size_t> KTraceImpl<BufferMode::kPerCpu>::ReadUser(user_out_ptr<void> ptr,
+                                                             uint32_t offset, size_t len) {
+  // Reads must be serialized with respect to all other non-write operations.
+  KTraceGuard guard{&lock_};
+
+  // If the per-CPU buffers have not been initialized, there's nothing to do, so return early.
+  if (!percpu_buffers_) {
+    return zx::ok(0);
+  }
+
+  // Eventually, this should support users passing in buffers smaller than the sum of the size of
+  // all per-CPU buffers, but for now we do not allow this.
+  if (len < (buffer_size_ * num_buffers_)) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  // Iterate through each per-CPU buffer and read its contents.
+  size_t bytes_read = 0;
+  user_out_ptr<ktl::byte> byte_ptr = ptr.reinterpret<ktl::byte>();
+  for (uint32_t i = 0; i < num_buffers_; i++) {
+    auto copy_fn = [&](uint32_t offset, ktl::span<ktl::byte> src) {
+      // This is safe to do while holding the lock_ because the KTrace lock is a leaf lock that is
+      // not acquired during the course of a page fault.
+      zx_status_t status = ZX_ERR_BAD_STATE;
+      guard.CallUntracked([&]() {
+        status =
+            byte_ptr.byte_offset(bytes_read + offset).copy_array_to_user(src.data(), src.size());
+      });
+      return status;
+    };
+    const zx::result<size_t> result = percpu_buffers_[i].Read(copy_fn, static_cast<uint32_t>(len));
+    if (result.is_error()) {
+      DiagsPrintf(INFO, "failed to copy out ktrace data: %d\n", result.status_value());
+      // If we copied some data from a previous buffer, we have to return the fact that we did so
+      // here. Otherwise, that data will be lost.
+      if (bytes_read != 0) {
+        return zx::ok(bytes_read);
+      }
+      // Otherwise, return the error.
+      return zx::error(result.status_value());
+    }
+    bytes_read += result.value();
+  }
+  return zx::ok(bytes_read);
+}
+
 // The InitHook is the same for both the single and per-CPU buffer implementation of KTrace.
 template <BufferMode Mode>
 void KTraceImpl<Mode>::InitHook(unsigned) {

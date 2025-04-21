@@ -10,6 +10,7 @@
 #include <lib/fxt/serializer.h>
 #include <lib/ktrace.h>
 #include <lib/unittest/unittest.h>
+#include <lib/unittest/user_memory.h>
 #include <lib/zircon-internal/ktrace.h>
 
 #include <arch/ops.h>
@@ -309,6 +310,65 @@ class KTraceTests {
 
     END_TEST;
   }
+
+  static bool TestReadUser() {
+    BEGIN_TEST;
+
+    // Initialize a KTrace instance, but do not start tracing.
+    TestKTrace ktrace;
+    const uint32_t num_cpus = arch_max_num_cpus();
+    const uint32_t total_bufsize = PAGE_SIZE * num_cpus;
+    ktrace.Init(total_bufsize, 0u);
+
+    // Initialize "user" memory to test with.
+    using testing::UserMemory;
+    ktl::unique_ptr<UserMemory> user_mem = UserMemory::Create(total_bufsize);
+
+    // Initialize a buffer full of data to write to the ktrace buffer.
+    fbl::AllocChecker ac;
+    ktl::byte* src = new (&ac) ktl::byte[total_bufsize];
+    ASSERT_TRUE(ac.check());
+    srand(4);
+    for (uint32_t i = 0; i < total_bufsize; i++) {
+      src[i] = static_cast<ktl::byte>(rand());
+    }
+
+    // Initialize a destination buffer to read data into.
+    ktl::byte* dst = new (&ac) ktl::byte[total_bufsize];
+    ASSERT_TRUE(ac.check());
+    memset(dst, 0, total_bufsize);
+
+    // Verify that ReadUser succeeds and returns a size of zero when tracing has not been started.
+    zx::result<size_t> result = ktrace.ReadUser(user_mem->user_out<void>(), 0, total_bufsize);
+    ASSERT_OK(result.status_value());
+    ASSERT_EQ(0ul, result.value());
+
+    // Start tracing and write some test data into the per-CPU buffers.
+    // We use the SPSC buffer API here to avoid having to synthesize fxt headers, and to bypass the
+    // synchronization performed by KTrace.Reserve, which is unnecessary when performing writes
+    // serially on a single test thread.
+    ASSERT_OK(ktrace.Control(KTRACE_ACTION_START, 0xffff));
+    for (uint32_t i = 0; i < num_cpus; i++) {
+      zx::result<TestKTrace::PerCpuBuffer::Reservation> res =
+          ktrace.percpu_buffers_[i].Reserve(PAGE_SIZE);
+      ASSERT_OK(result.status_value());
+      res->Write(ktl::span<ktl::byte>(src + (i * PAGE_SIZE), PAGE_SIZE));
+      res->Commit();
+    }
+
+    // Verify that passing in too small of a buffer results in a ZX_ERR_INVALID_ARGS.
+    result = ktrace.ReadUser(user_mem->user_out<void>(), 0, total_bufsize - 1);
+    ASSERT_EQ(ZX_ERR_INVALID_ARGS, result.status_value());
+
+    // Verify that passing in a large enough buffer correctly reads the data out.
+    result = ktrace.ReadUser(user_mem->user_out<void>(), 0, total_bufsize);
+    ASSERT_OK(result.status_value());
+    ASSERT_OK(user_mem->VmoRead(dst, 0, total_bufsize));
+    ASSERT_BYTES_EQ(reinterpret_cast<uint8_t*>(dst), reinterpret_cast<uint8_t*>(src),
+                    total_bufsize);
+
+    END_TEST;
+  }
 };
 
 UNITTEST_START_TESTCASE(ktrace_tests)
@@ -317,4 +377,5 @@ UNITTEST("init_stop", KTraceTests::TestInitStop)
 UNITTEST("start_stop", KTraceTests::TestStartStop)
 UNITTEST("write", KTraceTests::TestWrite)
 UNITTEST("rewind", KTraceTests::TestRewind)
+UNITTEST("read_user", KTraceTests::TestReadUser)
 UNITTEST_END_TESTCASE(ktrace_tests, "ktrace", "KTrace tests")
