@@ -25,14 +25,11 @@ namespace msd {
 
 class MagmaTestServer;
 
-template <typename FidlDeviceType>
 class MagmaDriverBase : public fdf::DriverBase,
-                        public fidl::WireServer<FidlDeviceType>,
+                        public fidl::WireServer<fuchsia_gpu_magma::CombinedDevice>,
                         public fidl::WireServer<fuchsia_gpu_magma::PowerElementProvider>,
                         internal::DependencyInjectionServer::Owner {
  public:
-  using fws = fidl::WireServer<FidlDeviceType>;
-
   MagmaDriverBase(std::string_view name, fdf::DriverStartArgs start_args,
                   fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : DriverBase(name, std::move(start_args), std::move(driver_dispatcher)),
@@ -153,8 +150,7 @@ class MagmaDriverBase : public fdf::DriverBase,
     return true;
   }
 
-  void Query(typename fws::QueryRequestView request,
-             typename fws::QueryCompleter::Sync& _completer) override {
+  void Query(QueryRequestView request, QueryCompleter::Sync& _completer) override {
     MAGMA_DLOG("MagmaDriverBase::Query");
     std::lock_guard lock(magma_mutex_);
     if (!CheckSystemDevice(_completer))
@@ -179,8 +175,7 @@ class MagmaDriverBase : public fdf::DriverBase,
     }
   }
 
-  void Connect2(typename fws::Connect2RequestView request,
-                typename fws::Connect2Completer::Sync& _completer) override {
+  void Connect2(Connect2RequestView request, Connect2Completer::Sync& _completer) override {
     MAGMA_DLOG("MagmaDriverBase::Connect2");
     std::lock_guard lock(magma_mutex_);
     if (!CheckSystemDevice(_completer))
@@ -206,8 +201,7 @@ class MagmaDriverBase : public fdf::DriverBase,
     });
   }
 
-  void DumpState(typename fws::DumpStateRequestView request,
-                 typename fws::DumpStateCompleter::Sync& _completer) override {
+  void DumpState(DumpStateRequestView request, DumpStateCompleter::Sync& _completer) override {
     MAGMA_DLOG("MagmaDriverBase::DumpState");
     std::lock_guard lock(magma_mutex_);
     if (!CheckSystemDevice(_completer))
@@ -221,7 +215,7 @@ class MagmaDriverBase : public fdf::DriverBase,
       magma_system_device_->DumpStatus(request->dump_type);
   }
 
-  void GetIcdList(typename fws::GetIcdListCompleter::Sync& completer) override {
+  void GetIcdList(GetIcdListCompleter::Sync& completer) override {
     std::lock_guard lock(magma_mutex_);
     if (!CheckSystemDevice(completer))
       return;
@@ -253,8 +247,7 @@ class MagmaDriverBase : public fdf::DriverBase,
         };
     auto device_protocol =
         [this](fidl::ServerEnd<fuchsia_gpu_magma::CombinedDevice> server_end) mutable {
-          fidl::BindServer(dispatcher(), fidl::ServerEnd<FidlDeviceType>(server_end.TakeChannel()),
-                           this);
+          fidl::BindServer(dispatcher(), std::move(server_end), this);
         };
     auto test_protocol =
         [this, &test_server](fidl::ServerEnd<fuchsia_gpu_magma::TestDevice2> server_end) mutable {
@@ -310,8 +303,7 @@ class MagmaDriverBase : public fdf::DriverBase,
         };
     auto device_protocol =
         [this](fidl::ServerEnd<fuchsia_gpu_magma::CombinedDevice> server_end) mutable {
-          fidl::BindServer(dispatcher(), fidl::ServerEnd<FidlDeviceType>(server_end.TakeChannel()),
-                           this);
+          fidl::BindServer(dispatcher(), std::move(server_end), this);
         };
 
     fuchsia_gpu_magma::Service::InstanceHandler handler(
@@ -328,7 +320,7 @@ class MagmaDriverBase : public fdf::DriverBase,
     return zx::ok();
   }
 
-  void BindConnector(fidl::ServerEnd<FidlDeviceType> server) {
+  void BindConnector(fidl::ServerEnd<fuchsia_gpu_magma::CombinedDevice> server) {
     fidl::BindServer(dispatcher(), std::move(server), this);
   }
 
@@ -355,7 +347,7 @@ class MagmaDriverBase : public fdf::DriverBase,
   std::mutex magma_mutex_;
   std::unique_ptr<msd::Driver> magma_driver_ FIT_GUARDED(magma_mutex_);
   std::unique_ptr<MagmaSystemDevice> magma_system_device_ FIT_GUARDED(magma_mutex_);
-  driver_devfs::Connector<FidlDeviceType> magma_devfs_connector_;
+  driver_devfs::Connector<fuchsia_gpu_magma::CombinedDevice> magma_devfs_connector_;
   // Node representing /dev/class/gpu/<id>.
   fidl::WireSyncClient<fuchsia_driver_framework::Node> gpu_node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> gpu_node_controller_;
@@ -376,26 +368,7 @@ class MagmaTestServer : public fidl::WireServer<fuchsia_gpu_magma::TestDevice2> 
   zx_status_t unit_test_status_ = ZX_ERR_NOT_FOUND;
 };
 
-class MagmaTestDriverBase : public MagmaDriverBase<fuchsia_gpu_magma::TestDevice> {
- public:
-  MagmaTestDriverBase(std::string_view name, fdf::DriverStartArgs start_args,
-                      fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : MagmaDriverBase(name, std::move(start_args), std::move(driver_dispatcher)) {}
-
-  void GetUnitTestStatus(fws::GetUnitTestStatusCompleter::Sync& _completer) override {
-    MAGMA_DLOG("MagmaDriverBase::GetUnitTestStatus");
-    std::lock_guard<std::mutex> lock(magma_mutex());
-    if (!CheckSystemDevice(_completer))
-      return;
-    _completer.Reply(unit_test_status_);
-  }
-  void set_unit_test_status(zx_status_t status) { unit_test_status_ = status; }
-
- private:
-  zx_status_t unit_test_status_ = ZX_ERR_NOT_FOUND;
-};
-
-using MagmaProductionDriverBase = MagmaDriverBase<fuchsia_gpu_magma::CombinedDevice>;
+using MagmaProductionDriverBase = MagmaDriverBase;
 
 }  // namespace msd
 

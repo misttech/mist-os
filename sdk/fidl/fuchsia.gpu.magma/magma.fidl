@@ -117,6 +117,7 @@ closed protocol CombinedDevice {
 
 /// Additional device methods for the purposes of testing the MSD and should not be used by ICDs.
 /// DEPRECATED: Please use TestDevice2.
+@available(removed=HEAD)
 closed protocol TestDevice {
     compose CombinedDevice;
 
