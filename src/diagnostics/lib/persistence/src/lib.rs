@@ -146,6 +146,12 @@ impl Display for ServiceName {
     }
 }
 
+impl From<ServiceName> for String {
+    fn from(ServiceName(value): ServiceName) -> Self {
+        value
+    }
+}
+
 const CONFIG_GLOB: &str = "/config/data/*.persist";
 
 fn try_insert_items(config: &mut Config, config_text: &str) -> Result<(), Error> {

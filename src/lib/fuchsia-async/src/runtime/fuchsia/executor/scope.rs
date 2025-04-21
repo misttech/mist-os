@@ -96,8 +96,8 @@ impl Scope {
     ///
     /// May panic if not called in the context of an executor (e.g. within a
     /// call to [`run`][crate::SendExecutor::run]).
-    pub fn new_with_name(name: &str) -> Scope {
-        ScopeHandle::with_current(|handle| handle.new_child_with_name(name))
+    pub fn new_with_name(name: impl Into<String>) -> Scope {
+        ScopeHandle::with_current(|handle| handle.new_child_with_name(name.into()))
     }
 
     /// Get the scope of the current task, or the global scope if there is no task
@@ -137,8 +137,8 @@ impl Scope {
     }
 
     /// Create a child scope with a name.
-    pub fn new_child_with_name(&self, name: &str) -> Scope {
-        self.inner.new_child_with_name(name)
+    pub fn new_child_with_name(&self, name: impl Into<String>) -> Scope {
+        self.inner.new_child_with_name(name.into())
     }
 
     /// Returns the name of the scope.
@@ -352,25 +352,15 @@ pub struct ScopeHandle {
 impl ScopeHandle {
     /// Create a child scope.
     pub fn new_child(&self) -> Scope {
-        let mut state = self.lock();
-        let child = ScopeHandle {
-            inner: Arc::new(ScopeInner {
-                executor: self.inner.executor.clone(),
-                state: Condition::new(ScopeState::new(
-                    Some(self.clone()),
-                    state.status(),
-                    JoinResults::default().into(),
-                )),
-                name: String::new(),
-            }),
-        };
-        let weak = child.downgrade();
-        state.insert_child(weak);
-        Scope { inner: child }
+        self.new_child_inner(String::new())
     }
 
     /// Create a child scope.
-    pub fn new_child_with_name(&self, name: &str) -> Scope {
+    pub fn new_child_with_name(&self, name: impl Into<String>) -> Scope {
+        self.new_child_inner(name.into())
+    }
+
+    fn new_child_inner(&self, name: String) -> Scope {
         let mut state = self.lock();
         let child = ScopeHandle {
             inner: Arc::new(ScopeInner {
@@ -380,7 +370,7 @@ impl ScopeHandle {
                     state.status(),
                     JoinResults::default().into(),
                 )),
-                name: name.to_string(),
+                name,
             }),
         };
         let weak = child.downgrade();
@@ -566,7 +556,7 @@ impl<R: Send + 'static> ScopeStream<R> {
     /// May panic if not called in the context of an executor (e.g. within a
     /// call to [`run`][crate::SendExecutor::run]).
     pub fn new() -> (Self, ScopeStreamHandle<R>) {
-        Self::new_with_name(String::new())
+        Self::new_inner(String::new())
     }
 
     /// Creates a new scope stream with a name.
@@ -577,7 +567,11 @@ impl<R: Send + 'static> ScopeStream<R> {
     ///
     /// May panic if not called in the context of an executor (e.g. within a
     /// call to [`run`][crate::SendExecutor::run]).
-    pub fn new_with_name(name: String) -> (Self, ScopeStreamHandle<R>) {
+    pub fn new_with_name(name: impl Into<String>) -> (Self, ScopeStreamHandle<R>) {
+        Self::new_inner(name.into())
+    }
+
+    fn new_inner(name: String) -> (Self, ScopeStreamHandle<R>) {
         let this = ScopeHandle::with_current(|handle| {
             let mut state = handle.lock();
             let stream = Arc::default();

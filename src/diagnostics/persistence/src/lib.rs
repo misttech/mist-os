@@ -165,7 +165,7 @@ async fn spawn_persist_services(
                 )
             })?;
 
-        let service_scope = scope.new_child_with_name(service_name);
+        let service_scope = scope.new_child_with_name(service_name.clone());
         PersistServer::spawn(
             service_name.clone(),
             tags.keys().cloned().collect(),
