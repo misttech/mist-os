@@ -144,9 +144,6 @@ _types_not_requiring_compatibility = [
 #     atom metadata specified by `source`/`value`. (That metadata is what
 #     controls whether the atom is marked as unstable in the final IDK.)
 #
-#   type (optional)
-#     Type of the atom. Defaults to schema.
-#
 # File scopes
 #
 # Each scope describes a file to be added to the SDK element. The supported
@@ -165,12 +162,9 @@ template("sdk_atom") {
   assert(defined(invoker.meta), "Must specify some metadata")
   meta = invoker.meta
 
-  # TODO(https://fxbug.dev/42165942): Read the type from the schema file.
-  if (defined(meta.type)) {
-    type = meta.type
-  } else {
-    type = meta.schema
-  }
+  # TODO(https://fxbug.dev/42165942): Rename `meta.schema` to `meta.type` and
+  # use the type to determine the schema file.
+  type = meta.schema
 
   assert(defined(invoker.category), "Must define an SDK category")
   category = invoker.category

@@ -19,9 +19,12 @@ sdk_atom("sdk_atom_unittest") {
   ]
   meta = {
     dest = "meta.json"
-    schema = "common"
-    type = "data"
-    value = ""
+    schema = "data"
+    value = {
+      type = "config"
+      name = target_name
+      data = [ "foo.bar" ]
+    }
   }
 }
 

@@ -84,7 +84,6 @@ template("sdk_version_history") {
                 "//build/info/jiri_generated/integration_daily_commit_hash.txt",
                 root_build_dir)
       }
-      type = "version_history"
     }
     non_sdk_deps = [ ":${_labels.compile}" ]
   }
