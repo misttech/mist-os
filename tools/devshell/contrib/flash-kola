@@ -37,6 +37,26 @@ if [[ -z $ANDROID_SERIAL ]]; then
   fi
 fi
 
+BOOTLOADER="$(${FASTBOOT} getvar product 2>&1 | grep '^product:' | awk '{print $2}')"
+# Only attempt to set bootmode if the bootloader is not 'sorrel' and mode is not 'factory'
+if [[ "${BOOTLOADER}" != "sorrel" ]]; then
+  # Ensure bootmode is set to factory before flashing partitions.
+  fx-info "Checking current bootmode..."
+  # Capture output and potential errors. Use awk to extract the value after 'bootmode='.
+  CURRENT_BOOTMODE=$(${FASTBOOT} oem get_config bootmode 2>&1 | awk '/bootmode:/ {print $3}')
+  if [[ "${CURRENT_BOOTMODE}" != "factory" ]]; then
+    fx-info "Current bootmode is '${CURRENT_BOOTMODE}', setting it to 'factory'."
+    ${FASTBOOT} oem set_config bootmode factory || {
+      fx-error "Failed to set bootmode to factory. Please check the device."
+      exit 1
+    }
+  else
+    fx-info "Bootmode: 'factory'."
+  fi
+else
+  fx-info "Bootloader is '${BOOTLOADER}'."
+fi
+
 ${FASTBOOT} flash boot_a "$ZBI_PATH"
 ${FASTBOOT} flash boot_b "$ZBI_PATH"
 ${FASTBOOT} flash dtbo_a "$DTBO_PATH"
@@ -53,7 +73,6 @@ ${FASTBOOT} reboot bootloader
 # the next fastboot command will execute before the host realizes the device is
 # gone which causes the command to fail.
 sleep 4
-BOOTLOADER="$(${FASTBOOT} getvar product 2>&1 | grep '^product:' | awk '{print $2}')"
 # Attempt to flash SSH keys. This is only supported on devices running custom
 # Fuchsia firmware, so if it doesn't work just log a warning.
 function push_ssh_keys {
