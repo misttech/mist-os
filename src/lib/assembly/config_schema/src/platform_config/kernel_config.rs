@@ -86,6 +86,10 @@ pub struct PlatformKernelConfig {
     /// Configurations related to page scanner behavior.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub page_scanner: Option<PageScannerConfig>,
+
+    // Configurations related to out-of-memory and memory reclamation behavior.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub oom: OomConfig,
 }
 
 /// Options for cprng behaviors
@@ -159,6 +163,38 @@ pub struct PageScannerConfig {
     /// but removes some timing predictability from system behavior.
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub disable_eviction: bool,
+}
+
+// Configurations related to out-of-memory and memory reclamation behavior.
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(default, deny_unknown_fields)]
+pub struct OomConfig {
+    /// Delay (in ms) before kernel eviction is triggered under memory pressure.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eviction_delay_ms: Option<u32>,
+
+    /// Whether kernel eviction also tries to free a minimum amount in addition
+    /// to meeting a free memory target.
+    #[serde(skip_serializing_if = "is_evict_with_min_target_default")]
+    pub evict_with_min_target: bool,
+
+    /// The granularity (in MiB) of synchronous kernel eviction to avoid OOM.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eviction_delta_at_oom_mb: Option<u32>,
+}
+
+impl Default for OomConfig {
+    fn default() -> Self {
+        Self {
+            eviction_delay_ms: None,
+            evict_with_min_target: true,
+            eviction_delta_at_oom_mb: None,
+        }
+    }
+}
+
+fn is_evict_with_min_target_default(val: &bool) -> bool {
+    *val
 }
 
 #[cfg(test)]

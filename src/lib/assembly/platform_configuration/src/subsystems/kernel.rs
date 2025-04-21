@@ -30,8 +30,18 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
                 builder.platform_bundle("kernel_oom_behavior_disable")
             }
             (&BuildType::UserDebug | &BuildType::User, _) => {
-                anyhow::bail!("'kernel.oom_behavior' can only be set on 'build_type=\"eng\"");
+                anyhow::bail!("'kernel.oom.behavior' can only be set on 'build_type=\"eng\"");
             }
+        }
+        if let Some(eviction_delay_ms) = kernel_config.oom.eviction_delay_ms {
+            builder.kernel_arg(KernelArg::OomEvictionDelayMs(eviction_delay_ms));
+        }
+        if !kernel_config.oom.evict_with_min_target {
+            // the default is true
+            builder.kernel_arg(KernelArg::OomEvictWithMinTarget(false));
+        }
+        if let Some(eviction_delta_at_oom_mb) = kernel_config.oom.eviction_delta_at_oom_mb {
+            builder.kernel_arg(KernelArg::OomEvictionDeltaAtOomMib(eviction_delta_at_oom_mb));
         }
         match (&context.board_info.kernel.serial_mode, &context.build_type) {
             (SerialMode::NoOutput, &BuildType::User) => {

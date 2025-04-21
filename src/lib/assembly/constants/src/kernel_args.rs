@@ -45,6 +45,22 @@ pub enum KernelArg {
     /// memory pressure level transitions.
     OomEvictContinuous(bool),
 
+    /// This option specifies the duration (in milliseconds) by which the kernel delays eviction
+    /// when eviction is required by a change in memory pressure state. This delay allows userspace
+    /// components responding to memory pressure to reclaim memory first, avoiding thrash due to
+    /// interference with kernel eviction.
+    OomEvictionDelayMs(u32),
+
+    /// This option specifies whether the kernel should also evict a minimum amount of memory along
+    /// with trying to meet the target free memory goal. If userspace also frees memory in response
+    /// to memory pressure, this ensures some fairness by having kernel eviction share the load.
+    OomEvictWithMinTarget(bool),
+
+    /// This option specifies the granularity (in MB) at which the kernel will try to synchronously
+    /// evict memory to avoid entering the out-of-memory state. Note that this value is independent
+    /// of the kernel.oom.evict-with-min-target, and they do not influence each other.
+    OomEvictionDeltaAtOomMib(u32),
+
     /// This option specifies the free-memory threshold at which the out-of-memory (OOM)
     /// thread will trigger an out-of-memory event and begin killing processes, or
     /// rebooting the system.
@@ -201,6 +217,11 @@ impl KernelArg {
             Self::Serial(s) => ("kernel.serial", s.to_string()),
             Self::OomEvictAtWarning(b) => ("kernel.oom.evict-at-warning", b.to_string()),
             Self::OomEvictContinuous(b) => ("kernel.oom.evict-continuous", b.to_string()),
+            Self::OomEvictionDelayMs(i) => ("kernel.oom.eviction-delay-ms", i.to_string()),
+            Self::OomEvictWithMinTarget(b) => ("kernel.oom.evict-with-min-target", b.to_string()),
+            Self::OomEvictionDeltaAtOomMib(i) => {
+                ("kernel.oom.eviction-delta-at-oom-mb", i.to_string())
+            }
             Self::OomOutOfMemoryMib(i) => ("kernel.oom.outofmemory-mb", i.to_string()),
             Self::OomCriticalMib(i) => ("kernel.oom.critical-mb", i.to_string()),
             Self::OomWarningMib(i) => ("kernel.oom.warning-mb", i.to_string()),
@@ -239,6 +260,7 @@ impl KernelArg {
             Self::SchedulerPreferLittleCpus(_)
             | Self::OomEvictAtWarning(_)
             | Self::OomEvictContinuous(_)
+            | Self::OomEvictWithMinTarget(_)
             | Self::HaltOnPanic(_)
             | Self::PageScannerStartAtBoot(_)
             | Self::PhysVerbose(_)
@@ -252,6 +274,8 @@ impl KernelArg {
             // These kernel args have their right half provided by the product, therefore we
             // serialize them with a =* to catch all options.
             Self::Serial(_)
+            | Self::OomEvictionDelayMs(_)
+            | Self::OomEvictionDeltaAtOomMib(_)
             | Self::OomOutOfMemoryMib(_)
             | Self::OomCriticalMib(_)
             | Self::OomWarningMib(_)

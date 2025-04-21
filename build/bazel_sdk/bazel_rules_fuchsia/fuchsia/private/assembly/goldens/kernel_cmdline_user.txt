@@ -23,6 +23,10 @@
 ?kernel.oom.evict-at-warning=true
 ?kernel.oom.evict-continuous=false
 ?kernel.oom.evict-continuous=true
+?kernel.oom.evict-with-min-target=false
+?kernel.oom.evict-with-min-target=true
+?kernel.oom.eviction-delay-ms=*
+?kernel.oom.eviction-delta-at-oom-mb=*
 ?kernel.oom.outofmemory-mb=*
 ?kernel.oom.warning-mb=*
 ?kernel.page-scanner.enable-eviction=false
