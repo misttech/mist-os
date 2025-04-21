@@ -21,6 +21,7 @@
 # CONFIG_RANDOMIZE_BASE is not set, the Zircon kernel does not yet fully implement KASLR (http://b/42098994)
 # CONFIG_RT_GROUP_SCHED is not set
 # CONFIG_SYSVIPC is not set
+# CONFIG_TIME_NS is not set, Starnix does not implement and there's no known need (http://b/409148368)
 # CONFIG_USELIB is not set
 CONFIG_ADVISE_SYSCALLS=y
 CONFIG_AIO=y
