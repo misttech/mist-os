@@ -556,14 +556,6 @@
                     "Unblocking the landing of some Rust crates that have a different LICENSE layout.",
                     "More info in https://fxbug.dev/397749809"
                 ]
-            },
-            {
-                "paths": [
-                    "third_party/half"
-                ],
-                "notes": [
-                    "Temporary skip, while repository is being added."
-                ]
             }
         ]
     }
