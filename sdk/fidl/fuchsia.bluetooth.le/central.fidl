@@ -161,6 +161,27 @@ closed protocol Central {
         handle server_end:Connection;
     });
 
+    /// Create a new Connected Iosochronous Group (CIG) with the specified parameters. This
+    /// operation is only valid when operating in the Central role for a connection.
+    ///
+    /// If the Central channel is closed before the CIG is explicitly removed, the group will
+    /// be removed and disconnected.
+    ///
+    /// On failure, returns an error code, see `CreateCigError`. On success, returns a unique
+    /// id allocated by the host.
+    @available(added=NEXT)
+    strict CreateConnectedIsochronousGroup(resource table {
+        /// Required. Parameters for the CIG.
+        1: cig_parameters CigParameters;
+        /// Required. At least one CIS must be included.
+        2: cis_requested_parameters vector<CisRequestedParameters>:MAX_STREAMS_IN_GROUP;
+        /// Required. ConnectedIsochronousGroup protocol to connect.
+        3: cig server_end:ConnectedIsochronousGroup;
+    }) -> (table {
+        /// A unique CIG_ID, allocated by the host.
+        1: cig_id uint8;
+    }) error CreateCigError;
+
     /// Returns the list of peripherals that are known to the system from previous scan, connection,
     /// and/or bonding procedures. The results can be filtered based on service UUIDs that are known to
     /// be present on the peripheral.

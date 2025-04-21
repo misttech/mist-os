@@ -11,6 +11,11 @@ using zx;
 @available(added=NEXT)
 const MAX_ISO_PACKET_SIZE uint16 = 0x0FFF;
 
+/// The maximum number of connected isochronous streams that can be added to
+/// a connected isochronous group.
+@available(added=NEXT)
+const MAX_STREAMS_IN_GROUP uint8 = 31;
+
 /// Parameters related to a single direction of transmission in an established CIS.
 @available(added=24)
 type CisUnidirectionalParams = table {
@@ -80,6 +85,114 @@ type IsoPacketStatusFlag = strict enum : uint8 {
 
     /// Parts of the packet were not received correctly.
     LOST_DATA = 2;
+};
+
+@available(added=NEXT)
+type CigFramingOptions = strict enum {
+    UNFRAMED = 0x00;
+    FRAMED = 0x01;
+};
+
+@available(added=NEXT)
+type CigPacking = flexible enum {
+    SEQUENTIAL = 0x00;
+    INTERLEAVED = 0x01;
+};
+
+@available(added=NEXT)
+type CigParameters = table {
+    /// Interval between the start of consecutive SDUs (central => peripheral,
+    /// microseconds). This is a function of the codec being used.
+    /// Required.
+    1: sdu_interval_c_to_p uint32;
+
+    /// Interval between the start of consecutive SDUs (peripheral => central,
+    /// microseconds). This is a function of the codec being used.
+    /// Required.
+    2: sdu_interval_p_to_c uint32;
+
+    /// The preferred method of arranging subevents of multiple CISes. The
+    /// controller may ignore this parameter.
+    /// Optional. If not specified, SEQUENTIAL will be used.
+    3: packing CigPacking;
+
+    /// Specifies inclusion of time offset values in data frame.
+    /// Optional. If not specified, UNFRAMED will be used.
+    4: framing CigFramingOptions;
+
+    /// Maximum latency, in milliseconds, between controllers (central =>
+    /// peripheral).
+    /// Required.
+    5: max_transport_latency_c_to_p uint16;
+
+    /// Maximum latency, in milliseconds, between controllers (peripheral =>
+    /// central).
+    /// Required.
+    6: max_transport_latency_p_to_c uint16;
+};
+
+@available(added=NEXT)
+type CisRequestedParameters = resource table {
+    /// ID selected to uniquely identify a stream within a CIG. All `cis_id`s
+    /// must be distinct within a single creation request.
+    /// Required.
+    1: cis_id uint8;
+
+    /// The channel that will be used for operations on the stream.
+    /// Required.
+    2: connection_stream server_end:IsochronousStream;
+
+    /// Maximum SDU size (central => peripheral). This is a function of the
+    /// codec being used. Unidirectional streams should set the unused
+    /// direction to 0.
+    /// Optional. If not provided, a value of 0 will be used (unidirectional)
+    3: max_sdu_size_outgoing uint16;
+
+    /// Maximum SDU size (peripheral => central). This is a function of the
+    /// codec being used. Unidirectional streams should set the unused
+    /// direction to 0.
+    /// Optional. If not provided, a value of 0 will be used (unidirectional)
+    4: max_sdu_size_incoming uint16;
+};
+
+@available(added=NEXT)
+type CisParameters = table {
+    /// ID of the stream to establish (as previously passed to Connection/CreateCig()).
+    /// Required.
+    1: cis_id uint8;
+
+    /// Peripheral device providing other end of the isochronous data stream.
+    /// Required.
+    2: id bt.PeerId;
+};
+
+@available(added=NEXT)
+type CreateCigError = flexible enum {
+    /// The CIG could not be created because an unknown or unspecified error occurred unrelated
+    /// to the other errors defined below.
+    UNKNOWN = 1;
+
+    /// The CIG could not be created because it would exceed available resources.
+    NOT_ENOUGH_RESOURCES = 2;
+
+    /// The CIG could not be created because the combination of parameters supplied to CreateCig
+    /// for one or more CISes are invalid.
+    INVALID_CIS_PARAMETERS = 3;
+};
+
+@available(added=NEXT)
+type EstablishStreamsError = flexible enum {
+    /// The controller does not support a CIS with the parameters specified for it.
+    NOT_SUPPORTED = 1;
+
+    /// The same CIS was specified multiple times in a call.
+    DUPLICATE_CIS = 2;
+
+    /// One or more CISes specified already exist.
+    CIS_ALREADY_ESTABLISHED = 3;
+
+    /// One or more of the peers specified in the CIS parameters are not connected.
+    PEER_NOT_CONNECTED = 4;
 };
 
 @available(added=24)
@@ -153,4 +266,24 @@ open protocol IsochronousStream {
         /// The data frame itself.
         1: data vector<uint8>:MAX_ISO_PACKET_SIZE;
     }) -> () error zx.Status;
+};
+
+@available(added=NEXT)
+open protocol ConnectedIsochronousGroup {
+    /// Connect one or more Isochronous streams. Each CIS is established with the peer specified
+    /// in the parameters. On successful initiation of the operation, an OnEstablished() event will
+    /// be sent on the IsochronousStream.
+    ///
+    /// On error, no CISes are established and an appropriate `EstablishStreamsError` code will be
+    /// returned.
+    ///
+    /// Otherwise, this call returns once each CIS specified has connected.
+    flexible EstablishStreams(table {
+        /// Required.
+        1: cis_params vector<CisParameters>:MAX_STREAMS_IN_GROUP;
+    }) -> () error EstablishStreamsError;
+
+    /// Remove this CIG. Associated streams will be closed. This protocol will be closed after
+    /// all of the associated streams have closed and the group has been removed.
+    flexible Remove();
 };
