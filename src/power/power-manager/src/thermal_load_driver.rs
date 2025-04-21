@@ -70,6 +70,8 @@ impl ThermalLoadDriverBuilder<'_> {
             reboot_temperature_c: f64,
             poll_interval_s: f64,
             filter_time_constant_s: f64,
+            #[serde(default)]
+            log_for_test: bool,
         }
 
         #[derive(Deserialize)]
@@ -110,6 +112,7 @@ impl ThermalLoadDriverBuilder<'_> {
                             config.filter_time_constant_s
                         },
                     ),
+                    log_for_test: config.log_for_test,
                 })
                 .collect(),
             thermal_load_notify_nodes: data
@@ -186,13 +189,18 @@ impl ThermalLoadDriver {
             let inspect = TemperatureInputInspect::new(&this.inspect, &sensor_name, &config);
 
             let mut periodic_timer = fasync::Interval::new(config.poll_interval.into());
+            let log_for_test = config.log_for_test;
             let temperature_input = TemperatureInput::new(config);
 
             // Enter the timer-based polling loop...
+            let mut count: u32 = 0;
             while let Some(()) = periodic_timer.next().await {
                 // Read a new filtered temperature value. Errors are logged but the polling loop
                 // will continue on the next iteration.
-                let new_thermal_load = match temperature_input.get_thermal_load().await {
+                let new_thermal_load = match temperature_input
+                    .get_thermal_load(&sensor_name, &mut count, log_for_test)
+                    .await
+                {
                     Ok(load) => load,
                     Err(e) => {
                         error!(
@@ -280,6 +288,9 @@ struct TemperatureInputConfig {
     /// Time constant to be used for filtering raw temperature readings. A value of 0 effectively
     /// disables filtering.
     filter_time_constant: Seconds,
+
+    /// Indicate if we need to log extra info for testing purpose.
+    log_for_test: bool,
 }
 
 /// Configuration and data source for a single temperature sensor.
@@ -314,8 +325,23 @@ impl TemperatureInput {
     /// The function will first poll the temperature handler to retrieve the latest filtered
     /// temperature value. The temperature is then converted to a thermal load value by also
     /// considering the configured `onset_temperature` and `reboot_temperature` parameters.
-    async fn get_thermal_load(&self) -> Result<ThermalLoad> {
+    async fn get_thermal_load(
+        &self,
+        name: &String,
+        call_count: &mut u32,
+        log_for_test: bool,
+    ) -> Result<ThermalLoad> {
         self.temperature_filter.get_temperature(get_current_timestamp()).await.map(|temperature| {
+            if log_for_test {
+                if *call_count % 5 == 0 {
+                    // The prefix LOG_FOR_TESTING may be used elsewhere so if this code is removed,
+                    // it has to be added in other files for the same sensor. (see b/409073173).
+                    info!("LOG_FOR_TESTING {}: {:?}", name, temperature.filtered);
+                    *call_count = 0;
+                }
+                *call_count += 1;
+            }
+
             temperature_to_thermal_load(
                 temperature.filtered,
                 self.onset_temperature,
@@ -586,6 +612,7 @@ mod tests {
                     reboot_temperature: Celsius(50.0),
                     poll_interval: Seconds(1.0),
                     filter_time_constant: Seconds(1.0),
+                    log_for_test: false,
                 },
                 TemperatureInputConfig {
                     temperature_handler_node: mock_temperature_handler_2.clone(),
@@ -593,6 +620,7 @@ mod tests {
                     reboot_temperature: Celsius(100.0),
                     poll_interval: Seconds(1.0),
                     filter_time_constant: Seconds(1.0),
+                    log_for_test: false,
                 },
             ],
             system_shutdown_node,
@@ -661,6 +689,7 @@ mod tests {
                 reboot_temperature: Celsius(50.0),
                 poll_interval: Seconds(1.0),
                 filter_time_constant: Seconds(1.0),
+                log_for_test: false,
             }],
             system_shutdown_node,
             platform_metrics_node,
@@ -713,6 +742,7 @@ mod tests {
                     reboot_temperature: Celsius(50.0),
                     poll_interval: Seconds(1.99),
                     filter_time_constant: Seconds(10.0),
+                    log_for_test: false,
                 },
                 TemperatureInputConfig {
                     temperature_handler_node: mock_temperature_handler_2.clone(),
@@ -720,6 +750,7 @@ mod tests {
                     reboot_temperature: Celsius(100.0),
                     poll_interval: Seconds(2.0),
                     filter_time_constant: Seconds(20.0),
+                    log_for_test: false,
                 },
             ],
             system_shutdown_node,
@@ -792,6 +823,7 @@ mod tests {
                 reboot_temperature: Celsius(50.0),
                 poll_interval: Seconds(1.0),
                 filter_time_constant: Seconds(1.0),
+                log_for_test: false,
             }],
             system_shutdown_node: mock_system_shutdown_node.clone(),
             platform_metrics_node: mock_platform_metrics.clone(),
