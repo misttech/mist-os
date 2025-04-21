@@ -65,6 +65,13 @@ bool GenerateObsAndCheckCount(uint32_t day_index,
   std::vector<uint64_t> num_obs;
   (*cobalt_controller)
       ->GenerateAggregatedObservations(day_index, std::move(aggregatedReportSpecs), &num_obs);
+
+  // Check if observations are successfully generated for each report spec to avoid out of range
+  // vector access
+  FX_CHECK(num_obs.size() == aggregatedReportIds.size())
+      << "Observation generation failed. Expect " << aggregatedReportIds.size()
+      << " reports with generated observations, but only " << num_obs.size()
+      << " reports had observations generated.";
   for (size_t i = 0; i < aggregatedReportIds.size(); i++) {
     const auto& [metric_id, report_id] = aggregatedReportIds[i];
     uint64_t expected = expected_num_obs[{metric_id, report_id}];
