@@ -270,11 +270,6 @@ if (allowed_device_types == []) {
 #     [bool] Indicates that test_manager should create no exception channels as it would
 #     otherwise do to detect panics. Some tests that create exception channels at the job
 #     level will fail if test_manager creates its customary exception channels.
-#   disable_fastboot (optional)
-#     [bool] Indicates that the test is associated with bringup builders and
-#     should be run on zedboot devices. This allows us to identify which bringup tests should and
-#     should not run on NUCs in fastboot.
-#     TODO (betramlalusha): Remove once b/406524915 is fixed.
 #
 template("test_spec") {
   testonly = true
@@ -373,18 +368,6 @@ template("test_spec") {
           !defined(dim.dimensions),
           "found nested dimensions environment field. Did you set `dimensions = some_env`? It should be `dimensions = some_env.dimensions`")
 
-      # The General Bootloader on fastboot devices does not support fastboot boot.
-      # This causes boot tests to fail on NUCs in fastboot TCP.
-      # For now, boot tests should only run on NUCs in zedboot.
-      # TODO (betramlalusha): Remove once b/406524915 is fixed.
-      if (defined(dim.device_type) &&
-          dim.device_type == "Intel NUC Kit NUC11TNHv5" &&
-          defined(invoker.disable_fastboot) && invoker.disable_fastboot) {
-        dim.fastboot_enabled = "0"
-        env.dimensions = {
-        }
-        env.dimensions = dim
-      }
       foreach(key, all_dimension_keys) {
         dims += [
           {
@@ -531,7 +514,6 @@ template("test_spec") {
                              "expects_ssh",
                              "is_boot_test",
                            ])
-    not_needed(invoker, [ "disable_fastboot" ])
     if (!defined(expects_ssh)) {
       expects_ssh = true
     }

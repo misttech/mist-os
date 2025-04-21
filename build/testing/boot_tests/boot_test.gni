@@ -108,7 +108,6 @@ template("_boot_test") {
     is_boot_test = true
     product_bundle = name
     expects_ssh = false
-    disable_fastboot = true
 
     forward_variables_from(invoker,
                            [

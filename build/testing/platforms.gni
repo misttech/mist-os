@@ -23,7 +23,6 @@ all_dimension_keys = [
   "os",
   "pool",
   "testbed",
-  "fastboot_enabled",
 ]
 
 # Scopes of dimensions for every available platform.
@@ -55,10 +54,6 @@ test_platforms = [
   {
     device_type = "Intel NUC Kit NUC11TNHv5"
     cpu = "x64"
-  },
-  {
-    device_type = "Intel NUC Kit NUC11TNHv5"
-    fastboot_enabled = "0"
   },
   {
     device_type = "Astro"
