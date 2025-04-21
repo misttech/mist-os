@@ -81,6 +81,7 @@ pub fn dispatch_syscall(
         sys_munlock, sys_munlockall, sys_munmap, sys_process_madvise, sys_process_mrelease,
         sys_process_vm_readv, sys_process_vm_writev, sys_set_robust_list, sys_userfaultfd,
     };
+    use crate::perf::sys_perf_event_open;
     use crate::signals::syscalls::{
         sys_kill, sys_pidfd_send_signal, sys_restart_syscall, sys_rt_sigaction, sys_rt_sigpending,
         sys_rt_sigprocmask, sys_rt_sigqueueinfo, sys_rt_sigreturn, sys_rt_sigsuspend,
@@ -88,8 +89,8 @@ pub fn dispatch_syscall(
         sys_tkill, sys_wait4, sys_waitid,
     };
     use crate::syscalls::misc::{
-        sys_delete_module, sys_getrandom, sys_perf_event_open, sys_personality, sys_sched_yield,
-        sys_setdomainname, sys_sethostname, sys_sysinfo, sys_uname, sys_unknown,
+        sys_delete_module, sys_getrandom, sys_personality, sys_sched_yield, sys_setdomainname,
+        sys_sethostname, sys_sysinfo, sys_uname, sys_unknown,
     };
     use crate::syscalls::reboot::sys_reboot;
     use crate::syscalls::time::{
@@ -151,6 +152,7 @@ pub fn dispatch_syscall(
             sys_brk as sys_arch32_brk, sys_mprotect as sys_arch32_mprotect,
             sys_process_madvise as sys_arch32_process_madvise,
         };
+        pub use crate::perf::sys_arch32_perf_event_open;
         pub use crate::signals::syscalls::{
             sys_arch32_rt_sigaction, sys_arch32_rt_sigtimedwait, sys_arch32_sigaltstack,
             sys_arch32_signalfd, sys_arch32_signalfd4, sys_arch32_waitid,
@@ -164,7 +166,7 @@ pub fn dispatch_syscall(
             sys_wait4 as sys_arch32_wait4,
         };
         pub use crate::syscalls::misc::{
-            sys_arch32_perf_event_open, sys_arch32_uname, sys_getrandom as sys_arch32_getrandom,
+            sys_arch32_uname, sys_getrandom as sys_arch32_getrandom,
             sys_personality as sys_arch32_personality, sys_sched_yield as sys_arch32_sched_yield,
         };
         pub use crate::syscalls::reboot::sys_arch32_reboot;
