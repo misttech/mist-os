@@ -62,6 +62,16 @@ zx_status_t ForEachMadtEntryOfType(const AcpiParserInterface& parser, uint8_t ty
 zx_status_t EnumerateProcessorLocalApics(
     const AcpiParserInterface& parser,
     const fit::inline_function<zx_status_t(const AcpiMadtLocalApicEntry&)>& callback) {
+#if __mist_os__
+  return ForEachMadtEntryOfType<AcpiMadtLocalApicEntry>(
+      parser, ACPI_LITE_MADT_TYPE_LOCAL_APIC,
+      [&callback](const AcpiMadtLocalApicEntry& record) -> zx_status_t {
+        if (!(record.flags & ACPI_MADT_FLAG_ENABLED)) {
+          return ZX_OK;
+        }
+        return callback(record);
+      });
+#else
   return ForEachMadtEntryOfType<AcpiMadtLocalApicEntry>(
       parser, ACPI_MADT_TYPE_LOCAL_APIC,
       [&callback](const AcpiMadtLocalApicEntry& record) -> zx_status_t {
@@ -70,13 +80,19 @@ zx_status_t EnumerateProcessorLocalApics(
         }
         return callback(record);
       });
+#endif
 }
 
 zx_status_t EnumerateIoApics(
     const AcpiParserInterface& parser,
     const fit::inline_function<zx_status_t(const AcpiMadtIoApicEntry&)>& callback) {
+#if __mist_os__
+  return ForEachMadtEntryOfType<AcpiMadtIoApicEntry, decltype(callback)>(
+      parser, ACPI_LITE_MADT_TYPE_IO_APIC, callback);
+#else
   return ForEachMadtEntryOfType<AcpiMadtIoApicEntry, decltype(callback)>(
       parser, ACPI_MADT_TYPE_IO_APIC, callback);
+#endif
 }
 
 zx_status_t EnumerateIoApicIsaOverrides(

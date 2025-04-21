@@ -37,9 +37,15 @@ zx_status_t EnumerateCpuNumaPairs(
     }
 
     // Ignore anything not ACPI_SRAT_TYPE_MEMORY_AFFINITY.
+#if __mist_os__
+    if (sub_header->type != ACPI_LITE_SRAT_TYPE_MEMORY_AFFINITY) {
+      continue;
+    }
+#else
     if (sub_header->type != ACPI_SRAT_TYPE_MEMORY_AFFINITY) {
       continue;
     }
+#endif
 
     const auto* mem = Downcast<AcpiSratMemoryAffinityEntry>(sub_header);
     if (mem == nullptr) {

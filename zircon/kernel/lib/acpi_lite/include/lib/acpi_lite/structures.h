@@ -312,7 +312,11 @@ static_assert(sizeof(AcpiSratProcessorAffinityEntry) == 16);
 // Type 1: memory affinity structure
 //
 // Reference: ACPI v6.3 Section 5.2.16.2.
+#if __mist_os__
+#define ACPI_LITE_SRAT_TYPE_MEMORY_AFFINITY 1
+#else
 #define ACPI_SRAT_TYPE_MEMORY_AFFINITY 1
+#endif
 struct AcpiSratMemoryAffinityEntry {
   AcpiSubTableHeader header;
   uint32_t proximity_domain;
@@ -350,7 +354,11 @@ static_assert(sizeof(AcpiSratProcessorX2ApicAffinityEntry) == 24);
 // Multiple APIC Description Table (MADT) entries.
 
 // MADT entry type 0: Processor Local APIC (ACPI v6.3 Section 5.2.12.2)
+#if __mist_os__
+#define ACPI_LITE_MADT_TYPE_LOCAL_APIC 0
+#else
 #define ACPI_MADT_TYPE_LOCAL_APIC 0
+#endif
 struct AcpiMadtLocalApicEntry {
   AcpiSubTableHeader header;
   uint8_t processor_id;
@@ -364,7 +372,11 @@ static_assert(sizeof(AcpiMadtLocalApicEntry) == 8);
 #define ACPI_MADT_FLAG_ENABLED 0x1
 
 // MADT entry type 1: I/O APIC (ACPI v6.3 Section 5.2.12.3)
+#if __mist_os__
+#define ACPI_LITE_MADT_TYPE_IO_APIC 1
+#else
 #define ACPI_MADT_TYPE_IO_APIC 1
+#endif
 struct AcpiMadtIoApicEntry {
   AcpiSubTableHeader header;
   uint8_t io_apic_id;
