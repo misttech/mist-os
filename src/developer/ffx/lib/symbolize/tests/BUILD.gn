@@ -19,17 +19,14 @@ if (is_host) {
   ffx_e2e_test("ffx_symbolize_lib_e2e_test") {
     edition = "2021"
     source_root = "e2e_test.rs"
-    sources = [
-      "shared.rs",
-      source_root,
-    ]
+    sources = [ source_root ]
     deps = [
       "//src/developer/ffx/config:lib",
       "//src/developer/ffx/lib/e2e_emu",
       "//src/developer/ffx/lib/symbolize",
+      "//src/developer/ffx/lib/symbolize/test-utils:symbolize_test_utils",
       "//src/lib/diagnostics/log/rust_cpp_bridge",
       "//src/lib/fuchsia",
-      "//third_party/rust_crates:serde",
       "//third_party/rust_crates:serde_json",
       "//third_party/rust_crates:tracing",
     ]
@@ -50,18 +47,13 @@ if (is_host) {
   rustc_binary("print_fn_ptr_bin") {
     edition = "2021"
     source_root = "print_fn_ptr.rs"
-    sources = [
-      "shared.rs",
-      source_root,
-    ]
+    sources = [ source_root ]
     deps = [
       ":no_symbol_area",
       "//sdk/rust/zx",
-      "//src/lib/process_builder",
+      "//src/developer/ffx/lib/symbolize/test-utils:symbolize_test_utils",
       "//third_party/rust_crates:libc",
-      "//third_party/rust_crates:serde",
       "//third_party/rust_crates:serde_json",
-      "//third_party/rust_crates:zerocopy",
     ]
   }
 
