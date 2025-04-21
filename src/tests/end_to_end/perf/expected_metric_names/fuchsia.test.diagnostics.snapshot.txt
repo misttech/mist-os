@@ -1,0 +1,10 @@
+fuchsia.snapshot_test_cpu: CpuAverage
+fuchsia.snapshot_test_cpu: CpuMax
+fuchsia.snapshot_test_cpu: CpuMin
+fuchsia.snapshot_test_cpu: CpuP25
+fuchsia.snapshot_test_cpu: CpuP5
+fuchsia.snapshot_test_cpu: CpuP50
+fuchsia.snapshot_test_cpu: CpuP75
+fuchsia.snapshot_test_cpu: CpuP95
+fuchsia.snapshot_test_cpu: Memory/Process/archivist/PrivatePopulated
+fuchsia.snapshot_test_cpu: Memory/Process/feedback/PrivatePopulated

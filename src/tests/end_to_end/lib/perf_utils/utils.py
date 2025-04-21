@@ -6,7 +6,7 @@ import json
 import os
 import time
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 P = TypeVar("P")
 R = TypeVar("R")
@@ -40,6 +40,7 @@ class FuchsiaPerfResults(ABC, Generic[P, R]):
             repetitions: the number of times to execute an action.
         """
         time_ns: list[int] = []
+        self.additional_json: list[Any] = []
         for _ in range(repetitions):
             pre_result = self.pre_action()
             start = time.monotonic_ns()
@@ -96,6 +97,7 @@ class FuchsiaPerfResults(ABC, Generic[P, R]):
                 "unit": "ns",
             },
         ]
+        fuchsiaperf_data.extend(self.additional_json)
         test_perf_file = os.path.join(
             results_path, f"results.{label.lower()}.freeform.json"
         )

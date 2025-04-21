@@ -1681,8 +1681,6 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         data = self.fd_fc_obj._send_snapshot_command()
         self.assertEqual(len(data), 15)
 
-        mock_fc_create_context.assert_called()
-        mock_health_check.assert_called()
         mock_fc_connect_device_proxy.assert_called()
 
     @mock.patch.object(
@@ -1721,8 +1719,6 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         with self.assertRaises(fc_errors.FuchsiaControllerError):
             self.fd_fc_obj._send_snapshot_command()
 
-        mock_fc_create_context.assert_called()
-        mock_health_check.assert_called()
         mock_fc_connect_device_proxy.assert_called()
 
     @mock.patch.object(
@@ -1766,8 +1762,6 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         with self.assertRaises(fc_errors.FuchsiaControllerError):
             self.fd_fc_obj._send_snapshot_command()
 
-        mock_fc_create_context.assert_called()
-        mock_health_check.assert_called()
         mock_fc_connect_device_proxy.assert_called()
 
     @mock.patch.object(
@@ -1810,8 +1804,6 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         with self.assertRaises(fc_errors.FuchsiaControllerError):
             self.fd_fc_obj._send_snapshot_command()
 
-        mock_fc_create_context.assert_called()
-        mock_health_check.assert_called()
         mock_fc_connect_device_proxy.assert_called()
 
     @mock.patch.object(
@@ -1860,8 +1852,6 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         with self.assertRaises(fc_errors.FuchsiaControllerError):
             self.fd_fc_obj._send_snapshot_command()
 
-        mock_fc_create_context.assert_called()
-        mock_health_check.assert_called()
         mock_fc_connect_device_proxy.assert_called()
 
     @mock.patch.object(
@@ -1914,8 +1904,6 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         with self.assertRaises(fc_errors.FuchsiaControllerError):
             self.fd_fc_obj._send_snapshot_command()
 
-        mock_fc_create_context.assert_called()
-        mock_health_check.assert_called()
         mock_fc_connect_device_proxy.assert_called()
 
 

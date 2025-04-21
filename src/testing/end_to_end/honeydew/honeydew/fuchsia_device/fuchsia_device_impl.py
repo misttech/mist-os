@@ -183,6 +183,7 @@ class FuchsiaDeviceImpl(
         self._on_device_close_fns: list[Callable[[], None]] = []
 
         self._config: dict[str, Any] | None = config
+        self._created_context = False
 
         self.health_check()
 
@@ -804,7 +805,11 @@ class FuchsiaDeviceImpl(
         """
         self._on_device_close_fns.append(fn)
 
-    def snapshot(self, directory: str, snapshot_file: str | None = None) -> str:
+    def snapshot(
+        self,
+        directory: str,
+        snapshot_file: str | None = None,
+    ) -> str:
         """Captures the snapshot of the device.
 
         Args:
@@ -1071,10 +1076,6 @@ class FuchsiaDeviceImpl(
         Returns:
             Bytes containing snapshot data as a zip archive.
         """
-        # Ensure device is healthy and ready to send FIDL requests before
-        # sending snapshot command.
-        self.fuchsia_controller.create_context()
-        self.health_check()
 
         channel_server, channel_client = fcp.Channel.create()
         params = f_feedback.GetSnapshotParameters(

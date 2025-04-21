@@ -2,18 +2,28 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/python/python_mobly_test.gni")
 import("//build/testing/environments.gni")
+import("//build/testing/perf/test.gni")
 
 assert(is_host, "E2E tests are host only")
 
-python_mobly_test("snapshot_test") {
+python_perf_test("snapshot_test") {
   main_source = "snapshot_test.py"
   libraries = [
     "//src/testing/end_to_end/honeydew",
     "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     "//src/tests/end_to_end/lib/perf_utils",
+    "//src/performance/lib/perf_publish",
+    "//src/performance/lib/memory",
+    "//src/performance/lib/py_test_utils:perf_test_utils",
+    "//src/performance/lib/trace_processing",
   ]
+
+  expected_metric_names_filepaths = [ "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.test.diagnostics.snapshot.txt" ]
+
+  if (is_host) {
+    deps = [ "//src/developer/ffx/plugins/profile:ffx_profile_tool_test_data" ]
+  }
 
   params_source = "params.yaml"
   environments = [
