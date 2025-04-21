@@ -166,6 +166,26 @@ template("sdk_atom") {
   # use the type to determine the schema file.
   type = meta.schema
 
+  # Though the metadata files have a `type` key, the `type` variable is not
+  # used for this. Verify the `type` variable and underlying metadata are
+  # consistent when possible.  The values of `type` must match if and only if
+  # the argument's value is not "data". For "data" atoms, an underlying type is
+  # specified in the metadata. Atoms that use a `meta.source` file cannot be
+  # verified.
+  if (defined(meta.value)) {
+    value = meta.value
+    assert(defined(value.type) && value.type != "",
+           "`type` must be specified in `value`.")
+    if (type == "data") {
+      assert(value.type != type,
+             "'data' atoms must specify the actual type in 'meta.value'.")
+    } else {
+      assert(value.type == type)
+    }
+  } else {
+    assert(type != "data", "'data' atoms must use `meta.value`.")
+  }
+
   assert(defined(invoker.category), "Must define an SDK category")
   category = invoker.category
 
