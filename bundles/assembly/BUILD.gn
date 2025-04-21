@@ -1831,6 +1831,16 @@ assembly_input_bundle("feedback_user_config") {
   config_data_labels = [ "//src/developer/forensics:feedback_user_config" ]
 }
 
+assembly_input_bundle("cobalt_user_config") {
+  config_data_labels = [ "//src/cobalt:cobalt_user_config" ]
+}
+assembly_input_bundle("cobalt_userdebug_config") {
+  config_data_labels = [ "//src/cobalt:cobalt_userdebug_config" ]
+}
+assembly_input_bundle("cobalt_default_config") {
+  config_data_labels = [ "//src/cobalt:cobalt_default_config" ]
+}
+
 assembly_input_bundle("factory_reset_trigger") {
   base_packages = [ "//src/recovery/factory-reset-trigger" ]
   compiled_packages = [
@@ -1991,35 +2001,10 @@ assembly_input_bundle("common_standard") {
   ]
 }
 
-# This is exclusive to user builds on the minimal support level.
-#
-assembly_input_bundle("standard_user") {
-  config_data = [
-    {
-      package_name = "cobalt"
-      files = [
-        {
-          source = "//src/cobalt/bin/app/configs/user_config.json"
-          destination = "config.json"
-        },
-      ]
-    },
-  ]
-}
-
 # This is exclusive to userdebug builds on the minimal support level.
 #
 assembly_input_bundle("standard_userdebug") {
   config_data = [
-    {
-      package_name = "cobalt"
-      files = [
-        {
-          source = "//src/cobalt/bin/app/configs/userdebug_config.json"
-          destination = "config.json"
-        },
-      ]
-    },
     {
       package_name = "triage-detect"
       files = [
@@ -2066,17 +2051,6 @@ assembly_input_bundle("standard_eng") {
             "//src/devices/bin/driver_playground/meta/driver_playground.core_shard.cml",
             "//src/power/metrics-logger/meta/metrics-logger.core_shard.cml",
           ]
-        },
-      ]
-    },
-  ]
-  config_data = [
-    {
-      package_name = "cobalt"
-      files = [
-        {
-          source = "//src/cobalt/bin/app/configs/default_config.json"
-          destination = "config.json"
         },
       ]
     },

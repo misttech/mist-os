@@ -237,7 +237,6 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "core_realm",
                     "core_realm_user_and_userdebug",
                     "common_standard",
-                    "standard_user",
                 ]
             }
         } {

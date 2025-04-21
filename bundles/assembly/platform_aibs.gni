@@ -188,7 +188,6 @@ user_platform_aib_names =
 
       # The minimal feature-set-level
       "common_standard",
-      "standard_user",
 
       ###
       # Feature-level / Subsystem-level bundles
@@ -311,6 +310,7 @@ user_platform_aib_names =
       "feedback_remote_device_id_provider",
       "feedback_user_config",
       "feedback_userdebug_config",
+      "cobalt_user_config",
 
       # Kernel Reclamation
       "kernel_anonymous_memory_compression",
@@ -350,6 +350,7 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
                          "session_manager_enable_pkg_cache",
                          "standard_userdebug",
                          "standard_userdebug_and_eng",
+                         "cobalt_userdebug_config",
                          "mdns_fuchsia_device_wired_service",
                          "nanohub_support",
                          "omaha_client_empty_eager_config",
@@ -443,6 +444,7 @@ eng_only_platform_aib_names =
 
       # Forensics
       "feedback_upload_config",
+      "cobalt_default_config",
     ]
 eng_platform_aib_names =
     userdebug_platform_aib_names + eng_only_platform_aib_names
