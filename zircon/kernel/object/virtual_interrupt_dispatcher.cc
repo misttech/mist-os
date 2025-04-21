@@ -45,21 +45,92 @@ zx_status_t VirtualInterruptDispatcher::Create(KernelHandle<InterruptDispatcher>
   return ZX_OK;
 }
 
-// void VirtualInterruptDispatcher::IrqHandler(void* ctx) { }
-
-void VirtualInterruptDispatcher::MaskInterrupt() {}
-
-void VirtualInterruptDispatcher::UnmaskInterrupt() {}
-
-void VirtualInterruptDispatcher::DeactivateInterrupt() {}
-
-void VirtualInterruptDispatcher::UnregisterInterruptHandler() {}
-
 VirtualInterruptDispatcher::VirtualInterruptDispatcher(Flags flags, uint32_t options)
     : InterruptDispatcher(flags, options) {
+  // Immediately after construction, virtual interrupt objects are always in the
+  // untriggered state.  Make sure that our initial signal state reflects this.
+  UpdateState(0, ZX_VIRTUAL_INTERRUPT_UNTRIGGERED);
   kcounter_add(dispatcher_virtual_interrupt_create_count, 1);
 }
 
 VirtualInterruptDispatcher::~VirtualInterruptDispatcher() {
   kcounter_add(dispatcher_virtual_interrupt_destroy_count, 1);
+}
+
+void VirtualInterruptDispatcher::MaskInterrupt() {}
+void VirtualInterruptDispatcher::UnmaskInterrupt() {}
+void VirtualInterruptDispatcher::DeactivateInterrupt() {}
+void VirtualInterruptDispatcher::UnregisterInterruptHandler() {}
+
+zx_status_t VirtualInterruptDispatcher::WaitForInterrupt(zx_time_t* out_timestamp) {
+  while (true) {
+    // Hold the dispatcher lock during the first phase, and if we decide that we
+    // need to block, be sure that our UNTRIGGERED signal has been asserted.
+    {
+      Guard<CriticalMutex> guard{get_lock()};
+      const ktl::optional<zx_status_t> opt_status = BeginWaitForInterrupt(out_timestamp);
+      if (opt_status.has_value()) {
+        return opt_status.value();
+      }
+
+      UpdateStateLocked(0, ZX_VIRTUAL_INTERRUPT_UNTRIGGERED);
+    }
+
+    const zx_status_t block_status = DoWaitForInterruptBlock();
+    if (block_status != ZX_OK) {
+      return block_status;
+    }
+  }
+}
+
+zx_status_t VirtualInterruptDispatcher::Trigger(zx_time_t timestamp) {
+  Guard<CriticalMutex> dispatcher_guard{get_lock()};
+  const zx_status_t result = InterruptDispatcher::Trigger(timestamp);
+
+  // If the trigger operation succeeded, then we know that we must be in either
+  // the triggered or need-ack state, and we should clear the UNTRIGGERED
+  // signal.
+  if (result == ZX_OK) {
+    UpdateStateLocked(ZX_VIRTUAL_INTERRUPT_UNTRIGGERED, 0);
+  }
+
+  return result;
+}
+
+zx_status_t VirtualInterruptDispatcher::Ack() {
+  // Hold the dispatcher lock while we perform our lower level ack operation.
+  // If this succeeds, make sure that the UNTRIGGERED signal is asserted.
+  Guard<CriticalMutex> guard{get_lock()};
+  const zx::result<PostAckState> result = AckInternal();
+
+  // If something goes wrong with the ack, then our UNTRIGGERED signal state
+  // should not have changed.
+  if (result.is_error()) {
+    return result.error_value();
+  }
+
+  // Things went well, we successfully acked the interrupt and should assert the
+  // UNTRIGGERED signal.  If, however, the interrupt immediately retriggered
+  // (because it already had another pending signal), be sure to clear the
+  // UNTRIGGERED signal after asserting it.
+  UpdateStateLocked(0, ZX_VIRTUAL_INTERRUPT_UNTRIGGERED);
+  if (result.value() == PostAckState::Retriggered) {
+    UpdateStateLocked(ZX_VIRTUAL_INTERRUPT_UNTRIGGERED, 0);
+  } else {
+    DEBUG_ASSERT(result.value() == PostAckState::FullyAcked);
+  }
+
+  return ZX_OK;
+}
+
+zx_status_t VirtualInterruptDispatcher::Destroy() {
+  // An interrupt which has been explicitly destroyed (using a call to
+  // zx_interrupt_destroy) can no longer be in the triggered state.  Make sure
+  // that we assert the virtual interrupt's UNTRIGGERED signal to be sure that
+  // we don't accidentally end up with waiters stuck waiting on a destroyed
+  // interrupt.
+  Guard<CriticalMutex> guard{get_lock()};
+  const zx_status_t result = InterruptDispatcher::Destroy();
+  UpdateStateLocked(0, ZX_VIRTUAL_INTERRUPT_UNTRIGGERED);
+  return result;
 }

@@ -30,58 +30,77 @@ InterruptDispatcher::InterruptDispatcher(Flags flags, uint32_t options)
 zx_info_interrupt_t InterruptDispatcher::GetInfo() const { return {.options = options_}; }
 
 zx_status_t InterruptDispatcher::WaitForInterrupt(zx_time_t* out_timestamp) {
-  bool defer_unmask = false;
   while (true) {
-    {
-      Guard<SpinLock, IrqSave> guard{&spinlock_};
-      if (port_dispatcher_) {
-        return ZX_ERR_BAD_STATE;
-      }
-      switch (state_) {
-        case InterruptState::DESTROYED:
-          return ZX_ERR_CANCELED;
-        case InterruptState::TRIGGERED:
-          state_ = InterruptState::NEEDACK;
-          *out_timestamp = timestamp_;
-          timestamp_ = 0;
-          return event_.Unsignal();
-        case InterruptState::NEEDACK:
-          if ((flags_ & INTERRUPT_WAKE_VECTOR)) {
-            wake_event_.Acknowledge();
-          }
-          if (flags_ & INTERRUPT_UNMASK_PREWAIT) {
-            UnmaskInterrupt();
-          } else if (flags_ & INTERRUPT_UNMASK_PREWAIT_UNLOCKED) {
-            defer_unmask = true;
-          }
-          break;
-        case InterruptState::IDLE:
-          break;
-        default:
-          return ZX_ERR_BAD_STATE;
-      }
-      state_ = InterruptState::WAITING;
+    const ktl::optional<zx_status_t> opt_status = BeginWaitForInterrupt(out_timestamp);
+    if (opt_status.has_value()) {
+      return opt_status.value();
     }
 
-    if (defer_unmask) {
-      UnmaskInterrupt();
-    }
-
-    {
-      ThreadDispatcher::AutoBlocked by(ThreadDispatcher::Blocked::INTERRUPT);
-      zx_status_t status = event_.Wait(Deadline::infinite());
-      if (status != ZX_OK) {
-        // The Event::Wait call was interrupted and we need to retry
-        // but before we retry we will set the interrupt state
-        // back to IDLE if we are still in the WAITING state
-        Guard<SpinLock, IrqSave> guard{&spinlock_};
-        if (state_ == InterruptState::WAITING) {
-          state_ = InterruptState::IDLE;
-        }
-        return status;
-      }
+    const zx_status_t block_status = DoWaitForInterruptBlock();
+    if (block_status != ZX_OK) {
+      return block_status;
     }
   }
+}
+
+ktl::optional<zx_status_t> InterruptDispatcher::BeginWaitForInterrupt(zx_time_t* out_timestamp) {
+  bool defer_unmask = false;
+
+  {
+    Guard<SpinLock, IrqSave> guard{&spinlock_};
+    if (port_dispatcher_) {
+      return ZX_ERR_BAD_STATE;
+    }
+    switch (state_) {
+      case InterruptState::DESTROYED:
+        return ZX_ERR_CANCELED;
+
+      case InterruptState::TRIGGERED:
+        state_ = InterruptState::NEEDACK;
+        *out_timestamp = timestamp_;
+        timestamp_ = 0;
+        return event_.Unsignal();
+
+      case InterruptState::NEEDACK:
+        if ((flags_ & INTERRUPT_WAKE_VECTOR)) {
+          wake_event_.Acknowledge();
+        }
+        if (flags_ & INTERRUPT_UNMASK_PREWAIT) {
+          UnmaskInterrupt();
+        } else if (flags_ & INTERRUPT_UNMASK_PREWAIT_UNLOCKED) {
+          defer_unmask = true;
+        }
+        break;
+
+      case InterruptState::IDLE:
+        break;
+
+      default:
+        return ZX_ERR_BAD_STATE;
+    }
+    state_ = InterruptState::WAITING;
+  }
+
+  if (defer_unmask) {
+    UnmaskInterrupt();
+  }
+
+  return ktl::nullopt;
+}
+
+zx_status_t InterruptDispatcher::DoWaitForInterruptBlock() {
+  ThreadDispatcher::AutoBlocked by(ThreadDispatcher::Blocked::INTERRUPT);
+  zx_status_t status = event_.Wait(Deadline::infinite());
+  if (status != ZX_OK) {
+    // The Event::Wait call was interrupted and we need to retry
+    // but before we retry we will set the interrupt state
+    // back to IDLE if we are still in the WAITING state.
+    Guard<SpinLock, IrqSave> guard{&spinlock_};
+    if (state_ == InterruptState::WAITING) {
+      state_ = InterruptState::IDLE;
+    }
+  }
+  return status;
 }
 
 bool InterruptDispatcher::SendPacketLocked(zx_time_t timestamp) {
@@ -249,6 +268,12 @@ zx_status_t InterruptDispatcher::Unbind(fbl::RefPtr<PortDispatcher> port_dispatc
 }
 
 zx_status_t InterruptDispatcher::Ack() {
+  zx::result<InterruptDispatcher::PostAckState> res = AckInternal();
+  return res.is_error() ? res.error_value() : ZX_OK;
+}
+
+zx::result<InterruptDispatcher::PostAckState> InterruptDispatcher::AckInternal() {
+  PostAckState post_ack_state = FullyAcked;
   bool defer_unmask = false;
   // Use preempt disable to reduce the likelihood of the woken thread running
   // while the spinlock is still held.
@@ -256,10 +281,10 @@ zx_status_t InterruptDispatcher::Ack() {
   {
     Guard<SpinLock, IrqSave> guard{&spinlock_};
     if (port_dispatcher_ == nullptr && !(flags_ & INTERRUPT_ALLOW_ACK_WITHOUT_PORT_FOR_TEST)) {
-      return ZX_ERR_BAD_STATE;
+      return zx::error(ZX_ERR_BAD_STATE);
     }
     if (state_ == InterruptState::DESTROYED) {
-      return ZX_ERR_CANCELED;
+      return zx::error(ZX_ERR_CANCELED);
     }
     if (state_ == InterruptState::NEEDACK) {
       if (flags_ & INTERRUPT_WAKE_VECTOR) {
@@ -277,8 +302,9 @@ zx_status_t InterruptDispatcher::Ack() {
           // interrupt packet has not been processed,
           // another interrupt has occurred & then the
           // interrupt was ACK'd
-          return ZX_ERR_BAD_STATE;
+          return zx::error(ZX_ERR_BAD_STATE);
         }
+        post_ack_state = PostAckState::Retriggered;
       } else {
         state_ = InterruptState::IDLE;
       }
@@ -288,7 +314,7 @@ zx_status_t InterruptDispatcher::Ack() {
   if (defer_unmask) {
     UnmaskInterrupt();
   }
-  return ZX_OK;
+  return zx::ok(post_ack_state);
 }
 
 void InterruptDispatcher::on_zero_handles() { Destroy(); }

@@ -36,10 +36,11 @@ class InterruptDispatcher : public SoloDispatcher<InterruptDispatcher, ZX_DEFAUL
 
   bool is_wake_vector() const { return flags_ & INTERRUPT_WAKE_VECTOR; }
 
-  zx_status_t WaitForInterrupt(zx_time_t* out_timestamp);
-  zx_status_t Trigger(zx_time_t timestamp);
-  zx_status_t Ack();
-  zx_status_t Destroy();
+  virtual zx_status_t WaitForInterrupt(zx_time_t* out_timestamp);
+  virtual zx_status_t Trigger(zx_time_t timestamp);
+  virtual zx_status_t Ack();
+  virtual zx_status_t Destroy();
+
   void InterruptHandler();
   zx_status_t Bind(fbl::RefPtr<PortDispatcher> port_dispatcher, uint64_t key);
   zx_status_t Unbind(fbl::RefPtr<PortDispatcher> port_dispatcher);
@@ -84,11 +85,17 @@ class InterruptDispatcher : public SoloDispatcher<InterruptDispatcher, ZX_DEFAUL
     INTERRUPT_TIMESTAMP_MONO = (1u << 7),
   };
 
+  enum PostAckState {
+    FullyAcked,   // The interrupt was acked, and there was no other interrupt pending afterwards.
+    Retriggered,  // The interrupt was acked, but immediately re-triggered due to a pending irq.
+  };
+
   // It is an error to specify both INTERRUPT_UNMASK_PREWAIT and INTERRUPT_UNMASK_PREWAIT_UNLOCKED.
   explicit InterruptDispatcher(Flags flags) : InterruptDispatcher(flags, 0) {}
   explicit InterruptDispatcher(Flags flags, uint32_t options);
   void Signal() { event_.Signal(); }
   bool SendPacketLocked(zx_time_t timestamp) TA_REQ(spinlock_);
+  zx::result<InterruptDispatcher::PostAckState> AckInternal() TA_EXCL(spinlock_);
 
   // Allow subclasses to add/remove the wake event instance from the global diagnostics list at the
   // appropriate times during initialization and teardown. These methods do not need to be called
@@ -96,6 +103,16 @@ class InterruptDispatcher : public SoloDispatcher<InterruptDispatcher, ZX_DEFAUL
   // the specific requirements regarding when to initialize and destroy the wake event.
   void InitializeWakeEvent() TA_REQ(spinlock_) { wake_event_.Initialize(); }
   void DestroyWakeEvent() TA_REQ(spinlock_) { wake_event_.Destroy(); }
+
+  // The zx_interrupt_wait operation is broken down into two phases.  First, we
+  // BeginWaitForInterrupt, which will handle internal bookkeeping and either return a status code
+  // if the wait operation is finished (success or failure), or it will return nothing if we need to
+  // block and try again later.
+  //
+  // Afterwards, if we need to block, we will call DoWaitForInterruptBlock and try again if the
+  // block operation succeeds.
+  ktl::optional<zx_status_t> BeginWaitForInterrupt(zx_time_t* out_timestamp) TA_EXCL(spinlock_);
+  zx_status_t DoWaitForInterruptBlock() TA_EXCL(spinlock_);
 
  private:
   AutounsignalEvent event_;
