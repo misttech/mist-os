@@ -169,6 +169,23 @@ pub struct PageScannerConfig {
 #[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct OomConfig {
+    /// What should happen if the device runs out-of-memory.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub behavior: OOMBehavior,
+
+    /// Triggers kernel eviction when free memory falls below warning_mb,
+    /// as opposed to the default of triggering eviction when free memory falls
+    /// below critical_mb.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub evict_at_warning: bool,
+
+    /// This option configures kernel eviction to run continually in the
+    /// background to try and keep the system out of memory pressure, as opposed
+    /// to triggering one-shot eviction only at memory pressure level
+    /// transitions.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub evict_continuous: bool,
+
     /// Delay (in ms) before kernel eviction is triggered under memory pressure.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub eviction_delay_ms: Option<u32>,
@@ -181,14 +198,38 @@ pub struct OomConfig {
     /// The granularity (in MiB) of synchronous kernel eviction to avoid OOM.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub eviction_delta_at_oom_mb: Option<u32>,
+
+    /// This option specifies the free-memory threshold at which the
+    /// out-of-memory (OOM) thread will trigger an out-of-memory event and begin
+    /// killing processes, or rebooting the system.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub out_of_memory_mb: Option<u32>,
+
+    /// This option specifies the free-memory threshold at which the
+    /// out-of-memory (OOM) thread will trigger a critical memory pressure
+    /// event, signaling that processes should free up memory.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub critical_mb: Option<u32>,
+
+    /// This option specifies the free-memory threshold at which the
+    /// out-of-memory (OOM) thread will trigger a warning memory pressure event,
+    /// signaling that processes should slow down memory allocations.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub warning_mb: Option<u32>,
 }
 
 impl Default for OomConfig {
     fn default() -> Self {
         Self {
+            behavior: Default::default(),
+            evict_at_warning: false,
+            evict_continuous: false,
             eviction_delay_ms: None,
             evict_with_min_target: true,
             eviction_delta_at_oom_mb: None,
+            out_of_memory_mb: None,
+            critical_mb: None,
+            warning_mb: None,
         }
     }
 }
