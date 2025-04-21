@@ -279,7 +279,8 @@ _component_manager_bin = {
     # TODO(https://fxbug.dev/302204241): Uncomment when component_manager no longer
     # depends on serde_json (it does through version-history, at least)
     # "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:serde_json5",
+    # We depend on this indirectly through configc using it.
+    "//third_party/rust_crates:serde_json5($default_toolchain)",
   ]
 }
 

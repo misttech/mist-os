@@ -6,6 +6,15 @@ import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 
+fuchsia_component_manifest("manifest") {
+  component_name = "shutdown-shim"
+  manifest = "meta/shutdown-shim.cml"
+}
+
+fuchsia_structured_config_rust_lib("shutdown-shim-config") {
+  cm_label = ":manifest"
+}
+
 rustc_library("lib") {
   name = "shutdown-shim"
   edition = "2021"
@@ -19,6 +28,7 @@ rustc_library("lib") {
     "src/shutdown_watcher.rs",
   ]
   deps = [
+    ":shutdown-shim-config",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
@@ -63,6 +73,7 @@ rustc_binary("bin") {
   deps = [
     ":lib",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/rust/zx",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",

@@ -29,6 +29,7 @@ use futures::channel::mpsc;
 use futures::lock::Mutex as AMutex;
 use futures::prelude::*;
 use futures::select;
+use shutdown_shim_config::Config;
 use std::pin::pin;
 use std::sync::{Arc, LazyLock};
 use std::time::Duration;
@@ -51,8 +52,11 @@ enum IncomingRequest {
 pub async fn main(
     svc: impl Directory + AsRefDirectory + 'static,
     directory_request: ServerEnd<fio::DirectoryMarker>,
+    config_vmo: Option<zx::Vmo>,
 ) -> Result<(), anyhow::Error> {
     println!("[shutdown-shim]: started");
+
+    let _config = Config::from_vmo(&config_vmo.expect("Config VMO handle must be present."))?;
 
     // Initialize the inspect framework.
     //

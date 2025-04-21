@@ -28,6 +28,11 @@
             to: "#critical-services",
         },
         {
+            config: [ "fuchsia.power.SuspendEnabled" ],
+            from: "parent",
+            to: "#shutdown_shim",
+        },
+        {
             protocol: [
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",

@@ -49,6 +49,16 @@ async fn new_realm(
     let mocks_server =
         builder.add_local_child("mocks-server", mocks_provider, ChildOptions::new()).await?;
 
+    // Give config capabilities.
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::configuration("fuchsia.power.SuspendEnabled"))
+                .from(Ref::void())
+                .to(&shutdown_shim),
+        )
+        .await?;
+
     // Give the shim logging
     builder
         .add_route(

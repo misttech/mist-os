@@ -112,6 +112,7 @@ pub enum RepackageError {
 
 /// The list of runners currently supported by structured config.
 static SUPPORTED_RUNNERS: &[&str] = &[
+    "builtin_shutdown_shim",
     "driver",
     "elf",
     "elf_test_runner",
@@ -147,11 +148,18 @@ pub fn validate_component(
         .as_ref()
         .ok_or(ValidationError::ProgramMissing)?
         .runner
-        .as_ref()
+        .clone()
+        .or_else(|| {
+            manifest.uses.iter().find_map(|decl| match decl {
+                cm_rust::UseDecl::Runner(runner) => Some(runner.source_name.clone()),
+                _ => None,
+            })
+        })
         .ok_or(ValidationError::RunnerMissing)?
-        .as_str();
-    if !SUPPORTED_RUNNERS.contains(&runner) {
-        return Err(ValidationError::UnsupportedRunner(runner.to_owned()));
+        .to_string();
+
+    if !SUPPORTED_RUNNERS.contains(&runner.as_str()) {
+        return Err(ValidationError::UnsupportedRunner(runner));
     }
 
     let path = match &config_decl.value_source {

@@ -134,6 +134,10 @@ impl BuiltinRunner {
             _ => return Err(BuiltinRunnerError::IllegalProgram),
         };
         let program_section: Option<Dictionary> = start_info.program.take();
+        let config_vmo: Option<zx::Vmo> = start_info.encoded_config.take().map(|data| match data {
+            fidl_fuchsia_mem::Data::Buffer(buffer) => buffer.vmo,
+            _ => panic!("Unexpected config buffer variant"),
+        });
 
         let job = self.root_job.create_child_job().map_err(BuiltinRunnerError::JobCreation)?;
         let job2 = job.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
@@ -149,6 +153,7 @@ impl BuiltinRunner {
             outgoing_dir,
             lifecycle_server,
             program_section,
+            config_vmo,
         );
         Ok((program, Box::pin(wait_for_job_termination(job2))))
     }
@@ -161,7 +166,8 @@ impl BuiltinRunner {
                       namespace: Namespace,
                       outgoing_dir: ServerEnd<fio::DirectoryMarker>,
                       lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
-                      _program: Option<Dictionary>| {
+                      _program: Option<Dictionary>,
+                      _config: Option<zx::Vmo>| {
                     async move {
                         let program = ElfRunnerProgram::new(job, namespace, elf_runner_resources);
                         program.serve_outgoing(outgoing_dir);
@@ -180,7 +186,8 @@ impl BuiltinRunner {
                       namespace: Namespace,
                       outgoing_dir: ServerEnd<fio::DirectoryMarker>,
                       lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
-                      _program: Option<Dictionary>| {
+                      _program: Option<Dictionary>,
+                      _config: Option<zx::Vmo>| {
                     async move {
                         let ns_entries: Vec<fprocess::NameInfo> = namespace.into();
                         let res = devfs::main(ns_entries, outgoing_dir, lifecycle_server).await;
@@ -201,7 +208,8 @@ impl BuiltinRunner {
                       namespace: Namespace,
                       outgoing_dir: ServerEnd<fio::DirectoryMarker>,
                       lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
-                      _program: Option<Dictionary>| {
+                      _program: Option<Dictionary>,
+                      config: Option<zx::Vmo>| {
                     async move {
                         let _lifecycle_server = lifecycle_server;
                         let ns_entries: Vec<fprocess::NameInfo> = namespace.into();
@@ -215,7 +223,7 @@ impl BuiltinRunner {
                             error!("[shutdown-shim] no /svc in namespace");
                             return;
                         };
-                        let res = shutdown_shim::main(svc, outgoing_dir).await;
+                        let res = shutdown_shim::main(svc, outgoing_dir, config).await;
                         if let Err(e) = res {
                             error!("[shutdown-shim] {e}");
                         }
@@ -233,7 +241,8 @@ impl BuiltinRunner {
                       namespace: Namespace,
                       outgoing_dir: ServerEnd<fio::DirectoryMarker>,
                       lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
-                      program: Option<Dictionary>| {
+                      program: Option<Dictionary>,
+                      _config: Option<zx::Vmo>| {
                     async move {
                         let ns_entries: Vec<fprocess::NameInfo> = namespace.into();
                         let res = service_broker::main(
@@ -334,6 +343,7 @@ type BuiltinProgramFn = Box<
             ServerEnd<fio::DirectoryMarker>,
             ServerEnd<fprocess_lifecycle::LifecycleMarker>,
             Option<Dictionary>,
+            Option<zx::Vmo>,
         ) -> BoxFuture<'static, ()>
         + Send
         + 'static,
@@ -349,6 +359,7 @@ impl BuiltinProgram {
         outgoing_dir: ServerEnd<fio::DirectoryMarker>,
         lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
         program: Option<Dictionary>,
+        config_vmo: Option<zx::Vmo>,
     ) -> Self {
         let (abort_scope, task_abort) = AbortableScope::new();
         let main_process_critical = root_job_if_critical.is_some();
@@ -374,7 +385,7 @@ impl BuiltinProgram {
         let task = fasync::Task::spawn(async move {
             let _f = f;
             _ = abort_scope
-                .run(body(job2, namespace, outgoing_dir, lifecycle_server, program))
+                .run(body(job2, namespace, outgoing_dir, lifecycle_server, program, config_vmo))
                 .await;
         })
         .boxed()
@@ -698,7 +709,8 @@ mod tests {
                       _namespace: Namespace,
                       _outgoing_dir: ServerEnd<fio::DirectoryMarker>,
                       lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
-                      _program: Option<Dictionary>| {
+                      _program: Option<Dictionary>,
+                      _config: Option<zx::Vmo>| {
                     async move {
                         let _lifecycle_server = lifecycle_server;
                     }
@@ -715,7 +727,8 @@ mod tests {
                       _namespace: Namespace,
                       _outgoing_dir: ServerEnd<fio::DirectoryMarker>,
                       lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
-                      _program: Option<Dictionary>| {
+                      _program: Option<Dictionary>,
+                      _config: Option<zx::Vmo>| {
                     async move {
                         let mut stream = lifecycle_server.into_stream();
                         #[allow(clippy::never_loop)]
@@ -744,7 +757,8 @@ mod tests {
                       _namespace: Namespace,
                       _outgoing_dir: ServerEnd<fio::DirectoryMarker>,
                       lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
-                      _program: Option<Dictionary>| {
+                      _program: Option<Dictionary>,
+                      _config: Option<zx::Vmo>| {
                     async move {
                         let _lifecycle_server = lifecycle_server;
                         std::future::pending::<()>().await;
