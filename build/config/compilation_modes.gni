@@ -25,6 +25,7 @@ declare_args() {
   #       * `debug`: "optimized for debugging", light enough to avoid confusion
   #       * `moderate`: moderate optimization level (clang's default -O2)
   #       * `size`:  optimized for space rather than purely for speed
+  #       * `size_thinlto`:  optimize for space and use Thin LTO
   #       * `size_lto`:  optimize for space and use LTO
   #       * `speed`: optimized purely for speed
   #       * `sanitizer`: optimized for sanitizers (ASan, etc.)
@@ -41,7 +42,7 @@ _default_compilation_settings = {
   }
 
   balanced = {
-    optimize = "size_lto"
+    optimize = "size_thinlto"
   }
 
   release = {

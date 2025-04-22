@@ -24,6 +24,7 @@ _optimize_valid = [
   "minimal",
   "moderate",
   "size",
+  "size_thinlto",
   "size_lto",
   "speed",
   "sanitizer",

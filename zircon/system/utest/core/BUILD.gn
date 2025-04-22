@@ -246,7 +246,8 @@ if (is_fuchsia) {
     # Remotely: run on a bigger RBE worker
     # Locally: run in a lower-concurrency pool
     # See https://fxbug.dev/338504187 for context.
-    if (is_lto_variant || optimize == "size_lto") {
+    if (is_lto_variant || optimize == "size_lto" ||
+        optimize == "size_thinlto") {
       _concurrent_jobs = concurrent_jobs.link_highmem
       configs += _concurrent_jobs.configs
       forward_variables_from(_concurrent_jobs.vars, "*")

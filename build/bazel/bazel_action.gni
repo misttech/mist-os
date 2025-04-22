@@ -920,7 +920,8 @@ template("bazel_action") {
     } else if (optimize == "debug") {
       args += [ "--compilation_mode=dbg" ]
     } else if (optimize == "size" || optimize == "speed" ||
-               optimize == "profile" || optimize == "size_lto") {
+               optimize == "profile" || optimize == "size_lto" ||
+               optimize == "size_thinlto") {
       args += [ "--compilation_mode=opt" ]
       if (clang_ml_inliner) {
         args += [ "--features=ml_inliner" ]
