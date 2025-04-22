@@ -4970,6 +4970,21 @@ assembly_input_bundle("recovery_fdr") {
   ]
 }
 
+assembly_input_bundle("recovery_android") {
+  base_packages = [ "//src/recovery/system:system_recovery_android" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/recovery/system/meta/core_shards/system_recovery_android.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
 assembly_input_bundle("session_manager_enable_pkg_cache") {
   compiled_packages = [
     {

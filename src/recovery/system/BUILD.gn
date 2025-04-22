@@ -178,3 +178,20 @@ fuchsia_package("system_recovery_fdr") {
     ":roboto_regular",
   ]
 }
+
+fuchsia_component_manifest("manifest_android") {
+  component_name = "system_recovery_android"
+  manifest = "meta/system_recovery_android.cml"
+}
+
+fuchsia_component("component_android") {
+  cm_label = ":manifest_android"
+  deps = [ "android:bin" ]
+}
+
+fuchsia_package("system_recovery_android") {
+  deps = [
+    ":component_android",
+    ":roboto_regular",
+  ]
+}
