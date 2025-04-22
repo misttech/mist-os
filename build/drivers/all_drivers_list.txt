@@ -79,8 +79,6 @@
 //src/devices/bin/driver-index:fake-driver
 //src/devices/bin/driver-index:fake-driver2
 //src/devices/bin/driver-index:fake-fallback-driver
-//src/devices/bin/driver_host:test_driver_driver
-//src/devices/bin/driver_host:test_not_driver_driver
 //src/devices/block/drivers/ahci:ahci-driver
 //src/devices/block/drivers/aml-sdmmc:aml-sdmmc-driver
 //src/devices/block/drivers/aml-sdmmc:aml-sdmmc-no-banjo-bazel-package.bazel_build

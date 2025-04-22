@@ -34,8 +34,8 @@
 
 #include "fidl/fuchsia.io/cpp/natural_types.h"
 #include "lib/driver/testing/cpp/driver_runtime.h"
-#include "src/devices/bin/driver_host/loader.h"
 #include "src/devices/misc/drivers/compat/compat_driver_server.h"
+#include "src/devices/misc/drivers/compat/loader.h"
 #include "src/devices/misc/drivers/compat/v1_test.h"
 
 namespace fboot = fuchsia_boot;
@@ -713,11 +713,11 @@ class DriverTest : public testing::Test {
     fdio_open3("/pkg/driver/compat.so",
                static_cast<uint64_t>(fuchsia_io::kPermReadable | fuchsia_io::kPermExecutable),
                file_server.TakeHandle().release());
-    driver_host::Loader::OverrideMap overrides;
+    compat::Loader::OverrideMap overrides;
     overrides.emplace("libdriver.so", std::move(file_client));
-    async_patterns::DispatcherBound<driver_host::Loader> loader(
+    async_patterns::DispatcherBound<compat::Loader> loader(
         loader_loop.dispatcher(), std::in_place, original_loader.borrow(), std::move(overrides));
-    loader.AsyncCall(&driver_host::Loader::Bind, std::move(server_end));
+    loader.AsyncCall(&compat::Loader::Bind, std::move(server_end));
 
     void* v1_driver_library = dlopen_vmo(v1_driver_vmo.get(), RTLD_NOW);
     void* note = dlsym(v1_driver_library, "__zircon_driver_note__");

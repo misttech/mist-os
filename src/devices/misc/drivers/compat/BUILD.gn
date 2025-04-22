@@ -166,6 +166,23 @@ resource("test-firmware-file") {
   outputs = [ "lib/firmware/test" ]
 }
 
+source_set("loader") {
+  sources = [
+    "loader.cc",
+    "loader.h",
+  ]
+
+  deps = [
+    "//sdk/lib/async-default",
+    "//zircon/system/ulib/zx",
+  ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_cpp",
+  ]
+}
+
 cc_test_executable("unittests") {
   testonly = true
   output_name = "compat_test"
@@ -177,6 +194,7 @@ cc_test_executable("unittests") {
   deps = [
     ":fuchsia.test.echo_cpp",
     ":lib",
+    ":loader",
     ":test-firmware-file",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_testing",
     "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_cpp_testing",
@@ -193,7 +211,6 @@ cc_test_executable("unittests") {
     "//sdk/lib/driver/compat/cpp:symbols",
     "//sdk/lib/driver/runtime/testing/cpp",
     "//sdk/lib/driver/testing/cpp",
-    "//src/devices/bin/driver_host:loader",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//src/testing/fidl:placeholders_cpp",

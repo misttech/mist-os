@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BIN_DRIVER_HOST_LOADER_H_
-#define SRC_DEVICES_BIN_DRIVER_HOST_LOADER_H_
+#ifndef SRC_DEVICES_MISC_DRIVERS_COMPAT_LOADER_H_
+#define SRC_DEVICES_MISC_DRIVERS_COMPAT_LOADER_H_
 
 #include <fidl/fuchsia.io/cpp/fidl.h>
 #include <fidl/fuchsia.ldsvc/cpp/wire.h>
@@ -11,7 +11,7 @@
 #include <string>
 #include <unordered_map>
 
-namespace driver_host {
+namespace compat {
 
 // Loader is a loader service that is used to override the DFv1 driver library
 // with an alternative implementation.
@@ -40,6 +40,6 @@ class Loader : public fidl::WireServer<fuchsia_ldsvc::Loader> {
   fidl::ServerBindingGroup<fuchsia_ldsvc::Loader> bindings_;
 };
 
-}  // namespace driver_host
+}  // namespace compat
 
-#endif  // SRC_DEVICES_BIN_DRIVER_HOST_LOADER_H_
+#endif  // SRC_DEVICES_MISC_DRIVERS_COMPAT_LOADER_H_

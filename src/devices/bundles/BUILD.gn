@@ -11,8 +11,6 @@ group("drivers") {
     "//src/devices/bin/driver-index:test-bind-component",
     "//src/devices/bin/driver-index:test-bind2-component",
     "//src/devices/bin/driver-index:test-fallback-component",
-    "//src/devices/bin/driver_host:test_driver",
-    "//src/devices/bin/driver_host:test_not_driver",
     "//src/devices/block:drivers",
     "//src/devices/board:drivers",
     "//src/devices/bus:drivers",

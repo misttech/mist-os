@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bin/driver_host/loader.h"
+#include "src/devices/misc/drivers/compat/loader.h"
 
 #include <lib/async/default.h>
 #include <lib/zx/vmo.h>
 
-#include "src/devices/lib/log/log.h"
-
-namespace driver_host {
+namespace compat {
 
 namespace fio = fuchsia_io;
 
@@ -32,8 +30,6 @@ void Loader::LoadObject(LoadObjectRequestView request, LoadObjectCompleter::Sync
                       ->GetBackingMemory(fio::VmoFlags::kRead | fio::VmoFlags::kExecute |
                                          fio::VmoFlags::kPrivateClone);
     if (!result.is_ok()) {
-      LOGF(ERROR, "Failed to open library VMO: %s",
-           result.error_value().FormatDescription().c_str());
       zx_status_t status = result.error_value().is_domain_error()
                                ? result.error_value().domain_error()
                                : result.error_value().framework_error().status();
@@ -66,4 +62,4 @@ void Loader::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
   completer.Reply(ZX_OK);
 }
 
-}  // namespace driver_host
+}  // namespace compat
