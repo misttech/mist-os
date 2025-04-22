@@ -4750,7 +4750,7 @@ mod tests {
 
         // Update the saved networks with knowledge of the test SSID and credentials.
         let connect_selection = generate_connect_selection();
-        let mut save_network_fut = test_values.saved_networks.store(
+        let save_network_fut = test_values.saved_networks.store(
             connect_selection.target.network.clone(),
             connect_selection.target.credential.clone(),
         );
@@ -4890,7 +4890,7 @@ mod tests {
 
         // Update the saved networks with knowledge of the test SSID and credentials.
         let connect_selection = generate_connect_selection();
-        let mut save_network_fut = test_values.saved_networks.store(
+        let save_network_fut = test_values.saved_networks.store(
             connect_selection.target.network.clone(),
             connect_selection.target.credential.clone(),
         );
@@ -4931,7 +4931,7 @@ mod tests {
         // Insert a saved network.
         let network_id = NetworkIdentifier::new(TEST_SSID.clone(), SecurityType::Wpa);
         let credential = Credential::Password(TEST_PASSWORD.as_bytes().to_vec());
-        let mut save_network_fut =
+        let save_network_fut =
             test_values.saved_networks.store(network_id.clone(), credential.clone());
         let mut save_network_fut = pin!(save_network_fut);
         assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));

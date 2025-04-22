@@ -3014,7 +3014,7 @@ mod tests {
             + std::marker::Unpin,
     >(
         route_stream: RS,
-        mut watcher_stream: WS,
+        watcher_stream: WS,
         mut route_set_results: HashMap<fnet_routes_ext::TableId, VecDeque<RouteSetResult>>,
     ) {
         #[derive(GenericOverIp)]

@@ -91,7 +91,7 @@ fn component_teardown_processes_final_request() {
     let mut executor = fasync::TestExecutor::new();
 
     // Run the test until we destroy the target component.
-    let (_test, echo_proxy, mut destroy_fut) = executor.run_singlethreaded(async move {
+    let (_test, echo_proxy, destroy_fut) = executor.run_singlethreaded(async move {
         let components = vec![
             (
                 "root",

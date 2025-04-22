@@ -3514,7 +3514,7 @@ mod test {
         let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
         let time = &FakeTimeController::new();
         let counters = Counters::default();
-        let mut renewing_fut = pin!(renewing
+        let renewing_fut = pin!(renewing
             .do_renewing(client_config, test_socket_provider, time, &mut stop_receiver, &counters)
             .fuse());
         let renewing_fut = pin!(renewing_fut);
