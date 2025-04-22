@@ -10,8 +10,8 @@ import("//build/testing/golden_files.gni")
 import("config.gni")
 
 _types_supporting_unstable_atoms = [
-  "fidl_library",
   "cc_source_library",
+  "fidl_library",
 ]
 _types_not_requiring_compatibility = [
   "bind_library",
@@ -215,11 +215,12 @@ template("sdk_atom") {
           category == "internal",
       "Atoms of type '${type}' must be in the 'partner' SDK category ('${category}').")
 
+  target_label = get_label_info(":${target_name}", "label_no_toolchain")
+
   if (category == "internal" &&
       # `sdk_source_set()` enforces an allowlist.
       type != "cc_source_library") {
     # Handle individual exceptions for types with only one "internal" instance.
-    target_label = get_label_info(":${target_name}", "label_no_toolchain")
     assert(
         (type == "cc_prebuilt_library" &&
              # TODO(https://fxbug.dev/343059325): Remove once devicetree is in "partner".
@@ -284,11 +285,14 @@ template("sdk_atom") {
       _types_not_requiring_compatibility + [ type ] - [ type ] !=
       _types_not_requiring_compatibility
   if ((type == "cc_prebuilt_library" &&
-       (target_name == "driver_runtime_sdk_manifest" ||
-        target_name == "libvulkan_sdk_manifest")) ||
-      (type == "loadable_module" && target_name == "vulkan_layers")) {
+       (target_label ==
+        "//src/devices/bin/driver_runtime:driver_runtime_sdk_manifest" ||
+        target_label ==
+        "//third_party/Vulkan-Loader/src:libvulkan_sdk_manifest")) ||
+      (type == "loadable_module" &&
+       target_label == "//src/lib/vulkan:vulkan_layers")) {
     # These few targets specify `no_headers` (or would if using a template).
-    # Since this list is unlikely to change much, just exempt them by name.
+    # Since this list is unlikely to change much, just exempt them.
     is_type_not_requiring_compatibility = true
   }
 
@@ -297,7 +301,10 @@ template("sdk_atom") {
           (defined(meta.stable) && !meta.stable) ||
           is_type_not_requiring_compatibility,
       "All atoms with types ('${type}') and categories ('${category}') requiring compatibility must specify an `api` file unless explicitly unstable.")
-  not_needed([ "is_type_not_requiring_compatibility" ])
+  not_needed([
+               "is_type_not_requiring_compatibility",
+               "target_label",
+             ])
 
   if (defined(invoker.api)) {
     if (!defined(invoker.current_api) && !defined(invoker.api_contents)) {
