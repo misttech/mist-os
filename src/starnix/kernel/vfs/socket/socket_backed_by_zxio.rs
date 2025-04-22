@@ -32,9 +32,12 @@ use std::mem::size_of;
 use std::sync::{Arc, OnceLock};
 use syncio::zxio::{
     zxio_socket_mark, IP_RECVERR, SOL_IP, SOL_SOCKET, SO_DOMAIN, SO_FUCHSIA_MARK, SO_MARK,
-    SO_PROTOCOL, SO_TYPE, ZXIO_SOCKET_MARK_DOMAIN_1,
+    SO_PROTOCOL, SO_TYPE, ZXIO_SOCKET_MARK_DOMAIN_1, ZXIO_SOCKET_MARK_DOMAIN_2,
 };
-use syncio::{ControlMessage, RecvMessageInfo, ServiceConnector, Zxio, ZxioErrorCode};
+use syncio::{
+    ControlMessage, RecvMessageInfo, ServiceConnector, Zxio, ZxioErrorCode,
+    ZxioSocketCreationOptions, ZxioSocketMark,
+};
 use {
     fidl_fuchsia_posix_socket as fposix_socket,
     fidl_fuchsia_posix_socket_packet as fposix_socket_packet,
@@ -45,7 +48,10 @@ use {
 /// value in the fuchsia `ZXIO_SOCKET_MARK_DOMAIN_1`. If a mark in this domain
 /// is absent, it will be reported to starnix applications as a `0` since that
 /// is the default mark value on Linux.
-const ZXIO_SOCKET_MARK_SO_MARK: u8 = ZXIO_SOCKET_MARK_DOMAIN_1;
+pub const ZXIO_SOCKET_MARK_SO_MARK: u8 = ZXIO_SOCKET_MARK_DOMAIN_1;
+/// Fuchsia does not have uids, we use the `ZXIO_SOCKET_MARK_DOMAIN_2` on the
+/// socket to store the UID for the sockets created by starnix.
+pub const ZXIO_SOCKET_MARK_UID: u8 = ZXIO_SOCKET_MARK_DOMAIN_2;
 
 /// Connects to the appropriate `fuchsia_posix_socket_*::Provider` protocol.
 struct SocketProviderServiceConnector;
@@ -86,20 +92,26 @@ pub struct ZxioBackedSocket {
 
 impl ZxioBackedSocket {
     pub fn new(
+        current_task: &CurrentTask,
         domain: SocketDomain,
         socket_type: SocketType,
         protocol: SocketProtocol,
     ) -> Result<ZxioBackedSocket, Errno> {
+        let marks = if current_task.kernel().features.netstack_mark {
+            &mut [ZxioSocketMark::so_mark(0), ZxioSocketMark::uid(current_task.creds().uid)]
+        } else {
+            &mut [][..]
+        };
         let zxio = Zxio::new_socket::<SocketProviderServiceConnector>(
             domain.as_raw() as c_int,
             socket_type.as_raw() as c_int,
             protocol.as_raw() as c_int,
+            ZxioSocketCreationOptions { marks },
         )
         .map_err(|status| from_status_like_fdio!(status))?
         .map_err(|out_code| errno_from_zxio_code!(out_code))?;
 
-        let socket = Self::new_with_zxio(zxio);
-        Ok(socket)
+        Ok(Self::new_with_zxio(zxio))
     }
 
     pub fn new_with_zxio(zxio: syncio::Zxio) -> ZxioBackedSocket {
@@ -537,12 +549,7 @@ impl SocketOps for ZxioBackedSocket {
             }
             (SOL_SOCKET, SO_MARK) => {
                 let mark = current_task.read_object::<u32>(user_opt.try_into()?)?;
-                let socket_mark = zxio_socket_mark {
-                    is_present: true,
-                    domain: ZXIO_SOCKET_MARK_SO_MARK,
-                    value: mark,
-                    ..Default::default()
-                };
+                let socket_mark = ZxioSocketMark::so_mark(mark);
                 let optval: &[u8; size_of::<zxio_socket_mark>()] =
                     zerocopy::transmute_ref!(&socket_mark);
                 self.zxio

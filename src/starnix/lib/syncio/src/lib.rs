@@ -18,12 +18,13 @@ use std::mem::{size_of, size_of_val, MaybeUninit};
 use std::num::TryFromIntError;
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::pin::Pin;
-use zerocopy::{FromBytes, IntoBytes};
+use zerocopy::{FromBytes, Immutable, IntoBytes, TryFromBytes};
 use zx::{self as zx, AsHandleRef as _, HandleBased as _};
 use zxio::{
     msghdr, sockaddr, sockaddr_storage, socklen_t, zx_handle_t, zx_status_t, zxio_object_type_t,
-    zxio_seek_origin_t, zxio_storage_t, ZXIO_SELINUX_CONTEXT_STATE_DATA,
-    ZXIO_SHUTDOWN_OPTIONS_READ, ZXIO_SHUTDOWN_OPTIONS_WRITE,
+    zxio_seek_origin_t, zxio_socket_mark_t, zxio_storage_t, ZXIO_SELINUX_CONTEXT_STATE_DATA,
+    ZXIO_SHUTDOWN_OPTIONS_READ, ZXIO_SHUTDOWN_OPTIONS_WRITE, ZXIO_SOCKET_MARK_DOMAIN_1,
+    ZXIO_SOCKET_MARK_DOMAIN_2,
 };
 
 pub mod zxio;
@@ -618,22 +619,64 @@ fn clean_pointer_fields(attrs: &mut zxio_node_attributes_t) {
 
 pub const ZXIO_ROOT_HASH_LENGTH: usize = 64;
 
+/// Linux marks aren't compatible with Fuchsia marks, we store the `SO_MARK`
+/// value in the fuchsia `ZXIO_SOCKET_MARK_DOMAIN_1`. If a mark in this domain
+/// is absent, it will be reported to starnix applications as a `0` since that
+/// is the default mark value on Linux.
+pub const ZXIO_SOCKET_MARK_SO_MARK: u8 = ZXIO_SOCKET_MARK_DOMAIN_1;
+/// Fuchsia does not have uids, we use the `ZXIO_SOCKET_MARK_DOMAIN_2` on the
+/// socket to store the UID for the sockets created by starnix.
+pub const ZXIO_SOCKET_MARK_UID: u8 = ZXIO_SOCKET_MARK_DOMAIN_2;
+
+/// A transparent wrapper around the bindgen type.
+#[repr(transparent)]
+#[derive(IntoBytes, TryFromBytes, Immutable)]
+pub struct ZxioSocketMark(zxio_socket_mark_t);
+
+impl ZxioSocketMark {
+    fn new(domain: u8, value: u32) -> Self {
+        ZxioSocketMark(zxio_socket_mark_t { is_present: true, domain, value, ..Default::default() })
+    }
+
+    /// Creates a new socket mark representing the SO_MARK domain.
+    pub fn so_mark(mark: u32) -> Self {
+        Self::new(ZXIO_SOCKET_MARK_SO_MARK, mark)
+    }
+
+    /// Creates a new socket mark representing the uid domain.
+    pub fn uid(uid: u32) -> Self {
+        Self::new(ZXIO_SOCKET_MARK_UID, uid)
+    }
+}
+
+/// Socket creation options that can be used.
+pub struct ZxioSocketCreationOptions<'a> {
+    pub marks: &'a mut [ZxioSocketMark],
+}
+
 impl Zxio {
     pub fn new_socket<S: ServiceConnector>(
         domain: c_int,
         socket_type: c_int,
         protocol: c_int,
+        ZxioSocketCreationOptions { marks }: ZxioSocketCreationOptions<'_>,
     ) -> Result<Result<Self, ZxioErrorCode>, zx::Status> {
         let zxio = Zxio::default();
         let mut out_context = zxio.as_storage_ptr() as *mut c_void;
         let mut out_code = 0;
 
+        let creation_opts = zxio::zxio_socket_creation_options {
+            num_marks: marks.len(),
+            marks: marks.as_mut_ptr() as *mut _,
+        };
+
         let status = unsafe {
-            zxio::zxio_socket(
+            zxio::zxio_socket_with_options(
                 Some(service_connector::<S>),
                 domain,
                 socket_type,
                 protocol,
+                creation_opts,
                 Some(storage_allocator),
                 &mut out_context as *mut *mut c_void,
                 &mut out_code,

@@ -412,7 +412,7 @@ fn create_socket_ops(
             if socket_type == SocketType::Raw {
                 security::check_task_capable(current_task, CAP_NET_RAW)?;
             }
-            Ok(Box::new(ZxioBackedSocket::new(domain, socket_type, protocol)?))
+            Ok(Box::new(ZxioBackedSocket::new(current_task, domain, socket_type, protocol)?))
         }
         SocketDomain::Netlink => {
             let netlink_family = NetlinkFamily::from_raw(protocol.as_raw());
@@ -422,7 +422,7 @@ fn create_socket_ops(
             // Follow Linux, and require CAP_NET_RAW to create packet sockets.
             // See https://man7.org/linux/man-pages/man7/packet.7.html.
             security::check_task_capable(current_task, CAP_NET_RAW)?;
-            Ok(Box::new(ZxioBackedSocket::new(domain, socket_type, protocol)?))
+            Ok(Box::new(ZxioBackedSocket::new(current_task, domain, socket_type, protocol)?))
         }
         SocketDomain::Key => {
             track_stub!(
