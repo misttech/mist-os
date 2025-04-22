@@ -39,7 +39,7 @@ async-channel = "1.8.0"
 async-lock = "2.3"
 async-ringbuf  = "0.3.1"
 async-stream = "0.3.5"
-async-trait = "0.1.71"
+async-trait = "0.1.88"
 base64 = "0.22.1"
 bincode = "1.3"
 bit-set = "0.5.3"
@@ -514,7 +514,7 @@ rustflags = []
 [gn.package.async-fs."1.6.0"]
 rustflags = []
 
-[gn.package.async-trait."0.1.71"]
+[gn.package.async-trait."0.1.88"]
 rustflags = []
 
 [gn.package.base64."0.13.0"]

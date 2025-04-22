@@ -92,7 +92,7 @@ group("async-stream") {
 }
 
 group("async-trait") {
-  public_deps = [ ":async-trait-v0_1_71($host_toolchain)" ]
+  public_deps = [ ":async-trait-v0_1_88($host_toolchain)" ]
 }
 
 group("base64") {
@@ -2285,18 +2285,18 @@ rust_library("async-task-v4_0_3") {
   applicable_licenses = [ ":async-task-v4_0_3.license" ]
 }
 
-license("async-trait-v0_1_71.license") {
+license("async-trait-v0_1_88.license") {
   public_package_name = "async_trait"
   license_files = [
-    "//third_party/rust_crates/vendor/async-trait-0.1.71/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/async-trait-0.1.71/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/async-trait-0.1.88/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/async-trait-0.1.88/LICENSE-MIT",
   ]
 }
 
-rust_proc_macro("async-trait-v0_1_71") {
+rust_proc_macro("async-trait-v0_1_88") {
   crate_name = "async_trait"
-  crate_root = "//third_party/rust_crates/vendor/async-trait-0.1.71/src/lib.rs"
-  output_name = "async_trait-1fd7cf147dfbb38f"
+  crate_root = "//third_party/rust_crates/vendor/async-trait-0.1.88/src/lib.rs"
+  output_name = "async_trait-e24d309deceaa72f"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -2308,14 +2308,14 @@ rust_proc_macro("async-trait-v0_1_71") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=1fd7cf147dfbb38f",
-    "-Cextra-filename=-1fd7cf147dfbb38f",
+    "--edition=2021",
+    "-Cmetadata=e24d309deceaa72f",
+    "-Cextra-filename=-e24d309deceaa72f",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":async-trait-v0_1_71.license" ]
+  applicable_licenses = [ ":async-trait-v0_1_88.license" ]
 }
 
 license("atomic-waker-v1_1_2.license") {
@@ -6419,7 +6419,7 @@ rust_library("fuse3-v0_6_1") {
 
   deps = []
   deps += [ ":nix-v0_29_0" ]
-  deps += [ ":async-trait-v0_1_71($host_toolchain)" ]
+  deps += [ ":async-trait-v0_1_88($host_toolchain)" ]
   deps += [ ":bincode-v1_3_3" ]
   deps += [ ":bytes-v1_10_0" ]
   deps += [ ":cstr-v0_2_11($host_toolchain)" ]
@@ -17604,7 +17604,7 @@ rust_library("trust-dns-proto-v0_22_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":async-trait-v0_1_71($host_toolchain)" ]
+  deps += [ ":async-trait-v0_1_88($host_toolchain)" ]
   deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":data-encoding-v2_3_2" ]
   deps += [ ":enum-as-inner-v0_5_1($host_toolchain)" ]

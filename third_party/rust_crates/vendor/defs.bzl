@@ -590,7 +590,7 @@ _NORMAL_DEV_ALIASES = {
 _PROC_MACRO_DEPENDENCIES = {
     "third_party/rust_crates": {
         _COMMON_CONDITION: {
-            "async-trait": Label("//third_party/rust_crates/vendor/async-trait-0.1.71:async_trait"),
+            "async-trait": Label("//third_party/rust_crates/vendor/async-trait-0.1.88:async_trait"),
             "derivative": Label("//third_party/rust_crates/vendor/derivative-2.2.0:derivative"),
             "enumn": Label("//third_party/rust_crates/vendor/enumn-0.1.14:enumn"),
             "num-derive": Label("//third_party/rust_crates/vendor/num-derive-0.4.2:num_derive"),
