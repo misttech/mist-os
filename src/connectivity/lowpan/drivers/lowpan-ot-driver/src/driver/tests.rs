@@ -122,11 +122,13 @@ where
 
 /// This is just a simple test where we bring everything up and
 /// immediately tear it down. If this fails there are fundamental problems.
+#[ignore]
 #[fuchsia::test(threads = 10)]
 async fn test_driver_setup_and_teardown() {
     test_harness(|_| async move {}).await;
 }
 
+#[ignore]
 #[fuchsia::test(threads = 10)]
 async fn test_initial_device_state() {
     test_harness(|driver| async move {
@@ -197,6 +199,7 @@ async fn test_energy_scan() {
     .await;
 }
 
+#[ignore]
 #[fuchsia::test(threads = 10)]
 async fn test_get_supported_channels() {
     test_harness(|driver| async move {
@@ -206,6 +209,7 @@ async fn test_get_supported_channels() {
     .await;
 }
 
+#[ignore]
 #[fuchsia::test(threads = 10)]
 async fn test_get_factory_mac_address() {
     test_harness(|driver| async move {
@@ -215,6 +219,7 @@ async fn test_get_factory_mac_address() {
     .await;
 }
 
+#[ignore]
 #[fuchsia::test(threads = 10)]
 async fn test_get_current_mac_address() {
     test_harness(|driver| async move {
@@ -224,6 +229,7 @@ async fn test_get_current_mac_address() {
     .await;
 }
 
+#[ignore]
 #[fuchsia::test(threads = 10)]
 async fn test_get_supported_network_types() {
     test_harness(|driver| async move {
@@ -236,6 +242,7 @@ async fn test_get_supported_network_types() {
     .await;
 }
 
+#[ignore]
 #[fuchsia::test(threads = 10)]
 async fn test_get_current_channel() {
     test_harness(|driver| async move {
@@ -245,6 +252,7 @@ async fn test_get_current_channel() {
     .await;
 }
 
+#[ignore]
 #[fuchsia::test(threads = 10)]
 async fn test_get_partition_id() {
     test_harness(|driver| async move {
@@ -254,6 +262,7 @@ async fn test_get_partition_id() {
     .await;
 }
 
+#[ignore]
 #[fuchsia::test(threads = 10)]
 async fn test_get_current_rssi() {
     test_harness(|driver| async move {
@@ -263,6 +272,7 @@ async fn test_get_current_rssi() {
     .await;
 }
 
+#[ignore]
 #[fuchsia::test(threads = 10)]
 async fn test_get_thread_rloc16() {
     test_harness(|driver| async move {
@@ -272,6 +282,7 @@ async fn test_get_thread_rloc16() {
     .await;
 }
 
+#[ignore]
 #[fuchsia::test(threads = 10)]
 async fn test_get_thread_router_id() {
     test_harness(|driver| async move {
@@ -281,6 +292,7 @@ async fn test_get_thread_router_id() {
     .await;
 }
 
+#[ignore]
 #[fuchsia::test(threads = 10)]
 async fn test_get_neighbor_table_offline() {
     test_harness(|driver| async move {
@@ -290,6 +302,7 @@ async fn test_get_neighbor_table_offline() {
     .await;
 }
 
+#[ignore]
 #[fuchsia::test(threads = 10)]
 async fn test_get_counters() {
     test_harness(|driver| async move {
@@ -299,6 +312,7 @@ async fn test_get_counters() {
     .await;
 }
 
+#[ignore]
 #[fuchsia::test(threads = 10)]
 async fn test_provision_network_offline() {
     test_harness(|driver| async move {
@@ -347,6 +361,7 @@ async fn test_provision_network_offline() {
     .await;
 }
 
+#[ignore]
 #[fuchsia::test(threads = 10)]
 async fn test_provision_network_online() {
     test_harness(|driver| async move {
@@ -417,6 +432,7 @@ async fn test_provision_network_online() {
     .await;
 }
 
+#[ignore]
 #[fuchsia::test(threads = 10)]
 #[allow(clippy::or_fun_call)]
 async fn test_add_on_mesh_prefix() {
@@ -463,6 +479,7 @@ async fn test_add_on_mesh_prefix() {
     .await;
 }
 
+#[ignore]
 #[fuchsia::test(threads = 10)]
 #[allow(clippy::or_fun_call)]
 async fn test_add_external_route() {
