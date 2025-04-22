@@ -115,6 +115,12 @@ cquery:no_sdk --platforms=//build/bazel/platforms:host
 aquery:no_sdk --platforms=//build/bazel/platforms:host
 build:no_sdk --platforms=//build/bazel/platforms:host
 
+# The `--config=host option` is shorthand for
+#`--platforms=//build/bazel/platforms:host`.
+cquery:host --platforms=//build/bazel/platforms:host
+aquery:host --platforms=//build/bazel/platforms:host
+build:host --platforms=//build/bazel/platforms:host
+
 # Enable clippy for Rust targets specified on the build line.
 # See https://bazelbuild.github.io/rules_rust/rust_clippy.html.
 build --aspects=@rules_rust//rust:defs.bzl%rust_clippy_aspect
