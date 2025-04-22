@@ -31,6 +31,7 @@ pub struct BorderAgentState : u32 {
     const HIGH_AVAILABILITY = (1<<5);
     const BBR_IS_ACTIVE = (1<<7);
     const BBR_IS_PRIMARY = (1<<8);
+    const EPSKC_SUPPORTED = (1<<11);
 }
 }
 
