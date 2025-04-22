@@ -35,6 +35,7 @@ void TestBase::SetUp() {
   zx::result<std::unique_ptr<fake_display::FakeSysmemDeviceHierarchy>>
       create_sysmem_provider_result = fake_display::FakeSysmemDeviceHierarchy::Create();
   ASSERT_OK(create_sysmem_provider_result);
+  ASSERT_NE(create_sysmem_provider_result.value(), nullptr);
 
   static constexpr fake_display::FakeDisplayDeviceConfig kDeviceConfig = {
       .periodic_vsync = false,
