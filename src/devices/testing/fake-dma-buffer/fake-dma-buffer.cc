@@ -8,6 +8,7 @@
 #include <string_view>
 
 #include <fake-dma-buffer/fake-dma-buffer.h>
+#include "lib/zx/vmo.h"
 
 class ContiguousBufferImpl : public dma_buffer::ContiguousBuffer {
  public:
@@ -15,8 +16,9 @@ class ContiguousBufferImpl : public dma_buffer::ContiguousBuffer {
       : size_(size), virt_(virt), phys_(phys), vmo_(std::move(vmo)), pmt_(std::move(pmt)) {}
   size_t size() const { return size_; }
   void* virt() const { return virt_; }
-
   zx_paddr_t phys() const { return phys_; }
+  zx::unowned_vmo vmo() const { return vmo_.borrow(); }
+
   ~ContiguousBufferImpl() {
     if (vmo_.is_valid()) {
       delete reinterpret_cast<ddk_fake::FakePage*>(phys_);

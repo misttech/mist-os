@@ -25,8 +25,9 @@ class ContiguousBuffer : public fbl::DoublyLinkedListable<std::unique_ptr<Contig
  public:
   virtual size_t size() const = 0;
   virtual void* virt() const = 0;
-
   virtual zx_paddr_t phys() const = 0;
+  virtual zx::unowned_vmo vmo() const = 0;
+
   virtual ~ContiguousBuffer() = default;
 };
 
