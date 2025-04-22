@@ -563,6 +563,7 @@ fn make_target<B: SplitByteSlice + Copy>(
     msg: dns::Message<B>,
 ) -> Option<(ffx::TargetInfo, u32)> {
     let mut nodename = String::new();
+    let mut serial = None;
     let mut ttl = 0u32;
     let mut ssh_port: u16 = 0;
     let mut ssh_address = None;
@@ -582,6 +583,7 @@ fn make_target<B: SplitByteSlice + Copy>(
             dns::Type::Txt => {
                 if let Some(data) = record.rdata.bytes() {
                     let txt_lines: Vec<String> = decode_txt_rdata(data).unwrap_or_default();
+                    tracing::debug!("found text lines: {:#?}", txt_lines);
                     let mut ip_addr: Option<IpAddress> = None;
                     for txt in &txt_lines {
                         if let Some((name, value)) = txt.split_once(':') {
@@ -602,6 +604,14 @@ fn make_target<B: SplitByteSlice + Copy>(
                                 }
                                 _ => {}
                             };
+                        }
+                        if let Some((name, value)) = txt.split_once('=') {
+                            match name {
+                                "serial" => {
+                                    serial = Some(value.to_string());
+                                }
+                                _ => {}
+                            }
                         }
                     }
                     if let Some(ip) = ip_addr {
@@ -630,10 +640,11 @@ fn make_target<B: SplitByteSlice + Copy>(
     }
 
     tracing::debug!(
-        "Making target from message. nodename: {} address: {:#?} fastboot_interface: {:#?}",
+        "Making target from message. nodename: {} address: {:#?} fastboot_interface: {:#?} serial: {:#?}",
         nodename,
         src,
-        fastboot_interface
+        fastboot_interface,
+        serial,
     );
 
     if nodename.is_empty() || ttl == 0 {
@@ -643,6 +654,7 @@ fn make_target<B: SplitByteSlice + Copy>(
         ffx::TargetInfo {
             nodename: Some(nodename),
             addresses: Some(vec![src]),
+            serial_number: serial,
             target_state: fastboot_interface.map(|_| ffx::TargetState::Fastboot),
             fastboot_interface,
             ssh_address,
@@ -720,11 +732,11 @@ async fn recv_loop(
             }
         };
 
-        tracing::debug!("Socket: {:#?} received message", sock);
+        tracing::trace!("Socket: {:#?} received message", sock);
 
         // Only interested in fuchsia services or fastboot.
         if !is_fuchsia_response(&msg) && is_fastboot_response(&msg).is_none() {
-            tracing::debug!(
+            tracing::trace!(
                 "Socket: {:#?} skipping message: as it is not fuchsia or fastboot",
                 sock
             );
@@ -1021,6 +1033,42 @@ mod tests {
             })
         );
         assert_eq!(t.nodename.unwrap(), "foo._fuchsia._udp");
+    }
+
+    #[test]
+    fn test_make_target_with_serial() -> Result<()> {
+        let nodename = DomainBuilder::from_str("foo._fuchsia._udp.local").unwrap();
+        let mut txt_data: Vec<u8> = vec![];
+        let txt_strings = ["foo=bar", "serial=1234990"];
+        for d in txt_strings {
+            txt_data.write_all(&[d.len() as u8])?;
+            txt_data.write_all(d.as_bytes())?;
+        }
+        let record =
+            RecordBuilder::new(nodename.clone(), Type::A, Class::Any, true, 4500, &[8, 8, 8, 8]);
+        let text_record =
+            RecordBuilder::new(nodename, Type::Txt, Class::Any, true, 4500, &txt_data);
+        let mut message = MessageBuilder::new(0, true);
+        message.add_additional(record);
+        message.add_additional(text_record);
+        let mut msg_bytes = message
+            .into_serializer()
+            .serialize_vec_outer()
+            .unwrap_or_else(|_| panic!("failed to serialize"));
+        let parsed = msg_bytes.parse::<Message<_>>().expect("failed to parse");
+        let addr: SocketAddr = (MDNS_MCAST_V4, 12).into();
+        let (t, ttl) = make_target(addr, parsed).unwrap();
+        assert_eq!(ttl, 4500);
+        assert_eq!(
+            t.addresses.as_ref().unwrap()[0],
+            ffx::TargetAddrInfo::Ip(ffx::TargetIp {
+                ip: IpAddress::Ipv4(Ipv4Address { addr: MDNS_MCAST_V4.octets() }),
+                scope_id: 0
+            })
+        );
+        assert_eq!(t.nodename.unwrap(), "foo._fuchsia._udp");
+        assert_eq!(t.serial_number.unwrap(), "1234990");
+        Ok(())
     }
 
     #[test]
