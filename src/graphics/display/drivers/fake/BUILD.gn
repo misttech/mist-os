@@ -28,6 +28,7 @@ source_set("fake-lib") {
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//sdk/lib/driver/logging/cpp",
+    "//src/graphics/display/lib/api-protocols/cpp",
     "//src/graphics/display/lib/api-types/cpp",
     "//src/lib/fsl",
     "//zircon/system/ulib/fbl",

@@ -6,11 +6,10 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_H_
 
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/zircon-internal/thread_annotations.h>
-#include <lib/zx/channel.h>
+#include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -24,11 +23,21 @@
 #include <unordered_map>
 
 #include "src/graphics/display/drivers/fake/image-info.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-interface.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-interface.h"
 #include "src/graphics/display/lib/api-types/cpp/color.h"
+#include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/engine-info.h"
+#include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
+#include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
+#include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 
 namespace fake_display {
 
@@ -63,54 +72,58 @@ struct FakeDisplayDeviceConfig {
 //
 // This class has a complex threading model. See method-level comments for the
 // thread safety properties of each method.
-class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
+class FakeDisplay : public display::DisplayEngineInterface {
  public:
-  explicit FakeDisplay(FakeDisplayDeviceConfig device_config,
-                       fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator,
-                       inspect::Inspector inspector);
+  // `engine_events` must outlive the newly constructed instance.
+  explicit FakeDisplay(display::DisplayEngineEventsInterface* engine_events,
+                       fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client,
+                       const FakeDisplayDeviceConfig& device_config, inspect::Inspector inspector);
 
   FakeDisplay(const FakeDisplay&) = delete;
   FakeDisplay& operator=(const FakeDisplay&) = delete;
 
-  ~FakeDisplay();
+  virtual ~FakeDisplay();
 
-  // ddk::DisplayEngineProtocol:
+  // display::DisplayEngineInterface:
   //
   // When the driver is migrated to FIDL, these methods will only be called on
   // the Display Engine API serving dispatcher.
-  void DisplayEngineCompleteCoordinatorConnection(
-      const display_engine_listener_protocol_t* display_engine_listener,
-      engine_info_t* out_banjo_engine_info);
-  void DisplayEngineUnsetListener();
-  zx_status_t DisplayEngineImportBufferCollection(uint64_t banjo_driver_buffer_collection_id,
-                                                  zx::channel collection_token);
-  zx_status_t DisplayEngineReleaseBufferCollection(uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayEngineImportImage(const image_metadata_t* image_metadata,
-                                       uint64_t banjo_driver_buffer_collection_id,
-                                       uint32_t buffer_index, uint64_t* out_image_handle);
-  void DisplayEngineReleaseImage(uint64_t image_handle);
-  config_check_result_t DisplayEngineCheckConfiguration(
-      const display_config_t* display_config_ptr,
-      layer_composition_operations_t* out_layer_composition_operations_list,
-      size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual);
-  void DisplayEngineApplyConfiguration(const display_config_t* display_config_ptr,
-                                       const config_stamp_t* banjo_config_stamp);
-  zx_status_t DisplayEngineSetBufferCollectionConstraints(
-      const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayEngineSetDisplayPower(uint64_t display_id, bool power_on);
-  zx_status_t DisplayEngineImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
-                                                 uint32_t buffer_index,
-                                                 uint64_t* out_capture_handle);
-  zx_status_t DisplayEngineStartCapture(uint64_t capture_handle);
-  zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle);
-  zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb);
-
-  const display_engine_protocol_t* display_engine_banjo_protocol() const {
-    return &display_engine_banjo_protocol_;
-  }
+  display::EngineInfo CompleteCoordinatorConnection() override __TA_EXCLUDES(mutex_);
+  zx::result<> ImportBufferCollection(
+      display::DriverBufferCollectionId buffer_collection_id,
+      fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_collection_token) override
+      __TA_EXCLUDES(mutex_);
+  zx::result<> ReleaseBufferCollection(
+      display::DriverBufferCollectionId buffer_collection_id) override __TA_EXCLUDES(mutex_);
+  zx::result<display::DriverImageId> ImportImage(
+      const display::ImageMetadata& image_metadata,
+      display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) override
+      __TA_EXCLUDES(mutex_);
+  zx::result<display::DriverCaptureImageId> ImportImageForCapture(
+      display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) override
+      __TA_EXCLUDES(mutex_);
+  void ReleaseImage(display::DriverImageId image_id) override __TA_EXCLUDES(mutex_);
+  display::ConfigCheckResult CheckConfiguration(
+      display::DisplayId display_id, display::ModeId display_mode_id,
+      cpp20::span<const display::DriverLayer> layers,
+      cpp20::span<display::LayerCompositionOperations> layer_composition_operations) override
+      __TA_EXCLUDES(mutex_);
+  void ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
+                          cpp20::span<const display::DriverLayer> layers,
+                          display::DriverConfigStamp config_stamp) override __TA_EXCLUDES(mutex_);
+  zx::result<> SetBufferCollectionConstraints(
+      const display::ImageBufferUsage& image_buffer_usage,
+      display::DriverBufferCollectionId buffer_collection_id) override __TA_EXCLUDES(mutex_);
+  zx::result<> SetDisplayPower(display::DisplayId display_id, bool power_on) override
+      __TA_EXCLUDES(mutex_);
+  zx::result<> StartCapture(display::DriverCaptureImageId capture_image_id) override
+      __TA_EXCLUDES(mutex_);
+  zx::result<> ReleaseCapture(display::DriverCaptureImageId capture_image_id) override
+      __TA_EXCLUDES(mutex_);
+  zx::result<> SetMinimumRgb(uint8_t minimum_rgb) override __TA_EXCLUDES(mutex_);
 
   // Can be called from any thread.
-  bool IsCaptureSupported() const;
+  bool IsCaptureSupported() const __TA_EXCLUDES(mutex_);
 
   // Manually triggers the VSync dispatch logic.
   //
@@ -123,10 +136,10 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   // configuration.
   //
   // Can be called from any thread.
-  void TriggerVsync();
+  void TriggerVsync() __TA_EXCLUDES(mutex_);
 
   // Can be called from any thread.
-  display::DriverConfigStamp LastAppliedConfigStamp() const {
+  display::DriverConfigStamp LastAppliedConfigStamp() const __TA_EXCLUDES(mutex_) {
     std::lock_guard lock(mutex_);
     return applied_config_stamp_;
   }
@@ -134,16 +147,19 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   // Just for display core unittests.
   //
   // Can be called from any thread.
-  zx::result<display::DriverImageId> ImportVmoImageForTesting(zx::vmo vmo, size_t vmo_offset);
+  zx::result<display::DriverImageId> ImportVmoImageForTesting(zx::vmo vmo, size_t vmo_offset)
+      __TA_EXCLUDES(mutex_);
 
   // Can be called from any thread.
-  uint8_t GetClampRgbValue() const {
+  uint8_t GetClampRgbValue() const __TA_EXCLUDES(mutex_) {
     std::lock_guard lock(mutex_);
     return clamp_rgb_value_;
   }
 
   // Can be called from any thread.
-  zx::vmo DuplicateInspectorVmoForTesting() { return inspector_.DuplicateVmo(); }
+  zx::vmo DuplicateInspectorVmoForTesting() __TA_EXCLUDES(mutex_) {
+    return inspector_.DuplicateVmo();
+  }
 
  private:
   enum class BufferCollectionUsage : int32_t;
@@ -157,10 +173,10 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   // Dispatches an OnVsync() event to the Display Coordinator.
   //
   // Can be called from any thread.
-  void SendVsync() __TA_EXCLUDES(engine_listener_mutex_);
+  void SendVsync() __TA_EXCLUDES(mutex_);
 
   // Simulates a display capture, if a capture was requested.
-  zx::result<> ServiceAnyCaptureRequest();
+  zx::result<> ServiceAnyCaptureRequest() __TA_EXCLUDES(mutex_);
 
   // Simulates a display capture for a single-layer image configuration.
   static zx::result<> DoImageCapture(DisplayImageInfo& source_info,
@@ -170,14 +186,8 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   static zx::result<> DoColorFillCapture(display::Color fill_color,
                                          CaptureImageInfo& destination_info);
 
-  // Dispatches an OnCaptureComplete() event to the Display Coordinator.
-  void SendCaptureComplete() __TA_EXCLUDES(engine_listener_mutex_);
-
-  // Dispatches an OnDisplayAdded() event to the Display Coordinator.
-  void SendDisplayInformation() __TA_EXCLUDES(engine_listener_mutex_);
-
   // Must be called exactly once before using the Sysmem client.
-  void InitializeSysmemClient();
+  void InitializeSysmemClient() __TA_EXCLUDES(mutex_);
 
   fuchsia_sysmem2::wire::BufferCollectionConstraints CreateBufferCollectionConstraints(
       BufferCollectionUsage usage, fidl::AnyArena& arena);
@@ -189,8 +199,7 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   // be already initialized.
   void RecordDisplayConfigToInspectRootNode();
 
-  // Banjo vtable for fuchsia.hardware.display.controller.DisplayEngine.
-  const display_engine_protocol_t display_engine_banjo_protocol_;
+  display::DisplayEngineEventsInterface& engine_events_;
 
   // Safe to access on multiple threads thanks to immutability.
   const FakeDisplayDeviceConfig device_config_;
@@ -207,14 +216,6 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
 
   // Guards resources accessed by the VSync and capture threads.
   mutable std::mutex mutex_;
-
-  // Guards the Display Coordinator's event listener connection.
-  //
-  // No other mutex may be acquired while this mutex is acquired. In other words,
-  // event dispatch logic is expected to capture this mutex, dispatch the event,
-  // and immediately release the mutex. This ordering keeps the driver ready
-  // for a migration to the api-protocols library.
-  mutable std::mutex engine_listener_mutex_;
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
   //
@@ -281,10 +282,6 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   // This is associated with the display capture lock so we have the option to
   // reflect the clamping when we simulate display capture.
   uint8_t clamp_rgb_value_ __TA_GUARDED(mutex_) = 0;
-
-  // Used to dispatch events to the Display Coordinator.
-  ddk::DisplayEngineListenerProtocolClient engine_listener_client_
-      __TA_GUARDED(engine_listener_mutex_);
 
   inspect::Inspector inspector_;
 };

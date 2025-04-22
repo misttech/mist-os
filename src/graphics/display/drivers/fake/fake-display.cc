@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.math/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fit/result.h>
 #include <lib/fzl/vmo-mapper.h>
@@ -29,10 +28,8 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <format>
 #include <initializer_list>
-#include <iterator>
 #include <limits>
 #include <mutex>
 #include <string>
@@ -41,14 +38,27 @@
 
 #include "src/graphics/display/drivers/coordinator/preferred-scanout-image-type.h"
 #include "src/graphics/display/drivers/fake/image-info.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-interface.h"
+#include "src/graphics/display/lib/api-types/cpp/alpha-mode.h"
 #include "src/graphics/display/lib/api-types/cpp/color.h"
+#include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
+#include "src/graphics/display/lib/api-types/cpp/coordinate-transformation.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
-#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/engine-info.h"
+#include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
+#include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
+#include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
+#include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-id.h"
+#include "src/graphics/display/lib/api-types/cpp/mode.h"
 #include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
+#include "src/graphics/display/lib/api-types/cpp/rectangle.h"
 #include "src/lib/fsl/handles/object_info.h"
 
 namespace fake_display {
@@ -56,12 +66,10 @@ namespace fake_display {
 namespace {
 
 // List of supported pixel formats.
-constexpr fuchsia_images2_pixel_format_enum_value_t kSupportedPixelFormats[] = {
-    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-        fuchsia_images2::wire::PixelFormat::kB8G8R8A8),
-    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-        fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
-};
+constexpr auto kSupportedPixelFormats = std::to_array<display::PixelFormat>({
+    display::PixelFormat::kB8G8R8A8,
+    display::PixelFormat::kR8G8B8A8,
+});
 constexpr auto kSupportedFormatModifiers =
     std::to_array<fuchsia_images2::wire::PixelFormatModifier>({
         fuchsia_images2::wire::PixelFormatModifier::kLinear,
@@ -76,61 +84,24 @@ constexpr int32_t kWidth = 1280;
 constexpr int32_t kHeight = 800;
 
 constexpr display::DisplayId kDisplayId(1);
+constexpr display::ModeId kDisplayModeId(1);
 
-constexpr int32_t kRefreshRateFps = 60;
-
-display_mode_t CreateBanjoDisplayMode() {
-  static constexpr int64_t kPixelClockFrequencyHz = int64_t{kWidth} * kHeight * kRefreshRateFps;
-  static_assert(kPixelClockFrequencyHz >= 0);
-  static_assert(kPixelClockFrequencyHz <= display::kMaxPixelClockHz);
-
-  static constexpr display::DisplayTiming kDisplayTiming = {
-      .horizontal_active_px = kWidth,
-      .horizontal_front_porch_px = 0,
-      .horizontal_sync_width_px = 0,
-      .horizontal_back_porch_px = 0,
-      .vertical_active_lines = kHeight,
-      .vertical_front_porch_lines = 0,
-      .vertical_sync_width_lines = 0,
-      .vertical_back_porch_lines = 0,
-      .pixel_clock_frequency_hz = kPixelClockFrequencyHz,
-      .fields_per_frame = display::FieldsPerFrame::kProgressive,
-      .hsync_polarity = display::SyncPolarity::kNegative,
-      .vsync_polarity = display::SyncPolarity::kNegative,
-      .vblank_alternates = false,
-      .pixel_repetition = 0,
-  };
-
-  return display::ToBanjoDisplayMode(kDisplayTiming);
-}
-
-// `banjo_display_mode` must outlive the returned value.
-raw_display_info_t CreateRawDisplayInfo(const display_mode_t* banjo_display_mode) {
-  raw_display_info_t args = {
-      .display_id = display::ToBanjoDisplayId(kDisplayId),
-      .preferred_modes_list = banjo_display_mode,
-      .preferred_modes_count = 1,
-      .edid_bytes_list = nullptr,
-      .edid_bytes_count = 0,
-      .pixel_formats_list = kSupportedPixelFormats,
-      .pixel_formats_count = std::size(kSupportedPixelFormats),
-  };
-  return args;
-}
+constexpr int32_t kRefreshRateHz = 60;
 
 }  // namespace
 
-FakeDisplay::FakeDisplay(FakeDisplayDeviceConfig device_config,
-                         fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator,
-                         inspect::Inspector inspector)
-    : display_engine_banjo_protocol_({&display_engine_protocol_ops_, this}),
+FakeDisplay::FakeDisplay(display::DisplayEngineEventsInterface* engine_events,
+                         fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client,
+                         const FakeDisplayDeviceConfig& device_config, inspect::Inspector inspector)
+    : engine_events_(*engine_events),
       device_config_(device_config),
-      sysmem_client_(std::move(sysmem_allocator)),
+      sysmem_client_(std::move(sysmem_client)),
       applied_fallback_color_({
           .format = display::PixelFormat::kB8G8R8A8,
           .bytes = std::initializer_list<uint8_t>{0, 0, 0, 0, 0, 0, 0, 0},
       }),
       inspector_(std::move(inspector)) {
+  ZX_DEBUG_ASSERT(engine_events != nullptr);
   ZX_DEBUG_ASSERT(sysmem_client_.is_valid());
   InitializeSysmemClient();
 
@@ -156,11 +127,11 @@ FakeDisplay::~FakeDisplay() {
   }
 }
 
-zx_status_t FakeDisplay::DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) {
+zx::result<> FakeDisplay::SetMinimumRgb(uint8_t minimum_rgb) {
   std::lock_guard lock(mutex_);
 
   clamp_rgb_value_ = minimum_rgb;
-  return ZX_OK;
+  return zx::ok();
 }
 
 void FakeDisplay::InitializeSysmemClient() {
@@ -183,40 +154,24 @@ void FakeDisplay::InitializeSysmemClient() {
   }
 }
 
-void FakeDisplay::DisplayEngineCompleteCoordinatorConnection(
-    const display_engine_listener_protocol_t* display_engine_listener,
-    engine_info_t* out_banjo_engine_info) {
-  ZX_DEBUG_ASSERT(display_engine_listener != nullptr);
-  ZX_DEBUG_ASSERT(out_banjo_engine_info != nullptr);
+display::EngineInfo FakeDisplay::CompleteCoordinatorConnection() {
+  const display::ModeAndId mode_and_id({
+      .id = kDisplayModeId,
+      .mode = display::Mode({
+          .active_width = kWidth,
+          .active_height = kHeight,
+          .refresh_rate_millihertz = kRefreshRateHz * 1'000,
+      }),
+  });
 
-  {
-    std::lock_guard engine_listener_lock(engine_listener_mutex_);
-    engine_listener_client_ = ddk::DisplayEngineListenerProtocolClient(display_engine_listener);
-  }
-  SendDisplayInformation();
+  const cpp20::span<const display::ModeAndId> preferred_modes(&mode_and_id, 1);
+  engine_events_.OnDisplayAdded(kDisplayId, preferred_modes, kSupportedPixelFormats);
 
-  *out_banjo_engine_info = {
+  return display::EngineInfo({
       .max_layer_count = 1,
       .max_connected_display_count = 1,
       .is_capture_supported = IsCaptureSupported(),
-  };
-}
-
-void FakeDisplay::SendDisplayInformation() {
-  const display_mode_t banjo_display_mode = CreateBanjoDisplayMode();
-  const raw_display_info_t banjo_display_info = CreateRawDisplayInfo(&banjo_display_mode);
-
-  std::lock_guard engine_listener_lock(engine_listener_mutex_);
-  if (!engine_listener_client_.is_valid()) {
-    fdf::warn("OnDisplayAdded() emitted with invalid event listener; event dropped");
-    return;
-  }
-  engine_listener_client_.OnDisplayAdded(&banjo_display_info);
-}
-
-void FakeDisplay::DisplayEngineUnsetListener() {
-  std::lock_guard engine_listener_lock(engine_listener_mutex_);
-  engine_listener_client_ = ddk::DisplayEngineListenerProtocolClient();
+  });
 }
 
 zx::result<display::DriverImageId> FakeDisplay::ImportVmoImageForTesting(zx::vmo vmo,
@@ -246,25 +201,23 @@ zx::result<display::DriverImageId> FakeDisplay::ImportVmoImageForTesting(zx::vmo
 
 namespace {
 
-bool IsAcceptableImageTilingType(uint32_t image_tiling_type) {
-  return image_tiling_type == IMAGE_TILING_TYPE_PREFERRED_SCANOUT ||
-         image_tiling_type == IMAGE_TILING_TYPE_LINEAR;
+bool IsAcceptableImageTilingType(display::ImageTilingType image_tiling_type) {
+  return image_tiling_type == display::ImageTilingType::kLinear ||
+         image_tiling_type.ToFidl() == IMAGE_TILING_TYPE_PREFERRED_SCANOUT;
 }
 
 }  // namespace
 
-zx_status_t FakeDisplay::DisplayEngineImportBufferCollection(
-    uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
-  const display::DriverBufferCollectionId buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
-
+zx::result<> FakeDisplay::ImportBufferCollection(
+    display::DriverBufferCollectionId buffer_collection_id,
+    fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_collection_token) {
   std::lock_guard lock(mutex_);
 
   auto buffer_collection_it = buffer_collections_.find(buffer_collection_id);
   if (buffer_collection_it != buffer_collections_.end()) {
     fdf::warn("Rejected BufferCollection import request with existing ID: {}",
               buffer_collection_id.value());
-    return ZX_ERR_ALREADY_EXISTS;
+    return zx::error(ZX_ERR_ALREADY_EXISTS);
   }
 
   auto [collection_client_endpoint, collection_server_endpoint] =
@@ -275,13 +228,12 @@ zx_status_t FakeDisplay::DisplayEngineImportBufferCollection(
   fidl::Arena arena;
   fidl::OneWayStatus bind_result = sysmem_client_->BindSharedCollection(
       fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena)
-          .token(
-              fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>(std::move(collection_token)))
+          .token(std::move(buffer_collection_token))
           .buffer_collection_request(std::move(collection_server_endpoint))
           .Build());
   if (!bind_result.ok()) {
     fdf::error("FIDL call BindSharedCollection failed: {}", bind_result.status_string());
-    return ZX_ERR_INTERNAL;
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
   buffer_collections_.insert(
@@ -289,56 +241,49 @@ zx_status_t FakeDisplay::DisplayEngineImportBufferCollection(
       std::make_pair(buffer_collection_id, fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>(
                                                std::move(collection_client_endpoint))));
 
-  return ZX_OK;
+  return zx::ok();
 }
 
-zx_status_t FakeDisplay::DisplayEngineReleaseBufferCollection(
-    uint64_t banjo_driver_buffer_collection_id) {
-  const display::DriverBufferCollectionId buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
-
+zx::result<> FakeDisplay::ReleaseBufferCollection(
+    display::DriverBufferCollectionId buffer_collection_id) {
   std::lock_guard lock(mutex_);
 
   auto buffer_collection_it = buffer_collections_.find(buffer_collection_id);
   if (buffer_collection_it == buffer_collections_.end()) {
     fdf::warn("Rejected request to release BufferCollection with unknown ID: {}",
               buffer_collection_id.value());
-    return ZX_ERR_NOT_FOUND;
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
 
   buffer_collections_.erase(buffer_collection_it);
-  return ZX_OK;
+  return zx::ok();
 }
 
-zx_status_t FakeDisplay::DisplayEngineImportImage(const image_metadata_t* image_metadata,
-                                                  uint64_t banjo_driver_buffer_collection_id,
-                                                  uint32_t buffer_index,
-                                                  uint64_t* out_image_handle) {
-  const display::DriverBufferCollectionId buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
-
+zx::result<display::DriverImageId> FakeDisplay::ImportImage(
+    const display::ImageMetadata& image_metadata,
+    display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) {
   std::lock_guard lock(mutex_);
 
   auto buffer_collection_it = buffer_collections_.find(buffer_collection_id);
   if (buffer_collection_it == buffer_collections_.end()) {
     fdf::error("ImportImage: Cannot find imported buffer collection ID: {}",
                buffer_collection_id.value());
-    return ZX_ERR_NOT_FOUND;
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
   fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& buffer_collection =
       buffer_collection_it->second;
 
-  if (!IsAcceptableImageTilingType(image_metadata->tiling_type)) {
-    fdf::info("ImportImage() will fail due to invalid Image tiling type {}",
-              image_metadata->tiling_type);
-    return ZX_ERR_INVALID_ARGS;
+  if (!IsAcceptableImageTilingType(image_metadata.tiling_type())) {
+    fdf::info("ImportImage: Invalid image tiling type: {}",
+              image_metadata.tiling_type().ValueForLogging());
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   zx::result<SysmemBufferInfo> sysmem_buffer_info_result =
       SysmemBufferInfo::GetSysmemMetadata(buffer_collection, buffer_index);
   if (sysmem_buffer_info_result.is_error()) {
     // SysmemBufferInfo::GetSysmemMetadata() has already logged the error.
-    return sysmem_buffer_info_result.error_value();
+    return sysmem_buffer_info_result.take_error();
   }
 
   // TODO(https://fxbug.dev/42079320): When capture is enabled
@@ -350,14 +295,11 @@ zx_status_t FakeDisplay::DisplayEngineImportImage(const image_metadata_t* image_
   auto display_image_info = std::make_unique<DisplayImageInfo>(
       driver_image_id, std::move(sysmem_buffer_info_result).value());
 
-  *out_image_handle = display::ToBanjoDriverImageId(driver_image_id);
   imported_images_.insert(std::move(display_image_info));
-  return ZX_OK;
+  return zx::ok(driver_image_id);
 }
 
-void FakeDisplay::DisplayEngineReleaseImage(uint64_t image_handle) {
-  display::DriverImageId image_id = display::ToDriverImageId(image_handle);
-
+void FakeDisplay::ReleaseImage(display::DriverImageId image_id) {
   std::lock_guard lock(mutex_);
 
   if (applied_image_id_ == image_id) {
@@ -370,123 +312,87 @@ void FakeDisplay::DisplayEngineReleaseImage(uint64_t image_handle) {
     fdf::warn("Rejected request to release Image with unknown ID: {}", image_id.value());
     return;
   }
-
   imported_images_.erase(image_it);
 }
 
-config_check_result_t FakeDisplay::DisplayEngineCheckConfiguration(
-    const display_config_t* display_config_ptr,
-    layer_composition_operations_t* out_layer_composition_operations_list,
-    size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual) {
-  ZX_DEBUG_ASSERT(display_config_ptr != nullptr);
-  const display_config_t& display_config = *display_config_ptr;
+display::ConfigCheckResult FakeDisplay::CheckConfiguration(
+    display::DisplayId display_id, display::ModeId display_mode_id,
+    cpp20::span<const display::DriverLayer> layers,
+    cpp20::span<display::LayerCompositionOperations> layer_composition_operations) {
+  ZX_DEBUG_ASSERT(display_id == kDisplayId);
 
-  if (out_layer_composition_operations_actual != nullptr) {
-    *out_layer_composition_operations_actual = 0;
+  ZX_DEBUG_ASSERT(layer_composition_operations.size() == layers.size());
+
+  // TODO(https://fxbug.dev/412450577): Remove the single-layer assumption.
+  ZX_DEBUG_ASSERT(layers.size() == 1);
+
+  if (display_mode_id != kDisplayModeId) {
+    return display::ConfigCheckResult::kUnsupportedDisplayModes;
   }
 
-  ZX_DEBUG_ASSERT(display::ToDisplayId(display_config.display_id) == kDisplayId);
+  const display::DriverLayer& layer = layers[0];
+  const display::Rectangle display_area({
+      .x = 0,
+      .y = 0,
+      .width = kWidth,
+      .height = kHeight,
+  });
 
-  ZX_DEBUG_ASSERT(layer_composition_operations_count >= display_config.layer_count);
-  cpp20::span<layer_composition_operations_t> layer_composition_operations(
-      out_layer_composition_operations_list, display_config.layer_count);
-  std::fill(layer_composition_operations.begin(), layer_composition_operations.end(), 0);
-  if (out_layer_composition_operations_actual != nullptr) {
-    *out_layer_composition_operations_actual = layer_composition_operations.size();
+  display::ConfigCheckResult result = display::ConfigCheckResult::kOk;
+  if (layer.display_destination() != display_area) {
+    // TODO(https://fxbug.dev/388602122): Revise the definition of MERGE to
+    // include this case, or replace with a different opcode.
+    layer_composition_operations[0] = layer_composition_operations[0].WithMerge();
+    result = display::ConfigCheckResult::kUnsupportedConfig;
   }
-
-  config_check_result_t check_result = [&] {
-    // TODO(https://fxbug.dev/394413629): Remove support for empty configs.
-    if (display_config.layer_count == 0) {
-      return CONFIG_CHECK_RESULT_OK;
-    }
-
-    if (display_config.layer_count > 1) {
-      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-    }
-    ZX_DEBUG_ASSERT(display_config.layer_count == 1);
-    const layer_t& layer = display_config.layer_list[0];
-    const rect_u_t display_area = {.x = 0, .y = 0, .width = kWidth, .height = kHeight};
-    if (memcmp(&layer.display_destination, &display_area, sizeof(rect_u_t)) != 0) {
-      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-    }
-
-    if (memcmp(&layer.image_source, &display_area, sizeof(rect_u_t)) != 0) {
-      // Allow solid color fill layers.
-      if (layer.image_source.width != 0 || layer.image_source.height != 0) {
-        return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-      }
-      if (layer.image_source.x != 0 || layer.image_source.y != 0) {
-        return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-      }
-
-      if (!display::PixelFormat::IsSupported(layer.fallback_color.format)) {
-        return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-      }
-
+  if (layer.image_source().dimensions().IsEmpty()) {
+    // Solid color fill layer.
+    if (layer.fallback_color().format().EncodingSize() != sizeof(uint32_t)) {
       // The capture simulation implementation is currently optimized for 32-bit
       // colors. Removing this constraint will require updating that
       // implementation.
-      display::PixelFormat fallback_color_pixel_format =
-          display::PixelFormat(layer.fallback_color.format);
-      if (fallback_color_pixel_format.EncodingSize() != sizeof(uint32_t)) {
-        return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-      }
+      layer_composition_operations[0] = layer_composition_operations[0].WithUseImage();
+      result = display::ConfigCheckResult::kUnsupportedConfig;
     }
-
-    if (layer.image_metadata.dimensions.width != layer.image_source.width) {
-      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-    }
-    if (layer.image_metadata.dimensions.height != layer.image_source.height) {
-      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-    }
-
-    if (layer.alpha_mode != ALPHA_DISABLE) {
-      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-    }
-    if (layer.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY) {
-      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-    }
-    return CONFIG_CHECK_RESULT_OK;
-  }();
-
-  if (check_result == CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG) {
-    for (size_t i = 0; i < display_config.layer_count; ++i) {
-      layer_composition_operations[i] = LAYER_COMPOSITION_OPERATIONS_MERGE;
+  } else {
+    // Image layer.
+    if (layer.image_source() != layer.display_destination()) {
+      layer_composition_operations[0] = layer_composition_operations[0].WithFrameScale();
+      result = display::ConfigCheckResult::kUnsupportedConfig;
     }
   }
-  return check_result;
+  if (layer.image_metadata().dimensions() != layer.image_source().dimensions()) {
+    layer_composition_operations[0] = layer_composition_operations[0].WithSrcFrame();
+    result = display::ConfigCheckResult::kUnsupportedConfig;
+  }
+  if (layer.alpha_mode() != display::AlphaMode::kDisable) {
+    layer_composition_operations[0] = layer_composition_operations[0].WithAlpha();
+    result = display::ConfigCheckResult::kUnsupportedConfig;
+  }
+  if (layer.image_source_transformation() != display::CoordinateTransformation::kIdentity) {
+    layer_composition_operations[0] = layer_composition_operations[0].WithTransform();
+    result = display::ConfigCheckResult::kUnsupportedConfig;
+  }
+  return result;
 }
 
-void FakeDisplay::DisplayEngineApplyConfiguration(const display_config_t* display_config_ptr,
-                                                  const config_stamp_t* banjo_config_stamp) {
-  ZX_DEBUG_ASSERT(display_config_ptr != nullptr);
-  const display_config_t& display_config = *display_config_ptr;
+void FakeDisplay::ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
+                                     cpp20::span<const display::DriverLayer> layers,
+                                     display::DriverConfigStamp config_stamp) {
+  ZX_DEBUG_ASSERT(display_id == kDisplayId);
+  ZX_DEBUG_ASSERT(display_mode_id == kDisplayModeId);
+  ZX_DEBUG_ASSERT(config_stamp != display::kInvalidDriverConfigStamp);
 
-  ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
-  const display::DriverConfigStamp config_stamp = display::ToDriverConfigStamp(*banjo_config_stamp);
-
+  ZX_DEBUG_ASSERT(layers.size() == 1);
   std::lock_guard lock(mutex_);
-  if (display_config.layer_count) {
-    // Only support one display.
-    ZX_DEBUG_ASSERT_MSG(display_config.layer_list[0].display_destination.x == 0,
-                        "ApplyConfig() applied rejected config");
-    ZX_DEBUG_ASSERT_MSG(display_config.layer_list[0].display_destination.y == 0,
-                        "ApplyConfig() applied rejected config");
-    ZX_DEBUG_ASSERT_MSG(display_config.layer_list[0].display_destination.width == kWidth,
-                        "ApplyConfig() applied rejected config");
-    ZX_DEBUG_ASSERT_MSG(display_config.layer_list[0].display_destination.height == kHeight,
-                        "ApplyConfig() applied rejected config");
 
-    applied_image_id_ = display::ToDriverImageId(display_config.layer_list[0].image_handle);
-    applied_fallback_color_ = display::Color::From(display_config.layer_list[0].fallback_color);
-  } else {
-    applied_image_id_ = display::kInvalidDriverImageId;
-    static constexpr display::Color kBlackBgra(
-        {.format = display::PixelFormat::kB8G8R8A8,
-         .bytes = std::initializer_list<uint8_t>{0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0x00}});
-    applied_fallback_color_ = kBlackBgra;
+  if (layers[0].image_id() != display::kInvalidDriverImageId) {
+    ZX_DEBUG_ASSERT_MSG(imported_images_.find(layers[0].image_id()) != imported_images_.end(),
+                        "Configuration contains invalid image ID: %" PRIu64,
+                        layers[0].image_id().value());
   }
+  applied_image_id_ = layers[0].image_id();
+  applied_fallback_color_ = layers[0].fallback_color();
 
   applied_config_stamp_ = config_stamp;
 }
@@ -557,13 +463,13 @@ fuchsia_sysmem2::wire::BufferCollectionConstraints FakeDisplay::CreateBufferColl
   constraints_builder.buffer_memory_constraints(CreateBufferMemoryConstraints(arena));
 
   std::vector<fuchsia_sysmem2::wire::ImageFormatConstraints> image_format_constraints;
-  image_format_constraints.reserve(std::size(kSupportedPixelFormats) *
+  image_format_constraints.reserve(kSupportedPixelFormats.size() *
                                    kSupportedFormatModifiers.size());
-  for (fuchsia_images2_pixel_format_enum_value_t banjo_pixel_format : kSupportedPixelFormats) {
+  for (display::PixelFormat pixel_format : kSupportedPixelFormats) {
     for (fuchsia_images2::wire::PixelFormatModifier format_modifier : kSupportedFormatModifiers) {
       fidl::WireTableBuilder<fuchsia_sysmem2::wire::ImageFormatConstraints>
           image_constraints_builder = fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena);
-      image_constraints_builder.pixel_format(display::PixelFormat(banjo_pixel_format).ToFidl())
+      image_constraints_builder.pixel_format(pixel_format.ToFidl())
           .pixel_format_modifier(format_modifier)
           .color_spaces(kSupportedColorSpaces)
           .size_alignment(fuchsia_math::wire::SizeU{.width = 1, .height = 1})
@@ -586,25 +492,25 @@ fuchsia_sysmem2::wire::BufferCollectionConstraints FakeDisplay::CreateBufferColl
   return constraints_builder.Build();
 }
 
-zx_status_t FakeDisplay::DisplayEngineSetBufferCollectionConstraints(
-    const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id) {
-  const display::DriverBufferCollectionId driver_buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
-
+zx::result<> FakeDisplay::SetBufferCollectionConstraints(
+    const display::ImageBufferUsage& image_buffer_usage,
+    display::DriverBufferCollectionId buffer_collection_id) {
   std::lock_guard lock(mutex_);
 
-  const auto buffer_collection_it = buffer_collections_.find(driver_buffer_collection_id);
+  const auto buffer_collection_it = buffer_collections_.find(buffer_collection_id);
   if (buffer_collection_it == buffer_collections_.end()) {
     fdf::error("SetBufferCollectionConstraints: Cannot find imported buffer collection ID: {}",
-               driver_buffer_collection_id.value());
-    return ZX_ERR_NOT_FOUND;
+               buffer_collection_id.value());
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
   fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& buffer_collection =
       buffer_collection_it->second;
 
-  BufferCollectionUsage buffer_collection_usage = (usage->tiling_type == IMAGE_TILING_TYPE_CAPTURE)
-                                                      ? BufferCollectionUsage::kCapture
-                                                      : BufferCollectionUsage::kPrimaryLayer;
+  BufferCollectionUsage buffer_collection_usage =
+      (image_buffer_usage.tiling_type == display::ImageTilingType::kCapture)
+          ? BufferCollectionUsage::kCapture
+          : BufferCollectionUsage::kPrimaryLayer;
+
   fidl::Arena arena;
   fidl::OneWayStatus set_constraints_status = buffer_collection->SetConstraints(
       fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena)
@@ -612,25 +518,21 @@ zx_status_t FakeDisplay::DisplayEngineSetBufferCollectionConstraints(
           .Build());
   if (!set_constraints_status.ok()) {
     fdf::error("SetConstraints() FIDL call failed: {}", set_constraints_status.status_string());
-    return set_constraints_status.status();
+    return zx::error(set_constraints_status.status());
   }
 
-  return ZX_OK;
+  return zx::ok();
 }
 
-zx_status_t FakeDisplay::DisplayEngineSetDisplayPower(uint64_t display_id, bool power_on) {
-  return ZX_ERR_NOT_SUPPORTED;
+zx::result<> FakeDisplay::SetDisplayPower(display::DisplayId display_id, bool power_on) {
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-zx_status_t FakeDisplay::DisplayEngineImportImageForCapture(
-    uint64_t banjo_driver_buffer_collection_id, uint32_t buffer_index,
-    uint64_t* out_capture_handle) {
+zx::result<display::DriverCaptureImageId> FakeDisplay::ImportImageForCapture(
+    display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) {
   if (!IsCaptureSupported()) {
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
-
-  const display::DriverBufferCollectionId buffer_collection_id =
-      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
 
   std::lock_guard lock(mutex_);
 
@@ -638,7 +540,7 @@ zx_status_t FakeDisplay::DisplayEngineImportImageForCapture(
   if (buffer_collection_it == buffer_collections_.end()) {
     fdf::error("ImportImage: Cannot find imported buffer collection ID: {}",
                buffer_collection_id.value());
-    return ZX_ERR_NOT_FOUND;
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
   fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& buffer_collection =
       buffer_collection_it->second;
@@ -647,7 +549,7 @@ zx_status_t FakeDisplay::DisplayEngineImportImageForCapture(
       SysmemBufferInfo::GetSysmemMetadata(buffer_collection, buffer_index);
   if (sysmem_buffer_info_result.is_error()) {
     // SysmemBufferInfo::GetSysmemMetadata() has already logged the error.
-    return sysmem_buffer_info_result.error_value();
+    return sysmem_buffer_info_result.take_error();
   }
 
   // TODO(https://fxbug.dev/42079320): Capture target images should not be of
@@ -657,61 +559,55 @@ zx_status_t FakeDisplay::DisplayEngineImportImageForCapture(
   auto capture_image_info = std::make_unique<CaptureImageInfo>(
       driver_capture_image_id, std::move(sysmem_buffer_info_result).value());
 
-  *out_capture_handle = display::ToBanjoDriverCaptureImageId(driver_capture_image_id);
   imported_captures_.insert(std::move(capture_image_info));
-  return ZX_OK;
+  return zx::ok(driver_capture_image_id);
 }
 
-zx_status_t FakeDisplay::DisplayEngineStartCapture(uint64_t capture_handle) {
+zx::result<> FakeDisplay::StartCapture(display::DriverCaptureImageId capture_image_id) {
   if (!IsCaptureSupported()) {
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   std::lock_guard lock(mutex_);
 
   if (started_capture_target_id_ != display::kInvalidDriverCaptureImageId) {
     fdf::error("Capture start request declined while a capture is already in-progress");
-    return ZX_ERR_SHOULD_WAIT;
+    return zx::error(ZX_ERR_SHOULD_WAIT);
   }
 
   // Confirm the handle was previously imported (hence valid)
-  display::DriverCaptureImageId driver_capture_image_id =
-      display::ToDriverCaptureImageId(capture_handle);
-  auto it = imported_captures_.find(driver_capture_image_id);
-  if (it == imported_captures_.end()) {
-    fdf::error("Capture start request with invalid handle: {}", driver_capture_image_id.value());
-    return ZX_ERR_INVALID_ARGS;
+  auto imported_capture_it = imported_captures_.find(capture_image_id);
+  if (imported_capture_it == imported_captures_.end()) {
+    fdf::error("Capture start request with invalid handle: {}", capture_image_id.value());
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  started_capture_target_id_ = driver_capture_image_id;
-  return ZX_OK;
+  started_capture_target_id_ = capture_image_id;
+  return zx::ok();
 }
 
-zx_status_t FakeDisplay::DisplayEngineReleaseCapture(uint64_t capture_handle) {
+zx::result<> FakeDisplay::ReleaseCapture(display::DriverCaptureImageId capture_image_id) {
   if (!IsCaptureSupported()) {
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
-  display::DriverCaptureImageId driver_capture_image_id =
-      display::ToDriverCaptureImageId(capture_handle);
-
   std::lock_guard lock(mutex_);
 
-  if (started_capture_target_id_ == driver_capture_image_id) {
+  if (started_capture_target_id_ == capture_image_id) {
     fdf::fatal("Refusing to release the target of an in-progress capture");
 
     // TODO(https://fxrev.dev/394954078): The return code is not meaningful. It will be
     // removed when the ReleaseCapture() error code is eliminated.
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
-  if (imported_captures_.erase(driver_capture_image_id) == nullptr) {
-    fdf::error("Capture release request with unused handle: {}", driver_capture_image_id.value());
+  if (imported_captures_.erase(capture_image_id) == nullptr) {
+    fdf::error("Capture release request with unused handle: {}", capture_image_id.value());
 
     // TODO(https://fxrev.dev/394954078): The return code is not meaningful. It will be
     // removed when the ReleaseCapture() error code is eliminated.
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
-  return ZX_OK;
+  return zx::ok();
 }
 
 bool FakeDisplay::IsCaptureSupported() const { return !device_config_.no_buffer_access; }
@@ -723,7 +619,7 @@ void FakeDisplay::CaptureThread() {
     [[maybe_unused]] zx::result<> capture_result = ServiceAnyCaptureRequest();
     // ServiceAnyCaptureRequest() has already logged the error.
 
-    zx::nanosleep(zx::deadline_after(zx::sec(1) / kRefreshRateFps));
+    zx::nanosleep(zx::deadline_after(zx::sec(1) / kRefreshRateHz));
   }
 }
 
@@ -763,7 +659,7 @@ zx::result<> FakeDisplay::ServiceAnyCaptureRequest() {
     }
   }
 
-  SendCaptureComplete();
+  engine_events_.OnCaptureComplete();
 
   started_capture_target_id_ = display::kInvalidDriverCaptureImageId;
 
@@ -904,14 +800,6 @@ zx::result<> FakeDisplay::DoColorFillCapture(display::Color fill_color,
   return zx::ok();
 }
 
-void FakeDisplay::SendCaptureComplete() {
-  std::lock_guard engine_listener_lock(engine_listener_mutex_);
-  if (!engine_listener_client_.is_valid()) {
-    return;
-  }
-  engine_listener_client_.OnCaptureComplete();
-}
-
 void FakeDisplay::TriggerVsync() {
   ZX_ASSERT_MSG(!device_config_.periodic_vsync,
                 "TriggerVsync() called on a device with periodic VSync enabled");
@@ -930,11 +818,13 @@ void FakeDisplay::TriggerVsync() {
 void FakeDisplay::VSyncThread() {
   while (!vsync_thread_shutdown_requested_.load(std::memory_order_relaxed)) {
     SendVsync();
-    zx::nanosleep(zx::deadline_after(zx::sec(1) / kRefreshRateFps));
+    zx::nanosleep(zx::deadline_after(zx::sec(1) / kRefreshRateHz));
   }
 }
 
 void FakeDisplay::SendVsync() {
+  zx::time vsync_timestamp = zx::clock::get_monotonic();
+
   display::DriverConfigStamp vsync_config_stamp;
   {
     std::lock_guard lock(mutex_);
@@ -945,17 +835,7 @@ void FakeDisplay::SendVsync() {
     return;
   }
 
-  const config_stamp_t banjo_vsync_config_stamp =
-      display::ToBanjoDriverConfigStamp(vsync_config_stamp);
-
-  zx_instant_mono_t banjo_vsync_timestamp = zx_clock_get_monotonic();
-
-  std::lock_guard engine_listener_lock(engine_listener_mutex_);
-  if (!engine_listener_client_.is_valid()) {
-    return;
-  }
-  engine_listener_client_.OnDisplayVsync(ToBanjoDisplayId(kDisplayId), banjo_vsync_timestamp,
-                                         &banjo_vsync_config_stamp);
+  engine_events_.OnDisplayVsync(kDisplayId, vsync_timestamp, vsync_config_stamp);
 }
 
 void FakeDisplay::RecordDisplayConfigToInspectRootNode() {
@@ -964,7 +844,7 @@ void FakeDisplay::RecordDisplayConfigToInspectRootNode() {
   root_node.RecordChild("device_config", [&](inspect::Node& config_node) {
     config_node.RecordInt("width_px", kWidth);
     config_node.RecordInt("height_px", kHeight);
-    config_node.RecordDouble("refresh_rate_hz", kRefreshRateFps);
+    config_node.RecordDouble("refresh_rate_hz", kRefreshRateHz);
     config_node.RecordBool("periodic_vsync", device_config_.periodic_vsync);
     config_node.RecordBool("no_buffer_access", device_config_.no_buffer_access);
   });

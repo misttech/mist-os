@@ -29,9 +29,11 @@ FakeDisplayStack::FakeDisplayStack(std::unique_ptr<SysmemServiceProvider> sysmem
     logger_.emplace();
   }
 
-  fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator = ConnectToSysmemAllocatorV2();
-  display_engine_ = std::make_unique<FakeDisplay>(device_config, std::move(sysmem_allocator),
-                                                  inspect::Inspector{});
+  fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client = ConnectToSysmemAllocatorV2();
+  display_engine_ = std::make_unique<FakeDisplay>(&engine_events_, std::move(sysmem_client),
+                                                  device_config, inspect::Inspector{});
+  banjo_adapter_ =
+      std::make_unique<display::DisplayEngineBanjoAdapter>(display_engine_.get(), &engine_events_);
 
   zx::result<fdf::SynchronizedDispatcher> create_dispatcher_result =
       fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
@@ -44,8 +46,8 @@ FakeDisplayStack::FakeDisplayStack(std::unique_ptr<SysmemServiceProvider> sysmem
   }
   coordinator_client_dispatcher_ = std::move(create_dispatcher_result).value();
 
-  ddk::DisplayEngineProtocolClient display_engine_client(
-      display_engine_->display_engine_banjo_protocol());
+  const display_engine_protocol_t display_engine_protocol = banjo_adapter_->GetProtocol();
+  ddk::DisplayEngineProtocolClient display_engine_client(&display_engine_protocol);
   auto engine_driver_client =
       std::make_unique<display_coordinator::EngineDriverClient>(display_engine_client);
   zx::result<std::unique_ptr<display_coordinator::Controller>> create_controller_result =
