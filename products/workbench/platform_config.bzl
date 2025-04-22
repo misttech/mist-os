@@ -39,9 +39,6 @@ workbench_platform_config = {
             },
         },
     },
-    "driver_framework": {
-        "use_rust_driver_host": True,
-    },
     "timekeeper": {
         "first_sampling_delay_sec": 86400,
         "back_off_time_between_pull_samples_sec": 86400,

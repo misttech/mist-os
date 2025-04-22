@@ -2474,6 +2474,7 @@ assembly_input_bundle("driver_framework") {
     "//src/devices/bin/devfs:package",
     "//src/devices/bin/driver_manager:package",
     "//src/devices/bin/driver_manager/devfs:package",
+    "//src/devices/bin/driver-host-rust:package",
     "//src/devices/bin/driver-index:package",
   ]
   compiled_packages = [
@@ -2488,24 +2489,6 @@ assembly_input_bundle("driver_framework") {
       ]
     },
   ]
-}
-
-# C++ Driver Host Support
-#
-# feature_set_levels: minimal
-# build-types: all
-#
-assembly_input_bundle("driver_host_cpp") {
-  bootfs_packages = [ "//src/devices/bin/driver_host:package" ]
-}
-
-# Rust Driver Host Support
-#
-# feature_set_levels: minimal
-# build-types: all
-#
-assembly_input_bundle("driver_host_rust") {
-  bootfs_packages = [ "//src/devices/bin/driver-host-rust:package" ]
 }
 
 # Full Package Driver Support

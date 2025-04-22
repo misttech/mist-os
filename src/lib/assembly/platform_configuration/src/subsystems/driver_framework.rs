@@ -34,11 +34,6 @@ impl DefineSubsystemConfiguration<(&DriverFrameworkConfig, &StorageConfig)>
         disabled_drivers.push("fuchsia-boot:///#meta/da7219.cm".to_string());
         builder.platform_bundle("driver_framework");
 
-        match driver_framework.use_rust_driver_host {
-            true => builder.platform_bundle("driver_host_rust"),
-            false => builder.platform_bundle("driver_host_cpp"),
-        };
-
         let enable_ephemeral_drivers = match (context.build_type, context.feature_set_level) {
             (BuildType::Eng, FeatureSetLevel::Standard) => {
                 builder.platform_bundle("full_drivers");
