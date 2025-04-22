@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use crate::fplugin::{ResourceType, Vmo};
-use crate::AttributionData;
+use crate::{AttributionData, ZXName};
 use fidl_fuchsia_kernel as fkernel;
-use regex::Regex;
+use regex::bytes::Regex;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
 use std::collections::hash_map::Entry::Occupied;
@@ -37,12 +37,12 @@ pub struct BucketDefinition {
 
 impl BucketDefinition {
     /// Tests whether a process matches this bucket's definition, based on its name.
-    fn process_match(&self, process: &str) -> bool {
+    fn process_match(&self, process: &ZXName) -> bool {
         self.process.as_ref().map_or(true, |p| p.is_match(process))
     }
 
     /// Tests whether a VMO matches this bucket's definition, based on its name.
-    fn vmo_match(&self, vmo: &str) -> bool {
+    fn vmo_match(&self, vmo: &ZXName) -> bool {
         self.vmo.as_ref().map_or(true, |v| v.is_match(vmo))
     }
 }
@@ -94,7 +94,7 @@ impl Digest {
         bucket_definitions: &Vec<BucketDefinition>,
     ) -> Self {
         // Contains all VMOs that have not yet been aggregated.
-        let mut undigested_vmos: HashMap<u64, (&Vmo, &String)> = attribution_data
+        let mut undigested_vmos: HashMap<u64, (&Vmo, &ZXName)> = attribution_data
             .resources_vec
             .iter()
             .filter_map(|r| match &r.resource_type {
@@ -269,7 +269,10 @@ mod tests {
                     }),
                 },
             ],
-            resource_names: vec!["resource".to_owned(), "matched".to_owned()],
+            resource_names: vec![
+                ZXName::try_from_bytes(b"resource").unwrap(),
+                ZXName::try_from_bytes(b"matched").unwrap(),
+            ],
             attributions: vec![Attribution {
                 source: PrincipalIdentifier(1),
                 subject: PrincipalIdentifier(1),

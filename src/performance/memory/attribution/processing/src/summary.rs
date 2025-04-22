@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use crate::kernel_statistics::KernelStatistics;
-use crate::{PrincipalType, ResourceReference};
+use crate::{
+    InflatedPrincipal, InflatedResource, PrincipalIdentifier, PrincipalType, ResourceReference,
+    ZXName,
+};
 use core::default::Default;
 use fidl_fuchsia_memory_attribution_plugin as fplugin;
 use fplugin::Vmo;
@@ -11,8 +14,6 @@ use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
-
-use crate::{InflatedPrincipal, InflatedResource, PrincipalIdentifier};
 
 /// Consider that two floats are equals if they differ less than [FLOAT_COMPARISON_EPSILON].
 const FLOAT_COMPARISON_EPSILON: f64 = 1e-10;
@@ -41,7 +42,7 @@ impl MemorySummary {
     pub(crate) fn build(
         principals: &HashMap<PrincipalIdentifier, RefCell<InflatedPrincipal>>,
         resources: &HashMap<u64, RefCell<InflatedResource>>,
-        resource_names: &Vec<String>,
+        resource_names: &Vec<ZXName>,
     ) -> MemorySummary {
         let mut output = MemorySummary { principals: Default::default(), undigested: 0 };
         for principal in principals.values() {
@@ -76,7 +77,7 @@ impl MemorySummary {
         principal_cell: &RefCell<InflatedPrincipal>,
         principals: &HashMap<PrincipalIdentifier, RefCell<InflatedPrincipal>>,
         resources: &HashMap<u64, RefCell<InflatedResource>>,
-        resource_names: &Vec<String>,
+        resource_names: &Vec<ZXName>,
     ) -> PrincipalSummary {
         let principal = principal_cell.borrow();
         let mut output = PrincipalSummary {
@@ -139,10 +140,10 @@ impl MemorySummary {
                     output
                         .vmos
                         .entry(
-                            vmo_name_to_digest_name(
+                            vmo_name_to_digest_zxname(
                                 &resource_names.get(resource.resource.name_index).unwrap(),
                             )
-                            .to_owned(),
+                            .clone(),
                         )
                         .or_default()
                         .merge(vmo_info, share_count);
@@ -212,7 +213,7 @@ pub struct PrincipalSummary {
     /// List of Zircon processes attributed (even partially) to this Principal.
     pub processes: Vec<String>,
     /// Summary of memory usage for the VMOs accessible to this Principal, grouped by VMO name.
-    pub vmos: HashMap<String, VmoSummary>,
+    pub vmos: HashMap<ZXName, VmoSummary>,
 }
 
 impl PartialEq for PrincipalSummary {
@@ -282,41 +283,62 @@ impl PartialEq for VmoSummary {
             && self.populated_total == other.populated_total
     }
 }
+const VMO_DIGEST_NAME_MAPPING: [(&str, &str); 13] = [
+    ("ld\\.so\\.1-internal-heap|(^stack: msg of.*)", "[process-bootstrap]"),
+    ("^blob-[0-9a-f]+$", "[blobs]"),
+    ("^inactive-blob-[0-9a-f]+$", "[inactive blobs]"),
+    ("^thrd_t:0x.*|initial-thread|pthread_t:0x.*$", "[stacks]"),
+    ("^data[0-9]*:.*$", "[data]"),
+    ("^bss[0-9]*:.*$", "[bss]"),
+    ("^relro:.*$", "[relro]"),
+    ("^$", "[unnamed]"),
+    ("^scudo:.*$", "[scudo]"),
+    ("^.*\\.so.*$", "[bootfs-libraries]"),
+    ("^stack_and_tls:.*$", "[bionic-stack]"),
+    ("^ext4!.*$", "[ext4]"),
+    ("^dalvik-.*$", "[dalvik]"),
+];
 
 /// Returns the name of a VMO category when the name match on of the rules.
 /// This is used for presentation and aggregation.
 pub fn vmo_name_to_digest_name(name: &str) -> &str {
-    /// Default, global regex match.
-    static RULES: std::sync::LazyLock<[(regex::Regex, &'static str); 13]> =
+    static RULES: std::sync::LazyLock<Vec<(regex::Regex, &'static str)>> =
         std::sync::LazyLock::new(|| {
-            [
-                (
-                    regex::Regex::new("ld\\.so\\.1-internal-heap|(^stack: msg of.*)").unwrap(),
-                    "[process-bootstrap]",
-                ),
-                (regex::Regex::new("^blob-[0-9a-f]+$").unwrap(), "[blobs]"),
-                (regex::Regex::new("^inactive-blob-[0-9a-f]+$").unwrap(), "[inactive blobs]"),
-                (
-                    regex::Regex::new("^thrd_t:0x.*|initial-thread|pthread_t:0x.*$").unwrap(),
-                    "[stacks]",
-                ),
-                (regex::Regex::new("^data[0-9]*:.*$").unwrap(), "[data]"),
-                (regex::Regex::new("^bss[0-9]*:.*$").unwrap(), "[bss]"),
-                (regex::Regex::new("^relro:.*$").unwrap(), "[relro]"),
-                (regex::Regex::new("^$").unwrap(), "[unnamed]"),
-                (regex::Regex::new("^scudo:.*$").unwrap(), "[scudo]"),
-                (regex::Regex::new("^.*\\.so.*$").unwrap(), "[bootfs-libraries]"),
-                (regex::Regex::new("^stack_and_tls:.*$").unwrap(), "[bionic-stack]"),
-                (regex::Regex::new("^ext4!.*$").unwrap(), "[ext4]"),
-                (regex::Regex::new("^dalvik-.*$").unwrap(), "[dalvik]"),
-            ]
+            VMO_DIGEST_NAME_MAPPING
+                .iter()
+                .map(|&(pattern, replacement)| (regex::Regex::new(pattern).unwrap(), replacement))
+                .collect()
         });
     RULES.iter().find(|(regex, _)| regex.is_match(name)).map_or(name, |rule| rule.1)
+}
+
+pub fn vmo_name_to_digest_zxname(name: &ZXName) -> &ZXName {
+    static RULES: std::sync::LazyLock<Vec<(regex::bytes::Regex, ZXName)>> =
+        std::sync::LazyLock::new(|| {
+            VMO_DIGEST_NAME_MAPPING
+                .iter()
+                .map(|&(pattern, replacement)| {
+                    (
+                        regex::bytes::Regex::new(pattern).unwrap(),
+                        ZXName::try_from_bytes(replacement.as_bytes()).unwrap(),
+                    )
+                })
+                .collect()
+        });
+    RULES.iter().find(|(regex, _)| regex.is_match(name)).map_or(name, |rule| &rule.1)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rename_zx_test() {
+        pretty_assertions::assert_eq!(
+            vmo_name_to_digest_zxname(&ZXName::from_string_lossy("ld.so.1-internal-heap")),
+            &ZXName::from_string_lossy("[process-bootstrap]"),
+        );
+    }
 
     #[test]
     fn rename_test() {

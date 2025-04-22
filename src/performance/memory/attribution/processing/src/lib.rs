@@ -11,7 +11,9 @@ use summary::MemorySummary;
 
 pub mod digest;
 pub mod kernel_statistics;
+mod name;
 pub mod summary;
+pub use name::ZXName;
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub struct PrincipalIdentifier(pub u64);
@@ -415,7 +417,7 @@ impl Into<fplugin::ResourceReference> for ResourceReference {
 pub struct AttributionData {
     pub principals_vec: Vec<Principal>,
     pub resources_vec: Vec<Resource>,
-    pub resource_names: Vec<String>,
+    pub resource_names: Vec<ZXName>,
     pub attributions: Vec<Attribution>,
 }
 
@@ -428,14 +430,14 @@ pub trait AttributionDataProvider: Send + Sync + 'static {
 pub struct ProcessedAttributionData {
     principals: HashMap<PrincipalIdentifier, RefCell<InflatedPrincipal>>,
     resources: HashMap<u64, RefCell<InflatedResource>>,
-    resource_names: Vec<String>,
+    resource_names: Vec<ZXName>,
 }
 
 impl ProcessedAttributionData {
     fn new(
         principals: HashMap<PrincipalIdentifier, RefCell<InflatedPrincipal>>,
         resources: HashMap<u64, RefCell<InflatedResource>>,
-        resource_names: Vec<String>,
+        resource_names: Vec<ZXName>,
     ) -> Self {
         Self { principals, resources, resource_names }
     }
@@ -633,20 +635,20 @@ mod tests {
         // And an additional parent VMO for 2_vmo, 2_vmo_parent (1011).
 
         let resource_names = vec![
-            "root_job".to_owned(),
-            "root_process".to_owned(),
-            "root_vmo".to_owned(),
-            "shared_vmo".to_owned(),
-            "runner_job".to_owned(),
-            "runner_process".to_owned(),
-            "runner_vmo".to_owned(),
-            "component_vmo".to_owned(),
-            "component_2_job".to_owned(),
-            "2_process".to_owned(),
-            "2_vmo".to_owned(),
-            "2_vmo_parent".to_owned(),
-            "component_vmo_mapped".to_owned(),
-            "component_vmo_mapped2".to_owned(),
+            ZXName::from_string_lossy("root_job"),
+            ZXName::from_string_lossy("root_process"),
+            ZXName::from_string_lossy("root_vmo"),
+            ZXName::from_string_lossy("shared_vmo"),
+            ZXName::from_string_lossy("runner_job"),
+            ZXName::from_string_lossy("runner_process"),
+            ZXName::from_string_lossy("runner_vmo"),
+            ZXName::from_string_lossy("component_vmo"),
+            ZXName::from_string_lossy("component_2_job"),
+            ZXName::from_string_lossy("2_process"),
+            ZXName::from_string_lossy("2_vmo"),
+            ZXName::from_string_lossy("2_vmo_parent"),
+            ZXName::from_string_lossy("component_vmo_mapped"),
+            ZXName::from_string_lossy("component_vmo_mapped2"),
         ];
 
         let attributions = vec![
@@ -954,7 +956,7 @@ mod tests {
                 processes: vec!["root_process (1001)".to_owned()],
                 vmos: vec![
                     (
-                        "root_vmo".to_owned(),
+                        ZXName::from_string_lossy("root_vmo"),
                         VmoSummary {
                             count: 1,
                             committed_private: 1024,
@@ -967,7 +969,7 @@ mod tests {
                         }
                     ),
                     (
-                        "shared_vmo".to_owned(),
+                        ZXName::from_string_lossy("shared_vmo"),
                         VmoSummary {
                             count: 1,
                             committed_private: 0,
@@ -1000,7 +1002,7 @@ mod tests {
                 attributor: Some("root".to_owned()),
                 processes: vec!["runner_process (1005)".to_owned()],
                 vmos: vec![(
-                    "runner_vmo".to_owned(),
+                    ZXName::from_string_lossy("runner_vmo"),
                     VmoSummary {
                         count: 1,
                         committed_private: 1024,
@@ -1033,7 +1035,7 @@ mod tests {
                 processes: vec!["2_process (1009)".to_owned()],
                 vmos: vec![
                     (
-                        "shared_vmo".to_owned(),
+                        ZXName::from_string_lossy("shared_vmo"),
                         VmoSummary {
                             count: 1,
                             committed_private: 0,
@@ -1046,7 +1048,7 @@ mod tests {
                         }
                     ),
                     (
-                        "2_vmo".to_owned(),
+                        ZXName::from_string_lossy("2_vmo"),
                         VmoSummary {
                             count: 1,
                             committed_private: 1024,
@@ -1080,7 +1082,7 @@ mod tests {
                 processes: vec!["runner_process (1005)".to_owned()],
                 vmos: vec![
                     (
-                        "component_vmo".to_owned(),
+                        ZXName::from_string_lossy("component_vmo"),
                         VmoSummary {
                             count: 1,
                             committed_private: 128,
@@ -1093,7 +1095,7 @@ mod tests {
                         }
                     ),
                     (
-                        "component_vmo_mapped".to_owned(),
+                        ZXName::from_string_lossy("component_vmo_mapped"),
                         VmoSummary {
                             count: 1,
                             committed_private: 1024,
@@ -1106,7 +1108,7 @@ mod tests {
                         }
                     ),
                     (
-                        "component_vmo_mapped2".to_owned(),
+                        ZXName::from_string_lossy("component_vmo_mapped2"),
                         VmoSummary {
                             count: 1,
                             committed_private: 1024,
@@ -1141,10 +1143,10 @@ mod tests {
         // In this scenario, component 1 reattributes component_job to component 2 entirely.
 
         let resource_names = vec![
-            "root_job".to_owned(),
-            "component_job".to_owned(),
-            "component_process".to_owned(),
-            "component_vmo".to_owned(),
+            ZXName::from_string_lossy("root_job"),
+            ZXName::from_string_lossy("component_job"),
+            ZXName::from_string_lossy("component_process"),
+            ZXName::from_string_lossy("component_vmo"),
         ];
         let attributions = vec![
             fplugin::Attribution {
@@ -1311,7 +1313,7 @@ mod tests {
                 attributor: Some("component 1".to_owned()),
                 processes: vec!["component_process (1002)".to_owned()],
                 vmos: vec![(
-                    "component_vmo".to_owned(),
+                    ZXName::from_string_lossy("component_vmo"),
                     VmoSummary {
                         count: 1,
                         committed_private: 1024,

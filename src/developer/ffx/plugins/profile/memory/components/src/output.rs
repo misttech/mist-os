@@ -4,6 +4,8 @@
 
 use attribution_processing::kernel_statistics::KernelStatistics;
 use attribution_processing::summary::{MemorySummary, PrincipalSummary, VmoSummary};
+use attribution_processing::ZXName;
+
 use prettytable::{row, table, Table};
 
 pub fn write_summary(
@@ -67,7 +69,7 @@ fn write_summary_principal(
     tbl.set_format(format);
     tbl.print(f)?;
 
-    let mut vmos: Vec<(&String, &VmoSummary)> = value.vmos.iter().collect();
+    let mut vmos: Vec<(&ZXName, &VmoSummary)> = value.vmos.iter().collect();
     vmos.sort_by_key(|(_, v)| -(v.populated_total as i64));
     let mut tbl = Table::new();
     tbl.add_row(
@@ -183,7 +185,7 @@ fn write_summary_principal_csv<W: std::io::Write>(
     csv_writer: &mut csv::Writer<W>,
     value: &PrincipalSummary,
 ) -> std::io::Result<()> {
-    let mut vmos: Vec<(&String, &VmoSummary)> = value.vmos.iter().collect();
+    let mut vmos: Vec<(&ZXName, &VmoSummary)> = value.vmos.iter().collect();
     vmos.sort_by_key(|(_, v)| -(v.populated_total as i64));
     for (name, vmo) in vmos {
         csv_writer.write_record(&[
@@ -244,7 +246,7 @@ mod tests {
             attributor: None,
             processes: vec![String::from("proc_a"), String::from("proc_b")],
             vmos: HashMap::from([(
-                String::from("[scudo]"),
+                ZXName::from_string_lossy("[scudo]"),
                 VmoSummary {
                     count: 42,
                     committed_private: 10,
@@ -293,7 +295,7 @@ mod tests {
             attributor: Some(String::from("mr,freeze")),
             processes: vec![],
             vmos: HashMap::from([(
-                String::from("[scudo]"),
+                ZXName::from_string_lossy("[scudo]"),
                 VmoSummary {
                     count: 42,
                     committed_private: 10,

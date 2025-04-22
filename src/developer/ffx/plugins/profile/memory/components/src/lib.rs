@@ -12,7 +12,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use attribution_processing::kernel_statistics::KernelStatistics;
 use attribution_processing::summary::{ComponentProfileResult, MemorySummary};
-use attribution_processing::{AttributionData, Principal, Resource};
+use attribution_processing::{AttributionData, Principal, Resource, ZXName};
 use errors::ffx_error;
 use ffx_profile_memory_components_args::ComponentsCommand;
 use ffx_writer::{MachineWriter, ToolIO};
@@ -145,7 +145,12 @@ fn process_snapshot(snapshot: fplugin::Snapshot) -> (MemorySummary, KernelStatis
         attribution_processing::attribute_vmos(AttributionData {
             principals_vec: principals,
             resources_vec: resources,
-            resource_names: snapshot.resource_names.unwrap(),
+            resource_names: snapshot
+                .resource_names
+                .unwrap()
+                .iter()
+                .map(|n| ZXName::from_string_lossy(n))
+                .collect(),
             attributions,
         })
         .summary(),
@@ -537,7 +542,7 @@ mod tests {
                 processes: vec!["root_process (1001)".to_owned()],
                 vmos: vec![
                     (
-                        "root_vmo".to_owned(),
+                        ZXName::from_string_lossy("root_vmo"),
                         VmoSummary {
                             count: 1,
                             committed_private: 1024,
@@ -550,7 +555,7 @@ mod tests {
                         }
                     ),
                     (
-                        "shared_vmo".to_owned(),
+                        ZXName::from_string_lossy("shared_vmo"),
                         VmoSummary {
                             count: 1,
                             committed_private: 0,
@@ -583,7 +588,7 @@ mod tests {
                 attributor: Some("root".to_owned()),
                 processes: vec!["runner_process (1005)".to_owned()],
                 vmos: vec![(
-                    "runner_vmo".to_owned(),
+                    ZXName::from_string_lossy("runner_vmo"),
                     VmoSummary {
                         count: 1,
                         committed_private: 1024,
@@ -616,7 +621,7 @@ mod tests {
                 processes: vec!["2_process (1009)".to_owned()],
                 vmos: vec![
                     (
-                        "shared_vmo".to_owned(),
+                        ZXName::from_string_lossy("shared_vmo"),
                         VmoSummary {
                             count: 1,
                             committed_private: 0,
@@ -629,7 +634,7 @@ mod tests {
                         }
                     ),
                     (
-                        "2_vmo".to_owned(),
+                        ZXName::from_string_lossy("2_vmo"),
                         VmoSummary {
                             count: 1,
                             committed_private: 1024,
@@ -663,7 +668,7 @@ mod tests {
                 processes: vec!["runner_process (1005)".to_owned()],
                 vmos: vec![
                     (
-                        "component_vmo".to_owned(),
+                        ZXName::from_string_lossy("component_vmo"),
                         VmoSummary {
                             count: 1,
                             committed_private: 128,
@@ -676,7 +681,7 @@ mod tests {
                         }
                     ),
                     (
-                        "component_vmo_mapped".to_owned(),
+                        ZXName::from_string_lossy("component_vmo_mapped"),
                         VmoSummary {
                             count: 1,
                             committed_private: 1024,
@@ -689,7 +694,7 @@ mod tests {
                         }
                     ),
                     (
-                        "component_vmo_mapped2".to_owned(),
+                        ZXName::from_string_lossy("component_vmo_mapped2"),
                         VmoSummary {
                             count: 1,
                             committed_private: 1024,
@@ -923,7 +928,7 @@ mod tests {
                 attributor: Some("component 1".to_owned()),
                 processes: vec!["component_process (1002)".to_owned()],
                 vmos: vec![(
-                    "component_vmo".to_owned(),
+                    ZXName::from_string_lossy("component_vmo"),
                     VmoSummary {
                         count: 1,
                         committed_private: 1024,

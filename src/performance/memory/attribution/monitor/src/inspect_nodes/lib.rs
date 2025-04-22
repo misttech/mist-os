@@ -335,7 +335,7 @@ fn digest_service(
 mod tests {
     use attribution_processing::{
         Attribution, AttributionData, Principal, PrincipalDescription, PrincipalIdentifier,
-        PrincipalType, Resource, ResourceReference,
+        PrincipalType, Resource, ResourceReference, ZXName,
     };
     use diagnostics_assertions::{assert_data_tree, NonZeroIntProperty};
     use fuchsia_async::TestExecutor;
@@ -376,7 +376,7 @@ mod tests {
                             ..Default::default()
                         }),
                     }],
-                    resource_names: vec!["resource".to_owned()],
+                    resource_names: vec![ZXName::from_string_lossy("resource")],
                     attributions: vec![Attribution {
                         source: PrincipalIdentifier(1),
                         subject: PrincipalIdentifier(1),

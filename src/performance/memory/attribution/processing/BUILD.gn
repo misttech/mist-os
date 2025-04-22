@@ -14,11 +14,14 @@ rustc_library("processing") {
   deps = [
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
     "//sdk/fidl/fuchsia.memory.attribution.plugin:fuchsia.memory.attribution.plugin_rust",
+    "//sdk/rust/zx-types",
     "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:bstr",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:regex",
     "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:zerocopy",
   ]
 
   test_deps = [ "//third_party/rust_crates:pretty_assertions" ]
@@ -27,6 +30,7 @@ rustc_library("processing") {
     "src/digest.rs",
     "src/kernel_statistics.rs",
     "src/lib.rs",
+    "src/name.rs",
     "src/summary.rs",
   ]
 }

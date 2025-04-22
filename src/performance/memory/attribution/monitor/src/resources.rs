@@ -3,10 +3,13 @@
 // found in the LICENSE file.
 
 use crate::attribution_client::AttributionState;
+use attribution_processing::ZXName;
 use fuchsia_trace::duration;
 use std::collections::{HashMap, HashSet};
 use std::mem::MaybeUninit;
 use traces::CATEGORY_MEMORY_CAPTURE;
+use zerocopy::{FromBytes, IntoBytes};
+
 use {
     fidl_fuchsia_memory_attribution as fattribution,
     fidl_fuchsia_memory_attribution_plugin as fplugin,
@@ -25,7 +28,7 @@ pub struct KernelResources {
     /// Many different resources often share the same name. In order to minimize the space taken by
     /// resource definitions, we give each unique name an identifier, and refer to these
     /// identifiers in the resource definitions
-    pub resource_names: HashMap<String, u64>,
+    pub resource_names: HashMap<ZXName, u64>,
 }
 
 #[derive(Default)]
@@ -255,7 +258,6 @@ impl KernelResourcesBuilder {
         let job_name = job.get_name()?;
         let child_jobs = job.children()?;
         let processes = job.processes()?;
-
         for child_job_koid in &child_jobs {
             // Here and below: jobs and processes can disappear while we explore the job
             // and process hierarchy. Therefore, we don't stop the exploration if we don't
@@ -301,7 +303,7 @@ impl KernelResourcesBuilder {
             };
         }
 
-        let name_index = self.ensure_resource_name(job_name);
+        let name_index = self.ensure_resource_name(&job_name)?;
         self.kernel_resources.resources.insert(
             koid.clone(),
             fplugin::Resource {
@@ -319,15 +321,15 @@ impl KernelResourcesBuilder {
     }
 
     /// Ensures the resource name is registered and returns its index.
-    fn ensure_resource_name(&mut self, resource_name: zx::Name) -> u64 {
-        match self.kernel_resources.resource_names.get(&resource_name.as_bstr().to_string()) {
-            Some(name_index) => *name_index,
+    fn ensure_resource_name(&mut self, resource_name: &zx::Name) -> Result<u64, zx::Status> {
+        let resource_name: &ZXName = ZXName::ref_from_bytes(resource_name.as_bytes())
+            .map_err(|_| zx::Status::INVALID_ARGS)?;
+        match self.kernel_resources.resource_names.get(resource_name) {
+            Some(name_index) => Ok(*name_index),
             None => {
                 let index = self.kernel_resources.resource_names.len() as u64;
-                self.kernel_resources
-                    .resource_names
-                    .insert(resource_name.as_bstr().to_string(), index);
-                index
+                self.kernel_resources.resource_names.insert(resource_name.clone(), index);
+                Ok(index)
             }
         }
     }
@@ -365,7 +367,7 @@ impl KernelResourcesBuilder {
                 if self.kernel_resources.resources.contains_key(&info_vmo.koid) {
                     continue;
                 }
-                let name_index = self.ensure_resource_name(info_vmo.name);
+                let name_index = self.ensure_resource_name(&info_vmo.name)?;
                 self.kernel_resources.resources.insert(
                     info_vmo.koid.clone(),
                     fplugin::Resource {
@@ -423,7 +425,7 @@ impl KernelResourcesBuilder {
             None
         };
 
-        let name_index = self.ensure_resource_name(process_name);
+        let name_index = self.ensure_resource_name(&process_name)?;
         self.kernel_resources.resources.insert(
             koid.clone(),
             fplugin::Resource {

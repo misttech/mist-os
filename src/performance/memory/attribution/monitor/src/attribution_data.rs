@@ -7,7 +7,7 @@ use crate::common::PrincipalIdMap;
 use crate::resources::{Job, KernelResources};
 use attribution_processing::{
     Attribution, AttributionData, AttributionDataProvider, Principal, PrincipalDescription,
-    PrincipalType, ResourceReference,
+    PrincipalType, ResourceReference, ZXName,
 };
 use fuchsia_sync::Mutex;
 use fuchsia_trace::duration;
@@ -107,7 +107,7 @@ impl AttributionDataProvider for AttributionDataProviderImpl {
             }
 
             let mut resource_names =
-                kernel_resources.resource_names.into_iter().collect::<Vec<(String, u64)>>();
+                kernel_resources.resource_names.into_iter().collect::<Vec<(ZXName, u64)>>();
             resource_names.sort_unstable_by_key(|(_, index)| *index);
 
             Ok(AttributionData {
@@ -306,14 +306,14 @@ mod tests {
         );
 
         assert_eq!(
-            capture.resource_names.into_iter().collect::<HashSet<String>>(),
+            capture.resource_names.into_iter().collect::<HashSet<ZXName>>(),
             HashSet::from([
-                "job1".to_owned(),
-                "job2".to_owned(),
-                "process3".to_owned(),
-                "vmo4".to_owned(),
-                "process5".to_owned(),
-                "vmo6".to_owned()
+                ZXName::from_string_lossy("job1"),
+                ZXName::from_string_lossy("job2"),
+                ZXName::from_string_lossy("process3"),
+                ZXName::from_string_lossy("vmo4"),
+                ZXName::from_string_lossy("process5"),
+                ZXName::from_string_lossy("vmo6")
             ])
         );
     }
