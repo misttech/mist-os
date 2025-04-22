@@ -1,9 +1,6 @@
-# Temporary owners as part of submodules migrations to approve CLs that mirror
-# jiri manigest changes into fuchsia.git.
-# TODO(b/253329946): Remove OWNERS file once submodules are the source of truth in fuchsia.git.
+# Service accounts that update submodule revisions used by Code Search.
 global-integration-roller@fuchsia-infra.iam.gserviceaccount.com #{LAST_RESORT_SUGGESTION}
 releases-prod-builder@fuchsia-infra.iam.gserviceaccount.com #{LAST_RESORT_SUGGESTION}
-# Include users to debug submodules below.
 
 per-file owners.toml = file: /third_party/rust_crates/OWNERS
 
