@@ -855,8 +855,7 @@ impl<
             None,
             dst_ip.into_specified(),
             OptionSequenceBuilder::new(options.iter()).into_serializer(),
-            IcmpZeroCode,
-            message,
+            ip::icmp::NdpMessage::NeighborSolicitation { message, code: IcmpZeroCode },
         )
         .map_err(|IpSendFrameError { serializer: _, error }| {
             debug!("error sending DAD packet: {error:?}")
@@ -920,8 +919,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
             src_ip.map(UnicastAddr::into_specified),
             dst_ip,
             body(src_ip),
-            IcmpZeroCode,
-            message,
+            ip::icmp::NdpMessage::RouterSolicitation { message, code: IcmpZeroCode },
         )
     }
 }

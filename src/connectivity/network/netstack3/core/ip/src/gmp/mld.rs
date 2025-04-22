@@ -25,7 +25,7 @@ use netstack3_filter as filter;
 use packet::serialize::{PacketBuilder, Serializer};
 use packet::InnerPacketBuilder;
 use packet_formats::icmp::mld::{
-    IcmpMldv1MessageType, MldPacket, Mldv1Body, Mldv1MessageBuilder, Mldv2QueryBody,
+    MldPacket, Mldv1Body, Mldv1MessageBuilder, Mldv1MessageType, Mldv2QueryBody,
     Mldv2ReportMessageBuilder, MulticastListenerDone, MulticastListenerReport,
     MulticastListenerReportV2,
 };
@@ -423,26 +423,22 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
         let result = match msg_type {
             gmp::v1::GmpMessageType::Report => {
                 self.increment_both(device, |counters: &MldCounters| &counters.tx_mldv1_report);
-                send_mld_v1_packet::<_, _, _>(
+                send_mld_v1_packet::<_, _>(
                     self,
                     bindings_ctx,
                     device,
                     group_addr,
-                    MulticastListenerReport,
-                    group_addr,
-                    (),
+                    MldMessage::ListenerReport { group_addr },
                 )
             }
             gmp::v1::GmpMessageType::Leave => {
                 self.increment_both(device, |counters: &MldCounters| &counters.tx_leave_group);
-                send_mld_v1_packet::<_, _, _>(
+                send_mld_v1_packet::<_, _>(
                     self,
                     bindings_ctx,
                     device,
                     Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS,
-                    MulticastListenerDone,
-                    group_addr,
-                    (),
+                    MldMessage::ListenerDone { group_addr },
                 )
             }
         };
@@ -721,32 +717,47 @@ fn new_ip_and_icmp_builders<
     (ipv6, icmp)
 }
 
+/// A type to allow implementing the required filtering traits on a concrete
+/// subset of message types.
+enum MldMessage {
+    ListenerReport { group_addr: <MulticastListenerReport as Mldv1MessageType>::GroupAddr },
+    ListenerDone { group_addr: <MulticastListenerDone as Mldv1MessageType>::GroupAddr },
+}
+
 /// Send an MLD packet.
 ///
 /// The MLD packet being sent should have its `hop_limit` to be 1 and a
 /// `RouterAlert` option in its Hop-by-Hop Options extensions header.
-fn send_mld_v1_packet<
-    BC: MldBindingsContext,
-    CC: MldSendContext<BC>,
-    M: IcmpMldv1MessageType + filter::IcmpMessage<Ipv6>,
->(
+fn send_mld_v1_packet<BC: MldBindingsContext, CC: MldSendContext<BC>>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     dst_ip: MulticastAddr<Ipv6Addr>,
-    msg: M,
-    group_addr: M::GroupAddr,
-    max_resp_delay: M::MaxRespDelay,
+    msg: MldMessage,
 ) -> MldResult<()> {
-    let (ipv6, icmp) = new_ip_and_icmp_builders(core_ctx, device, dst_ip, msg);
-    let body = Mldv1MessageBuilder::<M>::new_with_max_resp_delay(group_addr, max_resp_delay)
-        .into_serializer()
-        .encapsulate(icmp)
-        .encapsulate(ipv6);
+    macro_rules! send {
+        ($type:ty, $struct:expr, $group_addr:expr) => {{
+            let (ipv6, icmp) = new_ip_and_icmp_builders(core_ctx, device, dst_ip, $struct);
 
-    let destination = IpPacketDestination::Multicast(dst_ip);
-    IpLayerHandler::send_ip_frame(core_ctx, bindings_ctx, &device, destination, body)
-        .map_err(|_| MldError::SendFailure { addr: group_addr.into() })
+            let body = Mldv1MessageBuilder::<$type>::new_with_max_resp_delay($group_addr, ())
+                .into_serializer()
+                .encapsulate(icmp)
+                .encapsulate(ipv6);
+
+            let destination = IpPacketDestination::Multicast(dst_ip);
+            IpLayerHandler::send_ip_frame(core_ctx, bindings_ctx, &device, destination, body)
+                .map_err(|_| MldError::SendFailure { addr: $group_addr.into() })
+        }};
+    }
+
+    match msg {
+        MldMessage::ListenerReport { group_addr } => {
+            send!(MulticastListenerReport, MulticastListenerReport, group_addr)
+        }
+        MldMessage::ListenerDone { group_addr } => {
+            send!(MulticastListenerDone, MulticastListenerDone, group_addr)
+        }
+    }
 }
 
 /// Statistics about MLD.

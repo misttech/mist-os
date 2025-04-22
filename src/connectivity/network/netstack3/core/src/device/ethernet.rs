@@ -213,8 +213,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>
                 [NdpOptionBuilder::SourceLinkLayerAddress(mac.bytes().as_ref())].iter(),
             )
             .into_serializer(),
-            IcmpZeroCode,
-            NeighborSolicitation::new(lookup_addr.get()),
+            icmp::NdpMessage::NeighborSolicitation {
+                message: NeighborSolicitation::new(lookup_addr.get()),
+                code: IcmpZeroCode,
+            },
         );
     }
 }
