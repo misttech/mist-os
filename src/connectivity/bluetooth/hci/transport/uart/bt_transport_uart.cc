@@ -131,9 +131,7 @@ zx::result<> BtTransportUart::Start() {
 
   // Start compat device server to forward metadata.
   zx::result compat_server_result = compat_server_.Initialize(
-      incoming(), outgoing(), node_name(), "bt-transport-uart",
-      // TODO(b/355242959): Don't forward DEVICE_METADATA_MAC_ADDRESS once no longer used.
-      compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS}));
+      incoming(), outgoing(), node_name(), "bt-transport-uart", compat::ForwardMetadata::None());
   if (compat_server_result.is_error()) {
     fdf::error("Failed to initialize device server: {}", compat_server_result);
     return compat_server_result.take_error();

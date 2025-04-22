@@ -36,11 +36,9 @@ void AmlUartV2::Start(fdf::StartCompleter completer) {
 
   parent_node_client_.Bind(std::move(node()), dispatcher());
 
-  device_server_.Begin(
-      incoming(), outgoing(), node_name(), kChildName,
-      fit::bind_member<&AmlUartV2::OnDeviceServerInitialized>(this),
-      // TODO(b/373918767): Don't forward DEVICE_METADATA_MAC_ADDRESS once no longer retrieved.
-      compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS}));
+  device_server_.Begin(incoming(), outgoing(), node_name(), kChildName,
+                       fit::bind_member<&AmlUartV2::OnDeviceServerInitialized>(this),
+                       compat::ForwardMetadata::None());
 }
 
 void AmlUartV2::PrepareStop(fdf::PrepareStopCompleter completer) {

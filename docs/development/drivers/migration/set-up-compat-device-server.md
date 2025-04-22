@@ -212,7 +212,7 @@ For asynchronous initialization, do the following:
       async_completer_.emplace(std::move(completer));
       device_server_.Begin(incoming(), outgoing(), node_name(), child_name,
       fit::bind_member<&MyDriver::OnDeviceServerInitialized>(this),
-      compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS}));
+      compat::ForwardMetadata::Some({DEVICE_METADATA_PRIVATE}));
    }
    ```
 

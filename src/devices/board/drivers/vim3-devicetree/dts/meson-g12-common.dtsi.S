@@ -24,7 +24,7 @@
 			interrupts = <GIC_SPI 8 GIC_IRQ_MODE_LEVEL_HIGH>;
 			phys = <&ethmac>;
 			iommus = <&dummy_iommu DWMAC_BTI>;
-			boot-metadata = <0x43414D6D 0>; /*DEVICE_METADATA_MAC_ADDRESS*/
+			boot-metadata = <0x43414D6D 0>; /*ZBI_TYPE_DRV_MAC_ADDRESS*/
 		};
 
 		video-decoder@ffd00000 {
@@ -333,7 +333,7 @@
 			g-tx-fifo-size = <128 4 128 16>;
 			g-turnaround-time = <9>;
 			dma-burst-len = <5>;
-			boot-metadata = <0x43414D6D 0>, /*DEVICE_METADATA_MAC_ADDRESS*/
+			boot-metadata = <0x43414D6D 0>, /*ZBI_TYPE_DRV_MAC_ADDRESS*/
 				<0x4e4c5253 0>; /*DEVICE_METADATA_SERIAL_NUMBER*/
 		};
 

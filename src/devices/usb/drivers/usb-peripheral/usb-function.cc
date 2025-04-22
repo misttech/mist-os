@@ -52,16 +52,13 @@ zx_status_t UsbFunction::AddDevice(const std::string& name) {
       fuchsia_hardware_usb_function::UsbFunctionService::Name,
       ddk::MetadataServer<fuchsia_boot_metadata::MacAddressMetadata>::kFidlServiceName,
   };
-  status = DdkAdd(
-      ddk::DeviceAddArgs(name.c_str())
-          .set_str_props(props)
-          // TODO(b/373918767): Don't forward DEVICE_METADATA_MAC_ADDRESS once no longer retrieved.
-          .forward_metadata(peripheral_->parent(), DEVICE_METADATA_MAC_ADDRESS)
-          // TODO(b/407987472): Don't forward DEVICE_METADATA_SERIAL_NUMBER once no longer
-          // retrieved.
-          .forward_metadata(peripheral_->parent(), DEVICE_METADATA_SERIAL_NUMBER)
-          .set_fidl_service_offers(offers)
-          .set_outgoing_dir(endpoints->client.TakeChannel()));
+  status = DdkAdd(ddk::DeviceAddArgs(name.c_str())
+                      .set_str_props(props)
+                      // TODO(b/407987472): Don't forward DEVICE_METADATA_SERIAL_NUMBER once no
+                      // longer retrieved.
+                      .forward_metadata(peripheral_->parent(), DEVICE_METADATA_SERIAL_NUMBER)
+                      .set_fidl_service_offers(offers)
+                      .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {
     zxlogf(ERROR, "usb_dev_bind_functions add_device failed %s", zx_status_get_string(status));
     return status;
