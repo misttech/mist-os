@@ -37,6 +37,20 @@ pub trait FfxContext<T, E> {
     ) -> Result<T, Error>;
 }
 
+/// Helper function for preventing duplicate error messages. Takes an error and, if it is of type
+/// `crate::Error` extracts its source. This prevents duplicating error messages by re-wrapping the
+/// error types within `FfxContext` multiple times, as the context chain messages get copied in
+/// each subsequent error wrapping.
+fn unwrap_source(err: anyhow::Error) -> anyhow::Error {
+    match err.downcast::<Error>() {
+        Ok(e) => match e.source() {
+            Ok(source) => source,
+            Err(e) => e.into(),
+        },
+        Err(e) => e,
+    }
+}
+
 impl<T, E> FfxContext<T, E> for Result<T, E>
 where
     Self: anyhow::Context<T, E>,
@@ -47,25 +61,25 @@ where
     }
 
     fn bug_context<C: Display + Send + Sync + 'static>(self, context: C) -> Result<T, Error> {
-        self.context(context).map_err(Error::Unexpected)
+        self.map_err(|e| Error::Unexpected(unwrap_source(e.into()).context(context)))
     }
 
     fn with_bug_context<C: Display + Send + Sync + 'static>(
         self,
         f: impl FnOnce() -> C,
     ) -> Result<T, Error> {
-        self.with_context(f).map_err(Error::Unexpected)
+        self.bug_context((f)())
     }
 
     fn user_message<C: Display + Send + Sync + 'static>(self, context: C) -> Result<T, Error> {
-        self.context(context).map_err(Error::User)
+        self.map_err(|e| Error::User(unwrap_source(e.into()).context(context)))
     }
 
     fn with_user_message<C: Display + Send + Sync + 'static>(
         self,
         f: impl FnOnce() -> C,
     ) -> Result<T, Error> {
-        self.with_context(f).map_err(Error::User)
+        self.user_message((f)())
     }
 }
 
@@ -156,5 +170,40 @@ mod tests {
             "anyhow.with_user_message() should be a user error"
         );
         assert_matches!(anyhow::Result::<()>::Err(anyhow!(ERR_STR)).with_user_message(|| FfxError::TestingError).ffx_error(), Some(FfxError::TestingError), "anyhow.with_user_message should be a user error that properly extracts to the ffx error.");
+    }
+
+    #[test]
+    fn test_user_error_formats_through_multiple_levels() {
+        let user_err =
+            anyhow::Result::<()>::Err(anyhow!("the wubbler broke")).user_message("broken wubbler");
+        let user_err2 = user_err.user_message("getting wubbler");
+        let err_string = format!("{}", user_err2.unwrap_err());
+        assert_eq!(err_string, "getting wubbler: broken wubbler: the wubbler broke");
+    }
+
+    #[test]
+    fn test_bug_and_user_error_override_each_other_but_add_context() {
+        let user_err =
+            anyhow::Result::<()>::Err(anyhow!("the wubbler broke")).user_message("broken wubbler");
+        let user_err2 = user_err.bug_context("getting wubbler");
+        let user_err3 = user_err2.user_message("delegating wubbler");
+        let err_string = format!("{}", user_err3.unwrap_err());
+        assert_eq!(
+            err_string,
+            "delegating wubbler: getting wubbler: broken wubbler: the wubbler broke"
+        );
+    }
+
+    #[test]
+    fn test_bug_and_user_error_override_each_other_but_add_context_part_two() {
+        let user_err =
+            anyhow::Result::<()>::Err(anyhow!("the wubbler broke")).user_message("broken wubbler");
+        let user_err2 = user_err.bug_context("getting wubbler");
+        let user_err3 = user_err2.bug_context("delegating wubbler");
+        let err_string = format!("{}", user_err3.unwrap_err());
+        assert_eq!(
+            err_string,
+            "BUG: An internal command error occurred.\nError: delegating wubbler\n    1.  getting wubbler\n    2.  broken wubbler\n    3.  the wubbler broke"
+        );
     }
 }

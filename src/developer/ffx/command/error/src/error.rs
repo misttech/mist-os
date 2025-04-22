@@ -55,6 +55,16 @@ impl Error {
             Self::Config(e) => try_downcast(e).map_err(Self::Config),
         }
     }
+
+    /// Attempts to get the original `anyhow::Error` source (this is useful for chaining context
+    /// errors). If successful, returns `Ok(e)` with the error source, but if there's no error
+    /// source that can be returned, returns `self`.
+    pub fn source(self) -> Result<anyhow::Error, Self> {
+        match self {
+            Self::User(e) | Self::Unexpected(e) | Self::Config(e) => Ok(e),
+            Self::Help { .. } | Self::ExitWithCode(_) => Err(self),
+        }
+    }
 }
 
 /// Writes a detailed description of an anyhow error to the formatter
@@ -62,6 +72,43 @@ fn write_detailed(f: &mut std::fmt::Formatter<'_>, error: &anyhow::Error) -> std
     write!(f, "Error: {}", error)?;
     for (i, e) in error.chain().skip(1).enumerate() {
         write!(f, "\n  {: >3}.  {}", i + 1, e)?;
+    }
+    Ok(())
+}
+
+fn write_display(f: &mut std::fmt::Formatter<'_>, error: &anyhow::Error) -> std::fmt::Result {
+    write!(f, "{error}")?;
+    let mut previous_error = error.to_string();
+    for e in error.chain().skip(1) {
+        // This is a total hack. When errors are chained together through various thiserror
+        // wrappers, what can happen is the error will use this display function to make itself
+        // into a string, and the display function will show duplicates of the context chain.
+        //
+        // If, for example, we have something like `ffx_bail!` which returns an error, and it is
+        // encapsulated into a `thiserror` enum, and then later wrapped into a
+        // `ffx_command::Error::User`, we will have a context chain with the same error multiple
+        // times in a row. For example, say we have something like:
+        //
+        // ```
+        // let err = ffx_error!(anyhow!("this thing broke"));
+        // let err2 = LogError::FfxError(err);
+        // let err3 = ffx_command::Error::User(err2);
+        // eprintln!("{err3}");
+        // ```
+        //
+        // This will print: "this thing broke: this thing broke"
+        //
+        // This check will prevent that from happening without removing the context chain.
+        let err_string = format!("{}", e);
+        // There have been issues with empty strings in the past when formatting errors. Make
+        // sure to explicitly show that an empty string is in one of the errors so that it can
+        // be caught. This sort of thing used to happen with certain SSH errors.
+        let err_string = if err_string.is_empty() { "\"\"".to_owned() } else { err_string };
+        if err_string == previous_error {
+            continue;
+        }
+        write!(f, ": {}", err_string)?;
+        previous_error = err_string;
     }
     Ok(())
 }
@@ -74,7 +121,7 @@ impl std::fmt::Display for Error {
                 writeln!(f, "{BUG_LINE}")?;
                 write_detailed(f, error)
             }
-            Self::User(error) | Self::Config(error) => write!(f, "{error}"),
+            Self::User(error) | Self::Config(error) => write_display(f, error),
             Self::Help { output, .. } => write!(f, "{output}"),
             Self::ExitWithCode(code) => write!(f, "Exiting with code {code}"),
         }
@@ -258,5 +305,72 @@ mod tests {
             let res = err.downcast_non_fatal().expect("expected non-fatal downcast");
             assert_eq!(res.to_string(), ERR_STR.to_owned());
         }
+    }
+
+    #[test]
+    fn test_error_source() {
+        static ERR_STR: &'static str = "some nonsense";
+        let constructors = vec![Error::User, Error::Unexpected, Error::Config];
+        for cons in constructors.into_iter() {
+            let err = cons(anyhow!(ERR_STR));
+            let res = err.source();
+            assert!(res.is_ok());
+            assert_eq!(res.unwrap().to_string(), ERR_STR.to_owned());
+        }
+    }
+
+    #[test]
+    fn test_error_source_flatten_no_context() {
+        assert_eq!("Some Operation", Error::User(anyhow!("Some Operation")).to_string());
+    }
+
+    // The order of context's is "in-side-out", the root-most error is
+    // created first, and then the context() is attached on all of the
+    // returned values, so they are created in the opposite order that they
+    // are displayed.
+
+    #[test]
+    fn test_error_source_flatten_one_context() {
+        let expected = "Some Other Operation: some failure";
+        let error = anyhow!("some failure");
+        let error = error.context("Some Other Operation");
+        assert_eq!(expected, Error::User(error).to_string());
+    }
+
+    #[test]
+    fn test_error_source_flatten_two_contexts() {
+        let expected = "Some Operation: some context: some failure";
+        let error = anyhow!("some failure");
+        let error = error.context("some context");
+        let error = error.context("Some Operation");
+        assert_eq!(expected, Error::User(error).to_string());
+    }
+
+    #[test]
+    fn test_error_source_flatten_three_contexts() {
+        let expected = "Some Operation: some context: more context: some failure";
+        let error = anyhow!("some failure")
+            .context("more context")
+            .context("some context")
+            .context("Some Operation");
+        assert_eq!(expected, Error::User(error).to_string());
+    }
+
+    #[test]
+    fn test_error_doesnt_duplicate_when_rewrapped() {
+        #[derive(thiserror::Error, Debug)]
+        enum NonsenseErr {
+            #[error(transparent)]
+            Error(#[from] FfxError),
+        }
+        let expected = "This thing broke!";
+        let error = ffx_error!(anyhow!(expected));
+        let error: NonsenseErr = error.into();
+        let error = Error::User(error.into());
+        assert_eq!(
+            error.to_string(),
+            expected.to_owned(),
+            "There should be no duplication from re-wrapping errors"
+        );
     }
 }
