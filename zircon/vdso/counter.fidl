@@ -43,7 +43,7 @@ closed protocol Counter {
     ///
     /// ## Return value
     ///
-    /// `zx_counter_create()` returns `ZX_OK` and a valid event handle (via *out*) on
+    /// `zx_counter_create()` returns `ZX_OK` and a valid counter handle (via *out*) on
     /// success.
     ///
     /// On failure, an error value is returned.
@@ -92,7 +92,7 @@ closed protocol Counter {
     /// ```c
     /// #include <zircon/syscalls.h>
     ///
-    /// zx_status_t zx_event_add(zx_handle_t handle, int64_t value);
+    /// zx_status_t zx_counter_add(zx_handle_t handle, int64_t value);
     /// ```
     ///
     /// ## Description
@@ -158,7 +158,7 @@ closed protocol Counter {
     /// ```c
     /// #include <zircon/syscalls.h>
     ///
-    /// zx_status_t zx_event_read(zx_handle_t handle, int64_t* value);
+    /// zx_status_t zx_counter_read(zx_handle_t handle, int64_t* value);
     /// ```
     ///
     /// ## Description
@@ -208,7 +208,7 @@ closed protocol Counter {
     /// ```c
     /// #include <zircon/syscalls.h>
     ///
-    /// zx_status_t zx_event_write(zx_handle_t handle, int64_t value);
+    /// zx_status_t zx_counter_write(zx_handle_t handle, int64_t value);
     /// ```
     ///
     /// ## Description
