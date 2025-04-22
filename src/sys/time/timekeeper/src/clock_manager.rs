@@ -651,13 +651,16 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                         Some(Command::Reference{
                             boot_reference, utc_reference, mut responder
                         }) => {
-                            last_proposal = Some(Sample {
+                            let sample = Sample {
                                     reference: boot_reference,
                                     utc: utc_reference,
                                     // Don't allow user samples to be infinitely precise, there is
                                     // always *some* error involved.
                                     std_dev: USER_SAMPLE_DEFAULT_STD_DEV,
-                            });
+                            };
+                            // TODO: b/412337617 - probably want to demote this to debug! soon-ish.
+                            info!("manage_clock: got a reference time sample: {:?}", sample);
+                            last_proposal = Some(sample);
                             self.managed_clock_start(
                                 &mut clock_started,
                                 last_proposal.as_ref(),

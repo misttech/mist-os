@@ -10,8 +10,7 @@ use crate::enums::{
 use crate::{MonitorTrack, PrimaryTrack, TimeSource};
 use fidl_fuchsia_time_external::Status;
 use fuchsia_inspect::{
-    BoolProperty, Inspector, IntProperty, Node, NumericProperty, Property, StringProperty,
-    UintProperty,
+    Inspector, IntProperty, Node, NumericProperty, Property, StringProperty, UintProperty,
 };
 use fuchsia_runtime::{UtcClock, UtcClockDetails, UtcDuration, UtcInstant};
 use fuchsia_sync::Mutex;
@@ -188,6 +187,13 @@ impl RealTimeClockNode {
     }
 }
 
+#[derive(Debug)]
+enum UserAdjustResult {
+    Unspecified,
+    Success,
+    Failure,
+}
+
 /// An inspect `Node` and properties used to describe the history of user UTC
 /// adjustments.
 struct UserAdjustUtcNode {
@@ -198,7 +204,9 @@ struct UserAdjustUtcNode {
     /// The value of the offset resulting from the last successful proposal.
     last_allowed_offset_nanos: IntProperty,
     /// Was last update was a failure?
-    last_update_failure: BoolProperty,
+    last_update_result: StringProperty,
+    /// The boot timestamp at which the last UTC adjustment was applied.
+    last_update_timestamp_nanos: IntProperty,
     /// The inspect node these fields are exported to.
     _node: Node,
 }
@@ -209,7 +217,11 @@ impl UserAdjustUtcNode {
             success_count: node.create_uint("success_count", 0),
             failure_count: node.create_uint("failure_count", 0),
             last_allowed_offset_nanos: node.create_int("last_proposed_offset_nanos", 0),
-            last_update_failure: node.create_bool("last_updated_failure", false),
+            last_update_result: node.create_string(
+                "last_update_result",
+                &format!("{:?}", UserAdjustResult::Unspecified),
+            ),
+            last_update_timestamp_nanos: node.create_int("last_update_timestamp_nanos", 0),
             _node: node,
         }
     }
@@ -217,15 +229,16 @@ impl UserAdjustUtcNode {
 
 impl UserAdjustUtcNode {
     fn update_user_adjust_utc(&mut self, outcome: UserAdjustUtcOutcome, offset: UtcDuration) {
+        self.last_update_timestamp_nanos.set(reference_time());
         match outcome {
             UserAdjustUtcOutcome::Succeeded => {
                 self.success_count.add(1);
-                self.last_update_failure.set(false);
+                self.last_update_result.set(&format!("{:?}", UserAdjustResult::Success));
                 self.last_allowed_offset_nanos.set(offset.into_nanos());
             }
             UserAdjustUtcOutcome::Failed => {
                 self.failure_count.add(1);
-                self.last_update_failure.set(true);
+                self.last_update_result.set(&format!("{:?}", UserAdjustResult::Failure));
             }
         }
     }
