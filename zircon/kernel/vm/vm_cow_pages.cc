@@ -4863,59 +4863,116 @@ zx_status_t VmCowPages::Resize(uint64_t s) {
   LTRACEF("vmcp %p, size %" PRIu64 "\n", this, s);
 
   __UNINITIALIZED DeferredOps deferred(this);
-  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+  // In the case where we are shrinking any child limits may need to be updated, but the locking
+  // order requires their locks to be acquired without our lock held, and so we do this after
+  // dropping the main lock, but before any pages are freed from the deferred ops. See the comment
+  // and checks where this is set to true for details on the correctness.
+  bool update_child_limits = false;
+  {
+    Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
 
-  // make sure everything is aligned before we get started
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(size_));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(s));
+    // make sure everything is aligned before we get started
+    DEBUG_ASSERT(IS_PAGE_ALIGNED(size_));
+    DEBUG_ASSERT(IS_PAGE_ALIGNED(s));
 
-  // see if we're shrinking or expanding the vmo
-  if (s < size_) {
-    // shrinking
-    const uint64_t start = s;
-    const uint64_t end = size_;
-    const uint64_t len = end - start;
+    // see if we're shrinking or expanding the vmo
+    if (s < size_) {
+      // shrinking
+      const uint64_t start = s;
+      const uint64_t end = size_;
+      const uint64_t len = end - start;
 
-    // bail if there are any pinned pages in the range we're trimming
-    if (AnyPagesPinnedLocked(start, len)) {
-      return ZX_ERR_BAD_STATE;
-    }
-
-    // unmap all of the pages in this range on all the mapping regions
-    RangeChangeUpdateLocked(VmCowRange(start, len), RangeChangeOp::Unmap, &deferred);
-
-    // Resolve any outstanding page requests tracked by the page source that are now out-of-bounds.
-    if (page_source_) {
-      // Tell the page source that any non-resident pages that are now out-of-bounds
-      // were supplied, to ensure that any reads of those pages get woken up.
-      InvalidateReadRequestsLocked(start, len);
-
-      // If DIRTY requests are supported, also tell the page source that any non-Dirty pages that
-      // are now out-of-bounds were dirtied (without actually dirtying them), to ensure that any
-      // threads blocked on DIRTY requests for those pages get woken up.
-      if (is_source_preserving_page_content() && page_source_->ShouldTrapDirtyTransitions()) {
-        InvalidateDirtyRequestsLocked(start, len);
+      // bail if there are any pinned pages in the range we're trimming
+      if (AnyPagesPinnedLocked(start, len)) {
+        return ZX_ERR_BAD_STATE;
       }
-    }
 
-    // If pager-backed and the new size falls partway in an interval, we will need to clip the
-    // interval.
-    if (is_source_preserving_page_content()) {
-      // Check if the first populated slot we find in the now-invalid range is an interval end.
-      uint64_t interval_end = UINT64_MAX;
-      zx_status_t status = page_list_.ForEveryPageInRange(
-          [&interval_end](const VmPageOrMarker* p, uint64_t off) {
-            if (p->IsIntervalEnd()) {
-              interval_end = off;
-            }
-            // We found the first populated slot. Stop the traversal.
-            return ZX_ERR_STOP;
-          },
-          start, size_);
-      DEBUG_ASSERT(status == ZX_OK);
+      // unmap all of the pages in this range on all the mapping regions
+      RangeChangeUpdateLocked(VmCowRange(start, len), RangeChangeOp::Unmap, &deferred);
 
-      if (interval_end != UINT64_MAX) {
-        status = page_list_.ClipIntervalEnd(interval_end, interval_end - start + PAGE_SIZE);
+      // Resolve any outstanding page requests tracked by the page source that are now
+      // out-of-bounds.
+      if (page_source_) {
+        // Tell the page source that any non-resident pages that are now out-of-bounds
+        // were supplied, to ensure that any reads of those pages get woken up.
+        InvalidateReadRequestsLocked(start, len);
+
+        // If DIRTY requests are supported, also tell the page source that any non-Dirty pages that
+        // are now out-of-bounds were dirtied (without actually dirtying them), to ensure that any
+        // threads blocked on DIRTY requests for those pages get woken up.
+        if (is_source_preserving_page_content() && page_source_->ShouldTrapDirtyTransitions()) {
+          InvalidateDirtyRequestsLocked(start, len);
+        }
+      }
+
+      // If pager-backed and the new size falls partway in an interval, we will need to clip the
+      // interval.
+      if (is_source_preserving_page_content()) {
+        // Check if the first populated slot we find in the now-invalid range is an interval end.
+        uint64_t interval_end = UINT64_MAX;
+        zx_status_t status = page_list_.ForEveryPageInRange(
+            [&interval_end](const VmPageOrMarker* p, uint64_t off) {
+              if (p->IsIntervalEnd()) {
+                interval_end = off;
+              }
+              // We found the first populated slot. Stop the traversal.
+              return ZX_ERR_STOP;
+            },
+            start, size_);
+        DEBUG_ASSERT(status == ZX_OK);
+
+        if (interval_end != UINT64_MAX) {
+          status = page_list_.ClipIntervalEnd(interval_end, interval_end - start + PAGE_SIZE);
+          if (status != ZX_OK) {
+            DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
+            return status;
+          }
+        }
+      }
+
+      // Clip the parent limit and release any pages, if any, in this node or the parents.
+      //
+      // It should never exceed this node's size, either the current size (which is `end`) or the
+      // new size (which is `start`).
+      DEBUG_ASSERT(parent_limit_ <= end);
+
+      ReleaseOwnedPagesLocked(start, LockedPtr(), deferred.FreedList(this));
+
+      // If the tail of a parent disappears, the children shouldn't be able to see that region
+      // again, even if the parent is later reenlarged. So update the children's parent limits.
+      if (children_list_len_ != 0) {
+        // The only scenario where we can have children is if this is a pager backed hierarchy, in
+        // which case the DeferredOps constructed at the top of this function holds the pager
+        // hierarchy lock, which is held over all resize operations. Due to this lock being held we
+        // know that, even once the VMO lock is dropped, no resize operation to reenlarge can occur
+        // till after we have completed updating the child limits.
+        // In the present state, with our size_ reduced but child parent_limit_ not updated, the
+        // children will just walk up to us, see that the offset is beyond our size_, and substitute
+        // a zero page. Once the child parent_limit_s are updated they will instead not walk up to
+        // us, and substitute a zero page.
+        ASSERT(root_has_page_source());
+        update_child_limits = true;
+      }
+    } else if (s > size_) {
+      uint64_t temp;
+      // Check that this VMOs new size would not cause it to overflow if projected onto the root.
+      bool overflow = add_overflow(root_parent_offset_, s, &temp);
+      if (overflow) {
+        return ZX_ERR_INVALID_ARGS;
+      }
+      // expanding
+      // figure the starting and ending page offset that is affected
+      const uint64_t start = size_;
+      const uint64_t end = s;
+      const uint64_t len = end - start;
+
+      // inform all our children or mapping that there's new bits
+      RangeChangeUpdateLocked(VmCowRange(start, len), RangeChangeOp::Unmap, &deferred);
+
+      // If pager-backed, need to insert a dirty zero interval beyond the old size.
+      if (is_source_preserving_page_content()) {
+        zx_status_t status =
+            page_list_.AddZeroInterval(start, end, VmPageOrMarker::IntervalDirtyState::Dirty);
         if (status != ZX_OK) {
           DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
           return status;
@@ -4923,61 +4980,32 @@ zx_status_t VmCowPages::Resize(uint64_t s) {
       }
     }
 
-    // Clip the parent limit and release any pages, if any, in this node or the parents.
-    //
-    // It should never exceed this node's size, either the current size (which is `end`) or the new
-    // size (which is `start`).
-    DEBUG_ASSERT(parent_limit_ <= end);
+    // save bytewise size
+    size_ = s;
 
-    ReleaseOwnedPagesLocked(start, LockedPtr(), deferred.FreedList(this));
+    // We were able to successfully resize. Mark as modified.
+    mark_modified_locked();
 
-    // If the tail of a parent disappears, the children shouldn't be able to see that region again,
-    // even if the parent is later reenlarged. So update the children's parent limits.
-    //
+    VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
+    VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
+    VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
+  }
+  // Now that the lock is dropped, check if we need to update the child limits before the
+  // DeferredOps get finalized.
+  if (update_child_limits) {
+    // Use a TreeWalkCursor to walk all our children.
     // A child's parent limit will also limit that child's descendants' views into this node, so
     // this method only needs to touch the direct children.
-    for (auto& child : children_list_) {
-      AssertHeld(child.lock_ref());
-
-      child.parent_limit_ = ClampedLimit(child.parent_offset_, child.parent_limit_, start);
-    }
-
-  } else if (s > size_) {
-    uint64_t temp;
-    // Check that this VMOs new size would not cause it to overflow if projected onto the root.
-    bool overflow = add_overflow(root_parent_offset_, s, &temp);
-    if (overflow) {
-      return ZX_ERR_INVALID_ARGS;
-    }
-    // expanding
-    // figure the starting and ending page offset that is affected
-    const uint64_t start = size_;
-    const uint64_t end = s;
-    const uint64_t len = end - start;
-
-    // inform all our children or mapping that there's new bits
-    RangeChangeUpdateLocked(VmCowRange(start, len), RangeChangeOp::Unmap, &deferred);
-
-    // If pager-backed, need to insert a dirty zero interval beyond the old size.
-    if (is_source_preserving_page_content()) {
-      zx_status_t status =
-          page_list_.AddZeroInterval(start, end, VmPageOrMarker::IntervalDirtyState::Dirty);
-      if (status != ZX_OK) {
-        DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
-        return status;
-      }
+    TreeWalkCursor cursor(LockedPtr(this, VmLockAcquireMode::First));
+    // Go to the first child, if we still have one.
+    if (cursor.NextChild()) {
+      // Update this child and all its siblings.
+      do {
+        cursor.GetCur().locked().parent_limit_ = ClampedLimit(
+            cursor.GetCur().locked().parent_offset_, cursor.GetCur().locked().parent_limit_, s);
+      } while (cursor.NextSibling());
     }
   }
-
-  // save bytewise size
-  size_ = s;
-
-  // We were able to successfully resize. Mark as modified.
-  mark_modified_locked();
-
-  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
-  VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   return ZX_OK;
 }
 
