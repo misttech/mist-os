@@ -334,11 +334,11 @@ async fn main() {
                   }
                   InternalMessage::TouchEvent{ phase, trace_id } => {
                     trace::duration!(c"input", c"OnTouchEvent");
-                    trace::flow_end!(c"input", c"dispatch_event_to_client", trace_id);
+                    trace::flow_end!(c"input", c"touch_in_simplest_app", trace_id);
                     // Change color on every finger down event.
                     if phase == EventPhase::Add {
                         // Trace from now until the update is applied.
-                        let trace_id = trace::Id::new();
+                        let trace_id = trace::Id::random();
                         touch_updates.push(trace_id);
                         trace::flow_begin!(c"input", c"touch_update", trace_id);
                         app.next_color();

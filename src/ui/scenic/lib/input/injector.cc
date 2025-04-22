@@ -176,7 +176,7 @@ void Injector::Inject(std::vector<fuchsia::ui::pointerinjector::Event> events,
     return;
   }
 
-  for (const auto& event : events) {
+  for (auto& event : events) {
     if (!event.has_timestamp() || !event.has_data()) {
       FX_LOGS(ERROR) << "Inject() called with an incomplete event";
       CloseChannel(ZX_ERR_INVALID_ARGS);
@@ -211,8 +211,11 @@ void Injector::Inject(std::vector<fuchsia::ui::pointerinjector::Event> events,
 
       if (event.has_trace_flow_id()) {
         TRACE_FLOW_END("input", "dispatch_event_to_scenic", event.trace_flow_id());
-        TRACE_FLOW_BEGIN("input", "input_event_in_scenic", event.trace_flow_id());
+      } else {
+        event.set_trace_flow_id(TRACE_NONCE());
       }
+      TRACE_FLOW_BEGIN("input", "dispatch_event_to_client", event.trace_flow_id());
+
       ForwardEvent(event, stream_id);
       continue;
     } else {
