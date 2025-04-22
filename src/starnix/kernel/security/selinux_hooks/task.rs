@@ -4,12 +4,13 @@
 
 use crate::security::selinux_hooks::{
     check_permission, check_self_permission, fs_node_effective_sid_and_class, fs_node_ensure_class,
-    fs_node_set_label_with_task, has_file_permissions, KernelPermission, PermissionCheck,
-    ProcessPermission, TaskAttrs,
+    fs_node_set_label_with_task, has_file_permissions, todo_check_permission, KernelPermission,
+    PermissionCheck, ProcessPermission, TaskAttrs,
 };
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityId, SecurityServer};
 use crate::task::{CurrentTask, Task};
 use crate::vfs::FsNode;
+use crate::TODO_DENY;
 use selinux::{
     Cap2Class, CapClass, CommonCap2Permission, CommonCapPermission, FilePermission, KernelClass,
     NullessByteStr,
@@ -216,6 +217,7 @@ pub(in crate::security) fn check_exec_access(
         // Check that ptrace permission is allowed if the process is traced.
         if let Some(ptracer) = current_task.ptracer_task().upgrade() {
             let tracer_sid = ptracer.security_state.lock().current_sid;
+            // TODO: https://fxbug.dev/412581419 - SIGKILL the process on failure.
             check_permission(
                 &permission_check,
                 current_task.kernel(),
@@ -229,9 +231,11 @@ pub(in crate::security) fn check_exec_access(
         // Check that the share permission is allowed, if the process shares any resources (i.e. if
         // it was created with e.g. `CLONE_FILES`, etc).
         if current_task.thread_group().read().is_sharing {
-            check_permission(
-                &permission_check,
+            // TODO: https://fxbug.dev/412581419 - SIGKILL the process on failure.
+            todo_check_permission(
+                TODO_DENY!("https://fxbug.dev/380076748", "Restrict processes with shared state."),
                 current_task.kernel(),
+                &permission_check,
                 current_sid,
                 new_sid,
                 ProcessPermission::Share,
@@ -697,6 +701,7 @@ pub(in crate::security) fn set_procattr(
             // Check that ptrace permission is allowed if the process is traced.
             if let Some(ptracer) = current_task.ptracer_task().upgrade() {
                 let tracer_sid = ptracer.security_state.lock().current_sid;
+                // TODO: https://fxbug.dev/412581419 - SIGKILL the process on failure.
                 check_permission(
                     &permission_check,
                     current_task.kernel(),
