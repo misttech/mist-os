@@ -17,6 +17,14 @@ type AndroidVendorSupport = table {
     2: minor_version uint8;
 };
 
+/// Various settings for audio offload data paths, which vary by controller
+/// manufacturer and firmware version.
+@available(added=NEXT)
+type AudioOffloadSettings = table {
+    /// The index to use when SCO OFFLOAD DataPath is requested.
+    1: sco_offload_index uint8;
+};
+
 /// Table of features supported by the vendor.
 type VendorFeatures = table {
     /// Supports the SetAclPriority command
@@ -25,6 +33,10 @@ type VendorFeatures = table {
     /// Supports Android Vendor Extensions
     /// If missing, Android Vendor Extensions are not supported.
     2: android_vendor_extensions AndroidVendorSupport;
+    /// Specify some alternative settings for audio offload paths.
+    /// If missing, use the reasonable defaults or configured settings.
+    @available(added=NEXT)
+    3: audio_offload_settings AudioOffloadSettings;
 };
 
 type VendorAclPriority = flexible enum : uint8 {
