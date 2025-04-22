@@ -4,34 +4,30 @@
 
 #include "src/firmware/drivers/usb-fastboot-function/usb_fastboot_function.h"
 
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
+#include <lib/driver/compat/cpp/compat.h>
 #include <lib/zircon-internal/align.h>
 
 namespace usb_fastboot_function {
 namespace {
 size_t CalculateRxHeaderLength(size_t data_size) {
-  // By default `usb_request_t.header.length` takes the value of `kBulkReqSize` when it is
-  // allocated with `usb::Request<>::Alloc(...)`. It seems to affect the amount of data to be
-  // received from the host. One phenomena I observe is that when 1) the host sends less than
-  // `usb_request_t.header.length` amount of data in a packet and 2) the data size is a multiple of
-  // kBulkMaxPacketSize, the packet will appear to be "delayed" and combined with the next packet.
-  // For example, suppose usb_request_t.header.length=2048, kBulkMaxPacketSize=512, and host is
-  // sending the last 512/1024/1536 bytes during download, this last packet will not reach this
-  // driver immediately. But if the host sends another 10 bytes of data, the driver will receive a
-  // single packet of size (512/1024/1536 + 10) bytes. This causes hangs during download. Thus we
-  // adjust the value of `usb_request_t.header.length` based on the expected amount of data to
-  // receive. usb_request_t.header.length is required to be multiples of kBulkMaxPacketSize. Thus we
-  // adjust it to be the smaller between kBulkReqSize and the round up value of `data_size' w.r.t
-  // kBulkMaxPacketSize. For example, if we are expecting exactly 512 bytes of data, the following
-  // will give 512 exactly.
+  // Adjusts USB RX request length to bypass zero-length-packet. Upstream fastboot implementation
+  // doesn't send zero-length packet when download completes. This causes host side driver to stall
+  // if size of download data happens to be multiples of USB max packet size but not multiples of
+  // bulk size. For example, suppose bulk request size is 2048, and USB max packet size is 512, and
+  // host is sending the last 512/1024/1536 bytes during download, this last packet will not reach
+  // this driver immediately. But if the host sends another 10 bytes of data, the driver will
+  // receive a single packet of size (512/1024/1536 + 10) bytes. Thus we adjust the value of bulk
+  // request based on the expected amount of data to receive. The size is required to be multiples
+  // of kBulkMaxPacketSize. Thus we adjust it to be the smaller between kBulkReqSize and the round
+  // up value of `data_size' w.r.t kBulkMaxPacketSize. For example, if we are expecting exactly 512
+  // bytes of data, the following will give 512 exactly.
   return std::min(static_cast<size_t>(kBulkReqSize), ZX_ROUNDUP(data_size, kBulkMaxPacketSize));
 }
 }  // namespace
 
-void UsbFastbootFunction::CleanUpTx(zx_status_t status, usb::Request<> req) {
+void UsbFastbootFunction::CleanUpTx(zx_status_t status, usb::FidlRequest req) {
   send_vmo_.Reset();
-  bulk_in_reqs_.Add(std::move(req));
+  bulk_in_ep_.PutRequest(std::move(req));
   if (status == ZX_OK) {
     send_completer_->ReplySuccess();
   } else {
@@ -40,44 +36,43 @@ void UsbFastbootFunction::CleanUpTx(zx_status_t status, usb::Request<> req) {
   send_completer_.reset();
 }
 
-zx_status_t UsbFastbootFunction::PrepareSendRequest(usb::Request<>& request) {
+void UsbFastbootFunction::QueueTx(usb::FidlRequest req) {
   size_t to_send = std::min(static_cast<size_t>(kBulkReqSize), total_to_send_ - sent_size_);
-  request.request()->header.length = to_send;
-  ssize_t bytes_copied =
-      request.CopyTo(static_cast<uint8_t*>(send_vmo_.start()) + sent_size_, to_send, 0);
-  if (bytes_copied < 0) {
-    zxlogf(ERROR, "Failed to copy data into send req %zd.", bytes_copied);
-    return ZX_ERR_INTERNAL;
+  auto actual = req.CopyTo(0, static_cast<uint8_t*>(send_vmo_.start()) + sent_size_, to_send,
+                           bulk_in_ep_.GetMapped());
+  ZX_ASSERT(actual.size() == 1);
+  req->data()->at(0).size(actual[0]);
+  if (auto status = req.CacheFlush(bulk_in_ep_.GetMapped()); status != ZX_OK) {
+    ZX_PANIC("Cache flush failed %d", status);
   }
-  return ZX_OK;
+
+  std::vector<fuchsia_hardware_usb_request::Request> requests;
+  requests.emplace_back(req.take_request());
+  auto result = bulk_in_ep_->QueueRequests(std::move(requests));
+  if (result.is_error()) {
+    ZX_PANIC("Failed to QueueRequests %s", result.error_value().FormatDescription().c_str());
+  }
 }
 
-void UsbFastbootFunction::TxComplete(usb_request_t* req) {
+void UsbFastbootFunction::TxComplete(fuchsia_hardware_usb_endpoint::Completion completion) {
   std::lock_guard<std::mutex> _(send_lock_);
-  usb::Request<> request(req, parent_request_size_);
-
-  // Following the same practice as cdc eth and adb, do not queue request if error is
-  // ZX_ERR_IO_NOT_PRESENT.
-  if (req->response.status == ZX_ERR_IO_NOT_PRESENT) {
-    CleanUpTx(req->response.status, std::move(request));
+  usb::FidlRequest req{std::move(completion.request().value())};
+  auto status = *completion.status();
+  // Do not queue request on error.
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "tx_completion error: %s", zx_status_get_string(status));
+    CleanUpTx(status, std::move(req));
     return;
   }
 
   // If succeeds, update `sent_size_`, otherwise keep it the same to retry.
-  if (req->response.status == ZX_OK) {
-    sent_size_ += req->header.length;
-    if (sent_size_ == total_to_send_) {
-      CleanUpTx(ZX_OK, std::move(request));
-      return;
-    }
-  }
-
-  if (zx_status_t status = PrepareSendRequest(request); status != ZX_OK) {
-    CleanUpTx(ZX_ERR_INTERNAL, std::move(request));
+  sent_size_ += *completion.transfer_size();
+  if (sent_size_ == total_to_send_) {
+    CleanUpTx(ZX_OK, std::move(req));
     return;
   }
 
-  function_.RequestQueue(request.take(), &tx_complete_);
+  QueueTx(std::move(req));
 }
 
 void UsbFastbootFunction::Send(::fuchsia_hardware_fastboot::wire::FastbootImplSendRequest* request,
@@ -112,27 +107,15 @@ void UsbFastbootFunction::Send(::fuchsia_hardware_fastboot::wire::FastbootImplSe
     return;
   }
 
-  std::optional<usb::Request<>> tx_request = bulk_in_reqs_.Get(usb_request_size_);
-  if (!tx_request) {
-    zxlogf(ERROR, "Failed to get tx request");
-    send_vmo_.Reset();
-    completer.ReplyError(ZX_ERR_UNAVAILABLE);
-    return;
-  }
-
+  auto req = bulk_in_ep_.GetRequest();
+  ZX_ASSERT(req);
   sent_size_ = 0;
   send_completer_ = completer.ToAsync();
-
-  if (zx_status_t status = PrepareSendRequest(*tx_request); status != ZX_OK) {
-    CleanUpTx(status, std::move(*tx_request));
-    return;
-  }
-
-  function_.RequestQueue(tx_request->take(), &tx_complete_);
+  QueueTx(std::move(*req));
 }
 
-void UsbFastbootFunction::CleanUpRx(zx_status_t status, usb::Request<> req) {
-  bulk_out_reqs_.Add(std::move(req));
+void UsbFastbootFunction::CleanUpRx(zx_status_t status, usb::FidlRequest req) {
+  bulk_out_ep_.PutRequest(std::move(req));
   if (status == ZX_OK) {
     receive_completer_->ReplySuccess(receive_vmo_.Release());
   } else {
@@ -142,45 +125,62 @@ void UsbFastbootFunction::CleanUpRx(zx_status_t status, usb::Request<> req) {
   receive_completer_.reset();
 }
 
-void UsbFastbootFunction::RxComplete(usb_request_t* req) {
+void UsbFastbootFunction::QueueRx(usb::FidlRequest req) {
+  ZX_ASSERT(req->data()->size() == 1);
+  req.reset_buffers(bulk_out_ep_.GetMapped());
+  req->data()->at(0).size(CalculateRxHeaderLength(requested_size_ - received_size_));
+  if (auto status = req.CacheFlushInvalidate(bulk_out_ep_.GetMapped()); status != ZX_OK) {
+    ZX_PANIC("Cache flush and invalidate failed %d", status);
+  }
+
+  std::vector<fuchsia_hardware_usb_request::Request> requests;
+  requests.emplace_back(req.take_request());
+  auto result = bulk_out_ep_->QueueRequests(std::move(requests));
+  if (result.is_error()) {
+    ZX_PANIC("Failed to QueueRequests %s", result.error_value().FormatDescription().c_str());
+  }
+}
+
+void UsbFastbootFunction::RxComplete(fuchsia_hardware_usb_endpoint::Completion completion) {
   std::lock_guard<std::mutex> _(receive_lock_);
-  usb::Request<> request(req, parent_request_size_);
 
-  // Following the same practice as cdc eth and adb driver, do not queue request if error is
-  // ZX_ERR_IO_NOT_PRESENT.
-  if (req->response.status == ZX_ERR_IO_NOT_PRESENT) {
-    zxlogf(INFO, "IO not present");
-    CleanUpRx(req->response.status, std::move(request));
+  usb::FidlRequest req{std::move(completion.request().value())};
+  zx_status_t status = *completion.status();
+
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "rx_completion error: %s", zx_status_get_string(status));
+    CleanUpRx(status, std::move(req));
     return;
   }
 
-  if (req->response.status != ZX_OK) {
-    // For all other failures, simply re-queue the request.
-    function_.RequestQueue(request.take(), &rx_complete_);
+  // This should always be true because when we registered VMOs, we only registered one per
+  // request.
+  ZX_ASSERT(req->data()->size() == 1);
+  auto addr = bulk_out_ep_.GetMappedAddr(req.request(), 0);
+  if (!addr.has_value()) {
+    zxlogf(ERROR, "Failed to get mapped");
+    CleanUpRx(ZX_ERR_INTERNAL, std::move(req));
     return;
   }
 
-  // Extracts data from the request
-  void* data;
-  if (zx_status_t status = request.Mmap(&data); status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map request data %d", status);
-    CleanUpRx(status, std::move(request));
-    return;
+  if (auto status = req.CacheFlushInvalidate(bulk_out_ep_.GetMapped()); status != ZX_OK) {
+    ZX_PANIC("Cache flush and invalidate failed %d", status);
   }
 
-  memcpy(static_cast<uint8_t*>(receive_vmo_.start()) + received_size_, data, req->response.actual);
-  received_size_ += req->response.actual;
+  const uint8_t* data = reinterpret_cast<const uint8_t*>(*addr);
+  memcpy(static_cast<uint8_t*>(receive_vmo_.start()) + received_size_, data,
+         *completion.transfer_size());
+  received_size_ += *completion.transfer_size();
   if (received_size_ >= requested_size_) {
     zx_status_t status = receive_vmo_.vmo().set_prop_content_size(received_size_);
     if (status != ZX_OK) {
       zxlogf(ERROR, "Failed to set content size %d", status);
     }
-    CleanUpRx(status, std::move(request));
+    CleanUpRx(status, std::move(req));
     return;
   }
 
-  request.request()->header.length = CalculateRxHeaderLength(requested_size_ - received_size_);
-  function_.RequestQueue(request.take(), &rx_complete_);
+  QueueRx(std::move(req));
 }
 
 void UsbFastbootFunction::Receive(
@@ -211,17 +211,10 @@ void UsbFastbootFunction::Receive(
     return;
   }
 
-  std::optional<usb::Request<>> rx_request = bulk_out_reqs_.Get(usb_request_size_);
-  if (!rx_request) {
-    zxlogf(ERROR, "Failed to get rx request");
-    receive_vmo_.Reset();
-    completer.ReplyError(ZX_ERR_UNAVAILABLE);
-    return;
-  }
-
+  auto req = bulk_out_ep_.GetRequest();
+  ZX_ASSERT(req);
   receive_completer_ = completer.ToAsync();
-  rx_request->request()->header.length = CalculateRxHeaderLength(requested_size_);
-  function_.RequestQueue(rx_request->take(), &rx_complete_);
+  QueueRx(std::move(*req));
 }
 
 size_t UsbFastbootFunction::UsbFunctionInterfaceGetDescriptorsSize() {
@@ -280,96 +273,103 @@ zx_status_t UsbFastbootFunction::UsbFunctionInterfaceSetInterface(uint8_t interf
   return ConfigureEndpoints(alt_setting);
 }
 
-zx_status_t UsbFastbootFunction::Bind(void* ctx, zx_device_t* dev) {
-  auto driver = std::make_unique<UsbFastbootFunction>(dev);
-  zx_status_t status = driver->Bind();
-  if (status != ZX_OK) {
-    return status;
+zx::result<> UsbFastbootFunction::Start() {
+  std::lock_guard<std::mutex> _guard_receive(receive_lock_);
+  std::lock_guard<std::mutex> _guard_send(send_lock_);
+  zx::result<ddk::UsbFunctionProtocolClient> function =
+      compat::ConnectBanjo<ddk::UsbFunctionProtocolClient>(incoming());
+  if (function.is_error()) {
+    zxlogf(ERROR, "Failed to connect function %s", function.status_string());
+    return function.take_error();
   }
-  // The DriverFramework now owns driver.
-  [[maybe_unused]] auto ptr = driver.release();
-  return ZX_OK;
-}
+  function_ = *function;
 
-zx_status_t UsbFastbootFunction::Bind() {
-  is_bound.Set(true);
-  parent_request_size_ = function_.GetRequestSize();
-  usb_request_size_ = usb::Request<>::RequestSize(parent_request_size_);
+  auto client = incoming()->Connect<fuchsia_hardware_usb_function::UsbFunctionService::Device>();
 
   auto status = function_.AllocInterface(&descriptors_.fastboot_intf.b_interface_number);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Fastboot interface alloc failed - %d.", status);
-    return status;
+    return zx::error(status);
   }
 
   status = function_.AllocInterface(&descriptors_.placehodler_intf.b_interface_number);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Placeholder interface alloc failed - %d.", status);
-    return status;
+    return zx::error(status);
   }
 
   status = function_.AllocEp(USB_DIR_OUT, &descriptors_.bulk_out_ep.b_endpoint_address);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Bulk out endpoint alloc failed - %d.", status);
-    return status;
+    return zx::error(status);
   }
   status = function_.AllocEp(USB_DIR_IN, &descriptors_.bulk_in_ep.b_endpoint_address);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Builk in endpoint alloc failed - %d.", status);
-    return status;
+    return zx::error(status);
   }
 
-  // Allocate bulk out usb requests.
-  std::optional<usb::Request<>> request;
-  status = usb::Request<>::Alloc(&request, kBulkReqSize, bulk_out_addr(), parent_request_size_);
+  auto dispatcher =
+      fdf::SynchronizedDispatcher::Create({}, "fastboot-ep-dispatcher", [](fdf_dispatcher_t*) {});
+  if (dispatcher.is_error()) {
+    zxlogf(ERROR, "[bug] fdf::SynchronizedDispatcher::Create(): %s", dispatcher.status_string());
+    return dispatcher.take_error();
+  }
+  dispatcher_ = std::move(dispatcher.value());
+
+  // Allocates a bulk out usb request.
+  status = bulk_out_ep_.Init(descriptors_.bulk_out_ep.b_endpoint_address, *client,
+                             dispatcher_.async_dispatcher());
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Allocating bulk out request failed - %d.", status);
-    return status;
-  }
-  {
-    std::lock_guard<std::mutex> _(receive_lock_);
-    bulk_out_reqs_.Add(*std::move(request));
+    zxlogf(ERROR, "[bug] bulk_out_ep_.Init(): %s", zx_status_get_string(status));
+    return zx::error(status);
   }
 
-  // Allocate bulk in usb requests.
-  status = usb::Request<>::Alloc(&request, kBulkReqSize, bulk_in_addr(), parent_request_size_);
+  // Allocates a bulk in usb request.
+  status = bulk_in_ep_.Init(descriptors_.bulk_in_ep.b_endpoint_address, *client,
+                            dispatcher_.async_dispatcher());
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Allocating bulk in request failed - %d.", status);
-    return status;
-  }
-  {
-    std::lock_guard<std::mutex> _(send_lock_);
-    bulk_in_reqs_.Add(*std::move(request));
+    zxlogf(ERROR, "[bug] bulk_in_ep_.Init(): %s", zx_status_get_string(status));
+    return zx::error(status);
   }
 
-  zx::result result = DdkAddService<fuchsia_hardware_fastboot::Service>(
+  // Allocates RX request
+  if (auto actual = bulk_out_ep_.AddRequests(1, kBulkReqSize,
+                                             fuchsia_hardware_usb_request::Buffer::Tag::kVmoId);
+      actual != 1) {
+    zxlogf(ERROR, "Failed to allocate RX requests");
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  // Allocates TX request
+  if (auto actual = bulk_in_ep_.AddRequests(1, kBulkReqSize,
+                                            fuchsia_hardware_usb_request::Buffer::Tag::kVmoId);
+      actual != 1) {
+    zxlogf(ERROR, "Failed to allocate TX requests");
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  auto serve_result = outgoing()->AddService<fuchsia_hardware_fastboot::Service>(
       fuchsia_hardware_fastboot::Service::InstanceHandler({
           .fastboot = bindings_.CreateHandler(
               this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
       }));
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to export serivce: %s", result.status_string());
-    return result.status_value();
+  if (serve_result.is_error()) {
+    zxlogf(ERROR, "Failed to add Device service %s", serve_result.status_string());
+    return serve_result.take_error();
   }
 
-  function_.SetInterface(this, &usb_function_interface_protocol_ops_);
-  return DdkAdd(ddk::DeviceAddArgs("usb_fastboot_function")
-                    .set_flags(DEVICE_ADD_NON_BINDABLE)
-                    .set_inspect_vmo(inspect_.DuplicateVmo()));
+  status = function_.SetInterface(this, &usb_function_interface_protocol_ops_);
+  if (status != ZX_OK) {
+    ZX_PANIC("SetInterface failed %s", zx_status_get_string(status));
+  }
+
+  is_bound.Set(true);
+  return zx::ok();
 }
 
-void UsbFastbootFunction::DdkInit(ddk::InitTxn txn) { txn.Reply(ZX_OK); }
-
-void UsbFastbootFunction::DdkRelease() { delete this; }
-
-static zx_driver_ops_t usb_fastboot_function_driver_ops = []() -> zx_driver_ops_t {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = UsbFastbootFunction::Bind;
-  return ops;
-}();
+void UsbFastbootFunction::PrepareStop(fdf::PrepareStopCompleter completer) { completer(zx::ok()); }
 
 }  // namespace usb_fastboot_function
 
-ZIRCON_DRIVER(UsbFastbootFunction, usb_fastboot_function::usb_fastboot_function_driver_ops,
-              "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT(usb_fastboot_function::UsbFastbootFunction);

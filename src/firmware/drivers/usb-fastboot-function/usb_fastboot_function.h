@@ -6,19 +6,22 @@
 #define SRC_FIRMWARE_DRIVERS_USB_FASTBOOT_FUNCTION_USB_FASTBOOT_FUNCTION_H_
 
 #include <fidl/fuchsia.hardware.fastboot/cpp/wire.h>
+#include <fidl/fuchsia.hardware.usb.endpoint/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.usb.function/cpp/fidl.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/ddk/driver.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <zircon/compiler.h>
 
 #include <mutex>
 
-#include <ddktl/device.h>
-#include <ddktl/protocol/empty-protocol.h>
+#include <usb-endpoint/usb-endpoint-client.h>
 #include <usb/request-cpp.h>
 #include <usb/usb-request.h>
+#include <usb/usb.h>
 
 namespace usb_fastboot_function {
 
@@ -28,20 +31,19 @@ namespace usb_fastboot_function {
 constexpr uint32_t kBulkReqSize = 4 * 1024;
 constexpr uint16_t kBulkMaxPacketSize = 512;
 
-class UsbFastbootFunction;
-using DeviceType = ddk::Device<UsbFastbootFunction, ddk::Initializable>;
-class UsbFastbootFunction : public DeviceType,
+class UsbFastbootFunction : public fdf::DriverBase,
                             public fidl::WireServer<fuchsia_hardware_fastboot::FastbootImpl>,
                             public ddk::UsbFunctionInterfaceProtocol<UsbFastbootFunction> {
  public:
-  explicit UsbFastbootFunction(zx_device_t* parent) : DeviceType(parent), function_(parent) {}
+  explicit UsbFastbootFunction(fdf::DriverStartArgs start_args,
+                               fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : fdf::DriverBase("usb_fastboot", std::move(start_args), std::move(driver_dispatcher)) {}
 
   virtual ~UsbFastbootFunction() = default;
 
-  static zx_status_t Bind(void* ctx, zx_device_t* dev);
-  zx_status_t Bind();
-  void DdkInit(ddk::InitTxn txn);
-  void DdkRelease();
+  // Driver lifecycle methods.
+  zx::result<> Start() override;
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
   // For inspect test.
   zx::vmo inspect_vmo() { return inspect_.DuplicateVmo(); }
@@ -71,52 +73,35 @@ class UsbFastbootFunction : public DeviceType,
   inspect::Inspector inspect_;
   inspect::BoolProperty is_bound = inspect_.GetRoot().CreateBool("is_bound", false);
   ddk::UsbFunctionProtocolClient function_;
-  size_t parent_request_size_ = 0;
-  // Size of a usb request taking into account parent request size + alignment + internal
-  // bookkeeping. This is calculated by Usb::Request<>::RequestSize() method.
-  size_t usb_request_size_ = 0;
+  fdf::SynchronizedDispatcher dispatcher_;
 
   std::mutex send_lock_;
   size_t total_to_send_ __TA_GUARDED(send_lock_) = 0;
   size_t sent_size_ __TA_GUARDED(send_lock_) = 0;
   fzl::OwnedVmoMapper send_vmo_ __TA_GUARDED(send_lock_);
   std::optional<SendCompleter::Async> send_completer_ __TA_GUARDED(send_lock_);
-  usb::RequestPool<> bulk_in_reqs_ __TA_GUARDED(send_lock_){};
+  // In-direction (TX to host).
+  usb::EndpointClient<UsbFastbootFunction> bulk_in_ep_{
+      usb::EndpointType::BULK, this, std::mem_fn(&UsbFastbootFunction::TxComplete)};
 
   std::mutex receive_lock_;
   fzl::OwnedVmoMapper receive_vmo_ __TA_GUARDED(receive_lock_);
   size_t received_size_ __TA_GUARDED(receive_lock_) = 0;
   size_t requested_size_ __TA_GUARDED(receive_lock_) = 0;
   std::optional<ReceiveCompleter::Async> receive_completer_ __TA_GUARDED(receive_lock_);
-  usb::RequestPool<> bulk_out_reqs_ __TA_GUARDED(receive_lock_){};
+  // Out-direction (RX from host).
+  usb::EndpointClient<UsbFastbootFunction> bulk_out_ep_{
+      usb::EndpointType::BULK, this, std::mem_fn(&UsbFastbootFunction::RxComplete)};
 
   fidl::ServerBindingGroup<fuchsia_hardware_fastboot::FastbootImpl> bindings_;
 
   // USB request completion callback methods.
-  void TxComplete(usb_request_t* req);
-  void RxComplete(usb_request_t* req);
-
-  // Completion callbacks.
-  const usb_request_complete_callback_t rx_complete_ = {
-      .callback =
-          [](void* ctx, usb_request_t* req) {
-            ZX_DEBUG_ASSERT(ctx != nullptr);
-            reinterpret_cast<UsbFastbootFunction*>(ctx)->RxComplete(req);
-          },
-      .ctx = this,
-  };
-  const usb_request_complete_callback_t tx_complete_ = {
-      .callback =
-          [](void* ctx, usb_request_t* req) {
-            ZX_DEBUG_ASSERT(ctx != nullptr);
-            reinterpret_cast<UsbFastbootFunction*>(ctx)->TxComplete(req);
-          },
-      .ctx = this,
-  };
-
-  void CleanUpRx(zx_status_t status, usb::Request<> req) __TA_REQUIRES(receive_lock_);
-  void CleanUpTx(zx_status_t status, usb::Request<> req) __TA_REQUIRES(send_lock_);
-  zx_status_t PrepareSendRequest(usb::Request<>& req) __TA_REQUIRES(send_lock_);
+  void RxComplete(fuchsia_hardware_usb_endpoint::Completion completion);
+  void TxComplete(fuchsia_hardware_usb_endpoint::Completion completion);
+  void CleanUpRx(zx_status_t status, usb::FidlRequest req) __TA_REQUIRES(receive_lock_);
+  void CleanUpTx(zx_status_t status, usb::FidlRequest req) __TA_REQUIRES(send_lock_);
+  void QueueTx(usb::FidlRequest req) __TA_REQUIRES(send_lock_);
+  void QueueRx(usb::FidlRequest req) __TA_REQUIRES(receive_lock_);
 
   // USB Fastboot interface descriptor.
   struct {
