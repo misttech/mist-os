@@ -53,12 +53,7 @@ void Display::OnVsync(zx::time timestamp,
   // Estimate current vsync interval. Need to include a maximum to mitigate any
   // potential issues during long breaks.
   const zx::duration time_since_last_vsync = timestamp - vsync_timing_->last_vsync_time();
-  if (time_since_last_vsync >= kMaximumVsyncInterval) {
-    FX_LOGS(WARNING) << "Display::OnVsync()  computed interval " << time_since_last_vsync.to_msecs()
-                     << "ms exceeds maximum of " << kMaximumVsyncInterval.to_msecs()
-                     << "ms.  Keeping existing interval: "
-                     << vsync_timing_->vsync_interval().to_msecs() << "ms.";
-  } else {
+  if (time_since_last_vsync < kMaximumVsyncInterval) {
     vsync_timing_->set_vsync_interval(std::max(kMinimumVsyncInterval, time_since_last_vsync));
   }
 
