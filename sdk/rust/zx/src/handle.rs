@@ -218,15 +218,6 @@ impl<'a, T: HandleBased> Unowned<'a, T> {
         }
     }
 
-    #[deprecated = "https://fxbug.dev/410869980: For soft transition. Use wait().to_result() instead"]
-    pub fn deprecated_wait(
-        &self,
-        signals: Signals,
-        deadline: MonotonicInstant,
-    ) -> Result<Signals, Status> {
-        self.wait(signals, deadline).to_result()
-    }
-
     pub fn wait_async(
         &self,
         port: &Port,
@@ -365,16 +356,6 @@ pub trait AsHandleRef {
     /// syscall.
     fn wait_handle(&self, signals: Signals, deadline: MonotonicInstant) -> WaitResult {
         self.as_handle_ref().wait(signals, deadline)
-    }
-
-    #[allow(deprecated)]
-    #[deprecated = "https://fxbug.dev/410869980: For soft transition. Use wait_handle().to_result() instead"]
-    fn deprecated_wait_handle(
-        &self,
-        signals: Signals,
-        deadline: MonotonicInstant,
-    ) -> Result<Signals, Status> {
-        self.as_handle_ref().deprecated_wait(signals, deadline)
     }
 
     /// Causes packet delivery on the given port when the object changes state and matches signals.
