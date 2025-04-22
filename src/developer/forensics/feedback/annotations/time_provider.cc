@@ -86,6 +86,7 @@ void TimeProvider::OnClockLoggingQuality(async_dispatcher_t* dispatcher, async::
     return;
   }
 
+  FX_LOGS(INFO) << "Received signal that UTC clock is accurate";
   is_utc_time_accurate_ = true;
 }
 
