@@ -150,7 +150,7 @@ class TA_CAP("mutex") SpinLockBase
       !kSchedulerLockSpinTracingEnabled ||
       (Options & SpinLockOptions::TraceDisabled) != SpinLockOptions::None;
 
-  arch_spin_lock_t spinlock_ = ARCH_SPIN_LOCK_INITIAL_VALUE;
+  arch_spin_lock_t spinlock_;
 };
 
 using SpinLock = SpinLockBase<SpinLockOptions::None>;
