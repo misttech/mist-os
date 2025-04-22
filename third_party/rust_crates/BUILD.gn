@@ -957,7 +957,7 @@ group("sha1") {
 }
 
 group("sha2") {
-  public_deps = [ ":sha2-v0_10_6" ]
+  public_deps = [ ":sha2-v0_10_8" ]
 }
 
 if (!(current_os == "fuchsia")) {
@@ -9469,7 +9469,7 @@ rust_library("mock-omaha-server-v0_3_3") {
   deps += [ ":p256-v0_11_1" ]
   deps += [ ":serde-v1_0_204" ]
   deps += [ ":serde_json-v1_0_128" ]
-  deps += [ ":sha2-v0_10_6" ]
+  deps += [ ":sha2-v0_10_8" ]
   deps += [ ":thiserror-v1_0_69" ]
   deps += [ ":tracing-v0_1_40" ]
   deps += [ ":url-v1_7_2" ]
@@ -10541,7 +10541,7 @@ rust_library("omaha_client-v0_2_1") {
   deps += [ ":serde-v1_0_204" ]
   deps += [ ":serde_json-v1_0_128" ]
   deps += [ ":serde_repr-v0_1_7($host_toolchain)" ]
-  deps += [ ":sha2-v0_10_6" ]
+  deps += [ ":sha2-v0_10_8" ]
   deps += [ ":signature-v1_6_4" ]
   deps += [ ":thiserror-v1_0_69" ]
   deps += [ ":tracing-v0_1_40" ]
@@ -10864,7 +10864,7 @@ rust_library("p256-v0_11_1") {
   deps += [ ":ecdsa-v0_14_8" ]
   deps += [ ":elliptic-curve-v0_12_3" ]
   deps += [ ":serdect-v0_1_0" ]
-  deps += [ ":sha2-v0_10_6" ]
+  deps += [ ":sha2-v0_10_8" ]
 
   rustenv = []
 
@@ -15289,18 +15289,18 @@ rust_library("sha1-v0_10_6") {
   applicable_licenses = [ ":sha1-v0_10_6.license" ]
 }
 
-license("sha2-v0_10_6.license") {
+license("sha2-v0_10_8.license") {
   public_package_name = "sha2"
   license_files = [
-    "//third_party/rust_crates/vendor/sha2-0.10.6/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/sha2-0.10.6/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/sha2-0.10.8/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/sha2-0.10.8/LICENSE-MIT",
   ]
 }
 
-rust_library("sha2-v0_10_6") {
+rust_library("sha2-v0_10_8") {
   crate_name = "sha2"
-  crate_root = "//third_party/rust_crates/vendor/sha2-0.10.6/src/lib.rs"
-  output_name = "sha2-b9671518cdc203e8"
+  crate_root = "//third_party/rust_crates/vendor/sha2-0.10.8/src/lib.rs"
+  output_name = "sha2-3650396497a36e3e"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -15315,15 +15315,15 @@ rust_library("sha2-v0_10_6") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=b9671518cdc203e8",
-    "-Cextra-filename=-b9671518cdc203e8",
+    "-Cmetadata=3650396497a36e3e",
+    "-Cextra-filename=-3650396497a36e3e",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":sha2-v0_10_6.license" ]
+  applicable_licenses = [ ":sha2-v0_10_8.license" ]
 }
 
 license("sharded-slab-v0_1_4.license") {

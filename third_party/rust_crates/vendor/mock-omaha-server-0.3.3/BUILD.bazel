@@ -83,7 +83,7 @@ rust_library(
         "//third_party/rust_crates/vendor/p256-0.11.1:p256",
         "//third_party/rust_crates/vendor/serde-1.0.204:serde",
         "//third_party/rust_crates/vendor/serde_json-1.0.128:serde_json",
-        "//third_party/rust_crates/vendor/sha2-0.10.6:sha2",
+        "//third_party/rust_crates/vendor/sha2-0.10.8:sha2",
         "//third_party/rust_crates/vendor/thiserror-1.0.69:thiserror",
         "//third_party/rust_crates/vendor/tracing-0.1.40:tracing",
         "//third_party/rust_crates/vendor/url-1.7.2:url",

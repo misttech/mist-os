@@ -209,7 +209,7 @@ serde_json = "1.0.128"
 serde_json5 = "0.2.1"
 serde_repr = "0.1.7"
 sha1 = "0.10.6"
-sha2 = "0.10.2"
+sha2 = "0.10.8"
 signature =  "1.4.0"
 # TODO(https://fxbug.dev/385403698): add a visibility allowlist to prevent unintended usage when
 # targetting fuchsia.
