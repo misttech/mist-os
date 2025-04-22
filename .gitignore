@@ -240,3 +240,7 @@ lcov.info
 
 # Mypy Type Checker extension
 /.mypy_cache
+
+# Nix shell
+/shell.nix
+/default.nix
