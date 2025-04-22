@@ -121,12 +121,14 @@ async fn main_inner() -> Result<(), Error> {
     // determine whether executability should be enforced.
     let pkg_cache_config::Config {
         all_packages_executable: _,
-        use_fxblob,
+        use_fxblob: _,
         use_system_image,
         enable_upgradable_packages,
     } = config;
-    let builder = blobfs::Client::builder().readable().writable().executable();
-    let blobfs = if use_fxblob { builder.use_creator().use_reader() } else { builder }
+    let blobfs = blobfs::Client::builder()
+        .readable()
+        .writable()
+        .executable()
         .build()
         .await
         .context("error opening blobfs")?;

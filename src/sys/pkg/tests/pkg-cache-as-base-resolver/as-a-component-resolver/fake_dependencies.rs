@@ -67,14 +67,12 @@ async fn main() {
             vfs::remote::remote_dir(blobfs.root_dir_proxy().expect("get blobfs root dir")),
     };
 
-    if BLOB_IMPLEMENTATION == blobfs_ramdisk::Implementation::Fxblob {
-        out_dir
-            .add_entry(
-                "fxfs-svc",
-                vfs::remote::remote_dir(blobfs.svc_dir().expect("get blobfs svc dir").unwrap()),
-            )
-            .unwrap();
-    }
+    out_dir
+        .add_entry(
+            "fxfs-svc",
+            vfs::remote::remote_dir(blobfs.svc_dir().expect("get blobfs svc dir").unwrap()),
+        )
+        .unwrap();
 
     let scope = vfs::execution_scope::ExecutionScope::new();
     let dir_server: ServerEnd<fio::DirectoryMarker> =

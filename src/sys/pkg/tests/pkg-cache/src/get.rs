@@ -635,8 +635,8 @@ async fn cpp_blobfs() {
     let () = get_with_specific_blobfs_implementation(
         TestEnv::builder().cpp_blobfs().build().await,
         |blob| match blob {
-            fpkg::BlobWriter::File(_) => (),
-            fpkg::BlobWriter::Writer(_) => panic!("should be using fuchsia.io.File"),
+            fpkg::BlobWriter::File(_) => panic!("should be using fuchsia.fxfs.BlobWriter"),
+            fpkg::BlobWriter::Writer(_) => (),
         },
     )
     .await;

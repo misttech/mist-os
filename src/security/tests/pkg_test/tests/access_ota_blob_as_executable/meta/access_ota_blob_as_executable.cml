@@ -227,12 +227,20 @@
         },
         {
             protocol: [
+                "fuchsia.fxfs.BlobCreator",
+                "fuchsia.fxfs.BlobReader",
+            ],
+            from: "#fshost",
+            to: "#pkg-cache",
+        },
+        {
+            protocol: [
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.process.Launcher",
             ],
             from: "parent",
             to: [
-                "#fshost",
+                "#pkg-cache",
                 "#pkg_server",
             ],
         },
