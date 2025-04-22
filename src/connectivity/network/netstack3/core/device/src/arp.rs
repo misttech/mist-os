@@ -51,6 +51,9 @@ pub struct ArpCounters {
     pub rx_packets: Counter,
     /// Count of received ARP packets that were dropped due to being unparsable.
     pub rx_malformed_packets: Counter,
+    /// Count of received ARP packets that were dropped due to being echoed.
+    /// E.g. an ARP packet sent by us that was reflected back by the network.
+    pub rx_echoed_packets: Counter,
     /// Count of ARP request packets received.
     pub rx_requests: Counter,
     /// Count of ARP response packets received.
@@ -349,7 +352,6 @@ fn handle_packet<
     mut buffer: B,
 ) {
     core_ctx.counters().rx_packets.increment();
-    // TODO(wesleyac) Add support for probe.
     let packet = match buffer.parse::<ArpPacket<_, D::Address, Ipv4Addr>>() {
         Ok(packet) => packet,
         Err(err) => {
@@ -365,6 +367,7 @@ fn handle_packet<
         }
     };
 
+    #[derive(Debug)]
     enum ValidArpOp {
         Request,
         Response,
@@ -385,6 +388,20 @@ fn handle_packet<
             return;
         }
     };
+
+    // If the sender's hardware address is *our* hardware address, this is
+    // an echoed ARP packet (e.g. the network reflected back an ARP packet that
+    // we sent). Here we deviate from the behavior specified in RFC 826 (which
+    // makes no comment on handling echoed ARP packets), and drop the packet.
+    // There's no benefit to tracking our own ARP packets in the ARP table, and
+    // some RFCs built on top of ARP (i.e. RFC 5227 - IPv4 Address Conflict
+    // Detection) explicitly call out that echoed ARP packets should be ignored.
+    let sender_hw_addr = packet.sender_hardware_address();
+    if sender_hw_addr == *core_ctx.get_hardware_addr(bindings_ctx, &device_id) {
+        core_ctx.counters().rx_echoed_packets.increment();
+        debug!("dropping an echoed ARP packet: {op:?}");
+        return;
+    }
 
     enum PacketKind {
         Gratuitous,
@@ -506,7 +523,6 @@ fn handle_packet<
         }
     };
 
-    let sender_hw_addr = packet.sender_hardware_address();
     if let Some(addr) = SpecifiedAddr::new(sender_addr) {
         NudHandler::<Ipv4, D, _>::handle_neighbor_update(
             core_ctx,
@@ -635,6 +651,7 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
     use core::iter;
+    use net_types::ip::Ip;
 
     use net_types::ethernet::Mac;
     use netstack3_base::socket::SocketIpAddr;
@@ -1329,5 +1346,35 @@ mod tests {
             SpecifiedAddr::new(TEST_REMOTE_IPV4).unwrap(),
             expected_state,
         );
+    }
+
+    // Test that we ignore ARP packets that have our hardware address as the
+    // sender hardware address.
+    #[test]
+    fn test_drop_echoed_arp_packet() {
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
+
+        // Receive an ARP packet that matches an ARP probe (as specified in
+        // RFC 5227 section 2.1.1) that has been echoed back to ourselves.
+        send_arp_packet(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            ArpOp::Request,
+            Ipv4::UNSPECIFIED_ADDRESS, /* sender_ipv4 */
+            TEST_LOCAL_IPV4,           /* target_ipv4 */
+            TEST_LOCAL_MAC,            /* sender_mac */
+            Mac::UNSPECIFIED,          /* target_mac */
+            FrameDestination::Broadcast,
+        );
+
+        // We should not have cached the sender's address information.
+        assert_neighbor_unknown(
+            &mut core_ctx,
+            FakeLinkDeviceId,
+            SpecifiedAddr::new(TEST_LOCAL_IPV4).unwrap(),
+        );
+
+        // We should not have sent an ARP response.
+        assert_eq!(core_ctx.frames().len(), 0);
     }
 }

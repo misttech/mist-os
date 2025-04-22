@@ -1833,6 +1833,7 @@ async fn inspect_counters(name: &str) {
                     Requests: 0u64,
                     Responses: 0u64,
                     Malformed: 0u64,
+                    Echoed: 0u64,
                     NonLocalDstAddr: 0u64,
                 },
                 "Tx": {
