@@ -26,6 +26,9 @@ const ZRAM_COMPRESSED_BYTES: &str = "[Addl]ZramCompressedBytes";
 ///
 /// `name` represents the meaningful name of the group; grouping is done based on process and VMO
 /// names.
+///
+// Note: This needs to mirror `//src/lib/assembly/memory_buckets/src/memory_buckets.rs`, but cannot
+// reuse it directly because it is an host-only library.
 #[derive(Deserialize)]
 pub struct BucketDefinition {
     pub name: String,
@@ -33,6 +36,7 @@ pub struct BucketDefinition {
     pub process: Option<Regex>,
     #[serde(deserialize_with = "deserialize_regex")]
     pub vmo: Option<Regex>,
+    pub event_code: u64,
 }
 
 impl BucketDefinition {
@@ -53,13 +57,13 @@ where
     D: Deserializer<'de>,
 {
     // Deserialize as Option<&str>
-    Option::<&str>::deserialize(d)
+    Option::<String>::deserialize(d)
         // If the parsing failed, return the error, otherwise transform the value
         .and_then(|os| {
             os
                 // If there is a value, try to parse it as a Regex.
                 .map(|s| {
-                    Regex::new(s)
+                    Regex::new(&s)
                         // If the regex compilation failed, wrap the error in the error type expected
                         // by serde.
                         .map_err(D::Error::custom)
@@ -357,6 +361,7 @@ mod tests {
                 name: "matched".to_string(),
                 process: None,
                 vmo: Some(Regex::new("matched")?),
+                event_code: Default::default(),
             }],
         );
         let expected_buckets = vec![
@@ -388,6 +393,7 @@ mod tests {
                 name: "matched".to_string(),
                 process: Some(Regex::new("matched")?),
                 vmo: None,
+                event_code: Default::default(),
             }],
         );
         let expected_buckets = vec![
@@ -419,6 +425,7 @@ mod tests {
                 name: "matched".to_string(),
                 process: Some(Regex::new("matched")?),
                 vmo: Some(Regex::new("matched")?),
+                event_code: Default::default(),
             }],
         );
         let expected_buckets = vec![

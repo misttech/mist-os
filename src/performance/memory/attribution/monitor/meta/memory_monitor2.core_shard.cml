@@ -33,6 +33,12 @@
             to: "#memory_monitor2",
         },
         {
+            directory: "config-data",
+            from: "parent",
+            to: "#memory_monitor2",
+            subdir: "memory_monitor2",
+        },
+        {
             config: [
                 "fuchsia.memory.CaptureOnPressureChange",
                 "fuchsia.memory.CriticalCaptureDelay",

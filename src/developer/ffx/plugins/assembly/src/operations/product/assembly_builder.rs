@@ -846,6 +846,10 @@ impl ImageAssemblyConfigBuilder {
         self.memory_buckets.write(&memory_buckets_path)?;
         self.add_config_data_entry(
             "memory_monitor",
+            FileEntry { source: memory_buckets_path.clone(), destination: "buckets.json".into() },
+        )?;
+        self.add_config_data_entry(
+            "memory_monitor2",
             FileEntry { source: memory_buckets_path, destination: "buckets.json".into() },
         )?;
 

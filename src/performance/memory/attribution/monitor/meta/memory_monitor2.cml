@@ -41,6 +41,11 @@
             ],
         },
         {
+            directory: "config-data",
+            rights: [ "r*" ],
+            path: "/config/data",
+        },
+        {
             config: "fuchsia.memory.CaptureOnPressureChange",
             key: "capture_on_pressure_change",
             availability: "optional",
