@@ -68,6 +68,7 @@ group("test") {
     "//src/storage/benchmarks/verity:benchmarks",
     "//src/sys/component_manager/tests:benchmarks",
     "//src/tests/benchmarks",
+    "//src/tests/end_to_end/snapshot:snapshot_test($host_toolchain)",
     "//src/tests/microbenchmarks:benchmarks",
 
     # Many tests use sl4f to communicate with the target.
