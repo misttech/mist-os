@@ -276,8 +276,7 @@ class KTraceTests {
 
     // Call Rewind and then verify that:
     // * Tracing has stopped, and therefore writes are disabled.
-    // * The boot CPU buffer contains a metadata record.
-    // * The remaining CPU buffers are all empty.
+    // * The CPU buffers are all empty.
     ASSERT_OK(ktrace.Control(KTRACE_ACTION_REWIND, 0));
     ASSERT_FALSE(ktrace.WritesEnabled());
     auto copy_fn = [&](uint32_t offset, ktl::span<ktl::byte> src) {
@@ -285,27 +284,10 @@ class KTraceTests {
       return ZX_OK;
     };
     for (uint32_t i = 0; i < arch_max_num_cpus(); i++) {
+      // We should read out nothing because the buffer is empty.
       const zx::result<size_t> result = ktrace.percpu_buffers_[i].Read(copy_fn, PAGE_SIZE);
       ASSERT_OK(result.status_value());
-      if (i == BOOT_CPU_ID) {
-        // If this is the boot CPU, we should read only the metadata record.
-        struct FxtMetadata {
-          uint64_t magic;
-          uint64_t init_record_header;
-          zx_ticks_t ticks_per_second;
-        } fxt_metadata = {
-            .magic = 0x0016547846040010,
-            .init_record_header = 0x21,
-            .ticks_per_second = ticks_per_second(),
-        };
-
-        ASSERT_EQ(sizeof(FxtMetadata), result.value());
-        ASSERT_BYTES_EQ(reinterpret_cast<const uint8_t*>(&fxt_metadata),
-                        reinterpret_cast<uint8_t*>(data_buffer->data()), sizeof(FxtMetadata))
-      } else {
-        // Otherwise, we should read out nothing because the buffer is empty.
-        ASSERT_EQ(0ul, result.value());
-      }
+      ASSERT_EQ(0ul, result.value());
     }
 
     END_TEST;

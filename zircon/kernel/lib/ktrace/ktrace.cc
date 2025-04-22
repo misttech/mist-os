@@ -649,6 +649,9 @@ ktl::byte* KTraceImpl<BufferMode::kSingle>::KernelAspaceAllocator::Allocate(uint
 template <>
 void KTraceImpl<BufferMode::kSingle>::KernelAspaceAllocator::Free(ktl::byte* ptr) {}
 
+template <>
+void KTraceImpl<BufferMode::kSingle>::ReportMetadata() {}
+
 //
 // TODO(https://fxbug.dev/404539312): Implement the per-CPU buffer specializations for KTraceImpl.
 //
@@ -731,6 +734,82 @@ zx_status_t KTraceImpl<BufferMode::kPerCpu>::Allocate() {
 }
 
 template <>
+zx::result<KTraceImpl<BufferMode::kPerCpu>::PendingCommit> KTraceImpl<BufferMode::kPerCpu>::Reserve(
+    uint64_t header) {
+  // Compute the number of bytes we need to reserve from the provided fxt header.
+  const uint32_t num_words = fxt::RecordFields::RecordSize::Get<uint32_t>(header);
+  const uint32_t num_bytes = num_words * sizeof(uint64_t);
+
+  // Disable interrupts.
+  // We have to do this before we check if writes are enabled, otherwise a racing Stop operation
+  // may disable writes and send the IPI it uses to verify that we're done writing before we begin
+  // our write.
+  // We also have to do this before we check which CPU this thread is on, otherwise this thread
+  // could be migrated across CPUs after we check the current CPU number, leading to an invalid,
+  // cross-CPU write.
+  interrupt_saved_state_t saved_state = arch_interrupt_save();
+  auto restore_interrupt_state =
+      fit::defer([&saved_state]() { arch_interrupt_restore(saved_state); });
+
+  // If writes are disabled, then return an error. We return ZX_ERR_BAD_STATE, because this means
+  // that tracing was disabled.
+  //
+  // It is valid for writes to be disabled immediately after this check. This is ok because Stop,
+  // which disables writes, will follow up with an IPI to all cores and wait for those IPIs to
+  // return. Because we disabled interrupts prior to this check, that IPI will not return until
+  // this write operation is complete.
+  if (!WritesEnabled()) {
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
+  // Check which CPU we're running on and Reserve a slot in the appropriate SPSC buffer.
+  const cpu_num_t cpu_num = arch_curr_cpu_num();
+  DEBUG_ASSERT(percpu_buffers_ != nullptr);
+  zx::result<PerCpuBuffer::Reservation> result = percpu_buffers_[cpu_num].Reserve(num_bytes);
+  if (result.is_error()) {
+    return result.take_error();
+  }
+  PendingCommit res(ktl::move(result.value()), saved_state, header);
+
+  // The PendingWrite is now responsible for restoring interrupt state.
+  restore_interrupt_state.cancel();
+
+  return zx::ok(ktl::move(res));
+}
+
+template <>
+void KTraceImpl<BufferMode::kPerCpu>::ReportMetadata() {
+  // Emit the FXT metadata records. These must be emitted on the boot CPU to ensure that they
+  // are read at the very beginning of the trace.
+  auto emit_starting_records = [](void* arg) {
+    KTraceImpl<BufferMode::kPerCpu>* ktrace = static_cast<KTraceImpl<BufferMode::kPerCpu>*>(arg);
+    zx_status_t status = fxt::WriteMagicNumberRecord(ktrace);
+    DEBUG_ASSERT(status == ZX_OK);
+    status = fxt::WriteInitializationRecord(ktrace, ticks_per_second());
+    DEBUG_ASSERT(status == ZX_OK);
+  };
+  const cpu_mask_t target_mask = cpu_num_to_mask(BOOT_CPU_ID);
+  mp_sync_exec(MP_IPI_TARGET_MASK, target_mask, emit_starting_records, &GetInstance());
+
+  // Emit strings needed to improve readability, such as syscall names, to the trace buffer.
+  fxt::InternedString::RegisterStrings();
+
+  // Emit the KOIDs of each CPU to the trace buffer.
+  const uint32_t max_cpus = arch_max_num_cpus();
+  char name[32];
+  for (uint32_t i = 0; i < max_cpus; i++) {
+    snprintf(name, sizeof(name), "cpu-%u", i);
+    fxt::WriteKernelObjectRecord(&GetInstance(), fxt::Koid(cpu_context_map_.GetCpuKoid(i)),
+                                 ZX_OBJ_TYPE_THREAD, fxt::StringRef{name},
+                                 fxt::Argument{"process"_intern, kNoProcess});
+  }
+
+  // Emit the names of all live processes and threads to the trace buffer.
+  ktrace_report_live_processes();
+  ktrace_report_live_threads();
+}
+
+template <>
 zx_status_t KTraceImpl<BufferMode::kPerCpu>::Start(uint32_t, uint32_t categories) {
   // Allocate the buffers. This will be a no-op if the buffers are already initialized.
   if (zx_status_t status = Allocate(); status != ZX_OK) {
@@ -744,10 +823,13 @@ zx_status_t KTraceImpl<BufferMode::kPerCpu>::Start(uint32_t, uint32_t categories
     return ZX_OK;
   }
 
-  // Otherwise, enable writes and report static metadata before setting the categories bitmask.
-  // The metadata needs to be emitted before we enable arbitrary categories, otherwise the thread
-  // and process records will be interspersed with generic trace records.
+  // Otherwise, enable writes.
   EnableWrites();
+
+  // Report static metadata before setting the categories bitmask.
+  // These metadata records must be emitted before we enable arbitrary categories, otherwise generic
+  // trace records may fill up the buffer and cause these metadata records to be dropped, which
+  // could make the trace unreadable.
   ReportMetadata();
 
   set_categories_bitmask(categories);
@@ -809,82 +891,9 @@ zx_status_t KTraceImpl<BufferMode::kPerCpu>::Rewind() {
     PerCpuBuffer* percpu_buffers = static_cast<PerCpuBuffer*>(arg);
     PerCpuBuffer& curr_cpu_buffer = percpu_buffers[curr_cpu];
     curr_cpu_buffer.Drain();
-
-    // If this is not running on the boot CPU, we're done.
-    if (curr_cpu != BOOT_CPU_ID) {
-      return;
-    }
-
-    // FxtMetadata is a type that contains the metadata records that are expected to be at the
-    // beginning of every kernel trace. We place one of these structures in the boot CPU's buffer.
-    struct FxtMetadata {
-      // Magic Record
-      // https://fuchsia.dev/fuchsia-src/reference/tracing/trace-format#magic-number-record
-      uint64_t magic;
-      // Initialization Record
-      // https://fuchsia.dev/fuchsia-src/reference/tracing/trace-format#initialization-record
-      uint64_t init_record_header;
-      zx_ticks_t ticks_per_second;
-    };
-    const FxtMetadata fxt_metadata = {
-        .magic = 0x0016547846040010,
-        .init_record_header = 0x21,
-        .ticks_per_second = ticks_per_second(),
-    };
-
-    // Reserve space for the metadata record.
-    // We just drained this buffer, so this reservation cannot fail.
-    zx::result<PerCpuBuffer::Reservation> res = curr_cpu_buffer.Reserve(sizeof(FxtMetadata));
-    DEBUG_ASSERT(res.is_ok());
-    res->Write(ktl::span<const ktl::byte>(reinterpret_cast<const ktl::byte*>(&fxt_metadata),
-                                          sizeof(fxt_metadata)));
-    res->Commit();
   };
   mp_sync_exec(MP_IPI_TARGET_ALL, 0, run_drain, percpu_buffers_.get());
   return ZX_OK;
-}
-
-template <>
-zx::result<KTraceImpl<BufferMode::kPerCpu>::PendingCommit> KTraceImpl<BufferMode::kPerCpu>::Reserve(
-    uint64_t header) {
-  // Compute the number of bytes we need to reserve from the provided fxt header.
-  const uint32_t num_words = fxt::RecordFields::RecordSize::Get<uint32_t>(header);
-  const uint32_t num_bytes = num_words * sizeof(uint64_t);
-
-  // Disable interrupts.
-  // We have to do this before we check if writes are enabled, otherwise a racing Stop operation
-  // may disable writes and send the IPI it uses to verify that we're done writing before we begin
-  // our write.
-  // We also have to do this before we check which CPU this thread is on, otherwise this thread
-  // could be migrated across CPUs after we check the current CPU number, leading to an invalid,
-  // cross-CPU write.
-  interrupt_saved_state_t saved_state = arch_interrupt_save();
-  auto restore_interrupt_state =
-      fit::defer([&saved_state]() { arch_interrupt_restore(saved_state); });
-
-  // If writes are disabled, then return an error. We return ZX_ERR_BAD_STATE, because this means
-  // that tracing was disabled.
-  //
-  // It is valid for writes to be disabled immediately after this check. This is ok because Stop,
-  // which disables writes, will follow up with an IPI to all cores and wait for those IPIs to
-  // return. Because we disabled interrupts prior to this check, that IPI will not return until
-  // this write operation is complete.
-  if (!WritesEnabled()) {
-    return zx::error(ZX_ERR_BAD_STATE);
-  }
-
-  // Check which CPU we're running on and Reserve a slot in the appropriate SPSC buffer.
-  const cpu_num_t cpu_num = arch_curr_cpu_num();
-  zx::result<PerCpuBuffer::Reservation> result = percpu_buffers_[cpu_num].Reserve(num_bytes);
-  if (result.is_error()) {
-    return result.take_error();
-  }
-  PendingCommit res(ktl::move(result.value()), saved_state, header);
-
-  // The PendingWrite is now responsible for restoring interrupt state.
-  restore_interrupt_state.cancel();
-
-  return zx::ok(ktl::move(res));
 }
 
 template <>

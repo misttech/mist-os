@@ -1039,24 +1039,7 @@ class KTraceImpl {
 
   // Emits metadata records into the trace buffer.
   // This method is declared virtual to facilitate testing.
-  virtual void ReportMetadata() {
-    // Emit strings needed to improve readability, such as syscall names, to the trace buffer.
-    fxt::InternedString::RegisterStrings();
-
-    // Emit the KOIDs of each CPU to the trace buffer.
-    const uint32_t max_cpus = arch_max_num_cpus();
-    char name[32];
-    for (uint32_t i = 0; i < max_cpus; i++) {
-      snprintf(name, sizeof(name), "cpu-%u", i);
-      fxt::WriteKernelObjectRecord(&GetInstance(), fxt::Koid(cpu_context_map_.GetCpuKoid(i)),
-                                   ZX_OBJ_TYPE_THREAD, fxt::StringRef{name},
-                                   fxt::Argument{"process"_intern, kNoProcess});
-    }
-
-    // Emit the names of all live processes and threads to the trace buffer.
-    ktrace_report_live_processes();
-    ktrace_report_live_threads();
-  }
+  virtual void ReportMetadata();
 
   // Getter and setter for the categories bitmask.
   // These use acquire-release semantics because the order in which we set the bitmask matters.
