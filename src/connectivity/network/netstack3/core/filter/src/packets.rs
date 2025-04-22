@@ -40,6 +40,8 @@ use packet_formats::tcp::{TcpSegmentBuilderWithOptions, TcpSegmentRaw};
 use packet_formats::udp::{UdpPacketBuilder, UdpPacketRaw};
 use zerocopy::{SplitByteSlice, SplitByteSliceMut};
 
+use crate::conntrack;
+
 /// An IP extension trait for the filtering crate.
 pub trait FilterIpExt: IpExt {
     /// A marker type to add an [`IpPacket`] bound to [`Self::Packet`].
@@ -122,6 +124,35 @@ pub trait IpPacket<I: FilterIpExt> {
     /// that type may also need to retain a reference to the backing buffer in order
     /// to modify the transport header.
     fn transport_packet_mut<'a>(&'a mut self) -> Self::TransportPacketMut<'a>;
+
+    /// The header information to be used for connection tracking.
+    ///
+    /// TODO(https://fxbug.dev/328057704): For the transport
+    /// header, this currently returns the same information as
+    /// [`IpPacket::maybe_transport_packet`], but that will change when ICMP
+    /// error NAT is implemented.
+    ///
+    /// Returns `None` if the packet cannot be tracked, e.g. because it doesn't
+    /// have a transport header.
+    ///
+    /// Subtlety: For ICMP packets, only request/response messages will have
+    /// a transport packet defined (and currently only ECHO messages do). This
+    /// gets us basic tracking for free, and lets us implicitly ignore ICMP
+    /// errors, which are not meant to be tracked.
+    ///
+    /// If other ICMP message types eventually have TransportPacket impls, then
+    /// this would lead to multiple message types being mapped to the same tuple
+    /// if they happen to have the same ID.
+    fn conntrack_packet(&self) -> Option<conntrack::PacketMetadata<I>> {
+        self.maybe_transport_packet().transport_packet_data().map(|transport_data| {
+            conntrack::PacketMetadata::new(
+                self.src_addr(),
+                self.dst_addr(),
+                I::map_ip(self.protocol(), |proto| proto.into(), |proto| proto.into()),
+                transport_data,
+            )
+        })
+    }
 }
 
 /// A payload of an IP packet that may be a valid transport layer packet.

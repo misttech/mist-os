@@ -1170,7 +1170,7 @@ mod tests {
     use test_case::test_case;
 
     use super::*;
-    use crate::conntrack::{PacketMetadata, Tuple};
+    use crate::conntrack::Tuple;
     use crate::context::testutil::{
         FakeBindingsCtx, FakeDeviceClass, FakeNatCtx, FakePrimaryAddressId, FakeWeakAddressId,
     };
@@ -1196,9 +1196,11 @@ mod tests {
 
     impl<I: FilterIpExt, A, BC: FilterBindingsContext> ConnectionExclusive<I, NatConfig<I, A>, BC> {
         fn from_packet<P: IpPacket<I>>(bindings_ctx: &BC, packet: &P) -> Self {
-            let packet = PacketMetadata::new(packet).expect("packet should be trackable");
-            ConnectionExclusive::from_deconstructed_packet(bindings_ctx, &packet)
-                .expect("create conntrack entry")
+            ConnectionExclusive::from_deconstructed_packet(
+                bindings_ctx,
+                &packet.conntrack_packet().unwrap(),
+            )
+            .expect("create conntrack entry")
         }
     }
 
@@ -1218,7 +1220,7 @@ mod tests {
     }
 
     fn tuple_with_port(which: ReplyTuplePort, port: u16) -> Tuple<Ipv4> {
-        Tuple::from_packet(&packet_with_port(which, port)).unwrap()
+        packet_with_port(which, port).conntrack_packet().unwrap().tuple
     }
 
     #[test]
@@ -1585,7 +1587,10 @@ mod tests {
             body: FakeUdpPacket { src_port: 22222, dst_port: 22222 },
         };
         let (mut conn, direction) = conntrack
-            .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .get_connection_for_packet_and_update(
+                &bindings_ctx,
+                packet.conntrack_packet().expect("packet should be valid"),
+            )
             .expect("packet should be valid")
             .expect("packet should be trackable");
 
@@ -1644,7 +1649,7 @@ mod tests {
 
         let mut packet = FakeIpPacket::<I, FakeUdpPacket>::arbitrary_value();
         let (mut conn, direction) = conntrack
-            .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .get_connection_for_packet_and_update(&bindings_ctx, packet.conntrack_packet().unwrap())
             .expect("packet should be valid")
             .expect("packet should be trackable");
 
@@ -1689,7 +1694,7 @@ mod tests {
         // `DoNotNat` given it has not already been configured for the connection.
         let mut reply = packet.reply();
         let (mut conn, direction) = conntrack
-            .get_connection_for_packet_and_update(&bindings_ctx, &reply)
+            .get_connection_for_packet_and_update(&bindings_ctx, reply.conntrack_packet().unwrap())
             .expect("packet should be valid")
             .expect("packet should be trackable");
         let verdict = perform_nat::<IngressHook, _, _, _, _>(
@@ -1759,7 +1764,7 @@ mod tests {
         let mut packet = FakeIpPacket::<_, FakeUdpPacket>::arbitrary_value();
         let pre_nat_packet = packet.clone();
         let (mut conn, direction) = conntrack
-            .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .get_connection_for_packet_and_update(&bindings_ctx, packet.conntrack_packet().unwrap())
             .expect("packet should be valid")
             .expect("packet should be trackable");
         let original = conn.original_tuple().clone();
@@ -1858,7 +1863,7 @@ mod tests {
         let mut packet = FakeIpPacket::<_, FakeUdpPacket>::arbitrary_value();
         let pre_nat_packet = packet.clone();
         let (mut conn, direction) = conntrack
-            .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .get_connection_for_packet_and_update(&bindings_ctx, packet.conntrack_packet().unwrap())
             .expect("packet should be valid")
             .expect("packet should be trackable");
         let original = conn.original_tuple().clone();
@@ -1957,7 +1962,7 @@ mod tests {
         // packet will be masqueraded to, and the same source port, to cause a conflict.
         let reply = FakeIpPacket { src_ip: I::SRC_IP_2, ..packet.clone() };
         let (conn, _dir) = conntrack
-            .get_connection_for_packet_and_update(&bindings_ctx, &reply)
+            .get_connection_for_packet_and_update(&bindings_ctx, reply.conntrack_packet().unwrap())
             .expect("packet should be valid")
             .expect("packet should be trackable");
         assert_matches!(
@@ -2017,7 +2022,7 @@ mod tests {
         // Create a packet and get the corresponding connection from conntrack.
         let mut packet = FakeIpPacket::<_, FakeUdpPacket>::arbitrary_value();
         let (mut conn, direction) = conntrack
-            .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .get_connection_for_packet_and_update(&bindings_ctx, packet.conntrack_packet().unwrap())
             .expect("packet should be valid")
             .expect("packet should be trackable");
 
@@ -2206,7 +2211,7 @@ mod tests {
         // should be dropped.
         let packet = packet_with_port(which, LOCAL_PORT.get());
         let (conn, _dir) = table
-            .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .get_connection_for_packet_and_update(&bindings_ctx, packet.conntrack_packet().unwrap())
             .expect("packet should be valid")
             .expect("packet should be trackable");
         assert_matches!(
@@ -2243,7 +2248,10 @@ mod tests {
         for port in LOCAL_PORT.get()..=MAX_PORT.get() {
             let packet = packet_with_port(which, port);
             let (conn, _dir) = table
-                .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+                .get_connection_for_packet_and_update(
+                    &bindings_ctx,
+                    packet.conntrack_packet().unwrap(),
+                )
                 .expect("packet should be valid")
                 .expect("packet should be trackable");
             assert_matches!(
@@ -2291,7 +2299,7 @@ mod tests {
         // connection should be adopted.
         let packet = packet_with_port(which, LOCAL_PORT.get());
         let (conn, _dir) = table
-            .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .get_connection_for_packet_and_update(&bindings_ctx, packet.conntrack_packet().unwrap())
             .expect("packet should be valid")
             .expect("packet should be trackable");
         let existing = assert_matches!(

@@ -376,13 +376,17 @@ where
             let conn = match metadata.take_connection_and_direction() {
                 Some((c, d)) => Some((c, d)),
                 None => {
-                    match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
-                    {
-                        Ok(result) => result,
-                        // TODO(https://fxbug.dev/328064909): Support configurable dropping of
-                        // invalid packets.
-                        Err(GetConnectionError::InvalidPacket(c, d)) => Some((c, d)),
-                    }
+                    packet.conntrack_packet().and_then(|packet| {
+                        match state
+                            .conntrack
+                            .get_connection_for_packet_and_update(bindings_ctx, packet)
+                        {
+                            Ok(result) => result,
+                            // TODO(https://fxbug.dev/328064909): Support configurable dropping of
+                            // invalid packets.
+                            Err(GetConnectionError::InvalidPacket(c, d)) => Some((c, d)),
+                        }
+                    })
                 }
             };
 
@@ -448,7 +452,7 @@ where
                 // It's possible that there won't be a connection in the metadata by this point;
                 // this could be, for example, because the packet is for a protocol not tracked
                 // by conntrack.
-                None => {
+                None => packet.conntrack_packet().and_then(|packet| {
                     match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
                     {
                         Ok(result) => result,
@@ -456,7 +460,7 @@ where
                         // invalid packets.
                         Err(GetConnectionError::InvalidPacket(c, d)) => Some((c, d)),
                     }
-                }
+                }),
             };
 
             let verdict = match check_routines_for_hook(
@@ -539,13 +543,14 @@ where
         this.with_filter_state_and_nat_ctx(|state, core_ctx| {
             // There isn't going to be an existing connection in the metadata
             // before this hook, so we don't have to look.
-            let conn =
+            let conn = packet.conntrack_packet().and_then(|packet| {
                 match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet) {
                     Ok(result) => result,
                     // TODO(https://fxbug.dev/328064909): Support configurable dropping of invalid
                     // packets.
                     Err(GetConnectionError::InvalidPacket(c, d)) => Some((c, d)),
-                };
+                }
+            });
 
             let verdict = match check_routines_for_hook(
                 &state.installed_routines.get().ip.local_egress,
@@ -602,7 +607,7 @@ where
                 // It's possible that there won't be a connection in the metadata by this point;
                 // this could be, for example, because the packet is for a protocol not tracked
                 // by conntrack.
-                None => {
+                None => packet.conntrack_packet().and_then(|packet| {
                     match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
                     {
                         Ok(result) => result,
@@ -610,7 +615,7 @@ where
                         // invalid packets.
                         Err(GetConnectionError::InvalidPacket(c, d)) => Some((c, d)),
                     }
-                }
+                }),
             };
 
             let verdict = match check_routines_for_hook(
@@ -826,7 +831,7 @@ mod tests {
 
     use super::*;
     use crate::actions::MarkAction;
-    use crate::conntrack::{self, ConnectionDirection, Tuple};
+    use crate::conntrack::{self, ConnectionDirection};
     use crate::context::testutil::{FakeBindingsCtx, FakeCtx, FakeDeviceClass, FakeWeakAddressId};
     use crate::logic::nat::NatConfig;
     use crate::matchers::testutil::{ethernet_interface, wlan_interface, FakeDeviceId};
@@ -1464,7 +1469,7 @@ mod tests {
         // The stashed reference should point to the connection that is in the table.
         let (stashed, _dir) =
             metadata.take_connection_and_direction().expect("metadata should include connection");
-        let tuple = Tuple::from_packet(&packet).expect("packet should be trackable");
+        let tuple = packet.conntrack_packet().expect("packet should be trackable").tuple;
         let table = core_ctx
             .conntrack()
             .get_connection(&tuple)
