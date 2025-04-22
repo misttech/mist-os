@@ -976,7 +976,8 @@ mod test {
         let (mut file, temp_path) = NamedTempFile::new_in(&tmpdir).unwrap().into_parts();
         let mut rng = SmallRng::from_entropy();
         let mut buf = Vec::<u8>::new();
-        buf.resize(50 * 4096, 0);
+        // Dont want it to neatly fit a block size
+        buf.resize(50 * 4096 + 1244, 0);
         rng.fill_bytes(&mut buf);
         file.write_all(&buf).unwrap();
         file.flush().unwrap();
@@ -1018,8 +1019,15 @@ mod test {
             std::fs::read(simg2img_output).expect("Failed to read simg2img output");
 
         assert_eq!(
-            buf, simg2img_output_bytes,
+            buf,
+            simg2img_output_bytes[0..buf.len()],
             "Output from simg2img should match our generated file"
+        );
+
+        assert_eq!(
+            simg2img_output_bytes[buf.len()..],
+            vec![0u8; simg2img_output_bytes.len() - buf.len()],
+            "The remainder of our simg2img_output_bytes should be 0"
         );
     }
 }
