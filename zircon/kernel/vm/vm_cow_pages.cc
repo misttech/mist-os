@@ -126,6 +126,11 @@ inline uint64_t CheckedAdd(uint64_t a, uint64_t b) {
   return result;
 }
 
+inline uint64_t CheckedSub(uint64_t a, uint64_t b) {
+  DEBUG_ASSERT(b <= a);
+  return a - b;
+}
+
 inline uint64_t ClampedLimit(uint64_t offset, uint64_t limit, uint64_t max_limit) {
   // Return a clamped `limit` value such that `offset + clamped_limit <= max_limit`.
   // If `offset > max_limit` to begin with, then clamp `limit` to 0 to avoid underflow.
@@ -359,6 +364,389 @@ class BatchPQUpdateBacklink {
   size_t count_ = 0;
   vm_page_t* pages_[kMaxPages];
   uint64_t offsets_[kMaxPages];
+};
+
+// Helper class for iterating over a subtree while respecting the child->parent lock ordering
+// requirement.
+// Cursor is constructed with a root, i.e. the starting point, and will iterate over at least
+// every node that existed at the point of construction. Nodes that are racily created mid
+// iteration may or may not be visited. Utilizes the cursor lists in the VmCowPages to coordinate
+// with any destruction.
+// A cursor is logically at a 'current' location, which is initially the root the cursor was
+// constructed at. As the current location is always held locked, the cursor can be assumed to be
+// initially valid, and is valid as long as any iteration request (NextChild / NextSibling) returns
+// true. The cursor explicitly performs a pre-order walk, allowing subtrees of a given node to be
+// skipped during the iteration.
+class VmCowPages::TreeWalkCursor
+    : public fbl::ContainableBaseClasses<
+          fbl::TaggedDoublyLinkedListable<TreeWalkCursor*, VmCowPages::RootListTag>,
+          fbl::TaggedDoublyLinkedListable<TreeWalkCursor*, VmCowPages::CurListTag>> {
+ public:
+  explicit TreeWalkCursor(LockedPtr root)
+      : root_(root.get()), cur_(root.get()), cur_locked_(ktl::move(root)) {
+    DEBUG_ASSERT(cur_locked_.locked().life_cycle_ == LifeCycle::Alive);
+    cur_locked_.locked().root_cursor_list_.push_back(this);
+    cur_locked_.locked().cur_cursor_list_.push_back(this);
+  }
+  ~TreeWalkCursor() {
+    if (root_) {
+      reset();
+    }
+  }
+  // These static methods exist to simplify the call sites in VmCowPages in such a way that the lock
+  // annotations are preserved. A generic 'perform arbitrary lambda on all cursors' helper would
+  // reduce the code duplication here, but it would lose the annotations.
+  // See description of the non static methods for these do.
+
+  static void MoveToSibling(fbl::TaggedDoublyLinkedList<TreeWalkCursor*, CurListTag>& cursor_list,
+                            VmCowPages* cur, VmCowPages* sibling) TA_REQ(cur->lock())
+      TA_REQ(sibling->lock()) {
+    while (!cursor_list.is_empty()) {
+      cursor_list.front().MoveToSibling(cur, sibling);
+    }
+  }
+  static void MoveToSiblingOfParent(
+      fbl::TaggedDoublyLinkedList<TreeWalkCursor*, CurListTag>& cursor_list, VmCowPages* cur,
+      VmCowPages* parent) TA_REQ(cur->lock()) TA_REQ(parent->lock()) {
+    while (!cursor_list.is_empty()) {
+      cursor_list.front().MoveToSiblingOfParent(cur, parent);
+    }
+  }
+  static void Erase(fbl::TaggedDoublyLinkedList<TreeWalkCursor*, RootListTag>& cursor_list,
+                    VmCowPages* leaf) TA_REQ(leaf->lock()) {
+    while (!cursor_list.is_empty()) {
+      cursor_list.front().Erase(leaf);
+    }
+  }
+  static void MergeToChild(fbl::TaggedDoublyLinkedList<TreeWalkCursor*, CurListTag>& cur_list,
+                           fbl::TaggedDoublyLinkedList<TreeWalkCursor*, RootListTag>& root_list,
+                           VmCowPages* cur, VmCowPages* child) TA_REQ(cur->lock())
+      TA_REQ(child->lock()) {
+    while (!root_list.is_empty()) {
+      root_list.front().MergeRootToChild(cur, child);
+    }
+    while (!cur_list.is_empty()) {
+      cur_list.front().MergeToChild(cur, child);
+    }
+  }
+
+  // Inform the cursor that its current node is going away, and it should re-home to its sibling.
+  void MoveToSibling(VmCowPages* cur, VmCowPages* sibling) TA_REQ(cur->lock())
+      TA_REQ(sibling->lock()) {
+    Guard<CriticalMutex> guard{&lock_};
+    DEBUG_ASSERT(cur->parent_ && cur->parent_ == sibling->parent_);
+    // If current was the root, then do not move to the sibling, as that would be outside our
+    // iteration tree, erase instead.
+    if (cur == root_) {
+      EraseLocked(cur, cur);
+      return;
+    }
+    MoveCurLocked(
+        cur, sibling,
+        CheckedSub(cumulative_parent_offset_, cur->parent_offset_) + sibling->parent_offset_);
+  }
+
+  // Inform the cursor that the root node is going away. Since a node can only be removed if it has
+  // no children, this implies that the cursor is still at the root, and so the entire cursor should
+  // be removed.
+  void Erase(VmCowPages* root) TA_REQ(root->lock()) {
+    DEBUG_ASSERT(root->children_list_len_ == 0);
+    Guard<CriticalMutex> guard{&lock_};
+    EraseLocked(root, root);
+  }
+
+  // Inform the cursor that the root node is being merged into the child, and the cursor should be
+  // moved.
+  void MergeRootToChild(VmCowPages* root, VmCowPages* child) TA_REQ(root->lock())
+      TA_REQ(child->lock()) {
+    Guard<CriticalMutex> guard{&lock_};
+    DEBUG_ASSERT(root == root_);
+    DEBUG_ASSERT(child->parent_.get() == root);
+    // If the cursor was still pointing at the root then also move it. Although this would get
+    // updated by a separate call to MergeToChild anyway, it's preferable to maintain the invariant.
+    if (cur_ == root) {
+      MoveCurLocked(root, child, cumulative_parent_offset_ + child->parent_offset_);
+    }
+    root->root_cursor_list_.erase(*this);
+    child->root_cursor_list_.push_back(this);
+    root_ = child;
+  }
+
+  // Inform the cursor that the current node is merging with its child.
+  void MergeToChild(VmCowPages* cur, VmCowPages* child) TA_REQ(cur->lock()) TA_REQ(child->lock()) {
+    Guard<CriticalMutex> guard{&lock_};
+    DEBUG_ASSERT(child->parent_.get() == cur);
+    MoveCurLocked(cur, child, cumulative_parent_offset_ + child->parent_offset_);
+  }
+
+  // Inform the cursor that both the current node and its parent are going away and the cursor
+  // should be moved to the next available sibling of the parent, assuming that is still within the
+  // subtree to be walked.
+  // This method will logically end up at the same final node as just MoveToNextSibling, and it is
+  // specialized not for performance, but rather for the scenario where the lock of |parent| is
+  // already held, and hence directly using MoveToNextSibling would cause a double lock acquisition.
+  void MoveToSiblingOfParent(VmCowPages* cur, VmCowPages* parent) TA_REQ(cur->lock())
+      TA_REQ(parent->lock()) {
+    DEBUG_ASSERT(cur->parent_.get() == parent);
+    // Not trying to be efficient, as this method is only used for cleaning up when racing
+    // deletion with a cursor traversal, so just move the cursor to the parent, then move to the
+    // sibling.
+    {
+      Guard<CriticalMutex> guard{&lock_};
+      if (cur == root_) {
+        EraseLocked(cur, cur);
+        return;
+      }
+      if (parent == root_) {
+        EraseLocked(cur, parent);
+        return;
+      }
+      MoveCurLocked(cur, parent, CheckedSub(cumulative_parent_offset_, cur->parent_offset_));
+    }
+    MoveToNextSibling(parent);
+  }
+
+  // Move the cursor to the next un-visited child, or if no children the next sibling. Returns false
+  // if iteration has completed and the cursor is now invalid. This may not be called on an invalid
+  // cursor.
+  bool NextChild() {
+    DEBUG_ASSERT(cur_locked_);
+    // If no child then find a sibling instead.
+    if (cur_locked_.locked().children_list_len_ == 0) {
+      return NextSibling();
+    }
+
+    // To acquire the sibling lock we need to release the current lock, so first take a refptr to
+    // the child.
+    fbl::RefPtr<VmCowPages> child_ref = fbl::MakeRefPtrUpgradeFromRaw(
+        &cur_locked_.locked().children_list_.front(), cur_locked_.locked().lock());
+    cur_locked_.release();
+
+    {
+      LockedPtr child(child_ref.get(), VmLockAcquireMode::First);
+      // While the locks were dropped things could have changed, so check that the child still has
+      // a parent before attempting to acquire the parents lock.
+      if (child.locked().parent_) {
+        LockedPtr parent(child.locked().parent_.get(), VmLockAcquireMode::Reentrant);
+        Guard<CriticalMutex> guard{&lock_};
+        // If nothing raced then the parent of child should still be cur_.
+        if (parent.get() == cur_) {
+          // Both cur_ and child must be in the alive state, otherwise cur_ would have been updated
+          // on a dead transition. The fact that a dead transition has not occurred, and that child
+          // lock must be acquired to perform said transition, is why it is safe for us to drop
+          // child_ref and store a raw LockedPtr of child.
+          DEBUG_ASSERT(parent.locked().life_cycle_ == LifeCycle::Alive &&
+                       child.locked().life_cycle_ == LifeCycle::Alive);
+          MoveCurLocked(&parent.locked(), &child.locked(),
+                        cumulative_parent_offset_ + child.locked().parent_offset_);
+          cur_locked_ = ktl::move(child);
+        }
+      }
+    }
+    // We raced with a modification to the tree. This modification will have set the new value of
+    // cur_ (possibly to nullptr if the cursor has been deleted), and we all UpdateCurLocked to
+    // retrieve this.
+    return UpdateCurLocked();
+  }
+
+  // Move the cursor to the next un-visited sibling, skipping any children of the current node.
+  // Returns false if iteration has completed and the cursor is now invalid. This may not be called
+  // on an invalid cursor.
+  bool NextSibling() {
+    DEBUG_ASSERT(cur_locked_);
+    {
+      LockedPtr cur = ktl::move(cur_locked_);
+      // Due to the way the sibling lock gets acquired we always need to re-acquire it as a first
+      // acquisition with its normal lock order. For this reason there is no point in attempting to
+      // retain the lock of the updated cur_, and so we use a common helper and then re-read (and
+      // re-lock) cur_.
+      MoveToNextSibling(&cur.locked());
+    }
+    return UpdateCurLocked();
+  }
+
+  // Retrieves the offset that projects an offset from the starting node into an offset in the
+  // current node. This does not imply that the current node can 'see' the content at that offset,
+  // just that if it could that is the offset that would do it.
+  // May only be called while the cursor is valid.
+  uint64_t GetCurrentOffset() const {
+    // As long as we hold cur_locked_ then no one can be altering cur_ and so we own the offset.
+    DEBUG_ASSERT(cur_locked_);
+    return cumulative_parent_offset_;
+  }
+
+  // Retrieve a reference to the current node.
+  const LockedPtr& GetCur() const { return cur_locked_; }
+
+ private:
+  // Helper for moving cur_ to the next sibling. The |start| location, which must be equal to cur_
+  // and held locked externally, must be passed in. This allows |cur_locked_| to be set by this
+  // method without having to release its lock.
+  // Walking the next sibling involves walking both 'up' and 'right' until we either find a node or
+  // we encounter root_ and terminate.
+  void MoveToNextSibling(VmCowPages* start) TA_REQ(start->lock()) {
+    DEBUG_ASSERT(!cur_locked_);
+    uint64_t offset;
+    {
+      Guard<CriticalMutex> guard{&lock_};
+      DEBUG_ASSERT(start == cur_);
+      // The later loop wants to assume that we have a parent (in order to be finding a sibling),
+      // which could be false if we are presently at the root_ and there is otherwise no parent.
+      if (start == root_) {
+        EraseLocked(start, start);
+        return;
+      }
+      // As we hold the lock to cur_, the offset cannot change, so we can cache it outside the lock.
+      offset = cumulative_parent_offset_;
+    }
+    LockedPtr cur;
+    while (true) {
+      // If we aren't at the root then, by definition, we are in a subtree and must have a parent.
+      DEBUG_ASSERT(cur.locked_or(start).parent_.get());
+      fbl::RefPtr<VmCowPages> sibling_ref;
+      {
+        // Acquire the parent lock and check for a sibling.
+        LockedPtr parent(cur.locked_or(start).parent_.get(), VmLockAcquireMode::Reentrant);
+        auto iter = ++parent.locked().children_list_.make_iterator(cur.locked_or(start));
+        if (!iter.IsValid()) {
+          // If no sibling then walk up to the parent, ensuring we do not walk past the root.
+          Guard<CriticalMutex> guard{&lock_};
+          // Although we checked this previously, the root can get moved into its child, and so we
+          // must re-check.
+          if (start == root_) {
+            EraseLocked(start, start);
+            return;
+          }
+          if (parent.get() == root_) {
+            EraseLocked(start, &parent.locked());
+            return;
+          }
+          offset = CheckedSub(offset, cur.locked_or(start).parent_offset_);
+          cur = ktl::move(parent);
+          continue;
+        }
+        // Make a ref to the sibling, we have to drop the parent lock before acquiring the sibling
+        // lock.
+        sibling_ref = fbl::MakeRefPtrUpgradeFromRaw(&*iter, parent.locked().lock());
+      }
+
+      LockedPtr sibling(sibling_ref.get(), cur.locked_or(start).lock_order() + 1,
+                        VmLockAcquireMode::Reentrant);
+      // If the sibling is still from the same parent then no race occurred and sibling must still
+      // be alive.
+      if (sibling.locked().parent_ == cur.locked_or(start).parent_) {
+        Guard<CriticalMutex> guard{&lock_};
+        DEBUG_ASSERT(start == cur_);
+        MoveCurLocked(start, &sibling.locked(),
+                      CheckedSub(offset, cur.locked_or(start).parent_offset_) +
+                          sibling.locked().parent_offset_);
+        return;
+      }
+      // Raced with a modification, need to go around again and see what the state of the tree is
+      // now and try again. The only way our siblings parent could have changed is if it got
+      // deleted, and since new siblings will be placed at the head of the list (where as we are
+      // iterating towards the tail), the number of times we can race is strictly bounded.
+    }
+  }
+
+  // Updates cur_locked_ to be what is in cur_. This is used to resolve scenarios where the lock to
+  // current needs to be dropped, and hence a racing deletion might move it.
+  bool UpdateCurLocked() TA_EXCL(lock_) {
+    // We must do this loop as the lock ordering is vmo->cursor and so in between dropping the
+    // cursor lock to acquire cur_locked_, cur_ could move again.
+    Guard<CriticalMutex> guard{&lock_};
+    fbl::RefPtr<VmCowPages> cur;
+    do {
+      // Clear any previous lock.
+      cur_locked_.release();
+      // Cursor was deleted.
+      if (!cur_) {
+        return false;
+      }
+      cur = fbl::MakeRefPtrUpgradeFromRaw(cur_, lock_);
+      guard.CallUnlocked([&]() { cur_locked_ = LockedPtr(cur.get(), VmLockAcquireMode::First); });
+    } while (cur_locked_.get() != cur_);
+    // We have the lock to cur_ and so we safely drop the RefPtr, knowing that the object cannot be
+    // destroyed without our backlink being updated, which would require someone else to acquire the
+    // lock first. All this is only true if the object is presently in the Alive state.
+    DEBUG_ASSERT(cur_locked_.locked().life_cycle_ == LifeCycle::Alive);
+    return true;
+  }
+
+  // Erase the cursor, removing all the backlinks.
+  void EraseLocked(VmCowPages* cur, VmCowPages* root) TA_REQ(cur->lock()) TA_REQ(root->lock())
+      TA_REQ(lock_) {
+    DEBUG_ASSERT(cur == cur_);
+    DEBUG_ASSERT(root == root_);
+    cur->cur_cursor_list_.erase(*this);
+    root->root_cursor_list_.erase(*this);
+    cur_ = root_ = nullptr;
+  }
+
+  // Helper to update the current location of the cursor.
+  void MoveCurLocked(VmCowPages* old_cur, VmCowPages* new_cur, uint64_t new_offset) TA_REQ(lock_)
+      TA_REQ(old_cur->lock()) TA_REQ(new_cur->lock()) {
+    DEBUG_ASSERT(old_cur == cur_);
+    DEBUG_ASSERT(new_cur != root_);
+    // Validate there is no cur_locked_, and so we can update this without racing with any readers
+    // as hold the lock of cur_.
+    DEBUG_ASSERT(!cur_locked_);
+    cumulative_parent_offset_ = new_offset;
+    old_cur->cur_cursor_list_.erase(*this);
+    new_cur->cur_cursor_list_.push_back(this);
+    cur_ = new_cur;
+  }
+
+  // Reset and invalidate the cursor.
+  void reset() {
+    LockedPtr cur = ktl::move(cur_locked_);
+    Guard<CriticalMutex> guard{&lock_};
+    LockedPtr root_locked;
+    fbl::RefPtr<VmCowPages> root;
+    // We must do this loop as the lock ordering is vmo->cursor and so in between dropping the
+    // cursor lock to acquire root_locked, root_ could move again.
+    do {
+      root_locked.release();
+      if (!root_) {
+        return;
+      }
+      if (root_ == cur_) {
+        EraseLocked(&cur.locked(), &cur.locked());
+        return;
+      }
+      root = fbl::MakeRefPtrUpgradeFromRaw(root_, lock_);
+      guard.CallUnlocked(
+          [&]() { root_locked = LockedPtr(root.get(), VmLockAcquireMode::Reentrant); });
+    } while (root_locked.get() != root_);
+    EraseLocked(&cur.locked(), &root_locked.locked());
+  }
+
+  // Modifying any item, such as root_ or cur_, requires holding the lock of the respective object,
+  // but to support being able to non-racily read the current value we define an additional lock_.
+  // Reading any value can be performed by holding either lock_, or the respective object lock_, but
+  // both must be held to modify.
+  DECLARE_CRITICAL_MUTEX(TreeWalkCursor) lock_;
+  // Tracks the offset that projects offsets from the original root, to the current node. This is
+  // logically locked by cur_->lock(), but this annotation cannot be properly expressed. Although we
+  // can say TA_REQ(cur_->lock()), there are times when we want to read this value know that
+  // cur_locked_ is valid when we do not hold lock_, hence we cannot even write
+  // AssertHeld(cur_->lock()), as we do not hold lock_ to dereference cur_, and hence cannot explain
+  // to the static analysis that cur_locked_ is an alias of cur_.
+  uint64_t cumulative_parent_offset_ = 0;
+  // The invariant that we maintain is that if root_ or cur_ is not null, then the object they point
+  // to must be in the Alive state, and this cursor must be in the respective cursor_list_.
+  // Modifying these can only be done when holding the respective object lock, as well as lock_.
+  // Attempting to annotate these with something like TA_GUARDED(cur_->lock()) is not useful since
+  // the static analysis cannot resolve the pointer aliasing, and since these are pointers that can
+  // change, using AssertHeld is dangerous as it can provide a false sense of correctness.
+  VmCowPages* root_ TA_GUARDED(lock_) = nullptr;
+  VmCowPages* cur_ TA_GUARDED(lock_) = nullptr;
+
+  // Whenever the cursor is valid, then cur_locked_ is a LockedPtr to cur_. This lock is only
+  // dropped internally when walking between nodes. Storing this internally, instead of returning it
+  // to the user on successful calls to NextChild or NextSibling is merely to ensure that they do
+  // not release the lock at all, allowing us to make assumptions when resuming iteration.
+  LockedPtr cur_locked_;
 };
 
 bool VmCowRange::IsBoundedBy(uint64_t max) const { return InRange(offset, len, max); }
@@ -719,6 +1107,11 @@ fbl::RefPtr<VmCowPages> VmCowPages::DeadTransitionLocked(const LockedPtr& parent
       // deferred deletion method, i.e. return the parent_ and have the caller call dead transition
       // on it.
       deferred = ktl::move(parent_);
+    } else {
+      // If we had a parent then RemoveChildLocked would have cleaned up any cursors, but otherwise
+      // we must erase from any lists. As we have no parent and cannot have children the root and
+      // current cursor list must be equivalent, and so only need to process one.
+      TreeWalkCursor::Erase(root_cursor_list_, this);
     }
   } else {
     // Most of the hidden vmo's state should have already been cleaned up when it merged
@@ -729,6 +1122,8 @@ fbl::RefPtr<VmCowPages> VmCowPages::DeadTransitionLocked(const LockedPtr& parent
   }
 
   DEBUG_ASSERT(page_list_.IsEmpty());
+  DEBUG_ASSERT(root_cursor_list_.is_empty());
+  DEBUG_ASSERT(cur_cursor_list_.is_empty());
 
   // Due to the potential lock dropping earlier double check our life_cycle_ is what we expect.
   DEBUG_ASSERT(life_cycle_ == LifeCycle::Dying);
@@ -1442,8 +1837,20 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed, const LockedPtr& sibling
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
+  // If we have a sibling to the right of the removed node then update any cursors to point there,
+  // otherwise find the next valid sibling starting from our parent, which we already hold the lock
+  // for.
+  const bool removed_left = removed == &children_list_.front();
+  if (removed_left && sibling) {
+    TreeWalkCursor::MoveToSibling(removed->cur_cursor_list_, removed, &sibling.locked());
+  } else {
+    TreeWalkCursor::MoveToSiblingOfParent(removed->cur_cursor_list_, removed, this);
+  }
+  // Moving the cursors should have implicitly cleared any root references since cursors can never
+  // be positioned outside their subtree.
+  DEBUG_ASSERT(removed->root_cursor_list_.is_empty());
+
   if (!is_hidden() || children_list_len_ > 2) {
-    // TODO(https://fxbug.dev/338300943): Make use of the |sibling|.
     DropChildLocked(removed);
     // Things should be consistent after dropping the child.
     VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
@@ -1454,6 +1861,10 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed, const LockedPtr& sibling
   // Hidden vmos have 0, 2 or more children. If we had more we would have already returned, and we
   // cannot be here with 0 children, therefore we must have 2, including the one we are removing.
   DEBUG_ASSERT(children_list_len_ == 2);
+
+  // Merge any cursors into the remaining child.
+  TreeWalkCursor::MergeToChild(cur_cursor_list_, root_cursor_list_, this, &sibling.locked());
+
   DropChildLocked(removed);
   MergeContentWithChildLocked();
 
@@ -5951,10 +6362,112 @@ void VmCowPages::RangeChangeUpdateCowChildrenLocked(VmCowRange range, RangeChang
 
 // static
 void VmCowPages::RangeChangeUpdateCowChildren(LockedPtr self, VmCowRange range, RangeChangeOp op) {
-  // TODO(https://fxbug.dev/338300943): Once all other usages of RangeChangeUpdateCowChildrenLocked
-  // have been removed this call can be replaced with an implementation that correctly walks the
-  // tree without relying on a hierarchy lock.
-  self.locked().RangeChangeUpdateCowChildrenLocked(range, op);
+  self->canary_.Assert();
+
+  // Helper for doing checking and performing a range change on a single candidate node. Although
+  // this is used once it is split out here to make the loops that actually walk the tree as easy to
+  // read as possible.
+  // Returns true if the passed in |candidate| had some overlap with the operation range, and hence
+  // its children also need to be walked. If false is returned the children of |candidate| can be
+  // skipped. Due to not being able to continuously hold locks while walking the subtree, even
+  // though we are therefore racing with concurrent modifications to the tree, it is still correct
+  // to skip subtrees. To explain why, first consider the following (impossible) scenario:
+  //                       A
+  //                       |
+  //                     |---|
+  //                     B  ...
+  //                     |
+  //                   |---|
+  //                   C   D
+  //  1. Thread 1 performs an unmap on a page in A (offset X), that can be seen by B, C and D
+  //  2. Thread 1 drops the lock of A to prepare to acquire lock of B
+  //  3. Thread 2 inserts a page into B at offset X, and starts its own child range change update/
+  //  4. Thread 2 drops the lock of B to prepare to acquire lock of C
+  //  5. Thread 1 acquires the lock of B, observes that B cannot see X in A and skips the subtree
+  //     of C and D.
+  // At this point neither of the threads have performed an unmap on C or D, so how can thread 1
+  // guarantee that neither can see page A?
+  // The reason this cannot happen, and why this is an impossible scenario, as this would require B
+  // to not be a hidden node, i.e. part of a user pager hierarchy. However, user pager hierarchies
+  // have an additional lock used to serialize all such operations, and so the operation in thread 2
+  // would not actually be able to start until thread 1 completely finished its range update and
+  // released this serialization lock.
+  auto check_candidate = [range, op](VmCowPages* candidate, uint64_t cur_accumulative_offset)
+                             TA_REQ(candidate->lock()) -> bool {
+    uint64_t candidate_offset = 0;
+    uint64_t candidate_len = 0;
+    if (!GetIntersect(cur_accumulative_offset, candidate->size_, range.offset, range.len,
+                      &candidate_offset, &candidate_len)) {
+      // Not intersection, can skip this node and the subtree.
+      return false;
+    }
+    // if they intersect with us, then by definition the new offset must be >= total parent_offset_
+    DEBUG_ASSERT(candidate_offset >= cur_accumulative_offset);
+
+    // subtract our offset
+    candidate_offset -= cur_accumulative_offset;
+
+    // verify that it's still within range of us
+    DEBUG_ASSERT(candidate_offset + candidate_len <= candidate->size_);
+
+    // Check if there are any gaps in this range where we would actually see the parent.
+    uint64_t first_gap_start = UINT64_MAX;
+    uint64_t last_gap_end = 0;
+    candidate->page_list_.ForEveryPageAndGapInRange(
+        [](auto page, uint64_t offset) {
+          // For anything in the page list we know we do not see the parent for this offset,
+          // so regardless of what it is just keep looking for a gap. Additionally any
+          // children that we have will see this content instead of our parents, and so we
+          // know it is also safe to skip them as well.
+          return ZX_ERR_NEXT;
+        },
+        [&first_gap_start, &last_gap_end](uint64_t start, uint64_t end) {
+          first_gap_start = ktl::min(first_gap_start, start);
+          last_gap_end = ktl::max(last_gap_end, end);
+          return ZX_ERR_NEXT;
+        },
+        candidate_offset, candidate_offset + candidate_len);
+
+    if (first_gap_start >= last_gap_end) {
+      vm_vmo_range_update_from_parent_skipped.Add(1);
+      return false;
+    }
+    // Invalidate the new, potentially smaller, range that covers the gaps. Due to the
+    // inability to store state we cannot use this smaller range for processing any of our
+    // children, as we would not be able to restore the original range when walking back up,
+    // but this still limits the range we process here and might have elided this subtree
+    // altogether if no gap was found.
+    // Construct a new, potentially smaller, range that covers the gaps. This will still
+    // result in potentially processing pages that are locally covered, but are limited to a
+    // single range here.
+    if (candidate->paged_ref_) {
+      AssertHeld(candidate->paged_ref_->lock_ref());
+      candidate->paged_ref_->RangeChangeUpdateLocked(
+          VmCowRange(first_gap_start, last_gap_end - first_gap_start), op);
+    }
+    vm_vmo_range_update_from_parent_performed.Add(1);
+    // We processed this node and may need to walk the subtree.
+    return true;
+  };
+
+  if (range.is_empty()) {
+    return;
+  }
+
+  if (self.locked().children_list_len_ == 0) {
+    return;
+  }
+  TreeWalkCursor cursor(ktl::move(self));
+
+  bool candidate = cursor.NextChild();
+
+  while (candidate) {
+    if (check_candidate(&cursor.GetCur().locked(), cursor.GetCurrentOffset())) {
+      candidate = cursor.NextChild();
+    } else {
+      candidate = cursor.NextSibling();
+    }
+  }
 }
 
 template <typename T>

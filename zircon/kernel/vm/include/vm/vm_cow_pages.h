@@ -1648,6 +1648,21 @@ class VmCowPages final : public VmHierarchyBase,
   fbl::TaggedDoublyLinkedList<VmCowPages*, internal::ChildListTag> children_list_
       TA_GUARDED(lock());
 
+  // To support iterating over a subtree a cursor object is used and installed in nodes as they are
+  // iterated. This ensures that if iteration races with any node destruction that the cursor can be
+  // used to perform fixups.
+  // Any cursors in these lists are processed (i.e. moved) during a dead transition, and so it is
+  // invalid to perform an iteration over a non-alive node / subtree. Equivalently the cursor itself
+  // relies on this fact to allow it to safely store raw pointer backlinks, knowing they will always
+  // be cleared in a dead transition prior to the pointer becoming invalid.
+  // Both the root (i.e. start and final termination point) and the current location of any cursor
+  // needs to be tracked, as these both need potential updates.
+  struct RootListTag {};
+  struct CurListTag {};
+  class TreeWalkCursor;
+  fbl::TaggedDoublyLinkedList<TreeWalkCursor*, RootListTag> root_cursor_list_ TA_GUARDED(lock());
+  fbl::TaggedDoublyLinkedList<TreeWalkCursor*, CurListTag> cur_cursor_list_ TA_GUARDED(lock());
+
   // Counts the total number of pages pinned by ::CommitRange. If one page is pinned n times, it
   // contributes n to this count.
   uint64_t pinned_page_count_ TA_GUARDED(lock()) = 0;
