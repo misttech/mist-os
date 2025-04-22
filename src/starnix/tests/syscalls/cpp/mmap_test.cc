@@ -1020,6 +1020,71 @@ TEST_F(MMapProcTest, MprotectFailureIsConsistent) {
   unlink(path.c_str());
 }
 
+TEST_F(MMapProcTest, MProtectAppliedPartially) {
+  // Calls mprotect on a region that contains 3 adjacent mappings:
+  // The first and third mapping can be mprotected with RW, but the second can't
+  // because it's a mapping of a read-only file.
+  // Tests that mprotect fails, but still changes the permissions of the
+  // first mapping.
+
+  // Create a file
+  test_helper::ScopedTempDir tmp_dir;
+  std::string path = tmp_dir.path() + "/test_mprotect_applied_partially";
+  fbl::unique_fd fd = fbl::unique_fd(open(path.c_str(), O_RDONLY | O_CREAT | O_TRUNC, 0777));
+  ASSERT_TRUE(fd);
+
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+
+  // Find unused address space to hold the 3 adjacent mappings
+  char* base_address = nullptr;
+  {
+    auto mapping = test_helper::ScopedMMap::MMap(nullptr, page_size * 3, PROT_NONE,
+                                                 MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    EXPECT_TRUE(*mapping);
+    base_address = static_cast<char*>(mapping->mapping());
+  }
+
+  // Create the 3 adjacent mappings
+  auto first_mapping = test_helper::ScopedMMap::MMap(
+      base_address, page_size, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0);
+  auto second_mapping = test_helper::ScopedMMap::MMap(
+      base_address + page_size, page_size, PROT_READ, MAP_SHARED | MAP_FIXED, fd.get(), 0);
+  auto third_mapping =
+      test_helper::ScopedMMap::MMap(base_address + 2 * page_size, page_size, PROT_NONE,
+                                    MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0);
+  ASSERT_TRUE(*first_mapping);
+  ASSERT_TRUE(*second_mapping);
+  ASSERT_TRUE(*third_mapping);
+
+  // Helper that checks if the permissions of `mapping` match `expected_perms`.
+  auto perms_of_mapping_match = [this](test_helper::ScopedMMap& mapping,
+                                       std::string expected_perms) -> testing::AssertionResult {
+    std::string maps;
+    if (!files::ReadFileToString(proc_path() + "/self/maps", &maps)) {
+      return testing::AssertionFailure() << "reading /proc/self/maps failed";
+    }
+    auto first_mapping_report =
+        test_helper::find_memory_mapping(reinterpret_cast<uintptr_t>(mapping.mapping()), maps);
+    if (!first_mapping_report.has_value()) {
+      return testing::AssertionFailure() << "mapping not found in /proc/self/maps";
+    }
+    if (first_mapping_report->perms != expected_perms) {
+      return testing::AssertionFailure()
+             << "expected perms " << expected_perms << ", got " << first_mapping_report->perms;
+    }
+    return testing::AssertionSuccess();
+  };
+
+  // Check the permissions before and after `mprotect`.
+  EXPECT_TRUE(perms_of_mapping_match(*first_mapping, "---p"));
+  EXPECT_TRUE(perms_of_mapping_match(*third_mapping, "---p"));
+  errno = 0;
+  EXPECT_EQ(mprotect(first_mapping->mapping(), page_size * 3, PROT_READ | PROT_WRITE), -1);
+  EXPECT_EQ(errno, EACCES);
+  EXPECT_TRUE(perms_of_mapping_match(*first_mapping, "rw-p"));
+  EXPECT_TRUE(perms_of_mapping_match(*third_mapping, "---p"));
+}
+
 bool IsMapped(uintptr_t addr) {
   static const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
   int rv = msync(reinterpret_cast<void*>(addr & ~(page_size - 1)), page_size, MS_ASYNC);

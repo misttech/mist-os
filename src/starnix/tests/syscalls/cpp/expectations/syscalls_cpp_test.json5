@@ -33,6 +33,9 @@
                 // TODO(https://fxbug.dev/42072786)
                 "MMapProcTest.AdjacentFileMappings",
 
+                // TODO(https://fxbug.dev/411617451)
+                "MMapProcTest.MProtectAppliedPartially",
+
                 // TODO(https://fxbug.dev/42079266)
                 "VdsoTest.VdsoCanBeMadvised",
 
