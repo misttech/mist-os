@@ -175,6 +175,8 @@ type RuleMatcherV4 = table {
     /// Matches whether the source address of the packet is from the subnet.
     1: from fuchsia.net.Ipv4AddressWithPrefix;
     /// The rest of the matcher that is common between IP versions.
+    ///
+    /// Interpreted as an empty table if absent.
     2: base BaseMatcher;
 };
 // LINT.ThenChange(ipv6.fidl)

@@ -547,10 +547,7 @@ impl<I: IpExt> RulesWorker<I> {
                     E::Unauthenticated => panic!(
                         "should already be authenticated to delete rule we previously installed"
                     ),
-                    E::RuleAlreadyExists
-                    | E::InvalidAction
-                    | E::BaseMatcherMissing
-                    | E::InvalidMatcher => {
+                    E::RuleAlreadyExists | E::InvalidAction | E::InvalidMatcher => {
                         panic!("should not get RuleSetError {e:?} while deleting")
                     }
                     E::__SourceBreaking { unknown_ordinal } => {
@@ -616,7 +613,6 @@ impl AddRuleError {
                 RuleSetError::RuleDoesNotExist => {
                     panic!("should not get RuleDoesNotExist while adding")
                 }
-                RuleSetError::BaseMatcherMissing => Errno::EINVAL,
                 RuleSetError::InvalidMatcher => Errno::EINVAL,
                 RuleSetError::__SourceBreaking { unknown_ordinal: _ } => Errno::EINVAL,
             },

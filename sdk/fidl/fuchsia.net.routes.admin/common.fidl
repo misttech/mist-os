@@ -145,8 +145,7 @@ type RuleSetError = flexible enum : uint32 {
     RULE_ALREADY_EXISTS = 3;
     /// Tried to remove a rule at an index that does not have an existing rule.
     RULE_DOES_NOT_EXIST = 4;
-    /// The matcher is misconfigured because the base part is missing.
-    BASE_MATCHER_MISSING = 5;
-    /// The matcher is invalid, there are parts of the matcher that are mutually exclusive.
-    INVALID_MATCHER = 6;
+    /// The matcher is invalid, there are parts of the matcher that are invalid
+    /// on their own or mutually exclusive.
+    INVALID_MATCHER = 5;
 };

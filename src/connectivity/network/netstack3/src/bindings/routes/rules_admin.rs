@@ -338,7 +338,7 @@ impl<I: Ip + FidlRuleAdminIpExt> UserRuleSet<I> {
                     Err(err) => {
                         log::warn!("error addding a rule: {err:?}");
                         return responder
-                            .send(Err(fnet_routes_admin::RuleSetError::BaseMatcherMissing))
+                            .send(Err(fnet_routes_admin::RuleSetError::InvalidMatcher))
                             .map(ControlFlow::Continue);
                     }
                 };
