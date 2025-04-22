@@ -41,10 +41,11 @@ class TracingAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
               "teardown_test"
             * Logs a info message onto device that test case has ended.
         """
-        # in case if any trace session started by the test cases remains initialized.
-        self.device.tracing.terminate()
-
-        super().teardown_test()
+        try:
+            # in case if any trace session started by the test cases remains initialized.
+            self.device.tracing.terminate()
+        finally:
+            super().teardown_test()
 
     # Mobly enumerates test cases alphabetically, change in order of test cases
     # or their names or mobly enumeration logic can break tests. To avoid this,
