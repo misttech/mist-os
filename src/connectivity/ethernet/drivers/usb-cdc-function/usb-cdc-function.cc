@@ -5,17 +5,18 @@
 #include "src/connectivity/ethernet/drivers/usb-cdc-function/usb-cdc-function.h"
 
 #include <endian.h>
+#include <fidl/fuchsia.boot.metadata/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.usb.function/cpp/fidl.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/metadata.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/fdf/cpp/dispatcher.h>
 
 #include <mutex>
 #include <vector>
 
+#include <ddktl/metadata_server.h>
 #include <usb-endpoint/usb-endpoint-client.h>
 #include <usb/request-fidl.h>
 #include <usb/usb-request.h>
@@ -59,13 +60,22 @@ void UsbCdcFunction::usb_request_queue(usb::FidlRequest&& req,
 }
 
 zx_status_t UsbCdcFunction::cdc_generate_mac_address() {
-  size_t actual;
-  auto status = device_get_metadata(parent_, DEVICE_METADATA_MAC_ADDRESS, &mac_addr_,
-                                    sizeof(mac_addr_), &actual);
-  if (status != ZX_OK || actual != sizeof(mac_addr_)) {
+  zx::result result = ddk::GetMetadataIfExists<fuchsia_boot_metadata::MacAddressMetadata>(parent_);
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to get MAC address metadata: %s", result.status_string());
+    return result.status_value();
+  }
+  if (result.value().has_value()) {
+    const auto& metadata = result.value().value();
+    if (!metadata.mac_address().has_value()) {
+      zxlogf(ERROR, "MAC address metadata missing mac_address field");
+      return ZX_ERR_INTERNAL;
+    }
+    mac_addr_ = metadata.mac_address().value().octets();
+  } else {
     zxlogf(INFO, "ethernet MAC metadata not found. Generating random address");
 
-    zx_cprng_draw(mac_addr_, sizeof(mac_addr_));
+    zx_cprng_draw(mac_addr_.data(), mac_addr_.size());
     mac_addr_[0] = 0x02;
   }
 
@@ -88,7 +98,7 @@ zx_status_t UsbCdcFunction::EthernetImplQuery(uint32_t options, ethernet_info_t*
 
   memset(out_info, 0, sizeof(*out_info));
   out_info->mtu = ETH_MTU;
-  memcpy(out_info->mac, mac_addr_, sizeof(mac_addr_));
+  memcpy(out_info->mac, mac_addr_.data(), mac_addr_.size());
   out_info->netbuf_size = sizeof(txn_info_t);
 
   return ZX_OK;

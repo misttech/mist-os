@@ -14,7 +14,7 @@
 #include <lib/sync/completion.h>
 #include <zircon/listnode.h>
 
-#include <atomic>
+#include <array>
 #include <mutex>
 #include <optional>
 #include <thread>
@@ -112,7 +112,7 @@ class UsbCdcFunction : public UsbCdcFunctionType,
   std::atomic_bool unbound_ = false;  // set to true when device is going away.
 
   // Device attributes
-  uint8_t mac_addr_[ETH_MAC_SIZE] = {};
+  std::array<uint8_t, ETH_MAC_SIZE> mac_addr_;
   // Ethernet lock -- must be acquired after tx_mutex
   // when both locks are held.
   std::mutex ethernet_mutex_ __TA_ACQUIRED_AFTER(tx_mutex_);
