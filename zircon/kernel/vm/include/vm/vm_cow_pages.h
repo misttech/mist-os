@@ -750,10 +750,6 @@ class VmCowPages final : public VmHierarchyBase,
   // backed) then a nullptr can be provided.
   void RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op, DeferredOps* deferred)
       TA_REQ(lock());
-  // TODO(https://fxbug.dev/338300943): Under fine grained locking children cannot be iterated while
-  // this VMOs lock is held. This method exists while call sites transition to the above method that
-  // takes ownership of the lock.
-  void RangeChangeUpdateCowChildrenLocked(VmCowRange range, RangeChangeOp op) TA_REQ(lock());
 
   // Promote pages in the specified range for reclamation under memory pressure. |offset| will be
   // rounded down to the page boundary, and |len| will be rounded up to the page boundary.
@@ -1135,16 +1131,8 @@ class VmCowPages final : public VmHierarchyBase,
   // AddNewPagesLocked or similar.
   zx_status_t AllocUninitializedPage(vm_page_t** page, AnonymousPageRequest* page_request);
 
-  // Helper for removing a page from the PageQueues and freeing it (either to the PMM, or the owning
-  // page source).
-  void RemoveAndFreePageLocked(vm_page_t* page) TA_REQ(lock());
-
   // Helper for removing a page from the PageQueues and adding to a deferred ops for later freeing.
   void RemovePageLocked(vm_page_t* page, DeferredOps& ops) TA_REQ(lock());
-
-  // Helper for removing a page from the page queues and either returning it immediately to the PMM
-  // if it's a loaned page, or appending it to the supplied list.
-  void RemovePageToListLocked(vm_page_t* page, list_node_t* free_list) TA_REQ(lock());
 
   // Helper class for managing a two part add page transaction. This object allows adding a page to
   // be split into a check and allocation, which can fail, with the final insertion, which cannot

@@ -817,18 +817,6 @@ zx::result<vm_page_t*> VmCowPages::AllocLoanedPage(F allocated) {
   });
 }
 
-void VmCowPages::RemoveAndFreePageLocked(vm_page_t* page) {
-  if (page->is_loaned()) {
-    FreeLoanedPagesHolder flph;
-    Pmm::Node().BeginFreeLoanedPage(
-        page, [](vm_page_t* page) { pmm_page_queues()->Remove(page); }, flph);
-    Pmm::Node().FinishFreeLoanedPages(flph);
-  } else {
-    pmm_page_queues()->Remove(page);
-    FreePage(page);
-  }
-}
-
 void VmCowPages::RemovePageLocked(vm_page_t* page, DeferredOps& ops) {
   if (page->is_loaned()) {
     Pmm::Node().BeginFreeLoanedPage(
@@ -836,18 +824,6 @@ void VmCowPages::RemovePageLocked(vm_page_t* page, DeferredOps& ops) {
   } else {
     pmm_page_queues()->Remove(page);
     list_add_tail(ops.FreedList(this).List(), &page->queue_node);
-  }
-}
-
-void VmCowPages::RemovePageToListLocked(vm_page_t* page, list_node_t* free_list) {
-  if (page->is_loaned()) {
-    FreeLoanedPagesHolder flph;
-    Pmm::Node().BeginFreeLoanedPage(
-        page, [](vm_page_t* page) { pmm_page_queues()->Remove(page); }, flph);
-    Pmm::Node().FinishFreeLoanedPages(flph);
-  } else {
-    pmm_page_queues()->Remove(page);
-    list_add_tail(free_list, &page->queue_node);
   }
 }
 
@@ -6257,135 +6233,6 @@ void VmCowPages::RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op,
   if (paged_ref_ && !range.is_empty()) {
     paged_backlink_locked(this)->RangeChangeUpdateLocked(range, op);
   }
-}
-
-void VmCowPages::RangeChangeUpdateCowChildrenLocked(VmCowRange range, RangeChangeOp op) {
-  canary_.Assert();
-
-  // Helper for doing checking and performing a range change on a single candidate node. Although
-  // this is used once it is split out here to make the loops that actually walk the tree as easy to
-  // read as possible.
-  // Returns true if the passed in |candidate| had some overlap with the operation range, and hence
-  // its children also need to be walked. If false is returned the children of |candidate| can be
-  // skipped.
-  auto check_candidate = [range, op](VmCowPages* candidate, uint64_t cur_accumulative_offset)
-                             TA_REQ(candidate->lock()) -> bool {
-    uint64_t candidate_offset = 0;
-    uint64_t candidate_len = 0;
-    if (!GetIntersect(cur_accumulative_offset, candidate->size_, range.offset, range.len,
-                      &candidate_offset, &candidate_len)) {
-      // Not intersection, can skip this node and the subtree.
-      return false;
-    }
-    // if they intersect with us, then by definition the new offset must be >= total parent_offset_
-    DEBUG_ASSERT(candidate_offset >= cur_accumulative_offset);
-
-    // subtract our offset
-    candidate_offset -= cur_accumulative_offset;
-
-    // verify that it's still within range of us
-    DEBUG_ASSERT(candidate_offset + candidate_len <= candidate->size_);
-
-    // Check if there are any gaps in this range where we would actually see the parent.
-    uint64_t first_gap_start = UINT64_MAX;
-    uint64_t last_gap_end = 0;
-    candidate->page_list_.ForEveryPageAndGapInRange(
-        [](auto page, uint64_t offset) {
-          // For anything in the page list we know we do not see the parent for this offset,
-          // so regardless of what it is just keep looking for a gap. Additionally any
-          // children that we have will see this content instead of our parents, and so we
-          // know it is also safe to skip them as well.
-          return ZX_ERR_NEXT;
-        },
-        [&first_gap_start, &last_gap_end](uint64_t start, uint64_t end) {
-          first_gap_start = ktl::min(first_gap_start, start);
-          last_gap_end = ktl::max(last_gap_end, end);
-          return ZX_ERR_NEXT;
-        },
-        candidate_offset, candidate_offset + candidate_len);
-
-    if (first_gap_start >= last_gap_end) {
-      // Entire range was traversed and no gaps found. Neither us, nor our children, can see
-      // the parents content for this range and so we can skip the range update and not walk
-      // the subtree.
-      vm_vmo_range_update_from_parent_skipped.Add(1);
-      return false;
-    }
-    // Invalidate the new, potentially smaller, range that covers the gaps. Due to the
-    // inability to store state we cannot use this smaller range for processing any of our
-    // children, as we would not be able to restore the original range when walking back up,
-    // but this still limits the range we process here and might have elided this subtree
-    // altogether if no gap was found.
-    // Construct a new, potentially smaller, range that covers the gaps. This will still
-    // result in potentially processing pages that are locally covered, but are limited to a
-    // single range here.
-    if (candidate->paged_ref_) {
-      AssertHeld(candidate->paged_ref_->lock_ref());
-      candidate->paged_ref_->RangeChangeUpdateLocked(
-          VmCowRange(first_gap_start, last_gap_end - first_gap_start), op);
-    }
-    vm_vmo_range_update_from_parent_performed.Add(1);
-    // We processed this node and may need to walk the subtree.
-    return true;
-  };
-
-  if (range.is_empty()) {
-    return;
-  }
-
-  // Set the initial parent to this so we can start processing the subtree.
-  VmCowPages* cur_parent = this;
-  AssertHeld(cur_parent->lock_ref());
-  // Candidate tracks the child of cur_parent that we are considering for performing a range change
-  // update on and then potentially walking its subtree.
-  using ChildIter = fbl::TaggedDoublyLinkedList<VmCowPages*, internal::ChildListTag>::iterator;
-  ChildIter candidate = cur_parent->children_list_.begin();
-
-  // As we walk up and down the tree we track the total parent offset so that we can translate the
-  // original op range into the space of the child.
-  uint64_t cumulative_parent_offset = 0;
-
-  // Keep processing as long as there is some potential subtree to process.
-  while (candidate.IsValid()) {
-    // Check this candidate and keep walking down and to the right as far as possible.
-    do {
-      AssertHeld(candidate->lock_ref());
-      // Add this candidate's parent offset onto the current cumulative total parent offset to
-      // project the original op range down.
-      const uint64_t candidate_offset = cumulative_parent_offset + candidate->parent_offset_;
-      // Potentially perform any range change operation, and if we do and we have children then
-      // walk down.
-      if (check_candidate(&*candidate, candidate_offset) && candidate->children_list_len_ > 0) {
-        cur_parent = &*candidate;
-        candidate = cur_parent->children_list_.begin();
-        cumulative_parent_offset = candidate_offset;
-      } else {
-        // Either no children or do not need to walk this subtree, move to our sibling.
-        candidate++;
-      }
-    } while (candidate.IsValid());
-
-    // Need to walk up and see if there is a sibling in our parent chain that needs checking,
-    // stopping if we would exit our original subtree.
-    // Try the siblings of current, unless this would cause us to leave the subtree
-    while (cur_parent != this && !candidate.IsValid()) {
-      VmCowPages* next_parent = cur_parent->parent_.get();
-      DEBUG_ASSERT(next_parent);
-      AssertHeld(next_parent->lock_ref());
-
-      // Next candidate is the sibling of our current parent.
-      candidate = next_parent->children_list_.make_iterator(*cur_parent);
-      candidate++;
-
-      // Update cur_parent and update our cumulative offset tracking.
-      DEBUG_ASSERT(cumulative_parent_offset >= cur_parent->parent_offset_);
-      cumulative_parent_offset -= cur_parent->parent_offset_;
-      cur_parent = cur_parent->parent_.get();
-    }
-  }
-  // We only terminate once we arrive back at the start, which should imply no parent offset is
-  // still being applied.
-  DEBUG_ASSERT(cumulative_parent_offset == 0);
 }
 
 // static
