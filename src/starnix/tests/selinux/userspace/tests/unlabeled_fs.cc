@@ -8,25 +8,22 @@
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
+#include "src/starnix/tests/selinux/userspace/base_initial_sids.h"
 #include "src/starnix/tests/selinux/userspace/util.h"
 
 namespace {
 
-TEST(InitialSidTest, NewFileTakesFilesystemInitialSidType) {
-  LoadPolicy("initial_sids_policy.pp");
+TEST(UnlabeledFsTest, CreateFileInUnlabeledFs) {
+  LoadPolicy("file_transition_policy.pp");
   ASSERT_EQ(WriteTaskAttr("current", "unconfined_u:unconfined_r:unconfined_t:s0"), fit::ok());
 
-  // Create a file in `/`, which is not specifically labeled in the policy and will default to being
-  // labeled with the `unlabeled` initial SID.
+  // Check that `/` which is not labeled in the policy is labeled with the `unlabeled` initial SID.
+  EXPECT_EQ(GetLabel("/"), kUnlabeledInitialSid);
+
+  // Check that creating a file in an unlabeled filesystem follows transition rules.
   auto fd = fbl::unique_fd(open("/test-file", O_CREAT, 0777));
   ASSERT_THAT(fd.get(), SyscallSucceeds()) << "while creating file";
-
-  ssize_t len = 0;
-  char label[256] = {};
-  ASSERT_THAT(len = fgetxattr(fd.get(), "security.selinux", label, sizeof(label)),
-              SyscallSucceeds());
-  EXPECT_EQ(RemoveTrailingNul(std::string(label, len)),
-            "unconfined_u:object_r:unlabeled_sid_test_t:s0");
+  EXPECT_EQ(GetLabel(fd.get()), "unconfined_u:object_r:unlabeled_unconfined_file_t:s0");
 }
 
 }  // namespace

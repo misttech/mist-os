@@ -163,9 +163,10 @@ _COMPOSITE_POLICY_PATHS = [
     ),
     (
         [
-            "initial_sids_policy.conf",
+            "base_policy.conf",
+            "new_file/file_transition_policy.conf",
         ],
-        "initial_sids_policy.pp",
+        "file_transition_policy.pp",
     ),
 ]
 
