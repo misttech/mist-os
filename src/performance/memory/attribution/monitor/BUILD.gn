@@ -44,6 +44,7 @@ rustc_binary("bin") {
     "//src/lib/mapped-vmo",
     "//src/lib/trace/rust:trace",
     "//src/performance/memory/attribution/processing",
+    "//src/performance/memory/index_table_builder",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",

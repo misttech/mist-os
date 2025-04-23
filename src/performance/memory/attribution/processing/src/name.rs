@@ -15,7 +15,17 @@ use zx_types::ZX_MAX_NAME_LEN;
 
 /// Zircon resource name with a maximum length of `ZX_MAX_NAME_LEN - 1`.
 #[derive(
-    Eq, Hash, FromBytes, Immutable, KnownLayout, PartialEq, PartialOrd, Ord, Serialize, Clone,
+    Default,
+    Eq,
+    Hash,
+    FromBytes,
+    Immutable,
+    KnownLayout,
+    PartialEq,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Clone,
 )]
 pub struct ZXName([u8; ZX_MAX_NAME_LEN]);
 
@@ -92,6 +102,12 @@ impl std::fmt::Debug for ZXName {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self.as_bstr(), f)
+    }
+}
+
+impl From<&ZXName> for ZXName {
+    fn from(name_ref: &ZXName) -> Self {
+        name_ref.clone()
     }
 }
 

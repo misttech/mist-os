@@ -7,7 +7,7 @@ use crate::common::PrincipalIdMap;
 use crate::resources::{Job, KernelResources};
 use attribution_processing::{
     Attribution, AttributionData, AttributionDataProvider, Principal, PrincipalDescription,
-    PrincipalType, ResourceReference, ZXName,
+    PrincipalType, ResourceReference,
 };
 use fuchsia_sync::Mutex;
 use fuchsia_trace::duration;
@@ -106,14 +106,10 @@ impl AttributionDataProvider for AttributionDataProviderImpl {
                 }
             }
 
-            let mut resource_names =
-                kernel_resources.resource_names.into_iter().collect::<Vec<(ZXName, u64)>>();
-            resource_names.sort_unstable_by_key(|(_, index)| *index);
-
             Ok(AttributionData {
                 principals_vec: principals,
                 resources_vec: kernel_resources.resources.into_values().map(|r| r.into()).collect(),
-                resource_names: resource_names.into_iter().map(|(name, _)| name).collect(),
+                resource_names: kernel_resources.resource_names.build(),
                 attributions,
             })
         }
@@ -123,11 +119,10 @@ impl AttributionDataProvider for AttributionDataProviderImpl {
 
 #[cfg(test)]
 mod tests {
+    use attribution_processing::{PrincipalIdentifier, ZXName};
     use core::assert_eq;
-    use std::collections::HashSet;
-
-    use attribution_processing::PrincipalIdentifier;
     use fidl_fuchsia_memory_attribution as fattribution;
+    use std::collections::HashSet;
 
     use super::*;
     use crate::attribution_client::{AttributionProvider, PrincipalDefinition};
