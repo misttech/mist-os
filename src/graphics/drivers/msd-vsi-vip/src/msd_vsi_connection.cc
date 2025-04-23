@@ -36,7 +36,7 @@ magma_status_t MsdVsiAbiConnection::MapBuffer(msd::Buffer& buff, uint64_t gpu_va
   return status.get();
 }
 
-void MsdVsiAbiConnection::ReleaseBuffer(msd::Buffer& buff) {
+void MsdVsiAbiConnection::ReleaseBuffer(msd::Buffer& buff, bool shutting_down) {
   auto connection = ptr().get();
   auto buffer = MsdVsiAbiBuffer::cast(&buff)->ptr();
 

@@ -23,7 +23,8 @@ MagmaSystemConnection::~MagmaSystemConnection() {
   // away due to the shutdown.
   context_map_.clear();
   for (auto iter = buffer_map_.begin(); iter != buffer_map_.end();) {
-    msd_connection()->ReleaseBuffer(*iter->second->msd_buf());
+    const bool kShuttingDown = true;
+    msd_connection()->ReleaseBuffer(*iter->second->msd_buf(), kShuttingDown);
     iter = buffer_map_.erase(iter);
   }
 

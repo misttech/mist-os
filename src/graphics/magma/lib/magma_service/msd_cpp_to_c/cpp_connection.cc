@@ -25,9 +25,10 @@ magma_status_t CppConnection::MapBuffer(msd::Buffer& buffer, uint64_t gpu_va, ui
   return msd_connection_map_buffer(connection_, msd_buffer.buffer(), gpu_va, offset, length, flags);
 }
 
-void CppConnection::ReleaseBuffer(msd::Buffer& buffer) {
+void CppConnection::ReleaseBuffer(msd::Buffer& buffer, bool shutting_down) {
   auto& msd_buffer = static_cast<CppBuffer&>(buffer);
 
+  // TODO(b/406629017) - pass shutting_down, use msd_connection_release_buffer2
   msd_connection_release_buffer(connection_, msd_buffer.buffer());
 }
 

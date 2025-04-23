@@ -127,7 +127,9 @@ class Connection {
   // Signals that the given |buffer| is no longer in use on the given |connection|. This must be
   // called for every connection associated with a buffer before the buffer is destroyed, or for
   // every buffer associated with a connection before the connection is destroyed.
-  virtual void ReleaseBuffer(Buffer& buffer) {}
+  // In addition to handling client requests, this may be called when a connection is released,
+  // in which case |shutting_down| is true and the implementation should not block.
+  virtual void ReleaseBuffer(Buffer& buffer, bool shutting_down = false) {}
 
   // Sets the callback to be used by a connection for various notifications.
   // This is called when a connection is created, and also called to unset

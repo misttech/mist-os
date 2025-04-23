@@ -60,8 +60,12 @@ magma_status_t msd_connection_map_buffer(struct MsdConnection* msd_connection,
                                          struct MsdBuffer* msd_buffer, uint64_t gpu_va,
                                          uint64_t offset, uint64_t length, uint64_t flags);
 
+// TODO(b/406629017) - remove after transition to msd_connection_release_buffer2.
 void msd_connection_release_buffer(struct MsdConnection* msd_connection,
                                    struct MsdBuffer* msd_buffer);
+
+void msd_connection_release_buffer2(struct MsdConnection* msd_connection,
+                                    struct MsdBuffer* msd_buffer, int32_t shutting_down);
 
 struct MsdContext* msd_connection_create_context(struct MsdConnection* msd_connection);
 

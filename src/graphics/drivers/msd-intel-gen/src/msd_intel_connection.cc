@@ -241,7 +241,7 @@ magma_status_t MsdIntelAbiConnection::MapBuffer(msd::Buffer& msd_buffer, uint64_
   return status.get();
 }
 
-void MsdIntelAbiConnection::ReleaseBuffer(msd::Buffer& buffer) {
+void MsdIntelAbiConnection::ReleaseBuffer(msd::Buffer& buffer, bool shutting_down) {
   ptr()->ReleaseBuffer(static_cast<MsdIntelAbiBuffer*>(&buffer)->ptr()->platform_buffer());
 }
 

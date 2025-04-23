@@ -246,7 +246,7 @@ class MsdArmAbiConnection : public msd::Connection {
   magma_status_t UnmapBuffer(msd::Buffer& buffer, uint64_t gpu_va) override;
   magma_status_t BufferRangeOp(msd::Buffer& buffer, uint32_t options, uint64_t start_offset,
                                uint64_t length) override;
-  void ReleaseBuffer(msd::Buffer& buffer) override;
+  void ReleaseBuffer(msd::Buffer& buffer, bool shutting_down) override;
 
   void SetNotificationCallback(msd::NotificationHandler* handler) override;
   std::unique_ptr<msd::Context> CreateContext() override;
