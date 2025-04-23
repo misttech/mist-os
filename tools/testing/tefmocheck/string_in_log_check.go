@@ -447,8 +447,10 @@ func fuchsiaLogChecks() []FailureModeCheck {
 			Type: syslogType,
 		},
 		&stringInLogCheck{
+			// LINT.IfChange
 			String: "honeydew.errors.HealthCheckError: health check failed on",
-			Type:   swarmingOutputType,
+			// LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/fuchsia_device/fuchsia_device_impl.py)
+			Type: swarmingOutputType,
 		},
 		&stringInLogCheck{
 			// LINT.IfChange(blob_write_failure)
@@ -868,6 +870,12 @@ func infraToolLogChecks() []FailureModeCheck {
 			String:      "failed to merge profiles",
 			Type:        swarmingOutputType,
 			AlwaysFlake: true,
+		},
+		&stringInLogCheck{
+			// LINT.IfChange
+			String: "One or more FuchsiaDevice's health check failed in teardown_test. So failing the test case...",
+			// LINT.ThenChange(//src/testing/end_to_end/mobly_base_tests/fuchsia_base_test/fuchsia_base_test.py)
+			Type: swarmingOutputType,
 		},
 	}
 }
