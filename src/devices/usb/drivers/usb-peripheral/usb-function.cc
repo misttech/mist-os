@@ -54,9 +54,6 @@ zx_status_t UsbFunction::AddDevice(const std::string& name) {
   };
   status = DdkAdd(ddk::DeviceAddArgs(name.c_str())
                       .set_str_props(props)
-                      // TODO(b/407987472): Don't forward DEVICE_METADATA_SERIAL_NUMBER once no
-                      // longer retrieved.
-                      .forward_metadata(peripheral_->parent(), DEVICE_METADATA_SERIAL_NUMBER)
                       .set_fidl_service_offers(offers)
                       .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {

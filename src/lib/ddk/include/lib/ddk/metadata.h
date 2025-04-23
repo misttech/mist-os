@@ -34,10 +34,6 @@ static_assert(DEVICE_METADATA_PARTITION_MAP == ZBI_TYPE_DRV_PARTITION_MAP, "");
 // type: usb_mode_t
 #define DEVICE_METADATA_USB_MODE 0x4D425355  // USBM
 
-// TODO(b/373918767): Remove once no longer used.
-#define DEVICE_METADATA_SERIAL_NUMBER 0x4e4c5253  // SRLN
-static_assert(DEVICE_METADATA_SERIAL_NUMBER == ZBI_TYPE_SERIAL_NUMBER, "");
-
 // Platform board private data (for board driver)
 // type: ???
 #define DEVICE_METADATA_BOARD_PRIVATE 0x524F426D  // mBOR

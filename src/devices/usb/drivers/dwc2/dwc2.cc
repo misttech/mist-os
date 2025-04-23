@@ -1098,8 +1098,6 @@ zx_status_t Dwc2::Init(const dwc2_config::Config& config) {
   };
   status = DdkAdd(ddk::DeviceAddArgs("dwc2")
                       .set_str_props(props)
-                      // TODO(b/373918767): Don't forward once no longer retrieved.
-                      .forward_metadata(parent(), DEVICE_METADATA_SERIAL_NUMBER)
                       .set_fidl_service_offers(offers)
                       .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {

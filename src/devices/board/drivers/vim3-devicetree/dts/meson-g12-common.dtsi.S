@@ -334,7 +334,7 @@
 			g-turnaround-time = <9>;
 			dma-burst-len = <5>;
 			boot-metadata = <0x43414D6D 0>, /*ZBI_TYPE_DRV_MAC_ADDRESS*/
-				<0x4e4c5253 0>; /*DEVICE_METADATA_SERIAL_NUMBER*/
+				<0x4e4c5253 0>; /*ZBI_TYPE_SERIAL_NUMBER*/ 
 		};
 
 		xhci: usb@ff500000 {
