@@ -882,33 +882,53 @@ def record_fuchsia_workspace(
     )
     # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
 
-    # LINT.IfChange
     generated.record_symlink(
+        # LINT.IfChange
+        "workspace/fuchsia_build_generated/in_tree_idk",
+        # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
+        # LINT.IfChange
+        gn_output_dir / "regenerator_outputs/bazel_in_tree_idk",
+        # LINT.ThenChange(//build/regenerator.py)
+    )
+
+    generated.record_symlink(
+        # LINT.IfChange
         "workspace/fuchsia_build_generated/fuchsia_in_tree_idk.hash",
-        gn_output_dir / "obj/build/bazel/fuchsia_in_tree_idk.hash",
+        # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
+        # LINT.IfChange
+        gn_output_dir / "sdk/prebuild/in_tree_collection.json",
+        # LINT.ThenChange(//build/regenerator.py)
     )
 
     generated.record_symlink(
+        # LINT.IfChange
         "workspace/fuchsia_build_generated/fuchsia_internal_only_idk.hash",
+        # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
+        # LINT.IfChange
         gn_output_dir / "obj/build/bazel/fuchsia_internal_only_idk.hash",
+        # LINT.ThenChange(//build/bazel/BUILD.gn)
     )
 
-    # LINT.ThenChange(//build//bazel/BUILD.gn)
-
-    # LINT.IfChange
     # The following symlinks are used only by bazel_action.py when processing
     # the list of Bazel source inputs, the actual repository setup in
-    # WORKSPACE.bazel reuse the two symlinks above instead.
+    # WORKSPACE.bazel reuses the two symlinks above instead.
     generated.record_symlink(
+        # LINT.IfChange
         "workspace/fuchsia_build_generated/fuchsia_sdk.hash",
-        gn_output_dir / "obj/build/bazel/fuchsia_in_tree_idk.hash",
+        # LINT.ThenChange(//build/bazel/scripts/bazel_action.py)
+        # LINT.IfChange
+        gn_output_dir / "sdk/prebuild/in_tree_collection.json",
+        # LINT.ThenChange(//build/regenerator.py)
     )
 
     generated.record_symlink(
+        # LINT.IfChange
         "workspace/fuchsia_build_generated/internal_sdk.hash",
+        # LINT.ThenChange(//build/bazel/scripts/bazel_action.py)
+        # LINT.IfChange
         gn_output_dir / "obj/build/bazel/fuchsia_internal_only_idk.hash",
+        # LINT.ThenChange(//build/bazel/BUILD.gn)
     )
-    # LINT.ThenChange(//build/bazel/scripts/bazel_action.py)
 
     # Create a link to an empty repository. This is updated by bazel_action.py
     # before each Bazel invocation to point to the @gn_targets content specific

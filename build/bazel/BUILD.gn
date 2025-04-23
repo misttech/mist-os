@@ -50,11 +50,6 @@ group("generate_fuchsia_sdk_repository") {
 }
 
 # LINT.IfChange
-generate_content_hash_file("fuchsia_in_tree_idk.hash") {
-  source_paths = [ "$root_build_dir/regenerator_outputs/bazel_in_tree_idk" ]
-  deps = [ "//sdk:bazel_in_tree_idk" ]
-}
-
 generate_content_hash_file("fuchsia_internal_only_idk.hash") {
   source_paths = [ "$root_build_dir/sdk/exported/bazel_internal_only_idk" ]
   deps = [ "//sdk:bazel_internal_only_idk" ]

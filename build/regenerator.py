@@ -315,7 +315,9 @@ def main() -> int:
         )
 
         with Path(
+            # LINT.IfChange
             f"{build_dir}/sdk/prebuild/in_tree_collection.json"
+            # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
         ).open() as f:
             prebuild_manifest = json.load(f)
 
@@ -332,7 +334,9 @@ def main() -> int:
             return result
 
         result = idk_generator.WriteIdkContentsToDirectory(
+            # LINT.IfChange
             Path(f"{build_dir}/regenerator_outputs/bazel_in_tree_idk")
+            # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
         )
         if result != 0:
             print(

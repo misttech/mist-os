@@ -949,10 +949,6 @@ template("bazel_action") {
 
     if (!_no_sdk) {
       deps += [
-        # TODO(https://fxbug.dev/338009514): Remove this target and rely
-        # directly on //sdk:ensure_bazel_in_tree_idk_populated_for_bazel_action.
-        "//build/bazel:fuchsia_in_tree_idk.hash",
-
         # TODO(https://fxbug.dev/333907192): Remove this IDK.
         "//build/bazel:fuchsia_internal_only_idk.hash",
 

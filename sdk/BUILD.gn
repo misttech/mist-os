@@ -1293,7 +1293,6 @@ if (current_toolchain == default_toolchain) {
     visibility = [
       ":bazel_in_tree_idk_tests_${target_cpu}",
       ":ensure_bazel_in_tree_idk_is_populated_for_bazel_action",
-      "//build/bazel:fuchsia_in_tree_idk.hash",
       "//build/bazel:generate_main_workspace",
       "//build/bazel/bazel_sdk:ninja_generated_in_tree_idk_for_test.bazel_input",
     ]
