@@ -115,8 +115,11 @@ unsafe impl<D: Decoder + ?Sized, T: Decode<D>> Decode<D> for WireVector<T> {
             return Err(DecodeError::RequiredValueAbsent);
         }
 
-        let slice = decoder.decode_next_slice::<T>(**len as usize)?;
-        WirePointer::set_decoded(ptr, slice.into_raw().cast());
+        let mut slice = decoder.take_slice_slot::<T>(**len as usize)?;
+        for i in 0..**len as usize {
+            T::decode(slice.index(i), decoder)?;
+        }
+        WirePointer::set_decoded(ptr, slice.as_mut_ptr().cast());
 
         Ok(())
     }

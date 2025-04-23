@@ -7,7 +7,7 @@ use core::fmt;
 use core::mem::{replace, ManuallyDrop, MaybeUninit};
 
 use zx::sys::{zx_handle_t, ZX_HANDLE_INVALID};
-use zx::{Handle, HandleBased as _};
+use zx::Handle;
 
 use crate::fuchsia::{HandleDecoder, HandleEncoder};
 use crate::{
@@ -73,11 +73,11 @@ unsafe impl<D: HandleDecoder + ?Sized> Decode<D> for WireHandle {
         match **encoded {
             0 => (),
             u32::MAX => {
-                let handle = decoder.take_handle()?;
+                let handle = decoder.take_raw_handle()?;
                 munge!(let Self { mut decoded } = slot);
                 // SAFETY: `Cell` has no uninit bytes, even though it doesn't implement `IntoBytes`.
                 unsafe {
-                    decoded.as_mut_ptr().write(ManuallyDrop::new(Cell::new(handle.into_raw())));
+                    decoded.as_mut_ptr().write(ManuallyDrop::new(Cell::new(handle)));
                 }
             }
             e => return Err(DecodeError::InvalidHandlePresence(e)),

@@ -27,7 +27,7 @@ mod error;
 mod flexible;
 mod flexible_result;
 mod framework_error;
-#[cfg(target_os = "fuchsia")]
+#[cfg(feature = "fuchsia")]
 pub mod fuchsia;
 mod lockers;
 pub mod mpsc;

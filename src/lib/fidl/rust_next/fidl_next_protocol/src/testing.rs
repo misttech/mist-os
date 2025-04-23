@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_next_codec::{Chunk, Decode, DecoderExt as _, Encode, EncoderExt as _, Owned, WireString};
+use fidl_next_codec::{
+    Chunk, Decode, Decoded, DecoderExt as _, Encode, EncoderExt as _, WireString,
+};
 use fuchsia_async::{Scope, Task};
 
 use crate::{
@@ -17,9 +19,9 @@ pub fn assert_encoded<T: Encode<Vec<Chunk>>>(mut value: T, chunks: &[Chunk]) {
 
 pub fn assert_decoded<T: for<'a> Decode<&'a mut [Chunk]>>(
     mut chunks: &mut [Chunk],
-    f: impl FnOnce(Owned<'_, T>),
+    f: impl FnOnce(Decoded<T, &mut [Chunk]>),
 ) {
-    let value = (&mut chunks).decode_next::<T>().expect("failed to decode");
+    let value = (&mut chunks).decode::<T>().expect("failed to decode");
     f(value)
 }
 
@@ -37,16 +39,15 @@ pub async fn test_close_on_drop<T: Transport + 'static>(client_end: T, server_en
             &mut self,
             server: &ServerSender<T>,
             ordinal: u64,
-            mut buffer: T::RecvBuffer,
+            buffer: T::RecvBuffer,
             responder: Responder,
         ) {
+            let message = buffer.decode::<WireString>().expect("failed to decode request");
+            assert_eq!(ordinal, 42);
+            assert_eq!(&**message, "Ping");
+
             let server = server.clone();
             self.scope.spawn(async move {
-                assert_eq!(ordinal, 42);
-                let message =
-                    (&mut buffer).decode_last::<WireString>().expect("failed to decode request");
-                assert_eq!(&**message, "Ping");
-
                 server
                     .send_response(responder, 42, &mut "Pong".to_string())
                     .expect("failed to encode response")
@@ -63,12 +64,13 @@ pub async fn test_close_on_drop<T: Transport + 'static>(client_end: T, server_en
     let server_task =
         Task::spawn(async move { server.run(TestServer { scope: Scope::new() }).await });
 
-    let mut buffer = client_sender
+    let message = client_sender
         .send_two_way(42, &mut "Ping".to_string())
         .expect("client failed to encode request")
         .await
-        .expect("client failed to send request and receive response");
-    let message = (&mut buffer).decode_last::<WireString>().expect("failed to decode response");
+        .expect("client failed to send request and receive response")
+        .decode::<WireString>()
+        .expect("failed to decode response");
     assert_eq!(&**message, "Pong");
 
     drop(client_sender);
@@ -81,10 +83,9 @@ pub async fn test_one_way<T: Transport + 'static>(client_end: T, server_end: T) 
     struct TestServer;
 
     impl<T: Transport> ServerHandler<T> for TestServer {
-        fn on_one_way(&mut self, _: &ServerSender<T>, ordinal: u64, mut buffer: T::RecvBuffer) {
+        fn on_one_way(&mut self, _: &ServerSender<T>, ordinal: u64, buffer: T::RecvBuffer) {
             assert_eq!(ordinal, 42);
-            let message =
-                (&mut buffer).decode_last::<WireString>().expect("failed to decode request");
+            let message = buffer.decode::<WireString>().expect("failed to decode request");
             assert_eq!(&**message, "Hello world");
         }
 
@@ -126,16 +127,15 @@ pub async fn test_two_way<T: Transport + 'static>(client_end: T, server_end: T) 
             &mut self,
             server: &ServerSender<T>,
             ordinal: u64,
-            mut buffer: T::RecvBuffer,
+            buffer: T::RecvBuffer,
             responder: Responder,
         ) {
+            assert_eq!(ordinal, 42);
+            let message = buffer.decode::<WireString>().expect("failed to decode request");
+            assert_eq!(&**message, "Ping");
+
             let server = server.clone();
             self.scope.spawn(async move {
-                assert_eq!(ordinal, 42);
-                let message =
-                    (&mut buffer).decode_last::<WireString>().expect("failed to decode request");
-                assert_eq!(&**message, "Ping");
-
                 server
                     .send_response(responder, 42, &mut "Pong".to_string())
                     .expect("failed to encode response")
@@ -152,12 +152,13 @@ pub async fn test_two_way<T: Transport + 'static>(client_end: T, server_end: T) 
     let server_task =
         Task::spawn(async move { server.run(TestServer { scope: Scope::new() }).await });
 
-    let mut buffer = client_sender
+    let message = client_sender
         .send_two_way(42, &mut "Ping".to_string())
         .expect("client failed to encode request")
         .await
-        .expect("client failed to send request and receive response");
-    let message = (&mut buffer).decode_last::<WireString>().expect("failed to decode response");
+        .expect("client failed to send request and receive response")
+        .decode::<WireString>()
+        .expect("failed to decode response");
     assert_eq!(&**message, "Pong");
 
     client_sender.close();
@@ -182,23 +183,22 @@ pub async fn test_multiple_two_way<T: Transport + 'static>(client_end: T, server
             &mut self,
             server: &ServerSender<T>,
             ordinal: u64,
-            mut buffer: T::RecvBuffer,
+            buffer: T::RecvBuffer,
             responder: Responder,
         ) {
+            let message = buffer.decode::<WireString>().expect("failed to decode request");
+
+            let response = match ordinal {
+                1 => "One",
+                2 => "Two",
+                3 => "Three",
+                x => panic!("unexpected request ordinal {x} from client"),
+            };
+
+            assert_eq!(&**message, response);
+
             let server = server.clone();
             self.scope.spawn(async move {
-                let message =
-                    (&mut buffer).decode_last::<WireString>().expect("failed to decode request");
-
-                let response = match ordinal {
-                    1 => "One",
-                    2 => "Two",
-                    3 => "Three",
-                    x => panic!("unexpected request ordinal {x} from client"),
-                };
-
-                assert_eq!(&**message, response);
-
                 server
                     .send_response(responder, ordinal, &mut response.to_string())
                     .expect("server failed to encode response")
@@ -227,20 +227,22 @@ pub async fn test_multiple_two_way<T: Transport + 'static>(client_end: T, server
     let (response_one, response_two, response_three) =
         futures::join!(send_one, send_two, send_three);
 
-    let mut buffer_one = response_one.expect("client failed to send request and receive response");
-    let message_one =
-        (&mut buffer_one).decode_last::<WireString>().expect("failed to decode response");
+    let message_one = response_one
+        .expect("client failed to send request and receive response")
+        .decode::<WireString>()
+        .expect("failed to decode response");
     assert_eq!(&**message_one, "One");
 
-    let mut buffer_two = response_two.expect("client failed to send request and receive response");
-    let message_two =
-        (&mut buffer_two).decode_last::<WireString>().expect("failed to decode response");
+    let message_two = response_two
+        .expect("client failed to send request and receive response")
+        .decode::<WireString>()
+        .expect("failed to decode response");
     assert_eq!(&**message_two, "Two");
 
-    let mut buffer_three =
-        response_three.expect("client failed to send request and receive response");
-    let message_three =
-        (&mut buffer_three).decode_last::<WireString>().expect("failed to decode response");
+    let message_three = response_three
+        .expect("client failed to send request and receive response")
+        .decode::<WireString>()
+        .expect("failed to decode response");
     assert_eq!(&**message_three, "Three");
 
     client_sender.close();
@@ -255,10 +257,9 @@ pub async fn test_event<T: Transport + 'static>(client_end: T, server_end: T) {
     struct TestClient;
 
     impl<T: Transport> ClientHandler<T> for TestClient {
-        fn on_event(&mut self, client: &ClientSender<T>, ordinal: u64, mut buffer: T::RecvBuffer) {
+        fn on_event(&mut self, client: &ClientSender<T>, ordinal: u64, buffer: T::RecvBuffer) {
             assert_eq!(ordinal, 10);
-            let message =
-                (&mut buffer).decode_last::<WireString>().expect("failed to decode request");
+            let message = buffer.decode::<WireString>().expect("failed to decode request");
             assert_eq!(&**message, "Surprise!");
 
             client.close();

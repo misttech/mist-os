@@ -276,7 +276,7 @@ mod tests {
                 },
             };
 
-            let mut start_res = client_sender.start(&mut start_request).unwrap().await.unwrap();
+            let start_res = client_sender.start(&mut start_request).unwrap().await.unwrap();
             start_res.decode().unwrap().unwrap();
 
             client_sender.stop().unwrap().await.unwrap();

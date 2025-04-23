@@ -122,14 +122,14 @@ pub struct RecvBuffer {
 }
 
 impl RecvBuffer {
-    fn take_next_handle(&mut self) -> Result<MixedHandle, fidl_next::DecodeError> {
-        let Some(handles) = self.buffer.handles_mut() else {
+    fn next_handle(&self) -> Result<&MixedHandle, fidl_next::DecodeError> {
+        let Some(handles) = self.buffer.handles() else {
             return Err(fidl_next::DecodeError::InsufficientHandles);
         };
         if handles.len() < self.handle_offset + 1 {
             return Err(fidl_next::DecodeError::InsufficientHandles);
         }
-        handles[self.handle_offset].take().ok_or(fidl_next::DecodeError::RequiredHandleAbsent)
+        handles[self.handle_offset].as_ref().ok_or(fidl_next::DecodeError::RequiredHandleAbsent)
     }
 }
 
@@ -152,7 +152,15 @@ unsafe impl fidl_next::Decoder for RecvBuffer {
         Ok(unsafe { NonNull::new_unchecked((&mut data[pos..(pos + count)]).as_mut_ptr()) })
     }
 
-    fn finish(&mut self) -> Result<(), fidl_next::DecodeError> {
+    fn commit(&mut self) {
+        if let Some(handles) = self.buffer.handles_mut() {
+            for i in 0..self.handle_offset {
+                core::mem::forget(handles[i].take());
+            }
+        }
+    }
+
+    fn finish(&self) -> Result<(), fidl_next::DecodeError> {
         let data_len = self.buffer.data().unwrap_or(&[]).len();
         if self.data_offset != data_len {
             return Err(fidl_next::DecodeError::ExtraBytes {
@@ -188,24 +196,30 @@ impl fidl_next::decoder::InternalHandleDecoder for RecvBuffer {
 }
 
 impl fidl_next::fuchsia::HandleDecoder for RecvBuffer {
-    fn take_handle(&mut self) -> Result<zx::Handle, fidl_next::DecodeError> {
-        let handle = self.take_next_handle()?.resolve();
-        let MixedHandleType::Zircon(handle) = handle else {
-            return Err(fidl_next::DecodeError::ExpectedZirconHandle);
+    fn take_raw_handle(&mut self) -> Result<zx::sys::zx_handle_t, fidl_next::DecodeError> {
+        let result = {
+            let handle = self.next_handle()?.resolve_ref();
+            let MixedHandleType::Zircon(handle) = handle else {
+                return Err(fidl_next::DecodeError::ExpectedZirconHandle);
+            };
+            handle.raw_handle()
         };
         let pos = self.handle_offset;
         self.handle_offset = pos + 1;
-        Ok(handle)
+        Ok(result)
     }
 
     fn take_raw_driver_handle(&mut self) -> Result<u32, fidl_next::DecodeError> {
-        let handle = self.take_next_handle()?.resolve();
-        let MixedHandleType::Driver(handle) = handle else {
-            return Err(fidl_next::DecodeError::ExpectedDriverHandle);
+        let result = {
+            let handle = self.next_handle()?.resolve_ref();
+            let MixedHandleType::Driver(handle) = handle else {
+                return Err(fidl_next::DecodeError::ExpectedDriverHandle);
+            };
+            unsafe { handle.get_raw().get() }
         };
         let pos = self.handle_offset;
         self.handle_offset = pos + 1;
-        Ok(handle.into_raw().get())
+        Ok(result)
     }
 
     fn handles_remaining(&mut self) -> usize {
@@ -450,15 +464,13 @@ mod test {
                 .unwrap();
 
             {
-                let mut res = client_sender.get_hardware_id().unwrap().await.unwrap();
-                let res = res.decode().unwrap();
+                let res = client_sender.get_hardware_id().unwrap().await.unwrap().decode().unwrap();
                 let hardware_id = res.unwrap();
                 assert_eq!(hardware_id.response, 4004);
             }
 
             {
-                let mut res = client_sender.get_event().unwrap().await.unwrap();
-                let res = res.decode().unwrap();
+                let res = client_sender.get_event().unwrap().await.unwrap().decode().unwrap();
                 let event = Event::from_handle(res.event.take());
 
                 // wait for the event on a fuchsia_async executor

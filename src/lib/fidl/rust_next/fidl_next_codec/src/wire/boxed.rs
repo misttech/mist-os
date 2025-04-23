@@ -83,8 +83,9 @@ unsafe impl<D: Decoder + ?Sized, T: Decode<D>> Decode<D> for WireBox<T> {
         munge!(let Self { mut ptr } = slot);
 
         if WirePointer::is_encoded_present(ptr.as_mut())? {
-            let value = decoder.decode_next::<T>()?;
-            WirePointer::set_decoded(ptr, value.into_raw());
+            let mut value = decoder.take_slot::<T>()?;
+            T::decode(value.as_mut(), decoder)?;
+            WirePointer::set_decoded(ptr, value.as_mut_ptr());
         }
 
         Ok(())

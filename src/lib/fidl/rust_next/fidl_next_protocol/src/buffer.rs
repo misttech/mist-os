@@ -27,7 +27,7 @@ pub fn decode_header<T: Transport>(
     mut buffer: &mut T::RecvBuffer,
 ) -> Result<(u32, u64), DecodeError> {
     let (txid, ordinal) = {
-        let header = buffer.decode_next::<WireMessageHeader>()?;
+        let header = buffer.decode_prefix::<WireMessageHeader>()?;
         (*header.txid, *header.ordinal)
     };
 

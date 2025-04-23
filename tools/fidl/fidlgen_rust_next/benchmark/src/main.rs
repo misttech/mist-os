@@ -149,8 +149,8 @@ where
         b.iter_batched_ref(
             || decode_wire_chunks.clone(),
             |decode_chunks| {
-                let mut chunks = black_box(decode_chunks).as_mut_slice();
-                black_box((&mut chunks).decode_next::<W>()).unwrap();
+                let chunks = black_box(decode_chunks).as_mut_slice();
+                black_box(chunks.decode::<W>()).unwrap();
             },
             criterion::BatchSize::SmallInput,
         );
@@ -160,8 +160,8 @@ where
         b.iter_batched_ref(
             || decode_chunks.clone(),
             |decode_chunks| {
-                let mut chunks = black_box(decode_chunks).as_mut_slice();
-                let value = (&mut chunks).decode_next::<W>().unwrap();
+                let chunks = black_box(decode_chunks).as_mut_slice();
+                let value = chunks.decode::<W>().unwrap();
                 black_box(T::take_from(&value));
             },
             criterion::BatchSize::SmallInput,

@@ -8,7 +8,7 @@ use core::mem::take;
 use core::ptr::NonNull;
 use core::slice;
 
-use crate::{Chunk, Decode, DecodeError, Owned, Slot, CHUNK_SIZE};
+use crate::{Chunk, Decode, DecodeError, Decoded, Owned, Slot, CHUNK_SIZE};
 
 /// A decoder for FIDL handles (internal).
 pub trait InternalHandleDecoder {
@@ -44,10 +44,16 @@ pub unsafe trait Decoder: InternalHandleDecoder {
     /// Returns `Err` if the decoder doesn't have enough chunks left.
     fn take_chunks_raw(&mut self, count: usize) -> Result<NonNull<Chunk>, DecodeError>;
 
-    /// Finishes decoding.
+    /// Commits to any decoding operations which are in progress.
     ///
-    /// Returns `Err` if the decoder did not finish successfully.
-    fn finish(&mut self) -> Result<(), DecodeError>;
+    /// Resources like handles may be taken from a decoder during decoding. However, decoding may
+    /// fail after those resources are taken but before decoding completes. To ensure that resources
+    /// are always dropped, taken resources are still considered owned by the decoder until `commit`
+    /// is called. After `commit`, ownership of those resources is transferred to the decoded data.
+    fn commit(&mut self);
+
+    /// Verifies that decoding finished cleanly, with no leftover chunks or resources.
+    fn finish(&self) -> Result<(), DecodeError>;
 }
 
 impl InternalHandleDecoder for &mut [Chunk] {
@@ -76,7 +82,12 @@ unsafe impl Decoder for &mut [Chunk] {
     }
 
     #[inline]
-    fn finish(&mut self) -> Result<(), DecodeError> {
+    fn commit(&mut self) {
+        // No resources to take, so commit is a no-op
+    }
+
+    #[inline]
+    fn finish(&self) -> Result<(), DecodeError> {
         if !self.is_empty() {
             return Err(DecodeError::ExtraBytes { num_extra: self.len() * CHUNK_SIZE });
         }
@@ -102,37 +113,38 @@ pub trait DecoderExt {
         len: usize,
     ) -> Result<Slot<'buf, [T]>, DecodeError>;
 
-    /// Decodes a `T` and returns an `Owned` pointer to it.
+    /// Decodes an `Owned` value from the decoder without finishing it.
     ///
-    /// Returns `Err` if decoding failed.
-    fn decode_next<'buf, T: Decode<Self>>(
+    /// On success, returns `Ok` of an `Owned` value. Returns `Err` if decoding failed.
+    fn decode_prefix<'buf, T: Decode<Self>>(
         self: &mut &'buf mut Self,
     ) -> Result<Owned<'buf, T>, DecodeError>;
 
-    /// Decodes a slice of `T` and returns an `Owned` pointer to it.
+    /// Decodes an `Owned` slice from the decoder without finishing it.
     ///
-    /// Returns `Err` if decoding failed.
-    fn decode_next_slice<'buf, T: Decode<Self>>(
+    /// On success, returns `Ok` of an `Owned` slice. Returns `Err` if decoding failed.
+    fn decode_slice_prefix<'buf, T: Decode<Self>>(
         self: &mut &'buf mut Self,
         len: usize,
     ) -> Result<Owned<'buf, [T]>, DecodeError>;
 
-    /// Finishes the decoder by decoding a `T`.
+    /// Decodes a value from the decoder and finishes it.
     ///
-    /// On success, returns `Ok` of an `Owned` pointer to the decoded value. Returns `Err` if the
-    /// decoder did not finish successfully.
-    fn decode_last<'buf, T: Decode<Self>>(
-        self: &mut &'buf mut Self,
-    ) -> Result<Owned<'buf, T>, DecodeError>;
+    /// On success, returns `Ok` of a `Decoded` value with the decoder. Returns `Err` if decoding
+    /// failed or the decoder finished with an error.
+    fn decode<T>(self) -> Result<Decoded<T, Self>, DecodeError>
+    where
+        T: Decode<Self>,
+        Self: Sized;
 
-    /// Finishes the decoder by decoding a slice of `T`.
+    /// Decodes a slice from the decoder and finishes it.
     ///
-    /// On success, returns `Ok` of an `Owned` pointer to the decoded slice. Returns `Err` if the
-    /// decoder did not finish successfully.
-    fn decode_last_slice<'buf, T: Decode<Self>>(
-        self: &mut &'buf mut Self,
-        len: usize,
-    ) -> Result<Owned<'buf, [T]>, DecodeError>;
+    /// On success, returns `Ok` of a `Decoded` slice with the decoder. Returns `Err` if decoding
+    /// failed or the decoder finished with an error.
+    fn decode_slice<T>(self, len: usize) -> Result<Decoded<[T], Self>, DecodeError>
+    where
+        T: Decode<Self>,
+        Self: Sized;
 }
 
 impl<D: Decoder + ?Sized> DecoderExt for D {
@@ -178,15 +190,18 @@ impl<D: Decoder + ?Sized> DecoderExt for D {
         unsafe { Ok(Slot::new_slice_unchecked(chunks.as_mut_ptr().cast(), len)) }
     }
 
-    fn decode_next<'buf, T: Decode<Self>>(
+    fn decode_prefix<'buf, T: Decode<Self>>(
         self: &mut &'buf mut Self,
     ) -> Result<Owned<'buf, T>, DecodeError> {
         let mut slot = self.take_slot::<T>()?;
         T::decode(slot.as_mut(), self)?;
+        self.commit();
+        // SAFETY: `slot` decoded successfully and the decoder was committed. `slot` now points to a
+        // valid `T` within the decoder.
         unsafe { Ok(Owned::new_unchecked(slot.as_mut_ptr())) }
     }
 
-    fn decode_next_slice<'buf, T: Decode<Self>>(
+    fn decode_slice_prefix<'buf, T: Decode<Self>>(
         self: &mut &'buf mut Self,
         len: usize,
     ) -> Result<Owned<'buf, [T]>, DecodeError> {
@@ -194,23 +209,35 @@ impl<D: Decoder + ?Sized> DecoderExt for D {
         for i in 0..len {
             T::decode(slot.index(i), self)?;
         }
+        self.commit();
+        // SAFETY: `slot` decoded successfully and the decoder was committed. `slot` now points to a
+        // valid `[T]` within the decoder.
         unsafe { Ok(Owned::new_unchecked(slot.as_mut_ptr())) }
     }
 
-    fn decode_last<'buf, T: Decode<Self>>(
-        self: &mut &'buf mut Self,
-    ) -> Result<Owned<'buf, T>, DecodeError> {
-        let result = self.decode_next()?;
-        self.finish()?;
-        Ok(result)
+    fn decode<T>(mut self) -> Result<Decoded<T, Self>, DecodeError>
+    where
+        T: Decode<Self>,
+        Self: Sized,
+    {
+        let mut decoder = &mut self;
+        let result = decoder.decode_prefix::<T>()?;
+        decoder.finish()?;
+        // SAFETY: `result` points to an owned `T` contained within `decoder`.
+        unsafe { Ok(Decoded::new_unchecked(result.into_raw(), self)) }
     }
 
-    fn decode_last_slice<'buf, T: Decode<Self>>(
-        self: &mut &'buf mut Self,
+    fn decode_slice<T: Decode<Self>>(
+        mut self,
         len: usize,
-    ) -> Result<Owned<'buf, [T]>, DecodeError> {
-        let result = self.decode_next_slice(len)?;
-        self.finish()?;
-        Ok(result)
+    ) -> Result<Decoded<[T], Self>, DecodeError>
+    where
+        Self: Sized,
+    {
+        let mut decoder = &mut self;
+        let result = decoder.decode_slice_prefix::<T>(len)?;
+        decoder.finish()?;
+        // SAFETY: `result` points to an owned `[T]` contained within `decoder`.
+        unsafe { Ok(Decoded::new_unchecked(result.into_raw(), self)) }
     }
 }

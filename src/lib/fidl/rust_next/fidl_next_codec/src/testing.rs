@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{Chunk, Decode, DecoderExt as _, Encode, EncoderExt as _, Owned};
+use crate::{Chunk, Decode, Decoded, DecoderExt as _, Encode, EncoderExt as _};
 
 pub fn assert_encoded<T: Encode<Vec<Chunk>>>(mut value: T, chunks: &[Chunk]) {
     let mut encoded_chunks = Vec::new();
@@ -12,8 +12,8 @@ pub fn assert_encoded<T: Encode<Vec<Chunk>>>(mut value: T, chunks: &[Chunk]) {
 
 pub fn assert_decoded<T: for<'a> Decode<&'a mut [Chunk]>>(
     mut chunks: &mut [Chunk],
-    f: impl FnOnce(Owned<'_, T>),
+    f: impl FnOnce(Decoded<T, &mut [Chunk]>),
 ) {
-    let value = (&mut chunks).decode_next::<T>().expect("failed to decode");
+    let value = (&mut chunks).decode::<T>().expect("failed to decode");
     f(value)
 }

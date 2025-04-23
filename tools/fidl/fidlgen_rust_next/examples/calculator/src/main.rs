@@ -15,7 +15,7 @@ impl<T: Transport> CalculatorClientHandler<T> for MyCalculatorClient {
     fn on_error(
         &mut self,
         sender: &ClientSender<T, Calculator>,
-        mut response: ResponseBuffer<T, calculator::OnError>,
+        response: ResponseBuffer<T, calculator::OnError>,
     ) {
         let message = response.decode().unwrap();
         assert_eq!(message.status_code, 100);
@@ -33,58 +33,58 @@ impl<T: Transport + 'static> CalculatorServerHandler<T> for MyCalculatorServer {
     fn add(
         &mut self,
         sender: &ServerSender<T, Calculator>,
-        mut request: RequestBuffer<T, calculator::Add>,
+        buffer: RequestBuffer<T, calculator::Add>,
         responder: Responder<calculator::Add>,
     ) {
+        let Ok(request) = buffer.decode() else { return sender.close() };
+        println!("{} + {} = {}", request.a, request.b, request.a + request.b);
+        let mut response = Flexible::Ok(CalculatorAddResponse { sum: request.a + request.b });
+
         let sender = sender.clone();
         self.scope.spawn(async move {
-            let Ok(request) = request.decode() else { return sender.close() };
-
-            println!("{} + {} = {}", request.a, request.b, request.a + request.b);
-            let mut response = Flexible::Ok(CalculatorAddResponse { sum: request.a + request.b });
             if responder.respond(&sender, &mut response).unwrap().await.is_err() {
-                return sender.close();
-            };
+                sender.close();
+            }
         });
     }
 
     fn divide(
         &mut self,
         sender: &ServerSender<T, Calculator>,
-        mut request: RequestBuffer<T, calculator::Divide>,
+        buffer: RequestBuffer<T, calculator::Divide>,
         responder: Responder<calculator::Divide>,
     ) {
+        let Ok(request) = buffer.decode() else { return sender.close() };
+        let mut response = if request.divisor != 0 {
+            println!(
+                "{} / {} = {} rem {}",
+                request.dividend,
+                request.divisor,
+                request.dividend / request.divisor,
+                request.dividend % request.divisor,
+            );
+            FlexibleResult::Ok(CalculatorDivideResponse {
+                quotient: request.dividend / request.divisor,
+                remainder: request.dividend % request.divisor,
+            })
+        } else {
+            println!("{} / 0 = undefined", request.dividend);
+            FlexibleResult::Err(DivisionError::DivideByZero)
+        };
+
         let sender = sender.clone();
         self.scope.spawn(async move {
-            let Ok(request) = request.decode() else { return sender.close() };
-
-            let mut response = if request.divisor != 0 {
-                println!(
-                    "{} / {} = {} rem {}",
-                    request.dividend,
-                    request.divisor,
-                    request.dividend / request.divisor,
-                    request.dividend % request.divisor,
-                );
-                FlexibleResult::Ok(CalculatorDivideResponse {
-                    quotient: request.dividend / request.divisor,
-                    remainder: request.dividend % request.divisor,
-                })
-            } else {
-                println!("{} / 0 = undefined", request.dividend);
-                FlexibleResult::Err(DivisionError::DivideByZero)
-            };
             if responder.respond(&sender, &mut response).unwrap().await.is_err() {
                 return sender.close();
-            };
+            }
         });
     }
 
     fn clear(&mut self, sender: &ServerSender<T, Calculator>) {
+        println!("Cleared, sending an error back to close the connection");
+
         let sender = sender.clone();
         self.scope.spawn(async move {
-            println!("Cleared, sending an error back to close the connection");
-
             sender
                 .on_error(&mut CalculatorOnErrorRequest { status_code: 100 })
                 .unwrap()
@@ -137,38 +137,42 @@ async fn create_endpoints(
 }
 
 async fn add(client_sender: &ClientSender<Endpoint, Calculator>) {
-    let mut buffer =
-        client_sender.add(&mut CalculatorAddRequest { a: 16, b: 26 }).unwrap().await.unwrap();
-
-    let result = buffer.decode().unwrap();
-    let response = result.unwrap();
+    let result = client_sender
+        .add(&mut CalculatorAddRequest { a: 16, b: 26 })
+        .expect("failed to encode add request")
+        .await
+        .expect("failed to send add request or receive add response")
+        .decode()
+        .expect("failed to decode add response");
+    let response = result.ok().expect("add request failed with an error");
 
     assert_eq!(response.sum, 42);
 }
 
 async fn divide(client_sender: &ClientSender<Endpoint, Calculator>) {
     // Normal division
-    let mut buffer = client_sender
+    let result = client_sender
         .divide(&mut CalculatorDivideRequest { dividend: 100, divisor: 3 })
-        .unwrap()
+        .expect("failed to encode divide request")
         .await
-        .unwrap();
-
-    let result = buffer.decode().unwrap();
-    let response = result.unwrap();
+        .expect("failed to send divide request or receive divide response")
+        .decode()
+        .expect("failed to decode divide response");
+    let response = result.ok().expect("divide request failed with an error");
 
     assert_eq!(response.quotient, 33);
     assert_eq!(response.remainder, 1);
 
     // Cause an error
-    let mut buffer = client_sender
+    let result = client_sender
         .divide(&mut CalculatorDivideRequest { dividend: 42, divisor: 0 })
-        .unwrap()
+        .expect("failed to encode divide request")
         .await
-        .unwrap();
+        .expect("failed to send divide request or receive divide response")
+        .decode()
+        .expect("failed to decode divide response");
 
-    let result = buffer.decode().unwrap();
-    let error = result.unwrap_err();
+    let error = result.err().expect("divide request succeeded unexpectedly");
     assert_eq!(DivisionError::DivideByZero, (*error).into());
 }
 

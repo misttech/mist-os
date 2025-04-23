@@ -33,6 +33,7 @@ rustc_library("fidl_next_protocol") {
     # Used for lock-free mpsc channel, but not for any APIs
     "//third_party/rust_crates:futures",
   ]
+  features = []
 
   if (is_fuchsia) {
     sources += [
@@ -43,6 +44,7 @@ rustc_library("fidl_next_protocol") {
       "//sdk/rust/zx",
       "//src/lib/fuchsia-async",
     ]
+    features += [ "fuchsia" ]
   }
 
   with_unit_tests = true

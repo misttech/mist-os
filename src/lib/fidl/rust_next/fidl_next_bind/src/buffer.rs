@@ -4,7 +4,7 @@
 
 use core::marker::PhantomData;
 
-use fidl_next_codec::{Decode, DecodeError, DecoderExt as _, Owned};
+use fidl_next_codec::{Decode, DecodeError, Decoded, DecoderExt as _};
 use fidl_next_protocol::Transport;
 
 use super::Method;
@@ -29,12 +29,12 @@ macro_rules! buffer {
             }
 
             /// Decodes the buffer.
-            pub fn decode(&mut self) -> Result<Owned<'_, M::$type>, DecodeError>
+            pub fn decode(self) -> Result<Decoded<M::$type, T::RecvBuffer>, DecodeError>
             where
                 M: $trait,
                 M::$type: Decode<T::RecvBuffer>,
             {
-                (&mut self.buffer).decode_last::<M::$type>()
+                self.buffer.decode::<M::$type>()
             }
         }
     };

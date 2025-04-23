@@ -14,13 +14,13 @@ use crate::{Slot, WireF32, WireF64, WireI16, WireI32, WireI64, WireU16, WireU32,
 ///
 /// # Safety
 ///
-/// If `decode` returns `Ok`, then the provided `slot` must now contain a valid
-/// value of the implementing type.
+/// If `decode` returns `Ok`, then the provided `slot` will contain a valid `Self` after the
+/// decoder is committed.
 pub unsafe trait Decode<D: ?Sized> {
     /// Decodes a value into a slot using a decoder.
     ///
-    /// If decoding succeeds, `slot` will contain a valid value. If decoding fails, an error will be
-    /// returned.
+    /// If decoding succeeds, `slot` will contain a valid `Self` after the decoder is committed. If
+    /// decoding fails, an error will be returned.
     fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError>;
 }
 

@@ -25,7 +25,7 @@ mod buffer;
 mod client;
 mod endpoint;
 mod error;
-#[cfg(target_os = "fuchsia")]
+#[cfg(feature = "fuchsia")]
 pub mod fuchsia;
 mod protocol;
 mod server;

@@ -29,10 +29,11 @@ mod chunk;
 #[cfg(feature = "compat")]
 mod compat;
 mod decode;
+mod decoded;
 pub mod decoder;
 mod encode;
 pub mod encoder;
-#[cfg(target_os = "fuchsia")]
+#[cfg(feature = "fuchsia")]
 pub mod fuchsia;
 mod owned;
 mod primitives;
@@ -45,6 +46,7 @@ pub use munge::munge;
 
 pub use self::chunk::*;
 pub use self::decode::*;
+pub use self::decoded::*;
 pub use self::decoder::{Decoder, DecoderExt};
 pub use self::encode::*;
 pub use self::encoder::{Encoder, EncoderExt};
