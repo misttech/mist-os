@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::AsHandleRef;
 use fuchsia_component::directory::open_file_async;
 use zx::Status;
 use {fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio};
@@ -109,6 +110,26 @@ pub(crate) fn get_program_objvec<'a>(
         None => Ok(None),
     }
 }
+
+pub(crate) fn update_process_name(driver_url: &str, driver_count: usize) {
+    let name = if driver_count > 0 {
+        let Ok(current_name) = fuchsia_runtime::process_self().get_name() else {
+            return;
+        };
+        let current_name = current_name.to_string();
+        let driver_name = match current_name.split_once(' ') {
+            Some((driver_name, _)) => driver_name,
+            None => &current_name,
+        };
+
+        format!("{driver_name} (+{driver_count} more)")
+    } else {
+        basename(driver_url).to_string()
+    };
+    let name = zx::Name::new_lossy(&name);
+    let _ = fuchsia_runtime::process_self().set_name(&name);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

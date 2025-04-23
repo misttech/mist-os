@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::driver::Driver;
+use crate::utils::update_process_name;
 use anyhow::{Context, Result};
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl::HandleBased;
@@ -208,6 +209,7 @@ impl DriverHost {
             .start(start_args, request, shutdown_signaler, &self.scope)
             .await
             .map_err(Status::into_raw)?;
+        update_process_name(driver.get_url(), self.drivers.borrow().len());
         self.drivers.borrow_mut().insert(WeakDriver(Arc::downgrade(&driver)));
 
         // We carry a weak reference to avoid accidentally extending the lifetime of the
@@ -257,6 +259,7 @@ impl DriverHost {
             .start(start_args, request, shutdown_signaler, &self.scope)
             .await
             .map_err(Status::into_raw)?;
+        update_process_name(driver.get_url(), self.drivers.borrow().len());
         self.drivers.borrow_mut().insert(WeakDriver(Arc::downgrade(&driver)));
 
         // We carry a weak reference to avoid accidentally extending the lifetime of the
