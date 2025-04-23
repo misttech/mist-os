@@ -33,6 +33,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/lib/retry"
+	"go.fuchsia.dev/fuchsia/tools/lib/subprocess"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 	"go.fuchsia.dev/fuchsia/tools/testing/tap"
 	"go.fuchsia.dev/fuchsia/tools/testing/testparser"
@@ -398,7 +399,18 @@ func runAndOutputTests(
 	// a length check within the loop body anyway, and it's more robust to put
 	// the length check in the for loop condition.
 	testIndex := 0
+	shouldRunHealthCheck := false
+	againstDevice := (os.Getenv(botanistconstants.NodenameEnvKey) != targets.DefaultEmulatorNodename &&
+		os.Getenv(botanistconstants.NodenameEnvKey) != "")
 	for len(testQueue) > 0 {
+		if shouldRunHealthCheck {
+			if err := runHealthCheck(ctx); err != nil {
+				// Device is in a bad state and cannot run any more tests,
+				// so fail and return early.
+				return fmt.Errorf("failed to run health check: %w", err)
+			}
+			shouldRunHealthCheck = false
+		}
 		test := <-testQueue
 
 		t, sinks, err := testerForTest(test.Test)
@@ -435,6 +447,9 @@ func runAndOutputTests(
 		}
 		testIndex++
 
+		if againstDevice && !result.Passed() {
+			shouldRunHealthCheck = true
+		}
 		if shouldKeepGoing(test.Test, result, test.totalDuration) {
 			// Schedule the test to be run again.
 			testQueue <- test
@@ -474,6 +489,39 @@ func retryOnConnectionFailure(ctx context.Context, t Tester, execFunc func() err
 		}
 		return retry.Fatal(err)
 	}, nil)
+}
+
+func runHealthCheck(ctx context.Context) error {
+	cmd := []string{
+		os.Getenv(constants.DMCPathEnvKey),
+		"health-check",
+		os.Getenv(botanistconstants.NodenameEnvKey),
+	}
+	r := &subprocess.Runner{Env: os.Environ()}
+	state, err := getState(ctx, r, cmd)
+	if err != nil {
+		return fmt.Errorf("failed to get dms state: %w", err)
+	}
+	if state != "fuchsia" {
+		return fmt.Errorf("got dms state: %s", state)
+	}
+	return nil
+}
+
+func getState(ctx context.Context, r *subprocess.Runner, cmd []string) (string, error) {
+	var output bytes.Buffer
+	if err := r.Run(ctx, cmd, subprocess.RunOptions{Stdout: &output}); err != nil {
+		return "", fmt.Errorf("failed to run health check: %w", err)
+	}
+	logger.Debugf(ctx, output.String())
+	var jsonOutput []map[string]string
+	if err := json.Unmarshal(output.Bytes(), &jsonOutput); err != nil {
+		return "", err
+	}
+	if len(jsonOutput) != 1 {
+		return "", fmt.Errorf("expected status for one device, got %v", jsonOutput)
+	}
+	return jsonOutput[0]["dms_state"], nil
 }
 
 // shouldKeepGoing returns whether we should schedule another run of the test.

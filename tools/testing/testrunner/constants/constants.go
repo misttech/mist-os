@@ -18,4 +18,8 @@ const (
 	// A factor to multiply test timeouts by. Used when it is expected that tests will run
 	// slower on specific target types/environments.
 	TestTimeoutScaleFactor = "TEST_TIMEOUT_SCALE_FACTOR"
+	// Used to run health-checks with DMS.
+	DMCPathEnvKey       = "DMC_PATH"
+	DMSPortEnvKey       = "DMS_PORT"
+	NUCServerPortEnvKey = "NUC_SERVER_PORT"
 )
