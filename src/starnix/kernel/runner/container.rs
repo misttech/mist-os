@@ -8,7 +8,8 @@ use crate::{
     MountAction, SELinuxFeature,
 };
 use anyhow::{anyhow, bail, Context, Error};
-use bstr::BString;
+use bootreason::get_android_bootreason;
+use bstr::{BString, ByteSlice};
 use fasync::OnSignals;
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
 use fidl_fuchsia_component_runner::{TaskProviderRequest, TaskProviderRequestStream};
@@ -519,6 +520,18 @@ async fn create_container(
             Err(err) => log_warn!("could not get serial number: {err:?}"),
         }
     }
+    if features.android_bootreason {
+        kernel_cmdline.extend(b" android.bootreason=");
+        match get_android_bootreason() {
+            Ok(reason) => {
+                kernel_cmdline.extend(reason.bytes());
+            }
+            Err(err) => {
+                log_warn!("could not get android bootreason: {err:?}. falling back to 'unknown'");
+                kernel_cmdline.extend(b"unknown");
+            }
+        }
+    }
     if let Some(supported_vendors) = &features.magma_supported_vendors {
         kernel_cmdline.extend(b" ");
         let params = get_magma_params(supported_vendors);
@@ -601,6 +614,8 @@ async fn create_container(
         None
     };
 
+    log_debug!("final kernel cmdline: {kernel_cmdline:?}");
+    kernel_node.record_string("cmdline", kernel_cmdline.to_str_lossy());
     let kernel = Kernel::new(
         kernel_cmdline,
         features.kernel.clone(),

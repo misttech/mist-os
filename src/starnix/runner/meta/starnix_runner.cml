@@ -112,6 +112,7 @@
         },
         {
             protocol: [
+                "fuchsia.feedback.LastRebootInfoProvider",
                 "fuchsia.hardware.google.nanohub.Device",
                 "fuchsia.hardware.sockettunnel.Device",
                 "fuchsia.net.stack.Stack",

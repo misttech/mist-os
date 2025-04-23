@@ -103,6 +103,9 @@ pub struct Features {
     pub enable_utc_time_adjustment: bool,
 
     pub thermal: Option<Vec<String>>,
+
+    /// Whether to add android bootreason to kernel cmdline.
+    pub android_bootreason: bool,
 }
 
 #[derive(Default, Debug, PartialEq)]
@@ -152,6 +155,7 @@ impl Features {
                 nanohub,
                 enable_utc_time_adjustment,
                 thermal,
+                android_bootreason,
             } => {
                 inspect_node.record_bool("selinux", *selinux != SELinuxFeature::Disabled);
                 inspect_node.record_bool("ashmem", *ashmem);
@@ -202,6 +206,7 @@ impl Features {
                         None => "".to_string(),
                     },
                 );
+                inspect_node.record_bool("android_bootreason", *android_bootreason);
 
                 inspect_node.record_child("kernel", |kernel_node| {
                     kernel_node.record_bool("bpf_v2", *bpf_v2);
@@ -251,6 +256,7 @@ pub fn parse_features(start_info: &ContainerStartInfo) -> Result<Features, Error
         match (raw_flag, raw_args) {
             ("android_fdr", _) => features.android_fdr = true,
             ("android_serialno", _) => features.android_serialno = true,
+            ("android_bootreason", _) => features.android_bootreason = true,
             ("aspect_ratio", Some(args)) => {
                 let e = anyhow!("Invalid aspect_ratio: {:?}", args);
                 let components: Vec<_> = args.split(':').collect();

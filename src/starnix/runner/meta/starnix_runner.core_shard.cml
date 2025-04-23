@@ -129,7 +129,10 @@
             to: [ "#starnix_runner" ],
         },
         {
-            protocol: "fuchsia.feedback.CrashReporter",
+            protocol: [
+                "fuchsia.feedback.CrashReporter",
+                "fuchsia.feedback.LastRebootInfoProvider",
+            ],
             from: "#feedback",
             to: "#starnix_runner",
         },
