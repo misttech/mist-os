@@ -64,12 +64,6 @@ fx-update-bazel-workspace () {
 fx-bazel () {
   local workspace_variant="fuchsia"
   local opt
-  for opt in "$@"; do
-    if [[ "${opt}" == "--config=no_sdk" ]]; then
-        workspace_variant="no_sdk"
-        break
-    fi
-  done
   fx-update-bazel-workspace "${workspace_variant}"
   "$(fx-get-bazel)" "$@"
 }

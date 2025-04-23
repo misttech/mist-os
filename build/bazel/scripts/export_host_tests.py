@@ -164,7 +164,7 @@ class BazelCommand(object):
         ]
         self._common_args = [
             "--config=quiet",
-            "--config=no_sdk",  # For now, only supports host targets.
+            "--platforms=//build/bazel/platforms:host",  # For now, only supports host targets.
         ]
 
     def run(self, command: str, args: T.Sequence[str] = []) -> str:

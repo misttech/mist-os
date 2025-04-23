@@ -199,8 +199,9 @@ declare_args() {
 #     Default: false
 #
 #   no_sdk: (optional)
-#     Set this to true to run a Bazel command with `--config=no_sdk`, which allows
-#     building artifacts that do not depend on the Fuchsia IDK or SDK.
+#     Set this to true to run a Bazel command to build artifacts that do not
+#     depend on the Fuchsia IDK or SDK. This currently implies targeting the
+#     host platform.
 #     Type: boolean
 #     Default: false
 #
@@ -787,12 +788,14 @@ template("bazel_action") {
     args += [ "--" ]
 
     # Ensure that the default platform is set correctly when this build action
-    # is invoked from a Fuchsia or host toolchain. For other ones. Other toolchains
+    # is invoked from a Fuchsia or host toolchain. Other toolchains
     # will inherit the 'default' platforms which may be set to
     # //build/bazel/platforms:common in the future, and does not target any
     # specific system intentionally.
     if (_no_sdk) {
-      args += [ "--config=no_sdk" ]
+      # Only host binaries can be built without the SDK because, among other
+      # things, the Zircon library is not available without the SDK.
+      args += [ "--platforms=//build/bazel/platforms:host" ]
     } else if (is_host || is_fuchsia) {
       args +=
           [ "--platforms=//build/bazel/platforms:${current_os}_${current_cpu}" ]

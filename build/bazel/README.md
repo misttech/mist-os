@@ -161,28 +161,26 @@ or scripts. In particular, these directories never exist on infra builders.
 # WORKSPACE NO-SDK CONFIGURATION
 
 The Bazel workspace provides by default a `@fuchsia_sdk` repository that
-exposes Fuchsia SDK atom from the source tree to the Bazel graph. However
-this workspace cannot be used, even for queries, unless the in-tree IDK
+exposes Fuchsia SDK atoms from the source tree to the Bazel graph. However,
+this workspace cannot be used, except for queries, unless the in-tree IDK
 has been built with Ninja, a lengthy operation that can easily take several
 minutes, even on powerful workstations.
 
-It is possible to configure the Bazel workspace to remove this dependency,
-by not exposing `@fuchsia_sdk` at all. This allows building host Bazel
-targets (e.g. host tools) directly, just after `fx set` or `fx gen` is
-called.
+It is possible to configure avoid this dependency, by not populating
+`@fuchsia_sdk` with Ninja artifacts. This allows building host Bazel targets
+ (e.g. host tools) directly, just after `fx set` or `fx gen` is called.
 
-There are two ways to trigger this mode:
+There are two ways to use this mode:
+- In GN `bazel_action()` target definitions by setting `no_sdk = true` to
+  indicate that the bazel targets do not require Fuchsia SDK
+  dependencies at all.
 
-- In GN `bazel_action()` target definitions, set `no_sdk = true` to
-  indicate that the bazel targets do not require Fuchsia SDK dependencies
-  at all.
+- When invoking `fx bazel` directly, specify the host platform using
+  `--platforms=//build/bazel/platforms:host` or `--config=host`, which is a
+  convenience shortcut for the former.
 
-- When invoking `fx bazel` directly, use the special `--config=no_sdk`
-  option.
-
-Both will force the workspace configuration to be slightly altered
-before invoking Bazel. It is possible to safely switch between
-normal and no-sdk variants of the workspace. For example:
+It is possible to safely switch between normal and no-sdk variants operations.
+For example:
 
 ```
 # Clean build directory, and set a new build configuration.
@@ -191,29 +189,19 @@ fx clean
 
 # Build and run a series of host tests directly from Bazel
 # This does not invoke Ninja at all.
-fx bazel test --config=no_sdk //build/bazel/host_tests/...
+fx bazel test --platforms=//build/bazel/platforms:host //build/bazel/host_tests/...
+fx bazel test --config=host //build/bazel/host_tests/...
 
 # Build a host hello_world program with Bazel, invoked from
-# a Ninja action. Because this target definition uses no_sdk=true
-# this is fast, as it doesn't require building the IDK
+# a Ninja action. Because this target definition uses `no_sdk=true`
+# this is fast, as it doesn't require building the IDK.
 fx build //build/bazel/examples/hello_no_sdk
 
 # Build a similar program for Fuchsia, this will take several
 # minutes because it requires building the IDK first, even though
-# the program does not depend on any SDK atom :-/
+# the program does not depend on any SDK atom. :-/
 fx build //build/bazel/examples/hello_world
 ```
-
-It is possible to alternate between regular (fuchsia) and no-sdk
-build targets safely. Bazel may complain with a warning like:
-
-```
-WARNING: Build options ... have changed, discarding analysis cache (...)
-```
-
-This is normal and *harmless* (and there is no way to tell Bazel not to
-print this specific warning. Technically, the build is a tiny bit slower
-due to this, but the benefits outweigh the costs.
 
 # NINJA OUTPUTS AS BAZEL INPUTS
 

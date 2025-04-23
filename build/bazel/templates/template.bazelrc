@@ -39,7 +39,7 @@ build --incompatible_strict_action_env=true
 # though `bazel test` implicitly disables the behavior since  Bazel 7.1
 build --legacy_external_runfiles=false
 
-# Setup the default platform. Note that this will be overridden by --config=no_sdk.
+# Setup the default platform.
 # We need to set them for cqueries and aqueries as well as build (and
 # everything else that inherits from it). Alas, setting them in `common`
 # breaks other things.
@@ -107,13 +107,6 @@ build --@io_bazel_rules_go//go/config:linkmode=pie
 # very intentionally.
 common:no_gn_targets \
   --override_repository=gn_targets=build/bazel/local_repositories/empty
-
-# The --config=no_sdk option is used as a marker detected by both bazel_action.py
-# and `fx bazel` to adjust the workspace variant. It is also used to switch the
-# default platform to the host one.
-cquery:no_sdk --platforms=//build/bazel/platforms:host
-aquery:no_sdk --platforms=//build/bazel/platforms:host
-build:no_sdk --platforms=//build/bazel/platforms:host
 
 # The `--config=host option` is shorthand for
 #`--platforms=//build/bazel/platforms:host`.
