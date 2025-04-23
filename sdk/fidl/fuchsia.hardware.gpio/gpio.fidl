@@ -21,6 +21,11 @@ type InterruptOptions = flexible bits {
     /// Must not be set if system suspend / resume is disabled.
     @available(added=27)
     WAKEABLE = 0x01;
+
+    /// The interrupt returns a monotonic timestamp from synchronous and
+    /// asynchronous waits. Otherwise, it returns a boot timestamp from waits.
+    @available(added=NEXT)
+    TIMESTAMP_MONO = 0x02;
 };
 
 type InterruptMode = strict enum {

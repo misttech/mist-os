@@ -168,6 +168,11 @@
     },
     {
         "kind": "bits/member",
+        "name": "fuchsia.hardware.gpio/InterruptOptions.TIMESTAMP_MONO",
+        "value": "2"
+    },
+    {
+        "kind": "bits/member",
         "name": "fuchsia.hardware.gpio/InterruptOptions.WAKEABLE",
         "value": "1"
     },

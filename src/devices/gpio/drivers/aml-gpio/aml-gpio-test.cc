@@ -848,11 +848,34 @@ TEST_F(S905d2AmlGpioTest, S905d2GetDriveStrength) {
   interrupt_mmio().VerifyAll();
 }
 
-TEST_F(S905d2AmlGpioTest, ExtraInterruptOptions) {
-  constexpr fuchsia_hardware_gpio::InterruptOptions kWakeableInterruptOption =
-      fuchsia_hardware_gpio::InterruptOptions::kWakeable;
-  constexpr uint32_t kWakeableZirconInterruptOption = 0x20;
+TEST_F(S905d2AmlGpioTest, TimestampMonoInterruptOption) {
+  incoming().platform_device.SetExpectedInterruptFlags(ZX_INTERRUPT_MODE_EDGE_HIGH |
+                                                       ZX_INTERRUPT_TIMESTAMP_MONO);
+  interrupt_mmio()[0x3c20 * sizeof(uint32_t)].ExpectRead(0x0001'0001);
 
+  // Modify IRQ index for IRQ pin.
+  interrupt_mmio()[0x3c21 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000017);
+  // Interrupt select filter.
+  interrupt_mmio()[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
+
+  constexpr auto kOptions = fuchsia_hardware_gpio::InterruptOptions::kTimestampMono;
+
+  zx::interrupt out_int;
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)->GetInterrupt(0x0B, kOptions).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+    runtime_.Quit();
+  });
+  runtime_.Run();
+
+  mmio().VerifyAll();
+  ao_mmio().VerifyAll();
+  interrupt_mmio().VerifyAll();
+}
+
+TEST_F(S905d2AmlGpioTest, WakeableInterruptOption) {
+  constexpr uint32_t kWakeableZirconInterruptOption = 0x20;
   incoming().platform_device.SetExpectedInterruptFlags(ZX_INTERRUPT_MODE_EDGE_HIGH |
                                                        kWakeableZirconInterruptOption);
   interrupt_mmio()[0x3c20 * sizeof(uint32_t)].ExpectRead(0x0001'0001);
@@ -862,15 +885,11 @@ TEST_F(S905d2AmlGpioTest, ExtraInterruptOptions) {
   // Interrupt select filter.
   interrupt_mmio()[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
 
-  // The mode is now set by ConfigureInterrupt(); the mode passed here should be ignored. Other
-  // options should be passed through to platform-bus.
-  const auto options =
-      static_cast<fuchsia_hardware_gpio::InterruptOptions>(ZX_INTERRUPT_MODE_LEVEL_LOW) |
-      kWakeableInterruptOption;
+  constexpr auto kOptions = fuchsia_hardware_gpio::InterruptOptions::kWakeable;
 
   zx::interrupt out_int;
   fdf::Arena arena('GPIO');
-  client_.buffer(arena)->GetInterrupt(0x0B, options).Then([&](auto& result) {
+  client_.buffer(arena)->GetInterrupt(0x0B, kOptions).Then([&](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
     runtime_.Quit();
