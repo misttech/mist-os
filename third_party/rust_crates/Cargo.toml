@@ -155,7 +155,7 @@ memoffset = "0.9.1"
 miniz_oxide = "0.3.6"
 mock-omaha-server = { version = "0.3.3", default-features = false }
 mockall = "0.9"
-munge = "0.4.3"
+munge = "0.4.4"
 nix = { version = "0.29.0", features = ["feature", "fs", "hostname", "net", "process", "signal", "user"] }
 nom = { version = "8.0.0", default-features = false, features = ["std"] }
 nom-language = "0.1.0"

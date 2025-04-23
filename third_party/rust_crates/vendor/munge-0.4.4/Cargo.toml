@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "munge"
-version = "0.4.3"
+version = "0.4.4"
 authors = ["David Koloski <djkoloski@gmail.com>"]
 build = false
 autolib = false
@@ -44,7 +44,7 @@ name = "tests"
 path = "tests/tests.rs"
 
 [dependencies.munge_macro]
-version = "=0.4.3"
+version = "=0.4.4"
 default-features = false
 
 [dev-dependencies.rustversion]

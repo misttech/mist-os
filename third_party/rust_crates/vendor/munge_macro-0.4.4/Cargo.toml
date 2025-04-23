@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "munge_macro"
-version = "0.4.3"
+version = "0.4.4"
 authors = ["David Koloski <djkoloski@gmail.com>"]
 build = false
 autolib = false
