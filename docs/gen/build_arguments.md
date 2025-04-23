@@ -1056,7 +1056,7 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
+  clang_rt = ""
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
@@ -1909,6 +1909,7 @@ mode (above).
       * `debug`: "optimized for debugging", light enough to avoid confusion
       * `moderate`: moderate optimization level (clang's default -O2)
       * `size`:  optimized for space rather than purely for speed
+      * `size_thinlto`:  optimize for space and use Thin LTO
       * `size_lto`:  optimize for space and use LTO
       * `speed`: optimized purely for speed
       * `sanitizer`: optimized for sanitizers (ASan, etc.)
@@ -1918,7 +1919,7 @@ mode (above).
 
 **Current value (from the default):** `{ }`
 
-From //build/config/compilation_modes.gni:34
+From //build/config/compilation_modes.gni:35
 
 ### compress_debuginfo
 
@@ -1926,7 +1927,7 @@ Enable compression of debug sections.
 
 **Current value (from the default):** `"zstd"`
 
-From //build/config/compiler.gni:93
+From //build/config/compiler.gni:94
 
 ### config_example_cpp_greeting
 
@@ -2174,7 +2175,7 @@ From //src/storage/fshost/generated_fshost_config.gni:12
 
 **Current value (from the default):** `"debug"`
 
-From //build/config/compiler.gni:55
+From //build/config/compiler.gni:56
 
 ### delegated_network_provisioning
 
@@ -2302,7 +2303,7 @@ Explicitly specify DWARF version used.
 
 **Current value (from the default):** `5`
 
-From //build/config/compiler.gni:69
+From //build/config/compiler.gni:70
 
 ### e2e_test_labels
 
@@ -3413,7 +3414,7 @@ Debug build.
 
 **Current value (from the default):** `""`
 
-From //build/config/compilation_modes.gni:54
+From //build/config/compilation_modes.gni:55
 
 ### is_multi_product_build
 
@@ -6344,7 +6345,7 @@ Controls whether to use -Oz when `optimize` is set to `"size"`.
 
 **Current value (from the default):** `false`
 
-From //build/config/compiler.gni:44
+From //build/config/compiler.gni:45
 
 ### use_prebuilt_buildidtool
 
