@@ -6,7 +6,7 @@ use anyhow::{anyhow, Context as _};
 use async_trait::async_trait;
 use fuchsia_async::{self as fasync, TimeoutExt as _};
 use futures::{FutureExt as _, SinkExt as _, TryFutureExt as _, TryStreamExt as _};
-use log::warn;
+use log::info;
 use net_types::ip::{Ipv4, Ipv6};
 use std::net::SocketAddr;
 
@@ -75,7 +75,7 @@ impl Ping for Pinger {
         match r {
             Ok(()) => true,
             Err(e) => {
-                warn!("error while pinging {}: {:?}", addr, e);
+                info!("error while pinging {}: {:?}", addr, e);
                 false
             }
         }

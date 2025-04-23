@@ -8,7 +8,7 @@ use fuchsia_async::net::TcpStream;
 use fuchsia_async::TimeoutExt;
 
 use futures::{AsyncReadExt, AsyncWriteExt, TryFutureExt};
-use log::warn;
+use log::info;
 use std::net;
 
 const FETCH_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(10);
@@ -114,7 +114,7 @@ impl Fetch for Fetcher {
         match r {
             Ok(code) => Some(code),
             Err(e) => {
-                warn!("error while fetching {host}{path}: {e:?}");
+                info!("error while fetching {host}{path}: {e:?}");
                 None
             }
         }
