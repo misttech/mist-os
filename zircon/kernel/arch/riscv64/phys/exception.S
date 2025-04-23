@@ -123,11 +123,13 @@
   mv a0, sp
 
   // Make a first frame pointer record on the exception stack that links to
-  // the interrupted state's FP and PC.
+  // the interrupted state's FP and PC.  This differs from .prologue.fp 0, a1
+  // only in that CFI rules for fp and a1 are unchanged.
   add sp, sp, -16
-  sd s0, (sp)
+  .cfi_adjust_cfa_offset 16
+  sd fp, (sp)
   sd a1, 8(sp)
-  mv s0, sp
+  add fp, sp, 16
 
   // Show the interrupted PC as the earliest caller on the shadow call stack.
   // A backtrace via the exception shadow call stack won't go past there like
@@ -151,12 +153,13 @@
   j PhysExceptionHandler_returned_BUG
 
 .Lresume_from_exception:
-  // The handler code should have restored the SP it got on entry.
-  bne sp, s0, PhysExceptionHandler_returned_BUG
-
   // Pop the frame pointer link pair pushed above.
   add sp, sp, 16
   .cfi_adjust_cfa_offset -16
+
+  // The handler code should have restored the SP it got on entry.
+  // Since the FP points above its link pair, they should now match again.
+  bne sp, fp, PhysExceptionHandler_returned_BUG
 
   // Reload the interrupted PC (as modified) into sepc.
   ld a0, (sp)
