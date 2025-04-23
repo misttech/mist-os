@@ -21,10 +21,15 @@ namespace ktrace_provider {
 std::vector<trace::KnownCategory> GetKnownCategories();
 
 struct DrainContext {
-  DrainContext(zx::time start, trace_prolonged_context_t* context, zx::resource tracing_resource)
-      : start(start), reader(std::move(tracing_resource)), context(context) {}
+  DrainContext(zx::time start, trace_prolonged_context_t* context, zx::resource tracing_resource,
+               zx::duration poll_period)
+      : start(start),
+        reader(std::move(tracing_resource)),
+        context(context),
+        poll_period(poll_period) {}
 
-  static std::unique_ptr<DrainContext> Create(const zx::resource& tracing_resource) {
+  static std::unique_ptr<DrainContext> Create(const zx::resource& tracing_resource,
+                                              zx::duration poll_period) {
     auto context = trace_acquire_prolonged_context();
     if (context == nullptr) {
       return nullptr;
@@ -35,13 +40,18 @@ struct DrainContext {
       return nullptr;
     }
     return std::make_unique<DrainContext>(zx::clock::get_monotonic(), context,
-                                          std::move(cloned_resource));
+                                          std::move(cloned_resource), poll_period);
   }
 
   ~DrainContext() { trace_release_prolonged_context(context); }
   zx::time start;
   DeviceReader reader;
   trace_prolonged_context_t* context;
+  zx::duration poll_period;
+
+  // For kernel streaming, we don't use the DeviceReader, we just do all the data management here.
+  static constexpr size_t kChunkSize{size_t{1} * 1024 * 1024 / 8};
+  uint64_t buffer_[kChunkSize];
 };
 
 class App {

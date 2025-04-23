@@ -15,6 +15,8 @@ class DeviceReader : public Reader {
  public:
   explicit DeviceReader(zx::resource tracing_resource);
 
+  const zx::resource& Resource() { return tracing_resource_; }
+
  private:
   static constexpr size_t kChunkSize{16 * 4 * 1024};
 
