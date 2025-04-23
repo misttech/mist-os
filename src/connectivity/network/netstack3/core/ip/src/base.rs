@@ -1546,7 +1546,7 @@ impl<
         I: Ip + IpDeviceStateIpExt + IpDeviceIpExt + IpLayerIpExt,
         BC: IpDeviceBindingsContext<I, CC::DeviceId>
             + IpLayerBindingsContext<I, CC::DeviceId>
-            + IpSocketBindingsContext,
+            + IpSocketBindingsContext<CC::DeviceId>,
         CC: IpLayerEgressContext<I, BC>
             + IpStateContext<I>
             + IpDeviceContext<I>

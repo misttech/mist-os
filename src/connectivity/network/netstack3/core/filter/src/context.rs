@@ -7,13 +7,15 @@ use core::fmt::Debug;
 use net_types::ip::{Ipv4, Ipv6};
 use net_types::SpecifiedAddr;
 use netstack3_base::{
-    InstantBindingsTypes, IpDeviceAddr, IpDeviceAddressIdContext, RngContext, TimerBindingsTypes,
-    TimerContext,
+    InstantBindingsTypes, IpDeviceAddr, IpDeviceAddressIdContext, Marks, RngContext,
+    StrongDeviceIdentifier, TimerBindingsTypes, TimerContext,
 };
+
 use packet_formats::ip::IpExt;
 
 use crate::matchers::InterfaceProperties;
 use crate::state::State;
+use crate::{FilterIpExt, IpPacket};
 
 /// Trait defining required types for filtering provided by bindings.
 ///
@@ -37,7 +39,7 @@ impl<BC: TimerContext + RngContext + FilterBindingsTypes> FilterBindingsContext 
 /// directly as an argument, because it allows Netstack3 Core to use lock
 /// ordering types to enforce that filtering state is only acquired at or before
 /// a given lock level, while keeping test code free of locking concerns.
-pub trait FilterIpContext<I: IpExt, BT: FilterBindingsTypes>:
+pub trait FilterIpContext<I: FilterIpExt, BT: FilterBindingsTypes>:
     IpDeviceAddressIdContext<I, DeviceId: InterfaceProperties<BT::DeviceClass>>
 {
     /// The execution context that allows the filtering engine to perform
@@ -107,6 +109,39 @@ pub trait FilterContext<BT: FilterBindingsTypes>:
     ) -> O;
 }
 
+/// Result returned from [`SocketOpsFilter::on_egress`].
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum SocketEgressFilterResult {
+    /// Send the packet normally.
+    Send {
+        /// Indicates that congestion should be signaled to the higher level protocol.
+        congestion: bool,
+    },
+
+    /// Drop the packet.
+    Drop {
+        /// Indicates that congestion should be signaled to the higher level protocol.
+        congestion: bool,
+    },
+}
+
+/// Trait for a socket operations filter.
+pub trait SocketOpsFilter<D: StrongDeviceIdentifier> {
+    /// Called on every outgoing packet originated from a local socket.
+    fn on_egress<I: FilterIpExt, P: IpPacket<I>>(
+        &self,
+        packet: &P,
+        device: &D,
+        marks: &Marks,
+    ) -> SocketEgressFilterResult;
+}
+
+/// Implemented by bindings to provide socket operations filtering.
+pub trait SocketOpsFilterBindingContext<D: StrongDeviceIdentifier> {
+    /// Returns the filter that should be called for socket ops.
+    fn socket_ops_filter(&self) -> impl SocketOpsFilter<D>;
+}
+
 #[cfg(feature = "testutils")]
 impl<
         TimerId: Debug + PartialEq + Clone + Send + Sync + 'static,
@@ -147,9 +182,9 @@ pub(crate) mod testutil {
     use crate::state::validation::ValidRoutines;
     use crate::state::{IpRoutines, NatRoutines, OneWayBoolean, Routines};
 
-    pub trait TestIpExt: IpExt + AssignedAddrIpExt {}
+    pub trait TestIpExt: FilterIpExt + AssignedAddrIpExt {}
 
-    impl<I: IpExt + AssignedAddrIpExt> TestIpExt for I {}
+    impl<I: FilterIpExt + AssignedAddrIpExt> TestIpExt for I {}
 
     #[derive(Debug)]
     pub struct FakePrimaryAddressId<I: AssignedAddrIpExt>(

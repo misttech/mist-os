@@ -56,7 +56,7 @@ use netstack3_core::testutil::{
 use netstack3_core::{BindingsContext, CoreCtx, IpExt, StackState};
 use netstack3_device::queue::{ReceiveQueueContext as _, ReceiveQueueHandler as _};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
-use netstack3_filter::{FilterIpContext, TransportProtocol};
+use netstack3_filter::{FilterIpContext, FilterIpExt, TransportProtocol};
 use netstack3_ip::device::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
     SlaacConfigurationUpdate, StableSlaacAddressConfiguration,
@@ -2529,8 +2529,10 @@ fn conntrack_entry_retained_across_loopback<I: TestDualStackIpExt + IpExt>(
         }
     }
 
-    fn assert_conntrack_contains_tuple<I: TestIpExt>(ctx: &mut FakeCtx, tuple: Tuple<I>)
-    where
+    fn assert_conntrack_contains_tuple<I: TestIpExt + FilterIpExt>(
+        ctx: &mut FakeCtx,
+        tuple: Tuple<I>,
+    ) where
         for<'a> CoreCtx<'a, FakeBindingsCtx, lock_order::Unlocked>:
             FilterIpContext<I, FakeBindingsCtx>,
     {

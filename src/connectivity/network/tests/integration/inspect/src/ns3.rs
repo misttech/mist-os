@@ -1381,6 +1381,7 @@ async fn inspect_devices(name: &str) {
                         PacketTx: {
                             Sent: 0u64,
                             IllegalLoopbackAddress: 0u64,
+                            SocketEgressFilterDropped: 0u64,
                         },
                         PacketRx: {
                             Received: 0u64,
@@ -1424,6 +1425,7 @@ async fn inspect_devices(name: &str) {
                         PacketTx: {
                             Sent: 0u64,
                             IllegalLoopbackAddress: 0u64,
+                            SocketEgressFilterDropped: 0u64,
                         },
                         PacketRx: {
                             Received: 0u64,
@@ -1608,6 +1610,7 @@ async fn inspect_devices(name: &str) {
                         PacketTx: {
                             Sent: diagnostics_assertions::AnyUintProperty,
                             IllegalLoopbackAddress: 0u64,
+                            SocketEgressFilterDropped: 0u64,
                         },
                         PacketRx: {
                             Received: 0u64,
@@ -1651,6 +1654,7 @@ async fn inspect_devices(name: &str) {
                         PacketTx: {
                             Sent: diagnostics_assertions::AnyUintProperty,
                             IllegalLoopbackAddress: 0u64,
+                            SocketEgressFilterDropped: 0u64,
                         },
                         PacketRx: {
                             Received: 0u64,
@@ -1966,6 +1970,7 @@ async fn inspect_counters(name: &str) {
                 PacketTx: {
                     Sent: 1u64,
                     IllegalLoopbackAddress: 0u64,
+                    SocketEgressFilterDropped: 0u64,
                 },
                 "PacketRx": {
                     Received: 1u64,
@@ -2009,6 +2014,7 @@ async fn inspect_counters(name: &str) {
                 PacketTx: {
                     Sent: 0u64,
                     IllegalLoopbackAddress: 0u64,
+                    SocketEgressFilterDropped: 0u64,
                 },
                 "PacketRx": {
                     Received: 0u64,

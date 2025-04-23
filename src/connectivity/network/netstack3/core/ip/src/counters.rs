@@ -98,6 +98,8 @@ pub struct IpCounters<I: IpCountersIpExt, C: CounterRepr = Counter> {
     pub invalid_cached_conntrack_entry: C,
     /// IP fragmentation counters.
     pub fragmentation: FragmentationCounters<C>,
+    /// Number of packets filtered out by the socket egress filter.
+    pub socket_egress_filter_dropped: C,
 }
 
 impl<I: IpCountersIpExt, C: CounterRepr> Inspectable for IpCounters<I, C> {
@@ -128,10 +130,12 @@ impl<I: IpCountersIpExt, C: CounterRepr> Inspectable for IpCounters<I, C> {
             multicast_no_interest,
             invalid_cached_conntrack_entry,
             fragmentation,
+            socket_egress_filter_dropped,
         } = self;
         inspector.record_child("PacketTx", |inspector| {
             inspector.record_counter("Sent", send_ip_packet);
             inspector.record_counter("IllegalLoopbackAddress", tx_illegal_loopback_address);
+            inspector.record_counter("SocketEgressFilterDropped", socket_egress_filter_dropped);
         });
         inspector.record_child("PacketRx", |inspector| {
             inspector.record_counter("Received", receive_ip_packet);
@@ -291,6 +295,7 @@ pub mod testutil {
                 multicast_no_interest,
                 invalid_cached_conntrack_entry,
                 fragmentation,
+                socket_egress_filter_dropped,
             } = counters;
             IpCounterExpectations {
                 deliver_unicast: deliver_unicast.get(),
@@ -318,6 +323,7 @@ pub mod testutil {
                 multicast_no_interest: multicast_no_interest.get(),
                 invalid_cached_conntrack_entry: invalid_cached_conntrack_entry.get(),
                 fragmentation: fragmentation.into(),
+                socket_egress_filter_dropped: socket_egress_filter_dropped.get(),
             }
         }
     }

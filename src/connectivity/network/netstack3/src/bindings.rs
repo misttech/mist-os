@@ -73,6 +73,7 @@ use multicast_admin::{MulticastAdminEventSinks, MulticastAdminWorkers};
 use ndp_watcher::RouterAdvertisementSinkError;
 use resource_removal::{ResourceRemovalSink, ResourceRemovalWorker};
 
+use crate::bindings::bpf::EbpfManager;
 use crate::bindings::counters::BindingsCounters;
 use crate::bindings::interfaces_watcher::AddressPropertiesUpdate;
 use crate::bindings::time::{AtomicStackTime, StackTime};
@@ -88,7 +89,7 @@ use netstack3_core::device::{
     ReceiveQueueBindingsContext, TransmitQueueBindingsContext, WeakDeviceId,
 };
 use netstack3_core::error::ExistsError;
-use netstack3_core::filter::FilterBindingsTypes;
+use netstack3_core::filter::{FilterBindingsTypes, SocketOpsFilter, SocketOpsFilterBindingContext};
 use netstack3_core::icmp::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId};
 use netstack3_core::inspect::{InspectableValue, Inspector};
 use netstack3_core::ip::{
@@ -366,6 +367,7 @@ pub(crate) struct BindingsCtxInner {
     multicast_admin: MulticastAdminEventSinks,
     config: GlobalConfig,
     counters: BindingsCounters,
+    ebpf_manager: EbpfManager,
 }
 
 impl BindingsCtxInner {
@@ -385,6 +387,7 @@ impl BindingsCtxInner {
             multicast_admin,
             config,
             counters: Default::default(),
+            ebpf_manager: Default::default(),
         }
     }
 }
@@ -421,6 +424,12 @@ impl InstantContext for BindingsCtx {
 
 impl FilterBindingsTypes for BindingsCtx {
     type DeviceClass = fidl_fuchsia_net_interfaces::PortClass;
+}
+
+impl SocketOpsFilterBindingContext<DeviceId<BindingsCtx>> for BindingsCtx {
+    fn socket_ops_filter(&self) -> impl SocketOpsFilter<DeviceId<BindingsCtx>> {
+        &self.ebpf_manager
+    }
 }
 
 #[derive(Default)]

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::bindings::BindingsCtx;
 use ebpf::{
     link_program, BpfProgramContext, BpfValue, CbpfConfig, DataWidth, EbpfInstruction, EbpfProgram,
     Packet, ProgramArgument, Type, VerifiedEbpfProgram,
@@ -11,7 +12,10 @@ use ebpf_api::{
     SOCKET_FILTER_CBPF_CONFIG, SOCKET_FILTER_SK_BUF_TYPE,
 };
 use fidl_fuchsia_posix_socket_packet as fppacket;
+use netstack3_core::device::DeviceId;
 use netstack3_core::device_socket::Frame;
+use netstack3_core::filter::{FilterIpExt, IpPacket, SocketEgressFilterResult, SocketOpsFilter};
+use netstack3_core::routes::Marks;
 use std::collections::HashMap;
 use zerocopy::FromBytes;
 
@@ -126,7 +130,7 @@ impl SocketFilterProgram {
             )
         };
 
-        // TODO(https://fxbug.dev/370043219) Currently we assume that the code has been verified.
+        // TODO(https://fxbug.dev/370043219): Currently we assume that the code has been verified.
         // This is safe because fuchsia.posix.socket.packet is routed only to Starnix,
         // but that may change in the future. We need a better mechanism for permissions & BPF
         // verification.
@@ -161,6 +165,21 @@ impl SocketFilterProgram {
             0 => SocketFilterResult::Reject,
             n => SocketFilterResult::Accept(n.try_into().unwrap()),
         }
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct EbpfManager {}
+
+impl SocketOpsFilter<DeviceId<BindingsCtx>> for &EbpfManager {
+    fn on_egress<I: FilterIpExt, P: IpPacket<I>>(
+        &self,
+        _packet: &P,
+        _device: &DeviceId<BindingsCtx>,
+        _marks: &Marks,
+    ) -> SocketEgressFilterResult {
+        // TODO(https://fxbug.dev/407809292): Run attached eBPF programs.
+        SocketEgressFilterResult::Send { congestion: false }
     }
 }
 

@@ -96,9 +96,11 @@ pub mod filter {
 
     pub use netstack3_filter::{
         Action, AddressMatcher, AddressMatcherType, FilterApi, FilterBindingsContext,
-        FilterBindingsTypes, Hook, InterfaceMatcher, InterfaceProperties, IpRoutines, MarkAction,
-        NatRoutines, PacketMatcher, PortMatcher, ProofOfEgressCheck, Routine, Routines, Rule,
-        TransparentProxy, TransportProtocolMatcher, Tuple, UninstalledRoutine, ValidationError,
+        FilterBindingsTypes, FilterIpExt, Hook, InterfaceMatcher, InterfaceProperties, IpPacket,
+        IpRoutines, MarkAction, NatRoutines, PacketMatcher, PortMatcher, ProofOfEgressCheck,
+        Routine, Routines, Rule, SocketEgressFilterResult, SocketOpsFilter,
+        SocketOpsFilterBindingContext, TransparentProxy, TransportProtocolMatcher, Tuple,
+        UninstalledRoutine, ValidationError,
     };
 }
 
