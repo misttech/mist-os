@@ -582,18 +582,14 @@ class PageQueues {
   }
 
   // This processes the DontNeed queue and the LRU queue.
-  // For the DontNeed queue the pages are first placed in a temporary list (if |peek| is false), and
-  // then processed to ensure termination (see comment on dont_need_processing_list_ for full
-  // details). If |peek| is true we will either return a page from the DontNeed queue, or it will be
-  // empty, and so no temporary list is needed. For the LRU queue, the aim is to make the lru_gen_
-  // be the passed in target_gen. It achieves this by walking all the pages in the queue and either
+  // For the DontNeed queue the pages are either process to termination (if peek is false), or if
+  // peek is true we will either return a page from it or make it empty. For the LRU queue, the aim
+  // is to make the lru_gen_ be the passed in target_gen. It achieves this by walking all the pages
+  // in the queue and either
   //   1. For pages that have a newest accessed time and are in the wrong queue, are moved into the
   //      correct queue.
   //   2. For pages that are in the correct queue, they are either returned (if |peek| is true), or
-  //      moved to another queue - pages in the DontNeed queue are moved between
-  //      dont_need_processing_list_ and regular list, although this is in some ways the some queue
-  //      as the pages do not actually have their queue updated, and pages in the LRU queue have
-  //      their age effectively decreased by being moved to the next queue.
+  //      moved to the next queue, which causes their age to be effectively decreased.
   // In the second case for LRU, pages get moved into the next queue so that the LRU queue can
   // become empty, allowing the gen to be incremented to eventually reach the |target_gen|. The
   // mechanism of freeing up the LRU queue is necessary to make room for new MRU queues. When |peek|
@@ -616,13 +612,10 @@ class PageQueues {
                                                                uint64_t target_gen, bool peek)
       TA_EXCL(lock_);
 
-  // Helper used by ProcessDontNeedAndLruQueues. Processes the provided DoneNeed list (which should
-  // either be |dont_need_processing_list_| or |page_queues_[PageQueueReclaimDontNeed|) and places
-  // items in their correct list. If |peek| is true then the first item found that is correctly in
-  // the DontNeed list is returned.
-  // As this moves pages to their correct list, it is an error to call this with real DontNeed list
-  // and peek being false, as it would never terminate.
-  ktl::optional<VmoBacklink> ProcessDontNeedList(list_node_t* list, bool peek) TA_EXCL(lock_);
+  // Helper used by ProcessDontNeedAndLruQueues. Processes the DontNeed list and processes items
+  // into their correct list, and either processes all elements (if peek is false), or returns the
+  // first DontNeed item if peek is true.
+  ktl::optional<VmoBacklink> ProcessDontNeedList(bool peek) TA_EXCL(lock_);
 
   // Helpers for adding and removing to the queues. All of the public Set/Move/Remove operations
   // are convenience wrappers around these.
@@ -691,6 +684,13 @@ class PageQueues {
   // which takes a fbl::RefPtr<VmCowPages>.
   template <typename F>
   bool DebugPageIsSpecificQueue(const vm_page_t* page, PageQueue queue, F validator) const;
+
+  void AdvanceDontNeedCursorIf(vm_page_t* page) TA_REQ(lock_) {
+    if (page == dont_need_cursor_) {
+      dont_need_cursor_ = list_next_type(&page_queues_[PageQueueReclaimDontNeed], &page->queue_node,
+                                         vm_page_t, queue_node);
+    }
+  }
 
   // The lock_ is needed to protect the linked lists queues as these cannot be implemented with
   // atomics.
@@ -865,27 +865,19 @@ class PageQueues {
   // Current active ratio multiplier.
   uint64_t active_ratio_multiplier_ TA_GUARDED(lock_);
 
-  // This list is a temporary list used when updating the ages of pages in the DontNeed queue.
-  // Logically it can be considered the same queue as the PageQueuePagerBackedDontNeed, just a
-  // different physical list, and hence whether a page is here or in the regular
-  // page_queue_[PageQueuePagerBackedDontNeed] the page_queue_count_[PageQueuePagerBackedDontNeed]
-  // is the same.
-  // The way this list is used is when processing the LRU queue, all the pages in the regular
-  // DontNeed queue are moved here, and then this list is processed till its empty by moving them
-  // back to the DontNeed list. By doing this it can be guaranteed that original page is checked,
-  // without new DontNeed pages being able to cause the process to not terminate.
-  // Due to the way list_node_t's work, whether a page is in this specific list, or the page_queues_
-  // list, they can still be removed with list_delete, which is why it's safe to move the pages
-  // here.
-  // Note that we cannot guard this list by the dont_need_processing_lock_ since peek actions, that
-  // do not take that lock, also need to be able to remove items from this list.
-  list_node_t dont_need_processing_list_ TA_GUARDED(lock_) = LIST_INITIAL_CLEARED_VALUE;
+  // In order to process all the items in the DontNeed list, whilst still being able to periodically
+  // drop the lock to avoid a long running operation, we use a cursor to record the current page
+  // being examined. Any operation that removes a page from the DontNeed list must check if its
+  // removing this page, and advance it to the next page in the list if it is. This is automated by
+  // calling AdvanceDontNeedCursorIf.
+  vm_page_t* dont_need_cursor_ TA_GUARDED(lock_) = nullptr;
 
-  // The way processing works by moving all the DontNeed pages to the dont_need_process_list_ and
-  // then iterating over them means that it only make sense for one of these operations to be being
-  // done at a time. Since only one LRU rotation will realistically happen at a time, this lock in
-  // practice should never actually block anything.
-  DECLARE_MUTEX(PageQueues) dont_need_processing_lock_;
+  // There is only a single cursor and this lock acts as a resource control for it. This process
+  // needs to be done on LRU rotation / when peeking pages for reclamation, which need to be
+  // synchronized anyway so having this additional lock does not impact parallelism.
+  // The actual object member |dont_need_cursor_| is not guarded by this lock, since it needs to be
+  // read, and potentially updated, specifically by other threads who do not own the logical cursor.
+  DECLARE_MUTEX(PageQueues) dont_need_cursor_lock_;
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_PAGE_QUEUES_H_

@@ -179,7 +179,6 @@ PageQueues::PageQueues()
   for (uint32_t i = 0; i < PageQueueNumQueues; i++) {
     list_initialize(&page_queues_[i]);
   }
-  list_initialize(&dont_need_processing_list_);
 }
 
 PageQueues::~PageQueues() {
@@ -840,8 +839,7 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessLruQueueHelper(
   return ktl::nullopt;
 }
 
-ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessDontNeedList(list_node_t* list,
-                                                                       bool peek) {
+ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessDontNeedList(bool peek) {
   // Need to move every page out of the list and either put it back in the regular DontNeed list,
   // or in its correct queue. If we hit active pages we may need to replace them with loaned.
 
@@ -860,23 +858,25 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessDontNeedList(list_node
   const bool do_sweeping = (pmm_count_loaned_free_pages() != 0) &&
                            pmm_physical_page_borrowing_config()->is_borrowing_on_mru_enabled();
 
+  // In order to safely resume iteration where we left off between lock drops we need to make use of
+  // the dont_need_cursor_, which requires holding the dont_need_cursor_lock_.
+  Guard<Mutex> dont_need_cursor_guard{&dont_need_cursor_lock_};
+
   Guard<SpinLock, IrqSave> guard{&lock_};
-  // If not peeking we must be processing the dont_need_processing_list_, otherwise we will
-  // infinite loop taking items out and placing them back into the same list we are processing.
-  DEBUG_ASSERT(peek || list == &dont_need_processing_list_);
+  DEBUG_ASSERT(dont_need_cursor_ == nullptr);
+  vm_page_t* current =
+      list_peek_head_type(&page_queues_[PageQueueReclaimDontNeed], vm_page_t, queue_node);
   // Count work done separately to all iterations so we can periodically drop the lock and process
   // the deferred_list.
   uint64_t work_done = 0;
-  while (!list_is_empty(list)) {
-    // Take from the tail of the list as that represents the oldest item. That way if |peek| is true
-    // pages will get returned in oldest->newest order.
-    vm_page_t* page = list_remove_tail_type(list, vm_page_t, queue_node);
+  while (current) {
+    vm_page_t* page = current;
+    current = list_next_type(&page_queues_[PageQueueReclaimDontNeed], &current->queue_node,
+                             vm_page_t, queue_node);
     PageQueue page_queue =
         static_cast<PageQueue>(page->object.get_page_queue_ref().load(ktl::memory_order_relaxed));
     // Place in the correct list, preserving age
     if (page_queue == PageQueueReclaimDontNeed) {
-      // As we removed from the tail we place in the head, that way overall ordering is preserved.
-      list_add_head(&page_queues_[page_queue], &page->queue_node);
       if (peek) {
         VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
         DEBUG_ASSERT(cow);
@@ -888,6 +888,8 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessDontNeedList(list_node
         return VmoBacklink{ktl::move(cow_pages), page, page->object.get_page_offset()};
       }
     } else {
+      list_delete(&page->queue_node);
+
       // Only reason for a page to be in the DontNeed list and have the wrong queue is if it was
       // recently accessed. That means it's active and we can attempt to loan to it. As the entire
       // DontNeed queue is processed each time we change the LRU, we know this is a valid page queue
@@ -901,8 +903,12 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessDontNeedList(list_node
     }
     work_done++;
     if (work_done >= kMaxDeferredWork) {
-      // Drop the lock and flush the deferred_list
+      // Drop the lock and flush the deferred_list. Saving and restoring current to the
+      // dont_need_cursor_.
+      dont_need_cursor_ = current;
       guard.CallUnlocked([&deferred_list]() { deferred_list.Flush(); });
+      current = dont_need_cursor_;
+      dont_need_cursor_ = nullptr;
       work_done = 0;
     }
   }
@@ -919,31 +925,10 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessDontNeedAndLruQueues(u
   ASSERT(target_gen <= mru_gen_.load(ktl::memory_order_relaxed) - (kNumActiveQueues - 1));
 
   {
-    VM_KTRACE_DURATION(2, "ProcessDontNeedQueue");
-    if (peek) {
-      // When peeking we prefer to grab from the dont_need_processign_list_ first, as its pages are
-      // older, or at least were moved to the DontNeed queue further in the past.
-      ktl::optional<VmoBacklink> backlink = ProcessDontNeedList(&dont_need_processing_list_, true);
-      if (backlink != ktl::nullopt) {
-        return backlink;
-      }
-      list_node_t* list = [this]() TA_NO_THREAD_SAFETY_ANALYSIS {
-        return &page_queues_[PageQueueReclaimDontNeed];
-      }();
-      backlink = ProcessDontNeedList(list, true);
-      if (backlink != ktl::nullopt) {
-        return backlink;
-      }
-    } else {
-      // If not peeking then we will need to properly process the DontNeed queue, and so we must
-      // take the processing lock and move the existing pages into the processing list.
-      Guard<Mutex> dont_need_processing_guard{&dont_need_processing_lock_};
-      {
-        Guard<SpinLock, IrqSave> guard{&lock_};
-        ASSERT(list_is_empty(&dont_need_processing_list_));
-        list_move(&page_queues_[PageQueueReclaimDontNeed], &dont_need_processing_list_);
-      }
-      ProcessDontNeedList(&dont_need_processing_list_, false);
+    VM_KTRACE_DURATION(2, "ProcessDontNeedList");
+    ktl::optional<VmoBacklink> backlink = ProcessDontNeedList(peek);
+    if (backlink != ktl::nullopt) {
+      return backlink;
     }
   }
 
@@ -1103,6 +1088,7 @@ void PageQueues::MoveToQueueLocked(vm_page_t* page, PageQueue queue, DeferPendin
   uint32_t old_queue = page->object.get_page_queue_ref().exchange(queue, ktl::memory_order_relaxed);
   DEBUG_ASSERT(old_queue != PageQueueNone);
 
+  AdvanceDontNeedCursorIf(page);
   list_delete(&page->queue_node);
   list_add_head(&page_queues_[queue], &page->queue_node);
   page_queue_counts_[old_queue].fetch_sub(1, ktl::memory_order_relaxed);
@@ -1294,6 +1280,7 @@ void PageQueues::RemoveLocked(vm_page_t* page, DeferPendingSignals& dps) {
   UpdateActiveInactiveLocked((PageQueue)old_queue, PageQueueNone, dps);
   page->object.set_object(nullptr);
   page->object.set_page_offset(0);
+  AdvanceDontNeedCursorIf(page);
   list_delete(&page->queue_node);
 }
 
