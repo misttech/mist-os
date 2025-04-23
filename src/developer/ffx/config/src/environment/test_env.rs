@@ -258,8 +258,3 @@ pub async fn test_init() -> Result<TestEnv> {
         .build()
         .await
 }
-
-// For a soft transition.
-pub async fn test_init_in_tree(build_dir: &Path) -> Result<TestEnv> {
-    test_env().in_tree(build_dir).build().await
-}
