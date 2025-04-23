@@ -32,7 +32,7 @@ rustc_library("core") {
 
   visibility = [
     "//sdk/lib/driver/*",
-    "//src/devices/bin/driver-host-rust/*",
+    "//src/devices/bin/driver-host/*",
   ]
 }
 

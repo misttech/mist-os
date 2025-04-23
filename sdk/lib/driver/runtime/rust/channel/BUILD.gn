@@ -37,7 +37,7 @@ rustc_library("channel") {
 
   visibility = [
     "//sdk/lib/driver/*",
-    "//src/devices/bin/driver-host-rust/*",
+    "//src/devices/bin/driver-host/*",
   ]
 }
 

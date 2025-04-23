@@ -39,7 +39,7 @@ group("driver_test_realm") {
     ":fake_resolver",
     ":test_realm_manifest",
     "//src/devices/bin/devfs:component-for-test",
-    "//src/devices/bin/driver-host-rust:component",
+    "//src/devices/bin/driver-host:component",
     "//src/devices/bin/driver-index:component",
     "//src/devices/bin/driver_manager:driver_shared_libraries",
     "//src/devices/bin/driver_manager/devfs:component",

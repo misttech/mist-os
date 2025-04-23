@@ -8,7 +8,7 @@
     ],
     program: {
         runner: "elf",
-        binary: "bin/driver-host-rust",
+        binary: "bin/driver-host",
         use_next_vdso: "true",
 
         // DriverHost cannot be shut down until its Driver Components have
