@@ -121,6 +121,9 @@ open protocol ContainerPowerController {
         /// closed.
         /// If this does not exist, then the container can sleep when it chooses after handling the
         /// Wake call.
+        ///
+        /// The container will signal the pair of wake_lock with USER_0 when the lock has been created
+        /// in the kernel.
         2: wake_lock zx.Handle:EVENTPAIR;
     });
 

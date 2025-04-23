@@ -39,6 +39,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::ffi::CStr;
 use std::rc::Rc;
 use std::sync::Arc;
+use zx::Peered;
 use {
     fidl_fuchsia_posix as fposix, fidl_fuchsia_starnix_binder as fbinder, fuchsia_async as fasync,
     zx,
@@ -52,6 +53,8 @@ const NAME_REMOTE_BINDER_IOCTL_SEND_WORK: &'static CStr = c"remote_binder_ioctl_
 const NAME_REMOTE_BINDER_IOCTL_FIDL_REPLY: &'static CStr = c"remote_binder_ioctl_fidl_reply";
 const NAME_REMOTE_BINDER_IOCTL_WORKER_PROCESS: &'static CStr =
     c"remote_binder_ioctl_worker_process";
+
+const WAKE_LOCK_ACQUIRED_SIGNAL: zx::Signals = zx::Signals::USER_0;
 
 trait RemoteControllerConnector: Send + Sync + 'static {
     fn connect_to_remote_controller(
@@ -624,6 +627,10 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                 fbinder::ContainerPowerControllerRequest::Wake { payload, .. } => {
                     if let Some(wake_lock) = payload.wake_lock {
                         kernel.suspend_resume_manager.add_lock(wake_lock_name);
+                        // The client is responsible for lowering this signal if it reuses the same
+                        // event pair across calls.
+                        let _ =
+                            wake_lock.signal_peer(zx::Signals::empty(), WAKE_LOCK_ACQUIRED_SIGNAL);
                         let kernel_clone = kernel.clone();
                         let wake_lock_name = wake_lock_name.to_owned();
                         kernel.kthreads.spawn_future(async move {
@@ -1481,11 +1488,17 @@ mod tests {
             .unwrap();
         exec.run_singlethreaded(wait_for_message(&message_counter));
 
+        // Check that the wake lock event pair has been signalled to indicate the wake lock being
+        // acquired.
+        exec.run_singlethreaded(fasync::OnSignals::new(&wake_lock, WAKE_LOCK_ACQUIRED_SIGNAL))
+            .unwrap();
+
         // Check that we already have the lock.
         assert!(!kernel.suspend_resume_manager.add_lock("test"));
 
         // Drop our lock, run the executor, and check that the lock dropped.
         drop(wake_lock);
+
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
         assert!(kernel.suspend_resume_manager.add_lock("test"));
     }
