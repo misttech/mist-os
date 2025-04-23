@@ -253,7 +253,7 @@ group("smart_display_nelson_staging_tests") {
 ############################## WLAN Test groups - Start ###############################
 group("wlan_core_vim3_stable_tests") {
   testonly = true
-  public_deps = []
+  public_deps = [ "honeydew/honeydew/affordances/connectivity/wlan/wlan_policy_ap/tests/functional_tests:wlan_policy_ap_test_fc($host_toolchain)" ]
 }
 
 group("wlan_core_vim3_unstable_tests") {
@@ -261,7 +261,6 @@ group("wlan_core_vim3_unstable_tests") {
   public_deps = [
     "honeydew/honeydew/affordances/connectivity/wlan/wlan/tests/functional_tests:wlan_test_fc($host_toolchain)",
     "honeydew/honeydew/affordances/connectivity/wlan/wlan_policy/tests/functional_tests:wlan_policy_test_fc($host_toolchain)",
-    "honeydew/honeydew/affordances/connectivity/wlan/wlan_policy_ap/tests/functional_tests:wlan_policy_ap_test_fc($host_toolchain)",
   ]
 }
 
