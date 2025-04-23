@@ -296,6 +296,7 @@
 //src/devices/usb/drivers/xhci:xhci-driver
 //src/devices/usb/tests/usb-hci-test:fuchsia_driver
 //src/diagnostics/validator/logs/ddk/log-test-driver:log-test-driver-driver
+//src/firmware/drivers/usb-fastboot-function:driver
 //src/graphics/display/drivers/aml-canvas:aml-canvas-driver
 //src/graphics/display/drivers/amlogic-display:amlogic-display-driver
 //src/graphics/display/drivers/coordinator:coordinator-driver
