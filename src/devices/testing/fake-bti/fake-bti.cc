@@ -87,6 +87,48 @@ class Bti final : public fake_object::Object {
              offset, size);
   }
 
+  zx::result<size_t> GetPinnedVmos(cpp20::span<fake_bti_pinned_vmo_info_t> out) {
+    std::lock_guard guard(lock_);
+    size_t actual = pinned_vmos_.size();
+
+    for (unsigned i = 0; i < std::min(pinned_vmos_.size(), out.size()); ++i) {
+      const auto& vmo_info = pinned_vmos_[i];
+      zx::vmo vmo_dup;
+      zx_status_t status = vmo_info.vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo_dup);
+      if (status != ZX_OK) {
+        return zx::error(status);
+      }
+
+      out[i] = {
+          .vmo = vmo_dup.release(),
+          .size = vmo_info.size,
+          .offset = vmo_info.offset,
+      };
+    }
+    return zx::ok(actual);
+  }
+
+  zx::result<size_t> GetPhysFromPinnedVmos(const fake_bti_pinned_vmo_info_t& vmo_info,
+                                           cpp20::span<zx_paddr_t> out) {
+    zx_info_handle_basic_t target_info;
+    if (zx_status_t status = zx_object_get_info(vmo_info.vmo, ZX_INFO_HANDLE_BASIC, &target_info,
+                                                sizeof(target_info), nullptr, nullptr);
+        status != ZX_OK) {
+      return zx::error(status);
+    }
+
+    std::lock_guard guard(lock_);
+    for (const auto& pinned_vmo : pinned_vmos_) {
+      if (pinned_vmo.size == vmo_info.size && pinned_vmo.offset == vmo_info.offset &&
+          pinned_vmo.koid == target_info.koid) {
+        size_t num_copy = std::min(out.size(), pinned_vmo.paddrs.size());
+        std::copy_n(pinned_vmo.paddrs.cbegin(), num_copy, out.begin());
+        return zx::ok(pinned_vmo.paddrs.size());
+      }
+    }
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+
   const auto& pinned_vmos() const { return pinned_vmos_; }
 
  private:
@@ -213,26 +255,11 @@ zx_status_t fake_bti_get_pinned_vmos(zx_handle_t bti, fake_bti_pinned_vmo_info_t
                 "fake_bti_get_pinned_vmos: Bad handle %u\n", bti);
   std::shared_ptr<Bti> bti_obj = std::static_pointer_cast<Bti>(get_status.value());
 
-  const auto& vmos = bti_obj->pinned_vmos();
-  if (actual_num_vmos != nullptr) {
-    *actual_num_vmos = vmos.size();
+  zx::result result = bti_obj->GetPinnedVmos(cpp20::span(out_vmo_info, out_num_vmos));
+  if (result.is_ok() && actual_num_vmos) {
+    *actual_num_vmos = result.value();
   }
-
-  for (size_t i = 0; i < vmos.size() && i < out_num_vmos; i++) {
-    const auto& vmo_info = vmos[i];
-    zx::vmo vmo_dup;
-    zx_status_t status = vmo_info.vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo_dup);
-    if (status != ZX_OK) {
-      return status;
-    }
-
-    *(out_vmo_info++) = {
-        .vmo = vmo_dup.release(),
-        .size = vmo_info.size,
-        .offset = vmo_info.offset,
-    };
-  }
-  return ZX_OK;
+  return result.status_value();
 }
 
 zx_status_t fake_bti_get_phys_from_pinned_vmo(zx_handle_t bti, fake_bti_pinned_vmo_info_t vmo_info,
@@ -248,27 +275,12 @@ zx_status_t fake_bti_get_phys_from_pinned_vmo(zx_handle_t bti, fake_bti_pinned_v
                 "fake_bti_get_phys_from_pinned_vmo: Bad handle %u\n", bti);
   auto* bti_obj = static_cast<Bti*>(get_status.value().get());
 
-  zx_info_handle_basic_t target_info;
-  if (zx_status_t status = zx_object_get_info(vmo_info.vmo, ZX_INFO_HANDLE_BASIC, &target_info,
-                                              sizeof(target_info), nullptr, nullptr);
-      status != ZX_OK) {
-    return status;
+  zx::result result =
+      bti_obj->GetPhysFromPinnedVmos(vmo_info, cpp20::span(out_paddrs, out_num_paddrs));
+  if (result.is_ok() && actual_num_paddrs) {
+    *actual_num_paddrs = result.value();
   }
-
-  const auto& vmos = bti_obj->pinned_vmos();
-  for (const auto& pinned_vmo : vmos) {
-    if (pinned_vmo.size == vmo_info.size && pinned_vmo.offset == vmo_info.offset &&
-        pinned_vmo.koid == target_info.koid) {
-      *actual_num_paddrs = pinned_vmo.paddrs.size();
-
-      if (out_paddrs != nullptr) {
-        size_t num_copy = std::min(out_num_paddrs, pinned_vmo.paddrs.size());
-        std::memcpy(out_paddrs, pinned_vmo.paddrs.data(), num_copy * sizeof(zx_paddr_t));
-      }
-      return ZX_OK;
-    }
-  }
-  return ZX_ERR_NOT_FOUND;
+  return result.status_value();
 }
 
 // Fake syscall implementations
