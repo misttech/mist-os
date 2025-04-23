@@ -79,6 +79,18 @@ pub trait Transport {
     ) -> Poll<Result<Option<Self::RecvBuffer>, Self::Error>>;
 }
 
+/// A transport layer which can send messages without blocking.
+///
+/// Non-blocking send operations cannot apply backpressure, which can cause memory exhaustion across
+/// the system. `NonBlockingTransport` is intended for use only while porting existing code.
+pub trait NonBlockingTransport: Transport {
+    /// Completes a `SendFutureState` using a sender without blocking.
+    fn send_immediately(
+        future_state: &mut Self::SendFutureState,
+        sender: &Self::Sender,
+    ) -> Result<(), Self::Error>;
+}
+
 /// Helper methods for `Transport`.
 pub trait TransportExt: Transport {
     /// Sends an encoded message over the transport.
@@ -101,6 +113,16 @@ impl<T: Transport + ?Sized> TransportExt for T {}
 pub struct SendFuture<'s, T: Transport + ?Sized> {
     sender: &'s T::Sender,
     future_state: T::SendFutureState,
+}
+
+impl<T: NonBlockingTransport> SendFuture<'_, T> {
+    /// Completes the send operation synchronously and without blocking.
+    ///
+    /// Using this method prevents transports from applying backpressure. Prefer awaiting when
+    /// possible.
+    pub fn send_immediately(mut self) -> Result<(), T::Error> {
+        T::send_immediately(&mut self.future_state, self.sender)
+    }
 }
 
 impl<T: Transport> Future for SendFuture<'_, T> {

@@ -23,7 +23,7 @@ use zx::sys::{
 };
 use zx::{AsHandleRef as _, Channel, Handle, HandleBased, Status};
 
-use crate::Transport;
+use crate::{NonBlockingTransport, Transport};
 
 struct Shared {
     is_closed: AtomicBool,
@@ -250,30 +250,11 @@ impl Transport for Channel {
     }
 
     fn poll_send(
-        mut future_state: Pin<&mut Self::SendFutureState>,
+        future_state: Pin<&mut Self::SendFutureState>,
         _: &mut Context<'_>,
         sender: &Self::Sender,
     ) -> Poll<Result<(), Self::Error>> {
-        let result = unsafe {
-            zx_channel_write(
-                sender.shared.channel.get_ref().raw_handle(),
-                0,
-                future_state.buffer.chunks.as_ptr().cast::<u8>(),
-                (future_state.buffer.chunks.len() * CHUNK_SIZE) as u32,
-                future_state.buffer.handles.as_ptr().cast(),
-                future_state.buffer.handles.len() as u32,
-            )
-        };
-
-        if result == ZX_OK {
-            // Handles were written to the channel, so we must not drop them.
-            unsafe {
-                future_state.buffer.handles.set_len(0);
-            }
-            Poll::Ready(Ok(()))
-        } else {
-            Poll::Ready(Err(Status::from_raw(result)))
-        }
+        Poll::Ready(Self::send_immediately(future_state.get_mut(), sender))
     }
 
     fn close(sender: &Self::Sender) {
@@ -345,6 +326,34 @@ impl Transport for Channel {
     }
 }
 
+impl NonBlockingTransport for Channel {
+    fn send_immediately(
+        future_state: &mut Self::SendFutureState,
+        sender: &Self::Sender,
+    ) -> Result<(), Self::Error> {
+        let result = unsafe {
+            zx_channel_write(
+                sender.shared.channel.get_ref().raw_handle(),
+                0,
+                future_state.buffer.chunks.as_ptr().cast::<u8>(),
+                (future_state.buffer.chunks.len() * CHUNK_SIZE) as u32,
+                future_state.buffer.handles.as_ptr().cast(),
+                future_state.buffer.handles.len() as u32,
+            )
+        };
+
+        if result == ZX_OK {
+            // Handles were written to the channel, so we must not drop them.
+            unsafe {
+                future_state.buffer.handles.set_len(0);
+            }
+            Ok(())
+        } else {
+            Err(Status::from_raw(result))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use core::mem::MaybeUninit;
@@ -352,7 +361,7 @@ mod tests {
     use fidl_next_codec::fuchsia::{HandleDecoder, HandleEncoder, WireHandle};
     use fidl_next_codec::{
         munge, Decode, DecodeError, DecoderExt as _, Encodable, Encode, EncodeError,
-        EncoderExt as _, Slot, ZeroPadding,
+        EncoderExt as _, Slot, WireString, ZeroPadding,
     };
     use fuchsia_async as fasync;
     use zx::{AsHandleRef, Channel, Handle, HandleBased as _, Instant, Signals, WaitResult};
@@ -361,6 +370,7 @@ mod tests {
     use crate::testing::{
         test_close_on_drop, test_event, test_multiple_two_way, test_one_way, test_two_way,
     };
+    use crate::{Client, Responder, Server, ServerHandler, ServerSender, Transport};
 
     #[fasync::run_singlethreaded(test)]
     async fn close_on_drop() {
@@ -497,5 +507,40 @@ mod tests {
         );
 
         drop(decoded);
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn one_way_nonblocking() {
+        let (client_end, server_end) = Channel::create();
+        struct TestServer;
+
+        impl<T: Transport> ServerHandler<T> for TestServer {
+            fn on_one_way(&mut self, _: &ServerSender<T>, ordinal: u64, buffer: T::RecvBuffer) {
+                assert_eq!(ordinal, 42);
+                let message = buffer.decode::<WireString>().expect("failed to decode request");
+                assert_eq!(&**message, "Hello world");
+            }
+
+            fn on_two_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer, _: Responder) {
+                panic!("unexpected two-way message");
+            }
+        }
+
+        let mut client = Client::new(client_end);
+        let client_sender = client.sender().clone();
+        let client_task = fasync::Task::spawn(async move { client.run_sender().await });
+        let mut server = Server::new(server_end);
+        let server_task = fasync::Task::spawn(async move { server.run(TestServer).await });
+
+        client_sender
+            .send_one_way(42, &mut "Hello world".to_string())
+            .expect("client failed to encode request")
+            .send_immediately()
+            .expect("client failed to send request");
+        client_sender.close();
+        drop(client_sender);
+
+        client_task.await.expect("client encountered an error");
+        server_task.await.expect("server encountered an error");
     }
 }
