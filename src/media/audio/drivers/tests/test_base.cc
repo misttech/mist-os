@@ -53,16 +53,8 @@ void TestBase::SetUp() {
                                 fuchsia::hardware::audio::CodecConnectorPtr>(device_entry()));
       break;
     case DriverType::Composite:
-      // Use DFv1-specific trampoline Connector API for the virtual composite driver (DFv1),
-      // for all other non-virtual composite drivers (DFv2) do not use the trampoline.
-      // TODO(b/301003578): When virtual audio is DFv2, remove DFv1-specific trampoline support.
-      if (entry.device_type == DeviceType::Virtual) {
-        CreateCompositeFromChannel(
-            ConnectWithTrampoline<fuchsia::hardware::audio::Composite,
-                                  fuchsia::hardware::audio::CompositeConnectorPtr>(device_entry()));
-      } else {
-        CreateCompositeFromChannel(Connect<fuchsia::hardware::audio::CompositePtr>(device_entry()));
-      }
+      // For the driver type `Composite`, we need not connect via intermediate "trampoline".
+      CreateCompositeFromChannel(Connect<fuchsia::hardware::audio::CompositePtr>(device_entry()));
       break;
     case DriverType::Dai:
       CreateDaiFromChannel(

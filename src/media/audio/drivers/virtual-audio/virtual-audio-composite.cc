@@ -200,16 +200,6 @@ void VirtualAudioComposite::GetBuffer(GetBufferCompleter::Sync& completer) {
   completer.Reply(fit::ok(std::move(response)));
 }
 
-void VirtualAudioComposite::Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) {
-  if (composite_binding_.has_value()) {
-    fdf::error("Already bound");
-    request.composite_protocol().Close(ZX_ERR_ALREADY_BOUND);
-    return;
-  }
-  composite_binding_.emplace(dispatcher_, std::move(request.composite_protocol()), this,
-                             [this](auto info) { composite_binding_.reset(); });
-}
-
 // Health implementation
 //
 void VirtualAudioComposite::GetHealthState(GetHealthStateCompleter::Sync& completer) {
@@ -805,10 +795,14 @@ void VirtualAudioComposite::handle_unknown_method(
              metadata.method_ordinal);
 }
 
-void VirtualAudioComposite::Serve(
-    fidl::ServerEnd<fuchsia_hardware_audio::CompositeConnector> server) {
-  composite_connector_bindings_.AddBinding(dispatcher_, std::move(server), this,
-                                           fidl::kIgnoreBindingClosure);
+void VirtualAudioComposite::Serve(fidl::ServerEnd<fuchsia_hardware_audio::Composite> server) {
+  if (composite_binding_.has_value()) {
+    fdf::error("Already bound");
+    server.Close(ZX_ERR_ALREADY_BOUND);
+    return;
+  }
+  composite_binding_.emplace(dispatcher_, std::move(server), this,
+                             [this](auto info) { composite_binding_.reset(); });
 }
 
 void VirtualAudioComposite::GetGain(GetGainCompleter::Sync& completer) {

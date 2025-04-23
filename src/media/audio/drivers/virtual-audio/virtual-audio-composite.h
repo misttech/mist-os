@@ -16,8 +16,7 @@ class VirtualAudioComposite
     : public fidl::Server<fuchsia_virtualaudio::Device>,
       public fidl::Server<fuchsia_hardware_audio::Composite>,
       public fidl::Server<fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
-      public fidl::Server<fuchsia_hardware_audio::RingBuffer>,
-      public fidl::Server<fuchsia_hardware_audio::CompositeConnector> {
+      public fidl::Server<fuchsia_hardware_audio::RingBuffer> {
  public:
   using InstanceId = uint64_t;
   using OnDeviceBindingClosed = fit::callback<void(fidl::UnbindInfo)>;
@@ -60,9 +59,6 @@ class VirtualAudioComposite
                        ChangePlugStateCompleter::Sync& completer) override;
   void AdjustClockRate(AdjustClockRateRequest& request,
                        AdjustClockRateCompleter::Sync& completer) override;
-
-  // fuchsia.hardware.audio.CompositeConnector implementation.
-  void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override;
 
   // fuchsia.hardware.audio.Composite implementation.
   void Reset(ResetCompleter::Sync& completer) override;
@@ -108,7 +104,7 @@ class VirtualAudioComposite
           metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  void Serve(fidl::ServerEnd<fuchsia_hardware_audio::CompositeConnector> server);
+  void Serve(fidl::ServerEnd<fuchsia_hardware_audio::Composite> server);
   void ResetRingBuffer();
   void OnRingBufferClosed(fidl::UnbindInfo info);
   void OnSignalProcessingClosed(fidl::UnbindInfo info);
@@ -153,9 +149,7 @@ class VirtualAudioComposite
 
   async_dispatcher_t* dispatcher_;
   fidl::ServerBinding<fuchsia_virtualaudio::Device> device_binding_;
-  fidl::ServerBindingGroup<fuchsia_hardware_audio::CompositeConnector>
-      composite_connector_bindings_;
-  driver_devfs::Connector<fuchsia_hardware_audio::CompositeConnector> devfs_connector_{
+  driver_devfs::Connector<fuchsia_hardware_audio::Composite> devfs_connector_{
       fit::bind_member<&VirtualAudioComposite::Serve>(this)};
   std::optional<fdf::OwnedChildNode> child_;
   InstanceId instance_id_;
