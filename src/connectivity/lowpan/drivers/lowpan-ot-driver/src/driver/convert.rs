@@ -291,6 +291,9 @@ impl FromExt<&ot::BorderRoutingDhcp6PdState> for fidl_fuchsia_lowpan_experimenta
             ot::BorderRoutingDhcp6PdState::Running => {
                 fidl_fuchsia_lowpan_experimental::Dhcp6PdState::Dhcp6PdStateRunning
             }
+            ot::BorderRoutingDhcp6PdState::Idle => {
+                fidl_fuchsia_lowpan_experimental::Dhcp6PdState::Dhcp6PdStateIdle
+            }
         }
     }
 }
