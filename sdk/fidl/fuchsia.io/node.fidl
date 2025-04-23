@@ -8,7 +8,7 @@ using fuchsia.unknown;
 using zx;
 
 /// Information that describes the target node.
-@available(added=NEXT)
+@available(added=27)
 type NodeInfo = table {
     1: attributes NodeAttributes2;
 };
@@ -345,12 +345,12 @@ open protocol Node {
     });
 
     /// DEPRECATED - Use `fuchsia.unknown/Cloneable.Clone` instead.
-    // TODO(https://fxbug.dev/324081103): Mark this as removed=NEXT once the following places have
-    // been updated to no longer depend on this method:
+    // TODO(https://fxbug.dev/324081103): Mark this as removed at NEXT once the
+    // following places have been updated to no longer depend on this method:
     //  - //third_party/go: Relied on by implementation of Go fdio library.
     //  - //src/developer/ffx/playground/src/builtins.rs
     //  - //src/tests/end_to_end/fidlcat/fidlcat_e2e_tests.py
-    @available(added=26, deprecated=NEXT)
+    @available(added=26, deprecated=27)
     @selector("fuchsia.io1/Node.Clone")
     flexible DeprecatedClone(resource struct {
         flags OpenFlags;
@@ -423,7 +423,7 @@ open protocol Node {
     /// Acquires the `Directory.Open` rights and flags used to access this file.
     ///
     /// This method does not require any rights.
-    @available(replaced=NEXT, renamed="DeprecatedGetFlags")
+    @available(replaced=27, renamed="DeprecatedGetFlags")
     @selector("fuchsia.io1/Node.NodeGetFlags")
     strict GetFlags() -> (struct {
         s zx.Status;
@@ -434,7 +434,7 @@ open protocol Node {
     // TODO(https://fxbug.dev/376509077): Remove this when all out-of-tree servers support the new
     // GetFlags method. We can't gracefully remove this method since changing it to flexible breaks
     // wire compatibility with older clients.
-    @available(added=NEXT, deprecated=HEAD)
+    @available(added=27, deprecated=HEAD)
     @selector("fuchsia.io1/Node.NodeGetFlags")
     strict DeprecatedGetFlags() -> (struct {
         s zx.Status;
@@ -446,7 +446,7 @@ open protocol Node {
     /// - `OpenFlags.APPEND`
     ///
     /// This method does not require any rights.
-    @available(replaced=NEXT, renamed="DeprecatedSetFlags")
+    @available(replaced=27, renamed="DeprecatedSetFlags")
     @selector("fuchsia.io1/Node.NodeSetFlags")
     strict SetFlags(struct {
         flags OpenFlags;
@@ -458,7 +458,7 @@ open protocol Node {
     // TODO(https://fxbug.dev/376509077): Remove this when all out-of-tree servers support the new
     // GetFlags method. We can't gracefully remove this method since changing it to flexible breaks
     // wire compatibility with older clients.
-    @available(added=NEXT, deprecated=HEAD)
+    @available(added=27, deprecated=HEAD)
     @selector("fuchsia.io1/Node.NodeSetFlags")
     strict DeprecatedSetFlags(struct {
         flags OpenFlags;
@@ -474,7 +474,7 @@ open protocol Node {
     ///  - `Flags.PERM_INHERIT_*`: Only applies when determining connection rights.
     ///  - `Flags.PROTOCOL_*`: Only the protocol of the connection will be present.
     ///  - `Flags.FLAG_*`: Only applies when opening the resource, not part of the connection.
-    @available(added=NEXT)
+    @available(added=27)
     @selector("fuchsia.io/Node.GetFlags")
     flexible GetFlags() -> (struct {
         flags Flags;
@@ -489,7 +489,7 @@ open protocol Node {
     /// Errors:
     ///  - `ZX_ERR_NOT_SUPPORTED`: The object does not support this feature or the specified flags.
     ///  - `ZX_ERR_INVALID_ARGS`: `flags` other than `Flags.FILE_APPEND` were specified.
-    @available(added=NEXT)
+    @available(added=27)
     @selector("fuchsia.io/Node.SetFlags")
     flexible SetFlags(struct {
         flags Flags;
@@ -552,7 +552,7 @@ open protocol Node {
     @selector("fuchsia.io/Node.OnRepresentation")
     strict -> OnRepresentation(@generated_name("Representation") flexible resource union {
         /// The [`Node`] protocol was negotiated for this connection.
-        @available(replaced=NEXT, renamed="node")
+        @available(replaced=27, renamed="node")
         1: connector @generated_name("ConnectorInfo") table {
             /// Requested attributes for the object. This is only populated if requested.
             @available(added=18)
@@ -560,7 +560,7 @@ open protocol Node {
         };
 
         /// The [`Node`] protocol was negotiated for this connection.
-        @available(added=NEXT)
+        @available(added=27)
         1: node NodeInfo;
 
         /// The [`File`] protocol was negotiated for this connection.

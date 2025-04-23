@@ -6,7 +6,7 @@ library fuchsia.hardware.gpio;
 
 using zx;
 
-@available(added=NEXT)
+@available(added=27)
 const SIGNAL_ACK_INTERRUPT uint32 = 0x01000000; // ZX_USER_SIGNAL_0
 
 /// Whether to drive the GPIO to a high or low voltage, or disable the output buffer.
@@ -19,7 +19,7 @@ type BufferMode = strict enum {
 type InterruptOptions = flexible bits {
     /// The interrupt wakes up the system if the system is suspended.
     /// Must not be set if system suspend / resume is disabled.
-    @available(added=NEXT)
+    @available(added=27)
     WAKEABLE = 0x01;
 };
 

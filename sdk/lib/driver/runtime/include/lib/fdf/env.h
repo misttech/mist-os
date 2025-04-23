@@ -133,7 +133,7 @@ zx_status_t fdf_env_set_thread_limit(const char* scheduler_role, size_t schedule
 
 // Adds an allowed scheduler role for the given driver.
 void fdf_env_add_allowed_scheduler_role_for_driver(const void* driver, const char* role,
-                                                   size_t role_length) ZX_AVAILABLE_SINCE(NEXT);
+                                                   size_t role_length) ZX_AVAILABLE_SINCE(27);
 
 // Gets the opaque pointer uniquely associated with the driver currently running on the
 // thread identified by |tid|.
@@ -147,7 +147,7 @@ void fdf_env_add_allowed_scheduler_role_for_driver(const void* driver, const cha
 //
 // ZX_ERR_INVALID_ARGS: If the out_driver is not valid.
 zx_status_t fdf_env_get_driver_on_tid(zx_koid_t tid, const void** out_driver)
-    ZX_AVAILABLE_SINCE(NEXT);
+    ZX_AVAILABLE_SINCE(27);
 
 __END_CDECLS
 

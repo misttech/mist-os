@@ -248,7 +248,7 @@ __EXPORT bool fdf_env_dispatcher_has_queued_tasks(fdf_dispatcher_t* dispatcher) 
   return dispatcher->HasQueuedTasks();
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 __EXPORT void fdf_env_add_allowed_scheduler_role_for_driver(const void* driver, const char* role,
                                                             size_t role_length) {
   driver_runtime::AllowedSchedulerRoles::Get()->AddForDriver(driver,
@@ -314,7 +314,7 @@ __EXPORT zx_status_t fdf_env_set_thread_limit(const char* scheduler_role, size_t
       std::string_view(scheduler_role, scheduler_role_len), max_threads);
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 __EXPORT zx_status_t fdf_env_get_driver_on_tid(zx_koid_t tid, const void** out_driver) {
   if (!out_driver) {
     return ZX_ERR_INVALID_ARGS;

@@ -81,9 +81,9 @@ bool trace_is_category_enabled(const char* category_literal);
 // |length | is the length of bytes
 //
 // This function is thread-safe.
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 bool trace_is_category_bytestring_enabled(const unsigned char* bytes, size_t length)
-    ZX_AVAILABLE_SINCE(NEXT);
+    ZX_AVAILABLE_SINCE(27);
 #endif
 
 // Acquires a reference to the trace engine's context.
@@ -163,11 +163,11 @@ trace_context_t* trace_acquire_context_for_category(const char* category_literal
 // Returns NULL otherwise.
 //
 // This function is thread-safe and lock-free.
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 trace_context_t* trace_acquire_context_for_category_bytestring(const unsigned char* bytes,
                                                                size_t length,
                                                                trace_string_ref_t* out_ref)
-    ZX_AVAILABLE_SINCE(NEXT);
+    ZX_AVAILABLE_SINCE(27);
 #endif
 
 // Releases a reference to the trace engine's context.
@@ -235,12 +235,12 @@ trace_context_t* trace_acquire_context_for_category_cached(const char* category_
 // Returns NULL otherwise.
 //
 // This function is thread-safe and lock-free.
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 trace_context_t* trace_acquire_context_for_category_bytestring_cached(const unsigned char* bytes,
                                                                       size_t length,
                                                                       trace_site_t* site_ptr,
                                                                       trace_string_ref_t* out_ref)
-    ZX_AVAILABLE_SINCE(NEXT);
+    ZX_AVAILABLE_SINCE(27);
 #endif
 
 // Flush the cache built up by calls to

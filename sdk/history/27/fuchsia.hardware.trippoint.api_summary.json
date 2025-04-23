@@ -1,0 +1,197 @@
+[
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.trippoint/ClearedTripPoint"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.trippoint/OneshotTempAboveTripPoint.critical_temperature_celsius",
+        "ordinal": "1",
+        "type": "float32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.trippoint/OneshotTempAboveTripPoint"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.trippoint/OneshotTempBelowTripPoint.critical_temperature_celsius",
+        "ordinal": "1",
+        "type": "float32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.trippoint/OneshotTempBelowTripPoint"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.trippoint/TripDeviceMetadata.critical_temp_celsius",
+        "ordinal": "1",
+        "type": "float32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.trippoint/TripDeviceMetadata"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.trippoint/TripPoint.GetSensorName",
+        "strictness": "strict",
+        "ordinal": "5529710860705727169",
+        "direction": "two_way",
+        "response": "fuchsia.hardware.temperature/DeviceGetSensorNameResponse"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.trippoint/TripPoint.GetTemperatureCelsius",
+        "strictness": "strict",
+        "ordinal": "8457206737810101052",
+        "direction": "two_way",
+        "response": "fuchsia.hardware.temperature/DeviceGetTemperatureCelsiusResponse"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.trippoint/TripPoint.GetTripPointDescriptors",
+        "strictness": "flexible",
+        "ordinal": "845678244685367413",
+        "direction": "two_way",
+        "response": "fuchsia.hardware.trippoint/TripPoint_GetTripPointDescriptors_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.trippoint/TripPoint.SetTripPoints",
+        "strictness": "flexible",
+        "ordinal": "641596560377345427",
+        "direction": "two_way",
+        "request": "fuchsia.hardware.trippoint/TripPointSetTripPointsRequest",
+        "response": "fuchsia.hardware.trippoint/TripPoint_SetTripPoints_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.trippoint/TripPoint.WaitForAnyTripPoint",
+        "strictness": "flexible",
+        "ordinal": "7402046097778527813",
+        "direction": "two_way",
+        "response": "fuchsia.hardware.trippoint/TripPoint_WaitForAnyTripPoint_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.hardware.trippoint/TripPoint",
+        "openness": "open",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.trippoint/TripPointDescriptor.configuration",
+        "ordinal": "3",
+        "type": "fuchsia.hardware.trippoint/TripPointValue"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.trippoint/TripPointDescriptor.index",
+        "ordinal": "2",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.trippoint/TripPointDescriptor.type",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.trippoint/TripPointType"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.trippoint/TripPointDescriptor"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.trippoint/TripPointResult.index",
+        "ordinal": "2",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.trippoint/TripPointResult.measured_temperature_celsius",
+        "ordinal": "1",
+        "type": "float32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.trippoint/TripPointResult"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.trippoint/TripPointSetTripPointsRequest.descriptors",
+        "ordinal": "1",
+        "type": "vector<fuchsia.hardware.trippoint/TripPointDescriptor>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.trippoint/TripPointSetTripPointsRequest"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.trippoint/TripPointType.ONESHOT_TEMP_ABOVE",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.trippoint/TripPointType.ONESHOT_TEMP_BELOW",
+        "value": "2"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.hardware.trippoint/TripPointType",
+        "strictness": "flexible",
+        "type": "uint16"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.trippoint/TripPointValue.cleared_trip_point",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.trippoint/ClearedTripPoint"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.trippoint/TripPointValue.oneshot_temp_above_trip_point",
+        "ordinal": "2",
+        "type": "fuchsia.hardware.trippoint/OneshotTempAboveTripPoint"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.trippoint/TripPointValue.oneshot_temp_below_trip_point",
+        "ordinal": "3",
+        "type": "fuchsia.hardware.trippoint/OneshotTempBelowTripPoint"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.hardware.trippoint/TripPointValue",
+        "strictness": "flexible"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.trippoint/TripPoint_GetTripPointDescriptors_Response.descriptors",
+        "ordinal": "1",
+        "type": "vector<fuchsia.hardware.trippoint/TripPointDescriptor>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.trippoint/TripPoint_GetTripPointDescriptors_Response"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.trippoint/TripPoint_WaitForAnyTripPoint_Response.result",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.trippoint/TripPointResult"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.trippoint/TripPoint_WaitForAnyTripPoint_Response"
+    },
+    {
+        "kind": "library",
+        "name": "fuchsia.hardware.trippoint"
+    }
+]

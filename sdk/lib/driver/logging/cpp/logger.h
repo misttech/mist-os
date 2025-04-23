@@ -166,7 +166,7 @@ class Logger final {
 
   static std::unique_ptr<Logger> NoOp();
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
   void HandleInterest(fuchsia_diagnostics_types::wire::Interest interest);
 #else
   void HandleInterest(fuchsia_diagnostics::wire::Interest interest);

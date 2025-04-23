@@ -380,7 +380,7 @@ open protocol Directory {
     /// `OnOpen` event if applicable, and the `object` connection closed.
     ///
     /// `mode` is ignored.
-    @available(replaced=NEXT, renamed="DeprecatedOpen")
+    @available(replaced=27, renamed="DeprecatedOpen")
     @selector("fuchsia.io1/Directory.Open")
     strict Open(resource struct {
         flags OpenFlags;
@@ -391,7 +391,7 @@ open protocol Directory {
 
     /// DEPRECATED - Use `fuchsia.io/Directory.Open` instead.
     // TODO(https://fxbug.dev/324080864): Mark this as removed at NEXT when we ship API level 27.
-    @available(added=NEXT)
+    @available(added=27)
     @selector("fuchsia.io1/Directory.Open")
     flexible DeprecatedOpen(resource struct {
         flags OpenFlags;
@@ -406,7 +406,7 @@ open protocol Directory {
     /// Errors:
     /// * `ZX_ERR_BAD_PATH` if `path` is invalid
     /// * See [`Flags`] for other errors which may be communicated based on `flags`
-    @available(replaced=NEXT, renamed="Open")
+    @available(replaced=27, renamed="Open")
     @selector("fuchsia.io/Directory.Open3")
     strict Open3(resource struct {
         path Path;
@@ -421,7 +421,7 @@ open protocol Directory {
     /// Errors:
     /// * `ZX_ERR_BAD_PATH` if `path` is invalid
     /// * See [`Flags`] for other errors which may be communicated based on `flags`
-    @available(added=NEXT)
+    @available(added=27)
     @selector("fuchsia.io/Directory.Open3")
     strict Open(resource struct {
         path Path;

@@ -38,7 +38,7 @@ closed protocol Keyboard {
     }) -> ();
 
     /// Simulate one key press includes down and up event.
-    @available(added=NEXT)
+    @available(added=27)
     strict SimulateKeyPress(table {
         1: key_code fuchsia.input.Key;
     }) -> ();

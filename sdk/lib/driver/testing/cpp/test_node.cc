@@ -109,7 +109,7 @@ void TestNode::AddChild(AddChildRequestView request, AddChildCompleter::Sync& co
   }
   TestNode& node = it->second;
 
-#if FUCHSIA_API_LEVEL_LESS_THAN(NEXT)
+#if FUCHSIA_API_LEVEL_LESS_THAN(27)
   if (request->args.has_properties()) {
     node.SetProperties(fidl::ToNatural(request->args.properties()).value());
   }
@@ -191,7 +191,7 @@ void TestNode::SetParent(TestNode* parent,
                               fidl::kIgnoreBindingClosure);
 }
 
-#if FUCHSIA_API_LEVEL_LESS_THAN(NEXT)
+#if FUCHSIA_API_LEVEL_LESS_THAN(27)
 void TestNode::SetProperties(std::vector<fuchsia_driver_framework::NodeProperty> properties) {
   std::lock_guard guard(checker_);
   properties_ = std::move(properties);

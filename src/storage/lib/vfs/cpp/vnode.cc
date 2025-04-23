@@ -61,7 +61,7 @@ void Vnode::DeprecatedOpenRemote(fuchsia_io::OpenFlags, fuchsia_io::ModeType, fi
   ZX_PANIC("OpenRemote should only be called on remote nodes!");
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 void Vnode::OpenRemote(fuchsia_io::wire::DirectoryOpenRequest request) const {
   ZX_PANIC("OpenRemote should only be called on remote nodes!");
 }

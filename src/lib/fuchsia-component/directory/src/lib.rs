@@ -23,9 +23,9 @@ pub trait Directory {
 
 impl Directory for fio::DirectoryProxy {
     fn open(&self, path: &str, flags: fio::Flags, server_end: zx::Channel) -> Result<(), Error> {
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "27")]
         let () = self.open(path, flags, &fio::Options::default(), server_end.into())?;
-        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+        #[cfg(not(fuchsia_api_level_at_least = "27"))]
         let () = self.open3(path, flags, &fio::Options::default(), server_end.into())?;
         Ok(())
     }
@@ -33,9 +33,9 @@ impl Directory for fio::DirectoryProxy {
 
 impl Directory for fio::DirectorySynchronousProxy {
     fn open(&self, path: &str, flags: fio::Flags, server_end: zx::Channel) -> Result<(), Error> {
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "27")]
         let () = self.open(path, flags, &fio::Options::default(), server_end.into())?;
-        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+        #[cfg(not(fuchsia_api_level_at_least = "27"))]
         let () = self.open3(path, flags, &fio::Options::default(), server_end.into())?;
         Ok(())
     }
@@ -48,9 +48,9 @@ impl Directory for ClientEnd<fio::DirectoryMarker> {
         unsafe {
             let borrowed: zx::Channel = zx::Handle::from_raw(raw_handle).into();
             let proxy = fio::DirectorySynchronousProxy::new(borrowed);
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             proxy.open(path, flags, &fio::Options::default(), server_end.into())?;
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             proxy.open3(path, flags, &fio::Options::default(), server_end.into())?;
             std::mem::forget(proxy.into_channel());
         }

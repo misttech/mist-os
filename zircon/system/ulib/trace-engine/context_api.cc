@@ -559,7 +559,7 @@ bool RegisterString(trace_context_t* context, const char* string_literal, bool c
   return true;
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 // N.B. This may only return false if |check_category| is true.
 bool RegisterByteString(trace_context_t* context, std::span<const unsigned char> bytes,
                         bool check_category, trace_string_ref_t* out_ref_optional) {
@@ -645,10 +645,10 @@ EXPORT bool trace_context_is_category_enabled(trace_context_t* context,
   return trace::RegisterString(context, category_literal, true, nullptr);
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 EXPORT bool trace_context_is_category_bytestring_enabled(trace_context_t* context,
                                                          const unsigned char* bytes, size_t len)
-    ZX_AVAILABLE_SINCE(NEXT) {
+    ZX_AVAILABLE_SINCE(27) {
   return trace::RegisterByteString(context, std::span{bytes, len}, true, nullptr);
 }
 #endif
@@ -681,10 +681,10 @@ EXPORT void trace_context_register_string_literal(trace_context_t* context,
   ZX_DEBUG_ASSERT(result);
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 EXPORT void trace_context_register_bytestring(trace_context_t* context, const unsigned char* bytes,
                                               size_t length, trace_string_ref_t* out_ref)
-    ZX_AVAILABLE_SINCE(NEXT) {
+    ZX_AVAILABLE_SINCE(27) {
   bool result = trace::RegisterByteString(context, std::span{bytes, length}, false, out_ref);
   ZX_DEBUG_ASSERT(result);
 }
@@ -696,12 +696,12 @@ EXPORT_NO_DDK bool trace_context_register_category_literal(trace_context_t* cont
   return trace::RegisterString(context, category_literal, true, out_ref);
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 EXPORT_NO_DDK bool trace_context_register_category_bytestring(trace_context_t* context,
                                                               const unsigned char* bytes,
                                                               size_t length,
                                                               trace_string_ref_t* out_ref)
-    ZX_AVAILABLE_SINCE(NEXT) {
+    ZX_AVAILABLE_SINCE(27) {
   return trace::RegisterByteString(context, std::span{bytes, length}, true, out_ref);
 }
 #endif
@@ -842,10 +842,10 @@ EXPORT void trace_context_send_alert(trace_context_t* context, const char* alert
   context->handler()->ops->send_alert(context->handler(), alert_name);
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 EXPORT void trace_context_send_alert_bytestring(trace_context_t* context,
                                                 const unsigned char* alert_name, size_t length)
-    ZX_AVAILABLE_SINCE(NEXT) {
+    ZX_AVAILABLE_SINCE(27) {
   // We need to ensure the alert is null terminated. We do this by copying into a string.
   context->handler()->ops->send_alert(
       context->handler(), std::string{reinterpret_cast<const char*>(alert_name), length}.c_str());

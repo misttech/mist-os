@@ -159,37 +159,37 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 trace::duration!(c"storage", c"Directory::RemoveExtendedAttribute");
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::DirectoryRequest::GetFlags { responder } => {
                 trace::duration!(c"storage", c"Directory::GetFlags");
                 responder.send(Ok(fio::Flags::from(&self.options)))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::DirectoryRequest::SetFlags { flags: _, responder } => {
                 trace::duration!(c"storage", c"Directory::SetFlags");
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::DirectoryRequest::DeprecatedGetFlags { responder } => {
                 trace::duration!(c"storage", c"Directory::DeprecatedGetFlags");
                 responder.send(Status::OK.into_raw(), self.options.to_io1())?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::DirectoryRequest::DeprecatedSetFlags { flags: _, responder } => {
                 trace::duration!(c"storage", c"Directory::DeprecatedSetFlags");
                 responder.send(Status::NOT_SUPPORTED.into_raw())?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             fio::DirectoryRequest::GetFlags { responder } => {
                 trace::duration!(c"storage", c"Directory::GetFlags");
                 responder.send(Status::OK.into_raw(), self.options.to_io1())?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             fio::DirectoryRequest::SetFlags { flags: _, responder } => {
                 trace::duration!(c"storage", c"Directory::SetFlags");
                 responder.send(Status::NOT_SUPPORTED.into_raw())?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::DirectoryRequest::DeprecatedOpen {
                 flags,
                 mode: _,
@@ -205,7 +205,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 // chance to run before we try and process the next request for this directory.
                 yield_to_executor().await;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             fio::DirectoryRequest::Open { flags, mode: _, path, object, control_handle: _ } => {
                 {
                     trace::duration!(c"storage", c"Directory::Open");
@@ -278,7 +278,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             fio::DirectoryRequest::CreateSymlink { responder, .. } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::DirectoryRequest::Open { path, mut flags, options, object, control_handle: _ } => {
                 {
                     // Remove POSIX flags when the respective rights are not available.
@@ -298,7 +298,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 // chance to run before we try and process the next request for this directory.
                 yield_to_executor().await;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             fio::DirectoryRequest::Open3 {
                 path,
                 mut flags,

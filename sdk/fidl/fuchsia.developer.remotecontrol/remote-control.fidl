@@ -37,7 +37,7 @@ open protocol RemoteControl {
         response string:255;
     });
 
-    @available(replaced=NEXT)
+    @available(replaced=27)
     strict LogMessage(struct {
         tag string:MAX;
         message string:MAX;
@@ -45,7 +45,7 @@ open protocol RemoteControl {
     }) -> ();
 
     /// Writes a string to the syslog on the device.
-    @available(added=NEXT)
+    @available(added=27)
     strict LogMessage(struct {
         tag string:MAX;
         message string:MAX;
@@ -98,7 +98,7 @@ open protocol RemoteControl {
     ///
     /// Connects a channel to a service, given a moniker and a channel iff the component identified
     /// by the given moniker exposes a capability of the requested name.
-    @available(added=26, removed=NEXT)
+    @available(added=26, removed=27)
     @selector("OpenCapability")
     flexible DeprecatedOpenCapability(resource struct {
         moniker string:component.MAX_MONIKER_LENGTH;

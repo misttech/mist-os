@@ -201,7 +201,7 @@ void FileConnection::UpdateAttributes(fio::wire::MutableNodeAttributes* request,
   completer.Reply(Connection::NodeUpdateAttributes(update));
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 void FileConnection::DeprecatedGetFlags(DeprecatedGetFlagsCompleter::Sync& completer) {
 #else
 void FileConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
@@ -222,7 +222,7 @@ void FileConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
   completer.Reply(ZX_OK, flags);
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 void FileConnection::DeprecatedSetFlags(DeprecatedSetFlagsRequestView request,
                                         DeprecatedSetFlagsCompleter::Sync& completer) {
 #else
@@ -232,7 +232,7 @@ void FileConnection::SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sy
   completer.Reply(SetAppend(append).status_value());
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 void FileConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
   fio::Flags flags = fio::Flags::kProtocolFile | RightsToFlags(rights());
   if (GetAppend()) {

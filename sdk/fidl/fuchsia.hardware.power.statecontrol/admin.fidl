@@ -49,7 +49,7 @@ closed protocol Admin {
     /// Replaced by `PerformReboot`.
     // TODO(https://fxbug.dev/385742868): Delete this once "deprecated" propagates
     // to the SDK.
-    @available(deprecated=26, removed=NEXT)
+    @available(deprecated=26, removed=27)
     strict Reboot(struct {
         reason RebootReason;
     }) -> () error zx.Status;
@@ -121,7 +121,7 @@ closed protocol RebootMethodsWatcherRegister {
     /// Replaced by `RegisterWatcher`.
     // TODO(https://fxbug.dev/385742868): Delete this once "deprecated" propagates
     // to the SDK.
-    @available(deprecated=26, removed=NEXT)
+    @available(deprecated=26, removed=27)
     strict Register(resource struct {
         watcher client_end:RebootMethodsWatcher;
     });
@@ -145,7 +145,7 @@ closed protocol RebootMethodsWatcherRegister {
     /// Replaced by `RegisterWatcher`.
     // TODO(https://fxbug.dev/385742868): Delete this once "deprecated" propagates
     // to the SDK.
-    @available(added=26, deprecated=26, removed=NEXT)
+    @available(added=26, deprecated=26, removed=27)
     strict RegisterWithAck(resource struct {
         watcher client_end:RebootMethodsWatcher;
     }) -> ();
@@ -180,7 +180,7 @@ closed protocol RebootMethodsWatcherRegister {
 /// Replaced by `RebootWatcher`
 // TODO(https://fxbug.dev/385742868): Delete this once "deprecated" propagates
 // to the SDK.
-@available(deprecated=26, removed=NEXT)
+@available(deprecated=26, removed=27)
 closed protocol RebootMethodsWatcher {
     strict OnReboot(struct {
         reason RebootReason;

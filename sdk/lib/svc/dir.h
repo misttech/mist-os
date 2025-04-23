@@ -90,7 +90,7 @@ __EXPORT zx_status_t svc_directory_remove_entry(svc_dir_t* dir, const char* path
 // returns ZX_OK.
 __EXPORT zx_status_t svc_directory_destroy(svc_dir_t* dir) ZX_AVAILABLE_SINCE(10);
 
-#if FUCHSIA_API_LEVEL_LESS_THAN(NEXT)
+#if FUCHSIA_API_LEVEL_LESS_THAN(27)
 __EXPORT zx_status_t svc_dir_create(async_dispatcher_t* dispatcher, zx_handle_t directory_request,
                                     svc_dir_t** out_result)
     ZX_REMOVED_SINCE(

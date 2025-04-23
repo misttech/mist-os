@@ -185,7 +185,7 @@ open protocol AudioOffloadExt {
 
 /// Represents a service which is registered by this profile. Closing this protocol will remove the
 /// service registration.
-@available(deprecated=NEXT)
+@available(deprecated=27)
 open protocol ConnectionReceiver {
     /// Called when a peer connects to this service.  The channel connected is delivered
     /// with parameters in `channel`.
@@ -205,7 +205,7 @@ open protocol ConnectionReceiver {
 
 /// Represents a service which is registered by this profile. Closing this protocol will remove the
 /// service registration.
-@available(added=NEXT)
+@available(added=27)
 open protocol ConnectionReceiver2 {
     /// Called when a peer connects to this service.  The channel connected is delivered
     /// with parameters in `channel`.
@@ -279,14 +279,14 @@ open protocol Profile {
         1: services vector<ServiceDefinition>:MAX_SERVICES_PER_ADVERTISEMENT;
         /// Receives connections made to the advertised services.
         /// Either `receiver` or `connection_receiver` is required.
-        @available(deprecated=NEXT)
+        @available(deprecated=27)
         2: receiver client_end:ConnectionReceiver;
         /// The default parameters used to configure L2CAP connections on the `receiver`.
         /// Optional. See `ChannelParameters` for defaults.
         3: parameters ChannelParameters;
         /// Receives connections made to the advertised services.
         /// Either `receiver` or `connection_receiver` is required.
-        @available(added=NEXT)
+        @available(added=27)
         4: connection_receiver client_end:ConnectionReceiver2;
     }) -> (table {
         /// Set of service definitions as registered by the SDP server, updated with definitions

@@ -65,10 +65,10 @@ bool trace_context_is_category_enabled(trace_context_t* context, const char* cat
 // |length| must be the length of the bytestring
 //
 // This function is thread-safe.
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 bool trace_context_is_category_bytestring_enabled(trace_context_t* context,
                                                   const unsigned char* bytes, size_t length)
-    ZX_AVAILABLE_SINCE(NEXT);
+    ZX_AVAILABLE_SINCE(27);
 #endif
 
 // Registers a copy of a string into the string table.
@@ -127,10 +127,10 @@ void trace_context_register_string_literal(trace_context_t* context, const char*
 // |out_ref| points to where the registered string reference should be returned.
 //
 // This function is thread-safe.
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 void trace_context_register_bytestring(trace_context_t* context, const unsigned char* bytes,
                                        size_t length, trace_string_ref_t* out_ref)
-    ZX_AVAILABLE_SINCE(NEXT);
+    ZX_AVAILABLE_SINCE(27);
 #endif
 
 // Registers a string literal and returns its string ref.
@@ -182,11 +182,10 @@ bool trace_context_register_category_literal(trace_context_t* context, const cha
 // returns false and does not modify |*out_ref|.
 //
 // This function is thread-safe.
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 bool trace_context_register_category_bytestring(trace_context_t* context,
                                                 const unsigned char* bytes, size_t length,
-                                                trace_string_ref_t* out_ref)
-    ZX_AVAILABLE_SINCE(NEXT);
+                                                trace_string_ref_t* out_ref) ZX_AVAILABLE_SINCE(27);
 #endif
 
 // Registers the current thread into the thread table.
@@ -289,9 +288,9 @@ void trace_context_send_alert(trace_context_t* context, const char* alert_name);
 // |alert_name| is the name of the alert (max 14 characters).
 //
 // This function is thread-safe.
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 void trace_context_send_alert_bytestring(trace_context_t* context, const unsigned char* alert_name,
-                                         size_t length) ZX_AVAILABLE_SINCE(NEXT);
+                                         size_t length) ZX_AVAILABLE_SINCE(27);
 #endif
 
 // Writes a kernel object record for the object reference by the specified handle

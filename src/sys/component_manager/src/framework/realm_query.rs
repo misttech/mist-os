@@ -454,11 +454,11 @@ async fn open_deprecated(
                 .ok_or(fsys::OpenError::InstanceNotRunning)?
                 .runtime_dir()
                 .ok_or(fsys::OpenError::NoSuchDir)?;
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             let result = dir
                 .deprecated_open(flags, mode, path, object)
                 .map_err(|_| fsys::OpenError::FidlError);
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             let result =
                 dir.open(flags, mode, path, object).map_err(|_| fsys::OpenError::FidlError);
 
@@ -469,12 +469,12 @@ async fn open_deprecated(
             match state.get_resolved_state_mut() {
                 Some(r) => {
                     let pkg = r.package().ok_or(fsys::OpenError::NoSuchDir)?;
-                    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                    #[cfg(fuchsia_api_level_at_least = "27")]
                     let result = pkg
                         .package_dir
                         .deprecated_open(flags, mode, path, object)
                         .map_err(|_| fsys::OpenError::FidlError);
-                    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+                    #[cfg(not(fuchsia_api_level_at_least = "27"))]
                     let result = pkg
                         .package_dir
                         .open(flags, mode, path, object)

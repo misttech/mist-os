@@ -105,7 +105,7 @@ closed protocol Log {
 
     /// Dumps all cached logs by calling LogMany() followed by Done() on `log_listener`.
     /// A null `options` indicates no filtering is requested.
-    @available(removed=NEXT)
+    @available(removed=27)
     strict DumpLogsSafe(resource struct {
         log_listener client_end:LogListenerSafe;
         options box<LogFilterOptions>;
@@ -113,7 +113,7 @@ closed protocol Log {
 
     /// Listens to new log entries by calling Log() on `log_listener`.
     /// A null `options` indicates no filtering is requested.
-    @available(removed=NEXT)
+    @available(removed=27)
     strict ListenSafeWithSelectors(resource struct {
         log_listener client_end:LogListenerSafe;
         options box<LogFilterOptions>;
@@ -141,7 +141,7 @@ closed(removed=26) open(added=26) protocol LogSink {
         socket zx.Handle:SOCKET;
     });
 
-    @available(replaced=NEXT)
+    @available(replaced=27)
     strict WaitForInterestChange() -> (struct {
         data fuchsia.diagnostics.Interest;
     }) error InterestChangeError;
@@ -153,7 +153,7 @@ closed(removed=26) open(added=26) protocol LogSink {
     /// e.g. compile time configuration. Each client may only poll this once at a time.
     /// Invoking WaitForInterestChange a second time before the first call returns will
     /// result in an error being returned.
-    @available(added=NEXT)
+    @available(added=27)
     strict WaitForInterestChange() -> (struct {
         data fuchsia.diagnostics.types.Interest;
     }) error InterestChangeError;

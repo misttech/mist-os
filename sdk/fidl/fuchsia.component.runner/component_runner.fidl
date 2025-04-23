@@ -238,7 +238,7 @@ closed(removed=24) open(added=24) protocol ComponentController {
     /// guaranteed.
     strict Kill();
 
-    @available(replaced=NEXT)
+    @available(replaced=27)
     strict -> OnPublishDiagnostics(resource struct {
         payload fuchsia.diagnostics.types.ComponentDiagnostics;
     });
@@ -249,7 +249,7 @@ closed(removed=24) open(added=24) protocol ComponentController {
     /// component is publishing diagnostics about the runtime of the
     /// component. The component manager may optionally expose this data
     /// to clients.
-    @available(added=NEXT)
+    @available(added=27)
     strict -> OnPublishDiagnostics(resource struct {
         payload ComponentDiagnostics;
     });
@@ -314,7 +314,7 @@ closed(removed=24) open(added=24) protocol ComponentController {
 };
 
 // Task associated with a running component.
-@available(added=NEXT)
+@available(added=27)
 type Task = flexible resource union {
     1: job zx.Handle:JOB;
     2: process zx.Handle:PROCESS;
@@ -324,7 +324,7 @@ type Task = flexible resource union {
 // Contains handles for tasks of the running component. This is emitted by
 // runners and handled by component manager to obtain information about the
 // process and record diagnostics.
-@available(added=NEXT)
+@available(added=27)
 type ComponentTasks = resource table {
     // The Zircon task for the running component.
     // Resource usage for the component is attributed to this task.
@@ -344,7 +344,7 @@ type ComponentTasks = resource table {
 };
 
 // Diagnostics information about a component provided by the runner.
-@available(added=NEXT)
+@available(added=27)
 type ComponentDiagnostics = resource table {
     // Tasks associated with the running component.
     1: tasks ComponentTasks;

@@ -60,7 +60,7 @@ impl<D: Borrow<fio::DirectoryProxy>, P: DiscoverableProtocolMarker> ProtocolConn
     /// Note, this method does not check if the protocol exists. It is up to the
     /// caller to call `exists` to check for existence.
     pub fn connect_with(self, server_end: zx::Channel) -> Result<(), Error> {
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "27")]
         return self
             .svc_dir
             .borrow()
@@ -71,7 +71,7 @@ impl<D: Borrow<fio::DirectoryProxy>, P: DiscoverableProtocolMarker> ProtocolConn
                 server_end.into(),
             )
             .context("error connecting to protocol");
-        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+        #[cfg(not(fuchsia_api_level_at_least = "27"))]
         return self
             .svc_dir
             .borrow()
@@ -240,14 +240,14 @@ pub struct ServiceInstanceDirectory(pub fio::DirectoryProxy, pub String);
 impl MemberOpener for ServiceInstanceDirectory {
     fn open_member(&self, member: &str, server_end: zx::Channel) -> Result<(), fidl::Error> {
         let Self(directory, _) = self;
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "27")]
         return directory.open(
             member,
             fio::Flags::PROTOCOL_SERVICE,
             &fio::Options::default(),
             server_end,
         );
-        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+        #[cfg(not(fuchsia_api_level_at_least = "27"))]
         return directory.open3(
             member,
             fio::Flags::PROTOCOL_SERVICE,
@@ -361,14 +361,14 @@ impl<S: ServiceMarker> Service<S> {
         server_end: zx::Channel,
     ) -> Result<(), fidl::Error> {
         let path = format!("{}/{}", instance.as_ref(), member.as_ref());
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "27")]
         return self.dir.open(
             &path,
             fio::Flags::PROTOCOL_SERVICE,
             &fio::Options::default(),
             server_end,
         );
-        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+        #[cfg(not(fuchsia_api_level_at_least = "27"))]
         return self.dir.open3(
             &path,
             fio::Flags::PROTOCOL_SERVICE,

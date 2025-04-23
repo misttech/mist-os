@@ -8,12 +8,12 @@ using zx;
 
 /// An ISO data packet can be no larger than the maximum 12-bit unsigned integer.
 /// See Bluetooth Core Spec Version 6.0 | Vol 4, Part E, Section 5.4.5
-@available(added=NEXT)
+@available(added=27)
 const MAX_ISO_PACKET_SIZE uint16 = 0x0FFF;
 
 /// The maximum number of connected isochronous streams that can be added to
 /// a connected isochronous group.
-@available(added=NEXT)
+@available(added=27)
 const MAX_STREAMS_IN_GROUP uint8 = 31;
 
 /// Parameters related to a single direction of transmission in an established CIS.
@@ -87,19 +87,19 @@ type IsoPacketStatusFlag = strict enum : uint8 {
     LOST_DATA = 2;
 };
 
-@available(added=NEXT)
+@available(added=27)
 type CigFramingOptions = strict enum {
     UNFRAMED = 0x00;
     FRAMED = 0x01;
 };
 
-@available(added=NEXT)
+@available(added=27)
 type CigPacking = flexible enum {
     SEQUENTIAL = 0x00;
     INTERLEAVED = 0x01;
 };
 
-@available(added=NEXT)
+@available(added=27)
 type CigParameters = table {
     /// Interval between the start of consecutive SDUs (central => peripheral,
     /// microseconds). This is a function of the codec being used.
@@ -131,7 +131,7 @@ type CigParameters = table {
     6: max_transport_latency_p_to_c uint16;
 };
 
-@available(added=NEXT)
+@available(added=27)
 type CisRequestedParameters = resource table {
     /// ID selected to uniquely identify a stream within a CIG. All `cis_id`s
     /// must be distinct within a single creation request.
@@ -155,7 +155,7 @@ type CisRequestedParameters = resource table {
     4: max_sdu_size_incoming uint16;
 };
 
-@available(added=NEXT)
+@available(added=27)
 type CisParameters = table {
     /// ID of the stream to establish (as previously passed to Connection/CreateCig()).
     /// Required.
@@ -166,7 +166,7 @@ type CisParameters = table {
     2: id bt.PeerId;
 };
 
-@available(added=NEXT)
+@available(added=27)
 type CreateCigError = flexible enum {
     /// The CIG could not be created because an unknown or unspecified error occurred unrelated
     /// to the other errors defined below.
@@ -180,7 +180,7 @@ type CreateCigError = flexible enum {
     INVALID_CIS_PARAMETERS = 3;
 };
 
-@available(added=NEXT)
+@available(added=27)
 type EstablishStreamsError = flexible enum {
     /// The controller does not support a CIS with the parameters specified for it.
     NOT_SUPPORTED = 1;
@@ -261,14 +261,14 @@ open protocol IsochronousStream {
     /// Send data to an established ISO stream (host => controller).
     ///
     /// Returns ZX_ERR_INTERNAL for any errors encountered.
-    @available(added=NEXT)
+    @available(added=27)
     flexible Write(table {
         /// The data frame itself.
         1: data vector<uint8>:MAX_ISO_PACKET_SIZE;
     }) -> () error zx.Status;
 };
 
-@available(added=NEXT)
+@available(added=27)
 open protocol ConnectedIsochronousGroup {
     /// Connect one or more Isochronous streams. Each CIS is established with the peer specified
     /// in the parameters. On successful initiation of the operation, an OnEstablished() event will

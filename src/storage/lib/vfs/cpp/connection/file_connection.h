@@ -65,7 +65,7 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   void SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync& completer) final;
   void GetFlags(GetFlagsCompleter::Sync& completer) final;
   void SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) final;
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
   void DeprecatedGetFlags(DeprecatedGetFlagsCompleter::Sync& completer) final;
   void DeprecatedSetFlags(DeprecatedSetFlagsRequestView request,
                           DeprecatedSetFlagsCompleter::Sync& completer) final;

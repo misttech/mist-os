@@ -20,9 +20,9 @@ use libc as _;
 pub use log::error;
 use std::future::Future;
 
-#[cfg(fuchsia_api_level_less_than = "NEXT")]
+#[cfg(fuchsia_api_level_less_than = "27")]
 pub use fidl_fuchsia_diagnostics::{Interest, Severity};
-#[cfg(fuchsia_api_level_at_least = "NEXT")]
+#[cfg(fuchsia_api_level_at_least = "27")]
 pub use fidl_fuchsia_diagnostics_types::{Interest, Severity};
 
 //

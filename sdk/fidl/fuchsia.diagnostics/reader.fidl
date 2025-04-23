@@ -48,7 +48,7 @@ type FormattedContent = flexible resource union {
 
     /// A diagnostics schema encoded as text.
     /// The VMO will contain up to 1mb of diagnostics data.
-    @available(removed=NEXT)
+    @available(removed=27)
     2: text fuchsia.mem.Buffer;
 
     /// A diagnostics schema encoded as cbor.

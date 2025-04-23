@@ -33,7 +33,7 @@ void RemoteDir::DeprecatedOpenRemote(fio::OpenFlags flags, fio::ModeType mode,
                                      fidl::ServerEnd<fio::Node> object) const {
   // We consume |object| when making the wire call to the remote end, so on failure there isn't
   // anywhere for us to propagate the error.
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
   [[maybe_unused]] auto status =
       fidl::WireCall(remote_client_)->DeprecatedOpen(flags, mode, path, std::move(object));
 #else
@@ -44,7 +44,7 @@ void RemoteDir::DeprecatedOpenRemote(fio::OpenFlags flags, fio::ModeType mode,
                         ", response=", status.FormatDescription());
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 void RemoteDir::OpenRemote(fuchsia_io::wire::DirectoryOpenRequest request) const {
   // We consume the |request| channel when making the wire call to the remote end, so on failure
   // there isn't anywhere for us to propagate the error.

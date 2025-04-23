@@ -166,7 +166,7 @@ type BufferOp = flexible enum : uint32 {
 };
 
 /// The batch size used to send multiple immediate commands in a single message.
-@available(removed=NEXT)
+@available(removed=27)
 const MAX_IMMEDIATE_COMMANDS_DATA_SIZE uint32 = 2048;
 
 /// The batch size used to send multiple inline commands in a single message.
@@ -291,7 +291,7 @@ closed protocol Primary {
     /// Submits a series of commands for execution on the hardware without using a command buffer.
     /// `semaphores` must refer to events that have been imported, and will be signaled after
     /// the commands are completed.
-    @available(removed=NEXT)
+    @available(removed=27)
     strict ExecuteImmediateCommands(struct {
         context_id ContextId;
         command_data vector<uint8>:MAX_IMMEDIATE_COMMANDS_DATA_SIZE;

@@ -27,7 +27,7 @@ zx_status_t fdio_service_connect(const char* path, zx_handle_t request) {
 
 __EXPORT
 zx_status_t fdio_service_connect_at(zx_handle_t dir, const char* path, zx_handle_t request) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
   return fdio_open3_at(dir, path, uint64_t{fuchsia_io::wire::Flags::kProtocolService}, request);
 #else
   return fdio_open_at(dir, path, 0, request);
@@ -90,7 +90,7 @@ zx_status_t fdio_open_at(zx_handle_t dir, const char* path, uint32_t flags,
   fidl::UnownedClientEnd<fio::Directory> directory(dir);
   auto deprecated_flags = static_cast<fio::wire::OpenFlags>(flags);
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
   return fidl::WireCall(directory)
       ->DeprecatedOpen(deprecated_flags, {}, fidl::StringView::FromExternal(path),
                        std::move(request))
@@ -161,7 +161,7 @@ zx_status_t fdio_open3_at(zx_handle_t dir, const char* path, uint64_t flags,
 
   fidl::UnownedClientEnd<fio::Directory> directory(dir);
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
   return fidl::WireCall(directory)
       ->Open(fidl::StringView::FromExternal(path, length), fio::wire::Flags{flags}, {},
              std::move(request))

@@ -33,7 +33,7 @@ pub async fn wait_for_device_with<T>(
 
             let (controller_proxy, server_end) =
                 fidl::endpoints::create_proxy::<ControllerMarker>();
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             if dev_dir
                 .open(
                     &controller_filename,
@@ -45,7 +45,7 @@ pub async fn wait_for_device_with<T>(
             {
                 return Ok(None);
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             if dev_dir
                 .open3(
                     &controller_filename,

@@ -28,7 +28,7 @@ open protocol Device {
     /// If the RTC time is not valid, the driver will return an `ZX_ERR_OUT_OF_RANGE` error.
     ///
     /// Deprecated, see b/382085965. Do not add new uses of this method, implement Set2() below.
-    @available(removed=NEXT)
+    @available(removed=27)
     flexible Set(struct {
         rtc Time;
     }) -> (struct {
@@ -37,7 +37,7 @@ open protocol Device {
 
     /// Set the RTC time.
     /// If the RTC time is not valid, the driver will return an `ZX_ERR_OUT_OF_RANGE` error.
-    @available(added=NEXT)
+    @available(added=27)
     flexible Set2(struct {
         rtc Time;
     }) -> () error zx.Status;

@@ -69,7 +69,7 @@ open protocol Manager {
 
 
     /// Returns a list of all driver hosts that are known to the system.
-    @available(added=NEXT)
+    @available(added=27)
     flexible GetDriverHostInfo(resource struct {
         iterator server_end:DriverHostInfoIterator;
     });
@@ -147,7 +147,7 @@ open protocol Manager {
     /// disabled, and any active nodes created from this spec are removed and re-bound.
     ///
     /// Returns the number of affected composite nodes.
-    @available(added=NEXT)
+    @available(added=27)
     strict RebindCompositesWithDriver(struct {
         driver_url fuchsia.url.Url;
     }) -> (struct {

@@ -58,7 +58,7 @@ constexpr zx::result<std::tuple<fio::Rights, fio::Rights>> ValidateRequestRights
   return zx::ok(std::tuple{requested_rights & parent_rights, optional_rights & parent_rights});
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 void ForwardRequestToRemote(fio::wire::DirectoryOpenRequest* request, Vfs::Open2Result open_result,
                             fio::Rights parent_rights) {
 #else
@@ -178,7 +178,7 @@ void DirectoryConnection::UpdateAttributes(fio::wire::MutableNodeAttributes* req
   completer.Reply(Connection::NodeUpdateAttributes(update));
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 void DirectoryConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
   completer.ReplySuccess(fio::Flags::kProtocolDirectory | RightsToFlags(rights()));
 }
@@ -187,7 +187,7 @@ void DirectoryConnection::SetFlags(SetFlagsRequestView, SetFlagsCompleter::Sync&
 }
 #endif
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 void DirectoryConnection::DeprecatedGetFlags(DeprecatedGetFlagsCompleter::Sync& completer) {
 #else
 void DirectoryConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
@@ -195,7 +195,7 @@ void DirectoryConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
   completer.Reply(ZX_OK, RightsToOpenFlags(rights()));
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 void DirectoryConnection::DeprecatedSetFlags(DeprecatedSetFlagsRequestView,
                                              DeprecatedSetFlagsCompleter::Sync& completer) {
 #else
@@ -205,7 +205,7 @@ void DirectoryConnection::SetFlags(SetFlagsRequestView, SetFlagsCompleter::Sync&
   completer.Reply(ZX_ERR_NOT_SUPPORTED);
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 void DirectoryConnection::DeprecatedOpen(DeprecatedOpenRequestView request,
                                          DeprecatedOpenCompleter::Sync& completer) {
 #else
@@ -287,7 +287,7 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
   }
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& completer) {
 #else
 void DirectoryConnection::Open3(Open3RequestView request, Open3Completer::Sync& completer) {

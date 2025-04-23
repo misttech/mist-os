@@ -35,7 +35,7 @@ namespace syslog_runtime {
 
 namespace {
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 using FidlInterest = fuchsia_diagnostics_types::wire::Interest;
 #else
 using FidlInterest = fuchsia_diagnostics::wire::Interest;

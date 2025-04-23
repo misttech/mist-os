@@ -16,7 +16,7 @@ namespace fdf {
 namespace {
 std::atomic<Logger*> g_instance = nullptr;
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 using FidlSeverity = fuchsia_diagnostics_types::wire::Severity;
 using FidlInterest = fuchsia_diagnostics_types::wire::Interest;
 #else
@@ -152,7 +152,7 @@ void Logger::HandleInterest(FidlInterest interest) {
       case FidlSeverity::kFatal:
         severity_ = FUCHSIA_LOG_FATAL;
         return;
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
       default:
         severity_ = FUCHSIA_LOG_INFO;
         return;

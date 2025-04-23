@@ -107,7 +107,7 @@ void NodeConnection::UpdateAttributes(fio::wire::MutableNodeAttributes* request,
   completer.ReplyError(ZX_ERR_BAD_HANDLE);
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 void NodeConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
   completer.ReplySuccess(fio::Flags::kProtocolNode | RightsToFlags(rights()));
 }
@@ -116,7 +116,7 @@ void NodeConnection::SetFlags(SetFlagsRequestView, SetFlagsCompleter::Sync& comp
 }
 #endif
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 void NodeConnection::DeprecatedGetFlags(DeprecatedGetFlagsCompleter::Sync& completer) {
 #else
 void NodeConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
@@ -124,7 +124,7 @@ void NodeConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
   completer.Reply(ZX_OK, fio::OpenFlags::kNodeReference);
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 void NodeConnection::DeprecatedSetFlags(DeprecatedSetFlagsRequestView,
                                         DeprecatedSetFlagsCompleter::Sync& completer) {
 #else
@@ -144,7 +144,7 @@ void NodeConnection::QueryFilesystem(QueryFilesystemCompleter::Sync& completer) 
 zx::result<> NodeConnection::WithRepresentation(
     fit::callback<zx::result<>(fio::wire::Representation)> handler,
     std::optional<fio::NodeAttributesQuery> query) const {
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
   using NodeRepresentation = fio::wire::NodeInfo;
 #else
   using NodeRepresentation = fio::wire::ConnectorInfo;
@@ -165,7 +165,7 @@ zx::result<> NodeConnection::WithRepresentation(
   }
 #endif
   auto representation = builder.Build();
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
   return handler(fuchsia_io::wire::Representation::WithNode(
       fidl::ObjectView<NodeRepresentation>::FromExternal(&representation)));
 #else

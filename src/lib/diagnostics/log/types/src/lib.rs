@@ -8,9 +8,9 @@
 use std::str::FromStr;
 use std::{cmp, fmt};
 
-#[cfg(fuchsia_api_level_less_than = "NEXT")]
+#[cfg(fuchsia_api_level_less_than = "27")]
 use fidl_fuchsia_diagnostics as fdiagnostics;
-#[cfg(fuchsia_api_level_at_least = "NEXT")]
+#[cfg(fuchsia_api_level_at_least = "27")]
 use fidl_fuchsia_diagnostics_types as fdiagnostics;
 
 #[cfg(feature = "serde")]
@@ -192,7 +192,7 @@ impl From<fdiagnostics::Severity> for Severity {
             fdiagnostics::Severity::Warn => Severity::Warn,
             fdiagnostics::Severity::Error => Severity::Error,
             fdiagnostics::Severity::Fatal => Severity::Fatal,
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             other => panic!("unknown severity type: {other:?}"),
         }
     }

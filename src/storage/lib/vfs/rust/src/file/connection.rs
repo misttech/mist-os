@@ -768,12 +768,12 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
                 .trace(trace::trace_future_args!(c"storage", c"File::Resize"))
                 .await?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::FileRequest::GetFlags { responder } => {
                 trace::duration!(c"storage", c"File::GetFlags");
                 responder.send(Ok(fio::Flags::from(&self.options)))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::FileRequest::SetFlags { flags, responder } => {
                 trace::duration!(c"storage", c"File::SetFlags");
                 // The only supported flag is APPEND.
@@ -784,12 +784,12 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
                     responder.send(Err(Status::INVALID_ARGS.into_raw()))?;
                 }
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::FileRequest::DeprecatedGetFlags { responder } => {
                 trace::duration!(c"storage", c"File::DeprecatedGetFlags");
                 responder.send(Status::OK.into_raw(), self.options.to_io1())?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::FileRequest::DeprecatedSetFlags { flags, responder } => {
                 trace::duration!(c"storage", c"File::DeprecatedSetFlags");
                 // The only supported flag is APPEND.
@@ -798,12 +798,12 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
                 let flags = if is_append { fio::Flags::FILE_APPEND } else { fio::Flags::empty() };
                 responder.send(Status::from_result(self.file.set_flags(flags)).into_raw())?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             fio::FileRequest::GetFlags { responder } => {
                 trace::duration!(c"storage", c"File::GetFlags");
                 responder.send(Status::OK.into_raw(), self.options.to_io1())?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             fio::FileRequest::SetFlags { flags, responder } => {
                 trace::duration!(c"storage", c"File::SetFlags");
                 // The only supported flag is APPEND.

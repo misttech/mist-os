@@ -310,7 +310,7 @@ zx_status_t zxio_create_with_info(zx_handle_t raw_handle, const zx_info_handle_b
               fidl::ClientEnd<fuchsia_posix_socket_raw::Socket>(queryable.TakeChannel()));
         }
         case ZXIO_OBJECT_TYPE_NONE: {
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
           auto representation = fio::wire::Representation::WithNode({});
 #else
           auto representation = fio::wire::Representation::WithConnector({});
@@ -419,7 +419,7 @@ zx_status_t zxio_create_with_representation(fidl::ClientEnd<fio::Node> node,
                                             fio::wire::Representation& representation,
                                             zxio_node_attributes_t* attr, zxio_storage_t* storage) {
   switch (representation.Which()) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
     case fio::wire::Representation::Tag::kNode: {
       if (attr) {
         fio::wire::NodeInfo& node_info = representation.node();

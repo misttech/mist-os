@@ -13,7 +13,7 @@ where
 {
     let (new_proxy, new_server_end) = create_proxy::<M>();
 
-    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    #[cfg(fuchsia_api_level_at_least = "27")]
     proxy
         .deprecated_open(
             flags,
@@ -22,7 +22,7 @@ where
             ServerEnd::<fio::NodeMarker>::new(new_server_end.into_channel()),
         )
         .unwrap();
-    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+    #[cfg(not(fuchsia_api_level_at_least = "27"))]
     proxy
         .open(
             flags,
@@ -46,9 +46,9 @@ where
 {
     let (new_proxy, new_server_end) = create_proxy::<M>();
 
-    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    #[cfg(fuchsia_api_level_at_least = "27")]
     proxy.open(path, flags, options, new_server_end.into_channel()).unwrap();
-    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+    #[cfg(not(fuchsia_api_level_at_least = "27"))]
     proxy.open3(path, flags, options, new_server_end.into_channel()).unwrap();
 
     new_proxy

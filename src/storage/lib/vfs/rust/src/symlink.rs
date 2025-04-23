@@ -185,27 +185,27 @@ impl<T: Symlink> Connection<T> {
                     return Ok(true);
                 }
             },
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::SymlinkRequest::GetFlags { responder } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::SymlinkRequest::SetFlags { flags: _, responder } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::SymlinkRequest::DeprecatedGetFlags { responder } => {
                 responder.send(Status::NOT_SUPPORTED.into_raw(), fio::OpenFlags::empty())?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::SymlinkRequest::DeprecatedSetFlags { responder, .. } => {
                 responder.send(Status::ACCESS_DENIED.into_raw())?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             fio::SymlinkRequest::GetFlags { responder } => {
                 responder.send(Status::NOT_SUPPORTED.into_raw(), fio::OpenFlags::empty())?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             fio::SymlinkRequest::SetFlags { responder, .. } => {
                 responder.send(Status::ACCESS_DENIED.into_raw())?;
             }

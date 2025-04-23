@@ -55,7 +55,7 @@ closed protocol TouchScreen {
         /// Per step delay = duration / ( move_event_count + 1).
         /// DOWN - wait per step delay - CHANGE_1 - wait per step delay - ... -
         /// CHANGE_n - wait per step delay - UP.
-        @available(added=NEXT)
+        @available(added=27)
         4: duration zx.Duration;
     }) -> ();
 
