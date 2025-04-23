@@ -407,7 +407,7 @@ ktl::pair<VmPageOrMarker*, bool> VmPageList::LookupOrAllocateCheckForInterval(ui
   // Helper to mint new sentinel values for the split. Only creates zero ranges. If we support
   // other page interval types in the future, we will need to modify this to support them.
   auto mint_new_sentinel =
-      [&found_interval](VmPageOrMarker::IntervalSentinel sentinel) -> VmPageOrMarker {
+      [&found_interval](VmPageOrMarker::SentinelType sentinel) -> VmPageOrMarker {
     // We only support zero intervals for now.
     DEBUG_ASSERT(found_interval->IsIntervalZero());
     // Preserve dirty state across the split.
@@ -420,25 +420,25 @@ ktl::pair<VmPageOrMarker*, bool> VmPageList::LookupOrAllocateCheckForInterval(ui
   if (new_start) {
     if (new_start->IsIntervalEnd()) {
       // If an interval was ending at the next slot, change it into a Slot sentinel.
-      new_start->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+      new_start->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Slot);
     } else {
       DEBUG_ASSERT(new_start->IsEmpty());
-      *new_start = mint_new_sentinel(VmPageOrMarker::IntervalSentinel::Start);
+      *new_start = mint_new_sentinel(VmPageOrMarker::SentinelType::Start);
     }
   }
   if (new_end) {
     if (new_end->IsIntervalStart()) {
       // If an interval was starting at the previous slot, change it into a Slot sentinel.
-      new_end->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+      new_end->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Slot);
     } else {
       DEBUG_ASSERT(new_end->IsEmpty());
-      *new_end = mint_new_sentinel(VmPageOrMarker::IntervalSentinel::End);
+      *new_end = mint_new_sentinel(VmPageOrMarker::SentinelType::End);
     }
   }
 
   // Finally, install a slot sentinel at offset.
   if (slot->IsEmpty()) {
-    *slot = mint_new_sentinel(VmPageOrMarker::IntervalSentinel::Slot);
+    *slot = mint_new_sentinel(VmPageOrMarker::SentinelType::Slot);
   } else {
     DEBUG_ASSERT(slot->IsIntervalStart() || slot->IsIntervalEnd());
     // If we're overwriting the start or end sentinel, carry over any relevant state information to
@@ -458,7 +458,7 @@ ktl::pair<VmPageOrMarker*, bool> VmPageList::LookupOrAllocateCheckForInterval(ui
         slot->SetZeroIntervalAwaitingCleanLength(PAGE_SIZE);
       }
     }
-    slot->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+    slot->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Slot);
   }
 
   return {slot, true};
@@ -600,7 +600,7 @@ zx_status_t VmPageList::PopulateSlotsInInterval(uint64_t start_offset, uint64_t 
          (node_offset == last_node_offset ? last_node_index : VmPageListNode::kPageFanOut - 1);
          index++) {
       auto cur = &pln->Lookup(index);
-      *cur = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Slot,
+      *cur = VmPageOrMarker::ZeroInterval(VmPageOrMarker::SentinelType::Slot,
                                           start_slot->GetZeroIntervalDirtyState());
       if (awaiting_clean_len > 0) {
         cur->SetZeroIntervalAwaitingCleanLength(PAGE_SIZE);
@@ -818,12 +818,12 @@ zx_status_t VmPageList::AddZeroIntervalInternal(uint64_t start_offset, uint64_t 
       // old interval slot into an interval start.
       DEBUG_ASSERT(prev_slot->IsIntervalSlot());
       DEBUG_ASSERT(prev_slot->GetZeroIntervalDirtyState() == dirty_state);
-      prev_slot->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Start);
+      prev_slot->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Start);
     }
   } else {
     // We could not merge with an interval to the left. Start a new interval.
     DEBUG_ASSERT(new_start->IsEmpty());
-    *new_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Start, dirty_state);
+    *new_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::SentinelType::Start, dirty_state);
     if (awaiting_clean_len > 0) {
       final_start = VmPageOrMarkerRef(new_start);
       final_start_offset = interval_start;
@@ -862,7 +862,7 @@ zx_status_t VmPageList::AddZeroIntervalInternal(uint64_t start_offset, uint64_t 
       DEBUG_ASSERT(next_slot->IsIntervalSlot());
       DEBUG_ASSERT(next_slot->GetZeroIntervalDirtyState() == dirty_state);
       next_slot->SetZeroIntervalAwaitingCleanLength(0);
-      next_slot->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::End);
+      next_slot->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::End);
     }
   } else {
     // We could not merge with an interval to the right. Install an interval end sentinel.
@@ -870,10 +870,10 @@ zx_status_t VmPageList::AddZeroIntervalInternal(uint64_t start_offset, uint64_t 
     // so change it to a slot sentinel.
     if (new_end->IsIntervalStart()) {
       DEBUG_ASSERT(new_end->GetZeroIntervalDirtyState() == dirty_state);
-      new_end->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+      new_end->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Slot);
     } else {
       DEBUG_ASSERT(new_end->IsEmpty());
-      *new_end = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::End, dirty_state);
+      *new_end = VmPageOrMarker::ZeroInterval(VmPageOrMarker::SentinelType::End, dirty_state);
     }
   }
 
@@ -987,10 +987,10 @@ zx_status_t VmPageList::OverwriteZeroInterval(uint64_t old_start_offset, uint64_
       return ZX_ERR_NO_MEMORY;
     }
     if (clipped_start->IsIntervalEnd()) {
-      clipped_start->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+      clipped_start->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Slot);
     } else {
       DEBUG_ASSERT(clipped_start->IsEmpty());
-      *clipped_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Start,
+      *clipped_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::SentinelType::Start,
                                                     old_start->GetZeroIntervalDirtyState());
     }
 
@@ -1025,10 +1025,10 @@ zx_status_t VmPageList::OverwriteZeroInterval(uint64_t old_start_offset, uint64_
       return ZX_ERR_NO_MEMORY;
     }
     if (clipped_end->IsIntervalStart()) {
-      clipped_end->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+      clipped_end->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Slot);
     } else {
       DEBUG_ASSERT(clipped_end->IsEmpty());
-      *clipped_end = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::End,
+      *clipped_end = VmPageOrMarker::ZeroInterval(VmPageOrMarker::SentinelType::End,
                                                   old_end->GetZeroIntervalDirtyState());
     }
 
@@ -1039,12 +1039,10 @@ zx_status_t VmPageList::OverwriteZeroInterval(uint64_t old_start_offset, uint64_
   }
 
   if (new_start == new_end) {
-    *new_start =
-        VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Slot, new_dirty_state);
+    *new_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::SentinelType::Slot, new_dirty_state);
   } else {
-    *new_start =
-        VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Start, new_dirty_state);
-    *new_end = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::End, new_dirty_state);
+    *new_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::SentinelType::Start, new_dirty_state);
+    *new_end = VmPageOrMarker::ZeroInterval(VmPageOrMarker::SentinelType::End, new_dirty_state);
   }
 
   if (try_merge_left) {
@@ -1052,14 +1050,14 @@ zx_status_t VmPageList::OverwriteZeroInterval(uint64_t old_start_offset, uint64_
     VmPageOrMarker* left = lookup_slot(new_start_offset - PAGE_SIZE);
     if (left && left->IsIntervalZero() && left->GetZeroIntervalDirtyState() == new_dirty_state) {
       if (left->IsIntervalSlot()) {
-        left->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Start);
+        left->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Start);
       } else {
         DEBUG_ASSERT(left->IsIntervalEnd());
         *left = VmPageOrMarker::Empty();
         ReturnEmptySlot(new_start_offset - PAGE_SIZE);
       }
       if (new_start->IsIntervalSlot()) {
-        new_start->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::End);
+        new_start->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::End);
       } else {
         DEBUG_ASSERT(new_start->IsIntervalStart());
         *new_start = VmPageOrMarker::Empty();
@@ -1073,14 +1071,14 @@ zx_status_t VmPageList::OverwriteZeroInterval(uint64_t old_start_offset, uint64_
     VmPageOrMarker* right = lookup_slot(new_end_offset + PAGE_SIZE);
     if (right && right->IsIntervalZero() && right->GetZeroIntervalDirtyState() == new_dirty_state) {
       if (right->IsIntervalSlot()) {
-        right->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::End);
+        right->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::End);
       } else {
         DEBUG_ASSERT(right->IsIntervalStart());
         *right = VmPageOrMarker::Empty();
         ReturnEmptySlot(new_end_offset + PAGE_SIZE);
       }
       if (new_end->IsIntervalSlot()) {
-        new_end->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Start);
+        new_end->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Start);
       } else {
         DEBUG_ASSERT(new_end->IsIntervalEnd());
         *new_end = VmPageOrMarker::Empty();
@@ -1121,12 +1119,12 @@ zx_status_t VmPageList::ClipIntervalStart(uint64_t interval_start, uint64_t len)
   // It is possible that we are moving the start all the way to the end, leaving behind a single
   // interval slot.
   if (new_start->IsIntervalEnd()) {
-    new_start->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+    new_start->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Slot);
   } else {
     DEBUG_ASSERT(new_start->IsEmpty());
     // We only support zero intervals for now.
     DEBUG_ASSERT(old_start->IsIntervalZero());
-    *new_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Start,
+    *new_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::SentinelType::Start,
                                               old_start->GetZeroIntervalDirtyState());
   }
 
@@ -1171,12 +1169,12 @@ zx_status_t VmPageList::ClipIntervalEnd(uint64_t interval_end, uint64_t len) {
   // It is possible that we are moving the end all the way to the start, leaving behind a single
   // interval slot.
   if (new_end->IsIntervalStart()) {
-    new_end->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+    new_end->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Slot);
   } else {
     DEBUG_ASSERT(new_end->IsEmpty());
     // We only support zero intervals for now.
     DEBUG_ASSERT(old_end->IsIntervalZero());
-    *new_end = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::End,
+    *new_end = VmPageOrMarker::ZeroInterval(VmPageOrMarker::SentinelType::End,
                                             old_end->GetZeroIntervalDirtyState());
   }
   // Free up the old end.

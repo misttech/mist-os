@@ -244,10 +244,8 @@ size_t VmTriPageStorage::get_slot_length(vm_page_t* page, PageSlot slot) {
 
 // static
 std::pair<vm_page_t*, VmTriPageStorage::PageSlot> VmTriPageStorage::DecodeRef(CompressedRef ref) {
-  uint64_t compressed_ref = ref.value();
-  ASSERT(compressed_ref != 0);
-  vm_page_t* p = reinterpret_cast<vm_page_t*>((compressed_ref >> kRefPageShift) | kRefHighBits);
-  PageSlot slot = static_cast<PageSlot>((compressed_ref >> kRefTagShift) & BIT_MASK(kRefTagBits));
+  vm_page_t* p = ref.page();
+  PageSlot slot = static_cast<PageSlot>(ref.extra());
   ASSERT(slot != PageSlot::None);
   return {p, slot};
 }
@@ -257,8 +255,7 @@ VmTriPageStorage::CompressedRef VmTriPageStorage::EncodeRef(vm_page_t* page, Pag
   ASSERT(page);
   ASSERT(slot != PageSlot::None);
 
-  return CompressedRef((reinterpret_cast<uint64_t>(page) << kRefPageShift) |
-                       (static_cast<uint64_t>(slot) << kRefTagShift));
+  return CompressedRef(page, static_cast<uint8_t>(slot));
 }
 
 ktl::tuple<const void*, uint32_t, size_t> VmTriPageStorage::CompressedData(

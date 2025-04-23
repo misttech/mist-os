@@ -24,6 +24,7 @@
 #include <ktl/algorithm.h>
 #include <ktl/iterator.h>
 #include <ktl/move.h>
+#include <vm/compression.h>
 #include <vm/fault.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>

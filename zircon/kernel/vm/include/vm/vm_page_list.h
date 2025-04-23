@@ -19,6 +19,7 @@
 #include <ktl/algorithm.h>
 #include <ktl/unique_ptr.h>
 #include <vm/page.h>
+#include <vm/pmm.h>
 
 class VmPageList;
 class VMPLCursor;
@@ -57,23 +58,39 @@ class VmPageOrMarker {
   VmPageOrMarker(const VmPageOrMarker&) = delete;
   VmPageOrMarker& operator=(const VmPageOrMarker&) = delete;
 
-  // Minimal wrapper around a uint64_t to provide stronger typing in code to prevent accidental
-  // mixing of references and other uint64_t values.
+  // Minimal wrapper around a uint32_t to provide stronger typing in code to prevent accidental
+  // mixing of references and other values.
   // Provides a way to query the required alignment of the references and does debug enforcement of
   // this.
   class ReferenceValue {
    public:
     // kAlignBits represents the number of low bits in a reference that must be zero so they can be
     // used for internal metadata. This is declared here for convenience, and is asserted to be in
-    // sync with the private kReferenceBits.
-    static constexpr uint64_t kAlignBits = 2;
-    explicit constexpr ReferenceValue(uint64_t raw) : value_(raw) {
-      DEBUG_ASSERT((value_ & BIT_MASK(kAlignBits)) == 0);
+    // sync with the private VmPageOrMarker::kTypeBits.
+    static constexpr int kAlignBits = 2;
+    // kExtraBits is used for bookkeeping on certain page providers, namely compressed storage.
+    static constexpr int kExtraBits = 2;
+    // Ensure the pmm page-to-index has enough zero bits.
+    static_assert((kAlignBits + kExtraBits) <= PmmNode::kIndexZeroBits);
+
+    explicit ReferenceValue(const vm_page_t* page, uint8_t extra)
+        : value_(Pmm::Node().PageToIndex(page) | (BIT_MASK32(kExtraBits) & extra) << kAlignBits) {
+      DEBUG_ASSERT((extra & ~BIT_MASK32(kExtraBits)) == 0);
     }
-    uint64_t value() const { return value_; }
+
+    explicit constexpr ReferenceValue(uint32_t raw) : value_(raw) {
+      DEBUG_ASSERT((value_ & BIT_MASK32(kAlignBits)) == 0);
+    }
+
+    static ReferenceValue GetReservedValue() { return ReferenceValue(PmmNode::kIndexReserved0); }
+
+    uint32_t value() const { return value_; }
+    vm_page_t* page() const { return Pmm::Node().IndexToPage(value_); }
+    uint8_t extra() const { return (value_ >> kAlignBits) & BIT_MASK32(kExtraBits); }
+    bool is_reserved() const { return value_ == PmmNode::kIndexReserved0; }
 
    private:
-    uint64_t value_;
+    uint32_t value_;
   };
 
   // Returns a reference to the underlying vm_page*. Is only valid to call if `IsPage` is true.
@@ -81,11 +98,11 @@ class VmPageOrMarker {
     DEBUG_ASSERT(IsPage());
     // Do not need to mask any bits out of raw_, since Page has 0's for the type anyway.
     static_assert(kPageType == 0);
-    return reinterpret_cast<vm_page*>(raw_);
+    return Pmm::Node().IndexToPage(raw_);
   }
   ReferenceValue Reference() const {
     DEBUG_ASSERT(IsReference());
-    return ReferenceValue(raw_ & ~BIT_MASK(ReferenceValue::kAlignBits));
+    return ReferenceValue(raw_ & ~BIT_MASK32(ReferenceValue::kAlignBits));
   }
 
   // If this is a page, moves the underlying vm_page* out and returns it. After this IsPage will
@@ -95,12 +112,12 @@ class VmPageOrMarker {
     // Do not need to mask any bits out of the Release since Page has 0's for the type
     // anyway.
     static_assert(kPageType == 0);
-    return reinterpret_cast<vm_page*>(Release());
+    return Pmm::Node().IndexToPage(Release());
   }
 
   [[nodiscard]] ReferenceValue ReleaseReference() {
     DEBUG_ASSERT(IsReference());
-    return ReferenceValue(Release() & ~BIT_MASK(ReferenceValue::kAlignBits));
+    return ReferenceValue(Release() & ~BIT_MASK32(ReferenceValue::kAlignBits));
   }
 
   // Changes the content from a reference to a page and returns the original reference.
@@ -131,7 +148,7 @@ class VmPageOrMarker {
   }
 
   [[nodiscard]] VmPageOrMarker Swap(VmPageOrMarker&& other) {
-    uint64_t ret = raw_;
+    uint32_t ret = raw_;
     raw_ = other.Release();
     return VmPageOrMarker(ret);
   }
@@ -166,10 +183,12 @@ class VmPageOrMarker {
     // 1. It's a violation of the API of this method
     // 2. A null page cannot be represented internally as this is used to represent Empty
     DEBUG_ASSERT(p);
-    const uint64_t raw = reinterpret_cast<uint64_t>(p);
+    const uint32_t raw = Pmm::Node().PageToIndex(p);
+    // Getting zero in |raw| means that |p| lives on the stack or the heap. This is not supported.
+    DEBUG_ASSERT(raw != 0u);
     // A pointer should be aligned by definition, and hence the low bits should always be zero, but
     // assert this anyway just in case kTypeBits is increased or someone passed an invalid pointer.
-    DEBUG_ASSERT((raw & BIT_MASK(kTypeBits)) == 0);
+    DEBUG_ASSERT((raw & BIT_MASK32(kTypeBits)) == 0);
     return VmPageOrMarker{raw | kPageType};
   }
 
@@ -177,15 +196,19 @@ class VmPageOrMarker {
     return VmPageOrMarker(ref.value() | kReferenceType);
   }
 
+  // Interval type full bit allocation, from LSB to MSB:
+  // Type: 2b = 11 | SentinelType: 2b | IntervalType: 2b | DirtyState: 2b | Length: 24b
+  // note: Length is only valid when the DirtyState is Dirty.
+
   // The types of sparse page interval types that are supported.
-  enum class IntervalType : uint64_t {
+  enum class IntervalType : uint32_t {
     // Represents a range of zero pages.
     Zero = 0,
     NumTypes,
   };
 
   // Sentinel types that are used to represent a sparse page interval.
-  enum class IntervalSentinel : uint64_t {
+  enum class SentinelType : uint32_t {
     // Represents a single page interval.
     Slot = 0,
     // The first page of a multi-page interval.
@@ -201,125 +224,129 @@ class VmPageOrMarker {
   class ZeroRange {
    public:
     // This is the same as kIntervalBits. Equality is asserted later where kIntervalBits is defined.
-    static constexpr uint64_t kAlignBits = 6;
-    explicit constexpr ZeroRange(uint64_t val) : value_(val) {
-      DEBUG_ASSERT((value_ & BIT_MASK(kAlignBits)) == 0);
+    static constexpr int kAlignBits = 6;
+
+    explicit constexpr ZeroRange(uint32_t val) : value_(val) {
+      DEBUG_ASSERT((value_ & BIT_MASK32(kAlignBits)) == 0);
     }
     // The various dirty states that a zero interval can be in. Refer to VmCowPages::DirtyState for
     // an explanation of the states. Note that an AwaitingClean state is not encoded in the interval
     // state bits. This information is instead stored using the AwaitingCleanLength for convenience,
     // where a non-zero length indicates that the interval is AwaitingClean. Doing this affords
     // more convenient splitting and merging of intervals.
-    enum class DirtyState : uint64_t {
+    enum class DirtyState : uint32_t {
       Untracked = 0,
       Clean,
       Dirty,
       NumStates,
     };
-    ZeroRange(uint64_t val, DirtyState state) : value_(val) {
-      DEBUG_ASSERT((value_ & BIT_MASK(kAlignBits)) == 0);
+
+    ZeroRange(uint32_t val, DirtyState state) : value_(val) {
+      DEBUG_ASSERT((value_ & BIT_MASK32(kAlignBits)) == 0);
       DEBUG_ASSERT(GetDirtyState() == DirtyState::Untracked);
       SetDirtyState(state);
     }
-    uint64_t value() const { return value_; }
+    uint32_t value() const { return value_; }
 
     // For zero range tracking, we also need to track dirty state information, and if the interval
     // is AwaitingClean, the length that is AwaitingClean.
     static constexpr uint64_t kDirtyStateBits = VM_PAGE_OBJECT_DIRTY_STATE_BITS;
-    static_assert(static_cast<uint64_t>(DirtyState::NumStates) <= (1 << kDirtyStateBits));
-    static constexpr uint64_t kDirtyStateShift = kAlignBits;
+    static_assert(static_cast<uint32_t>(DirtyState::NumStates) <= (1 << kDirtyStateBits));
+    static constexpr int kDirtyStateShift = kAlignBits;
     DirtyState GetDirtyState() const {
-      return static_cast<DirtyState>((value_ & (BIT_MASK(kDirtyStateBits) << kDirtyStateShift)) >>
+      return static_cast<DirtyState>((value_ & (BIT_MASK32(kDirtyStateBits) << kDirtyStateShift)) >>
                                      kDirtyStateShift);
     }
     void SetDirtyState(DirtyState state) {
       // Only allow dirty and untracked zero ranges for now.
       DEBUG_ASSERT(state == DirtyState::Dirty || state == DirtyState::Untracked);
       // Clear the old state.
-      value_ &= ~(BIT_MASK(kDirtyStateBits) << kDirtyStateShift);
+      value_ &= ~(BIT_MASK32(kDirtyStateBits) << kDirtyStateShift);
       // Set the new state.
-      value_ |= static_cast<uint64_t>(state) << kDirtyStateShift;
+      value_ |= static_cast<uint32_t>(state) << kDirtyStateShift;
     }
+
+    static constexpr uint64_t kAwaitingCleanLengthShift = kAlignBits + kDirtyStateBits;
+    // Assert that we are not overlapping with the dirty state bits.
+    static_assert(kAwaitingCleanLengthShift >= kDirtyStateShift + kDirtyStateBits);
+    static_assert(kAwaitingCleanLengthShift <= PAGE_SIZE_SHIFT);
 
     // The AwaitingCleanLength will always be a page-aligned length, so we can mask out the low
     // PAGE_SIZE_SHIFT bits and store only the upper bits.
-    static constexpr uint64_t kAwaitingCleanLengthShift = PAGE_SIZE_SHIFT;
-    // Assert that we are not overlapping with the dirty state bits.
-    static_assert(kAwaitingCleanLengthShift >= kDirtyStateShift + kDirtyStateBits);
     void SetAwaitingCleanLength(uint64_t len) {
       DEBUG_ASSERT(GetDirtyState() == DirtyState::Dirty);
-      DEBUG_ASSERT(IS_ALIGNED(len, (1 << kAwaitingCleanLengthShift)));
+      DEBUG_ASSERT(IS_ALIGNED(len, PAGE_SIZE));
+      len = (len >> PAGE_SIZE_SHIFT) << kAwaitingCleanLengthShift;
       // Clear the old value.
-      value_ &= BIT_MASK(kAwaitingCleanLengthShift);
+      value_ &= BIT_MASK32(kAwaitingCleanLengthShift);
       // Set the new value.
-      value_ |= (len & ~BIT_MASK(kAwaitingCleanLengthShift));
+      value_ |= static_cast<uint32_t>(len);
     }
     uint64_t GetAwaitingCleanLength() const {
-      return value_ & ~BIT_MASK(kAwaitingCleanLengthShift);
+      uint64_t len = value_ & ~BIT_MASK32(kAwaitingCleanLengthShift);
+      return (len >> kAwaitingCleanLengthShift) << PAGE_SIZE_SHIFT;
     }
 
    private:
-    uint64_t value_;
+    uint32_t value_;
   };
   using IntervalDirtyState = ZeroRange::DirtyState;
 
   // Getters and setters for the interval type.
   bool IsIntervalStart() const {
-    return IsInterval() && GetIntervalSentinel() == IntervalSentinel::Start;
+    return IsInterval() && GetIntervalSentinel() == SentinelType::Start;
   }
-  bool IsIntervalEnd() const {
-    return IsInterval() && GetIntervalSentinel() == IntervalSentinel::End;
-  }
+  bool IsIntervalEnd() const { return IsInterval() && GetIntervalSentinel() == SentinelType::End; }
   bool IsIntervalSlot() const {
-    return IsInterval() && GetIntervalSentinel() == IntervalSentinel::Slot;
+    return IsInterval() && GetIntervalSentinel() == SentinelType::Slot;
   }
   bool IsIntervalZero() const { return IsInterval() && GetIntervalType() == IntervalType::Zero; }
 
   // Getters and setter for the zero interval type.
   bool IsZeroIntervalClean() const {
     DEBUG_ASSERT(IsIntervalZero());
-    return ZeroRange(raw_ & ~BIT_MASK(kIntervalBits)).GetDirtyState() ==
+    return ZeroRange(raw_ & ~BIT_MASK32(kIntervalBits)).GetDirtyState() ==
            ZeroRange::DirtyState::Clean;
   }
   bool IsZeroIntervalDirty() const {
     DEBUG_ASSERT(IsIntervalZero());
-    return ZeroRange(raw_ & ~BIT_MASK(kIntervalBits)).GetDirtyState() ==
+    return ZeroRange(raw_ & ~BIT_MASK32(kIntervalBits)).GetDirtyState() ==
            ZeroRange::DirtyState::Dirty;
   }
   bool IsZeroIntervalUntracked() const {
     DEBUG_ASSERT(IsIntervalZero());
-    return ZeroRange(raw_ & ~BIT_MASK(kIntervalBits)).GetDirtyState() ==
+    return ZeroRange(raw_ & ~BIT_MASK32(kIntervalBits)).GetDirtyState() ==
            ZeroRange::DirtyState::Untracked;
   }
   ZeroRange::DirtyState GetZeroIntervalDirtyState() const {
     DEBUG_ASSERT(IsIntervalZero());
-    return ZeroRange(raw_ & ~BIT_MASK(kIntervalBits)).GetDirtyState();
+    return ZeroRange(raw_ & ~BIT_MASK32(kIntervalBits)).GetDirtyState();
   }
   void SetZeroIntervalAwaitingCleanLength(uint64_t len) {
     DEBUG_ASSERT(IsIntervalZero());
     DEBUG_ASSERT(IsIntervalStart() || IsIntervalSlot());
     DEBUG_ASSERT(IsZeroIntervalDirty());
-    auto interval = ZeroRange(raw_ & ~BIT_MASK(kIntervalBits));
+    auto interval = ZeroRange(raw_ & ~BIT_MASK32(kIntervalBits));
     interval.SetAwaitingCleanLength(len);
-    raw_ = (raw_ & BIT_MASK(kIntervalBits)) | interval.value();
+    raw_ = (raw_ & BIT_MASK32(kIntervalBits)) | interval.value();
   }
   uint64_t GetZeroIntervalAwaitingCleanLength() const {
     DEBUG_ASSERT(IsIntervalZero());
     DEBUG_ASSERT(IsIntervalStart() || IsIntervalSlot());
-    return ZeroRange(raw_ & ~BIT_MASK(kIntervalBits)).GetAwaitingCleanLength();
+    return ZeroRange(raw_ & ~BIT_MASK32(kIntervalBits)).GetAwaitingCleanLength();
   }
 
  private:
-  explicit VmPageOrMarker(uint64_t raw) : raw_(raw) {}
+  explicit VmPageOrMarker(uint32_t raw) : raw_(raw) {}
 
   // The low 2 bits of raw_ are reserved to select the type, any other data has to fit into the
   // remaining high bits. Note that there is no explicit Empty type, rather a PageType with a zero
   // pointer is used to represent Empty.
-  static constexpr uint64_t kTypeBits = 2;
-  static constexpr uint64_t kPageType = 0b00;
-  static constexpr uint64_t kZeroMarkerType = 0b01;
-  static constexpr uint64_t kReferenceType = 0b10;
-  static constexpr uint64_t kIntervalType = 0b11;
+  static constexpr uint32_t kTypeBits = 2;
+  static constexpr uint32_t kPageType = 0b00;
+  static constexpr uint32_t kZeroMarkerType = 0b01;
+  static constexpr uint32_t kReferenceType = 0b10;
+  static constexpr uint32_t kIntervalType = 0b11;
 
   // Ensure the reference values have alignment such the type bits can be set without overlapping
   // actual ref being stored. Unlike the page type, which does not allow the 0 value to be stored, a
@@ -328,26 +355,25 @@ class VmPageOrMarker {
 
   // In addition to storing the type for an interval, we also need to track the type of interval
   // sentinel: the start, the end, or a single slot marker.
-  static constexpr uint64_t kIntervalSentinelBits = 2;
-  static_assert(static_cast<uint64_t>(IntervalSentinel::NumSentinels) <=
-                (1 << kIntervalSentinelBits));
-  static constexpr uint64_t kIntervalSentinelShift = kTypeBits;
-  IntervalSentinel GetIntervalSentinel() const {
-    return static_cast<IntervalSentinel>(
+  static constexpr int kIntervalSentinelBits = 2;
+  static_assert(static_cast<int>(SentinelType::NumSentinels) <= (1 << kIntervalSentinelBits));
+  static constexpr int kIntervalSentinelShift = kTypeBits;
+  SentinelType GetIntervalSentinel() const {
+    return static_cast<SentinelType>(
         (raw_ & (BIT_MASK(kIntervalSentinelBits) << kIntervalSentinelShift)) >>
         kIntervalSentinelShift);
   }
-  void SetIntervalSentinel(IntervalSentinel sentinel) {
+  void SetIntervalSentinel(SentinelType sentinel) {
     // Clear the old sentinel type.
-    raw_ &= ~(BIT_MASK(kIntervalSentinelBits) << kIntervalSentinelShift);
+    raw_ &= ~(BIT_MASK32(kIntervalSentinelBits) << kIntervalSentinelShift);
     // Set the new sentinel type.
-    raw_ |= static_cast<uint64_t>(sentinel) << kIntervalSentinelShift;
+    raw_ |= static_cast<uint32_t>(sentinel) << kIntervalSentinelShift;
   }
   // Next we also need to store the type of interval being represented; reserve a couple of bits for
   // this. Currently we only support one type of interval: a range of zero pages, but reserving 2
   // bits allows for more types in the future.
   static constexpr uint64_t kIntervalTypeBits = 2;
-  static_assert(static_cast<uint64_t>(IntervalType::NumTypes) <= (1 << kIntervalTypeBits));
+  static_assert(static_cast<uint32_t>(IntervalType::NumTypes) <= (1 << kIntervalTypeBits));
   static constexpr uint64_t kIntervalTypeShift = kIntervalSentinelShift + kIntervalSentinelBits;
   IntervalType GetIntervalType() const {
     return static_cast<IntervalType>((raw_ & (BIT_MASK(kIntervalTypeBits) << kIntervalTypeShift)) >>
@@ -359,10 +385,10 @@ class VmPageOrMarker {
   // Only support creation of zero interval type for now.
   // Private and only friended with VmPageList so that an external caller cannot arbitrarily create
   // interval sentinels.
-  [[nodiscard]] static VmPageOrMarker ZeroInterval(IntervalSentinel sentinel,
+  [[nodiscard]] static VmPageOrMarker ZeroInterval(SentinelType sentinel,
                                                    IntervalDirtyState state) {
-    uint64_t sentinel_bits = static_cast<uint64_t>(sentinel) << kIntervalSentinelShift;
-    uint64_t type_bits = static_cast<uint64_t>(IntervalType::Zero) << kIntervalTypeShift;
+    uint32_t sentinel_bits = static_cast<uint32_t>(sentinel) << kIntervalSentinelShift;
+    uint32_t type_bits = static_cast<uint32_t>(IntervalType::Zero) << kIntervalTypeShift;
     return VmPageOrMarker(ZeroRange(0, state).value() | type_bits | sentinel_bits | kIntervalType);
   }
 
@@ -372,31 +398,30 @@ class VmPageOrMarker {
   // when extending or clipping intervals.
   // Private and only friended with VmPageList so that an external caller cannot arbitrarily
   // manipulate interval sentinels.
-  void ChangeIntervalSentinel(IntervalSentinel new_sentinel) {
+  void ChangeIntervalSentinel(SentinelType new_sentinel) {
 #if ZX_DEBUG_ASSERT_IMPLEMENTED
     DEBUG_ASSERT(IsInterval());
     auto old_sentinel = GetIntervalSentinel();
     DEBUG_ASSERT(old_sentinel != new_sentinel);
-    if (old_sentinel == IntervalSentinel::Start || old_sentinel == IntervalSentinel::End) {
-      DEBUG_ASSERT(new_sentinel == IntervalSentinel::Slot);
+    if (old_sentinel == SentinelType::Start || old_sentinel == SentinelType::End) {
+      DEBUG_ASSERT(new_sentinel == SentinelType::Slot);
     } else {
-      DEBUG_ASSERT(old_sentinel == IntervalSentinel::Slot);
-      DEBUG_ASSERT(new_sentinel == IntervalSentinel::Start ||
-                   new_sentinel == IntervalSentinel::End);
+      DEBUG_ASSERT(old_sentinel == SentinelType::Slot);
+      DEBUG_ASSERT(new_sentinel == SentinelType::Start || new_sentinel == SentinelType::End);
     }
 #endif
     SetIntervalSentinel(new_sentinel);
   }
 
-  uint64_t GetType() const { return raw_ & BIT_MASK(kTypeBits); }
+  uint32_t GetType() const { return raw_ & BIT_MASK(kTypeBits); }
 
-  uint64_t Release() {
-    const uint64_t p = raw_;
+  uint32_t Release() {
+    const uint32_t p = raw_;
     raw_ = 0;
     return p;
   }
 
-  uint64_t raw_;
+  uint32_t raw_;
 
   friend VmPageList;
 };

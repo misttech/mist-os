@@ -239,7 +239,7 @@ bool tri_page_storage_optimal_bucket() {
     return (item % 2) == slot ? size : padding_size;
   };
 
-  uint64_t refs[kNumItems][2];
+  uint32_t refs[kNumItems][2];
 
   for (uint64_t i = 0; i < kNumItems; i++) {
     for (uint64_t j = 0; j < 2; j++) {
@@ -283,7 +283,7 @@ bool tri_page_storage_optimal_bucket() {
 
   // Cleanup
   for (auto& ref : refs) {
-    for (uint64_t j : ref) {
+    for (uint32_t j : ref) {
       storage.Free(VmTriPageStorage::CompressedRef(j));
     }
   }

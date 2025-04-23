@@ -65,7 +65,7 @@ class VmTriPageStorage final : public VmCompressedStorage {
 
   // Represents which of the three potential slots in a page that an allocation resides. Although
   // can have multiple slots in use, a given allocation exists at a unique slot.
-  enum class PageSlot : uint64_t {
+  enum class PageSlot : uint8_t {
     // None is explicitly defined as a 0 encoding to help detect usage errors of CompressedRefs.
     None = 0,
     Left = 1,
@@ -112,26 +112,6 @@ class VmTriPageStorage final : public VmCompressedStorage {
 
   // Retrieves the length of a particular slot in a page.
   static size_t get_slot_length(vm_page_t* page, PageSlot slot);
-
-  // The CompressedRef's we generate need to encode a pointer to a vm_page_t, and indicate which of
-  // the |Slot| this reference is for. They have the following bit layout:
-  // 63       0
-  // P..PTTA..A
-  // This layout is variable based on the number of bits reserved by the CompressedRef, indicated
-  // by its kAlignBits. After that alignment bits there are 2 bits for storing the slot tag, and
-  // then all remaining bits store the pointer to the vm_page_t.
-  // To pack a 64-bit vm_page_t pointer into <64 bits, the assumption of kernel pointer having spare
-  // high bits always being set is leveraged.
-  static constexpr uint64_t kRefTagShift = CompressedRef::kAlignBits;
-  static constexpr uint64_t kRefTagBits = 2;
-  static constexpr uint64_t kRefPageShift = kRefTagShift + kRefTagBits;
-  static constexpr uint64_t kRefHighBits = BIT_MASK(kRefPageShift)
-                                           << ((sizeof(uint64_t) * 8) - kRefPageShift);
-  // Check that all pointers in the kernel region, that is any value >KERNEL_ASPACE_BASE, will have
-  // the high bits always set.
-  static_assert((KERNEL_ASPACE_BASE & kRefHighBits) == kRefHighBits);
-  // Check that there are enough tag bits to encode all the possible PageSlots
-  static_assert(1ul << kRefTagBits >= static_cast<uint64_t>(PageSlot::NumSlots));
 
   // For simplicity select our number of buckets such that we can use a single uint64_t bitmap to
   // track availability.

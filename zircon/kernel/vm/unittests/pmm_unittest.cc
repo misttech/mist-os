@@ -164,7 +164,7 @@ static bool pmm_node_multi_alloc_test() {
 }
 
 // Allocates one page from the bulk allocation api.
-static bool pmm_node_singlton_list_test() {
+static bool pmm_node_singleton_list_test() {
   BEGIN_TEST;
   ManagedPmmNode node;
   list_node list = LIST_INITIAL_VALUE(list);
@@ -1266,11 +1266,39 @@ static bool kasan_detects_use_after_free() {
 }
 #endif  // __has_feature(address_sanitizer)
 
+static bool pmm_page_to_from_index_test() {
+  // Assert that indexes have zero bits, can roundtrip and are distinct for distinct pages.
+  BEGIN_TEST;
+
+  paddr_t pa;
+  vm_page_t* page0;
+  zx_status_t status = pmm_alloc_page(0, &page0, &pa);
+  ASSERT_EQ(ZX_OK, status, "pmm_alloc single page");
+  uint32_t index0 = Pmm::Node().PageToIndex(page0);
+  ASSERT_NE(0u, index0);
+  uint32_t zero_bits_mask = (1u << PmmNode::kIndexZeroBits) - 1;
+  ASSERT_EQ(0u, index0 & zero_bits_mask);
+  vm_page_t* same_page = Pmm::Node().IndexToPage(index0);
+  ASSERT_EQ(page0, same_page);
+
+  vm_page_t* page1;
+  status = pmm_alloc_page(0, &page1, &pa);
+  ASSERT_EQ(ZX_OK, status, "pmm_alloc single page");
+  uint32_t index1 = Pmm::Node().PageToIndex(page1);
+  ASSERT_NE(0u, index1);
+
+  ASSERT_NE(index0, index1);
+
+  pmm_free_page(page0);
+  pmm_free_page(page1);
+  END_TEST;
+}
+
 UNITTEST_START_TESTCASE(pmm_tests)
 VM_UNITTEST(pmm_smoke_test)
 VM_UNITTEST(pmm_alloc_contiguous_one_test)
 VM_UNITTEST(pmm_node_multi_alloc_test)
-VM_UNITTEST(pmm_node_singlton_list_test)
+VM_UNITTEST(pmm_node_singleton_list_test)
 VM_UNITTEST(pmm_node_loan_borrow_cancel_reclaim_end)
 VM_UNITTEST(pmm_node_oversized_alloc_test)
 VM_UNITTEST(pmm_node_free_mem_event_test)
@@ -1281,6 +1309,7 @@ VM_UNITTEST(pmm_checker_is_valid_fill_size_test)
 VM_UNITTEST(pmm_get_arena_info_test)
 VM_UNITTEST(pmm_arena_find_free_contiguous_test)
 VM_UNITTEST(pmm_alloc_append_test)
+VM_UNITTEST(pmm_page_to_from_index_test)
 UNITTEST_END_TESTCASE(pmm_tests, "pmm", "Physical memory manager tests")
 
 UNITTEST_START_TESTCASE(page_queues_tests)

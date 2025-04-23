@@ -211,7 +211,7 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
   // Returns whether or not the provided reference is a temporary reference.
   //
   // See |VmCompressor| for a full explanation of temporary references.
-  bool IsTempReference(const CompressedRef& ref) { return ref.value() == kTempReferenceValue; }
+  bool IsTempReference(const CompressedRef& ref) { return ref.is_reserved(); }
 
   // Retrieve the metadata for the original page referred to by ref.
   //
@@ -278,9 +278,6 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
   // not include the 8 bytes we add on as a timestamp for when a page was compressed.
   const size_t compression_threshold_;
 
-  // Currently only a single VmCompressor instance is supported, so only a single temporary
-  // reference is needed.
-  static constexpr uint64_t kTempReferenceValue = UINT64_MAX & ~BIT_MASK(CompressedRef::kAlignBits);
   DECLARE_MUTEX(VmCompression) instance_lock_;
   // The compressor instance has a more complicated locking structure than can be expressed with
   // annotations here. The instance_lock_ is used to control vending this out in |GetCompressor| to
