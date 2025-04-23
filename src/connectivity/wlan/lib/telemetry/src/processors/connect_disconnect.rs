@@ -245,7 +245,11 @@ impl ConnectDisconnectLogger {
 
     pub async fn log_disconnect(&self, info: &DisconnectInfo) {
         self.update_connection_state(ConnectionState::Disconnected(DisconnectedState {}));
+        self.log_disconnect_inspect(info);
+        self.log_disconnect_cobalt(info).await;
+    }
 
+    fn log_disconnect_inspect(&self, info: &DisconnectInfo) {
         let mut inspect_metadata_node = self.inspect_metadata_node.lock();
         let connected_network = InspectConnectedNetwork::from(&*info.original_bss_desc);
         let connected_network_id =
@@ -264,6 +268,47 @@ impl ConnectDisconnectLogger {
 
         self.time_series_stats.log_disconnected_networks(1 << connected_network_id);
         self.time_series_stats.log_disconnect_sources(1 << disconnect_source_id);
+    }
+
+    async fn log_disconnect_cobalt(&self, info: &DisconnectInfo) {
+        let mut metric_events = vec![];
+        metric_events.push(MetricEvent {
+            metric_id: metrics::TOTAL_DISCONNECT_COUNT_METRIC_ID,
+            event_codes: vec![],
+            payload: MetricEventPayload::Count(1),
+        });
+
+        if should_log_disconnect_for_mobile_device(info) {
+            metric_events.push(MetricEvent {
+                metric_id: metrics::DISCONNECT_OCCURRENCE_FOR_MOBILE_DEVICE_METRIC_ID,
+                event_codes: vec![],
+                payload: MetricEventPayload::Count(1),
+            });
+        }
+
+        metric_events.push(MetricEvent {
+            metric_id: metrics::CONNECTED_DURATION_ON_DISCONNECT_METRIC_ID,
+            event_codes: vec![],
+            payload: MetricEventPayload::IntegerValue(info.connected_duration.into_millis()),
+        });
+
+        log_cobalt_1dot1_batch!(
+            self.cobalt_1dot1_proxy,
+            &metric_events,
+            "log_disconnect_cobalt_metrics",
+        );
+    }
+}
+
+fn should_log_disconnect_for_mobile_device(info: &DisconnectInfo) -> bool {
+    match info.disconnect_source {
+        fidl_sme::DisconnectSource::Ap(_) => true,
+        fidl_sme::DisconnectSource::Mlme(cause)
+            if cause.reason_code != fidl_ieee80211::ReasonCode::MlmeLinkFailed =>
+        {
+            true
+        }
+        _ => false,
     }
 }
 
@@ -381,6 +426,7 @@ mod tests {
     use ieee80211_testutils::{BSSID_REGEX, SSID_REGEX};
     use rand::Rng;
     use std::pin::pin;
+    use test_case::test_case;
     use windowed_stats::experimental::serve;
     use windowed_stats::experimental::testing::TimeMatrixCall;
     use wlan_common::channel::{Cbw, Channel};
@@ -637,5 +683,121 @@ mod tests {
             &time_matrix_calls.drain::<u64>("disconnect_sources")[..],
             &[TimeMatrixCall::Fold(Timed::now(1 << 0))]
         );
+    }
+
+    #[fuchsia::test]
+    fn test_log_disconnect_cobalt() {
+        let mut test_helper = setup_test();
+        let logger = ConnectDisconnectLogger::new(
+            test_helper.cobalt_1dot1_proxy.clone(),
+            &test_helper.inspect_node,
+            &test_helper.inspect_metadata_node,
+            &test_helper.inspect_metadata_path,
+            test_helper.persistence_sender.clone(),
+            &test_helper.mock_time_matrix_client,
+        );
+
+        // Log the event
+        let disconnect_info = DisconnectInfo {
+            connected_duration: zx::BootDuration::from_millis(300_000),
+            ..fake_disconnect_info()
+        };
+        let mut test_fut = pin!(logger.log_disconnect(&disconnect_info));
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        let disconnect_count_metrics =
+            test_helper.get_logged_metrics(metrics::TOTAL_DISCONNECT_COUNT_METRIC_ID);
+        assert_eq!(disconnect_count_metrics.len(), 1);
+        assert_eq!(disconnect_count_metrics[0].payload, MetricEventPayload::Count(1));
+
+        let connected_duration_metrics =
+            test_helper.get_logged_metrics(metrics::CONNECTED_DURATION_ON_DISCONNECT_METRIC_ID);
+        assert_eq!(connected_duration_metrics.len(), 1);
+        assert_eq!(
+            connected_duration_metrics[0].payload,
+            MetricEventPayload::IntegerValue(300_000)
+        );
+    }
+
+    #[test_case(
+        fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
+            mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
+            reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
+        }),
+        true;
+        "ap_disconnect_source"
+    )]
+    #[test_case(
+        fidl_sme::DisconnectSource::Mlme(fidl_sme::DisconnectCause {
+            mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
+            reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
+        }),
+        true;
+        "mlme_disconnect_source_not_link_failed"
+    )]
+    #[test_case(
+        fidl_sme::DisconnectSource::Mlme(fidl_sme::DisconnectCause {
+            mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
+            reason_code: fidl_ieee80211::ReasonCode::MlmeLinkFailed,
+        }),
+        false;
+        "mlme_link_failed"
+    )]
+    #[test_case(
+        fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::Unknown),
+        false;
+        "user_disconnect_source"
+    )]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_log_disconnect_for_mobile_device_cobalt(
+        disconnect_source: fidl_sme::DisconnectSource,
+        should_log: bool,
+    ) {
+        let mut test_helper = setup_test();
+        let logger = ConnectDisconnectLogger::new(
+            test_helper.cobalt_1dot1_proxy.clone(),
+            &test_helper.inspect_node,
+            &test_helper.inspect_metadata_node,
+            &test_helper.inspect_metadata_path,
+            test_helper.persistence_sender.clone(),
+            &test_helper.mock_time_matrix_client,
+        );
+
+        // Log the event
+        let disconnect_info = DisconnectInfo { disconnect_source, ..fake_disconnect_info() };
+        let mut test_fut = pin!(logger.log_disconnect(&disconnect_info));
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        let metrics = test_helper
+            .get_logged_metrics(metrics::DISCONNECT_OCCURRENCE_FOR_MOBILE_DEVICE_METRIC_ID);
+        if should_log {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(metrics[0].payload, MetricEventPayload::Count(1));
+        } else {
+            assert!(metrics.is_empty());
+        }
+    }
+
+    fn fake_disconnect_info() -> DisconnectInfo {
+        let bss_description = random_bss_description!(Wpa2);
+        let channel = bss_description.channel;
+        DisconnectInfo {
+            iface_id: 1,
+            connected_duration: zx::BootDuration::from_hours(6),
+            is_sme_reconnecting: false,
+            disconnect_source: fidl_sme::DisconnectSource::User(
+                fidl_sme::UserDisconnectReason::Unknown,
+            ),
+            original_bss_desc: bss_description.into(),
+            current_rssi_dbm: -30,
+            current_snr_db: 25,
+            current_channel: channel,
+        }
     }
 }

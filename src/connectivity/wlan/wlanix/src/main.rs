@@ -565,8 +565,7 @@ async fn handle_client_connect_transactions<C: ClientIface>(
                 }
             }
             Ok(fidl_sme::ConnectTransactionEvent::OnDisconnect { info }) => {
-                let connected_duration =
-                    fasync::BootInstant::now() - ctx.most_recent_connect_time;
+                let connected_duration = fasync::BootInstant::now() - ctx.most_recent_connect_time;
                 telemetry_sender.send(TelemetryEvent::Disconnect {
                     info: wlan_telemetry::DisconnectInfo {
                         iface_id,
