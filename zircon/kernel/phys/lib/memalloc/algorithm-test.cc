@@ -8,11 +8,11 @@
 
 #include <lib/memalloc/range.h>
 #include <lib/memalloc/testing/range.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
 #include <memory>
 #include <random>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -26,8 +26,8 @@ using memalloc::RangeStream;
 using memalloc::Type;
 using memalloc::internal::RangeIterationContext;
 
-void TestFindNormalizedRamRanges(cpp20::span<memalloc::Range> input,
-                                 cpp20::span<const memalloc::Range> expected) {
+void TestFindNormalizedRamRanges(std::span<memalloc::Range> input,
+                                 std::span<const memalloc::Range> expected) {
   std::vector<memalloc::Range> actual;
   memalloc::FindNormalizedRamRanges(input, [&actual](const memalloc::Range& range) {
     actual.push_back(range);
@@ -36,8 +36,8 @@ void TestFindNormalizedRamRanges(cpp20::span<memalloc::Range> input,
   ASSERT_NO_FATAL_FAILURE(memalloc::testing::CompareRanges(expected, {actual}));
 }
 
-void TestFindNormalizedRanges(cpp20::span<memalloc::Range> input,
-                              cpp20::span<const memalloc::Range> expected) {
+void TestFindNormalizedRanges(std::span<memalloc::Range> input,
+                              std::span<const memalloc::Range> expected) {
   const size_t scratch_size = memalloc::FindNormalizedRangesScratchSize(input.size());
   auto scratch = std::make_unique<void*[]>(scratch_size);
   std::vector<memalloc::Range> actual;
@@ -50,7 +50,7 @@ void TestFindNormalizedRanges(cpp20::span<memalloc::Range> input,
   ASSERT_NO_FATAL_FAILURE(memalloc::testing::CompareRanges(expected, {actual}));
 }
 
-void ExpectBadOverlap(cpp20::span<memalloc::Range> input) {
+void ExpectBadOverlap(std::span<memalloc::Range> input) {
   const size_t scratch_size = memalloc::FindNormalizedRangesScratchSize(input.size());
   auto scratch = std::make_unique<void*[]>(scratch_size);
   constexpr auto noop = [](const memalloc::Range& range) { return true; };
@@ -58,8 +58,8 @@ void ExpectBadOverlap(cpp20::span<memalloc::Range> input) {
   ASSERT_TRUE(result.is_error());
 }
 
-void TestRangeStream(cpp20::span<cpp20::span<memalloc::Range>> inputs,
-                     cpp20::span<const memalloc::Range> expected) {
+void TestRangeStream(std::span<std::span<memalloc::Range>> inputs,
+                     std::span<const memalloc::Range> expected) {
   std::vector<RangeIterationContext> state(inputs.begin(), inputs.end());
   memalloc::RangeStream stream({state});
 
@@ -93,7 +93,7 @@ void TestRangeStream(cpp20::span<cpp20::span<memalloc::Range>> inputs,
   ASSERT_NO_FATAL_FAILURE(memalloc::testing::CompareRanges(expected, {actual}));
 }
 
-void Shuffle(cpp20::span<memalloc::Range> ranges) {
+void Shuffle(std::span<memalloc::Range> ranges) {
   static std::default_random_engine engine{0xc0ffee};
   std::shuffle(ranges.begin(), ranges.end(), engine);
 }
@@ -540,7 +540,7 @@ TEST(MemallocFindTests, CanShortCircuit) {
 
   const size_t scratch_size = 4 * sizeof(ranges) * sizeof(void*);
   auto scratch_ptr = std::make_unique<void*[]>(scratch_size);
-  cpp20::span<void*> scratch{scratch_ptr.get(), scratch_size};
+  std::span<void*> scratch{scratch_ptr.get(), scratch_size};
 
   std::vector<memalloc::Range> outputs;
 
@@ -629,7 +629,7 @@ TEST(MemallocRangeStreamTests, OutputIsSorted) {
 
   std::default_random_engine engine{0xc0ffee};
   std::uniform_int_distribution<size_t> dist(0, std::size(ranges));
-  auto make_partition = [&](std::vector<cpp20::span<memalloc::Range>>& parts) {
+  auto make_partition = [&](std::vector<std::span<memalloc::Range>>& parts) {
     size_t idx = 0;
     while (idx < std::size(ranges)) {
       size_t part_size = (dist(engine) % (std::size(ranges) - idx)) + 1;
@@ -655,7 +655,7 @@ TEST(MemallocRangeStreamTests, OutputIsSorted) {
 
   for (size_t i = 0; i < 100; ++i) {
     Shuffle(ranges);
-    std::vector<cpp20::span<memalloc::Range>> parts;
+    std::vector<std::span<memalloc::Range>> parts;
     make_partition(parts);
     ASSERT_NO_FATAL_FAILURE(TestRangeStream({parts}, expected));
   }

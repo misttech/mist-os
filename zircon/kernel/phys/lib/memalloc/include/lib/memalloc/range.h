@@ -7,7 +7,6 @@
 #ifndef ZIRCON_KERNEL_PHYS_LIB_MEMALLOC_INCLUDE_LIB_MEMALLOC_RANGE_H_
 #define ZIRCON_KERNEL_PHYS_LIB_MEMALLOC_INCLUDE_LIB_MEMALLOC_RANGE_H_
 
-#include <lib/stdcompat/span.h>
 #include <lib/zbi-format/memory.h>
 #include <stdio.h>
 
@@ -15,7 +14,9 @@
 #include <iterator>
 #include <limits>
 #include <optional>
+#include <span>
 #include <string_view>
+#include <tuple>
 #include <type_traits>
 
 namespace memalloc {
@@ -171,7 +172,7 @@ struct Range {
   constexpr bool IntersectsWith(const Range& other) const {
     const auto [left, right] =
         *this < other ? std::make_tuple(this, &other) : std::make_tuple(&other, this);
-    // Note: Until cpp20 reference wrappers are not constexpr.
+    // Note: Until std reference wrappers are not constexpr.
     return left->end() > right->addr;
   }
 };
@@ -182,7 +183,7 @@ struct Range {
 // recast a zbi_mem_range_t as a Range, the former's `reserved` field -
 // which, layout-wise, corresponds to the upper half of Type - must be zeroed
 // out.
-cpp20::span<Range> AsRanges(cpp20::span<zbi_mem_range_t> ranges);
+std::span<Range> AsRanges(std::span<zbi_mem_range_t> ranges);
 
 // Gives a custom, normalized view of a container of ranges, `Ranges`.
 // `NormalizeTypeFn` is a callable with signature `std::optional<Type>(Type)`:
@@ -267,12 +268,12 @@ struct RangeIterationContext {
   RangeIterationContext() = default;
 
   // Lexicographically sorts the ranges on construction.
-  explicit RangeIterationContext(cpp20::span<Range> ranges) : ranges_(ranges), it_(ranges.begin()) {
+  explicit RangeIterationContext(std::span<Range> ranges) : ranges_(ranges), it_(ranges.begin()) {
     std::sort(ranges_.begin(), ranges_.end());
   }
 
-  cpp20::span<Range> ranges_;
-  typename cpp20::span<Range>::iterator it_;
+  std::span<Range> ranges_;
+  typename std::span<Range>::iterator it_;
 };
 
 }  // namespace internal

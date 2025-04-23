@@ -8,12 +8,12 @@
 
 #include <lib/fit/result.h>
 #include <lib/memalloc/range.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
 #include <algorithm>
 #include <array>
 #include <limits>
+#include <span>
 
 namespace memalloc {
 
@@ -180,7 +180,7 @@ class ActiveRanges {
 const Range* RangeStream::operator()() {
   static constexpr auto at_end = [](const auto& ctx) { return ctx.it_ == ctx.ranges_.end(); };
 
-  // Dereferencing a cpp20::span iterator returns a reference.
+  // Dereferencing a std::span iterator returns a reference.
   constexpr auto to_ptr = [](auto it) -> const Range* { return &(*it); };
 
   // We want to take the lexicographic minimum among the ranges currently
@@ -281,7 +281,7 @@ void FindNormalizedRamRanges(RangeStream ranges, RangeCallback cb) {
   }
 }
 
-fit::result<fit::failed> FindNormalizedRanges(RangeStream ranges, cpp20::span<void*> scratch,
+fit::result<fit::failed> FindNormalizedRanges(RangeStream ranges, std::span<void*> scratch,
                                               RangeCallback cb) {
   if (ranges.empty()) {
     return fit::ok();
@@ -299,7 +299,7 @@ fit::result<fit::failed> FindNormalizedRanges(RangeStream ranges, cpp20::span<vo
                   ranges.size(), min_size_bytes, scratch.size_bytes());
   }
 
-  cpp20::span<Endpoint> endpoints{reinterpret_cast<Endpoint*>(scratch.data()), 2 * ranges.size()};
+  std::span<Endpoint> endpoints{reinterpret_cast<Endpoint*>(scratch.data()), 2 * ranges.size()};
   for (size_t i = 0; i < ranges.size(); ++i) {
     const Range* range = ranges();
     ZX_DEBUG_ASSERT(range);

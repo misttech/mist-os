@@ -6,9 +6,9 @@
 
 #include <inttypes.h>
 #include <lib/memalloc/range.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zbi-format/memory.h>
 
+#include <span>
 #include <string_view>
 #include <type_traits>
 
@@ -92,7 +92,7 @@ std::string_view ToString(Type type) {
   return "unknown"sv;
 }
 
-cpp20::span<Range> AsRanges(cpp20::span<zbi_mem_range_t> ranges) {
+std::span<Range> AsRanges(std::span<zbi_mem_range_t> ranges) {
   static_assert(std::is_standard_layout_v<Range>);
   static_assert(std::is_standard_layout_v<zbi_mem_range_t>);
   static_assert(offsetof(Range, addr) == offsetof(zbi_mem_range_t, paddr));

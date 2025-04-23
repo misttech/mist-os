@@ -6,8 +6,8 @@
 
 #include <lib/memalloc/range.h>
 #include <lib/memalloc/testing/range.h>
-#include <lib/stdcompat/span.h>
 
+#include <span>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -63,7 +63,7 @@ TEST(MemallocRangeTests, NormalizeRanges) {
   {
     std::vector<Range> normalized;
     memalloc::NormalizeRanges(
-        cpp20::span{kRanges},
+        std::span{kRanges},
         [&normalized](const Range& range) {
           normalized.push_back(range);
           return true;
@@ -76,7 +76,7 @@ TEST(MemallocRangeTests, NormalizeRanges) {
   {
     std::vector<Range> normalized;
     memalloc::NormalizeRanges(
-        cpp20::span{kRanges},
+        std::span{kRanges},
         [&normalized](const Range& range) {
           normalized.push_back(range);
           return false;
@@ -88,7 +88,7 @@ TEST(MemallocRangeTests, NormalizeRanges) {
   // Normalize just RAM.
   {
     std::vector<Range> normalized;
-    memalloc::NormalizeRam(cpp20::span{kRanges}, [&normalized](const Range& range) {
+    memalloc::NormalizeRam(std::span{kRanges}, [&normalized](const Range& range) {
       normalized.push_back(range);
       return true;
     });
@@ -105,14 +105,14 @@ TEST(MemallocRangeTests, NormalizeRanges) {
             .type = Type::kFreeRam,
         },
     };
-    memalloc::testing::CompareRanges(cpp20::span{kExpected}, {normalized});
+    memalloc::testing::CompareRanges(std::span{kExpected}, {normalized});
   }
 
   // Discard RAM.
   {
     std::vector<Range> normalized;
     memalloc::NormalizeRanges(
-        cpp20::span{kRanges},
+        std::span{kRanges},
         [&normalized](const Range& range) {
           normalized.push_back(range);
           return true;
@@ -129,14 +129,14 @@ TEST(MemallocRangeTests, NormalizeRanges) {
             .type = Type::kPeripheral,
         },
     };
-    memalloc::testing::CompareRanges(cpp20::span{kExpected}, {normalized});
+    memalloc::testing::CompareRanges(std::span{kExpected}, {normalized});
   }
 
   // Just keep pool test payloads and bookkeeping.
   {
     std::vector<Range> normalized;
     memalloc::NormalizeRanges(
-        cpp20::span{kRanges},
+        std::span{kRanges},
         [&normalized](const Range& range) {
           normalized.push_back(range);
           return true;
@@ -164,7 +164,7 @@ TEST(MemallocRangeTests, NormalizeRanges) {
             .type = Type::kPoolTestPayload,
         },
     };
-    memalloc::testing::CompareRanges(cpp20::span{kExpected}, {normalized});
+    memalloc::testing::CompareRanges(std::span{kExpected}, {normalized});
   }
 }
 

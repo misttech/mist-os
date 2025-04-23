@@ -5,10 +5,10 @@
 #include <lib/memalloc/pool.h>
 #include <lib/memalloc/range.h>
 #include <lib/memalloc/testing/range.h>
-#include <lib/stdcompat/bit.h>
 #include <zircon/assert.h>
 
 #include <array>
+#include <bit>
 #include <cstddef>
 #include <limits>
 #include <memory>
@@ -31,7 +31,7 @@ enum class Action {
   kMaxValue,  // Required by FuzzedDataProvider::ConsumeEnum().
 };
 
-bool IsValidPoolInitInput(cpp20::span<memalloc::Range> ranges) {
+bool IsValidPoolInitInput(std::span<memalloc::Range> ranges) {
   // The valid input spaces of Pool::Init() and FindNormalizedRanges()
   // coincide. Since the latter returns an error, we use that as a proxy to
   // vet inputs to the former (taking that it works as expected for granted).
@@ -48,7 +48,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
 
   size_t num_range_bytes = provider.ConsumeIntegralInRange<size_t>(0, provider.remaining_bytes());
   std::vector<std::byte> bytes = provider.ConsumeBytes<std::byte>(num_range_bytes);
-  cpp20::span<memalloc::Range> ranges = RangesFromBytes(bytes);
+  std::span<memalloc::Range> ranges = RangesFromBytes(bytes);
 
   if (!IsValidPoolInitInput(ranges)) {
     return 0;
@@ -135,7 +135,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         auto& allocation = allocations.back();
         uint64_t new_size = provider.ConsumeIntegralInRange<uint64_t>(1, kMax);
         uint64_t min_alignment = uint64_t{1} << provider.ConsumeIntegralInRange<size_t>(
-                                     0, cpp20::countr_zero(allocation.addr));
+                                     0, std::countr_zero(allocation.addr));
         if (auto result = ctx.pool.Resize(allocation, new_size, min_alignment); result.is_ok()) {
           allocation.addr = result.value();
           allocation.size = new_size;

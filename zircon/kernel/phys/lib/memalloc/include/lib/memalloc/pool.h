@@ -10,7 +10,6 @@
 #include <lib/fit/function.h>
 #include <lib/fit/result.h>
 #include <lib/memalloc/range.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zbi-format/zbi.h>
 #include <stdio.h>
 #include <zircon/assert.h>
@@ -18,6 +17,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <span>
 
 #include <fbl/intrusive_double_list.h>
 
@@ -135,7 +135,7 @@ class Pool {
   // Pool's initial bookkeeping.
   //
   template <size_t N>
-  fit::result<fit::failed> Init(std::array<cpp20::span<Range>, N> ranges,
+  fit::result<fit::failed> Init(std::array<std::span<Range>, N> ranges,
                                 uint64_t default_min_addr = kDefaultMinAddr,
                                 uint64_t default_max_addr = kDefaultMaxAddr) {
     return Init(ranges, std::make_index_sequence<N>(), default_min_addr, default_max_addr);
@@ -259,7 +259,7 @@ class Pool {
   //
   // `alignments` is a collection of power of two alignments, that is the mask for alignment is
   // equivalent to `(1 << alignments[n]) - 1`.
-  fit::result<fit::failed> CoalescePeripherals(cpp20::span<const size_t> alignments);
+  fit::result<fit::failed> CoalescePeripherals(std::span<const size_t> alignments);
 
   // Pretty-prints the memory ranges contained in the pool.
   void PrintMemoryRanges(const char* prefix, FILE* f = stdout) const {
@@ -285,11 +285,11 @@ class Pool {
   };
 
   // Ultimately deferred to as the actual initialization routine.
-  fit::result<fit::failed> Init(cpp20::span<internal::RangeIterationContext> state,
-                                uint64_t min_addr, uint64_t max_addr);
+  fit::result<fit::failed> Init(std::span<internal::RangeIterationContext> state, uint64_t min_addr,
+                                uint64_t max_addr);
 
   template <size_t... I>
-  fit::result<fit::failed> Init(std::array<cpp20::span<Range>, sizeof...(I)> ranges,
+  fit::result<fit::failed> Init(std::array<std::span<Range>, sizeof...(I)> ranges,
                                 std::index_sequence<I...> seq, uint64_t min_addr,
                                 uint64_t max_addr) {
     std::array state{internal::RangeIterationContext(ranges[I])...};

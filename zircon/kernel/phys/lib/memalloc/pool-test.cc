@@ -8,16 +8,15 @@
 #include <lib/memalloc/pool.h>
 #include <lib/memalloc/range.h>
 #include <lib/memalloc/testing/range.h>
-#include <lib/stdcompat/array.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zbi-format/zbi.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/limits.h>
 
+#include <array>
 #include <limits>
 #include <optional>
-#include <type_traits>
+#include <span>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -44,7 +43,7 @@ constexpr std::string_view kEmptyPrintOut =
     R"""(PREFIX: | Physical memory range                    | Size    | Type
 )""";
 
-void TestPoolInit(Pool& pool, cpp20::span<Range> input, std::optional<uint64_t> min_addr = {},
+void TestPoolInit(Pool& pool, std::span<Range> input, std::optional<uint64_t> min_addr = {},
                   std::optional<uint64_t> max_addr = {}, bool init_error = false) {
   auto status = pool.Init(std::array{input}, min_addr.value_or(kDefaultMinAddr),
                           max_addr.value_or(kDefaultMaxAddr));
@@ -55,7 +54,7 @@ void TestPoolInit(Pool& pool, cpp20::span<Range> input, std::optional<uint64_t> 
   ASSERT_FALSE(status.is_error());
 }
 
-void TestPoolContents(const Pool& pool, cpp20::span<const Range> expected) {
+void TestPoolContents(const Pool& pool, std::span<const Range> expected) {
   EXPECT_EQ(expected.size(), pool.size());
   std::vector<Range> actual(pool.begin(), pool.end());
   ASSERT_NO_FATAL_FAILURE(memalloc::testing::CompareRanges(expected, {actual}));
@@ -2675,7 +2674,7 @@ TEST(MemallocPoolTests, CoalescePeripheralSingleRunAtStart) {
                       .type = memalloc::Type::kPeripheral,
                   })
                   .is_ok());
-  auto coalesce_result = ctx.pool.CoalescePeripherals(cpp20::to_array<size_t>({30, 21, 12}));
+  auto coalesce_result = ctx.pool.CoalescePeripherals(std::to_array<size_t>({30, 21, 12}));
   ASSERT_TRUE(coalesce_result.is_ok());
   constexpr Range kExpected[] = {
       {
@@ -2738,7 +2737,7 @@ TEST(MemallocPoolTests, CoalescePeripheralWorseAlignment) {
                       .type = memalloc::Type::kPeripheral,
                   })
                   .is_ok());
-  auto coalesce_result = ctx.pool.CoalescePeripherals(cpp20::to_array<size_t>({30, 21, 12}));
+  auto coalesce_result = ctx.pool.CoalescePeripherals(std::to_array<size_t>({30, 21, 12}));
   ASSERT_TRUE(coalesce_result.is_ok());
   constexpr Range kExpected[] = {
       {
@@ -2807,7 +2806,7 @@ TEST(MemallocPoolTests, CoalescePeripheralSingleRunAtMiddle) {
                       .type = memalloc::Type::kPeripheral,
                   })
                   .is_ok());
-  auto coalesce_result = ctx.pool.CoalescePeripherals(cpp20::to_array<size_t>({30, 21, 12}));
+  auto coalesce_result = ctx.pool.CoalescePeripherals(std::to_array<size_t>({30, 21, 12}));
   ASSERT_TRUE(coalesce_result.is_ok());
   constexpr Range kExpected[] = {
       {
@@ -2876,7 +2875,7 @@ TEST(MemallocPoolTests, CoalescePeripheralSingleRunAtEnd) {
                       .type = memalloc::Type::kPeripheral,
                   })
                   .is_ok());
-  auto coalesce_result = ctx.pool.CoalescePeripherals(cpp20::to_array<size_t>({30, 21, 12}));
+  auto coalesce_result = ctx.pool.CoalescePeripherals(std::to_array<size_t>({30, 21, 12}));
   ASSERT_TRUE(coalesce_result.is_ok());
   constexpr Range kExpected[] = {
       {
@@ -2995,7 +2994,7 @@ TEST(MemallocPoolTests, CoalescePeripheralMultipleRuns) {
                   })
                   .is_ok());
 
-  auto coalesce_result = ctx.pool.CoalescePeripherals(cpp20::to_array<size_t>({30, 21, 12}));
+  auto coalesce_result = ctx.pool.CoalescePeripherals(std::to_array<size_t>({30, 21, 12}));
   ASSERT_TRUE(coalesce_result.is_ok());
   constexpr Range kExpected[] = {
       {
