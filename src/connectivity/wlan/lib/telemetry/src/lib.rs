@@ -172,7 +172,7 @@ pub fn serve_telemetry(
                     use TelemetryEvent::*;
                     match event {
                         ConnectResult { result, bss } => {
-                            connect_disconnect.log_connect_attempt(result, &bss).await;
+                            connect_disconnect.handle_connect_attempt(result, &bss).await;
                         }
                         Disconnect { info } => {
                             connect_disconnect.log_disconnect(&info).await;
@@ -203,6 +203,7 @@ pub fn serve_telemetry(
                     }
                 }
                 _ = telemetry_interval.next() => {
+                    connect_disconnect.handle_periodic_telemetry().await;
                     client_iface_counters_logger.handle_periodic_telemetry(connect_disconnect.is_connected()).await;
                 }
             }

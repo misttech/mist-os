@@ -214,8 +214,6 @@ impl TestHelper {
 
     /// Empty the cobalt metrics can be stored so that future checks on cobalt metrics can
     /// ignore previous values.
-    // TODO(339221340): remove these allows once the skeleton has a few uses
-    #[allow(unused)]
     pub fn clear_cobalt_events(&mut self) {
         self.cobalt_events = Vec::new();
     }
