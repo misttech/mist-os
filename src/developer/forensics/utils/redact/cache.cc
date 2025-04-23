@@ -17,7 +17,7 @@ RedactionIdCache::RedactionIdCache(inspect::UintProperty size_node, const int st
 int RedactionIdCache::GetId(const std::string& value) {
   const size_t hash = std::hash<std::string>{}(value);
 
-  if (ids_.count(hash) != 0) {
+  if (ids_.contains(hash)) {
     // Move |hash| to the front of |lru_|.
     lru_.splice(lru_.begin(), lru_, ids_[hash].second);
     return ids_[hash].first;

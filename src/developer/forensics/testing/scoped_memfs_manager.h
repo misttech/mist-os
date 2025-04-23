@@ -39,7 +39,7 @@ class ScopedMemFsManager {
     }
   }
 
-  bool Contains(const std::string& path) const { return bindings_.count(path) != 0; }
+  bool Contains(const std::string& path) const { return bindings_.contains(path); }
 
   // Create a directory at |path| in the component's namespace.
   void Create(const std::string& path) {

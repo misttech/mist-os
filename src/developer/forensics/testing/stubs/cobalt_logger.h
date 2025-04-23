@@ -26,7 +26,7 @@ class CobaltLoggerBase
   const cobalt::Event& LastEvent() const { return events_.back(); }
   const std::vector<cobalt::Event>& Events() const { return events_; }
 
-  bool WasMethodCalled(cobalt::EventType method) const { return calls_.count(method); }
+  bool WasMethodCalled(cobalt::EventType method) const { return calls_.contains(method); }
 
  protected:
   void InsertEvent(cobalt::EventType event_type, uint32_t metric_id,

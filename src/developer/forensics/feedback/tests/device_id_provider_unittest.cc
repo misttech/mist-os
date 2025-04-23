@@ -94,7 +94,7 @@ TEST(LocalDeviceIdProviderTest, GetOnUpdate) {
     device_id_provider.GetOnUpdate(
         [&annotations](Annotations result) { annotations = std::move(result); });
 
-    EXPECT_NE(annotations.count(kDeviceFeedbackIdKey), 0u);
+    EXPECT_TRUE(annotations.contains(kDeviceFeedbackIdKey));
     EXPECT_EQ(ReadFile(device_id_path), annotations.at(kDeviceFeedbackIdKey).Value());
   }
 }

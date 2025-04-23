@@ -56,7 +56,7 @@ void CrashRegister::UpsertWithAck(std::string component_url,
 }
 
 bool CrashRegister::HasProduct(const std::string& program_name) const {
-  return component_to_products_.count(program_name) != 0;
+  return component_to_products_.contains(program_name);
 }
 
 Product CrashRegister::GetProduct(const std::string& program_name) const {

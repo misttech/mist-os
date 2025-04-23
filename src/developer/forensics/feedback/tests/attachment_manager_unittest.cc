@@ -58,7 +58,7 @@ class SimpleAttachmentProvider : public AttachmentProvider {
   }
 
   void ForceCompletion(const uint64_t ticket, const Error error) override {
-    if (completers_[ticket] && completers_.count(ticket) != 0) {
+    if (completers_[ticket] && completers_.contains(ticket)) {
       completers_[ticket].complete_ok(error);
     }
   }

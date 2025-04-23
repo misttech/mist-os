@@ -51,7 +51,7 @@ void InspectDataBudget::UpdateBudget(
   std::string inspect_filename(kAttachmentInspect);
 
   // No-op if data limiting is disabled or the Inspect file doesn't exist in the latest archive.
-  if (!limit_data_flag_ || file_size_stats.count(inspect_filename) == 0) {
+  if (!limit_data_flag_ || !file_size_stats.contains(inspect_filename)) {
     return;
   }
 
