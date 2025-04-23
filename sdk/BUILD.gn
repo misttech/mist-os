@@ -1292,10 +1292,9 @@ if (current_toolchain == default_toolchain) {
     visibility = []
     visibility = [
       ":bazel_in_tree_idk_tests_${target_cpu}",
+      ":ensure_bazel_in_tree_idk_is_populated_for_bazel_action",
       "//build/bazel:fuchsia_in_tree_idk.hash",
       "//build/bazel:generate_main_workspace",
-      "//build/bazel/bazel_sdk:in_tree_fuchsia_sdk",
-      "//build/bazel/bazel_sdk:in_tree_fuchsia_sdk.bazel_inputs",
       "//build/bazel/bazel_sdk:ninja_generated_in_tree_idk_for_test.bazel_input",
     ]
 
@@ -1332,6 +1331,21 @@ if (current_toolchain == default_toolchain) {
     # with  `fx build //sdk:bazel_in_tree_idk_tests`
     visibility = []
     visibility = [ "//:root_targets" ]
+  }
+
+  # bazel_action() can be invoked from many places, so provide a wrapper around
+  # ":bazel_in_tree_idk" with broader visibility.
+  group("ensure_bazel_in_tree_idk_is_populated_for_bazel_action") {
+    visibility += [
+      "//boards/*",
+      "//build/*",
+      "//examples/drivers/*",
+      "//products/*",
+      "//sdk/lib/driver/*",
+      "//src/*",
+      "//vendor/*",
+    ]
+    deps = [ ":bazel_in_tree_idk" ]
   }
 
   #
