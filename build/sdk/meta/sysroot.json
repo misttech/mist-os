@@ -157,6 +157,13 @@
                             "$ref": "common.json#/definitions/file",
                             "description": "Path to the base directory for prebuilt libraries"
                         },
+                        "debug_libs": {
+                            "description": "List of libraries for debugging",
+                            "items": {
+                                "$ref": "common.json#/definitions/file"
+                            },
+                            "type": "array"
+                        },
                         "dist_libs": {
                             "description": "List of libraries for inclusion in packages",
                             "items": {
