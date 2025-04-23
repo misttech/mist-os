@@ -884,15 +884,6 @@ def record_fuchsia_workspace(
 
     generated.record_symlink(
         # LINT.IfChange
-        "workspace/fuchsia_build_generated/in_tree_idk",
-        # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
-        # LINT.IfChange
-        gn_output_dir / "regenerator_outputs/bazel_in_tree_idk",
-        # LINT.ThenChange(//build/regenerator.py)
-    )
-
-    generated.record_symlink(
-        # LINT.IfChange
         "workspace/fuchsia_build_generated/fuchsia_in_tree_idk.hash",
         # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
         # LINT.IfChange

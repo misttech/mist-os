@@ -538,14 +538,9 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    out_dir = args.output_dir
-    input_dir = args.input_dir.resolve()
-
-    repo_name = args.repository_name
-
     if not args.ninja_build_dir:
-        # args.fuchsia_dir points to the Bazel workspace which contains symlinks
-        # to the real files in the actual top-level source directory. resolve
+        # args.fuchsia_dir points to the Bazel workspace, which contains symlinks
+        # to the real files in the actual top-level source directory. Resolve
         # one of them to find the real location.
         #
         #  out/default/gen/build/bazel/workspace/README.md -->
@@ -573,9 +568,30 @@ def main() -> int:
             f"Ninja build directory does not exist: {args.ninja_build_dir}"
         )
 
-    ninja_build_dir = args.ninja_build_dir.resolve()
+    GenerateIdkRepository(
+        args.repository_name,
+        args.output_dir,
+        args.input_dir,
+        args.ninja_build_dir,
+    )
+    return 0
 
-    output_idk = OutputIdk(out_dir)
+
+def GenerateIdkRepository(
+    name: str, output_dir: Path, input_dir: Path, ninja_build_dir: Path
+) -> None:
+    """Generate a Bazel repository from the specified Fuchsia IDK directory.
+
+    Args:
+        name: Repository name.
+        output_dir: Path for the IDK repository directory.
+        input_dir: Path to the IDK directory from which to create the repository.
+        ninja_build_dir: Path to the Ninja build directory.
+    """
+    input_dir = input_dir.resolve()
+    ninja_build_dir = ninja_build_dir.resolve()
+
+    output_idk = OutputIdk(output_dir)
 
     # Symlink then source meta/manifest.json
     input_manifest_path = input_dir / _IDK_MANIFEST_RELPATH
@@ -583,7 +599,7 @@ def main() -> int:
 
     output_idk.add_symlink(_IDK_MANIFEST_RELPATH, input_manifest_path)
 
-    rewriter = PathRewriter(repo_name, output_idk, input_dir, ninja_build_dir)
+    rewriter = PathRewriter(name, output_idk, input_dir, ninja_build_dir)
 
     # Handle each part separately.
     for part in input_manifest["parts"]:
@@ -606,8 +622,6 @@ def main() -> int:
         output_idk.add_json_file(part_meta_path, meta, is_meta=True)
 
     output_idk.write_all()
-
-    return 0
 
 
 if __name__ == "__main__":

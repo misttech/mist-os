@@ -22,14 +22,18 @@ _SCRIPT_DIR = Path(__file__).parent
 
 # The directory that contains helper Python modules for this script.
 _BUILD_BAZEL_SCRIPTS = _SCRIPT_DIR / ".." / "build" / "bazel" / "scripts"
+# The root directory of Bazel build scripts.
+_BUILD_BAZEL_DIR = _SCRIPT_DIR / ".." / "build" / "bazel"
 # The directory that contains Python modules related to the IDK.
 _BUILD_SDK_SCRIPTS = _SCRIPT_DIR / ".." / "build" / "sdk"
 sys.path.insert(0, str(_BUILD_BAZEL_SCRIPTS))
+sys.path.insert(0, str(_BUILD_BAZEL_DIR))
 sys.path.insert(0, str(_BUILD_SDK_SCRIPTS))
 
 import compute_content_hash
 import remote_services_utils
 import workspace_utils
+from fuchsia_idk import generate_repository
 from generate_prebuild_idk import generate_prebuild_idk
 
 _DEFAULT_HOST_TAG = "linux-x64"
@@ -333,17 +337,45 @@ def main() -> int:
             )
             return result
 
-        result = idk_generator.WriteIdkContentsToDirectory(
-            # LINT.IfChange
-            Path(f"{build_dir}/regenerator_outputs/bazel_in_tree_idk")
-            # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
+        idk_export_dir_path = Path(
+            f"{build_dir}/regenerator_outputs/bazel_in_tree_idk"
         )
+        result = idk_generator.WriteIdkContentsToDirectory(idk_export_dir_path)
         if result != 0:
             print(
                 "ERROR: Failed to generate in-tree IDK export directory from prebuild metadata!",
                 file=sys.stderr,
             )
             return result
+
+        log("Generating @fuchsia_in_tree_idk repository content.")
+        # LINT.IfChange
+        _idk_repository_name = "fuchsia_in_tree_idk"
+        idk_repository_path = Path(
+            f"{build_dir}/regenerator_outputs/fuchsia_in_tree_idk"
+        )
+        # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
+        generate_repository.GenerateIdkRepository(
+            _idk_repository_name,
+            idk_repository_path,
+            idk_export_dir_path,
+            build_dir,
+        )
+
+        with (idk_repository_path / "WORKSPACE.bazel").open("wt") as f:
+            f.write(f'workspace(name = "{_idk_repository_name}")\n')
+        with (idk_repository_path / "MODULE.bazel").open("wt") as f:
+            f.write(f'module(name = "{_idk_repository_name}", version = "1")\n')
+
+        ninja_idk_export_dir_symlink_path = (
+            idk_repository_path / "ninja_idk_export_dir_symlink"
+        )
+        if (
+            ninja_idk_export_dir_symlink_path.exists()
+            or ninja_idk_export_dir_symlink_path.is_symlink()
+        ):
+            os.remove(ninja_idk_export_dir_symlink_path)
+        os.symlink(idk_export_dir_path, ninja_idk_export_dir_symlink_path)
 
         # The list of extra inputs to add to the Ninja build plan.
         extra_ninja_build_inputs: T.Set[Path] = set()

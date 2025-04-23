@@ -201,7 +201,7 @@ GN Build Graph                                       |  Bazel Workspace
   Bazel In-Tree IDK                                  |
     //sdk:bazel_in_tree_idk                          |
                                                      |
-                               [fuchsia_idk_repository()]-----> @fuchsia_in_tree_idk ---[fuchsia_sdk_repository()]---> @fuchsia_sdk
+                                                     |          @fuchsia_in_tree_idk ---[fuchsia_sdk_repository()]---> @fuchsia_sdk
                                                      |
                                                      |
   Bazel In-Tree Internal IDK                         |
