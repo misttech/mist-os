@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{IntoSessionManager, OffsetMap, Operation, RequestId, RequestTracking, SessionHelper};
+use super::{IntoSessionManager, OffsetMap, Operation, RequestTracking, SessionHelper};
 use anyhow::Error;
 use block_protocol::{BlockFifoRequest, BlockFifoResponse};
 use fidl::endpoints::RequestStream;
@@ -11,6 +11,7 @@ use fuchsia_async::{self as fasync, EHandle};
 use fuchsia_sync::{Condvar, Mutex};
 use futures::stream::{AbortHandle, Abortable};
 use futures::TryStreamExt;
+use slab::Slab;
 use std::borrow::Cow;
 use std::collections::{HashMap, VecDeque};
 use std::ffi::{c_char, c_void, CStr};
@@ -20,9 +21,19 @@ use std::sync::{Arc, Weak};
 use zx::{self as zx, AsHandleRef as _};
 use {fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume};
 
+/// We internally keep track of active requests, so that when the server is torn down, we can
+/// deallocate all of the resources for pending requests.
+struct ActiveRequest {
+    session: Arc<Session>,
+    request_tracking: RequestTracking,
+    // Retain a stronng reference to the VMO the request targets while it is active.
+    _vmo: Option<Arc<zx::Vmo>>,
+}
+
 pub struct SessionManager {
     callbacks: Callbacks,
     open_sessions: Mutex<HashMap<usize, Weak<Session>>>,
+    active_requests: Mutex<Slab<ActiveRequest>>,
     condvar: Condvar,
     mbox: ExecutorMailbox,
     info: super::DeviceInfo,
@@ -32,6 +43,32 @@ unsafe impl Send for SessionManager {}
 unsafe impl Sync for SessionManager {}
 
 impl SessionManager {
+    fn start_request(
+        &self,
+        session: Arc<Session>,
+        request_tracking: RequestTracking,
+        operation: Operation,
+        vmo: Option<Arc<zx::Vmo>>,
+    ) -> Request {
+        let mut active_requests = self.active_requests.lock();
+        let vacant = active_requests.vacant_entry();
+        let request = Request {
+            request_id: RequestId(vacant.key()),
+            operation,
+            trace_flow_id: request_tracking.trace_flow_id,
+            vmo: UnownedVmo(
+                vmo.as_ref().map(|vmo| vmo.raw_handle()).unwrap_or(zx::sys::ZX_HANDLE_INVALID),
+            ),
+        };
+        vacant.insert(ActiveRequest { session, request_tracking, _vmo: vmo });
+        request
+    }
+
+    fn complete_request(&self, request_id: RequestId, status: zx::Status) {
+        let request = self.active_requests.lock().remove(request_id.0);
+        request.session.send_reply(request.request_tracking, status);
+    }
+
     fn terminate(&self) {
         {
             // We must drop references to sessions whilst we're not holding the lock for
@@ -68,7 +105,6 @@ impl super::SessionManager for SessionManager {
             helper,
             fifo,
             queue: Mutex::default(),
-            vmos: Mutex::default(),
             abort_handle,
         });
         self.open_sessions.lock().insert(Arc::as_ptr(&session) as usize, Arc::downgrade(&session));
@@ -117,12 +153,8 @@ pub struct Callbacks {
     pub context: *mut c_void,
     pub start_thread: unsafe extern "C" fn(context: *mut c_void, arg: *const c_void),
     pub on_new_session: unsafe extern "C" fn(context: *mut c_void, session: *const Session),
-    pub on_requests: unsafe extern "C" fn(
-        context: *mut c_void,
-        session: *const Session,
-        requests: *mut Request,
-        request_count: usize,
-    ),
+    pub on_requests:
+        unsafe extern "C" fn(context: *mut c_void, requests: *mut Request, request_count: usize),
     pub log: unsafe extern "C" fn(context: *mut c_void, message: *const c_char, message_len: usize),
 }
 
@@ -141,6 +173,10 @@ impl Callbacks {
 #[allow(dead_code)]
 pub struct UnownedVmo(zx::sys::zx_handle_t);
 
+#[repr(transparent)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+pub struct RequestId(usize);
+
 #[repr(C)]
 pub struct Request {
     pub request_id: RequestId,
@@ -157,7 +193,6 @@ pub struct Session {
     helper: SessionHelper<SessionManager>,
     fifo: zx::Fifo<BlockFifoRequest, BlockFifoResponse>,
     queue: Mutex<SessionQueue>,
-    vmos: Mutex<HashMap<RequestId, Arc<zx::Vmo>>>,
     abort_handle: AbortHandle,
 }
 
@@ -166,7 +201,7 @@ struct SessionQueue {
     responses: VecDeque<BlockFifoResponse>,
 }
 
-pub const MAX_REQUESTS: usize = 64;
+pub const MAX_REQUESTS: usize = super::FIFO_MAX_REQUESTS;
 
 impl Session {
     fn run(&self) {
@@ -226,9 +261,16 @@ impl Session {
     }
 
     fn handle_requests<'a>(&self, requests: impl Iterator<Item = &'a BlockFifoRequest>) {
-        let mut decoded_requests: [MaybeUninit<Request>; MAX_REQUESTS] =
+        let mut c_requests: [MaybeUninit<Request>; MAX_REQUESTS] =
             unsafe { MaybeUninit::uninit().assume_init() };
         let mut count = 0;
+        let this = self
+            .manager
+            .open_sessions
+            .lock()
+            .get(&(self as *const _ as usize))
+            .and_then(Weak::upgrade)
+            .unwrap();
         for request in requests {
             if let Some(r) = self.helper.decode_fifo_request(request) {
                 let operation = match r.operation {
@@ -242,22 +284,9 @@ impl Session {
                         continue;
                     }
                 };
-                let RequestTracking { group_or_request, trace_flow_id } = r.request_tracking;
-                let mut request_id = group_or_request.into();
-                let vmo = if let Some(vmo) = r.vmo {
-                    let raw_handle = vmo.raw_handle();
-                    self.vmos.lock().insert(request_id, vmo);
-                    request_id = request_id.with_vmo();
-                    UnownedVmo(raw_handle)
-                } else {
-                    UnownedVmo(zx::sys::ZX_HANDLE_INVALID)
-                };
-                decoded_requests[count].write(Request {
-                    request_id,
-                    operation,
-                    trace_flow_id,
-                    vmo,
-                });
+                let c_request =
+                    self.manager.start_request(this.clone(), r.request_tracking, operation, r.vmo);
+                c_requests[count].write(c_request);
                 count += 1;
             }
         }
@@ -265,8 +294,7 @@ impl Session {
             unsafe {
                 (self.manager.callbacks.on_requests)(
                     self.manager.callbacks.context,
-                    self,
-                    decoded_requests[0].as_mut_ptr(),
+                    c_requests[0].as_mut_ptr(),
                     count,
                 );
             }
@@ -409,6 +437,7 @@ pub unsafe extern "C" fn block_server_new(
     let session_manager = Arc::new(SessionManager {
         callbacks,
         open_sessions: Mutex::default(),
+        active_requests: Mutex::new(Slab::with_capacity(MAX_REQUESTS)),
         condvar: Condvar::new(),
         mbox: ExecutorMailbox::new(),
         info: partition_info.to_rust(),
@@ -539,19 +568,12 @@ pub unsafe extern "C" fn block_server_session_release(session: &Session) {
 
 /// # Safety
 ///
-/// `session` must be valid.
+/// `block_server` must be valid.
 #[no_mangle]
 pub unsafe extern "C" fn block_server_send_reply(
-    session: &Session,
+    block_server: &BlockServer,
     request_id: RequestId,
-    trace_flow_id: Option<NonZero<u64>>,
     status: zx_status_t,
 ) {
-    if request_id.did_have_vmo() {
-        session.vmos.lock().remove(&request_id);
-    }
-    session.send_reply(
-        RequestTracking { group_or_request: request_id.into(), trace_flow_id },
-        zx::Status::from_raw(status),
-    );
+    block_server.server.session_manager.complete_request(request_id, zx::Status::from_raw(status));
 }

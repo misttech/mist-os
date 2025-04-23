@@ -221,9 +221,15 @@ void PartitionDevice::OnNewSession(block_server::Session session) {
   }
 }
 
-void PartitionDevice::OnRequests(const block_server::Session& session,
-                                 cpp20::span<block_server::Request> requests) {
-  sdmmc_parent_->OnRequests(session, *this, requests);
+void PartitionDevice::OnRequests(cpp20::span<block_server::Request> requests) {
+  sdmmc_parent_->OnRequests(*this, requests);
+}
+
+void PartitionDevice::SendReply(block_server::RequestId request, zx::result<> status) {
+  fbl::AutoLock lock(&lock_);
+  if (block_server_) {
+    block_server_->SendReply(request, status);
+  }
 }
 
 }  // namespace sdmmc

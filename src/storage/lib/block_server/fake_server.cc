@@ -11,13 +11,14 @@ namespace block_server {
 /// Implementation of Interface backed by a VMO.
 class FakeServer::FakeInterface : public Interface {
  public:
-  FakeInterface(zx::vmo data, uint64_t block_size)
-      : data_(std::move(data)), block_size_(block_size) {
+  FakeInterface(const FakeServer& server, zx::vmo data, uint64_t block_size)
+      : server_(server), data_(std::move(data)), block_size_(block_size) {
     uint64_t size;
     ZX_ASSERT(data.get_size(&size) == ZX_OK);
     ZX_ASSERT(size % block_size_ == 0);
   }
-  FakeInterface(uint64_t blocks, uint64_t block_size) : block_size_(block_size) {
+  FakeInterface(const FakeServer& server, uint64_t blocks, uint64_t block_size)
+      : server_(server), block_size_(block_size) {
     ZX_ASSERT(zx::vmo::create(blocks * block_size, 0, &data_) == ZX_OK);
   }
 
@@ -30,7 +31,7 @@ class FakeServer::FakeInterface : public Interface {
   void OnNewSession(Session session) override {
     std::thread([session = std::move(session)]() mutable { session.Run(); }).detach();
   }
-  void OnRequests(const Session& session, std::span<Request> requests) override {
+  void OnRequests(std::span<Request> requests) override {
     std::vector<uint8_t> buf;
     size_t len;
     for (const Request& request : requests) {
@@ -59,22 +60,26 @@ class FakeServer::FakeInterface : public Interface {
         case Operation::Tag::CloseVmo:
           break;
       }
-      session.SendReply(request.request_id, request.trace_flow_id, zx::ok());
+      const BlockServer* server = server_.server_.get();
+      if (server) {
+        server->SendReply(request.request_id, zx::ok());
+      }
     }
   }
 
   const zx::vmo& vmo() const { return data_; }
 
  private:
+  const FakeServer& server_;
   zx::vmo data_;
   uint64_t block_size_;
 };
 
 FakeServer::FakeServer(const PartitionInfo& info, zx::vmo data) {
   uint64_t size;
-  interface_ = data ? std::make_unique<FakeInterface>(std::move(data),
+  interface_ = data ? std::make_unique<FakeInterface>(*this, std::move(data),
                                                       static_cast<uint64_t>(info.block_size))
-                    : std::make_unique<FakeInterface>(info.block_count,
+                    : std::make_unique<FakeInterface>(*this, info.block_count,
                                                       static_cast<uint64_t>(info.block_size));
   ZX_ASSERT(interface_->vmo().get_size(&size) == ZX_OK);
   server_ = std::make_unique<BlockServer>(info, interface_.get());

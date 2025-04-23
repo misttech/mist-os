@@ -23,6 +23,11 @@ constexpr uint64_t kBlockSize = 512;
 
 class TestInterface : public Interface {
  public:
+  explicit TestInterface(const block_server::PartitionInfo& info) { server_.emplace(info, this); }
+
+  block_server::BlockServer TakeServer() { return *std::move(server_); }
+
+  BlockServer& server() { return *server_; }
   int threads_running() const { return threads_running_; }
 
   void StartThread(Thread thread) override {
@@ -51,7 +56,7 @@ class TestInterface : public Interface {
     }).detach();
   }
 
-  void OnRequests(const Session& session, std::span<Request> requests) override {
+  void OnRequests(std::span<Request> requests) override {
     for (const Request& request : requests) {
       switch (request.operation.tag) {
         case Operation::Tag::Read:
@@ -73,11 +78,12 @@ class TestInterface : public Interface {
         default:
           ZX_PANIC("Unexpected operation");
       }
-      session.SendReply(request.request_id, request.trace_flow_id, zx::ok());
+      server_->SendReply(request.request_id, zx::ok());
     }
   }
 
  private:
+  std::optional<BlockServer> server_;
   std::atomic<int> threads_running_ = 0;
   std::unique_ptr<uint8_t[]> data_ = std::make_unique<uint8_t[]>(kBlockSize * kBlocks);
 };
@@ -87,19 +93,15 @@ TEST(BlockServer, Basic) {
   zx::result client_end = fidl::CreateEndpoints(&server_end);
   ASSERT_EQ(client_end.status_value(), ZX_OK);
 
-  TestInterface test_interface;
-  BlockServer block_server(
-      PartitionInfo{
-          .start_block = 0,
-          .block_count = kBlocks,
-          .block_size = kBlockSize,
-          .type_guid = {1, 2, 3, 4},
-          .instance_guid = {5, 6, 7, 8},
-          .name = "partition",
-      },
-      &test_interface);
-
-  block_server.Serve(std::move(server_end));
+  TestInterface test_interface(PartitionInfo{
+      .start_block = 0,
+      .block_count = kBlocks,
+      .block_size = kBlockSize,
+      .type_guid = {1, 2, 3, 4},
+      .instance_guid = {5, 6, 7, 8},
+      .name = "partition",
+  });
+  test_interface.server().Serve(std::move(server_end));
 
   auto client = block_client::RemoteBlockDevice::Create(*std::move(client_end));
   ASSERT_EQ(client.status_value(), ZX_OK);
@@ -139,28 +141,24 @@ TEST(BlockServer, Termination) {
   zx::result client_end = fidl::CreateEndpoints(&server_end);
   ASSERT_EQ(client_end.status_value(), ZX_OK);
 
-  TestInterface test_interface;
-
-  std::unique_ptr<block_client::RemoteBlockDevice> client;
+  TestInterface test_interface(PartitionInfo{
+                                   .start_block = 0,
+                                   .block_count = kBlocks,
+                                   .block_size = kBlockSize,
+                                   .type_guid = {1, 2, 3, 4},
+                                   .instance_guid = {5, 6, 7, 8},
+                                   .name = "partition",
+                               }, );
+  test_interface.server().Serve(std::move(server_end));
 
   {
-    BlockServer block_server(
-        PartitionInfo{
-            .start_block = 0,
-            .block_count = kBlocks,
-            .block_size = kBlockSize,
-            .type_guid = {1, 2, 3, 4},
-            .instance_guid = {5, 6, 7, 8},
-            .name = "partition",
-        },
-        &test_interface);
-
-    block_server.Serve(std::move(server_end));
-
+    std::unique_ptr<block_client::RemoteBlockDevice> client;
     auto client_result = block_client::RemoteBlockDevice::Create(*std::move(client_end));
     ASSERT_EQ(client_result.status_value(), ZX_OK);
     client = *std::move(client_result);
   }
+
+  test_interface.TakeServer();
 
   EXPECT_EQ(test_interface.threads_running(), 0);
 }
@@ -170,29 +168,25 @@ TEST(BlockServer, AsyncTermination) {
   zx::result client_end = fidl::CreateEndpoints(&server_end);
   ASSERT_EQ(client_end.status_value(), ZX_OK);
 
-  TestInterface test_interface;
-
   std::unique_ptr<block_client::RemoteBlockDevice> client;
 
-  BlockServer block_server(
-      PartitionInfo{
-          .start_block = 0,
-          .block_count = kBlocks,
-          .block_size = kBlockSize,
-          .type_guid = {1, 2, 3, 4},
-          .instance_guid = {5, 6, 7, 8},
-          .name = "partition",
-      },
-      &test_interface);
+  TestInterface test_interface(PartitionInfo{
+      .start_block = 0,
+      .block_count = kBlocks,
+      .block_size = kBlockSize,
+      .type_guid = {1, 2, 3, 4},
+      .instance_guid = {5, 6, 7, 8},
+      .name = "partition",
+  });
 
-  block_server.Serve(std::move(server_end));
+  test_interface.server().Serve(std::move(server_end));
 
   auto client_result = block_client::RemoteBlockDevice::Create(*std::move(client_end));
   ASSERT_EQ(client_result.status_value(), ZX_OK);
   client = *std::move(client_result);
 
   sync_completion_t completion;
-  std::move(block_server).DestroyAsync([&] {
+  test_interface.TakeServer().DestroyAsync([&] {
     EXPECT_EQ(test_interface.threads_running(), 0);
     sync_completion_signal(&completion);
   });
@@ -203,6 +197,8 @@ TEST(BlockServer, AsyncTermination) {
 TEST(BlockServer, FailedOnNewSession) {
   class TestInterfaceWithFailedOnNewSession : public TestInterface {
    public:
+    explicit TestInterfaceWithFailedOnNewSession(const block_server::PartitionInfo info)
+        : TestInterface(info) {}
     void OnNewSession(Session session) override {
       // Do nothing.
     }
@@ -212,28 +208,23 @@ TEST(BlockServer, FailedOnNewSession) {
   zx::result client_end = fidl::CreateEndpoints(&server_end);
   ASSERT_EQ(client_end.status_value(), ZX_OK);
 
-  TestInterfaceWithFailedOnNewSession test_interface;
+  TestInterfaceWithFailedOnNewSession test_interface(PartitionInfo{
+                                                         .start_block = 0,
+                                                         .block_count = kBlocks,
+                                                         .block_size = kBlockSize,
+                                                         .type_guid = {1, 2, 3, 4},
+                                                         .instance_guid = {5, 6, 7, 8},
+                                                         .name = "partition",
+                                                     }, );
 
   std::unique_ptr<block_client::RemoteBlockDevice> client;
 
-  {
-    BlockServer block_server(
-        PartitionInfo{
-            .start_block = 0,
-            .block_count = kBlocks,
-            .block_size = kBlockSize,
-            .type_guid = {1, 2, 3, 4},
-            .instance_guid = {5, 6, 7, 8},
-            .name = "partition",
-        },
-        &test_interface);
+  test_interface.server().Serve(std::move(server_end));
 
-    block_server.Serve(std::move(server_end));
+  auto client_result = block_client::RemoteBlockDevice::Create(*std::move(client_end));
+  EXPECT_EQ(client_result.status_value(), ZX_ERR_PEER_CLOSED);
 
-    auto client_result = block_client::RemoteBlockDevice::Create(*std::move(client_end));
-    EXPECT_EQ(client_result.status_value(), ZX_ERR_PEER_CLOSED);
-  }
-
+  test_interface.TakeServer();
   EXPECT_EQ(test_interface.threads_running(), 0);
 }
 
@@ -242,19 +233,16 @@ TEST(BlockServer, FullFifo) {
   zx::result client_end = fidl::CreateEndpoints(&server_end);
   ASSERT_EQ(client_end.status_value(), ZX_OK);
 
-  TestInterface test_interface;
-  BlockServer block_server(
-      PartitionInfo{
-          .start_block = 0,
-          .block_count = kBlocks,
-          .block_size = kBlockSize,
-          .type_guid = {1, 2, 3, 4},
-          .instance_guid = {5, 6, 7, 8},
-          .name = "partition",
-      },
-      &test_interface);
+  TestInterface test_interface(PartitionInfo{
+      .start_block = 0,
+      .block_count = kBlocks,
+      .block_size = kBlockSize,
+      .type_guid = {1, 2, 3, 4},
+      .instance_guid = {5, 6, 7, 8},
+      .name = "partition",
+  });
 
-  block_server.Serve(std::move(server_end));
+  test_interface.server().Serve(std::move(server_end));
 
   auto [session, server] = fidl::Endpoints<fuchsia_hardware_block::Session>::Create();
   ASSERT_TRUE(fidl::WireCall(*client_end)->OpenSession(std::move(server)).ok());
@@ -310,19 +298,16 @@ TEST(BlockServer, Group) {
   zx::result client_end = fidl::CreateEndpoints(&server_end);
   ASSERT_EQ(client_end.status_value(), ZX_OK);
 
-  TestInterface test_interface;
-  BlockServer block_server(
-      PartitionInfo{
-          .start_block = 0,
-          .block_count = kBlocks,
-          .block_size = kBlockSize,
-          .type_guid = {1, 2, 3, 4},
-          .instance_guid = {5, 6, 7, 8},
-          .name = "partition",
-      },
-      &test_interface);
+  TestInterface test_interface(PartitionInfo{
+      .start_block = 0,
+      .block_count = kBlocks,
+      .block_size = kBlockSize,
+      .type_guid = {1, 2, 3, 4},
+      .instance_guid = {5, 6, 7, 8},
+      .name = "partition",
+  });
 
-  block_server.Serve(std::move(server_end));
+  test_interface.server().Serve(std::move(server_end));
 
   auto [session, server] = fidl::Endpoints<fuchsia_hardware_block::Session>::Create();
   ASSERT_TRUE(fidl::WireCall(*client_end)->OpenSession(std::move(server)).ok());

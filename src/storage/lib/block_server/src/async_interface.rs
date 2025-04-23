@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{DecodedRequest, DeviceInfo, IntoSessionManager, OffsetMap, Operation, SessionHelper};
+use super::{
+    DecodedRequest, DeviceInfo, IntoSessionManager, OffsetMap, Operation, SessionHelper,
+    FIFO_MAX_REQUESTS,
+};
 use anyhow::Error;
 use block_protocol::{BlockFifoRequest, BlockFifoResponse, WriteOptions};
 use futures::future::Fuse;
@@ -19,8 +22,6 @@ use {
     fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
     fuchsia_async as fasync,
 };
-
-pub(crate) const FIFO_MAX_REQUESTS: usize = 64;
 
 pub trait Interface: Send + Sync + Unpin + 'static {
     /// Runs `stream` to completion.

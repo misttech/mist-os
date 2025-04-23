@@ -166,8 +166,7 @@ void Ramdisk::OnNewSession(block_server::Session session) {
   }
 }
 
-void Ramdisk::OnRequests(const block_server::Session& session,
-                         cpp20::span<block_server::Request> requests) TA_NO_THREAD_SAFETY_ANALYSIS {
+void Ramdisk::OnRequests(cpp20::span<block_server::Request> requests) TA_NO_THREAD_SAFETY_ANALYSIS {
   for (const auto& request : requests) {
     zx_status_t status = ZX_OK;
 
@@ -227,13 +226,12 @@ void Ramdisk::OnRequests(const block_server::Session& session,
         }
       } break;
       case block_server::Operation::Tag::Trim:
-        session.SendReply(request.request_id, request.trace_flow_id,
-                          zx::error(ZX_ERR_NOT_SUPPORTED));
+        block_server_.SendReply(request.request_id, zx::error(ZX_ERR_NOT_SUPPORTED));
         break;
       case block_server::Operation::Tag::CloseVmo:
         ZX_PANIC("Unexpected operation");
     }
-    session.SendReply(request.request_id, request.trace_flow_id, zx::make_result(status));
+    block_server_.SendReply(request.request_id, zx::make_result(status));
   }
 }
 

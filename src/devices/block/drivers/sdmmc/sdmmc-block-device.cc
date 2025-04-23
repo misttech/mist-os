@@ -1213,8 +1213,7 @@ const inspect::Inspector& SdmmcBlockDevice::inspect() const {
 
 fdf::Logger& SdmmcBlockDevice::logger() const { return parent_->logger(); }
 
-void SdmmcBlockDevice::OnRequests(const block_server::Session& session,
-                                  const PartitionDevice& partition,
+void SdmmcBlockDevice::OnRequests(PartitionDevice& partition,
                                   cpp20::span<block_server::Request> requests) {
   fbl::AutoLock lock(&worker_lock_);
   while (power_suspended_ && !shutdown_)
@@ -1224,11 +1223,10 @@ void SdmmcBlockDevice::OnRequests(const block_server::Session& session,
 
   class Packer {
    public:
-    Packer(SdmmcBlockDevice* device, EmmcPartition partition, const block_server::Session* session,
-           size_t max_requests, int max_bytes, uint32_t block_size)
+    Packer(SdmmcBlockDevice* device, PartitionDevice& partition, size_t max_requests, int max_bytes,
+           uint32_t block_size)
         : device_(*device),
           partition_(partition),
-          session_(*session),
           max_requests_(max_requests),
           max_bytes_(max_bytes),
           block_size_(block_size) {}
@@ -1280,11 +1278,12 @@ void SdmmcBlockDevice::OnRequests(const block_server::Session& session,
     zx::result<> Flush(bool split_last = false) TA_NO_THREAD_SAFETY_ANALYSIS {
       if (requests_.empty())
         return zx::ok();
-      zx::result<> result = zx::make_result(device_.ReadWriteWithRetries(requests_, partition_));
+      zx::result<> result =
+          zx::make_result(device_.ReadWriteWithRetries(requests_, partition_.partition()));
       if (split_last && result.is_ok())
         requests_.pop_back();
       for (const block_server::Request& request : requests_) {
-        session_.SendReply(request.request_id, request.trace_flow_id, result);
+        partition_.SendReply(request.request_id, result);
       }
       requests_.clear();
       total_bytes_ = 0;
@@ -1293,8 +1292,7 @@ void SdmmcBlockDevice::OnRequests(const block_server::Session& session,
 
    private:
     SdmmcBlockDevice& device_;
-    const EmmcPartition partition_;
-    const block_server::Session& session_;
+    PartitionDevice& partition_;
     const size_t max_requests_;
     const uint64_t max_bytes_;
     uint32_t block_size_;
@@ -1306,9 +1304,9 @@ void SdmmcBlockDevice::OnRequests(const block_server::Session& session,
   EmmcPartition part = partition.partition();
   size_t max_reads = part == USER_DATA_PARTITION ? max_packed_reads_effective_ : 1;
   size_t max_writes = part == USER_DATA_PARTITION ? max_packed_writes_effective_ : 1;
-  Packer read_packer(this, part, &session, max_reads, block_info_.max_transfer_size,
+  Packer read_packer(this, partition, max_reads, block_info_.max_transfer_size,
                      block_info_.block_size);
-  Packer write_packer(this, part, &session, max_writes, block_info_.max_transfer_size,
+  Packer write_packer(this, partition, max_writes, block_info_.max_transfer_size,
                       block_info_.block_size);
 
   [[maybe_unused]] zx::result<> unused_result;
@@ -1318,7 +1316,7 @@ void SdmmcBlockDevice::OnRequests(const block_server::Session& session,
             block_server::CheckIoRange(request, partition.block_info().block_count);
         status != ZX_OK) {
       FDF_LOGL(WARNING, logger(), "Invalid request range.");
-      session.SendReply(request.request_id, request.trace_flow_id, zx::make_result(status));
+      partition.SendReply(request.request_id, zx::make_result(status));
       continue;
     }
     switch (request.operation.tag) {
@@ -1339,7 +1337,7 @@ void SdmmcBlockDevice::OnRequests(const block_server::Session& session,
 
         status = Flush();
 
-        session.SendReply(request.request_id, request.trace_flow_id, zx::make_result(status));
+        partition.SendReply(request.request_id, zx::make_result(status));
 
         TRACE_DURATION_END("sdmmc", "flush", "opcode",
                            TA_INT32(static_cast<int32_t>(request.operation.tag)), "txn_status",
@@ -1355,7 +1353,7 @@ void SdmmcBlockDevice::OnRequests(const block_server::Session& session,
                 .offset_dev = request.operation.trim.device_block_offset,
             },
             partition.partition());
-        session.SendReply(request.request_id, request.trace_flow_id, zx::make_result(status));
+        partition.SendReply(request.request_id, zx::make_result(status));
 
         TRACE_DURATION_END(
             "sdmmc", "trim", "opcode", TA_INT32(static_cast<int32_t>(request.operation.tag)),

@@ -44,8 +44,6 @@ class WriteOptions {
 namespace block_server {
 namespace internal {
 
-constexpr static const uintptr_t MAX_REQUESTS = 64;
-
 struct Session;
 
 struct PartitionInfo {
@@ -110,8 +108,7 @@ struct Callbacks {
   void *context;
   void (*start_thread)(void *context, const void *arg);
   void (*on_new_session)(void *context, const Session *session);
-  void (*on_requests)(void *context, const Session *session, Request *requests,
-                      uintptr_t request_count);
+  void (*on_requests)(void *context, Request *requests, uintptr_t request_count);
   void (*log)(void *context, const char *message, uintptr_t message_len);
 };
 
@@ -166,8 +163,8 @@ void block_server_session_release(const Session *session);
 
 /// # Safety
 ///
-/// `session` must be valid.
-void block_server_send_reply(const Session *session, RequestId request_id, uint64_t trace_flow_id,
+/// `block_server` must be valid.
+void block_server_send_reply(const BlockServer *block_server, RequestId request_id,
                              zx_status_t status);
 
 }  // extern "C"

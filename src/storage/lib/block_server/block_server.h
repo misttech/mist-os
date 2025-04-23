@@ -34,8 +34,6 @@ class Session {
   // Runs the session (blocking).
   void Run();
 
-  void SendReply(RequestId, TraceFlowId, zx::result<>) const;
-
  private:
   friend class BlockServer;
 
@@ -79,8 +77,10 @@ class Interface {
   virtual void OnNewSession(Session) = 0;
 
   // Called when new requests arrive.  It is OK for this method to block so as to cause push back on
-  // the fifo (which is recommended for effective flow control).
-  virtual void OnRequests(const Session&, std::span<Request>) = 0;
+  // the fifo (which is recommended for effective flow control).  Each request must eventually be
+  // completed by calling BlockServer::SendReply; failure to do so will result in resource leaks
+  // until the block server terminates.
+  virtual void OnRequests(std::span<Request>) = 0;
 
   // Called for log messages.
   virtual void Log(std::string_view msg) const {}
@@ -125,6 +125,8 @@ class BlockServer {
 
   // Serves a new connection.  The FIDL handling is multiplexed onto a single per-server thread.
   void Serve(fidl::ServerEnd<fuchsia_hardware_block_volume::Volume>);
+
+  void SendReply(RequestId, zx::result<>) const;
 
  private:
   Interface* interface_ = nullptr;

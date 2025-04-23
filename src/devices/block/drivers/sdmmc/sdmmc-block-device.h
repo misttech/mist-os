@@ -140,8 +140,7 @@ class SdmmcBlockDevice {
   fidl::WireSyncClient<fuchsia_driver_framework::Node>& block_node() { return block_node_; }
   std::string_view block_name() const { return block_name_; }
   SdmmcRootDevice* parent() { return parent_; }
-  void OnRequests(const block_server::Session& session, const PartitionDevice& partition,
-                  cpp20::span<block_server::Request> requests);
+  void OnRequests(PartitionDevice& partition, cpp20::span<block_server::Request> requests);
 
   // Visible for testing.
   void SetBlockInfo(uint32_t block_size, uint64_t block_count);

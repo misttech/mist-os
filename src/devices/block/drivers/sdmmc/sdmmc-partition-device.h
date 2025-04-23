@@ -49,12 +49,14 @@ class PartitionDevice : public ddk::BlockImplProtocol<PartitionDevice>,
 
   fdf::Logger& logger() const;
 
+  void SendReply(block_server::RequestId, zx::result<>);
+
   void StopBlockServer();
 
   // block_server::Interface
   void StartThread(block_server::Thread) override;
   void OnNewSession(block_server::Session) override;
-  void OnRequests(const block_server::Session&, cpp20::span<block_server::Request>) override;
+  void OnRequests(cpp20::span<block_server::Request>) override;
   void Log(std::string_view msg) const override {
     FDF_LOGL(INFO, logger(), "%.*s", static_cast<int>(msg.size()), msg.data());
   }
