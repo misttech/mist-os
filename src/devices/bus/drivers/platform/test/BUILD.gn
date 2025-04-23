@@ -122,7 +122,6 @@ driver_bind_rules("test-power-bind") {
 }
 
 fuchsia_cc_driver("test-power-driver") {
-  legacy = true
   testonly = true
   output_name = "test-power"
   configs += [ "//build/config:all_source" ]
@@ -131,10 +130,8 @@ fuchsia_cc_driver("test-power-driver") {
     ":test-power-bind",
     "//sdk/banjo/fuchsia.hardware.powerimpl:fuchsia.hardware.powerimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]

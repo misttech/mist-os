@@ -4,34 +4,27 @@
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <zircon/errors.h>
 
 #include <memory>
 
-#include <ddktl/device.h>
-
-#define DRIVER_NAME "test-power"
-
 namespace power {
 
-class TestPowerDevice;
-using DeviceType = ddk::Device<TestPowerDevice>;
-
-class TestPowerDevice : public DeviceType,
-                        public ddk::PowerImplProtocol<TestPowerDevice, ddk::base_protocol> {
+class TestPowerDriver : public fdf::DriverBase, public ddk::PowerImplProtocol<TestPowerDriver> {
  public:
-  static zx_status_t Create(zx_device_t* parent);
+  static constexpr std::string_view kChildNodeName = "test-power";
+  static constexpr std::string_view kDriverName = "test-power";
 
-  explicit TestPowerDevice(zx_device_t* parent) : DeviceType(parent) {}
+  TestPowerDriver(fdf::DriverStartArgs start_args,
+                  fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
 
-  zx_status_t Create(std::unique_ptr<TestPowerDevice>* out);
-
-  // Methods required by the ddk mixins
-  void DdkRelease();
+  // fdf::DriverBase implementation.
+  zx::result<> Start() override;
 
   zx_status_t PowerImplEnablePowerDomain(uint32_t index);
   zx_status_t PowerImplDisablePowerDomain(uint32_t index);
@@ -55,58 +48,57 @@ class TestPowerDevice : public DeviceType,
   uint32_t max_voltage_[4] = {1000, 1000, 1000, 1000};
   uint32_t cur_voltage_[4] = {0, 0, 0, 0};
   bool enabled_[4] = {false, false, false, false};
+
+  compat::SyncInitializedDeviceServer compat_server_;
+  fidl::ClientEnd<fuchsia_driver_framework::NodeController> child_;
+  compat::BanjoServer banjo_server_{ZX_PROTOCOL_POWER_IMPL, this, &power_impl_protocol_ops_};
 };
 
-zx_status_t TestPowerDevice::Create(zx_device_t* parent) {
-  auto dev = std::make_unique<TestPowerDevice>(parent);
-  zx_status_t status;
-
-  zxlogf(INFO, "TestPowerDevice::Create: %s ", DRIVER_NAME);
-
-  zx::result pdev =
-      dev->DdkConnectFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(parent);
-  if (pdev.is_error()) {
-    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev.status_string());
-    return pdev.status_value();
+zx::result<> TestPowerDriver::Start() {
+  compat::DeviceServer::BanjoConfig banjo_config{.default_proto_id = ZX_PROTOCOL_POWER_IMPL};
+  banjo_config.callbacks[ZX_PROTOCOL_POWER_IMPL] = banjo_server_.callback();
+  zx::result<> result = compat_server_.Initialize(
+      incoming(), outgoing(), node_name(), kChildNodeName,
+      compat::ForwardMetadata::Some({DEVICE_METADATA_POWER_DOMAINS}), std::move(banjo_config));
+  if (result.is_error()) {
+    fdf::error("Failed to initialize compat server: {}", result);
+    return result.take_error();
   }
 
-  status = dev->DdkAdd(ddk::DeviceAddArgs("test-power")
-                           .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
-                           .forward_metadata(parent, DEVICE_METADATA_POWER_DOMAINS));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: DdkAdd failed: %d", __func__, status);
-    return status;
+  std::vector offers = compat_server_.CreateOffers2();
+  zx::result child =
+      AddChild(kChildNodeName, std::vector<fuchsia_driver_framework::NodeProperty2>{}, offers);
+  if (child.is_error()) {
+    fdf::error("Failed to create child: {}", child);
+    return child.take_error();
   }
-  // devmgr is now in charge of dev.
-  [[maybe_unused]] auto ptr = dev.release();
+  child_ = std::move(child.value());
 
-  return ZX_OK;
+  return zx::ok();
 }
 
-void TestPowerDevice::DdkRelease() { delete this; }
-
-zx_status_t TestPowerDevice::PowerImplEnablePowerDomain(uint32_t index) {
+zx_status_t TestPowerDriver::PowerImplEnablePowerDomain(uint32_t index) {
   if (index >= 4) {
     return ZX_ERR_INVALID_ARGS;
   }
   enabled_[index] = true;
-  zxlogf(INFO, "%s: Enabling power domain for index:%d", __func__, index);
+  fdf::info("Enabling power domain for index {}", index);
   return ZX_OK;
 }
 
-zx_status_t TestPowerDevice::PowerImplDisablePowerDomain(uint32_t index) {
+zx_status_t TestPowerDriver::PowerImplDisablePowerDomain(uint32_t index) {
   if (index >= 4) {
     return ZX_ERR_INVALID_ARGS;
   }
   if (!enabled_[index]) {
-    zxlogf(ERROR, "%s: Power domain is not enabled: index:%d", __func__, index);
+    fdf::error("Power domain is not enabled for index {}", index);
     return ZX_ERR_UNAVAILABLE;
   }
   enabled_[index] = false;
   return ZX_OK;
 }
 
-zx_status_t TestPowerDevice::PowerImplGetPowerDomainStatus(uint32_t index,
+zx_status_t TestPowerDriver::PowerImplGetPowerDomainStatus(uint32_t index,
                                                            power_domain_status_t* out_status) {
   if (index >= 4) {
     return ZX_ERR_INVALID_ARGS;
@@ -118,7 +110,7 @@ zx_status_t TestPowerDevice::PowerImplGetPowerDomainStatus(uint32_t index,
   return ZX_OK;
 }
 
-zx_status_t TestPowerDevice::PowerImplGetSupportedVoltageRange(uint32_t index,
+zx_status_t TestPowerDriver::PowerImplGetSupportedVoltageRange(uint32_t index,
                                                                uint32_t* min_voltage,
                                                                uint32_t* max_voltage) {
   if (index >= 4) {
@@ -129,7 +121,7 @@ zx_status_t TestPowerDevice::PowerImplGetSupportedVoltageRange(uint32_t index,
   return ZX_OK;
 }
 
-zx_status_t TestPowerDevice::PowerImplRequestVoltage(uint32_t index, uint32_t voltage,
+zx_status_t TestPowerDriver::PowerImplRequestVoltage(uint32_t index, uint32_t voltage,
                                                      uint32_t* actual_voltage) {
   if (index >= 4) {
     return ZX_ERR_INVALID_ARGS;
@@ -142,7 +134,7 @@ zx_status_t TestPowerDevice::PowerImplRequestVoltage(uint32_t index, uint32_t vo
   return ZX_ERR_INVALID_ARGS;
 }
 
-zx_status_t TestPowerDevice::PowerImplGetCurrentVoltage(uint32_t index, uint32_t* current_voltage) {
+zx_status_t TestPowerDriver::PowerImplGetCurrentVoltage(uint32_t index, uint32_t* current_voltage) {
   if (index >= 4) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -150,7 +142,7 @@ zx_status_t TestPowerDevice::PowerImplGetCurrentVoltage(uint32_t index, uint32_t
   return ZX_OK;
 }
 
-zx_status_t TestPowerDevice::PowerImplWritePmicCtrlReg(uint32_t index, uint32_t addr,
+zx_status_t TestPowerDriver::PowerImplWritePmicCtrlReg(uint32_t index, uint32_t addr,
                                                        uint32_t value) {
   // Save most recent write for read.
   last_index_ = index;
@@ -160,7 +152,7 @@ zx_status_t TestPowerDevice::PowerImplWritePmicCtrlReg(uint32_t index, uint32_t 
   return ZX_OK;
 }
 
-zx_status_t TestPowerDevice::PowerImplReadPmicCtrlReg(uint32_t index, uint32_t addr,
+zx_status_t TestPowerDriver::PowerImplReadPmicCtrlReg(uint32_t index, uint32_t addr,
                                                       uint32_t* value) {
   if (index == last_index_ && addr == last_addr_) {
     *value = last_value_;
@@ -169,17 +161,6 @@ zx_status_t TestPowerDevice::PowerImplReadPmicCtrlReg(uint32_t index, uint32_t a
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t test_power_bind(void* ctx, zx_device_t* parent) {
-  return TestPowerDevice::Create(parent);
-}
-
-constexpr zx_driver_ops_t driver_ops = []() {
-  zx_driver_ops_t driver_ops = {};
-  driver_ops.version = DRIVER_OPS_VERSION;
-  driver_ops.bind = test_power_bind;
-  return driver_ops;
-}();
-
 }  // namespace power
 
-ZIRCON_DRIVER(test_power, power::driver_ops, "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT(power::TestPowerDriver);
