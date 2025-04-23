@@ -215,27 +215,21 @@ class VmCowPages final : public VmHierarchyBase,
   // This should only be used to report to user mode whether a VMO is user-pager backed, not for any
   // other purpose.
   bool is_root_source_user_pager_backed() const {
-    canary_.Assert();
     return !!(options_ & VmCowPagesOptions::kUserPagerBackedRoot);
   }
 
   // Returns whether the root of the cow pages hierarchy has non-null page_source_.
-  bool root_has_page_source() const {
-    canary_.Assert();
-    return !!(options_ & VmCowPagesOptions::kPageSourceRoot);
-  }
+  bool root_has_page_source() const { return !!(options_ & VmCowPagesOptions::kPageSourceRoot); }
 
   // Helper function for CowPage cloning methods. Returns any options that should be passed down to
   // the child.
   VmCowPagesOptions inheritable_options() const {
-    canary_.Assert();
     return VmCowPagesOptions::kNone | (options_ & (VmCowPagesOptions::kUserPagerBackedRoot |
                                                    VmCowPagesOptions::kPreservingPageContentRoot |
                                                    VmCowPagesOptions::kPageSourceRoot));
   }
 
   bool is_root_source_preserving_page_content() const {
-    canary_.Assert();
     return !!(options_ & VmCowPagesOptions::kPreservingPageContentRoot);
   }
 
@@ -244,7 +238,6 @@ class VmCowPages final : public VmHierarchyBase,
   bool is_discardable() const { return !!discardable_tracker_; }
 
   bool can_evict() const {
-    canary_.Assert();
     return page_source_ && page_source_->properties().is_preserving_page_content;
   }
 
@@ -324,7 +317,6 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Returns whether this cow pages node is dirty tracked.
   bool is_dirty_tracked() const {
-    canary_.Assert();
     // Pager-backed VMOs require dirty tracking either if they are directly backed by the pager,
     // i.e. the root VMO.
     return page_source_ && page_source_->properties().is_preserving_page_content;
