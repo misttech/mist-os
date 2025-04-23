@@ -21,8 +21,8 @@
 )]
 #![forbid(unsafe_op_in_unsafe_fn)]
 
-mod buffer;
 mod client;
+mod decoded;
 mod endpoint;
 mod error;
 #[cfg(feature = "fuchsia")]
@@ -31,8 +31,8 @@ mod protocol;
 mod server;
 mod service;
 
-pub use self::buffer::*;
 pub use self::client::*;
+pub use self::decoded::*;
 pub use self::endpoint::*;
 pub use self::error::*;
 pub use self::protocol::*;

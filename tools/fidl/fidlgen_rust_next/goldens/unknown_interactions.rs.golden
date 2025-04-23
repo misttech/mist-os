@@ -4366,30 +4366,21 @@ pub trait UnknownInteractionsAjarProtocolClientHandler<___T: ::fidl_next::Transp
         &mut self,
         sender: &::fidl_next::ClientSender<___T, UnknownInteractionsAjarProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<
-            ___T,
-            unknown_interactions_ajar_protocol::StrictEventFields,
-        >,
+        event: ::fidl_next::Response<___T, unknown_interactions_ajar_protocol::StrictEventFields>,
     );
 
     fn strict_event_union(
         &mut self,
         sender: &::fidl_next::ClientSender<___T, UnknownInteractionsAjarProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<
-            ___T,
-            unknown_interactions_ajar_protocol::StrictEventUnion,
-        >,
+        event: ::fidl_next::Response<___T, unknown_interactions_ajar_protocol::StrictEventUnion>,
     );
 
     fn strict_event_table(
         &mut self,
         sender: &::fidl_next::ClientSender<___T, UnknownInteractionsAjarProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<
-            ___T,
-            unknown_interactions_ajar_protocol::StrictEventTable,
-        >,
+        event: ::fidl_next::Response<___T, unknown_interactions_ajar_protocol::StrictEventTable>,
     );
 
     fn flexible_event(
@@ -4401,30 +4392,21 @@ pub trait UnknownInteractionsAjarProtocolClientHandler<___T: ::fidl_next::Transp
         &mut self,
         sender: &::fidl_next::ClientSender<___T, UnknownInteractionsAjarProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<
-            ___T,
-            unknown_interactions_ajar_protocol::FlexibleEventFields,
-        >,
+        event: ::fidl_next::Response<___T, unknown_interactions_ajar_protocol::FlexibleEventFields>,
     );
 
     fn flexible_event_union(
         &mut self,
         sender: &::fidl_next::ClientSender<___T, UnknownInteractionsAjarProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<
-            ___T,
-            unknown_interactions_ajar_protocol::FlexibleEventUnion,
-        >,
+        event: ::fidl_next::Response<___T, unknown_interactions_ajar_protocol::FlexibleEventUnion>,
     );
 
     fn flexible_event_table(
         &mut self,
         sender: &::fidl_next::ClientSender<___T, UnknownInteractionsAjarProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<
-            ___T,
-            unknown_interactions_ajar_protocol::FlexibleEventTable,
-        >,
+        event: ::fidl_next::Response<___T, unknown_interactions_ajar_protocol::FlexibleEventTable>,
     );
 
     fn on_unknown_interaction(
@@ -4491,39 +4473,51 @@ where
                 handler.strict_event(sender);
             }
 
-            5838220329633564521 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.strict_event_fields(sender, buffer);
-            }
+            5838220329633564521 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.strict_event_fields(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
-            6303151946645602671 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.strict_event_union(sender, buffer);
-            }
+            6303151946645602671 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.strict_event_union(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
-            659277224687564957 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.strict_event_table(sender, buffer);
-            }
+            659277224687564957 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.strict_event_table(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
             1281760452005010931 => {
                 handler.flexible_event(sender);
             }
 
-            4298964238728681570 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.flexible_event_fields(sender, buffer);
-            }
+            4298964238728681570 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.flexible_event_fields(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
-            8950943792372972717 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.flexible_event_union(sender, buffer);
-            }
+            8950943792372972717 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.flexible_event_union(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
-            705539350563403440 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.flexible_event_table(sender, buffer);
-            }
+            705539350563403440 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.flexible_event_table(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
             ordinal => handler.on_unknown_interaction(sender, ordinal),
         }
@@ -8660,30 +8654,21 @@ pub trait UnknownInteractionsClosedProtocolClientHandler<___T: ::fidl_next::Tran
         &mut self,
         sender: &::fidl_next::ClientSender<___T, UnknownInteractionsClosedProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<
-            ___T,
-            unknown_interactions_closed_protocol::StrictEventFields,
-        >,
+        event: ::fidl_next::Response<___T, unknown_interactions_closed_protocol::StrictEventFields>,
     );
 
     fn strict_event_union(
         &mut self,
         sender: &::fidl_next::ClientSender<___T, UnknownInteractionsClosedProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<
-            ___T,
-            unknown_interactions_closed_protocol::StrictEventUnion,
-        >,
+        event: ::fidl_next::Response<___T, unknown_interactions_closed_protocol::StrictEventUnion>,
     );
 
     fn strict_event_table(
         &mut self,
         sender: &::fidl_next::ClientSender<___T, UnknownInteractionsClosedProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<
-            ___T,
-            unknown_interactions_closed_protocol::StrictEventTable,
-        >,
+        event: ::fidl_next::Response<___T, unknown_interactions_closed_protocol::StrictEventTable>,
     );
 }
 
@@ -8733,20 +8718,26 @@ where
                 handler.strict_event(sender);
             }
 
-            6736355582617074292 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.strict_event_fields(sender, buffer);
-            }
+            6736355582617074292 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.strict_event_fields(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
-            4288682345454280036 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.strict_event_union(sender, buffer);
-            }
+            4288682345454280036 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.strict_event_union(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
-            2871682464255309246 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.strict_event_table(sender, buffer);
-            }
+            2871682464255309246 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.strict_event_table(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
             ordinal => {
                 sender.close();
@@ -16281,24 +16272,21 @@ pub trait UnknownInteractionsProtocolClientHandler<___T: ::fidl_next::Transport>
         &mut self,
         sender: &::fidl_next::ClientSender<___T, UnknownInteractionsProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<
-            ___T,
-            unknown_interactions_protocol::StrictEventFields,
-        >,
+        event: ::fidl_next::Response<___T, unknown_interactions_protocol::StrictEventFields>,
     );
 
     fn strict_event_union(
         &mut self,
         sender: &::fidl_next::ClientSender<___T, UnknownInteractionsProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<___T, unknown_interactions_protocol::StrictEventUnion>,
+        event: ::fidl_next::Response<___T, unknown_interactions_protocol::StrictEventUnion>,
     );
 
     fn strict_event_table(
         &mut self,
         sender: &::fidl_next::ClientSender<___T, UnknownInteractionsProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<___T, unknown_interactions_protocol::StrictEventTable>,
+        event: ::fidl_next::Response<___T, unknown_interactions_protocol::StrictEventTable>,
     );
 
     fn flexible_event(
@@ -16310,30 +16298,21 @@ pub trait UnknownInteractionsProtocolClientHandler<___T: ::fidl_next::Transport>
         &mut self,
         sender: &::fidl_next::ClientSender<___T, UnknownInteractionsProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<
-            ___T,
-            unknown_interactions_protocol::FlexibleEventFields,
-        >,
+        event: ::fidl_next::Response<___T, unknown_interactions_protocol::FlexibleEventFields>,
     );
 
     fn flexible_event_union(
         &mut self,
         sender: &::fidl_next::ClientSender<___T, UnknownInteractionsProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<
-            ___T,
-            unknown_interactions_protocol::FlexibleEventUnion,
-        >,
+        event: ::fidl_next::Response<___T, unknown_interactions_protocol::FlexibleEventUnion>,
     );
 
     fn flexible_event_table(
         &mut self,
         sender: &::fidl_next::ClientSender<___T, UnknownInteractionsProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<
-            ___T,
-            unknown_interactions_protocol::FlexibleEventTable,
-        >,
+        event: ::fidl_next::Response<___T, unknown_interactions_protocol::FlexibleEventTable>,
     );
 
     fn on_unknown_interaction(
@@ -16424,39 +16403,51 @@ where
                 handler.strict_event(sender);
             }
 
-            8896208255987935026 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.strict_event_fields(sender, buffer);
-            }
+            8896208255987935026 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.strict_event_fields(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
-            3919175221694221274 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.strict_event_union(sender, buffer);
-            }
+            3919175221694221274 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.strict_event_union(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
-            2711448698318579984 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.strict_event_table(sender, buffer);
-            }
+            2711448698318579984 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.strict_event_table(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
             7042257263728687206 => {
                 handler.flexible_event(sender);
             }
 
-            3613822014516746241 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.flexible_event_fields(sender, buffer);
-            }
+            3613822014516746241 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.flexible_event_fields(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
-            2499446536152409191 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.flexible_event_union(sender, buffer);
-            }
+            2499446536152409191 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.flexible_event_union(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
-            5724881371349617120 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.flexible_event_table(sender, buffer);
-            }
+            5724881371349617120 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.flexible_event_table(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
             ordinal => handler.on_unknown_interaction(sender, ordinal),
         }

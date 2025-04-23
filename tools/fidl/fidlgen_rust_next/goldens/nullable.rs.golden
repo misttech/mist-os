@@ -470,7 +470,7 @@ pub trait SimpleProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, SimpleProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, simple_protocol::Add>,
+        request: ::fidl_next::Request<___T, simple_protocol::Add>,
 
         responder: ::fidl_next::Responder<simple_protocol::Add>,
     );
@@ -508,8 +508,12 @@ where
             9142761280038437494 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.add(sender, buffer, responder);
+                match ::fidl_next::DecoderExt::decode(buffer) {
+                    Ok(decoded) => handler.add(sender, decoded, responder),
+                    Err(e) => {
+                        sender.close();
+                    }
+                }
             }
 
             ordinal => {

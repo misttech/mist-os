@@ -334,7 +334,7 @@ pub trait SuperServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, Super>,
 
-        request: ::fidl_next::RequestBuffer<___T, super_::Foo>,
+        request: ::fidl_next::Request<___T, super_::Foo>,
 
         responder: ::fidl_next::Responder<super_::Foo>,
     );
@@ -371,8 +371,12 @@ where
             7540745593380780216 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.foo(sender, buffer, responder);
+                match ::fidl_next::DecoderExt::decode(buffer) {
+                    Ok(decoded) => handler.foo(sender, decoded, responder),
+                    Err(e) => {
+                        sender.close();
+                    }
+                }
             }
 
             ordinal => {
@@ -494,7 +498,7 @@ pub trait SubServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, Sub>,
 
-        request: ::fidl_next::RequestBuffer<___T, sub::Foo>,
+        request: ::fidl_next::Request<___T, sub::Foo>,
 
         responder: ::fidl_next::Responder<sub::Foo>,
     );
@@ -531,8 +535,12 @@ where
             7540745593380780216 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.foo(sender, buffer, responder);
+                match ::fidl_next::DecoderExt::decode(buffer) {
+                    Ok(decoded) => handler.foo(sender, decoded, responder),
+                    Err(e) => {
+                        sender.close();
+                    }
+                }
             }
 
             ordinal => {

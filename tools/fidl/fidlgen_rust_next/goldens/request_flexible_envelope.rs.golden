@@ -1061,7 +1061,7 @@ pub trait ProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, Protocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, protocol::RequestStrictResponseFlexible>,
+        request: ::fidl_next::Request<___T, protocol::RequestStrictResponseFlexible>,
 
         responder: ::fidl_next::Responder<protocol::RequestStrictResponseFlexible>,
     );
@@ -1070,7 +1070,7 @@ pub trait ProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, Protocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, protocol::RequestFlexibleResponseStrict>,
+        request: ::fidl_next::Request<___T, protocol::RequestFlexibleResponseStrict>,
 
         responder: ::fidl_next::Responder<protocol::RequestFlexibleResponseStrict>,
     );
@@ -1111,15 +1111,27 @@ where
             700529454616207123 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.request_strict_response_flexible(sender, buffer, responder);
+                match ::fidl_next::DecoderExt::decode(buffer) {
+                    Ok(decoded) => {
+                        handler.request_strict_response_flexible(sender, decoded, responder)
+                    }
+                    Err(e) => {
+                        sender.close();
+                    }
+                }
             }
 
             5191655763393883319 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.request_flexible_response_strict(sender, buffer, responder);
+                match ::fidl_next::DecoderExt::decode(buffer) {
+                    Ok(decoded) => {
+                        handler.request_flexible_response_strict(sender, decoded, responder)
+                    }
+                    Err(e) => {
+                        sender.close();
+                    }
+                }
             }
 
             ordinal => {

@@ -7,9 +7,10 @@ use core::marker::PhantomData;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
+use fidl_next_codec::{Decode, DecoderExt as _};
 use fidl_next_protocol::{self as protocol, IgnoreEvents, ProtocolError, Transport};
 
-use super::{ClientEnd, Method, ResponseBuffer};
+use crate::{ClientEnd, Error, Method, Response};
 
 /// A strongly typed client sender.
 #[repr(transparent)]
@@ -149,13 +150,18 @@ impl<T, M> Future for ResponseFuture<'_, T, M>
 where
     T: Transport,
     M: Method,
+    M::Response: Decode<T::RecvBuffer>,
 {
-    type Output = Result<ResponseBuffer<T, M>, T::Error>;
+    type Output = Result<Response<T, M>, Error<T::Error>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // SAFETY: `self` is pinned, and `future` is a subfield of `self`, so `future` will not be
         // moved.
         let future = unsafe { self.map_unchecked_mut(|this| &mut this.future) };
-        future.poll(cx).map_ok(ResponseBuffer::from_untyped)
+        if let Poll::Ready(ready) = future.poll(cx).map_err(Error::Transport)? {
+            Poll::Ready(ready.decode().map_err(Error::Decode))
+        } else {
+            Poll::Pending
+        }
     }
 }

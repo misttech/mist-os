@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use fidl_next::{
-    Client, ClientEnd, ClientSender, Flexible, FlexibleResult, RequestBuffer, Responder,
-    ResponseBuffer, Server, ServerEnd, ServerSender, Transport,
+    Client, ClientEnd, ClientSender, Flexible, FlexibleResult, Request, Responder, Response,
+    Server, ServerEnd, ServerSender, Transport,
 };
 use fidl_next_examples_calculator::calculator::prelude::*;
 use fuchsia_async::{Scope, Task};
@@ -15,10 +15,9 @@ impl<T: Transport> CalculatorClientHandler<T> for MyCalculatorClient {
     fn on_error(
         &mut self,
         sender: &ClientSender<T, Calculator>,
-        response: ResponseBuffer<T, calculator::OnError>,
+        response: Response<T, calculator::OnError>,
     ) {
-        let message = response.decode().unwrap();
-        assert_eq!(message.status_code, 100);
+        assert_eq!(response.status_code, 100);
 
         println!("Client received an error event, closing connection");
         sender.close();
@@ -33,10 +32,9 @@ impl<T: Transport + 'static> CalculatorServerHandler<T> for MyCalculatorServer {
     fn add(
         &mut self,
         sender: &ServerSender<T, Calculator>,
-        buffer: RequestBuffer<T, calculator::Add>,
+        request: Request<T, calculator::Add>,
         responder: Responder<calculator::Add>,
     ) {
-        let Ok(request) = buffer.decode() else { return sender.close() };
         println!("{} + {} = {}", request.a, request.b, request.a + request.b);
         let mut response = Flexible::Ok(CalculatorAddResponse { sum: request.a + request.b });
 
@@ -51,10 +49,9 @@ impl<T: Transport + 'static> CalculatorServerHandler<T> for MyCalculatorServer {
     fn divide(
         &mut self,
         sender: &ServerSender<T, Calculator>,
-        buffer: RequestBuffer<T, calculator::Divide>,
+        request: Request<T, calculator::Divide>,
         responder: Responder<calculator::Divide>,
     ) {
-        let Ok(request) = buffer.decode() else { return sender.close() };
         let mut response = if request.divisor != 0 {
             println!(
                 "{} / {} = {} rem {}",
@@ -141,9 +138,7 @@ async fn add(client_sender: &ClientSender<Endpoint, Calculator>) {
         .add(&mut CalculatorAddRequest { a: 16, b: 26 })
         .expect("failed to encode add request")
         .await
-        .expect("failed to send add request or receive add response")
-        .decode()
-        .expect("failed to decode add response");
+        .expect("failed to send, receive, or decode response to add request");
     let response = result.ok().expect("add request failed with an error");
 
     assert_eq!(response.sum, 42);
@@ -155,9 +150,7 @@ async fn divide(client_sender: &ClientSender<Endpoint, Calculator>) {
         .divide(&mut CalculatorDivideRequest { dividend: 100, divisor: 3 })
         .expect("failed to encode divide request")
         .await
-        .expect("failed to send divide request or receive divide response")
-        .decode()
-        .expect("failed to decode divide response");
+        .expect("failed to send, receive, or decode response to divide request");
     let response = result.ok().expect("divide request failed with an error");
 
     assert_eq!(response.quotient, 33);
@@ -168,9 +161,7 @@ async fn divide(client_sender: &ClientSender<Endpoint, Calculator>) {
         .divide(&mut CalculatorDivideRequest { dividend: 42, divisor: 0 })
         .expect("failed to encode divide request")
         .await
-        .expect("failed to send divide request or receive divide response")
-        .decode()
-        .expect("failed to decode divide response");
+        .expect("failed to send, receive, or decode response to divide request");
 
     let error = result.err().expect("divide request succeeded unexpectedly");
     assert_eq!(DivisionError::DivideByZero, (*error).into());

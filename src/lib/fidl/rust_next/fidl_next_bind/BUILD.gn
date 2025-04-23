@@ -10,8 +10,8 @@ import("//build/rust/rustc_test.gni")
 rustc_library("fidl_next_bind") {
   edition = "2021"
   sources = [
-    "src/buffer.rs",
     "src/client.rs",
+    "src/decoded.rs",
     "src/endpoint.rs",
     "src/error.rs",
     "src/lib.rs",
@@ -22,6 +22,7 @@ rustc_library("fidl_next_bind") {
   deps = [
     "//src/lib/fidl/rust_next/fidl_next_codec",
     "//src/lib/fidl/rust_next/fidl_next_protocol",
+    "//third_party/rust_crates:thiserror",
   ]
   features = []
 

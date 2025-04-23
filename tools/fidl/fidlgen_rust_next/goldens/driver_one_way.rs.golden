@@ -330,7 +330,7 @@ pub trait OneWayServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, OneWay>,
 
-        request: ::fidl_next::RequestBuffer<___T, one_way::Send>,
+        request: ::fidl_next::Request<___T, one_way::Send>,
     );
 }
 
@@ -348,10 +348,12 @@ where
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
-            7942965975761529343 => {
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.send(sender, buffer);
-            }
+            7942965975761529343 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.send(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
             ordinal => {
                 sender.close();

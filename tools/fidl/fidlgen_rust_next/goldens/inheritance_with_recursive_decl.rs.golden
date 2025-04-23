@@ -235,7 +235,7 @@ pub trait ParentServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, Parent>,
 
-        request: ::fidl_next::RequestBuffer<___T, parent::First>,
+        request: ::fidl_next::Request<___T, parent::First>,
     );
 }
 
@@ -254,10 +254,12 @@ where
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
-            3973163707930985819 => {
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.first(sender, buffer);
-            }
+            3973163707930985819 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.first(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
             ordinal => {
                 sender.close();
@@ -550,14 +552,14 @@ pub trait ChildServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, Child>,
 
-        request: ::fidl_next::RequestBuffer<___T, child::First>,
+        request: ::fidl_next::Request<___T, child::First>,
     );
 
     fn second(
         &mut self,
         sender: &::fidl_next::ServerSender<___T, Child>,
 
-        request: ::fidl_next::RequestBuffer<___T, child::Second>,
+        request: ::fidl_next::Request<___T, child::Second>,
     );
 }
 
@@ -579,15 +581,19 @@ where
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
-            3973163707930985819 => {
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.first(sender, buffer);
-            }
+            3973163707930985819 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.first(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
-            2545123272820824165 => {
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.second(sender, buffer);
-            }
+            2545123272820824165 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.second(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
             ordinal => {
                 sender.close();

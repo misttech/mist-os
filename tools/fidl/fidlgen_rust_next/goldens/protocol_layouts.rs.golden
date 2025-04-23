@@ -2244,35 +2244,35 @@ pub trait MainProtocolClientHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ClientSender<___T, MainProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<___T, main_protocol::OnAnonComposed>,
+        event: ::fidl_next::Response<___T, main_protocol::OnAnonComposed>,
     );
 
     fn on_named_composed(
         &mut self,
         sender: &::fidl_next::ClientSender<___T, MainProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<___T, main_protocol::OnNamedComposed>,
+        event: ::fidl_next::Response<___T, main_protocol::OnNamedComposed>,
     );
 
     fn on_import(
         &mut self,
         sender: &::fidl_next::ClientSender<___T, MainProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<___T, main_protocol::OnImport>,
+        event: ::fidl_next::Response<___T, main_protocol::OnImport>,
     );
 
     fn on_local(
         &mut self,
         sender: &::fidl_next::ClientSender<___T, MainProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<___T, main_protocol::OnLocal>,
+        event: ::fidl_next::Response<___T, main_protocol::OnLocal>,
     );
 
     fn on_anon(
         &mut self,
         sender: &::fidl_next::ClientSender<___T, MainProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<___T, main_protocol::OnAnon>,
+        event: ::fidl_next::Response<___T, main_protocol::OnAnon>,
     );
 }
 
@@ -2333,30 +2333,40 @@ where
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
-            9198778981238868491 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.on_anon_composed(sender, buffer);
-            }
+            9198778981238868491 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.on_anon_composed(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
-            6802961197456477674 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.on_named_composed(sender, buffer);
-            }
+            6802961197456477674 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.on_named_composed(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
-            6584793811321990352 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.on_import(sender, buffer);
-            }
+            6584793811321990352 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.on_import(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
-            4199259762307646332 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.on_local(sender, buffer);
-            }
+            4199259762307646332 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.on_local(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
-            7275479350674227467 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.on_anon(sender, buffer);
-            }
+            7275479350674227467 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.on_anon(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
             ordinal => {
                 sender.close();
@@ -2500,14 +2510,14 @@ pub trait MainProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, MainProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, main_protocol::OneWayAnonComposed>,
+        request: ::fidl_next::Request<___T, main_protocol::OneWayAnonComposed>,
     );
 
     fn two_way_anon_composed(
         &mut self,
         sender: &::fidl_next::ServerSender<___T, MainProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, main_protocol::TwoWayAnonComposed>,
+        request: ::fidl_next::Request<___T, main_protocol::TwoWayAnonComposed>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayAnonComposed>,
     );
@@ -2516,7 +2526,7 @@ pub trait MainProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, MainProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, main_protocol::TwoWayAnonComposedWithError>,
+        request: ::fidl_next::Request<___T, main_protocol::TwoWayAnonComposedWithError>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayAnonComposedWithError>,
     );
@@ -2525,14 +2535,14 @@ pub trait MainProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, MainProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, main_protocol::OneWayNamedComposed>,
+        request: ::fidl_next::Request<___T, main_protocol::OneWayNamedComposed>,
     );
 
     fn two_way_named_composed(
         &mut self,
         sender: &::fidl_next::ServerSender<___T, MainProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, main_protocol::TwoWayNamedComposed>,
+        request: ::fidl_next::Request<___T, main_protocol::TwoWayNamedComposed>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayNamedComposed>,
     );
@@ -2541,7 +2551,7 @@ pub trait MainProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, MainProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, main_protocol::TwoWayNamedComposedWithError>,
+        request: ::fidl_next::Request<___T, main_protocol::TwoWayNamedComposedWithError>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayNamedComposedWithError>,
     );
@@ -2550,14 +2560,14 @@ pub trait MainProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, MainProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, main_protocol::OneWayImport>,
+        request: ::fidl_next::Request<___T, main_protocol::OneWayImport>,
     );
 
     fn two_way_import(
         &mut self,
         sender: &::fidl_next::ServerSender<___T, MainProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, main_protocol::TwoWayImport>,
+        request: ::fidl_next::Request<___T, main_protocol::TwoWayImport>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayImport>,
     );
@@ -2566,7 +2576,7 @@ pub trait MainProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, MainProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, main_protocol::TwoWayImportWithError>,
+        request: ::fidl_next::Request<___T, main_protocol::TwoWayImportWithError>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayImportWithError>,
     );
@@ -2575,14 +2585,14 @@ pub trait MainProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, MainProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, main_protocol::OneWayLocal>,
+        request: ::fidl_next::Request<___T, main_protocol::OneWayLocal>,
     );
 
     fn two_way_local(
         &mut self,
         sender: &::fidl_next::ServerSender<___T, MainProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, main_protocol::TwoWayLocal>,
+        request: ::fidl_next::Request<___T, main_protocol::TwoWayLocal>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayLocal>,
     );
@@ -2591,7 +2601,7 @@ pub trait MainProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, MainProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, main_protocol::TwoWayLocalWithError>,
+        request: ::fidl_next::Request<___T, main_protocol::TwoWayLocalWithError>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayLocalWithError>,
     );
@@ -2600,14 +2610,14 @@ pub trait MainProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, MainProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, main_protocol::OneWayAnon>,
+        request: ::fidl_next::Request<___T, main_protocol::OneWayAnon>,
     );
 
     fn two_way_anon(
         &mut self,
         sender: &::fidl_next::ServerSender<___T, MainProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, main_protocol::TwoWayAnon>,
+        request: ::fidl_next::Request<___T, main_protocol::TwoWayAnon>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayAnon>,
     );
@@ -2616,7 +2626,7 @@ pub trait MainProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, MainProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, main_protocol::TwoWayAnonWithError>,
+        request: ::fidl_next::Request<___T, main_protocol::TwoWayAnonWithError>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayAnonWithError>,
     );
@@ -2725,8 +2735,13 @@ where
 
                     467706262354916833 => {
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.one_way_anon_composed(sender, buffer);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.one_way_anon_composed(sender, decoded),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -2744,8 +2759,13 @@ where
 
                     6735359826241449560 => {
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.one_way_named_composed(sender, buffer);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.one_way_named_composed(sender, decoded),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -2763,8 +2783,13 @@ where
 
                     374039999976906043 => {
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.one_way_import(sender, buffer);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.one_way_import(sender, decoded),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -2782,8 +2807,13 @@ where
 
                     6085941264859402051 => {
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.one_way_local(sender, buffer);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.one_way_local(sender, decoded),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -2801,8 +2831,13 @@ where
 
                     4203317713771984620 => {
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.one_way_anon(sender, buffer);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.one_way_anon(sender, decoded),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -2843,8 +2878,13 @@ where
                         let responder = ::fidl_next::Responder::from_untyped(responder);
 
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.two_way_anon_composed(sender, buffer, responder);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.two_way_anon_composed(sender, decoded, responder),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -2855,8 +2895,13 @@ where
                         let responder = ::fidl_next::Responder::from_untyped(responder);
 
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.two_way_anon_composed_with_error(sender, buffer, responder);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.two_way_anon_composed_with_error(sender, decoded, responder),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -2873,8 +2918,13 @@ where
                         let responder = ::fidl_next::Responder::from_untyped(responder);
 
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.two_way_named_composed(sender, buffer, responder);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.two_way_named_composed(sender, decoded, responder),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -2885,8 +2935,13 @@ where
                         let responder = ::fidl_next::Responder::from_untyped(responder);
 
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.two_way_named_composed_with_error(sender, buffer, responder);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.two_way_named_composed_with_error(sender, decoded, responder),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -2903,8 +2958,13 @@ where
                         let responder = ::fidl_next::Responder::from_untyped(responder);
 
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.two_way_import(sender, buffer, responder);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.two_way_import(sender, decoded, responder),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -2915,8 +2975,13 @@ where
                         let responder = ::fidl_next::Responder::from_untyped(responder);
 
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.two_way_import_with_error(sender, buffer, responder);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.two_way_import_with_error(sender, decoded, responder),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -2933,8 +2998,13 @@ where
                         let responder = ::fidl_next::Responder::from_untyped(responder);
 
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.two_way_local(sender, buffer, responder);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.two_way_local(sender, decoded, responder),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -2945,8 +3015,13 @@ where
                         let responder = ::fidl_next::Responder::from_untyped(responder);
 
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.two_way_local_with_error(sender, buffer, responder);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.two_way_local_with_error(sender, decoded, responder),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -2963,8 +3038,13 @@ where
                         let responder = ::fidl_next::Responder::from_untyped(responder);
 
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.two_way_anon(sender, buffer, responder);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.two_way_anon(sender, decoded, responder),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -2975,8 +3055,13 @@ where
                         let responder = ::fidl_next::Responder::from_untyped(responder);
 
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.two_way_anon_with_error(sender, buffer, responder);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.two_way_anon_with_error(sender, decoded, responder),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -3470,14 +3555,14 @@ pub trait OpenProtocolClientHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ClientSender<___T, OpenProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<___T, open_protocol::FlexibleEvent>,
+        event: ::fidl_next::Response<___T, open_protocol::FlexibleEvent>,
     );
 
     fn strict_event(
         &mut self,
         sender: &::fidl_next::ClientSender<___T, OpenProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<___T, open_protocol::StrictEvent>,
+        event: ::fidl_next::Response<___T, open_protocol::StrictEvent>,
     );
 
     fn on_unknown_interaction(
@@ -3519,15 +3604,19 @@ where
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
-            9152311661656086484 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.flexible_event(sender, buffer);
-            }
+            9152311661656086484 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.flexible_event(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
-            3921073878922106269 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.strict_event(sender, buffer);
-            }
+            3921073878922106269 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.strict_event(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
             ordinal => handler.on_unknown_interaction(sender, ordinal),
         }
@@ -3600,14 +3689,14 @@ pub trait OpenProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, OpenProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, open_protocol::FlexibleOneWay>,
+        request: ::fidl_next::Request<___T, open_protocol::FlexibleOneWay>,
     );
 
     fn flexible_two_way_no_error(
         &mut self,
         sender: &::fidl_next::ServerSender<___T, OpenProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, open_protocol::FlexibleTwoWayNoError>,
+        request: ::fidl_next::Request<___T, open_protocol::FlexibleTwoWayNoError>,
 
         responder: ::fidl_next::Responder<open_protocol::FlexibleTwoWayNoError>,
     );
@@ -3616,7 +3705,7 @@ pub trait OpenProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, OpenProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, open_protocol::FlexibleTwoWayWithError>,
+        request: ::fidl_next::Request<___T, open_protocol::FlexibleTwoWayWithError>,
 
         responder: ::fidl_next::Responder<open_protocol::FlexibleTwoWayWithError>,
     );
@@ -3625,14 +3714,14 @@ pub trait OpenProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, OpenProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, open_protocol::StrictOneWay>,
+        request: ::fidl_next::Request<___T, open_protocol::StrictOneWay>,
     );
 
     fn strict_two_way_no_error(
         &mut self,
         sender: &::fidl_next::ServerSender<___T, OpenProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, open_protocol::StrictTwoWayNoError>,
+        request: ::fidl_next::Request<___T, open_protocol::StrictTwoWayNoError>,
 
         responder: ::fidl_next::Responder<open_protocol::StrictTwoWayNoError>,
     );
@@ -3641,7 +3730,7 @@ pub trait OpenProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, OpenProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, open_protocol::StrictTwoWayWithError>,
+        request: ::fidl_next::Request<___T, open_protocol::StrictTwoWayWithError>,
 
         responder: ::fidl_next::Responder<open_protocol::StrictTwoWayWithError>,
     );
@@ -3650,7 +3739,7 @@ pub trait OpenProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, OpenProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, open_protocol::FlexibleOneWayNamedPayload>,
+        request: ::fidl_next::Request<___T, open_protocol::FlexibleOneWayNamedPayload>,
     );
 
     fn on_unknown_interaction(
@@ -3719,8 +3808,13 @@ where
 
                     3516779973873009953 => {
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.flexible_one_way(sender, buffer);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.flexible_one_way(sender, decoded),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -3738,8 +3832,13 @@ where
 
                     8790149921168801703 => {
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.strict_one_way(sender, buffer);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.strict_one_way(sender, decoded),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -3757,8 +3856,13 @@ where
 
                     1525606789639046512 => {
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.flexible_one_way_named_payload(sender, buffer);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.flexible_one_way_named_payload(sender, decoded),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -3787,8 +3891,13 @@ where
                         let responder = ::fidl_next::Responder::from_untyped(responder);
 
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.flexible_two_way_no_error(sender, buffer, responder);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.flexible_two_way_no_error(sender, decoded, responder),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -3799,8 +3908,13 @@ where
                         let responder = ::fidl_next::Responder::from_untyped(responder);
 
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.flexible_two_way_with_error(sender, buffer, responder);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.flexible_two_way_with_error(sender, decoded, responder),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -3817,8 +3931,13 @@ where
                         let responder = ::fidl_next::Responder::from_untyped(responder);
 
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.strict_two_way_no_error(sender, buffer, responder);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.strict_two_way_no_error(sender, decoded, responder),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 
@@ -3829,8 +3948,13 @@ where
                         let responder = ::fidl_next::Responder::from_untyped(responder);
 
 
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.strict_two_way_with_error(sender, buffer, responder);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.strict_two_way_with_error(sender, decoded, responder),
+                                Err(e) => {
+
+                                    sender.close();
+                                }
+                            }
 
                     }
 

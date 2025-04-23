@@ -616,7 +616,7 @@ pub trait HandlesInProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, HandlesInProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, handles_in_protocol::SendHandles>,
+        request: ::fidl_next::Request<___T, handles_in_protocol::SendHandles>,
     );
 }
 
@@ -635,10 +635,12 @@ where
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
-            8904504160365833729 => {
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.send_handles(sender, buffer);
-            }
+            8904504160365833729 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.send_handles(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
             ordinal => {
                 sender.close();

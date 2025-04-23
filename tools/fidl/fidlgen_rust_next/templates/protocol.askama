@@ -250,7 +250,7 @@ pub trait {{ client_handler_name }}<___T: ::fidl_next::Transport> {
                 &mut self,
                 sender: &::fidl_next::ClientSender<___T, {{ protocol_name }}>,
                 {% if method.maybe_response_payload.is_some() %}
-                    message: ::fidl_next::ResponseBuffer<___T, {{ module_name }}::{{ method_type_name }}>,
+                    event: ::fidl_next::Response<___T, {{ module_name }}::{{ method_type_name }}>,
                 {% endif %}
             );
         {% endif %}
@@ -292,8 +292,13 @@ where
                 {% if method.kind == ProtocolMethodKind::Event %}
                     {{ method.ordinal }} => {
                         {% if method.maybe_response_payload.is_some() %}
-                            let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                            handler.{{ method_name }}(sender, buffer);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.{{ method_name }}(sender, decoded),
+                                Err(e) => {
+                                    {# TODO: send epitaph / log error #}
+                                    sender.close();
+                                }
+                            }
                         {% else %}
                             handler.{{ method_name}}(sender);
                         {% endif %}
@@ -392,7 +397,7 @@ pub trait {{ server_handler_name }}<___T: ::fidl_next::Transport> {
                     &mut self,
                     sender: &::fidl_next::ServerSender<___T, {{ protocol_name }}>,
                     {% if let Some(request) = method.maybe_request_payload %}
-                        request: ::fidl_next::RequestBuffer<___T, {{ module_name }}::{{ method_type_name }}>,
+                        request: ::fidl_next::Request<___T, {{ module_name }}::{{ method_type_name }}>,
                     {% endif %}
                 );
             {% when ProtocolMethodKind::TwoWay %}
@@ -401,7 +406,7 @@ pub trait {{ server_handler_name }}<___T: ::fidl_next::Transport> {
                     &mut self,
                     sender: &::fidl_next::ServerSender<___T, {{ protocol_name }}>,
                     {% if let Some(request) = method.maybe_request_payload %}
-                        request: ::fidl_next::RequestBuffer<___T, {{ module_name }}::{{ method_type_name }}>,
+                        request: ::fidl_next::Request<___T, {{ module_name }}::{{ method_type_name }}>,
                     {% endif %}
                     responder: ::fidl_next::Responder<{{ module_name }}::{{ method_type_name }}>,
                 );
@@ -444,8 +449,13 @@ where
                 {% if method.kind == ProtocolMethodKind::OneWay %}
                     {{ method.ordinal }} => {
                         {% if let Some(request) = method.maybe_request_payload %}
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.{{ method_name }}(sender, buffer);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.{{ method_name }}(sender, decoded),
+                                Err(e) => {
+                                    {# TODO: send epitaph / log error #}
+                                    sender.close();
+                                }
+                            }
                         {% else %}
                             handler.{{ method_name}}(sender);
                         {% endif %}
@@ -478,8 +488,13 @@ where
                         let responder = ::fidl_next::Responder::from_untyped(responder);
 
                         {% if let Some(request) = method.maybe_request_payload %}
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.{{ method_name }}(sender, buffer, responder);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.{{ method_name }}(sender, decoded, responder),
+                                Err(e) => {
+                                    {# TODO: send epitaph / log error #}
+                                    sender.close();
+                                }
+                            }
                         {% else %}
                             handler.{{ method_name}}(sender, responder);
                         {% endif %}

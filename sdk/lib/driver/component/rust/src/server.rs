@@ -276,8 +276,7 @@ mod tests {
                 },
             };
 
-            let start_res = client_sender.start(&mut start_request).unwrap().await.unwrap();
-            start_res.decode().unwrap().unwrap();
+            client_sender.start(&mut start_request).unwrap().await.unwrap().unwrap();
 
             client_sender.stop().unwrap().await.unwrap();
             client_exit_rx.await.unwrap();

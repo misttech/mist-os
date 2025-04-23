@@ -676,7 +676,7 @@ pub trait EmptyProtocolClientHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ClientSender<___T, EmptyProtocol>,
 
-        message: ::fidl_next::ResponseBuffer<___T, empty_protocol::Receive>,
+        event: ::fidl_next::Response<___T, empty_protocol::Receive>,
     );
 }
 
@@ -698,10 +698,12 @@ where
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
-            2301564782476583487 => {
-                let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                handler.receive(sender, buffer);
-            }
+            2301564782476583487 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.receive(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
             ordinal => {
                 sender.close();
@@ -753,14 +755,14 @@ pub trait EmptyProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, EmptyProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, empty_protocol::Send>,
+        request: ::fidl_next::Request<___T, empty_protocol::Send>,
     );
 
     fn send_and_receive(
         &mut self,
         sender: &::fidl_next::ServerSender<___T, EmptyProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, empty_protocol::SendAndReceive>,
+        request: ::fidl_next::Request<___T, empty_protocol::SendAndReceive>,
 
         responder: ::fidl_next::Responder<empty_protocol::SendAndReceive>,
     );
@@ -784,10 +786,12 @@ where
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
-            1378773277029173000 => {
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.send(sender, buffer);
-            }
+            1378773277029173000 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.send(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
             ordinal => {
                 sender.close();
@@ -806,8 +810,12 @@ where
             534401212734647530 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.send_and_receive(sender, buffer, responder);
+                match ::fidl_next::DecoderExt::decode(buffer) {
+                    Ok(decoded) => handler.send_and_receive(sender, decoded, responder),
+                    Err(e) => {
+                        sender.close();
+                    }
+                }
             }
 
             ordinal => {

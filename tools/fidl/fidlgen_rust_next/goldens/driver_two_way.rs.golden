@@ -359,7 +359,7 @@ pub trait TwoWayServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, TwoWay>,
 
-        request: ::fidl_next::RequestBuffer<___T, two_way::Add>,
+        request: ::fidl_next::Request<___T, two_way::Add>,
 
         responder: ::fidl_next::Responder<two_way::Add>,
     );
@@ -396,8 +396,12 @@ where
             989730524426044687 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.add(sender, buffer, responder);
+                match ::fidl_next::DecoderExt::decode(buffer) {
+                    Ok(decoded) => handler.add(sender, decoded, responder),
+                    Err(e) => {
+                        sender.close();
+                    }
+                }
             }
 
             ordinal => {

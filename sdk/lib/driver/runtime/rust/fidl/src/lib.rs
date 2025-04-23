@@ -464,13 +464,13 @@ mod test {
                 .unwrap();
 
             {
-                let res = client_sender.get_hardware_id().unwrap().await.unwrap().decode().unwrap();
+                let res = client_sender.get_hardware_id().unwrap().await.unwrap();
                 let hardware_id = res.unwrap();
                 assert_eq!(hardware_id.response, 4004);
             }
 
             {
-                let res = client_sender.get_event().unwrap().await.unwrap().decode().unwrap();
+                let res = client_sender.get_event().unwrap().await.unwrap();
                 let event = Event::from_handle(res.event.take());
 
                 // wait for the event on a fuchsia_async executor

@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use thiserror::Error;
+
+use fidl_next_codec::{EncodeError, DecodeError};
+
 /// Error returned by TryFrom on a strict enum if none of the members match the supplied value.
 #[derive(Debug)]
 pub struct UnknownStrictEnumMemberError(i128);
@@ -20,3 +24,17 @@ impl core::fmt::Display for UnknownStrictEnumMemberError {
 }
 
 impl core::error::Error for UnknownStrictEnumMemberError {}
+
+/// An encoding, decoding, or transport FIDL error.
+#[derive(Error, Debug)]
+pub enum Error<E> {
+    /// A FIDL encoding error.
+    #[error("encoding error: {0}")]
+    Encode(#[from] EncodeError),
+    /// A FIDL decoding error.
+    #[error("decoding error: {0}")]
+    Decode(#[from] DecodeError),
+    /// A FIDL transport error.
+    #[error("transport error: {0}")]
+    Transport(E),
+}

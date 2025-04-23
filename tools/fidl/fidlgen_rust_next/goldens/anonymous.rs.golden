@@ -1854,7 +1854,7 @@ pub trait SomeProtocolServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, SomeProtocol>,
 
-        request: ::fidl_next::RequestBuffer<___T, some_protocol::SomeMethod>,
+        request: ::fidl_next::Request<___T, some_protocol::SomeMethod>,
 
         responder: ::fidl_next::Responder<some_protocol::SomeMethod>,
     );
@@ -1892,8 +1892,12 @@ where
             2515914517457749720 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.some_method(sender, buffer, responder);
+                match ::fidl_next::DecoderExt::decode(buffer) {
+                    Ok(decoded) => handler.some_method(sender, decoded, responder),
+                    Err(e) => {
+                        sender.close();
+                    }
+                }
             }
 
             ordinal => {

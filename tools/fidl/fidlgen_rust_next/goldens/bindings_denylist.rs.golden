@@ -1596,7 +1596,7 @@ pub trait DeniedServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, Denied>,
 
-        request: ::fidl_next::RequestBuffer<___T, denied::ShouldNeverAppearInAnyBinding>,
+        request: ::fidl_next::Request<___T, denied::ShouldNeverAppearInAnyBinding>,
     );
 }
 
@@ -1615,10 +1615,12 @@ where
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
-            5338181991150205725 => {
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.should_never_appear_in_any_binding(sender, buffer);
-            }
+            5338181991150205725 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.should_never_appear_in_any_binding(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
             ordinal => {
                 sender.close();
@@ -4002,7 +4004,7 @@ pub trait DenyEachBindingServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, DenyEachBinding>,
 
-        request: ::fidl_next::RequestBuffer<___T, deny_each_binding::OnlyDenyCpp>,
+        request: ::fidl_next::Request<___T, deny_each_binding::OnlyDenyCpp>,
 
         responder: ::fidl_next::Responder<deny_each_binding::OnlyDenyCpp>,
     );
@@ -4011,7 +4013,7 @@ pub trait DenyEachBindingServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, DenyEachBinding>,
 
-        request: ::fidl_next::RequestBuffer<___T, deny_each_binding::OnlyDenyDart>,
+        request: ::fidl_next::Request<___T, deny_each_binding::OnlyDenyDart>,
 
         responder: ::fidl_next::Responder<deny_each_binding::OnlyDenyDart>,
     );
@@ -4020,7 +4022,7 @@ pub trait DenyEachBindingServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, DenyEachBinding>,
 
-        request: ::fidl_next::RequestBuffer<___T, deny_each_binding::OnlyDenyGo>,
+        request: ::fidl_next::Request<___T, deny_each_binding::OnlyDenyGo>,
 
         responder: ::fidl_next::Responder<deny_each_binding::OnlyDenyGo>,
     );
@@ -4029,7 +4031,7 @@ pub trait DenyEachBindingServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, DenyEachBinding>,
 
-        request: ::fidl_next::RequestBuffer<___T, deny_each_binding::OnlyDenyPython>,
+        request: ::fidl_next::Request<___T, deny_each_binding::OnlyDenyPython>,
 
         responder: ::fidl_next::Responder<deny_each_binding::OnlyDenyPython>,
     );
@@ -4038,7 +4040,7 @@ pub trait DenyEachBindingServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, DenyEachBinding>,
 
-        request: ::fidl_next::RequestBuffer<___T, deny_each_binding::OnlyDenyRust>,
+        request: ::fidl_next::Request<___T, deny_each_binding::OnlyDenyRust>,
 
         responder: ::fidl_next::Responder<deny_each_binding::OnlyDenyRust>,
     );
@@ -4047,7 +4049,7 @@ pub trait DenyEachBindingServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, DenyEachBinding>,
 
-        request: ::fidl_next::RequestBuffer<___T, deny_each_binding::OnlyDenySyzkaller>,
+        request: ::fidl_next::Request<___T, deny_each_binding::OnlyDenySyzkaller>,
 
         responder: ::fidl_next::Responder<deny_each_binding::OnlyDenySyzkaller>,
     );
@@ -4100,43 +4102,67 @@ where
             2957648440141224850 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.only_deny_cpp(sender, buffer, responder);
+                match ::fidl_next::DecoderExt::decode(buffer) {
+                    Ok(decoded) => handler.only_deny_cpp(sender, decoded, responder),
+                    Err(e) => {
+                        sender.close();
+                    }
+                }
             }
 
             8446571910689294295 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.only_deny_dart(sender, buffer, responder);
+                match ::fidl_next::DecoderExt::decode(buffer) {
+                    Ok(decoded) => handler.only_deny_dart(sender, decoded, responder),
+                    Err(e) => {
+                        sender.close();
+                    }
+                }
             }
 
             7311125300308839833 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.only_deny_go(sender, buffer, responder);
+                match ::fidl_next::DecoderExt::decode(buffer) {
+                    Ok(decoded) => handler.only_deny_go(sender, decoded, responder),
+                    Err(e) => {
+                        sender.close();
+                    }
+                }
             }
 
             3010747198252652930 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.only_deny_python(sender, buffer, responder);
+                match ::fidl_next::DecoderExt::decode(buffer) {
+                    Ok(decoded) => handler.only_deny_python(sender, decoded, responder),
+                    Err(e) => {
+                        sender.close();
+                    }
+                }
             }
 
             3719805222870932662 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.only_deny_rust(sender, buffer, responder);
+                match ::fidl_next::DecoderExt::decode(buffer) {
+                    Ok(decoded) => handler.only_deny_rust(sender, decoded, responder),
+                    Err(e) => {
+                        sender.close();
+                    }
+                }
             }
 
             2319043834522757514 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.only_deny_syzkaller(sender, buffer, responder);
+                match ::fidl_next::DecoderExt::decode(buffer) {
+                    Ok(decoded) => handler.only_deny_syzkaller(sender, decoded, responder),
+                    Err(e) => {
+                        sender.close();
+                    }
+                }
             }
 
             ordinal => {
@@ -4299,7 +4325,7 @@ pub trait ImportsSameNameContextServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, ImportsSameNameContext>,
 
-        request: ::fidl_next::RequestBuffer<___T, imports_same_name_context::AlwaysDenied>,
+        request: ::fidl_next::Request<___T, imports_same_name_context::AlwaysDenied>,
     );
 
     fn unattributed(&mut self, sender: &::fidl_next::ServerSender<___T, ImportsSameNameContext>);
@@ -4325,10 +4351,12 @@ where
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
-            6808317417318106526 => {
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.always_denied(sender, buffer);
-            }
+            6808317417318106526 => match ::fidl_next::DecoderExt::decode(buffer) {
+                Ok(decoded) => handler.always_denied(sender, decoded),
+                Err(e) => {
+                    sender.close();
+                }
+            },
 
             475191379775102607 => {
                 handler.unattributed(sender);

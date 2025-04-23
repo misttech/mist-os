@@ -430,10 +430,7 @@ pub trait ExampleUseOfErrorSyntaxServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, ExampleUseOfErrorSyntax>,
 
-        request: ::fidl_next::RequestBuffer<
-            ___T,
-            example_use_of_error_syntax::ComposedCallWhichMayFail,
-        >,
+        request: ::fidl_next::Request<___T, example_use_of_error_syntax::ComposedCallWhichMayFail>,
 
         responder: ::fidl_next::Responder<example_use_of_error_syntax::ComposedCallWhichMayFail>,
     );
@@ -442,7 +439,7 @@ pub trait ExampleUseOfErrorSyntaxServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, ExampleUseOfErrorSyntax>,
 
-        request: ::fidl_next::RequestBuffer<___T, example_use_of_error_syntax::CallWhichMayFail>,
+        request: ::fidl_next::Request<___T, example_use_of_error_syntax::CallWhichMayFail>,
 
         responder: ::fidl_next::Responder<example_use_of_error_syntax::CallWhichMayFail>,
     );
@@ -483,15 +480,23 @@ where
             3565108794310607393 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.composed_call_which_may_fail(sender, buffer, responder);
+                match ::fidl_next::DecoderExt::decode(buffer) {
+                    Ok(decoded) => handler.composed_call_which_may_fail(sender, decoded, responder),
+                    Err(e) => {
+                        sender.close();
+                    }
+                }
             }
 
             3757408930698888354 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.call_which_may_fail(sender, buffer, responder);
+                match ::fidl_next::DecoderExt::decode(buffer) {
+                    Ok(decoded) => handler.call_which_may_fail(sender, decoded, responder),
+                    Err(e) => {
+                        sender.close();
+                    }
+                }
             }
 
             ordinal => {
