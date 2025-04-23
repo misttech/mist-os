@@ -79,7 +79,8 @@ impl Kernels {
         let kernels = self.kernels.clone();
         self.background_tasks.spawn(async move {
             on_stop.await;
-            if let Some(kernel) = kernels.lock().remove(&kernel_koid) {
+            let kernel = kernels.lock().remove(&kernel_koid);
+            if let Some(kernel) = kernel {
                 _ = kernel.destroy().await.inspect_err(|e| log::error!("{e:?}"));
             }
         });

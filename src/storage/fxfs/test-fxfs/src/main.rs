@@ -127,7 +127,8 @@ async fn create_user_volume(
     inspect_node: &Mutex<fuchsia_inspect::Node>,
 ) -> Result<(), Error> {
     let remote_crypt = Arc::new(RemoteCrypt::new(crypt));
-    if let Some(vol) = mounted_volume.lock().take() {
+    let vol = mounted_volume.lock().take();
+    if let Some(vol) = vol {
         volumes_directory.lock().await.unmount(vol.store_id).await.context("unmount failed")?;
         inspect_node.lock().record_bool("mounted", false);
     }
@@ -168,7 +169,8 @@ async fn unmount_user_volume(
     mounted_volume: &Mutex<Option<MountedVolume>>,
     inspect_node: &Mutex<fuchsia_inspect::Node>,
 ) -> Result<(), Error> {
-    if let Some(vol) = mounted_volume.lock().take() {
+    let vol = mounted_volume.lock().take();
+    if let Some(vol) = vol {
         volumes_directory.lock().await.unmount(vol.store_id).await.context("unmount failed")?;
         inspect_node.lock().record_bool("mounted", false);
         Ok(())

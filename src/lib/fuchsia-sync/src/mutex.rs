@@ -30,7 +30,10 @@ unsafe impl lock_api::RawMutex for RawSyncMutex {
     const INIT: RawSyncMutex = RawSyncMutex(sys::zx_futex_t::new(SYNC_MUTEX_INIT));
 
     // libsync does not require the lock / unlock operations to happen on the same thread.
-    type GuardMarker = lock_api::GuardSend;
+    // However, we set this to no send to catch mistakes where folks accidentally hold a lock across
+    // an async await, which is often not intentional behavior and can lead to a deadlock. If
+    // sufficient need is required, this may be changed back to `lock_api::GuardSend`.
+    type GuardMarker = lock_api::GuardNoSend;
 
     #[inline]
     fn lock(&self) {
