@@ -210,6 +210,13 @@ impl ThermalLoadDriver {
                         continue;
                     }
                 };
+                fuchsia_trace::counter!(
+                    c"power_manager",
+                    c"ThermalLoadDriver thermal_load",
+                    0,
+                    "sensor" => sensor_name.as_str(),
+                    "thermal_load" => new_thermal_load.0
+                );
 
                 inspect.log_thermal_load(new_thermal_load);
 

@@ -60,6 +60,7 @@ pub struct ThermalStateHandlerBuilder<'a, 'b> {
     platform_metrics: Option<Rc<dyn Node>>,
     enable_cpu_thermal_state_connector: bool,
     enable_client_state_connector: bool,
+    cpu_thermal_load_sensor: Option<String>,
 }
 
 impl<'a, 'b> ThermalStateHandlerBuilder<'a, 'b> {
@@ -79,6 +80,16 @@ impl<'a, 'b> ThermalStateHandlerBuilder<'a, 'b> {
             enable_cpu_thermal_state_connector: bool,
             /// Enable FIDL `fuchsia.thermal.ClientStateConnector` service only if true (required).
             enable_client_state_connector: bool,
+            /// If true, thermal load for the "CPU" client is provided via UpdateThermalLoad,
+            /// sent by ThermalLoadDriver.
+            /// Otherwise, load for this client is provided by UpdateCpuThermalLoad, sent by
+            /// ThermalPolicy.
+            // TODO(https://fxbug.dev/412468901): In some ideal sense, it would be nice to replace
+            // the ThermalPolicy node with a generalization of ThermalLoadDriver that can handle
+            // integral error, and allow a thermal client to specify how it should be throttled
+            // according to different (sensor, load calculation) combinations, rather than just
+            // different sensors.
+            cpu_thermal_load_sensor: Option<String>,
         }
 
         #[derive(Deserialize)]
@@ -101,6 +112,7 @@ impl<'a, 'b> ThermalStateHandlerBuilder<'a, 'b> {
         let thermal_config_path = data.config.thermal_config_path;
         let enable_cpu_thermal_state_connector = data.config.enable_cpu_thermal_state_connector;
         let enable_client_state_connector = data.config.enable_client_state_connector;
+        let cpu_thermal_load_sensor = data.config.cpu_thermal_load_sensor;
 
         // Use `thermal_config_path` if it was provided, otherwise default to `THERMAL_CONFIG_PATH`
         let config_path =
@@ -123,6 +135,7 @@ impl<'a, 'b> ThermalStateHandlerBuilder<'a, 'b> {
             platform_metrics,
             enable_cpu_thermal_state_connector,
             enable_client_state_connector,
+            cpu_thermal_load_sensor,
         }
     }
 
@@ -144,6 +157,7 @@ impl<'a, 'b> ThermalStateHandlerBuilder<'a, 'b> {
                 thermal_config,
                 &inspect,
                 self.enable_cpu_thermal_state_connector,
+                self.cpu_thermal_load_sensor,
             ),
             metrics_tracker: RefCell::new(metrics_tracker),
             _inspect: inspect,
@@ -179,9 +193,15 @@ pub struct ThermalStateHandler {
 struct ThermalState(u32);
 
 /// Stores the configuration and state for all supported thermal clients.
-///
-/// The underlying HashMap maps client type strings to their corresponding `ClientState` entry.
-struct ClientStates(RefCell<HashMap<String, ClientState>>);
+struct ClientStates {
+    /// Maps client type strings to corresponding `ClientState` entries.
+    client_types_to_states: RefCell<HashMap<String, ClientState>>,
+
+    /// If specified, thermal load for the CPU client is based on UpdateThermalLoad messages
+    /// corresponding to this sensor. Otherwise, the CPU client's thermal load is based on
+    /// UpdateCpuThermalLoad messages.
+    cpu_thermal_load_sensor: Option<String>,
+}
 
 impl ClientStates {
     const CPU_CLIENT_TYPE: &'static str = "CPU";
@@ -195,8 +215,9 @@ impl ClientStates {
         thermal_config: ThermalConfig,
         inspect_parent: &inspect::Node,
         enable_cpu_thermal_state_connector: bool,
+        cpu_thermal_load_sensor: Option<String>,
     ) -> Self {
-        let mut client_states =
+        let mut client_types_to_states =
             HashMap::from_iter(thermal_config.into_iter().map(|(client_type, client_config)| {
                 let client_state = ClientState::new(
                     Some(client_config),
@@ -207,7 +228,7 @@ impl ClientStates {
             }));
 
         if enable_cpu_thermal_state_connector {
-            client_states.insert(
+            client_types_to_states.insert(
                 Self::CPU_CLIENT_TYPE.to_string(),
                 ClientState::new(
                     None,
@@ -217,7 +238,10 @@ impl ClientStates {
             );
         }
 
-        Self(RefCell::new(client_states))
+        Self {
+            client_types_to_states: RefCell::new(client_types_to_states),
+            cpu_thermal_load_sensor,
+        }
     }
 
     /// Processes a new thermal load for the given sensor.
@@ -232,9 +256,13 @@ impl ClientStates {
             "sensor" => sensor
         );
 
-        for (client, client_state) in self.0.borrow_mut().iter_mut() {
-            if client != Self::CPU_CLIENT_TYPE {
+        for (client_type, client_state) in self.client_types_to_states.borrow_mut().iter_mut() {
+            if client_type != Self::CPU_CLIENT_TYPE {
                 client_state.process_new_thermal_load(thermal_load, sensor);
+            } else if let Some(cpu_sensor) = self.cpu_thermal_load_sensor.as_ref() {
+                if sensor == cpu_sensor {
+                    client_state.process_new_cpu_thermal_load(thermal_load);
+                }
             }
         }
     }
@@ -250,7 +278,13 @@ impl ClientStates {
             "thermal_load" => thermal_load.0
         );
 
-        match self.0.borrow_mut().get_mut(Self::CPU_CLIENT_TYPE) {
+        if self.cpu_thermal_load_sensor.is_some() {
+            log::error!(
+                "This code path shouldn't be exercised when cpu_thermal_load_sensor is specified"
+            );
+        }
+
+        match self.client_types_to_states.borrow_mut().get_mut(Self::CPU_CLIENT_TYPE) {
             Some(client_state) => client_state.process_new_cpu_thermal_load(thermal_load),
             None => log::error!("CPU thermal client is not enabled"),
         }
@@ -271,7 +305,7 @@ impl ClientStates {
             "client_type" => client_type
         );
 
-        match self.0.borrow_mut().get_mut(client_type) {
+        match self.client_types_to_states.borrow_mut().get_mut(client_type) {
             Some(client_state) => {
                 client_state.connect_stream(stream);
                 Ok(())
@@ -893,6 +927,7 @@ mod tests {
             platform_metrics: None,
             enable_cpu_thermal_state_connector: false,
             enable_client_state_connector: true,
+            cpu_thermal_load_sensor: None,
         }
         .build()
         .unwrap();
@@ -983,6 +1018,7 @@ mod tests {
             platform_metrics: None,
             enable_cpu_thermal_state_connector: true,
             enable_client_state_connector: true,
+            cpu_thermal_load_sensor: None,
         }
         .build()
         .unwrap();
@@ -1069,6 +1105,7 @@ mod tests {
             platform_metrics: None,
             enable_cpu_thermal_state_connector: false,
             enable_client_state_connector: true,
+            cpu_thermal_load_sensor: None,
         }
         .build()
         .unwrap();
@@ -1113,6 +1150,7 @@ mod tests {
             platform_metrics: None,
             enable_cpu_thermal_state_connector: false,
             enable_client_state_connector: true,
+            cpu_thermal_load_sensor: None,
         }
         .build()
         .unwrap();
@@ -1143,6 +1181,7 @@ mod tests {
             platform_metrics: None,
             enable_cpu_thermal_state_connector: false,
             enable_client_state_connector: false,
+            cpu_thermal_load_sensor: None,
         }
         .build()
         .unwrap();
@@ -1170,6 +1209,7 @@ mod tests {
             platform_metrics: None,
             enable_cpu_thermal_state_connector: false,
             enable_client_state_connector: false,
+            cpu_thermal_load_sensor: None,
         }
         .build()
         .unwrap();
@@ -1204,6 +1244,7 @@ mod tests {
             platform_metrics: None,
             enable_cpu_thermal_state_connector: false,
             enable_client_state_connector: true,
+            cpu_thermal_load_sensor: None,
         }
         .build()
         .unwrap();
@@ -1242,6 +1283,7 @@ mod tests {
             platform_metrics: None,
             enable_cpu_thermal_state_connector: true,
             enable_client_state_connector: true,
+            cpu_thermal_load_sensor: None,
         }
         .build()
         .unwrap();
@@ -1268,6 +1310,50 @@ mod tests {
         // client1 state is unchanged, but client2 moves to state 29
         assert_matches!(client1.get_thermal_state(&mut executor), Ok(None));
         assert_matches!(client2.get_thermal_state(&mut executor), Ok(Some(ThermalState(29))));
+    }
+
+    /// Tests that if thermal_load_driver_limits_cpu == true, then both CPU and regular clients
+    /// are notified by handle_update_thermal_load.
+    #[test]
+    fn test_thermal_load_driver_limits_cpu() {
+        let mut executor = fasync::TestExecutor::new();
+        let mut service_fs = ServiceFs::new_local();
+
+        let thermal_config = ThermalConfig::new().add_client_config(
+            "client1",
+            ClientConfig::new()
+                .add_thermal_state(vec![TripPoint::new("sensor1", 1, 9)])
+                .add_thermal_state(vec![TripPoint::new("sensor1", 10, 19)]),
+        );
+
+        let node = ThermalStateHandlerBuilder {
+            node_name: "thermal_state_handler".to_string(),
+            inspect_root: None,
+            thermal_config: Some(thermal_config),
+            outgoing_svc_dir: Some(service_fs.root_dir()),
+            platform_metrics: None,
+            enable_cpu_thermal_state_connector: true,
+            enable_client_state_connector: true,
+            cpu_thermal_load_sensor: Some("sensor1".to_string()),
+        }
+        .build()
+        .unwrap();
+
+        let test_env = TestEnv::new(service_fs);
+        let client1 = test_env.connect_client("client1");
+        let client2 = test_env.connect_client("CPU");
+
+        // First request gives initial thermal state for both clients
+        assert_matches!(client1.get_thermal_state(&mut executor), Ok(Some(ThermalState(0))));
+        assert_matches!(client2.get_thermal_state(&mut executor), Ok(Some(ThermalState(0))));
+
+        // Update the thermal load for "sensor1" and verify client1 gets updated thermal state while
+        // client2 remains unchanged
+        executor
+            .run_singlethreaded(node.handle_update_thermal_load(ThermalLoad(19), "sensor1"))
+            .unwrap();
+        assert_matches!(client1.get_thermal_state(&mut executor), Ok(Some(ThermalState(2))));
+        assert_matches!(client2.get_thermal_state(&mut executor), Ok(Some(ThermalState(19))));
     }
 
     /// Tests that multiple clients connected simultaneously receive their appropriate thermal state
@@ -1299,6 +1385,7 @@ mod tests {
             platform_metrics: None,
             enable_cpu_thermal_state_connector: false,
             enable_client_state_connector: true,
+            cpu_thermal_load_sensor: None,
         }
         .build()
         .unwrap();
@@ -1344,6 +1431,7 @@ mod tests {
             platform_metrics: Some(mock_platform_metrics.clone()),
             enable_cpu_thermal_state_connector: false,
             enable_client_state_connector: false,
+            cpu_thermal_load_sensor: None,
         }
         .build()
         .unwrap();
