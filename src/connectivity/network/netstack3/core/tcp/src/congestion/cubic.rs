@@ -82,7 +82,7 @@ impl<I: Instant, const FAST_CONVERGENCE: bool> Cubic<I, FAST_CONVERGENCE> {
             // Slow start, Per RFC 5681 (https://www.rfc-editor.org/rfc/rfc5681#page-6):
             // we RECOMMEND that TCP implementations increase cwnd, per:
             //   cwnd += min (N, SMSS)                      (2)
-            *cwnd += u32::min(bytes_acked.get(), u32::from(*mss));
+            *cwnd = cwnd.saturating_add(u32::min(bytes_acked.get(), u32::from(*mss)));
             if *cwnd <= *ssthresh {
                 return;
             }
@@ -408,5 +408,26 @@ mod tests {
         const RTT: Duration = Duration::from_millis(100);
 
         cubic.on_ack(&mut params, NonZeroU32::MIN, clock.now(), RTT);
+    }
+
+    // This is a regression test for https://fxbug.dev/412748465.
+    #[test]
+    fn repro_overflow_b412748465() {
+        let clock = FakeInstantCtx::default();
+        let mut cubic = Cubic::<_, true /* FAST_CONVERGENCE */>::default();
+        // Setup the params in slow start with `cwnd` close to overflow.
+        let mut params = CongestionControlParams {
+            ssthresh: u32::MAX,
+            cwnd: u32::MAX - 1,
+            mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+        };
+        const RTT: Duration = Duration::from_millis(100);
+        // Ack enough bytes to push cwnd over u32::MAX.
+        cubic.on_ack(
+            &mut params,
+            NonZeroU32::new(2).unwrap(), /*bytes_acked*/
+            clock.now(),
+            RTT,
+        );
     }
 }
