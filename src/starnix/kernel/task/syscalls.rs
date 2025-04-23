@@ -426,8 +426,7 @@ pub fn sys_setpgid(
     let weak = get_task_or_current(current_task, pid);
     let task = Task::from_weak(&weak)?;
 
-    security::check_setpgid_access(current_task, &task)?;
-    current_task.thread_group().setpgid(locked, &task, pgid)?;
+    current_task.thread_group().setpgid(locked, current_task, &task, pgid)?;
     Ok(())
 }
 

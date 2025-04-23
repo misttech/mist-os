@@ -828,6 +828,7 @@ impl ThreadGroup {
     pub fn setpgid<L>(
         &self,
         locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
         target: &Task,
         pgid: pid_t,
     ) -> Result<(), Errno>
@@ -882,7 +883,9 @@ impl ThreadGroup {
                     if new_process_group.session != target_process_group.session {
                         return error!(EPERM);
                     }
+                    security::check_setpgid_access(current_task, target)?;
                 } else {
+                    security::check_setpgid_access(current_task, target)?;
                     // Create a new process group
                     new_process_group =
                         ProcessGroup::new(target_pgid, Some(target_process_group.session.clone()));
@@ -2045,45 +2048,59 @@ mod test {
         assert_eq!(other_session_child_task.thread_group().setsid(&mut locked), Ok(()));
 
         assert_eq!(
-            child_task1.thread_group().setpgid(&mut locked, &current_task, 0),
+            child_task1.thread_group().setpgid(&mut locked, &current_task, &current_task, 0),
             error!(ESRCH)
         );
         assert_eq!(
-            current_task.thread_group().setpgid(&mut locked, &execd_child_task, 0),
+            current_task.thread_group().setpgid(&mut locked, &current_task, &execd_child_task, 0),
             error!(EACCES)
         );
         assert_eq!(
-            current_task.thread_group().setpgid(&mut locked, &current_task, 0),
-            error!(EPERM)
-        );
-        assert_eq!(
-            current_task.thread_group().setpgid(&mut locked, &other_session_child_task, 0),
-            error!(EPERM)
-        );
-        assert_eq!(
-            current_task.thread_group().setpgid(&mut locked, &child_task1, -1),
-            error!(EINVAL)
-        );
-        assert_eq!(
-            current_task.thread_group().setpgid(&mut locked, &child_task1, 255),
+            current_task.thread_group().setpgid(&mut locked, &current_task, &current_task, 0),
             error!(EPERM)
         );
         assert_eq!(
             current_task.thread_group().setpgid(
                 &mut locked,
+                &current_task,
+                &other_session_child_task,
+                0
+            ),
+            error!(EPERM)
+        );
+        assert_eq!(
+            current_task.thread_group().setpgid(&mut locked, &current_task, &child_task1, -1),
+            error!(EINVAL)
+        );
+        assert_eq!(
+            current_task.thread_group().setpgid(&mut locked, &current_task, &child_task1, 255),
+            error!(EPERM)
+        );
+        assert_eq!(
+            current_task.thread_group().setpgid(
+                &mut locked,
+                &current_task,
                 &child_task1,
                 other_session_child_task.id
             ),
             error!(EPERM)
         );
 
-        assert_eq!(child_task1.thread_group().setpgid(&mut locked, &child_task1, 0), Ok(()));
+        assert_eq!(
+            child_task1.thread_group().setpgid(&mut locked, &current_task, &child_task1, 0),
+            Ok(())
+        );
         assert_eq!(child_task1.thread_group().read().process_group.session.leader, current_task.id);
         assert_eq!(child_task1.thread_group().read().process_group.leader, child_task1.id);
 
         let old_process_group = child_task2.thread_group().read().process_group.clone();
         assert_eq!(
-            current_task.thread_group().setpgid(&mut locked, &child_task2, child_task1.id),
+            current_task.thread_group().setpgid(
+                &mut locked,
+                &current_task,
+                &child_task2,
+                child_task1.id
+            ),
             Ok(())
         );
         assert_eq!(child_task2.thread_group().read().process_group.leader, child_task1.id);
