@@ -26,7 +26,7 @@ pub use node::*;
 /// Driver authors should implement this trait, taking information from the [`DriverContext`]
 /// passed to the [`Driver::start`] method to set up, and then tearing down any resources they use
 /// in the [`Driver::stop`] method.
-pub trait Driver: Sized + Send + Sync + 'static {
+pub trait Driver: Sized + Send + 'static {
     /// The name of the driver as it will appear in logs
     const NAME: &str;
 
