@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/bootfs_files_for_assembly.gni")
+import("//zircon/kernel/params.gni")
 
 executable("ktrace") {
   visibility = [
@@ -17,6 +18,7 @@ executable("ktrace") {
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
+  defines = [ "EXPERIMENTAL_KTRACE_STREAMING_ENABLED=$experimental_ktrace_streaming_enabled" ]
 }
 
 bootfs_files_for_assembly("bootfs") {
