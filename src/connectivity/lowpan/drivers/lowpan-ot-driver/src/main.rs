@@ -242,6 +242,9 @@ impl Config {
             warn!("Backbone interface not set, border routing not supported");
         }
 
+        let publisher =
+            connect_to_protocol::<fidl_fuchsia_net_mdns::ServiceInstancePublisherMarker>().unwrap();
+
         let driver_future = run_driver(
             self.name.clone(),
             connect_to_protocol_at::<RegisterMarker>(self.service_prefix.as_str())
@@ -250,6 +253,7 @@ impl Config {
             ot_instance,
             netif,
             backbone_if,
+            publisher,
         );
 
         Ok(driver_future)
@@ -263,6 +267,7 @@ async fn run_driver<N, RP, RFP, NI, BI>(
     ot_instance: OtInstanceBox,
     net_if: NI,
     backbone_if: BI,
+    publisher: fidl_fuchsia_net_mdns::ServiceInstancePublisherProxy,
 ) -> Result<(), Error>
 where
     N: AsRef<str>,
@@ -272,7 +277,7 @@ where
     BI: BackboneInterface,
 {
     let name = name.as_ref();
-    let mut driver = OtDriver::new(ot_instance, net_if, backbone_if);
+    let mut driver = OtDriver::new(ot_instance, net_if, backbone_if, publisher);
 
     driver.start_multicast_routing_manager();
 

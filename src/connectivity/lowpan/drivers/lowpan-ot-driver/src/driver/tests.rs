@@ -75,7 +75,13 @@ where
 
     ot::set_logging_level(ot::LogLevel::Crit);
 
-    let driver = Arc::new(OtDriver::new(instance, network_interface, backbone_interface));
+    // Create a publisher proxy and server end.  The server end behavior is not currently tested,
+    // so simply drop it.
+    let (publisher, _) =
+        fidl::endpoints::create_proxy::<fidl_fuchsia_net_mdns::ServiceInstancePublisherMarker>();
+
+    let driver =
+        Arc::new(OtDriver::new(instance, network_interface, backbone_interface, publisher));
 
     // Note that we cannot move this into an async block because
     // `fun` itself doesn't implement `Send`.

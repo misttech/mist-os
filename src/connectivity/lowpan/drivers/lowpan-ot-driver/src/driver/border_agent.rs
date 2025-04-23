@@ -118,11 +118,9 @@ async fn publish_border_agent_service(
     service_instance: String,
     txt: Vec<(String, Vec<u8>)>,
     port: u16,
+    publisher: ServiceInstancePublisherProxy,
 ) -> Result<(), anyhow::Error> {
     let (client, server) = create_endpoints::<ServiceInstancePublicationResponder_Marker>();
-
-    let publisher = connect_to_protocol::<ServiceInstancePublisherMarker>().unwrap();
-
     let publish_init_future = publisher
         .publish_service_instance(
             BORDER_AGENT_SERVICE_TYPE,
@@ -292,9 +290,218 @@ impl<OT: ot::InstanceInterface, NI, BI> OtDriver<OT, NI, BI> {
                 info!(tag = "meshcop"; "update_border_agent_service: pervious task terminated");
             }
 
-            *self.border_agent_service.lock() = Some(fasync::Task::spawn(
-                publish_border_agent_service(service_instance_name, txt, port),
-            ));
+            *self.border_agent_service.lock() =
+                Some(fasync::Task::spawn(publish_border_agent_service(
+                    service_instance_name,
+                    txt,
+                    port,
+                    self.publisher.clone(),
+                )));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::create_proxy;
+    use fidl_fuchsia_net_mdns as fidl_mdns;
+    use fuchsia_async::TestExecutor;
+    use lazy_static::lazy_static;
+    use std::pin::pin;
+    use std::task::Poll;
+
+    const TEST_PORT: u16 = 1234;
+    const TEST_SERVICE: &str = "test test test";
+
+    lazy_static! {
+        static ref TEST_TEXT: Vec<(String, Vec<u8>)> = vec![
+            (String::from("abcd"), vec![1, 2, 3, 4]),
+            (String::from("wxyz"), vec![5, 6, 7, 8]),
+        ];
+    }
+
+    struct TestValues {
+        publisher: ServiceInstancePublisherProxy,
+        publisher_stream: ServiceInstancePublisherRequestStream,
+    }
+
+    fn test_setup() -> TestValues {
+        let (publisher, publisher_reqs) =
+            create_proxy::<fidl_mdns::ServiceInstancePublisherMarker>();
+        let publisher_stream = publisher_reqs.into_stream();
+
+        return TestValues { publisher, publisher_stream };
+    }
+
+    #[fuchsia::test]
+    fn test_publish_border_agent_service_publication_failure() {
+        // Use an executor with fake time to prevent the timers related to the fake spinel instance
+        // from failing the test.
+        let mut exec = TestExecutor::new();
+        let mut test_vals = test_setup();
+
+        let fut = publish_border_agent_service(
+            String::from(TEST_SERVICE),
+            TEST_TEXT.to_vec(),
+            TEST_PORT,
+            test_vals.publisher,
+        );
+        let mut fut = pin!(fut);
+
+        // Progress the future and expect it to stall while attempting to interact with MDNS.
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // There should now be a request from the publisher.
+        assert_matches!(
+            exec.run_until_stalled(&mut test_vals.publisher_stream.next()),
+            Poll::Ready(Some(Ok(fidl_mdns::ServiceInstancePublisherRequest::PublishServiceInstance {
+                service, instance, options, publication_responder: _, responder,
+            }))) => {
+                assert_eq!(service, BORDER_AGENT_SERVICE_TYPE);
+                assert_eq!(instance, TEST_SERVICE);
+                assert_eq!(options, ServiceInstancePublicationOptions::default());
+                responder
+                    .send(Err(fidl_mdns::PublishServiceInstanceError::AlreadyPublishedLocally))
+                    .expect("Failed to send publish response");
+            }
+        );
+
+        // The future should complete with an error.
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+    }
+
+    #[fuchsia::test]
+    fn test_publish_border_agent_service_exits_when_publication_service_drops() {
+        let mut exec = TestExecutor::new();
+        let test_vals = test_setup();
+
+        // Drop the publisher stream.
+        drop(test_vals.publisher_stream);
+
+        let fut = publish_border_agent_service(
+            String::from(TEST_SERVICE),
+            TEST_TEXT.to_vec(),
+            TEST_PORT,
+            test_vals.publisher,
+        );
+        let mut fut = pin!(fut);
+
+        // Progress the future and expect it to stall while attempting to interact with MDNS.
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+    }
+
+    #[fuchsia::test]
+    fn test_publish_border_agent_service_publication_success() {
+        let mut exec = TestExecutor::new();
+        let mut test_vals = test_setup();
+
+        let fut = publish_border_agent_service(
+            String::from(TEST_SERVICE),
+            TEST_TEXT.to_vec(),
+            TEST_PORT,
+            test_vals.publisher,
+        );
+        let mut fut = pin!(fut);
+
+        // Progress the future and expect it to stall while attempting to interact with MDNS.
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // There should now be a request from the publisher.
+        let responder = match exec.run_until_stalled(&mut test_vals.publisher_stream.next()) {
+            Poll::Ready(Some(Ok(
+                fidl_mdns::ServiceInstancePublisherRequest::PublishServiceInstance {
+                    service,
+                    instance,
+                    options,
+                    publication_responder,
+                    responder,
+                },
+            ))) => {
+                assert_eq!(service, BORDER_AGENT_SERVICE_TYPE);
+                assert_eq!(instance, TEST_SERVICE);
+                assert_eq!(options, ServiceInstancePublicationOptions::default());
+                responder.send(Ok(())).expect("Failed to send publish response");
+
+                publication_responder
+            }
+            other => panic!("Unexpected variant: {:?}", other),
+        };
+        let responder = responder.into_proxy();
+
+        // The future should still be running.
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Publish
+        let publication_fut =
+            responder.on_publication(ServiceInstancePublicationCause::Announcement, None, &[]);
+        let mut publication_fut = pin!(publication_fut);
+        assert_matches!(exec.run_until_stalled(&mut publication_fut), Poll::Pending);
+
+        // Run the border agent future and observe:
+        // 1. The border agent future is still running.
+        // 2. The publication future completes.
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_matches!(
+            exec.run_until_stalled(&mut publication_fut),
+            Poll::Ready(Ok(Ok(ServiceInstancePublication { port, text, .. }))) => {
+                assert_eq!(port, Some(TEST_PORT));
+                assert_eq!(text, Some(vec![
+                    // asdf=1234
+                    vec![97, 98, 99, 100, 61, 1, 2, 3, 4],
+                    // wxyz=5678
+                    vec![119, 120, 121, 122, 61, 5, 6, 7, 8],
+                ]))
+            }
+        );
+
+        // Verify that the publisher proxy is still held.
+        assert_matches!(
+            exec.run_until_stalled(&mut test_vals.publisher_stream.next()),
+            Poll::Pending
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_publish_border_agent_service_exits_when_publisher_drops_responder() {
+        let mut exec = TestExecutor::new();
+        let mut test_vals = test_setup();
+
+        let fut = publish_border_agent_service(
+            String::from(TEST_SERVICE),
+            TEST_TEXT.to_vec(),
+            TEST_PORT,
+            test_vals.publisher,
+        );
+        let mut fut = pin!(fut);
+
+        // Progress the future and expect it to stall while attempting to interact with MDNS.
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // There should now be a request from the publisher.
+        let responder = match exec.run_until_stalled(&mut test_vals.publisher_stream.next()) {
+            Poll::Ready(Some(Ok(
+                fidl_mdns::ServiceInstancePublisherRequest::PublishServiceInstance {
+                    service,
+                    instance,
+                    options,
+                    publication_responder,
+                    responder,
+                },
+            ))) => {
+                assert_eq!(service, BORDER_AGENT_SERVICE_TYPE);
+                assert_eq!(instance, TEST_SERVICE);
+                assert_eq!(options, ServiceInstancePublicationOptions::default());
+                responder.send(Ok(())).expect("Failed to send publish response");
+
+                publication_responder
+            }
+            other => panic!("Unexpected variant: {:?}", other),
+        };
+        drop(responder);
+
+        // The future should complete.
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 }
