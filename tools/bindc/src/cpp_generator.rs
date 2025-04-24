@@ -1,3 +1,4 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -23,7 +24,7 @@ impl BindingGenerator for CppGenerator {
             var_name = var_name.strip_prefix("BIND_").unwrap_or(&var_name).to_string();
         }
 
-        format!("static const std::string {} = \"{}.{}\";\n", var_name, path, identifier_name)
+        format!("static const std::string_view {} = \"{}.{}\";\n", var_name, path, identifier_name)
     }
 
     fn generate_numerical_value_declaration(self: &Self, name: &str, val: &u64) -> String {
@@ -31,7 +32,7 @@ impl BindingGenerator for CppGenerator {
     }
 
     fn generate_string_value_declaration(self: &Self, name: &str, val: &str) -> String {
-        format!("static const std::string {} = \"{}\";\n", name, val)
+        format!("static const std::string_view {} = \"{}\";\n", name, val)
     }
 
     fn generate_bool_value_declaration(self: &Self, name: &str, val: &bool) -> String {
@@ -45,7 +46,7 @@ impl BindingGenerator for CppGenerator {
         identifier_name: &str,
         val: &str,
     ) -> String {
-        format!("static const std::string {} = \"{}.{}.{}\";\n", name, path, identifier_name, val)
+        format!("static const std::string_view {} = \"{}.{}.{}\";\n", name, path, identifier_name, val)
     }
 
     fn generate_result(
