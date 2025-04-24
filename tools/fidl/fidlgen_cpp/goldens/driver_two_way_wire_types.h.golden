@@ -67,10 +67,6 @@ template <>
 struct IsWire<::test_drivertwoway::wire::TwoWayAddRequest> : public std::true_type {};
 template <>
 struct IsStruct<::test_drivertwoway::wire::TwoWayAddRequest> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_drivertwoway::wire::TwoWayAddRequest>);
-static_assert(offsetof(::test_drivertwoway::wire::TwoWayAddRequest, addend1) == 0);
-static_assert(offsetof(::test_drivertwoway::wire::TwoWayAddRequest, addend2) == 2);
-static_assert(sizeof(::test_drivertwoway::wire::TwoWayAddRequest) == TypeTraits<::test_drivertwoway::wire::TwoWayAddRequest>::kPrimarySize);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_drivertwoway::wire::TwoWayAddRequest, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
@@ -81,23 +77,9 @@ struct ::fidl::internal::WireCodingTraits<::test_drivertwoway::wire::TwoWayAddRe
   static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::test_drivertwoway::wire::TwoWayAddRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_drivertwoway::wire::TwoWayAddRequest));
-    } else {
-      internal::WireCodingTraits<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->addend1, position + 0, recursion_depth);
-      internal::WireCodingTraits<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->addend2, position + 2, recursion_depth);
-    }
-  }
+      internal::WireEncoder* encoder, ::test_drivertwoway::wire::TwoWayAddRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-      internal::WireCodingTraits<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-          decoder, position + 2, recursion_depth);
-    }
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <>
@@ -117,9 +99,6 @@ template <>
 struct IsWire<::test_drivertwoway::wire::TwoWayAddResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_drivertwoway::wire::TwoWayAddResponse> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_drivertwoway::wire::TwoWayAddResponse>);
-static_assert(offsetof(::test_drivertwoway::wire::TwoWayAddResponse, sum) == 0);
-static_assert(sizeof(::test_drivertwoway::wire::TwoWayAddResponse) == TypeTraits<::test_drivertwoway::wire::TwoWayAddResponse>::kPrimarySize);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_drivertwoway::wire::TwoWayAddResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
@@ -130,20 +109,9 @@ struct ::fidl::internal::WireCodingTraits<::test_drivertwoway::wire::TwoWayAddRe
   static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::test_drivertwoway::wire::TwoWayAddResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_drivertwoway::wire::TwoWayAddResponse));
-    } else {
-      internal::WireCodingTraits<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->sum, position + 0, recursion_depth);
-    }
-  }
+      internal::WireEncoder* encoder, ::test_drivertwoway::wire::TwoWayAddResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #pragma clang diagnostic pop

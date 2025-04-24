@@ -86,46 +86,61 @@ constexpr inline auto ToUnderlying({{ . }} value) -> {{ .Type }} {
 
 {{ end }}
 
+
+{{- define "Enum:WireTypesSource" }}
+template <bool IsRecursive>
+void fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+  ::fidl::internal::WireEncoder* encoder, {{ . }}* value, ::fidl::internal::WirePosition position, ::fidl::internal::RecursionDepth<IsRecursive> recursion_depth) {
+  {{- if .Strictness }}
+  {{- $enumType := . }}
+  switch (*value) {
+    {{- range .Members }}
+    case {{ $enumType }}::{{ .Unified }}:
+    {{- end }}
+    {{- if .Members }}
+      break;
+    {{- end }}
+    default:
+      encoder->SetError(::fidl::internal::kCodingErrorUnknownEnumValue);
+      return;
+  }
+  {{- end }}
+  *position.As<{{ . }}>() = *value;
+}
+
+template <bool IsRecursive>
+void fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+  ::fidl::internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, ::fidl::internal::RecursionDepth<IsRecursive> recursion_depth) {
+  {{- if .Strictness }}
+  [[maybe_unused]] {{ . }} value = *position.As<{{ . }}>();
+  {{- $enumType := . }}
+  switch (value) {
+    {{- range .Members }}
+    case {{ $enumType }}::{{ .Unified }}:
+    {{- end }}
+    {{- if .Members }}
+      break;
+    {{- end }}
+    default:
+      decoder->SetError(::fidl::internal::kCodingErrorUnknownEnumValue);
+      return;
+  }
+  {{- end }}
+}
+
+template struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
+{{ end }}
+
 {{- define "Enum:Traits:WireTypesHeader" }}
 template <bool IsRecursive>
 struct internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = sizeof({{ .Type }});
   static constexpr bool kIsMemcpyCompatible = {{ not .Strictness }};
 
-  static void Encode(internal::WireEncoder* encoder, {{ . }}* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    {{- if .Strictness }}
-    {{- $enumType := . }}
-    switch (*value) {
-      {{- range .Members }}
-      case {{ $enumType }}::{{ .Unified }}:
-      {{- end }}
-      {{- if .Members }}
-        break;
-      {{- end }}
-      default:
-        encoder->SetError(::fidl::internal::kCodingErrorUnknownEnumValue);
-        return;
-    }
-    {{- end }}
-    *position.As<{{ . }}>() = *value;
-  }
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    {{- if .Strictness }}
-    [[maybe_unused]] {{ . }} value = *position.As<{{ . }}>();
-    {{- $enumType := . }}
-    switch (value) {
-      {{- range .Members }}
-      case {{ $enumType }}::{{ .Unified }}:
-      {{- end }}
-      {{- if .Members }}
-        break;
-      {{- end }}
-      default:
-        decoder->SetError(::fidl::internal::kCodingErrorUnknownEnumValue);
-        return;
-    }
-    {{- end }}
-  }
+  static void Encode(internal::WireEncoder* encoder, {{ . }}* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 {{ end }}

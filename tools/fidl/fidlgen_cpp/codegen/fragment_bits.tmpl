@@ -121,30 +121,49 @@ constexpr inline void {{ .Name }}::operator-=(
 
 {{ end }}
 
+
+
+{{- define "Bits:WireTypesSource" }}
+static_assert(std::is_standard_layout_v<{{ . }}>);
+static_assert(sizeof({{ . }}) == sizeof({{ .Type }}));
+
+template <bool IsRecursive>
+void fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    ::fidl::internal::WireEncoder* encoder, {{ . }}* value, ::fidl::internal::WirePosition position, ::fidl::internal::RecursionDepth<IsRecursive> recursion_depth) {
+  {{- if .Strictness }}
+  if (unlikely(static_cast<{{ .Type }}>(*value) & ~{{ .Mask }}ull)) {
+    encoder->SetError(::fidl::internal::kCodingErrorUnknownBitSetInBitsValue);
+  }
+  {{- end }}
+  *position.As<{{ . }}>() = *value;
+}
+
+template <bool IsRecursive>
+void fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    ::fidl::internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, ::fidl::internal::RecursionDepth<IsRecursive> recursion_depth) {
+  {{- if .Strictness }}
+  {{ . }} value = *position.As<{{ . }}>();
+  if (unlikely(static_cast<{{ .Type }}>(value) & ~{{ .Mask }}ull)) {
+    decoder->SetError(::fidl::internal::kCodingErrorUnknownBitSetInBitsValue);
+  }
+  {{- end }}
+}
+
+template struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
+{{ end }}
+
+
+
 {{- define "Bits:Traits:WireTypesHeader" }}
 template <bool IsRecursive>
 struct internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = sizeof({{ .Type }});
   static constexpr bool kIsMemcpyCompatible = {{ not .Strictness }};
-
-  static void Encode(internal::WireEncoder* encoder, {{ . }}* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    {{- if .Strictness }}
-    if (unlikely(static_cast<{{ .Type }}>(*value) & ~{{ .Mask }}ull)) {
-      encoder->SetError(::fidl::internal::kCodingErrorUnknownBitSetInBitsValue);
-    }
-    {{- end }}
-    *position.As<{{ . }}>() = *value;
-  }
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    {{- if .Strictness }}
-    {{ . }} value = *position.As<{{ . }}>();
-    if (unlikely(static_cast<{{ .Type }}>(value) & ~{{ .Mask }}ull)) {
-      decoder->SetError(::fidl::internal::kCodingErrorUnknownBitSetInBitsValue);
-    }
-    {{- end }}
-  }
+  static void Encode(internal::WireEncoder* encoder, {{ . }}* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
 {{ end }}
 
 
@@ -155,8 +174,6 @@ template <>
 struct IsFidlType<{{ . }}> : public std::true_type {};
 template <>
 struct ContainsHandle<{{ . }}> : public std::false_type {};
-static_assert(std::is_standard_layout_v<{{ . }}>);
-static_assert(sizeof({{ . }}) == sizeof({{ .Type }}));
 {{- end }}
 
 {{- define "Bits:WireTypesHeader" }}

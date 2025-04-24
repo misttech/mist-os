@@ -24,19 +24,12 @@ class {{ .Name }} {
   static constexpr char kSerializableName[] = "{{ .Serializable.Name }}";
   {{- end }}
 
-  {{ .Name }}() : ordinal_({{ .WireInvalidOrdinal }}), envelope_{} {}
+  {{ .Name }}();
 
   {{ if .IsResourceType }}
   ~{{ .Name }}();
-  {{ .Name }}({{ .Name }}&& other) {
-    _Move(std::move(other));
-  }
-  {{ .Name }}& operator=({{ .Name }}&& other) {
-    if (this != &other) {
-      _Move(std::move(other));
-    }
-    return *this;
-  }
+  {{ .Name }}({{ .Name }}&& other);
+  {{ .Name }}& operator=({{ .Name }}&& other);
   {{- else -}}
   {{ .Name }}(const {{ .Name }}&) = default;
   {{ .Name }}& operator=(const {{ .Name }}&) = default;
@@ -59,58 +52,35 @@ class {{ .Name }} {
   }
   {{- end }}
 
-  bool has_invalid_tag() const { return ordinal_ == {{ .WireInvalidOrdinal }}; }
+  bool has_invalid_tag() const;
 
   {{- range $index, $member := .Members }}
 
-  bool is_{{ .Name }}() const { return ordinal_ == {{ .WireOrdinalName }}; }
+    bool is_{{ .Name }}() const;
 
-  {{- if .Type.InlineInEnvelope }}
-  {{ .Docs }}
-  static {{ $.Name }} With{{ .UpperCamelCaseName }}({{ .Type }} val) {
-    {{ $.Name }} result;
-    result.ordinal_ = {{ .WireOrdinalName }};
-    result.envelope_.As<{{ .Type }}>().set_data(std::move(val));
-    return result;
-  }
-  {{- else }}
-  {{ .Docs }}
-  static {{ $.Name }} With{{ .UpperCamelCaseName }}(::fidl::ObjectView<{{ .Type }}> val) {
-    {{ $.Name }} result;
-    result.ordinal_ = {{ .WireOrdinalName }};
-    result.envelope_.As<{{ .Type }}>().set_data(std::move(val));
-    return result;
-  }
+    {{- if .Type.InlineInEnvelope }}
+      {{ .Docs }}
+      static {{ $.Name }} With{{ .UpperCamelCaseName }}({{ .Type }} val);
+    {{- else }}
+      {{ .Docs }}
+      static {{ $.Name }} With{{ .UpperCamelCaseName }}(::fidl::ObjectView<{{ .Type }}> val);
 
-  {{ .Docs }}
-  template <typename... Args>
-  static {{ $.Name }} With{{ .UpperCamelCaseName }}(::fidl::AnyArena& allocator, Args&&... args) {
-    return With{{ .UpperCamelCaseName }}(::fidl::ObjectView<{{ .Type }}>(allocator,
-                                         std::forward<Args>(args)...));
-  }
-  {{- end }}
+      {{ .Docs }}
+      template <typename... Args>
+      static {{ $.Name }} With{{ .UpperCamelCaseName }}(::fidl::AnyArena& allocator, Args&&... args) {
+        return With{{ .UpperCamelCaseName }}(::fidl::ObjectView<{{ .Type }}>(allocator,
+                                            std::forward<Args>(args)...));
+      }
+    {{- end }}
 
-{{ "" }}
-  {{- .Docs }}
-  {{ .Type }}& {{ .Name }}() {
-    ZX_ASSERT(ordinal_ == {{ .WireOrdinalName }});
-    return envelope_.As<{{ .Type }}>().get_data();
-  }
-  {{- .Docs }}
-  const {{ .Type }}& {{ .Name }}() const {
-    ZX_ASSERT(ordinal_ == {{ .WireOrdinalName }});
-    return envelope_.As<{{ .Type }}>().get_data();
-  }
-  {{- end }}
+    {{ .Docs }}
+    {{ .Type }}& {{ .Name }}();
 
-  {{- if .IsFlexible }}
+    {{ .Docs }}
+    const {{ .Type }}& {{ .Name }}() const;
+  {{ end }}
+
   {{ .TagEnum }} Which() const;
-  {{- else }}
-  {{ .TagEnum }} Which() const {
-    ZX_ASSERT(!has_invalid_tag());
-    return static_cast<{{ .TagEnum }}>(ordinal_);
-  }
-  {{- end }}
 
   {{- if .IsResourceType }}
   void _CloseHandles();
@@ -145,6 +115,9 @@ class {{ .Name }} {
 {{- if .IsResourceType }}
 {{- IfdefFuchsia -}}
 {{- end }}
+
+{{ . }}::{{ .Name }}() : ordinal_({{ .WireInvalidOrdinal }}), envelope_{} {}
+
 {{- if .IsFlexible }}
 auto {{ . }}::Which() const -> {{ .TagEnum }} {
   ZX_ASSERT(!has_invalid_tag());
@@ -161,6 +134,12 @@ auto {{ . }}::Which() const -> {{ .TagEnum }} {
   return {{ .TagUnknown }};
   {{- end }}
 }
+{{ else }}
+{{ .TagEnum }} {{ .NoLeading }}::Which() const {
+  ZX_ASSERT(!has_invalid_tag());
+  return static_cast<{{ .TagEnum }}>(ordinal_);
+}
+
 {{- end }}
 
 void {{ . }}::SizeAndOffsetAssertionHelper() {
@@ -181,6 +160,17 @@ void {{ . }}::SizeAndOffsetAssertionHelper() {
       break;
   }
 }
+
+{{ . }}::{{ .Name }}({{ .Name }}&& other) {
+  _Move(std::move(other));
+}
+{{ . }}& {{ .NoLeading }}::operator=({{ . }}&& other) {
+  if (this != &other) {
+    _Move(std::move(other));
+  }
+  return *this;
+}
+
 
 void {{ . }}::_Move({{ .Name }}&& other) {
   ordinal_ = other.ordinal_;
@@ -211,6 +201,148 @@ void {{ . }}::_CloseHandles() {
 }
 {{- end }}
 
+bool {{ .NoLeading }}::has_invalid_tag() const { return ordinal_ == {{ .WireInvalidOrdinal }}; }
+
+{{- range $index, $member := .Members }}
+
+  bool {{ $.NoLeading }}::is_{{ .Name }}() const { return ordinal_ == {{ .WireOrdinalName }}; }
+
+  {{- if .Type.InlineInEnvelope }}
+    {{ $ }} {{ $.NoLeading }}::With{{ .UpperCamelCaseName }}({{ .Type }} val) {
+      {{ $.Name }} result;
+      result.ordinal_ = {{ .WireOrdinalName }};
+      result.envelope_.As<{{ .Type }}>().set_data(std::move(val));
+      return result;
+    }
+  {{- else }}
+    {{ $ }} {{ $.NoLeading }}::With{{ .UpperCamelCaseName }}(::fidl::ObjectView<{{ .Type }}> val) {
+      {{ $.Name }} result;
+      result.ordinal_ = {{ .WireOrdinalName }};
+      result.envelope_.As<{{ .Type }}>().set_data(std::move(val));
+      return result;
+    }
+  {{- end }}
+
+  {{ .Docs }}
+  {{ .Type }}& {{ $.NoLeading }}::{{ .Name }}() {
+    ZX_ASSERT(ordinal_ == {{ .WireOrdinalName }});
+    return envelope_.As<{{ .Type }}>().get_data();
+  }
+  {{- .Docs }}
+  const {{ .Type }}& {{ $.NoLeading }}::{{ .Name }}() const {
+    ZX_ASSERT(ordinal_ == {{ .WireOrdinalName }});
+    return envelope_.As<{{ .Type }}>().get_data();
+  }
+{{- end }}
+
+
+static_assert(std::is_standard_layout_v<{{ . }}>);
+
+template <typename Constraint, bool IsRecursive>
+void fidl::internal::WireCodingTraits<{{ . }}, Constraint, IsRecursive>::Encode(
+    ::fidl::internal::WireEncoder* encoder, {{ . }}* value, ::fidl::internal::WirePosition position, ::fidl::internal::RecursionDepth<IsRecursive> recursion_depth) {
+  fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
+
+  if (unlikely(u->tag == 0)) {
+    if constexpr (Constraint::is_optional) {
+      *position.As<fidl_union_t>() = {};
+      return;
+    }
+    encoder->SetError(::fidl::internal::kCodingErrorInvalidUnionTag);
+    return;
+  }
+
+  ::fidl::internal::RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
+  if (!inner_depth.IsValid()) {
+    return;
+  }
+
+  *position.As<fidl_xunion_tag_t>() = u->tag;
+
+  {{/* Two switches here, so they are translated to lookup tables. */}}
+  size_t encode_inline_size;
+  switch (u->tag) {
+    {{- range .Members }}
+    case {{ .Ordinal }}: // {{ .TagName }}
+      encode_inline_size = ::fidl::internal::WireCodingTraits<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>::kInlineSize;
+      break;
+    {{- end }}
+    default:
+      encode_inline_size = 0;
+      break;
+  }
+  ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
+  switch (u->tag) {
+    {{- range .Members }}
+    case {{ .Ordinal }}: // {{ .TagName }}
+      encode_fn = ::fidl::internal::MakeEncodeFn<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>();
+      break;
+    {{- end }}
+    default:
+      encode_fn = nullptr;
+      break;
+  }
+  WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
+
+}
+
+template <typename Constraint, bool IsRecursive>
+void fidl::internal::WireCodingTraits<{{ . }}, Constraint, IsRecursive>::Decode(
+    ::fidl::internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, ::fidl::internal::RecursionDepth<IsRecursive> recursion_depth) {
+
+  {{ .TagEnum }} tag = *position.As<{{ .TagEnum }}>();
+  if (unlikely(static_cast<uint64_t>(tag) == 0)) {
+    if constexpr (!Constraint::is_optional) {
+      decoder->SetError(::fidl::internal::kCodingErrorInvalidUnionTag);
+      return;
+    }
+    if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
+      decoder->SetError(::fidl::internal::kCodingErrorZeroTagButNonZeroEnvelope);
+    }
+    return;
+  }
+
+  ::fidl::internal::RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
+  if (!inner_depth.IsValid()) {
+    return;
+  }
+
+  {{/* Two switches here, so they are translated to lookup tables. */}}
+  size_t decode_inline_size;
+  switch (tag) {
+    {{- range .Members }}
+    case {{ .TagName }}:
+      decode_inline_size = ::fidl::internal::WireCodingTraits<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>::kInlineSize;
+      break;
+    {{- end }}
+    default:
+      decode_inline_size = 0;
+      break;
+  }
+  DecodeFn<IsRecursive> decode_fn;
+  switch(tag) {
+    {{- range .Members }}
+    case {{ .TagName }}:
+      decode_fn = ::fidl::internal::MakeDecodeFn<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>();
+      break;
+    {{- end }}
+    default:
+      decode_fn = nullptr;
+      break;
+  }
+  {{- if .IsFlexible }}
+  ::fidl::internal::WireDecodeFlexibleEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
+  {{- else }}
+  ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
+  {{- end }}
+}
+
+template struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintUnion<false>, true>;
+template struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintUnion<false>, false>;
+template struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintUnion<true>, true>;
+template struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintUnion<true>, false>;
+
+
 {{- if .IsResourceType }}
 {{- EndifFuchsia -}}
 {{- end }}
@@ -240,106 +372,15 @@ template <>
 struct IsWire<{{ . }}> : public std::true_type {};
 template <>
 struct IsUnion<{{ . }}> : public std::true_type {};
-static_assert(std::is_standard_layout_v<{{ . }}>);
 
 template <typename Constraint, bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<{{ . }}, Constraint, IsRecursive> {
   static constexpr size_t kInlineSize = {{ .TypeShapeV2.InlineSize }};
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, {{ . }}* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
+  static void Encode(internal::WireEncoder* encoder, {{ . }}* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 
-    if (unlikely(u->tag == 0)) {
-      if constexpr (Constraint::is_optional) {
-        *position.As<fidl_union_t>() = {};
-        return;
-      }
-      encoder->SetError(kCodingErrorInvalidUnionTag);
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    *position.As<fidl_xunion_tag_t>() = u->tag;
-
-    {{/* Two switches here, so they are translated to lookup tables. */}}
-    size_t encode_inline_size;
-    switch (u->tag) {
-      {{- range .Members }}
-      case {{ .Ordinal }}: // {{ .TagName }}
-        encode_inline_size = ::fidl::internal::WireCodingTraits<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>::kInlineSize;
-        break;
-      {{- end }}
-      default:
-        encode_inline_size = 0;
-        break;
-    }
-    ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
-    switch (u->tag) {
-      {{- range .Members }}
-      case {{ .Ordinal }}: // {{ .TagName }}
-        encode_fn = ::fidl::internal::MakeEncodeFn<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>();
-        break;
-      {{- end }}
-      default:
-        encode_fn = nullptr;
-        break;
-    }
-    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
-
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    {{ .TagEnum }} tag = *position.As<{{ .TagEnum }}>();
-    if (unlikely(static_cast<uint64_t>(tag) == 0)) {
-      if constexpr (!Constraint::is_optional) {
-        decoder->SetError(kCodingErrorInvalidUnionTag);
-        return;
-      }
-      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
-      if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
-        decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
-      }
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    {{/* Two switches here, so they are translated to lookup tables. */}}
-    size_t decode_inline_size;
-    switch (tag) {
-      {{- range .Members }}
-      case {{ .TagName }}:
-        decode_inline_size = ::fidl::internal::WireCodingTraits<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>::kInlineSize;
-        break;
-      {{- end }}
-      default:
-        decode_inline_size = 0;
-        break;
-    }
-    DecodeFn<IsRecursive> decode_fn;
-    switch(tag) {
-      {{- range .Members }}
-      case {{ .TagName }}:
-        decode_fn = ::fidl::internal::MakeDecodeFn<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>();
-        break;
-      {{- end }}
-      default:
-        decode_fn = nullptr;
-        break;
-    }
-    {{- if .IsFlexible }}
-    ::fidl::internal::WireDecodeFlexibleEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
-    {{- else }}
-    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
-    {{- end }}
-  }
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 // Top-level union.

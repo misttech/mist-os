@@ -90,7 +90,7 @@ struct Int32Wrapper {
 
 class SimpleUnion {
  public:
-  SimpleUnion() : ordinal_(::test_nullable::wire::SimpleUnion::Ordinal::Invalid), envelope_{} {}
+  SimpleUnion();
 
   SimpleUnion(const SimpleUnion&) = default;
   SimpleUnion& operator=(const SimpleUnion&) = default;
@@ -102,47 +102,25 @@ class SimpleUnion {
     kB = 2,  // 0x2
   };
 
-  bool has_invalid_tag() const { return ordinal_ == ::test_nullable::wire::SimpleUnion::Ordinal::Invalid; }
+  bool has_invalid_tag() const;
 
-  bool is_a() const { return ordinal_ == ::test_nullable::wire::SimpleUnion::Ordinal::kA; }
+  bool is_a() const;
 
-  static SimpleUnion WithA(int32_t val) {
-    SimpleUnion result;
-    result.ordinal_ = ::test_nullable::wire::SimpleUnion::Ordinal::kA;
-    result.envelope_.As<int32_t>().set_data(std::move(val));
-    return result;
-  }
+  static SimpleUnion WithA(int32_t val);
 
-  int32_t& a() {
-    ZX_ASSERT(ordinal_ == ::test_nullable::wire::SimpleUnion::Ordinal::kA);
-    return envelope_.As<int32_t>().get_data();
-  }
-  const int32_t& a() const {
-    ZX_ASSERT(ordinal_ == ::test_nullable::wire::SimpleUnion::Ordinal::kA);
-    return envelope_.As<int32_t>().get_data();
-  }
+  int32_t& a();
 
-  bool is_b() const { return ordinal_ == ::test_nullable::wire::SimpleUnion::Ordinal::kB; }
+  const int32_t& a() const;
 
-  static SimpleUnion WithB(float val) {
-    SimpleUnion result;
-    result.ordinal_ = ::test_nullable::wire::SimpleUnion::Ordinal::kB;
-    result.envelope_.As<float>().set_data(std::move(val));
-    return result;
-  }
+  bool is_b() const;
 
-  float& b() {
-    ZX_ASSERT(ordinal_ == ::test_nullable::wire::SimpleUnion::Ordinal::kB);
-    return envelope_.As<float>().get_data();
-  }
-  const float& b() const {
-    ZX_ASSERT(ordinal_ == ::test_nullable::wire::SimpleUnion::Ordinal::kB);
-    return envelope_.As<float>().get_data();
-  }
-  ::test_nullable::wire::SimpleUnion::Tag Which() const {
-    ZX_ASSERT(!has_invalid_tag());
-    return static_cast<::test_nullable::wire::SimpleUnion::Tag>(ordinal_);
-  }
+  static SimpleUnion WithB(float val);
+
+  float& b();
+
+  const float& b() const;
+
+  ::test_nullable::wire::SimpleUnion::Tag Which() const;
 
  private:
   enum class Ordinal : fidl_xunion_tag_t {
@@ -200,9 +178,6 @@ template <>
 struct IsWire<::test_nullable::wire::StructWithNullableString> : public std::true_type {};
 template <>
 struct IsStruct<::test_nullable::wire::StructWithNullableString> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_nullable::wire::StructWithNullableString>);
-static_assert(offsetof(::test_nullable::wire::StructWithNullableString, val) == 0);
-static_assert(sizeof(::test_nullable::wire::StructWithNullableString) == TypeTraits<::test_nullable::wire::StructWithNullableString>::kPrimarySize);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNullableString, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
@@ -213,20 +188,9 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNulla
   static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::test_nullable::wire::StructWithNullableString* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_nullable::wire::StructWithNullableString));
-    } else {
-      internal::WireCodingTraits<::fidl::StringView, fidl::internal::WireCodingConstraintString<true>, IsRecursive>::Encode(encoder, &value->val, position + 0, recursion_depth);
-    }
-  }
+      internal::WireEncoder* encoder, ::test_nullable::wire::StructWithNullableString* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<::fidl::StringView, fidl::internal::WireCodingConstraintString<true>, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <>
@@ -246,9 +210,6 @@ template <>
 struct IsWire<::test_nullable::wire::StructWithNullableVector> : public std::true_type {};
 template <>
 struct IsStruct<::test_nullable::wire::StructWithNullableVector> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_nullable::wire::StructWithNullableVector>);
-static_assert(offsetof(::test_nullable::wire::StructWithNullableVector, val) == 0);
-static_assert(sizeof(::test_nullable::wire::StructWithNullableVector) == TypeTraits<::test_nullable::wire::StructWithNullableVector>::kPrimarySize);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNullableVector, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
@@ -259,20 +220,9 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNulla
   static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::test_nullable::wire::StructWithNullableVector* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_nullable::wire::StructWithNullableVector));
-    } else {
-      internal::WireCodingTraits<::fidl::VectorView<int32_t>, fidl::internal::WireCodingConstraintVector<fidl::internal::WireCodingConstraintEmpty, true>, IsRecursive>::Encode(encoder, &value->val, position + 0, recursion_depth);
-    }
-  }
+      internal::WireEncoder* encoder, ::test_nullable::wire::StructWithNullableVector* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<::fidl::VectorView<int32_t>, fidl::internal::WireCodingConstraintVector<fidl::internal::WireCodingConstraintEmpty, true>, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #ifdef __Fuchsia__
@@ -296,9 +246,6 @@ template <>
 struct IsWire<::test_nullable::wire::StructWithNullableHandle> : public std::true_type {};
 template <>
 struct IsStruct<::test_nullable::wire::StructWithNullableHandle> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_nullable::wire::StructWithNullableHandle>);
-static_assert(offsetof(::test_nullable::wire::StructWithNullableHandle, val) == 0);
-static_assert(sizeof(::test_nullable::wire::StructWithNullableHandle) == TypeTraits<::test_nullable::wire::StructWithNullableHandle>::kPrimarySize);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNullableHandle, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
@@ -309,20 +256,9 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNulla
   static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::test_nullable::wire::StructWithNullableHandle* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_nullable::wire::StructWithNullableHandle));
-    } else {
-      internal::WireCodingTraits<::zx::vmo, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_VMO, 0x80000000, true>, IsRecursive>::Encode(encoder, &value->val, position + 0, recursion_depth);
-    }
-  }
+      internal::WireEncoder* encoder, ::test_nullable::wire::StructWithNullableHandle* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<::zx::vmo, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_VMO, 0x80000000, true>, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #endif  // __Fuchsia__
@@ -344,10 +280,6 @@ template <>
 struct IsWire<::test_nullable::wire::SimpleProtocolAddRequest> : public std::true_type {};
 template <>
 struct IsStruct<::test_nullable::wire::SimpleProtocolAddRequest> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_nullable::wire::SimpleProtocolAddRequest>);
-static_assert(offsetof(::test_nullable::wire::SimpleProtocolAddRequest, a) == 0);
-static_assert(offsetof(::test_nullable::wire::SimpleProtocolAddRequest, b) == 4);
-static_assert(sizeof(::test_nullable::wire::SimpleProtocolAddRequest) == TypeTraits<::test_nullable::wire::SimpleProtocolAddRequest>::kPrimarySize);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::SimpleProtocolAddRequest, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
@@ -358,23 +290,9 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::SimpleProtocolA
   static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::test_nullable::wire::SimpleProtocolAddRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_nullable::wire::SimpleProtocolAddRequest));
-    } else {
-      internal::WireCodingTraits<int32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->a, position + 0, recursion_depth);
-      internal::WireCodingTraits<int32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->b, position + 4, recursion_depth);
-    }
-  }
+      internal::WireEncoder* encoder, ::test_nullable::wire::SimpleProtocolAddRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<int32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-      internal::WireCodingTraits<int32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-          decoder, position + 4, recursion_depth);
-    }
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <>
@@ -394,9 +312,6 @@ template <>
 struct IsWire<::test_nullable::wire::SimpleProtocolAddResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_nullable::wire::SimpleProtocolAddResponse> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_nullable::wire::SimpleProtocolAddResponse>);
-static_assert(offsetof(::test_nullable::wire::SimpleProtocolAddResponse, sum) == 0);
-static_assert(sizeof(::test_nullable::wire::SimpleProtocolAddResponse) == TypeTraits<::test_nullable::wire::SimpleProtocolAddResponse>::kPrimarySize);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::SimpleProtocolAddResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
@@ -407,20 +322,9 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::SimpleProtocolA
   static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::test_nullable::wire::SimpleProtocolAddResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_nullable::wire::SimpleProtocolAddResponse));
-    } else {
-      internal::WireCodingTraits<int32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->sum, position + 0, recursion_depth);
-    }
-  }
+      internal::WireEncoder* encoder, ::test_nullable::wire::SimpleProtocolAddResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<int32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #ifdef __Fuchsia__
@@ -444,9 +348,6 @@ template <>
 struct IsWire<::test_nullable::wire::StructWithNullableProtocol> : public std::true_type {};
 template <>
 struct IsStruct<::test_nullable::wire::StructWithNullableProtocol> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_nullable::wire::StructWithNullableProtocol>);
-static_assert(offsetof(::test_nullable::wire::StructWithNullableProtocol, val) == 0);
-static_assert(sizeof(::test_nullable::wire::StructWithNullableProtocol) == TypeTraits<::test_nullable::wire::StructWithNullableProtocol>::kPrimarySize);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNullableProtocol, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
@@ -457,20 +358,9 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNulla
   static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::test_nullable::wire::StructWithNullableProtocol* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_nullable::wire::StructWithNullableProtocol));
-    } else {
-      internal::WireCodingTraits<::fidl::ClientEnd<::test_nullable::SimpleProtocol>, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, true>, IsRecursive>::Encode(encoder, &value->val, position + 0, recursion_depth);
-    }
-  }
+      internal::WireEncoder* encoder, ::test_nullable::wire::StructWithNullableProtocol* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<::fidl::ClientEnd<::test_nullable::SimpleProtocol>, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, true>, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <>
@@ -493,9 +383,6 @@ template <>
 struct IsWire<::test_nullable::wire::StructWithNullableRequest> : public std::true_type {};
 template <>
 struct IsStruct<::test_nullable::wire::StructWithNullableRequest> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_nullable::wire::StructWithNullableRequest>);
-static_assert(offsetof(::test_nullable::wire::StructWithNullableRequest, val) == 0);
-static_assert(sizeof(::test_nullable::wire::StructWithNullableRequest) == TypeTraits<::test_nullable::wire::StructWithNullableRequest>::kPrimarySize);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNullableRequest, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
@@ -506,20 +393,9 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNulla
   static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::test_nullable::wire::StructWithNullableRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_nullable::wire::StructWithNullableRequest));
-    } else {
-      internal::WireCodingTraits<::fidl::ServerEnd<::test_nullable::SimpleProtocol>, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, true>, IsRecursive>::Encode(encoder, &value->val, position + 0, recursion_depth);
-    }
-  }
+      internal::WireEncoder* encoder, ::test_nullable::wire::StructWithNullableRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<::fidl::ServerEnd<::test_nullable::SimpleProtocol>, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, true>, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #endif  // __Fuchsia__
@@ -541,9 +417,6 @@ template <>
 struct IsWire<::test_nullable::wire::Int32Wrapper> : public std::true_type {};
 template <>
 struct IsStruct<::test_nullable::wire::Int32Wrapper> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_nullable::wire::Int32Wrapper>);
-static_assert(offsetof(::test_nullable::wire::Int32Wrapper, val) == 0);
-static_assert(sizeof(::test_nullable::wire::Int32Wrapper) == TypeTraits<::test_nullable::wire::Int32Wrapper>::kPrimarySize);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::Int32Wrapper, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
@@ -554,20 +427,9 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::Int32Wrapper, :
   static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::test_nullable::wire::Int32Wrapper* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_nullable::wire::Int32Wrapper));
-    } else {
-      internal::WireCodingTraits<int32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->val, position + 0, recursion_depth);
-    }
-  }
+      internal::WireEncoder* encoder, ::test_nullable::wire::Int32Wrapper* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<int32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <>
@@ -587,9 +449,6 @@ template <>
 struct IsWire<::test_nullable::wire::StructWithNullableStruct> : public std::true_type {};
 template <>
 struct IsStruct<::test_nullable::wire::StructWithNullableStruct> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_nullable::wire::StructWithNullableStruct>);
-static_assert(offsetof(::test_nullable::wire::StructWithNullableStruct, val) == 0);
-static_assert(sizeof(::test_nullable::wire::StructWithNullableStruct) == TypeTraits<::test_nullable::wire::StructWithNullableStruct>::kPrimarySize);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNullableStruct, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
@@ -600,20 +459,9 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNulla
   static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::test_nullable::wire::StructWithNullableStruct* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_nullable::wire::StructWithNullableStruct));
-    } else {
-      internal::WireCodingTraits<::fidl::ObjectView<::test_nullable::wire::Int32Wrapper>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->val, position + 0, recursion_depth);
-    }
-  }
+      internal::WireEncoder* encoder, ::test_nullable::wire::StructWithNullableStruct* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<::fidl::ObjectView<::test_nullable::wire::Int32Wrapper>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <>
@@ -633,9 +481,6 @@ template <>
 struct IsWire<::test_nullable::wire::StructWithNullableUnion> : public std::true_type {};
 template <>
 struct IsStruct<::test_nullable::wire::StructWithNullableUnion> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_nullable::wire::StructWithNullableUnion>);
-static_assert(offsetof(::test_nullable::wire::StructWithNullableUnion, val) == 0);
-static_assert(sizeof(::test_nullable::wire::StructWithNullableUnion) == TypeTraits<::test_nullable::wire::StructWithNullableUnion>::kPrimarySize);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNullableUnion, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
@@ -646,20 +491,9 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNulla
   static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::test_nullable::wire::StructWithNullableUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_nullable::wire::StructWithNullableUnion));
-    } else {
-      internal::WireCodingTraits<::fidl::WireOptional<::test_nullable::wire::SimpleUnion>, fidl::internal::WireCodingConstraintUnion<true>, IsRecursive>::Encode(encoder, &value->val, position + 0, recursion_depth);
-    }
-  }
+      internal::WireEncoder* encoder, ::test_nullable::wire::StructWithNullableUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<::fidl::WireOptional<::test_nullable::wire::SimpleUnion>, fidl::internal::WireCodingConstraintUnion<true>, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <>
@@ -679,104 +513,15 @@ template <>
 struct IsWire<::test_nullable::wire::SimpleUnion> : public std::true_type {};
 template <>
 struct IsUnion<::test_nullable::wire::SimpleUnion> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_nullable::wire::SimpleUnion>);
 
 template <typename Constraint, bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::SimpleUnion, Constraint, IsRecursive> {
   static constexpr size_t kInlineSize = 16;
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_nullable::wire::SimpleUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
+  static void Encode(internal::WireEncoder* encoder, ::test_nullable::wire::SimpleUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 
-    if (unlikely(u->tag == 0)) {
-      if constexpr (Constraint::is_optional) {
-        *position.As<fidl_union_t>() = {};
-        return;
-      }
-      encoder->SetError(kCodingErrorInvalidUnionTag);
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    *position.As<fidl_xunion_tag_t>() = u->tag;
-
-    size_t encode_inline_size;
-    switch (u->tag) {
-      case 1:  // ::test_nullable::wire::SimpleUnion::Tag::kA
-        encode_inline_size = ::fidl::internal::WireCodingTraits<int32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      case 2:  // ::test_nullable::wire::SimpleUnion::Tag::kB
-        encode_inline_size = ::fidl::internal::WireCodingTraits<float, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      default:
-        encode_inline_size = 0;
-        break;
-    }
-    ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
-    switch (u->tag) {
-      case 1:  // ::test_nullable::wire::SimpleUnion::Tag::kA
-        encode_fn = ::fidl::internal::MakeEncodeFn<int32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      case 2:  // ::test_nullable::wire::SimpleUnion::Tag::kB
-        encode_fn = ::fidl::internal::MakeEncodeFn<float, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      default:
-        encode_fn = nullptr;
-        break;
-    }
-    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
-
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    ::test_nullable::wire::SimpleUnion::Tag tag = *position.As<::test_nullable::wire::SimpleUnion::Tag>();
-    if (unlikely(static_cast<uint64_t>(tag) == 0)) {
-      if constexpr (!Constraint::is_optional) {
-        decoder->SetError(kCodingErrorInvalidUnionTag);
-        return;
-      }
-      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
-      if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
-        decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
-      }
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    size_t decode_inline_size;
-    switch (tag) {
-      case ::test_nullable::wire::SimpleUnion::Tag::kA:
-        decode_inline_size = ::fidl::internal::WireCodingTraits<int32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      case ::test_nullable::wire::SimpleUnion::Tag::kB:
-        decode_inline_size = ::fidl::internal::WireCodingTraits<float, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      default:
-        decode_inline_size = 0;
-        break;
-    }
-    DecodeFn<IsRecursive> decode_fn;
-    switch (tag) {
-      case ::test_nullable::wire::SimpleUnion::Tag::kA:
-        decode_fn = ::fidl::internal::MakeDecodeFn<int32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      case ::test_nullable::wire::SimpleUnion::Tag::kB:
-        decode_fn = ::fidl::internal::MakeDecodeFn<float, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      default:
-        decode_fn = nullptr;
-        break;
-    }
-    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 // Top-level union.

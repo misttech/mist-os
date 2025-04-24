@@ -30,6 +30,14 @@ fidl/{{ .LibraryDots }}/cpp/wire_types.cc
     {{ template "Const:WireTypesSource" . }}
   {{- end }}
 
+  {{- range .Bits }}
+    {{ template "Bits:WireTypesSource" . }}
+  {{- end }}
+
+  {{- range .Enums }}
+    {{ template "Enum:WireTypesSource" . }}
+  {{- end }}
+
   {{- range .Structs }}
     {{ template "Struct:WireTypesSource" . }}
   {{- end }}

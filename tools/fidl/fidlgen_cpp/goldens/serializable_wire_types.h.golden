@@ -84,7 +84,7 @@ class SerializableTable {
   ~SerializableTable() = default;
 
   // Returns whether no field is set.
-  bool IsEmpty() const { return max_ordinal_ == 0; }
+  bool IsEmpty() const;
 
   // Returns whether the table references unknown fields.
   bool HasUnknownData() const;
@@ -100,22 +100,14 @@ class SerializableTable {
  private:
 #endif  // FIDL_WIRE_ALLOW_DEPRECATED_MUTABLE_TABLES
 
-  explicit SerializableTable(::fidl::AnyArena& allocator)
-      : frame_ptr_(::fidl::ObjectView<::fidl::WireTableFrame<::test_serializable::wire::SerializableTable>>(allocator)) {}
+  explicit SerializableTable(::fidl::AnyArena& allocator);
   // This constructor allows a user controlled allocation (not using a Arena).
   // It should only be used when performance is key.
   // As soon as the frame is given to the table, it must not be used directly or for another table.
-  explicit SerializableTable(::fidl::ObjectView<::fidl::WireTableFrame<::test_serializable::wire::SerializableTable>>&& frame)
-      : frame_ptr_(std::move(frame)) {}
+  explicit SerializableTable(::fidl::ObjectView<::fidl::WireTableFrame<::test_serializable::wire::SerializableTable>>&& frame);
 
-  void Allocate(::fidl::AnyArena& allocator) {
-    max_ordinal_ = 0;
-    frame_ptr_ = ::fidl::ObjectView<::fidl::WireTableFrame<::test_serializable::wire::SerializableTable>>(allocator);
-  }
-  void Init(::fidl::ObjectView<::fidl::WireTableFrame<::test_serializable::wire::SerializableTable>>&& frame_ptr) {
-    max_ordinal_ = 0;
-    frame_ptr_ = std::move(frame_ptr);
-  }
+  void Allocate(::fidl::AnyArena& allocator);
+  void Init(::fidl::ObjectView<::fidl::WireTableFrame<::test_serializable::wire::SerializableTable>>&& frame_ptr);
 
  private:
   friend ::fidl::internal::WireTableBaseBuilder<::test_serializable::wire::SerializableTable, ::fidl::WireTableBuilder<::test_serializable::wire::SerializableTable>>;
@@ -142,17 +134,10 @@ class ::fidl::internal::WireTableBaseBuilder<::test_serializable::wire::Serializ
 
  public:
   // Build and return the table. The builder should not be used after this.
-  ::test_serializable::wire::SerializableTable Build() {
-    ZX_DEBUG_ASSERT(table_.frame_ptr_ != nullptr);
-    ::test_serializable::wire::SerializableTable t = std::move(table_);
-    // Poison this builder to prevent accidental reuse.
-    table_.frame_ptr_ = nullptr;
-    return t;
-  }
+  ::test_serializable::wire::SerializableTable Build();
 
  protected:
-  WireTableBaseBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_serializable::wire::SerializableTable>>&& frame)
-      : table_(std::move(frame)) {}
+  WireTableBaseBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_serializable::wire::SerializableTable>>&& frame);
 
  private:
   ::test_serializable::wire::SerializableTable table_;
@@ -165,9 +150,7 @@ class ::fidl::WireTableBuilder<::test_serializable::wire::SerializableTable> fin
  public:
  private:
   friend class ::test_serializable::wire::SerializableTable;
-  WireTableBuilder(::fidl::AnyArena& arena)
-      : Base(::fidl::ObjectView<::fidl::WireTableFrame<::test_serializable::wire::SerializableTable>>(arena)),
-        arena_(arena) {}
+  WireTableBuilder(::fidl::AnyArena& arena);
 
   [[maybe_unused]] std::reference_wrapper<::fidl::AnyArena> arena_;
 };
@@ -179,24 +162,16 @@ class ::fidl::WireTableExternalBuilder<::test_serializable::wire::SerializableTa
  private:
   friend class ::test_serializable::wire::SerializableTable;
   using Base::Base;
-  WireTableExternalBuilder(::fidl::WireTableFrame<::test_serializable::wire::SerializableTable>* frame)
-      : Base(::fidl::ObjectView<::fidl::WireTableFrame<::test_serializable::wire::SerializableTable>>::FromExternal(frame)) {}
+  WireTableExternalBuilder(::fidl::WireTableFrame<::test_serializable::wire::SerializableTable>* frame);
 };
 namespace test_serializable {
 namespace wire {
-
-inline ::fidl::WireTableBuilder<::test_serializable::wire::SerializableTable> SerializableTable::Builder(::fidl::AnyArena& arena) {
-  return ::fidl::WireTableBuilder<::test_serializable::wire::SerializableTable>(arena);
-}
-inline ::fidl::WireTableExternalBuilder<::test_serializable::wire::SerializableTable> SerializableTable::ExternalBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_serializable::wire::SerializableTable>> frame) {
-  return ::fidl::WireTableExternalBuilder<::test_serializable::wire::SerializableTable>(std::move(frame));
-}
 
 class SerializableUnion {
  public:
   static constexpr char kSerializableName[] = "test.serializable.SerializableUnion";
 
-  SerializableUnion() : ordinal_(::test_serializable::wire::SerializableUnion::Ordinal::Invalid), envelope_{} {}
+  SerializableUnion();
 
   SerializableUnion(const SerializableUnion&) = default;
   SerializableUnion& operator=(const SerializableUnion&) = default;
@@ -207,29 +182,17 @@ class SerializableUnion {
     kUnused = 1,  // 0x1
   };
 
-  bool has_invalid_tag() const { return ordinal_ == ::test_serializable::wire::SerializableUnion::Ordinal::Invalid; }
+  bool has_invalid_tag() const;
 
-  bool is_unused() const { return ordinal_ == ::test_serializable::wire::SerializableUnion::Ordinal::kUnused; }
+  bool is_unused() const;
 
-  static SerializableUnion WithUnused(bool val) {
-    SerializableUnion result;
-    result.ordinal_ = ::test_serializable::wire::SerializableUnion::Ordinal::kUnused;
-    result.envelope_.As<bool>().set_data(std::move(val));
-    return result;
-  }
+  static SerializableUnion WithUnused(bool val);
 
-  bool& unused() {
-    ZX_ASSERT(ordinal_ == ::test_serializable::wire::SerializableUnion::Ordinal::kUnused);
-    return envelope_.As<bool>().get_data();
-  }
-  const bool& unused() const {
-    ZX_ASSERT(ordinal_ == ::test_serializable::wire::SerializableUnion::Ordinal::kUnused);
-    return envelope_.As<bool>().get_data();
-  }
-  ::test_serializable::wire::SerializableUnion::Tag Which() const {
-    ZX_ASSERT(!has_invalid_tag());
-    return static_cast<::test_serializable::wire::SerializableUnion::Tag>(ordinal_);
-  }
+  bool& unused();
+
+  const bool& unused() const;
+
+  ::test_serializable::wire::SerializableUnion::Tag Which() const;
 
  private:
   enum class Ordinal : fidl_xunion_tag_t {
@@ -264,9 +227,6 @@ template <>
 struct IsWire<::test_serializable::wire::SerializableStruct> : public std::true_type {};
 template <>
 struct IsStruct<::test_serializable::wire::SerializableStruct> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_serializable::wire::SerializableStruct>);
-static_assert(offsetof(::test_serializable::wire::SerializableStruct, __reserved) == 0);
-static_assert(sizeof(::test_serializable::wire::SerializableStruct) == TypeTraits<::test_serializable::wire::SerializableStruct>::kPrimarySize);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_serializable::wire::SerializableStruct, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
@@ -277,23 +237,9 @@ struct ::fidl::internal::WireCodingTraits<::test_serializable::wire::Serializabl
   static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::test_serializable::wire::SerializableStruct* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_serializable::wire::SerializableStruct));
-    } else {
-      internal::WireCodingTraits<uint8_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->__reserved, position + 0, recursion_depth);
-    }
-  }
+      internal::WireEncoder* encoder, ::test_serializable::wire::SerializableStruct* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<uint8_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-    if (*position.As<uint8_t>() != 0) {
-      decoder->SetError(kCodingErrorInvalidPaddingBytes);
-    }
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <>
@@ -313,7 +259,6 @@ template <>
 struct IsWire<::test_serializable::wire::SerializableTable> : public std::true_type {};
 template <>
 struct IsTable<::test_serializable::wire::SerializableTable> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_serializable::wire::SerializableTable>);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_serializable::wire::SerializableTable, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
@@ -322,53 +267,8 @@ struct ::fidl::internal::WireCodingTraits<::test_serializable::wire::Serializabl
   static constexpr size_t kInlineSize = 16;
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_serializable::wire::SerializableTable* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 2);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    ::fidl::internal::WirePosition vector_position;
-    if (Base::PreworkResult::kEarlyExit ==
-        Base::PrepareForBodyEncode(encoder, value, position, &vector_position)) {
-      return;
-    }
-
-    fidl_vector_t* vec = reinterpret_cast<fidl_vector_t*>(value);
-    fidl_envelope_t* envelopes = static_cast<fidl_envelope_t*>(vec->data);
-    for (size_t i = 0; i < vec->count; i++) {
-      size_t encode_inline_size = 0;
-      switch (i) {
-      }
-      ::fidl::internal::EncodeFn<IsRecursive> encode_fn = nullptr;
-      switch (i) {
-      }
-      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_t);
-      WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
-    }
-  }
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 2);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    ::fidl::internal::WirePosition vector_position;
-    if (Base::PreworkResult::kEarlyExit == Base::DecodePrework(decoder, position, &vector_position)) {
-      return;
-    }
-
-    fidl_vector_t* vec = position.As<fidl_vector_t>();
-    for (size_t i = 0; i < vec->count; i++) {
-      size_t decode_inline_size = 0;
-      switch (i) {
-      }
-      DecodeFn<IsRecursive> decode_fn = nullptr;
-      switch (i) {
-      }
-      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_t), inner_depth);
-    }
-  }
+  static void Encode(internal::WireEncoder* encoder, ::test_serializable::wire::SerializableTable* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <>
@@ -388,92 +288,15 @@ template <>
 struct IsWire<::test_serializable::wire::SerializableUnion> : public std::true_type {};
 template <>
 struct IsUnion<::test_serializable::wire::SerializableUnion> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_serializable::wire::SerializableUnion>);
 
 template <typename Constraint, bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_serializable::wire::SerializableUnion, Constraint, IsRecursive> {
   static constexpr size_t kInlineSize = 16;
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_serializable::wire::SerializableUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
+  static void Encode(internal::WireEncoder* encoder, ::test_serializable::wire::SerializableUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 
-    if (unlikely(u->tag == 0)) {
-      if constexpr (Constraint::is_optional) {
-        *position.As<fidl_union_t>() = {};
-        return;
-      }
-      encoder->SetError(kCodingErrorInvalidUnionTag);
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    *position.As<fidl_xunion_tag_t>() = u->tag;
-
-    size_t encode_inline_size;
-    switch (u->tag) {
-      case 1:  // ::test_serializable::wire::SerializableUnion::Tag::kUnused
-        encode_inline_size = ::fidl::internal::WireCodingTraits<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      default:
-        encode_inline_size = 0;
-        break;
-    }
-    ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
-    switch (u->tag) {
-      case 1:  // ::test_serializable::wire::SerializableUnion::Tag::kUnused
-        encode_fn = ::fidl::internal::MakeEncodeFn<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      default:
-        encode_fn = nullptr;
-        break;
-    }
-    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
-
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    ::test_serializable::wire::SerializableUnion::Tag tag = *position.As<::test_serializable::wire::SerializableUnion::Tag>();
-    if (unlikely(static_cast<uint64_t>(tag) == 0)) {
-      if constexpr (!Constraint::is_optional) {
-        decoder->SetError(kCodingErrorInvalidUnionTag);
-        return;
-      }
-      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
-      if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
-        decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
-      }
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    size_t decode_inline_size;
-    switch (tag) {
-      case ::test_serializable::wire::SerializableUnion::Tag::kUnused:
-        decode_inline_size = ::fidl::internal::WireCodingTraits<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      default:
-        decode_inline_size = 0;
-        break;
-    }
-    DecodeFn<IsRecursive> decode_fn;
-    switch (tag) {
-      case ::test_serializable::wire::SerializableUnion::Tag::kUnused:
-        decode_fn = ::fidl::internal::MakeDecodeFn<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      default:
-        decode_fn = nullptr;
-        break;
-    }
-    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 // Top-level union.

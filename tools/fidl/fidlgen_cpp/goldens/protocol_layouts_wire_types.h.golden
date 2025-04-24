@@ -100,7 +100,7 @@ class LocalTablePayload {
   ~LocalTablePayload() = default;
 
   // Returns whether no field is set.
-  bool IsEmpty() const { return max_ordinal_ == 0; }
+  bool IsEmpty() const;
 
   // Returns whether the table references unknown fields.
   bool HasUnknownData() const;
@@ -111,49 +111,26 @@ class LocalTablePayload {
   // Return a builder that relies on explicitly allocating |fidl::ObjectView|s.
   static ::fidl::WireTableExternalBuilder<::test_protocollayouts::wire::LocalTablePayload> ExternalBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::LocalTablePayload>> frame);
 
-  [[nodiscard]] uint16_t& a() const {
-    ZX_ASSERT(has_a());
-    return frame_ptr_->a_.get_data();
-  }
-  [[nodiscard]] bool has_a() const {
-    return max_ordinal_ >= 1 && frame_ptr_->a_.has_data();
-  }
+  [[nodiscard]] uint16_t& a() const;
+  [[nodiscard]] bool has_a() const;
 #if defined(FIDL_WIRE_ALLOW_DEPRECATED_MUTABLE_TABLES) || false
  public:
 #else   // !defined(FIDL_WIRE_ALLOW_DEPRECATED_MUTABLE_TABLES)
  private:
 #endif  // FIDL_WIRE_ALLOW_DEPRECATED_MUTABLE_TABLES
 
-  LocalTablePayload& set_a(uint16_t elem) {
-    ZX_DEBUG_ASSERT(frame_ptr_ != nullptr);
-    frame_ptr_->a_.set_data(std::move(elem));
-    max_ordinal_ = std::max(max_ordinal_, static_cast<uint64_t>(1));
-    return *this;
-  }
+  LocalTablePayload& set_a(uint16_t elem);
 
-  LocalTablePayload& clear_a() {
-    ZX_DEBUG_ASSERT(frame_ptr_ != nullptr);
-    frame_ptr_->a_.clear_data();
-    max_ordinal_ = frame_ptr_->ComputeMaxOrdinal();
-    return *this;
-  }
+  LocalTablePayload& clear_a();
 
-  explicit LocalTablePayload(::fidl::AnyArena& allocator)
-      : frame_ptr_(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::LocalTablePayload>>(allocator)) {}
+  explicit LocalTablePayload(::fidl::AnyArena& allocator);
   // This constructor allows a user controlled allocation (not using a Arena).
   // It should only be used when performance is key.
   // As soon as the frame is given to the table, it must not be used directly or for another table.
-  explicit LocalTablePayload(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::LocalTablePayload>>&& frame)
-      : frame_ptr_(std::move(frame)) {}
+  explicit LocalTablePayload(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::LocalTablePayload>>&& frame);
 
-  void Allocate(::fidl::AnyArena& allocator) {
-    max_ordinal_ = 0;
-    frame_ptr_ = ::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::LocalTablePayload>>(allocator);
-  }
-  void Init(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::LocalTablePayload>>&& frame_ptr) {
-    max_ordinal_ = 0;
-    frame_ptr_ = std::move(frame_ptr);
-  }
+  void Allocate(::fidl::AnyArena& allocator);
+  void Init(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::LocalTablePayload>>&& frame_ptr);
 
  private:
   friend ::fidl::internal::WireTableBaseBuilder<::test_protocollayouts::wire::LocalTablePayload, ::fidl::WireTableBuilder<::test_protocollayouts::wire::LocalTablePayload>>;
@@ -180,45 +157,27 @@ class ::fidl::internal::WireTableBaseBuilder<::test_protocollayouts::wire::Local
 
  public:
   // Build and return the table. The builder should not be used after this.
-  ::test_protocollayouts::wire::LocalTablePayload Build() {
-    ZX_DEBUG_ASSERT(table_.frame_ptr_ != nullptr);
-    ::test_protocollayouts::wire::LocalTablePayload t = std::move(table_);
-    // Poison this builder to prevent accidental reuse.
-    table_.frame_ptr_ = nullptr;
-    return t;
-  }
-  [[nodiscard]] bool has_a() const {
-    return table_.has_a();
-  }
+  ::test_protocollayouts::wire::LocalTablePayload Build();
+  [[nodiscard]] bool has_a() const;
 
   // Clears the a field.
   //
   // This method should be used sparingly, such as only during tests, as it has
   // O(number_of_fields) complexity.
-  void clear_a() {
-    table_.clear_a();
-  }
+  void clear_a();
 
   // Getter for a.
   //
 
-  [[nodiscard]] uint16_t& a() const {
-    return table_.a();
-  }
+  [[nodiscard]] uint16_t& a() const;
 
   // Setter for a.
   //
 
-  BuilderImpl& a(uint16_t elem) {
-    ZX_DEBUG_ASSERT(table_.frame_ptr_ != nullptr);
-    table_.frame_ptr_->a_.set_data(std::move(elem));
-    table_.max_ordinal_ = std::max(table_.max_ordinal_, static_cast<uint64_t>(1));
-    return *static_cast<BuilderImpl*>(this);
-  }
+  BuilderImpl& a(uint16_t elem);
 
  protected:
-  WireTableBaseBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::LocalTablePayload>>&& frame)
-      : table_(std::move(frame)) {}
+  WireTableBaseBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::LocalTablePayload>>&& frame);
 
  private:
   ::test_protocollayouts::wire::LocalTablePayload table_;
@@ -231,9 +190,7 @@ class ::fidl::WireTableBuilder<::test_protocollayouts::wire::LocalTablePayload> 
  public:
  private:
   friend class ::test_protocollayouts::wire::LocalTablePayload;
-  WireTableBuilder(::fidl::AnyArena& arena)
-      : Base(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::LocalTablePayload>>(arena)),
-        arena_(arena) {}
+  WireTableBuilder(::fidl::AnyArena& arena);
 
   [[maybe_unused]] std::reference_wrapper<::fidl::AnyArena> arena_;
 };
@@ -245,21 +202,8 @@ class ::fidl::WireTableExternalBuilder<::test_protocollayouts::wire::LocalTableP
  private:
   friend class ::test_protocollayouts::wire::LocalTablePayload;
   using Base::Base;
-  WireTableExternalBuilder(::fidl::WireTableFrame<::test_protocollayouts::wire::LocalTablePayload>* frame)
-      : Base(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::LocalTablePayload>>::FromExternal(frame)) {}
+  WireTableExternalBuilder(::fidl::WireTableFrame<::test_protocollayouts::wire::LocalTablePayload>* frame);
 };
-namespace test_protocollayouts {
-namespace wire {
-
-inline ::fidl::WireTableBuilder<::test_protocollayouts::wire::LocalTablePayload> LocalTablePayload::Builder(::fidl::AnyArena& arena) {
-  return ::fidl::WireTableBuilder<::test_protocollayouts::wire::LocalTablePayload>(arena);
-}
-inline ::fidl::WireTableExternalBuilder<::test_protocollayouts::wire::LocalTablePayload> LocalTablePayload::ExternalBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::LocalTablePayload>> frame) {
-  return ::fidl::WireTableExternalBuilder<::test_protocollayouts::wire::LocalTablePayload>(std::move(frame));
-}
-
-}  // namespace wire
-}  // namespace test_protocollayouts
 
 template <>
 class ::fidl::WireTableBuilder<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>;
@@ -304,7 +248,7 @@ class MainProtocolOneWayAnonRequest {
   ~MainProtocolOneWayAnonRequest() = default;
 
   // Returns whether no field is set.
-  bool IsEmpty() const { return max_ordinal_ == 0; }
+  bool IsEmpty() const;
 
   // Returns whether the table references unknown fields.
   bool HasUnknownData() const;
@@ -315,49 +259,26 @@ class MainProtocolOneWayAnonRequest {
   // Return a builder that relies on explicitly allocating |fidl::ObjectView|s.
   static ::fidl::WireTableExternalBuilder<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest> ExternalBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>> frame);
 
-  [[nodiscard]] uint16_t& a() const {
-    ZX_ASSERT(has_a());
-    return frame_ptr_->a_.get_data();
-  }
-  [[nodiscard]] bool has_a() const {
-    return max_ordinal_ >= 1 && frame_ptr_->a_.has_data();
-  }
+  [[nodiscard]] uint16_t& a() const;
+  [[nodiscard]] bool has_a() const;
 #if defined(FIDL_WIRE_ALLOW_DEPRECATED_MUTABLE_TABLES) || false
  public:
 #else   // !defined(FIDL_WIRE_ALLOW_DEPRECATED_MUTABLE_TABLES)
  private:
 #endif  // FIDL_WIRE_ALLOW_DEPRECATED_MUTABLE_TABLES
 
-  MainProtocolOneWayAnonRequest& set_a(uint16_t elem) {
-    ZX_DEBUG_ASSERT(frame_ptr_ != nullptr);
-    frame_ptr_->a_.set_data(std::move(elem));
-    max_ordinal_ = std::max(max_ordinal_, static_cast<uint64_t>(1));
-    return *this;
-  }
+  MainProtocolOneWayAnonRequest& set_a(uint16_t elem);
 
-  MainProtocolOneWayAnonRequest& clear_a() {
-    ZX_DEBUG_ASSERT(frame_ptr_ != nullptr);
-    frame_ptr_->a_.clear_data();
-    max_ordinal_ = frame_ptr_->ComputeMaxOrdinal();
-    return *this;
-  }
+  MainProtocolOneWayAnonRequest& clear_a();
 
-  explicit MainProtocolOneWayAnonRequest(::fidl::AnyArena& allocator)
-      : frame_ptr_(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>>(allocator)) {}
+  explicit MainProtocolOneWayAnonRequest(::fidl::AnyArena& allocator);
   // This constructor allows a user controlled allocation (not using a Arena).
   // It should only be used when performance is key.
   // As soon as the frame is given to the table, it must not be used directly or for another table.
-  explicit MainProtocolOneWayAnonRequest(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>>&& frame)
-      : frame_ptr_(std::move(frame)) {}
+  explicit MainProtocolOneWayAnonRequest(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>>&& frame);
 
-  void Allocate(::fidl::AnyArena& allocator) {
-    max_ordinal_ = 0;
-    frame_ptr_ = ::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>>(allocator);
-  }
-  void Init(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>>&& frame_ptr) {
-    max_ordinal_ = 0;
-    frame_ptr_ = std::move(frame_ptr);
-  }
+  void Allocate(::fidl::AnyArena& allocator);
+  void Init(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>>&& frame_ptr);
 
  private:
   friend ::fidl::internal::WireTableBaseBuilder<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest, ::fidl::WireTableBuilder<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>>;
@@ -384,45 +305,27 @@ class ::fidl::internal::WireTableBaseBuilder<::test_protocollayouts::wire::MainP
 
  public:
   // Build and return the table. The builder should not be used after this.
-  ::test_protocollayouts::wire::MainProtocolOneWayAnonRequest Build() {
-    ZX_DEBUG_ASSERT(table_.frame_ptr_ != nullptr);
-    ::test_protocollayouts::wire::MainProtocolOneWayAnonRequest t = std::move(table_);
-    // Poison this builder to prevent accidental reuse.
-    table_.frame_ptr_ = nullptr;
-    return t;
-  }
-  [[nodiscard]] bool has_a() const {
-    return table_.has_a();
-  }
+  ::test_protocollayouts::wire::MainProtocolOneWayAnonRequest Build();
+  [[nodiscard]] bool has_a() const;
 
   // Clears the a field.
   //
   // This method should be used sparingly, such as only during tests, as it has
   // O(number_of_fields) complexity.
-  void clear_a() {
-    table_.clear_a();
-  }
+  void clear_a();
 
   // Getter for a.
   //
 
-  [[nodiscard]] uint16_t& a() const {
-    return table_.a();
-  }
+  [[nodiscard]] uint16_t& a() const;
 
   // Setter for a.
   //
 
-  BuilderImpl& a(uint16_t elem) {
-    ZX_DEBUG_ASSERT(table_.frame_ptr_ != nullptr);
-    table_.frame_ptr_->a_.set_data(std::move(elem));
-    table_.max_ordinal_ = std::max(table_.max_ordinal_, static_cast<uint64_t>(1));
-    return *static_cast<BuilderImpl*>(this);
-  }
+  BuilderImpl& a(uint16_t elem);
 
  protected:
-  WireTableBaseBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>>&& frame)
-      : table_(std::move(frame)) {}
+  WireTableBaseBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>>&& frame);
 
  private:
   ::test_protocollayouts::wire::MainProtocolOneWayAnonRequest table_;
@@ -435,9 +338,7 @@ class ::fidl::WireTableBuilder<::test_protocollayouts::wire::MainProtocolOneWayA
  public:
  private:
   friend class ::test_protocollayouts::wire::MainProtocolOneWayAnonRequest;
-  WireTableBuilder(::fidl::AnyArena& arena)
-      : Base(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>>(arena)),
-        arena_(arena) {}
+  WireTableBuilder(::fidl::AnyArena& arena);
 
   [[maybe_unused]] std::reference_wrapper<::fidl::AnyArena> arena_;
 };
@@ -449,21 +350,8 @@ class ::fidl::WireTableExternalBuilder<::test_protocollayouts::wire::MainProtoco
  private:
   friend class ::test_protocollayouts::wire::MainProtocolOneWayAnonRequest;
   using Base::Base;
-  WireTableExternalBuilder(::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>* frame)
-      : Base(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>>::FromExternal(frame)) {}
+  WireTableExternalBuilder(::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>* frame);
 };
-namespace test_protocollayouts {
-namespace wire {
-
-inline ::fidl::WireTableBuilder<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest> MainProtocolOneWayAnonRequest::Builder(::fidl::AnyArena& arena) {
-  return ::fidl::WireTableBuilder<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>(arena);
-}
-inline ::fidl::WireTableExternalBuilder<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest> MainProtocolOneWayAnonRequest::ExternalBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>> frame) {
-  return ::fidl::WireTableExternalBuilder<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>(std::move(frame));
-}
-
-}  // namespace wire
-}  // namespace test_protocollayouts
 
 template <>
 class ::fidl::WireTableBuilder<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>;
@@ -508,7 +396,7 @@ class MainProtocolTwoWayAnonResponse {
   ~MainProtocolTwoWayAnonResponse() = default;
 
   // Returns whether no field is set.
-  bool IsEmpty() const { return max_ordinal_ == 0; }
+  bool IsEmpty() const;
 
   // Returns whether the table references unknown fields.
   bool HasUnknownData() const;
@@ -519,49 +407,26 @@ class MainProtocolTwoWayAnonResponse {
   // Return a builder that relies on explicitly allocating |fidl::ObjectView|s.
   static ::fidl::WireTableExternalBuilder<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse> ExternalBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>> frame);
 
-  [[nodiscard]] uint16_t& a() const {
-    ZX_ASSERT(has_a());
-    return frame_ptr_->a_.get_data();
-  }
-  [[nodiscard]] bool has_a() const {
-    return max_ordinal_ >= 1 && frame_ptr_->a_.has_data();
-  }
+  [[nodiscard]] uint16_t& a() const;
+  [[nodiscard]] bool has_a() const;
 #if defined(FIDL_WIRE_ALLOW_DEPRECATED_MUTABLE_TABLES) || false
  public:
 #else   // !defined(FIDL_WIRE_ALLOW_DEPRECATED_MUTABLE_TABLES)
  private:
 #endif  // FIDL_WIRE_ALLOW_DEPRECATED_MUTABLE_TABLES
 
-  MainProtocolTwoWayAnonResponse& set_a(uint16_t elem) {
-    ZX_DEBUG_ASSERT(frame_ptr_ != nullptr);
-    frame_ptr_->a_.set_data(std::move(elem));
-    max_ordinal_ = std::max(max_ordinal_, static_cast<uint64_t>(1));
-    return *this;
-  }
+  MainProtocolTwoWayAnonResponse& set_a(uint16_t elem);
 
-  MainProtocolTwoWayAnonResponse& clear_a() {
-    ZX_DEBUG_ASSERT(frame_ptr_ != nullptr);
-    frame_ptr_->a_.clear_data();
-    max_ordinal_ = frame_ptr_->ComputeMaxOrdinal();
-    return *this;
-  }
+  MainProtocolTwoWayAnonResponse& clear_a();
 
-  explicit MainProtocolTwoWayAnonResponse(::fidl::AnyArena& allocator)
-      : frame_ptr_(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>>(allocator)) {}
+  explicit MainProtocolTwoWayAnonResponse(::fidl::AnyArena& allocator);
   // This constructor allows a user controlled allocation (not using a Arena).
   // It should only be used when performance is key.
   // As soon as the frame is given to the table, it must not be used directly or for another table.
-  explicit MainProtocolTwoWayAnonResponse(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>>&& frame)
-      : frame_ptr_(std::move(frame)) {}
+  explicit MainProtocolTwoWayAnonResponse(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>>&& frame);
 
-  void Allocate(::fidl::AnyArena& allocator) {
-    max_ordinal_ = 0;
-    frame_ptr_ = ::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>>(allocator);
-  }
-  void Init(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>>&& frame_ptr) {
-    max_ordinal_ = 0;
-    frame_ptr_ = std::move(frame_ptr);
-  }
+  void Allocate(::fidl::AnyArena& allocator);
+  void Init(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>>&& frame_ptr);
 
  private:
   friend ::fidl::internal::WireTableBaseBuilder<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse, ::fidl::WireTableBuilder<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>>;
@@ -588,45 +453,27 @@ class ::fidl::internal::WireTableBaseBuilder<::test_protocollayouts::wire::MainP
 
  public:
   // Build and return the table. The builder should not be used after this.
-  ::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse Build() {
-    ZX_DEBUG_ASSERT(table_.frame_ptr_ != nullptr);
-    ::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse t = std::move(table_);
-    // Poison this builder to prevent accidental reuse.
-    table_.frame_ptr_ = nullptr;
-    return t;
-  }
-  [[nodiscard]] bool has_a() const {
-    return table_.has_a();
-  }
+  ::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse Build();
+  [[nodiscard]] bool has_a() const;
 
   // Clears the a field.
   //
   // This method should be used sparingly, such as only during tests, as it has
   // O(number_of_fields) complexity.
-  void clear_a() {
-    table_.clear_a();
-  }
+  void clear_a();
 
   // Getter for a.
   //
 
-  [[nodiscard]] uint16_t& a() const {
-    return table_.a();
-  }
+  [[nodiscard]] uint16_t& a() const;
 
   // Setter for a.
   //
 
-  BuilderImpl& a(uint16_t elem) {
-    ZX_DEBUG_ASSERT(table_.frame_ptr_ != nullptr);
-    table_.frame_ptr_->a_.set_data(std::move(elem));
-    table_.max_ordinal_ = std::max(table_.max_ordinal_, static_cast<uint64_t>(1));
-    return *static_cast<BuilderImpl*>(this);
-  }
+  BuilderImpl& a(uint16_t elem);
 
  protected:
-  WireTableBaseBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>>&& frame)
-      : table_(std::move(frame)) {}
+  WireTableBaseBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>>&& frame);
 
  private:
   ::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse table_;
@@ -639,9 +486,7 @@ class ::fidl::WireTableBuilder<::test_protocollayouts::wire::MainProtocolTwoWayA
  public:
  private:
   friend class ::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse;
-  WireTableBuilder(::fidl::AnyArena& arena)
-      : Base(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>>(arena)),
-        arena_(arena) {}
+  WireTableBuilder(::fidl::AnyArena& arena);
 
   [[maybe_unused]] std::reference_wrapper<::fidl::AnyArena> arena_;
 };
@@ -653,21 +498,8 @@ class ::fidl::WireTableExternalBuilder<::test_protocollayouts::wire::MainProtoco
  private:
   friend class ::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse;
   using Base::Base;
-  WireTableExternalBuilder(::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>* frame)
-      : Base(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>>::FromExternal(frame)) {}
+  WireTableExternalBuilder(::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>* frame);
 };
-namespace test_protocollayouts {
-namespace wire {
-
-inline ::fidl::WireTableBuilder<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse> MainProtocolTwoWayAnonResponse::Builder(::fidl::AnyArena& arena) {
-  return ::fidl::WireTableBuilder<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>(arena);
-}
-inline ::fidl::WireTableExternalBuilder<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse> MainProtocolTwoWayAnonResponse::ExternalBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>> frame) {
-  return ::fidl::WireTableExternalBuilder<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>(std::move(frame));
-}
-
-}  // namespace wire
-}  // namespace test_protocollayouts
 
 template <>
 class ::fidl::WireTableBuilder<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>;
@@ -712,7 +544,7 @@ class MainProtocolTwoWayAnonWithErrorRequest {
   ~MainProtocolTwoWayAnonWithErrorRequest() = default;
 
   // Returns whether no field is set.
-  bool IsEmpty() const { return max_ordinal_ == 0; }
+  bool IsEmpty() const;
 
   // Returns whether the table references unknown fields.
   bool HasUnknownData() const;
@@ -723,49 +555,26 @@ class MainProtocolTwoWayAnonWithErrorRequest {
   // Return a builder that relies on explicitly allocating |fidl::ObjectView|s.
   static ::fidl::WireTableExternalBuilder<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest> ExternalBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>> frame);
 
-  [[nodiscard]] uint16_t& a() const {
-    ZX_ASSERT(has_a());
-    return frame_ptr_->a_.get_data();
-  }
-  [[nodiscard]] bool has_a() const {
-    return max_ordinal_ >= 1 && frame_ptr_->a_.has_data();
-  }
+  [[nodiscard]] uint16_t& a() const;
+  [[nodiscard]] bool has_a() const;
 #if defined(FIDL_WIRE_ALLOW_DEPRECATED_MUTABLE_TABLES) || false
  public:
 #else   // !defined(FIDL_WIRE_ALLOW_DEPRECATED_MUTABLE_TABLES)
  private:
 #endif  // FIDL_WIRE_ALLOW_DEPRECATED_MUTABLE_TABLES
 
-  MainProtocolTwoWayAnonWithErrorRequest& set_a(uint16_t elem) {
-    ZX_DEBUG_ASSERT(frame_ptr_ != nullptr);
-    frame_ptr_->a_.set_data(std::move(elem));
-    max_ordinal_ = std::max(max_ordinal_, static_cast<uint64_t>(1));
-    return *this;
-  }
+  MainProtocolTwoWayAnonWithErrorRequest& set_a(uint16_t elem);
 
-  MainProtocolTwoWayAnonWithErrorRequest& clear_a() {
-    ZX_DEBUG_ASSERT(frame_ptr_ != nullptr);
-    frame_ptr_->a_.clear_data();
-    max_ordinal_ = frame_ptr_->ComputeMaxOrdinal();
-    return *this;
-  }
+  MainProtocolTwoWayAnonWithErrorRequest& clear_a();
 
-  explicit MainProtocolTwoWayAnonWithErrorRequest(::fidl::AnyArena& allocator)
-      : frame_ptr_(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>>(allocator)) {}
+  explicit MainProtocolTwoWayAnonWithErrorRequest(::fidl::AnyArena& allocator);
   // This constructor allows a user controlled allocation (not using a Arena).
   // It should only be used when performance is key.
   // As soon as the frame is given to the table, it must not be used directly or for another table.
-  explicit MainProtocolTwoWayAnonWithErrorRequest(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>>&& frame)
-      : frame_ptr_(std::move(frame)) {}
+  explicit MainProtocolTwoWayAnonWithErrorRequest(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>>&& frame);
 
-  void Allocate(::fidl::AnyArena& allocator) {
-    max_ordinal_ = 0;
-    frame_ptr_ = ::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>>(allocator);
-  }
-  void Init(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>>&& frame_ptr) {
-    max_ordinal_ = 0;
-    frame_ptr_ = std::move(frame_ptr);
-  }
+  void Allocate(::fidl::AnyArena& allocator);
+  void Init(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>>&& frame_ptr);
 
  private:
   friend ::fidl::internal::WireTableBaseBuilder<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest, ::fidl::WireTableBuilder<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>>;
@@ -792,45 +601,27 @@ class ::fidl::internal::WireTableBaseBuilder<::test_protocollayouts::wire::MainP
 
  public:
   // Build and return the table. The builder should not be used after this.
-  ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest Build() {
-    ZX_DEBUG_ASSERT(table_.frame_ptr_ != nullptr);
-    ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest t = std::move(table_);
-    // Poison this builder to prevent accidental reuse.
-    table_.frame_ptr_ = nullptr;
-    return t;
-  }
-  [[nodiscard]] bool has_a() const {
-    return table_.has_a();
-  }
+  ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest Build();
+  [[nodiscard]] bool has_a() const;
 
   // Clears the a field.
   //
   // This method should be used sparingly, such as only during tests, as it has
   // O(number_of_fields) complexity.
-  void clear_a() {
-    table_.clear_a();
-  }
+  void clear_a();
 
   // Getter for a.
   //
 
-  [[nodiscard]] uint16_t& a() const {
-    return table_.a();
-  }
+  [[nodiscard]] uint16_t& a() const;
 
   // Setter for a.
   //
 
-  BuilderImpl& a(uint16_t elem) {
-    ZX_DEBUG_ASSERT(table_.frame_ptr_ != nullptr);
-    table_.frame_ptr_->a_.set_data(std::move(elem));
-    table_.max_ordinal_ = std::max(table_.max_ordinal_, static_cast<uint64_t>(1));
-    return *static_cast<BuilderImpl*>(this);
-  }
+  BuilderImpl& a(uint16_t elem);
 
  protected:
-  WireTableBaseBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>>&& frame)
-      : table_(std::move(frame)) {}
+  WireTableBaseBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>>&& frame);
 
  private:
   ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest table_;
@@ -843,9 +634,7 @@ class ::fidl::WireTableBuilder<::test_protocollayouts::wire::MainProtocolTwoWayA
  public:
  private:
   friend class ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest;
-  WireTableBuilder(::fidl::AnyArena& arena)
-      : Base(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>>(arena)),
-        arena_(arena) {}
+  WireTableBuilder(::fidl::AnyArena& arena);
 
   [[maybe_unused]] std::reference_wrapper<::fidl::AnyArena> arena_;
 };
@@ -857,22 +646,14 @@ class ::fidl::WireTableExternalBuilder<::test_protocollayouts::wire::MainProtoco
  private:
   friend class ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest;
   using Base::Base;
-  WireTableExternalBuilder(::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>* frame)
-      : Base(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>>::FromExternal(frame)) {}
+  WireTableExternalBuilder(::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>* frame);
 };
 namespace test_protocollayouts {
 namespace wire {
 
-inline ::fidl::WireTableBuilder<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest> MainProtocolTwoWayAnonWithErrorRequest::Builder(::fidl::AnyArena& arena) {
-  return ::fidl::WireTableBuilder<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>(arena);
-}
-inline ::fidl::WireTableExternalBuilder<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest> MainProtocolTwoWayAnonWithErrorRequest::ExternalBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>> frame) {
-  return ::fidl::WireTableExternalBuilder<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>(std::move(frame));
-}
-
 class LocalUnionPayload {
  public:
-  LocalUnionPayload() : ordinal_(::test_protocollayouts::wire::LocalUnionPayload::Ordinal::Invalid), envelope_{} {}
+  LocalUnionPayload();
 
   LocalUnionPayload(const LocalUnionPayload&) = default;
   LocalUnionPayload& operator=(const LocalUnionPayload&) = default;
@@ -887,25 +668,16 @@ class LocalUnionPayload {
     return Which() == ::test_protocollayouts::wire::LocalUnionPayload::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
-  bool has_invalid_tag() const { return ordinal_ == ::test_protocollayouts::wire::LocalUnionPayload::Ordinal::Invalid; }
+  bool has_invalid_tag() const;
 
-  bool is_b() const { return ordinal_ == ::test_protocollayouts::wire::LocalUnionPayload::Ordinal::kB; }
+  bool is_b() const;
 
-  static LocalUnionPayload WithB(bool val) {
-    LocalUnionPayload result;
-    result.ordinal_ = ::test_protocollayouts::wire::LocalUnionPayload::Ordinal::kB;
-    result.envelope_.As<bool>().set_data(std::move(val));
-    return result;
-  }
+  static LocalUnionPayload WithB(bool val);
 
-  bool& b() {
-    ZX_ASSERT(ordinal_ == ::test_protocollayouts::wire::LocalUnionPayload::Ordinal::kB);
-    return envelope_.As<bool>().get_data();
-  }
-  const bool& b() const {
-    ZX_ASSERT(ordinal_ == ::test_protocollayouts::wire::LocalUnionPayload::Ordinal::kB);
-    return envelope_.As<bool>().get_data();
-  }
+  bool& b();
+
+  const bool& b() const;
+
   ::test_protocollayouts::wire::LocalUnionPayload::Tag Which() const;
 
  private:
@@ -922,7 +694,7 @@ class LocalUnionPayload {
 
 class MainProtocolTwoWayImportWithErrorResult {
  public:
-  MainProtocolTwoWayImportWithErrorResult() : ordinal_(::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Ordinal::Invalid), envelope_{} {}
+  MainProtocolTwoWayImportWithErrorResult();
 
   MainProtocolTwoWayImportWithErrorResult(const MainProtocolTwoWayImportWithErrorResult&) = default;
   MainProtocolTwoWayImportWithErrorResult& operator=(const MainProtocolTwoWayImportWithErrorResult&) = default;
@@ -934,16 +706,11 @@ class MainProtocolTwoWayImportWithErrorResult {
     kErr = 2,       // 0x2
   };
 
-  bool has_invalid_tag() const { return ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Ordinal::Invalid; }
+  bool has_invalid_tag() const;
 
-  bool is_response() const { return ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Ordinal::kResponse; }
+  bool is_response() const;
 
-  static MainProtocolTwoWayImportWithErrorResult WithResponse(::fidl::ObjectView<::test_protocollayouts_imported::wire::ImportUnionPayload> val) {
-    MainProtocolTwoWayImportWithErrorResult result;
-    result.ordinal_ = ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Ordinal::kResponse;
-    result.envelope_.As<::test_protocollayouts_imported::wire::ImportUnionPayload>().set_data(std::move(val));
-    return result;
-  }
+  static MainProtocolTwoWayImportWithErrorResult WithResponse(::fidl::ObjectView<::test_protocollayouts_imported::wire::ImportUnionPayload> val);
 
   template <typename... Args>
   static MainProtocolTwoWayImportWithErrorResult WithResponse(::fidl::AnyArena& allocator, Args&&... args) {
@@ -951,36 +718,19 @@ class MainProtocolTwoWayImportWithErrorResult {
                                                                                                       std::forward<Args>(args)...));
   }
 
-  ::test_protocollayouts_imported::wire::ImportUnionPayload& response() {
-    ZX_ASSERT(ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Ordinal::kResponse);
-    return envelope_.As<::test_protocollayouts_imported::wire::ImportUnionPayload>().get_data();
-  }
-  const ::test_protocollayouts_imported::wire::ImportUnionPayload& response() const {
-    ZX_ASSERT(ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Ordinal::kResponse);
-    return envelope_.As<::test_protocollayouts_imported::wire::ImportUnionPayload>().get_data();
-  }
+  ::test_protocollayouts_imported::wire::ImportUnionPayload& response();
 
-  bool is_err() const { return ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Ordinal::kErr; }
+  const ::test_protocollayouts_imported::wire::ImportUnionPayload& response() const;
 
-  static MainProtocolTwoWayImportWithErrorResult WithErr(uint32_t val) {
-    MainProtocolTwoWayImportWithErrorResult result;
-    result.ordinal_ = ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Ordinal::kErr;
-    result.envelope_.As<uint32_t>().set_data(std::move(val));
-    return result;
-  }
+  bool is_err() const;
 
-  uint32_t& err() {
-    ZX_ASSERT(ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Ordinal::kErr);
-    return envelope_.As<uint32_t>().get_data();
-  }
-  const uint32_t& err() const {
-    ZX_ASSERT(ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Ordinal::kErr);
-    return envelope_.As<uint32_t>().get_data();
-  }
-  ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Tag Which() const {
-    ZX_ASSERT(!has_invalid_tag());
-    return static_cast<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Tag>(ordinal_);
-  }
+  static MainProtocolTwoWayImportWithErrorResult WithErr(uint32_t val);
+
+  uint32_t& err();
+
+  const uint32_t& err() const;
+
+  ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Tag Which() const;
 
  private:
   enum class Ordinal : fidl_xunion_tag_t {
@@ -997,7 +747,7 @@ class MainProtocolTwoWayImportWithErrorResult {
 
 class MainProtocolTwoWayLocalWithErrorResult {
  public:
-  MainProtocolTwoWayLocalWithErrorResult() : ordinal_(::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Ordinal::Invalid), envelope_{} {}
+  MainProtocolTwoWayLocalWithErrorResult();
 
   MainProtocolTwoWayLocalWithErrorResult(const MainProtocolTwoWayLocalWithErrorResult&) = default;
   MainProtocolTwoWayLocalWithErrorResult& operator=(const MainProtocolTwoWayLocalWithErrorResult&) = default;
@@ -1009,16 +759,11 @@ class MainProtocolTwoWayLocalWithErrorResult {
     kErr = 2,       // 0x2
   };
 
-  bool has_invalid_tag() const { return ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Ordinal::Invalid; }
+  bool has_invalid_tag() const;
 
-  bool is_response() const { return ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Ordinal::kResponse; }
+  bool is_response() const;
 
-  static MainProtocolTwoWayLocalWithErrorResult WithResponse(::fidl::ObjectView<::test_protocollayouts::wire::LocalUnionPayload> val) {
-    MainProtocolTwoWayLocalWithErrorResult result;
-    result.ordinal_ = ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Ordinal::kResponse;
-    result.envelope_.As<::test_protocollayouts::wire::LocalUnionPayload>().set_data(std::move(val));
-    return result;
-  }
+  static MainProtocolTwoWayLocalWithErrorResult WithResponse(::fidl::ObjectView<::test_protocollayouts::wire::LocalUnionPayload> val);
 
   template <typename... Args>
   static MainProtocolTwoWayLocalWithErrorResult WithResponse(::fidl::AnyArena& allocator, Args&&... args) {
@@ -1026,36 +771,19 @@ class MainProtocolTwoWayLocalWithErrorResult {
                                                                                             std::forward<Args>(args)...));
   }
 
-  ::test_protocollayouts::wire::LocalUnionPayload& response() {
-    ZX_ASSERT(ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Ordinal::kResponse);
-    return envelope_.As<::test_protocollayouts::wire::LocalUnionPayload>().get_data();
-  }
-  const ::test_protocollayouts::wire::LocalUnionPayload& response() const {
-    ZX_ASSERT(ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Ordinal::kResponse);
-    return envelope_.As<::test_protocollayouts::wire::LocalUnionPayload>().get_data();
-  }
+  ::test_protocollayouts::wire::LocalUnionPayload& response();
 
-  bool is_err() const { return ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Ordinal::kErr; }
+  const ::test_protocollayouts::wire::LocalUnionPayload& response() const;
 
-  static MainProtocolTwoWayLocalWithErrorResult WithErr(uint32_t val) {
-    MainProtocolTwoWayLocalWithErrorResult result;
-    result.ordinal_ = ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Ordinal::kErr;
-    result.envelope_.As<uint32_t>().set_data(std::move(val));
-    return result;
-  }
+  bool is_err() const;
 
-  uint32_t& err() {
-    ZX_ASSERT(ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Ordinal::kErr);
-    return envelope_.As<uint32_t>().get_data();
-  }
-  const uint32_t& err() const {
-    ZX_ASSERT(ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Ordinal::kErr);
-    return envelope_.As<uint32_t>().get_data();
-  }
-  ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Tag Which() const {
-    ZX_ASSERT(!has_invalid_tag());
-    return static_cast<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Tag>(ordinal_);
-  }
+  static MainProtocolTwoWayLocalWithErrorResult WithErr(uint32_t val);
+
+  uint32_t& err();
+
+  const uint32_t& err() const;
+
+  ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Tag Which() const;
 
  private:
   enum class Ordinal : fidl_xunion_tag_t {
@@ -1072,7 +800,7 @@ class MainProtocolTwoWayLocalWithErrorResult {
 
 class MainProtocolTwoWayAnonRequest {
  public:
-  MainProtocolTwoWayAnonRequest() : ordinal_(::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest::Ordinal::Invalid), envelope_{} {}
+  MainProtocolTwoWayAnonRequest();
 
   MainProtocolTwoWayAnonRequest(const MainProtocolTwoWayAnonRequest&) = default;
   MainProtocolTwoWayAnonRequest& operator=(const MainProtocolTwoWayAnonRequest&) = default;
@@ -1087,25 +815,16 @@ class MainProtocolTwoWayAnonRequest {
     return Which() == ::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
-  bool has_invalid_tag() const { return ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest::Ordinal::Invalid; }
+  bool has_invalid_tag() const;
 
-  bool is_b() const { return ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest::Ordinal::kB; }
+  bool is_b() const;
 
-  static MainProtocolTwoWayAnonRequest WithB(bool val) {
-    MainProtocolTwoWayAnonRequest result;
-    result.ordinal_ = ::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest::Ordinal::kB;
-    result.envelope_.As<bool>().set_data(std::move(val));
-    return result;
-  }
+  static MainProtocolTwoWayAnonRequest WithB(bool val);
 
-  bool& b() {
-    ZX_ASSERT(ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest::Ordinal::kB);
-    return envelope_.As<bool>().get_data();
-  }
-  const bool& b() const {
-    ZX_ASSERT(ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest::Ordinal::kB);
-    return envelope_.As<bool>().get_data();
-  }
+  bool& b();
+
+  const bool& b() const;
+
   ::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest::Tag Which() const;
 
  private:
@@ -1122,7 +841,7 @@ class MainProtocolTwoWayAnonRequest {
 
 class MainProtocolTwoWayAnonWithErrorResponse {
  public:
-  MainProtocolTwoWayAnonWithErrorResponse() : ordinal_(::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse::Ordinal::Invalid), envelope_{} {}
+  MainProtocolTwoWayAnonWithErrorResponse();
 
   MainProtocolTwoWayAnonWithErrorResponse(const MainProtocolTwoWayAnonWithErrorResponse&) = default;
   MainProtocolTwoWayAnonWithErrorResponse& operator=(const MainProtocolTwoWayAnonWithErrorResponse&) = default;
@@ -1137,25 +856,16 @@ class MainProtocolTwoWayAnonWithErrorResponse {
     return Which() == ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
-  bool has_invalid_tag() const { return ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse::Ordinal::Invalid; }
+  bool has_invalid_tag() const;
 
-  bool is_b() const { return ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse::Ordinal::kB; }
+  bool is_b() const;
 
-  static MainProtocolTwoWayAnonWithErrorResponse WithB(bool val) {
-    MainProtocolTwoWayAnonWithErrorResponse result;
-    result.ordinal_ = ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse::Ordinal::kB;
-    result.envelope_.As<bool>().set_data(std::move(val));
-    return result;
-  }
+  static MainProtocolTwoWayAnonWithErrorResponse WithB(bool val);
 
-  bool& b() {
-    ZX_ASSERT(ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse::Ordinal::kB);
-    return envelope_.As<bool>().get_data();
-  }
-  const bool& b() const {
-    ZX_ASSERT(ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse::Ordinal::kB);
-    return envelope_.As<bool>().get_data();
-  }
+  bool& b();
+
+  const bool& b() const;
+
   ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse::Tag Which() const;
 
  private:
@@ -1174,7 +884,7 @@ class MainProtocolTwoWayAnonWithErrorResult {
  public:
   using Response = test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse;
 
-  MainProtocolTwoWayAnonWithErrorResult() : ordinal_(::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Ordinal::Invalid), envelope_{} {}
+  MainProtocolTwoWayAnonWithErrorResult();
 
   MainProtocolTwoWayAnonWithErrorResult(const MainProtocolTwoWayAnonWithErrorResult&) = default;
   MainProtocolTwoWayAnonWithErrorResult& operator=(const MainProtocolTwoWayAnonWithErrorResult&) = default;
@@ -1186,16 +896,11 @@ class MainProtocolTwoWayAnonWithErrorResult {
     kErr = 2,       // 0x2
   };
 
-  bool has_invalid_tag() const { return ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Ordinal::Invalid; }
+  bool has_invalid_tag() const;
 
-  bool is_response() const { return ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Ordinal::kResponse; }
+  bool is_response() const;
 
-  static MainProtocolTwoWayAnonWithErrorResult WithResponse(::fidl::ObjectView<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse> val) {
-    MainProtocolTwoWayAnonWithErrorResult result;
-    result.ordinal_ = ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Ordinal::kResponse;
-    result.envelope_.As<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse>().set_data(std::move(val));
-    return result;
-  }
+  static MainProtocolTwoWayAnonWithErrorResult WithResponse(::fidl::ObjectView<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse> val);
 
   template <typename... Args>
   static MainProtocolTwoWayAnonWithErrorResult WithResponse(::fidl::AnyArena& allocator, Args&&... args) {
@@ -1203,36 +908,19 @@ class MainProtocolTwoWayAnonWithErrorResult {
                                                                                                                   std::forward<Args>(args)...));
   }
 
-  ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse& response() {
-    ZX_ASSERT(ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Ordinal::kResponse);
-    return envelope_.As<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse>().get_data();
-  }
-  const ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse& response() const {
-    ZX_ASSERT(ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Ordinal::kResponse);
-    return envelope_.As<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse>().get_data();
-  }
+  ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse& response();
 
-  bool is_err() const { return ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Ordinal::kErr; }
+  const ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse& response() const;
 
-  static MainProtocolTwoWayAnonWithErrorResult WithErr(uint32_t val) {
-    MainProtocolTwoWayAnonWithErrorResult result;
-    result.ordinal_ = ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Ordinal::kErr;
-    result.envelope_.As<uint32_t>().set_data(std::move(val));
-    return result;
-  }
+  bool is_err() const;
 
-  uint32_t& err() {
-    ZX_ASSERT(ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Ordinal::kErr);
-    return envelope_.As<uint32_t>().get_data();
-  }
-  const uint32_t& err() const {
-    ZX_ASSERT(ordinal_ == ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Ordinal::kErr);
-    return envelope_.As<uint32_t>().get_data();
-  }
-  ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Tag Which() const {
-    ZX_ASSERT(!has_invalid_tag());
-    return static_cast<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Tag>(ordinal_);
-  }
+  static MainProtocolTwoWayAnonWithErrorResult WithErr(uint32_t val);
+
+  uint32_t& err();
+
+  const uint32_t& err() const;
+
+  ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Tag Which() const;
 
  private:
   enum class Ordinal : fidl_xunion_tag_t {
@@ -1249,7 +937,7 @@ class MainProtocolTwoWayAnonWithErrorResult {
 
 class MainProtocolOnAnonRequest {
  public:
-  MainProtocolOnAnonRequest() : ordinal_(::test_protocollayouts::wire::MainProtocolOnAnonRequest::Ordinal::Invalid), envelope_{} {}
+  MainProtocolOnAnonRequest();
 
   MainProtocolOnAnonRequest(const MainProtocolOnAnonRequest&) = default;
   MainProtocolOnAnonRequest& operator=(const MainProtocolOnAnonRequest&) = default;
@@ -1264,25 +952,16 @@ class MainProtocolOnAnonRequest {
     return Which() == ::test_protocollayouts::wire::MainProtocolOnAnonRequest::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
-  bool has_invalid_tag() const { return ordinal_ == ::test_protocollayouts::wire::MainProtocolOnAnonRequest::Ordinal::Invalid; }
+  bool has_invalid_tag() const;
 
-  bool is_b() const { return ordinal_ == ::test_protocollayouts::wire::MainProtocolOnAnonRequest::Ordinal::kB; }
+  bool is_b() const;
 
-  static MainProtocolOnAnonRequest WithB(bool val) {
-    MainProtocolOnAnonRequest result;
-    result.ordinal_ = ::test_protocollayouts::wire::MainProtocolOnAnonRequest::Ordinal::kB;
-    result.envelope_.As<bool>().set_data(std::move(val));
-    return result;
-  }
+  static MainProtocolOnAnonRequest WithB(bool val);
 
-  bool& b() {
-    ZX_ASSERT(ordinal_ == ::test_protocollayouts::wire::MainProtocolOnAnonRequest::Ordinal::kB);
-    return envelope_.As<bool>().get_data();
-  }
-  const bool& b() const {
-    ZX_ASSERT(ordinal_ == ::test_protocollayouts::wire::MainProtocolOnAnonRequest::Ordinal::kB);
-    return envelope_.As<bool>().get_data();
-  }
+  bool& b();
+
+  const bool& b() const;
+
   ::test_protocollayouts::wire::MainProtocolOnAnonRequest::Tag Which() const;
 
  private:
@@ -1318,7 +997,6 @@ template <>
 struct IsWire<::test_protocollayouts::wire::LocalTablePayload> : public std::true_type {};
 template <>
 struct IsTable<::test_protocollayouts::wire::LocalTablePayload> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::LocalTablePayload>);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::LocalTablePayload, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
@@ -1327,65 +1005,8 @@ struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::LocalTab
   static constexpr size_t kInlineSize = 16;
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::LocalTablePayload* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 2);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    ::fidl::internal::WirePosition vector_position;
-    if (Base::PreworkResult::kEarlyExit ==
-        Base::PrepareForBodyEncode(encoder, value, position, &vector_position)) {
-      return;
-    }
-
-    fidl_vector_t* vec = reinterpret_cast<fidl_vector_t*>(value);
-    fidl_envelope_t* envelopes = static_cast<fidl_envelope_t*>(vec->data);
-    for (size_t i = 0; i < vec->count; i++) {
-      size_t encode_inline_size = 0;
-      switch (i) {
-        case 0:
-          encode_inline_size = ::fidl::internal::WireCodingTraits<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-          break;
-      }
-      ::fidl::internal::EncodeFn<IsRecursive> encode_fn = nullptr;
-      switch (i) {
-        case 0:
-          encode_fn = ::fidl::internal::MakeEncodeFn<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-          break;
-      }
-      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_t);
-      WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
-    }
-  }
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 2);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    ::fidl::internal::WirePosition vector_position;
-    if (Base::PreworkResult::kEarlyExit == Base::DecodePrework(decoder, position, &vector_position)) {
-      return;
-    }
-
-    fidl_vector_t* vec = position.As<fidl_vector_t>();
-    for (size_t i = 0; i < vec->count; i++) {
-      size_t decode_inline_size = 0;
-      switch (i) {
-        case 0:
-          decode_inline_size = ::fidl::internal::WireCodingTraits<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-          break;
-      }
-      DecodeFn<IsRecursive> decode_fn = nullptr;
-      switch (i) {
-        case 0:
-          decode_fn = ::fidl::internal::MakeDecodeFn<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-          break;
-      }
-      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_t), inner_depth);
-    }
-  }
+  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::LocalTablePayload* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <>
@@ -1405,7 +1026,6 @@ template <>
 struct IsWire<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest> : public std::true_type {};
 template <>
 struct IsTable<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
@@ -1414,65 +1034,8 @@ struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProt
   static constexpr size_t kInlineSize = 16;
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::MainProtocolOneWayAnonRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 2);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    ::fidl::internal::WirePosition vector_position;
-    if (Base::PreworkResult::kEarlyExit ==
-        Base::PrepareForBodyEncode(encoder, value, position, &vector_position)) {
-      return;
-    }
-
-    fidl_vector_t* vec = reinterpret_cast<fidl_vector_t*>(value);
-    fidl_envelope_t* envelopes = static_cast<fidl_envelope_t*>(vec->data);
-    for (size_t i = 0; i < vec->count; i++) {
-      size_t encode_inline_size = 0;
-      switch (i) {
-        case 0:
-          encode_inline_size = ::fidl::internal::WireCodingTraits<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-          break;
-      }
-      ::fidl::internal::EncodeFn<IsRecursive> encode_fn = nullptr;
-      switch (i) {
-        case 0:
-          encode_fn = ::fidl::internal::MakeEncodeFn<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-          break;
-      }
-      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_t);
-      WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
-    }
-  }
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 2);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    ::fidl::internal::WirePosition vector_position;
-    if (Base::PreworkResult::kEarlyExit == Base::DecodePrework(decoder, position, &vector_position)) {
-      return;
-    }
-
-    fidl_vector_t* vec = position.As<fidl_vector_t>();
-    for (size_t i = 0; i < vec->count; i++) {
-      size_t decode_inline_size = 0;
-      switch (i) {
-        case 0:
-          decode_inline_size = ::fidl::internal::WireCodingTraits<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-          break;
-      }
-      DecodeFn<IsRecursive> decode_fn = nullptr;
-      switch (i) {
-        case 0:
-          decode_fn = ::fidl::internal::MakeDecodeFn<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-          break;
-      }
-      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_t), inner_depth);
-    }
-  }
+  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::MainProtocolOneWayAnonRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <>
@@ -1492,7 +1055,6 @@ template <>
 struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse> : public std::true_type {};
 template <>
 struct IsTable<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
@@ -1501,65 +1063,8 @@ struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProt
   static constexpr size_t kInlineSize = 16;
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 2);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    ::fidl::internal::WirePosition vector_position;
-    if (Base::PreworkResult::kEarlyExit ==
-        Base::PrepareForBodyEncode(encoder, value, position, &vector_position)) {
-      return;
-    }
-
-    fidl_vector_t* vec = reinterpret_cast<fidl_vector_t*>(value);
-    fidl_envelope_t* envelopes = static_cast<fidl_envelope_t*>(vec->data);
-    for (size_t i = 0; i < vec->count; i++) {
-      size_t encode_inline_size = 0;
-      switch (i) {
-        case 0:
-          encode_inline_size = ::fidl::internal::WireCodingTraits<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-          break;
-      }
-      ::fidl::internal::EncodeFn<IsRecursive> encode_fn = nullptr;
-      switch (i) {
-        case 0:
-          encode_fn = ::fidl::internal::MakeEncodeFn<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-          break;
-      }
-      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_t);
-      WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
-    }
-  }
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 2);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    ::fidl::internal::WirePosition vector_position;
-    if (Base::PreworkResult::kEarlyExit == Base::DecodePrework(decoder, position, &vector_position)) {
-      return;
-    }
-
-    fidl_vector_t* vec = position.As<fidl_vector_t>();
-    for (size_t i = 0; i < vec->count; i++) {
-      size_t decode_inline_size = 0;
-      switch (i) {
-        case 0:
-          decode_inline_size = ::fidl::internal::WireCodingTraits<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-          break;
-      }
-      DecodeFn<IsRecursive> decode_fn = nullptr;
-      switch (i) {
-        case 0:
-          decode_fn = ::fidl::internal::MakeDecodeFn<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-          break;
-      }
-      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_t), inner_depth);
-    }
-  }
+  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <>
@@ -1579,7 +1084,6 @@ template <>
 struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type {};
 template <>
 struct IsTable<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
@@ -1588,65 +1092,8 @@ struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProt
   static constexpr size_t kInlineSize = 16;
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 2);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    ::fidl::internal::WirePosition vector_position;
-    if (Base::PreworkResult::kEarlyExit ==
-        Base::PrepareForBodyEncode(encoder, value, position, &vector_position)) {
-      return;
-    }
-
-    fidl_vector_t* vec = reinterpret_cast<fidl_vector_t*>(value);
-    fidl_envelope_t* envelopes = static_cast<fidl_envelope_t*>(vec->data);
-    for (size_t i = 0; i < vec->count; i++) {
-      size_t encode_inline_size = 0;
-      switch (i) {
-        case 0:
-          encode_inline_size = ::fidl::internal::WireCodingTraits<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-          break;
-      }
-      ::fidl::internal::EncodeFn<IsRecursive> encode_fn = nullptr;
-      switch (i) {
-        case 0:
-          encode_fn = ::fidl::internal::MakeEncodeFn<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-          break;
-      }
-      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_t);
-      WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
-    }
-  }
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 2);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    ::fidl::internal::WirePosition vector_position;
-    if (Base::PreworkResult::kEarlyExit == Base::DecodePrework(decoder, position, &vector_position)) {
-      return;
-    }
-
-    fidl_vector_t* vec = position.As<fidl_vector_t>();
-    for (size_t i = 0; i < vec->count; i++) {
-      size_t decode_inline_size = 0;
-      switch (i) {
-        case 0:
-          decode_inline_size = ::fidl::internal::WireCodingTraits<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-          break;
-      }
-      DecodeFn<IsRecursive> decode_fn = nullptr;
-      switch (i) {
-        case 0:
-          decode_fn = ::fidl::internal::MakeDecodeFn<uint16_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-          break;
-      }
-      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_t), inner_depth);
-    }
-  }
+  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <>
@@ -1666,92 +1113,15 @@ template <>
 struct IsWire<::test_protocollayouts::wire::LocalUnionPayload> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocollayouts::wire::LocalUnionPayload> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::LocalUnionPayload>);
 
 template <typename Constraint, bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::LocalUnionPayload, Constraint, IsRecursive> {
   static constexpr size_t kInlineSize = 16;
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::LocalUnionPayload* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
+  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::LocalUnionPayload* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 
-    if (unlikely(u->tag == 0)) {
-      if constexpr (Constraint::is_optional) {
-        *position.As<fidl_union_t>() = {};
-        return;
-      }
-      encoder->SetError(kCodingErrorInvalidUnionTag);
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    *position.As<fidl_xunion_tag_t>() = u->tag;
-
-    size_t encode_inline_size;
-    switch (u->tag) {
-      case 1:  // ::test_protocollayouts::wire::LocalUnionPayload::Tag::kB
-        encode_inline_size = ::fidl::internal::WireCodingTraits<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      default:
-        encode_inline_size = 0;
-        break;
-    }
-    ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
-    switch (u->tag) {
-      case 1:  // ::test_protocollayouts::wire::LocalUnionPayload::Tag::kB
-        encode_fn = ::fidl::internal::MakeEncodeFn<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      default:
-        encode_fn = nullptr;
-        break;
-    }
-    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
-
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    ::test_protocollayouts::wire::LocalUnionPayload::Tag tag = *position.As<::test_protocollayouts::wire::LocalUnionPayload::Tag>();
-    if (unlikely(static_cast<uint64_t>(tag) == 0)) {
-      if constexpr (!Constraint::is_optional) {
-        decoder->SetError(kCodingErrorInvalidUnionTag);
-        return;
-      }
-      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
-      if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
-        decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
-      }
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    size_t decode_inline_size;
-    switch (tag) {
-      case ::test_protocollayouts::wire::LocalUnionPayload::Tag::kB:
-        decode_inline_size = ::fidl::internal::WireCodingTraits<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      default:
-        decode_inline_size = 0;
-        break;
-    }
-    DecodeFn<IsRecursive> decode_fn;
-    switch (tag) {
-      case ::test_protocollayouts::wire::LocalUnionPayload::Tag::kB:
-        decode_fn = ::fidl::internal::MakeDecodeFn<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      default:
-        decode_fn = nullptr;
-        break;
-    }
-    ::fidl::internal::WireDecodeFlexibleEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 // Top-level union.
@@ -1776,104 +1146,15 @@ template <>
 struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult>);
 
 template <typename Constraint, bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult, Constraint, IsRecursive> {
   static constexpr size_t kInlineSize = 16;
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
+  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 
-    if (unlikely(u->tag == 0)) {
-      if constexpr (Constraint::is_optional) {
-        *position.As<fidl_union_t>() = {};
-        return;
-      }
-      encoder->SetError(kCodingErrorInvalidUnionTag);
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    *position.As<fidl_xunion_tag_t>() = u->tag;
-
-    size_t encode_inline_size;
-    switch (u->tag) {
-      case 1:  // ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Tag::kResponse
-        encode_inline_size = ::fidl::internal::WireCodingTraits<::test_protocollayouts_imported::wire::ImportUnionPayload, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::kInlineSize;
-        break;
-      case 2:  // ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Tag::kErr
-        encode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      default:
-        encode_inline_size = 0;
-        break;
-    }
-    ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
-    switch (u->tag) {
-      case 1:  // ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Tag::kResponse
-        encode_fn = ::fidl::internal::MakeEncodeFn<::test_protocollayouts_imported::wire::ImportUnionPayload, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>();
-        break;
-      case 2:  // ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Tag::kErr
-        encode_fn = ::fidl::internal::MakeEncodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      default:
-        encode_fn = nullptr;
-        break;
-    }
-    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
-
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Tag tag = *position.As<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Tag>();
-    if (unlikely(static_cast<uint64_t>(tag) == 0)) {
-      if constexpr (!Constraint::is_optional) {
-        decoder->SetError(kCodingErrorInvalidUnionTag);
-        return;
-      }
-      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
-      if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
-        decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
-      }
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    size_t decode_inline_size;
-    switch (tag) {
-      case ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Tag::kResponse:
-        decode_inline_size = ::fidl::internal::WireCodingTraits<::test_protocollayouts_imported::wire::ImportUnionPayload, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::kInlineSize;
-        break;
-      case ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Tag::kErr:
-        decode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      default:
-        decode_inline_size = 0;
-        break;
-    }
-    DecodeFn<IsRecursive> decode_fn;
-    switch (tag) {
-      case ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Tag::kResponse:
-        decode_fn = ::fidl::internal::MakeDecodeFn<::test_protocollayouts_imported::wire::ImportUnionPayload, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>();
-        break;
-      case ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::Tag::kErr:
-        decode_fn = ::fidl::internal::MakeDecodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      default:
-        decode_fn = nullptr;
-        break;
-    }
-    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 // Top-level union.
@@ -1898,104 +1179,15 @@ template <>
 struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult>);
 
 template <typename Constraint, bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult, Constraint, IsRecursive> {
   static constexpr size_t kInlineSize = 16;
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
+  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 
-    if (unlikely(u->tag == 0)) {
-      if constexpr (Constraint::is_optional) {
-        *position.As<fidl_union_t>() = {};
-        return;
-      }
-      encoder->SetError(kCodingErrorInvalidUnionTag);
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    *position.As<fidl_xunion_tag_t>() = u->tag;
-
-    size_t encode_inline_size;
-    switch (u->tag) {
-      case 1:  // ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Tag::kResponse
-        encode_inline_size = ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::LocalUnionPayload, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::kInlineSize;
-        break;
-      case 2:  // ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Tag::kErr
-        encode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      default:
-        encode_inline_size = 0;
-        break;
-    }
-    ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
-    switch (u->tag) {
-      case 1:  // ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Tag::kResponse
-        encode_fn = ::fidl::internal::MakeEncodeFn<::test_protocollayouts::wire::LocalUnionPayload, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>();
-        break;
-      case 2:  // ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Tag::kErr
-        encode_fn = ::fidl::internal::MakeEncodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      default:
-        encode_fn = nullptr;
-        break;
-    }
-    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
-
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Tag tag = *position.As<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Tag>();
-    if (unlikely(static_cast<uint64_t>(tag) == 0)) {
-      if constexpr (!Constraint::is_optional) {
-        decoder->SetError(kCodingErrorInvalidUnionTag);
-        return;
-      }
-      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
-      if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
-        decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
-      }
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    size_t decode_inline_size;
-    switch (tag) {
-      case ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Tag::kResponse:
-        decode_inline_size = ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::LocalUnionPayload, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::kInlineSize;
-        break;
-      case ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Tag::kErr:
-        decode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      default:
-        decode_inline_size = 0;
-        break;
-    }
-    DecodeFn<IsRecursive> decode_fn;
-    switch (tag) {
-      case ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Tag::kResponse:
-        decode_fn = ::fidl::internal::MakeDecodeFn<::test_protocollayouts::wire::LocalUnionPayload, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>();
-        break;
-      case ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::Tag::kErr:
-        decode_fn = ::fidl::internal::MakeDecodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      default:
-        decode_fn = nullptr;
-        break;
-    }
-    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 // Top-level union.
@@ -2020,92 +1212,15 @@ template <>
 struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest>);
 
 template <typename Constraint, bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest, Constraint, IsRecursive> {
   static constexpr size_t kInlineSize = 16;
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
+  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 
-    if (unlikely(u->tag == 0)) {
-      if constexpr (Constraint::is_optional) {
-        *position.As<fidl_union_t>() = {};
-        return;
-      }
-      encoder->SetError(kCodingErrorInvalidUnionTag);
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    *position.As<fidl_xunion_tag_t>() = u->tag;
-
-    size_t encode_inline_size;
-    switch (u->tag) {
-      case 1:  // ::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest::Tag::kB
-        encode_inline_size = ::fidl::internal::WireCodingTraits<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      default:
-        encode_inline_size = 0;
-        break;
-    }
-    ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
-    switch (u->tag) {
-      case 1:  // ::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest::Tag::kB
-        encode_fn = ::fidl::internal::MakeEncodeFn<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      default:
-        encode_fn = nullptr;
-        break;
-    }
-    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
-
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    ::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest::Tag tag = *position.As<::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest::Tag>();
-    if (unlikely(static_cast<uint64_t>(tag) == 0)) {
-      if constexpr (!Constraint::is_optional) {
-        decoder->SetError(kCodingErrorInvalidUnionTag);
-        return;
-      }
-      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
-      if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
-        decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
-      }
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    size_t decode_inline_size;
-    switch (tag) {
-      case ::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest::Tag::kB:
-        decode_inline_size = ::fidl::internal::WireCodingTraits<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      default:
-        decode_inline_size = 0;
-        break;
-    }
-    DecodeFn<IsRecursive> decode_fn;
-    switch (tag) {
-      case ::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest::Tag::kB:
-        decode_fn = ::fidl::internal::MakeDecodeFn<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      default:
-        decode_fn = nullptr;
-        break;
-    }
-    ::fidl::internal::WireDecodeFlexibleEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 // Top-level union.
@@ -2130,92 +1245,15 @@ template <>
 struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse>);
 
 template <typename Constraint, bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse, Constraint, IsRecursive> {
   static constexpr size_t kInlineSize = 16;
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
+  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 
-    if (unlikely(u->tag == 0)) {
-      if constexpr (Constraint::is_optional) {
-        *position.As<fidl_union_t>() = {};
-        return;
-      }
-      encoder->SetError(kCodingErrorInvalidUnionTag);
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    *position.As<fidl_xunion_tag_t>() = u->tag;
-
-    size_t encode_inline_size;
-    switch (u->tag) {
-      case 1:  // ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse::Tag::kB
-        encode_inline_size = ::fidl::internal::WireCodingTraits<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      default:
-        encode_inline_size = 0;
-        break;
-    }
-    ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
-    switch (u->tag) {
-      case 1:  // ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse::Tag::kB
-        encode_fn = ::fidl::internal::MakeEncodeFn<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      default:
-        encode_fn = nullptr;
-        break;
-    }
-    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
-
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse::Tag tag = *position.As<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse::Tag>();
-    if (unlikely(static_cast<uint64_t>(tag) == 0)) {
-      if constexpr (!Constraint::is_optional) {
-        decoder->SetError(kCodingErrorInvalidUnionTag);
-        return;
-      }
-      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
-      if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
-        decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
-      }
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    size_t decode_inline_size;
-    switch (tag) {
-      case ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse::Tag::kB:
-        decode_inline_size = ::fidl::internal::WireCodingTraits<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      default:
-        decode_inline_size = 0;
-        break;
-    }
-    DecodeFn<IsRecursive> decode_fn;
-    switch (tag) {
-      case ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse::Tag::kB:
-        decode_fn = ::fidl::internal::MakeDecodeFn<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      default:
-        decode_fn = nullptr;
-        break;
-    }
-    ::fidl::internal::WireDecodeFlexibleEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 // Top-level union.
@@ -2240,104 +1278,15 @@ template <>
 struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult>);
 
 template <typename Constraint, bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult, Constraint, IsRecursive> {
   static constexpr size_t kInlineSize = 16;
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
+  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 
-    if (unlikely(u->tag == 0)) {
-      if constexpr (Constraint::is_optional) {
-        *position.As<fidl_union_t>() = {};
-        return;
-      }
-      encoder->SetError(kCodingErrorInvalidUnionTag);
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    *position.As<fidl_xunion_tag_t>() = u->tag;
-
-    size_t encode_inline_size;
-    switch (u->tag) {
-      case 1:  // ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Tag::kResponse
-        encode_inline_size = ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::kInlineSize;
-        break;
-      case 2:  // ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Tag::kErr
-        encode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      default:
-        encode_inline_size = 0;
-        break;
-    }
-    ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
-    switch (u->tag) {
-      case 1:  // ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Tag::kResponse
-        encode_fn = ::fidl::internal::MakeEncodeFn<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>();
-        break;
-      case 2:  // ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Tag::kErr
-        encode_fn = ::fidl::internal::MakeEncodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      default:
-        encode_fn = nullptr;
-        break;
-    }
-    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
-
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Tag tag = *position.As<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Tag>();
-    if (unlikely(static_cast<uint64_t>(tag) == 0)) {
-      if constexpr (!Constraint::is_optional) {
-        decoder->SetError(kCodingErrorInvalidUnionTag);
-        return;
-      }
-      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
-      if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
-        decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
-      }
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    size_t decode_inline_size;
-    switch (tag) {
-      case ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Tag::kResponse:
-        decode_inline_size = ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::kInlineSize;
-        break;
-      case ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Tag::kErr:
-        decode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      default:
-        decode_inline_size = 0;
-        break;
-    }
-    DecodeFn<IsRecursive> decode_fn;
-    switch (tag) {
-      case ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Tag::kResponse:
-        decode_fn = ::fidl::internal::MakeDecodeFn<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>();
-        break;
-      case ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::Tag::kErr:
-        decode_fn = ::fidl::internal::MakeDecodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      default:
-        decode_fn = nullptr;
-        break;
-    }
-    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 // Top-level union.
@@ -2362,92 +1311,15 @@ template <>
 struct IsWire<::test_protocollayouts::wire::MainProtocolOnAnonRequest> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocollayouts::wire::MainProtocolOnAnonRequest> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolOnAnonRequest>);
 
 template <typename Constraint, bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolOnAnonRequest, Constraint, IsRecursive> {
   static constexpr size_t kInlineSize = 16;
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::MainProtocolOnAnonRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
+  static void Encode(internal::WireEncoder* encoder, ::test_protocollayouts::wire::MainProtocolOnAnonRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 
-    if (unlikely(u->tag == 0)) {
-      if constexpr (Constraint::is_optional) {
-        *position.As<fidl_union_t>() = {};
-        return;
-      }
-      encoder->SetError(kCodingErrorInvalidUnionTag);
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    *position.As<fidl_xunion_tag_t>() = u->tag;
-
-    size_t encode_inline_size;
-    switch (u->tag) {
-      case 1:  // ::test_protocollayouts::wire::MainProtocolOnAnonRequest::Tag::kB
-        encode_inline_size = ::fidl::internal::WireCodingTraits<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      default:
-        encode_inline_size = 0;
-        break;
-    }
-    ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
-    switch (u->tag) {
-      case 1:  // ::test_protocollayouts::wire::MainProtocolOnAnonRequest::Tag::kB
-        encode_fn = ::fidl::internal::MakeEncodeFn<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      default:
-        encode_fn = nullptr;
-        break;
-    }
-    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
-
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    ::test_protocollayouts::wire::MainProtocolOnAnonRequest::Tag tag = *position.As<::test_protocollayouts::wire::MainProtocolOnAnonRequest::Tag>();
-    if (unlikely(static_cast<uint64_t>(tag) == 0)) {
-      if constexpr (!Constraint::is_optional) {
-        decoder->SetError(kCodingErrorInvalidUnionTag);
-        return;
-      }
-      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
-      if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
-        decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
-      }
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    size_t decode_inline_size;
-    switch (tag) {
-      case ::test_protocollayouts::wire::MainProtocolOnAnonRequest::Tag::kB:
-        decode_inline_size = ::fidl::internal::WireCodingTraits<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      default:
-        decode_inline_size = 0;
-        break;
-    }
-    DecodeFn<IsRecursive> decode_fn;
-    switch (tag) {
-      case ::test_protocollayouts::wire::MainProtocolOnAnonRequest::Tag::kB:
-        decode_fn = ::fidl::internal::MakeDecodeFn<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      default:
-        decode_fn = nullptr;
-        break;
-    }
-    ::fidl::internal::WireDecodeFlexibleEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 // Top-level union.

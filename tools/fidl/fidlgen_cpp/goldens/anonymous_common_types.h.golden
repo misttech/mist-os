@@ -349,15 +349,11 @@ template <>
 struct IsFidlType<::test_anonymous::Flags> : public std::true_type {};
 template <>
 struct ContainsHandle<::test_anonymous::Flags> : public std::false_type {};
-static_assert(std::is_standard_layout_v<::test_anonymous::Flags>);
-static_assert(sizeof(::test_anonymous::Flags) == sizeof(uint16_t));
 
 template <>
 struct IsFidlType<::test_anonymous::BitsMember> : public std::true_type {};
 template <>
 struct ContainsHandle<::test_anonymous::BitsMember> : public std::false_type {};
-static_assert(std::is_standard_layout_v<::test_anonymous::BitsMember>);
-static_assert(sizeof(::test_anonymous::BitsMember) == sizeof(uint32_t));
 
 template <>
 struct IsFidlType<::test_anonymous::Op> : public std::true_type {};

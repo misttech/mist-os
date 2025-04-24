@@ -53,9 +53,6 @@ template <>
 struct IsWire<::test_byteandbytes::wire::ByteAndBytes> : public std::true_type {};
 template <>
 struct IsStruct<::test_byteandbytes::wire::ByteAndBytes> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_byteandbytes::wire::ByteAndBytes>);
-static_assert(offsetof(::test_byteandbytes::wire::ByteAndBytes, single_byte) == 0);
-static_assert(sizeof(::test_byteandbytes::wire::ByteAndBytes) == TypeTraits<::test_byteandbytes::wire::ByteAndBytes>::kPrimarySize);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_byteandbytes::wire::ByteAndBytes, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
@@ -66,20 +63,9 @@ struct ::fidl::internal::WireCodingTraits<::test_byteandbytes::wire::ByteAndByte
   static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::test_byteandbytes::wire::ByteAndBytes* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_byteandbytes::wire::ByteAndBytes));
-    } else {
-      internal::WireCodingTraits<uint8_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->single_byte, position + 0, recursion_depth);
-    }
-  }
+      internal::WireEncoder* encoder, ::test_byteandbytes::wire::ByteAndBytes* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<uint8_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #pragma clang diagnostic pop

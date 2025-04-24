@@ -76,9 +76,6 @@ template <>
 struct IsWire<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest> : public std::true_type {};
 template <>
 struct IsStruct<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest>);
-static_assert(offsetof(::test_inheritancewithrecursivedecl::wire::ParentFirstRequest, request) == 0);
-static_assert(sizeof(::test_inheritancewithrecursivedecl::wire::ParentFirstRequest) == TypeTraits<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest>::kPrimarySize);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
@@ -89,20 +86,9 @@ struct ::fidl::internal::WireCodingTraits<::test_inheritancewithrecursivedecl::w
   static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::test_inheritancewithrecursivedecl::wire::ParentFirstRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_inheritancewithrecursivedecl::wire::ParentFirstRequest));
-    } else {
-      internal::WireCodingTraits<::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, false>, IsRecursive>::Encode(encoder, &value->request, position + 0, recursion_depth);
-    }
-  }
+      internal::WireEncoder* encoder, ::test_inheritancewithrecursivedecl::wire::ParentFirstRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, false>, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <>
@@ -125,9 +111,6 @@ template <>
 struct IsWire<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest> : public std::true_type {};
 template <>
 struct IsStruct<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest>);
-static_assert(offsetof(::test_inheritancewithrecursivedecl::wire::ChildSecondRequest, request) == 0);
-static_assert(sizeof(::test_inheritancewithrecursivedecl::wire::ChildSecondRequest) == TypeTraits<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest>::kPrimarySize);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
@@ -138,20 +121,9 @@ struct ::fidl::internal::WireCodingTraits<::test_inheritancewithrecursivedecl::w
   static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::test_inheritancewithrecursivedecl::wire::ChildSecondRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_inheritancewithrecursivedecl::wire::ChildSecondRequest));
-    } else {
-      internal::WireCodingTraits<::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, false>, IsRecursive>::Encode(encoder, &value->request, position + 0, recursion_depth);
-    }
-  }
+      internal::WireEncoder* encoder, ::test_inheritancewithrecursivedecl::wire::ChildSecondRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>, fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, false>, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #endif  // __Fuchsia__

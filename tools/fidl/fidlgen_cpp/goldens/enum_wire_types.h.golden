@@ -42,28 +42,8 @@ struct internal::WireCodingTraits<::test_enum::wire::MyStrictEnum, ::fidl::inter
   static constexpr size_t kInlineSize = sizeof(uint32_t);
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_enum::wire::MyStrictEnum* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    switch (*value) {
-      case ::test_enum::wire::MyStrictEnum::kFoo:
-      case ::test_enum::wire::MyStrictEnum::kBar:
-        break;
-      default:
-        encoder->SetError(::fidl::internal::kCodingErrorUnknownEnumValue);
-        return;
-    }
-    *position.As<::test_enum::wire::MyStrictEnum>() = *value;
-  }
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    [[maybe_unused]] ::test_enum::wire::MyStrictEnum value = *position.As<::test_enum::wire::MyStrictEnum>();
-    switch (value) {
-      case ::test_enum::wire::MyStrictEnum::kFoo:
-      case ::test_enum::wire::MyStrictEnum::kBar:
-        break;
-      default:
-        decoder->SetError(::fidl::internal::kCodingErrorUnknownEnumValue);
-        return;
-    }
-  }
+  static void Encode(internal::WireEncoder* encoder, ::test_enum::wire::MyStrictEnum* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <bool IsRecursive>
@@ -71,11 +51,8 @@ struct internal::WireCodingTraits<::test_enum::wire::MyFlexibleEnum, ::fidl::int
   static constexpr size_t kInlineSize = sizeof(uint32_t);
   static constexpr bool kIsMemcpyCompatible = true;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_enum::wire::MyFlexibleEnum* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<::test_enum::wire::MyFlexibleEnum>() = *value;
-  }
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-  }
+  static void Encode(internal::WireEncoder* encoder, ::test_enum::wire::MyFlexibleEnum* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <bool IsRecursive>
@@ -83,11 +60,8 @@ struct internal::WireCodingTraits<::test_enum::wire::MyFlexibleEnumWithCustomUnk
   static constexpr size_t kInlineSize = sizeof(uint32_t);
   static constexpr bool kIsMemcpyCompatible = true;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_enum::wire::MyFlexibleEnumWithCustomUnknown* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<::test_enum::wire::MyFlexibleEnumWithCustomUnknown>() = *value;
-  }
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-  }
+  static void Encode(internal::WireEncoder* encoder, ::test_enum::wire::MyFlexibleEnumWithCustomUnknown* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <bool IsRecursive>
@@ -95,11 +69,8 @@ struct internal::WireCodingTraits<::test_enum::wire::MyEmptyFlexibleEnum, ::fidl
   static constexpr size_t kInlineSize = sizeof(uint32_t);
   static constexpr bool kIsMemcpyCompatible = true;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_enum::wire::MyEmptyFlexibleEnum* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<::test_enum::wire::MyEmptyFlexibleEnum>() = *value;
-  }
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-  }
+  static void Encode(internal::WireEncoder* encoder, ::test_enum::wire::MyEmptyFlexibleEnum* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #pragma clang diagnostic pop

@@ -72,9 +72,6 @@ template <>
 struct IsWire<::test_escaping::wire::DocCommentWithQuotes> : public std::true_type {};
 template <>
 struct IsStruct<::test_escaping::wire::DocCommentWithQuotes> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_escaping::wire::DocCommentWithQuotes>);
-static_assert(offsetof(::test_escaping::wire::DocCommentWithQuotes, __reserved) == 0);
-static_assert(sizeof(::test_escaping::wire::DocCommentWithQuotes) == TypeTraits<::test_escaping::wire::DocCommentWithQuotes>::kPrimarySize);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_escaping::wire::DocCommentWithQuotes, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
@@ -85,23 +82,9 @@ struct ::fidl::internal::WireCodingTraits<::test_escaping::wire::DocCommentWithQ
   static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::test_escaping::wire::DocCommentWithQuotes* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_escaping::wire::DocCommentWithQuotes));
-    } else {
-      internal::WireCodingTraits<uint8_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->__reserved, position + 0, recursion_depth);
-    }
-  }
+      internal::WireEncoder* encoder, ::test_escaping::wire::DocCommentWithQuotes* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<uint8_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-    if (*position.As<uint8_t>() != 0) {
-      decoder->SetError(kCodingErrorInvalidPaddingBytes);
-    }
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #pragma clang diagnostic pop

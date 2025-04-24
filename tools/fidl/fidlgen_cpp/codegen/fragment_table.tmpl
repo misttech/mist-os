@@ -70,7 +70,7 @@ public:
   ~{{ .Name }}() = default;
 
   // Returns whether no field is set.
-  bool IsEmpty() const { return max_ordinal_ == 0; }
+  bool IsEmpty() const;
 
   // Returns whether the table references unknown fields.
   bool HasUnknownData() const;
@@ -88,13 +88,8 @@ public:
 {{- range .Members }}
 {{ "" }}
   {{- .Docs }}
-  [[ nodiscard ]] {{ .Type }}& {{ .Name }}() const {
-    ZX_ASSERT({{ .MethodHasName }}());
-    return frame_ptr_->{{ .Name }}_.get_data();
-  }
-  [[ nodiscard ]] bool {{ .MethodHasName }}() const {
-    return max_ordinal_ >= {{ .Ordinal }} && frame_ptr_->{{ .Name }}_.has_data();
-  }
+  [[ nodiscard ]] {{ .Type }}& {{ .Name }}() const;
+  [[ nodiscard ]] bool {{ .MethodHasName }}() const;
 {{- end }}
 
 {{- /* Temporarily special case fuchsia.hardware.goldfish because of out of tree users. */}}
@@ -106,59 +101,29 @@ private:
 {{ range .Members }}
 
   {{- if .Type.InlineInEnvelope }}
-  {{ $.Name }}& set_{{ .Name }}({{ .Type }} elem) {
-    ZX_DEBUG_ASSERT(frame_ptr_ != nullptr);
-    frame_ptr_->{{ .Name }}_.set_data(std::move(elem));
-    max_ordinal_ = std::max(max_ordinal_, static_cast<uint64_t>({{ .Ordinal }}));
-    return *this;
-  }
+  {{ $.Name }}& set_{{ .Name }}({{ .Type }} elem);
   {{- else }}
   {{- /* TODO(https://fxbug.dev/42160282): The elem pointer should be const if it has no handles. */}}
-  {{ $.Name }}& set_{{ .Name }}(::fidl::ObjectView<{{ .Type }}> elem) {
-    ZX_DEBUG_ASSERT(frame_ptr_ != nullptr);
-    frame_ptr_->{{ .Name }}_.set_data(elem);
-    max_ordinal_ = std::max(max_ordinal_, static_cast<uint64_t>({{ .Ordinal }}));
-    return *this;
-  }
-  {{ $.Name }}& set_{{ .Name }}(std::nullptr_t) {
-    ZX_DEBUG_ASSERT(frame_ptr_ != nullptr);
-    frame_ptr_->{{ .Name }}_.set_data(nullptr);
-    return *this;
-  }
+  {{ $.Name }}& set_{{ .Name }}(::fidl::ObjectView<{{ .Type }}> elem);
+  {{ $.Name }}& set_{{ .Name }}(std::nullptr_t);
   template <typename... Args>
   {{ $.Name }}& set_{{ .Name }}(::fidl::AnyArena& allocator, Args&&... args) {
-    ZX_DEBUG_ASSERT(frame_ptr_ != nullptr);
-    frame_ptr_->{{ .Name }}_.set_data(
+    return set_{{ .Name }}(
         ::fidl::ObjectView<{{ .Type }}>(allocator, std::forward<Args>(args)...));
-    max_ordinal_ = std::max(max_ordinal_, static_cast<uint64_t>({{ .Ordinal }}));
-    return *this;
   }
   {{- end }}
 
-  {{ $.Name }}& {{ .MethodClearName }}() {
-    ZX_DEBUG_ASSERT(frame_ptr_ != nullptr);
-    frame_ptr_->{{ .Name }}_.clear_data();
-    max_ordinal_ = frame_ptr_->ComputeMaxOrdinal();
-    return *this;
-  }
+  {{ $.Name }}& {{ .MethodClearName }}();
 {{- end }}
 
-  explicit {{ .Name }}(::fidl::AnyArena& allocator)
-      : frame_ptr_(::fidl::ObjectView<{{ .WireTableFrame }}>(allocator)) {}
+  explicit {{ .Name }}(::fidl::AnyArena& allocator);
   // This constructor allows a user controlled allocation (not using a Arena).
   // It should only be used when performance is key.
   // As soon as the frame is given to the table, it must not be used directly or for another table.
-  explicit {{ .Name }}(::fidl::ObjectView<{{ .WireTableFrame }}>&& frame)
-      : frame_ptr_(std::move(frame)) {}
+  explicit {{ .Name }}(::fidl::ObjectView<{{ .WireTableFrame }}>&& frame);
 
-  void Allocate(::fidl::AnyArena& allocator) {
-    max_ordinal_ = 0;
-    frame_ptr_ = ::fidl::ObjectView<{{ .WireTableFrame }}>(allocator);
-  }
-  void Init(::fidl::ObjectView<{{ .WireTableFrame }}>&& frame_ptr) {
-    max_ordinal_ = 0;
-    frame_ptr_ = std::move(frame_ptr);
-  }
+  void Allocate(::fidl::AnyArena& allocator);
+  void Init(::fidl::ObjectView<{{ .WireTableFrame }}>&& frame_ptr);
 
  private:
   friend ::fidl::internal::WireTableBaseBuilder<{{ . }}, {{ .WireTableBuilder }}>;
@@ -184,58 +149,34 @@ class ::fidl::internal::WireTableBaseBuilder<{{ . }}, BuilderImpl> {
 
  public:
   // Build and return the table. The builder should not be used after this.
-  {{ . }} Build() {
-    ZX_DEBUG_ASSERT(table_.frame_ptr_ != nullptr);
-    {{ . }} t = std::move(table_);
-    // Poison this builder to prevent accidental reuse.
-    table_.frame_ptr_ = nullptr;
-    return t;
-  }
+  {{ . }} Build();
 
   {{- range .Members }}
-    [[ nodiscard ]] bool {{ .MethodHasName }}() const {
-      return table_.{{ .MethodHasName }}();
-    }
+    [[ nodiscard ]] bool {{ .MethodHasName }}() const;
 
     // Clears the {{ .Name }} field.
     //
     // This method should be used sparingly, such as only during tests, as it has
     // O(number_of_fields) complexity.
-    void {{ .MethodClearName }}() {
-      table_.{{ .MethodClearName }}();
-    }
+    void {{ .MethodClearName }}();
 
     // Getter for {{ .Name }}.
     //
     {{ .Docs }}
-    [[ nodiscard ]] {{ .Type }}& {{ .Name }}() const {
-      return table_.{{ .Name }}();
-    }
+    [[ nodiscard ]] {{ .Type }}& {{ .Name }}() const;
 
     // Setter for {{ .Name }}.
     //
     {{ .Docs }}
     {{- if .Type.InlineInEnvelope }}
-      BuilderImpl& {{ .Name }}({{ .Type }} elem) {
-        ZX_DEBUG_ASSERT(table_.frame_ptr_ != nullptr);
-        table_.frame_ptr_->{{ .Name }}_.set_data(std::move(elem));
-        table_.max_ordinal_ = std::max(table_.max_ordinal_, static_cast<uint64_t>({{ .Ordinal }}));
-        return *static_cast<BuilderImpl*>(this);
-      }
+      BuilderImpl& {{ .Name }}({{ .Type }} elem);
     {{- else }}
       {{- /* TODO(https://fxbug.dev/42160282): The elem pointer should be const if it has no handles. */}}
-      BuilderImpl& {{ .Name }}(Wrapper_Ignore_Me_<::fidl::ObjectView<{{ .Type }}>> elem) {
-        ZX_DEBUG_ASSERT(table_.frame_ptr_ != nullptr);
-        ZX_DEBUG_ASSERT(elem.value.get() != nullptr);
-        table_.frame_ptr_->{{ .Name }}_.set_data(elem.value);
-        table_.max_ordinal_ = std::max(table_.max_ordinal_, static_cast<uint64_t>({{ .Ordinal }}));
-        return *static_cast<BuilderImpl*>(this);
-      }
+      BuilderImpl& {{ .Name }}(Wrapper_Ignore_Me_<::fidl::ObjectView<{{ .Type }}>> elem);
     {{- end }}
   {{- end }}
  protected:
-  WireTableBaseBuilder(::fidl::ObjectView<{{ .WireTableFrame }}>&& frame)
-    : table_(std::move(frame)) {}
+  WireTableBaseBuilder(::fidl::ObjectView<{{ .WireTableFrame }}>&& frame);
 
  private:
   {{ . }} table_;
@@ -264,9 +205,7 @@ class {{ .WireTableBuilder }} final : public ::fidl::internal::WireTableBaseBuil
   {{- end }}
  private:
   friend class {{ . }};
-  {{ .WireTableBuilder.Self }}(::fidl::AnyArena& arena)
-      : Base(::fidl::ObjectView<{{ .WireTableFrame }}>(arena)),
-        arena_(arena) {}
+  {{ .WireTableBuilder.Self }}(::fidl::AnyArena& arena);
 
   [[maybe_unused]] std::reference_wrapper<::fidl::AnyArena> arena_;
 
@@ -279,17 +218,10 @@ class {{ .WireTableExternalBuilder }} final : public ::fidl::internal::WireTable
  private:
   friend class {{ . }};
   using Base::Base;
-  {{ .WireTableExternalBuilder.Self }}({{ .WireTableFrame }}* frame)
-      : Base(::fidl::ObjectView<{{ .WireTableFrame }}>::FromExternal(frame)) {}
+  {{ .WireTableExternalBuilder.Self }}({{ .WireTableFrame }}* frame);
 };
 
 {{- EnsureNamespace . }}
-inline {{ .WireTableBuilder }} {{ .Name }}::Builder(::fidl::AnyArena& arena) {
-  return {{ .WireTableBuilder }}(arena);
-}
-inline {{ .WireTableExternalBuilder }} {{ .Name }}::ExternalBuilder(::fidl::ObjectView<{{ .WireTableFrame }}> frame) {
-  return {{ .WireTableExternalBuilder }}(std::move(frame));
-}
 
 {{- if .IsResourceType }}
 {{- EndifFuchsia -}}
@@ -302,6 +234,7 @@ inline {{ .WireTableExternalBuilder }} {{ .Name }}::ExternalBuilder(::fidl::Obje
 {{- end }}
 
 {{ EnsureNamespace "" }}
+
 bool {{ .WireTableFrame }}::HasUnknownData() const {
   {{- range $index, $item := .FrameItems }}
     {{- if not $item }}
@@ -329,6 +262,23 @@ uint64_t {{ .WireTableFrame.NoLeading }}::ComputeMaxOrdinal() const {
   return max_ordinal;
 }
 
+{{ . }}::{{ .Name }}(::fidl::AnyArena& allocator)
+: frame_ptr_(::fidl::ObjectView<{{ .WireTableFrame }}>(allocator)) {}
+
+{{ . }}::{{ .Name }}(::fidl::ObjectView<{{ .WireTableFrame }}>&& frame)
+: frame_ptr_(std::move(frame)) {}
+
+void {{ .NoLeading }}::Allocate(::fidl::AnyArena& allocator) {
+  max_ordinal_ = 0;
+  frame_ptr_ = ::fidl::ObjectView<{{ .WireTableFrame }}>(allocator);
+}
+void {{ .NoLeading }}::Init(::fidl::ObjectView<{{ .WireTableFrame }}>&& frame_ptr) {
+  max_ordinal_ = 0;
+  frame_ptr_ = std::move(frame_ptr);
+}
+
+bool {{ . }}::IsEmpty() const { return max_ordinal_ == 0; }
+
 bool {{ . }}::HasUnknownData() const {
   if (max_ordinal_ > {{ .BiggestOrdinal }}) {
     return true;
@@ -350,6 +300,195 @@ void {{ . }}::_CloseHandles() {
   {{- end }}
 }
 {{- end }}
+
+{{ $table := . }}
+{{ range .Members }}
+  {{ .Type }}& {{ $table.NoLeading }}::{{ .Name }}() const {
+    ZX_ASSERT({{ .MethodHasName }}());
+    return frame_ptr_->{{ .Name }}_.get_data();
+  }
+
+  bool {{ $table.NoLeading }}::{{ .MethodHasName }}() const {
+    return max_ordinal_ >= {{ .Ordinal }} && frame_ptr_->{{ .Name }}_.has_data();
+  }
+
+  {{ $table }}& {{ $table.NoLeading }}::{{ .MethodClearName }}() {
+    ZX_DEBUG_ASSERT(frame_ptr_ != nullptr);
+    frame_ptr_->{{ .Name }}_.clear_data();
+    max_ordinal_ = frame_ptr_->ComputeMaxOrdinal();
+    return *this;
+  }
+
+  {{ if .Type.InlineInEnvelope }}
+    {{ $table }}& {{ $table.NoLeading }}::set_{{ .Name }}({{ .Type }} elem) {
+      ZX_DEBUG_ASSERT(frame_ptr_ != nullptr);
+      frame_ptr_->{{ .Name }}_.set_data(std::move(elem));
+      max_ordinal_ = std::max(max_ordinal_, static_cast<uint64_t>({{ .Ordinal }}));
+      return *this;
+    }
+  {{ else }}
+    {{ $table }}& {{ $table.NoLeading }}::set_{{ .Name }}(::fidl::ObjectView<{{ .Type }}> elem) {
+      ZX_DEBUG_ASSERT(frame_ptr_ != nullptr);
+      frame_ptr_->{{ .Name }}_.set_data(elem);
+      max_ordinal_ = std::max(max_ordinal_, static_cast<uint64_t>({{ .Ordinal }}));
+      return *this;
+    }
+
+    {{ $table }}& {{ $table.NoLeading }}::set_{{ .Name }}(std::nullptr_t) {
+      ZX_DEBUG_ASSERT(frame_ptr_ != nullptr);
+      frame_ptr_->{{ .Name }}_.set_data(nullptr);
+      return *this;
+    }
+  {{ end }}
+{{ end }}
+
+{{ .WireTableBuilder }} {{ .NoLeading }}::Builder(::fidl::AnyArena& arena) {
+  return {{ .WireTableBuilder }}(arena);
+}
+{{ .WireTableExternalBuilder }} {{ .NoLeading }}::ExternalBuilder(::fidl::ObjectView<{{ .WireTableFrame }}> frame) {
+  return {{ .WireTableExternalBuilder }}(std::move(frame));
+}
+
+template<typename BuilderImpl>
+fidl::internal::WireTableBaseBuilder<{{ . }}, BuilderImpl>::WireTableBaseBuilder(::fidl::ObjectView<{{ .WireTableFrame }}>&& frame)
+: table_(std::move(frame)) {}
+
+template<typename BuilderImpl>
+{{ . }} fidl::internal::WireTableBaseBuilder<{{ . }}, BuilderImpl>::Build() {
+  ZX_DEBUG_ASSERT(table_.frame_ptr_ != nullptr);
+  {{ . }} t = std::move(table_);
+  // Poison this builder to prevent accidental reuse.
+  table_.frame_ptr_ = nullptr;
+  return t;
+}
+
+{{- range .Members }}
+  template<typename BuilderImpl>
+  bool fidl::internal::WireTableBaseBuilder<{{ $ }}, BuilderImpl>::{{ .MethodHasName }}() const {
+    return table_.{{ .MethodHasName }}();
+  }
+
+  template<typename BuilderImpl>
+  void fidl::internal::WireTableBaseBuilder<{{ $ }}, BuilderImpl>::{{ .MethodClearName }}() {
+    table_.{{ .MethodClearName }}();
+  }
+
+  template<typename BuilderImpl>
+  {{ .Type }}& fidl::internal::WireTableBaseBuilder<{{ $ }}, BuilderImpl>::{{ .Name }}() const {
+    return table_.{{ .Name }}();
+  }
+
+  {{- if .Type.InlineInEnvelope }}
+    template<typename BuilderImpl>
+    BuilderImpl& fidl::internal::WireTableBaseBuilder<{{ $ }}, BuilderImpl>::{{ .Name }}({{ .Type }} elem) {
+      ZX_DEBUG_ASSERT(table_.frame_ptr_ != nullptr);
+      table_.frame_ptr_->{{ .Name }}_.set_data(std::move(elem));
+      table_.max_ordinal_ = std::max(table_.max_ordinal_, static_cast<uint64_t>({{ .Ordinal }}));
+      return *static_cast<BuilderImpl*>(this);
+    }
+  {{- else }}
+    template<typename BuilderImpl>
+    BuilderImpl& fidl::internal::WireTableBaseBuilder<{{ $ }}, BuilderImpl>::{{ .Name }}(Wrapper_Ignore_Me_<::fidl::ObjectView<{{ .Type }}>> elem) {
+      ZX_DEBUG_ASSERT(table_.frame_ptr_ != nullptr);
+      ZX_DEBUG_ASSERT(elem.value.get() != nullptr);
+      table_.frame_ptr_->{{ .Name }}_.set_data(elem.value);
+      table_.max_ordinal_ = std::max(table_.max_ordinal_, static_cast<uint64_t>({{ .Ordinal }}));
+      return *static_cast<BuilderImpl*>(this);
+    }
+  {{- end }}
+
+
+{{- end }}
+
+template class fidl::internal::WireTableBaseBuilder<{{ . }}, {{ .WireTableBuilder }}>;
+template class fidl::internal::WireTableBaseBuilder<{{ . }}, {{ .WireTableExternalBuilder }}>;
+
+{{ .WireTableBuilder }}::{{ .WireTableBuilder.Self }}(::fidl::AnyArena& arena)
+: Base(::fidl::ObjectView<{{ .WireTableFrame }}>(arena)),
+  arena_(arena) {}
+
+{{ .WireTableExternalBuilder }}::{{ .WireTableExternalBuilder.Self }}({{ .WireTableFrame }}* frame)
+: Base(::fidl::ObjectView<{{ .WireTableFrame }}>::FromExternal(frame)) {}
+
+template <bool IsRecursive>
+void fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    ::fidl::internal::WireEncoder* encoder, {{ . }}* value, ::fidl::internal::WirePosition position, ::fidl::internal::RecursionDepth<IsRecursive> recursion_depth) {
+      ::fidl::internal::RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 2);
+  if (!inner_depth.IsValid()) {
+    return;
+  }
+
+  ::fidl::internal::WirePosition vector_position;
+  if (Base::PreworkResult::kEarlyExit ==
+    Base::PrepareForBodyEncode(encoder, value, position, &vector_position)) {
+    return;
+  }
+
+  fidl_vector_t* vec = reinterpret_cast<fidl_vector_t*>(value);
+  fidl_envelope_t* envelopes = static_cast<fidl_envelope_t*>(vec->data);
+  for (size_t i = 0; i < vec->count; i++) {
+    {{/* Two switches here, so they are translated to lookup tables. */}}
+    size_t encode_inline_size = 0;
+    switch (i) {
+      {{- range .Members }}
+      case {{ Sub .Ordinal 1 }}:
+        encode_inline_size = ::fidl::internal::WireCodingTraits<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>::kInlineSize;
+        break;
+      {{- end }}
+    }
+    ::fidl::internal::EncodeFn<IsRecursive> encode_fn = nullptr;
+    switch (i) {
+      {{- range .Members }}
+      case {{ Sub .Ordinal 1 }}:
+        encode_fn = ::fidl::internal::MakeEncodeFn<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>();
+        break;
+      {{- end }}
+    }
+    WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_t);
+    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
+  }
+}
+
+template <bool IsRecursive>
+void fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    ::fidl::internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, ::fidl::internal::RecursionDepth<IsRecursive> recursion_depth) {
+      ::fidl::internal::RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 2);
+  if (!inner_depth.IsValid()) {
+    return;
+  }
+
+  ::fidl::internal::WirePosition vector_position;
+  if (Base::PreworkResult::kEarlyExit == Base::DecodePrework(decoder, position, &vector_position)) {
+    return;
+  }
+
+  fidl_vector_t* vec = position.As<fidl_vector_t>();
+  for (size_t i = 0; i < vec->count; i++) {
+    {{/* Two switches here, so they are translated to lookup tables. */}}
+    size_t decode_inline_size = 0;
+    switch (i) {
+      {{- range .Members }}
+      case {{ Sub .Ordinal 1 }}:
+        decode_inline_size = ::fidl::internal::WireCodingTraits<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>::kInlineSize;
+        break;
+      {{- end }}
+    }
+    DecodeFn<IsRecursive> decode_fn = nullptr;
+    switch(i) {
+      {{- range .Members }}
+      case {{ Sub .Ordinal 1 }}:
+        decode_fn = ::fidl::internal::MakeDecodeFn<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>();
+        break;
+      {{- end }}
+    }
+    ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_t), inner_depth);
+  }
+}
+
+template struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
+static_assert(std::is_standard_layout_v<{{ . }}>);
 
 {{ if .IsResourceType }}
 {{- EndifFuchsia -}}
@@ -380,7 +519,6 @@ template <>
 struct IsWire<{{ . }}> : public std::true_type {};
 template <>
 struct IsTable<{{ . }}> : public std::true_type {};
-static_assert(std::is_standard_layout_v<{{ . }}>);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
@@ -389,75 +527,8 @@ struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingC
   static constexpr size_t kInlineSize = {{ .TypeShapeV2.InlineSize }};
   static constexpr bool kIsMemcpyCompatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, {{ . }}* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 2);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    ::fidl::internal::WirePosition vector_position;
-    if (Base::PreworkResult::kEarlyExit ==
-      Base::PrepareForBodyEncode(encoder, value, position, &vector_position)) {
-      return;
-    }
-
-    fidl_vector_t* vec = reinterpret_cast<fidl_vector_t*>(value);
-    fidl_envelope_t* envelopes = static_cast<fidl_envelope_t*>(vec->data);
-    for (size_t i = 0; i < vec->count; i++) {
-      {{/* Two switches here, so they are translated to lookup tables. */}}
-      size_t encode_inline_size = 0;
-      switch (i) {
-        {{- range .Members }}
-        case {{ Sub .Ordinal 1 }}:
-          encode_inline_size = ::fidl::internal::WireCodingTraits<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>::kInlineSize;
-          break;
-        {{- end }}
-      }
-      ::fidl::internal::EncodeFn<IsRecursive> encode_fn = nullptr;
-      switch (i) {
-        {{- range .Members }}
-        case {{ Sub .Ordinal 1 }}:
-          encode_fn = ::fidl::internal::MakeEncodeFn<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>();
-          break;
-        {{- end }}
-      }
-      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_t);
-      WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
-    }
-  }
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 2);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    ::fidl::internal::WirePosition vector_position;
-    if (Base::PreworkResult::kEarlyExit == Base::DecodePrework(decoder, position, &vector_position)) {
-      return;
-    }
-
-    fidl_vector_t* vec = position.As<fidl_vector_t>();
-    for (size_t i = 0; i < vec->count; i++) {
-      {{/* Two switches here, so they are translated to lookup tables. */}}
-      size_t decode_inline_size = 0;
-      switch (i) {
-        {{- range .Members }}
-        case {{ Sub .Ordinal 1 }}:
-          decode_inline_size = ::fidl::internal::WireCodingTraits<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>::kInlineSize;
-          break;
-        {{- end }}
-      }
-      DecodeFn<IsRecursive> decode_fn = nullptr;
-      switch(i) {
-        {{- range .Members }}
-        case {{ Sub .Ordinal 1 }}:
-          decode_fn = ::fidl::internal::MakeDecodeFn<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>();
-          break;
-        {{- end }}
-      }
-      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_t), inner_depth);
-    }
-  }
+  static void Encode(internal::WireEncoder* encoder, {{ . }}* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 {{- if .IsResourceType }}

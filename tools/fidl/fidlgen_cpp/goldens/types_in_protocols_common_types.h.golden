@@ -169,8 +169,6 @@ template <>
 struct IsFidlType<::test_typesinprotocols::Bits> : public std::true_type {};
 template <>
 struct ContainsHandle<::test_typesinprotocols::Bits> : public std::false_type {};
-static_assert(std::is_standard_layout_v<::test_typesinprotocols::Bits>);
-static_assert(sizeof(::test_typesinprotocols::Bits) == sizeof(uint32_t));
 
 template <>
 struct IsFidlType<::test_typesinprotocols::Enum> : public std::true_type {};

@@ -64,9 +64,6 @@ template <>
 struct IsWire<::test_inheritance::wire::SuperFooRequest> : public std::true_type {};
 template <>
 struct IsStruct<::test_inheritance::wire::SuperFooRequest> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_inheritance::wire::SuperFooRequest>);
-static_assert(offsetof(::test_inheritance::wire::SuperFooRequest, s) == 0);
-static_assert(sizeof(::test_inheritance::wire::SuperFooRequest) == TypeTraits<::test_inheritance::wire::SuperFooRequest>::kPrimarySize);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_inheritance::wire::SuperFooRequest, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
@@ -77,20 +74,9 @@ struct ::fidl::internal::WireCodingTraits<::test_inheritance::wire::SuperFooRequ
   static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::test_inheritance::wire::SuperFooRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_inheritance::wire::SuperFooRequest));
-    } else {
-      internal::WireCodingTraits<::fidl::StringView, fidl::internal::WireCodingConstraintString<false>, IsRecursive>::Encode(encoder, &value->s, position + 0, recursion_depth);
-    }
-  }
+      internal::WireEncoder* encoder, ::test_inheritance::wire::SuperFooRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<::fidl::StringView, fidl::internal::WireCodingConstraintString<false>, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <>
@@ -110,9 +96,6 @@ template <>
 struct IsWire<::test_inheritance::wire::SuperFooResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_inheritance::wire::SuperFooResponse> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_inheritance::wire::SuperFooResponse>);
-static_assert(offsetof(::test_inheritance::wire::SuperFooResponse, y) == 0);
-static_assert(sizeof(::test_inheritance::wire::SuperFooResponse) == TypeTraits<::test_inheritance::wire::SuperFooResponse>::kPrimarySize);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_inheritance::wire::SuperFooResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
@@ -123,20 +106,9 @@ struct ::fidl::internal::WireCodingTraits<::test_inheritance::wire::SuperFooResp
   static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::test_inheritance::wire::SuperFooResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_inheritance::wire::SuperFooResponse));
-    } else {
-      internal::WireCodingTraits<int64_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->y, position + 0, recursion_depth);
-    }
-  }
+      internal::WireEncoder* encoder, ::test_inheritance::wire::SuperFooResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<int64_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #pragma clang diagnostic pop
