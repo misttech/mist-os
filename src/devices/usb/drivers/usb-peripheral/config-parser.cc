@@ -122,7 +122,7 @@ zx_status_t PeripheralConfigParser::SetCompositeProductDescription(uint16_t pid,
       pid_ = GOOGLE_USB_CDC_AND_VSOCK_BRIDGE_PID;
     } else if (pid_ == GOOGLE_USB_CDC_AND_ADB_PID && pid == GOOGLE_USB_VSOCK_BRIDGE_PID) {
       pid_ = GOOGLE_USB_CDC_AND_ADB_AND_VSOCK_BRIDGE_PID;
-    } else if (pid_ == GOOGLE_USB_CDC_PID && pid == GOOGLE_USB_FASTBOOT_PID) {
+    } else if (pid_ == GOOGLE_USB_FASTBOOT_PID && pid == GOOGLE_USB_CDC_PID) {
       pid_ = GOOGLE_USB_CDC_AND_FASTBOOT_PID;
     } else {
       zxlogf(ERROR, "No matching pid for this combination: 0x%x + 0x%x", pid_, pid);
