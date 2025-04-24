@@ -18,8 +18,8 @@ use net_types::ip::{AddrSubnet, Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mt
 use net_types::{LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _};
 use netstack3_base::{
     AnyDevice, CoreEventContext, CoreTimerContext, CounterContext, DeviceIdContext, ExistsError,
-    IpDeviceAddr, IpDeviceAddressIdContext, Ipv4DeviceAddr, Ipv6DeviceAddr, NotFoundError,
-    RemoveResourceResultWithContext, ResourceCounterContext,
+    IpAddressId as _, IpDeviceAddr, IpDeviceAddressIdContext, Ipv4DeviceAddr, Ipv6DeviceAddr,
+    NotFoundError, RemoveResourceResultWithContext, ResourceCounterContext,
 };
 use netstack3_device::{DeviceId, WeakDeviceId};
 use netstack3_filter::FilterImpl;
@@ -27,17 +27,17 @@ use netstack3_ip::device::{
     self, add_ip_addr_subnet_with_config, del_ip_addr_inner, get_ipv6_hop_limit,
     is_ip_device_enabled, is_ip_multicast_forwarding_enabled, is_ip_unicast_forwarding_enabled,
     join_ip_multicast_with_config, leave_ip_multicast_with_config, AddressRemovedReason,
-    DadAddressContext, DadAddressStateRef, DadContext, DadEvent, DadStateRef, DadTimerId,
+    DadAddressContext, DadAddressStateRef, DadContext, DadEvent, DadState, DadStateRef, DadTimerId,
     DefaultHopLimit, DelIpAddr, DualStackIpDeviceState, IpAddressIdSpec, IpAddressIdSpecContext,
     IpAddressState, IpDeviceAddresses, IpDeviceConfiguration, IpDeviceEvent, IpDeviceFlags,
     IpDeviceIpExt, IpDeviceMulticastGroups, IpDeviceStateBindingsTypes, IpDeviceStateContext,
     IpDeviceStateIpExt, IpDeviceTimerId, Ipv4AddressEntry, Ipv4AddressState,
     Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddrSlaacConfig, Ipv6AddressEntry,
-    Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState, Ipv6DeviceConfiguration, Ipv6DeviceTimerId,
-    Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext, Ipv6NetworkLearnedParameters,
-    Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState, RsContext, RsState, RsTimerId,
-    SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacConfigAndState, SlaacContext,
-    SlaacCounters, SlaacState, WeakAddressId,
+    Ipv6AddressFlags, Ipv6AddressState, Ipv6DadAddressContext, Ipv6DadSentProbeData,
+    Ipv6DeviceConfiguration, Ipv6DeviceTimerId, Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext,
+    Ipv6NetworkLearnedParameters, Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState, RsContext,
+    RsState, RsTimerId, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses,
+    SlaacConfigAndState, SlaacContext, SlaacCounters, SlaacState, WeakAddressId,
 };
 use netstack3_ip::gmp::{
     GmpGroupState, GmpState, GmpStateRef, IgmpContext, IgmpContextMarker, IgmpSendContext,
@@ -52,7 +52,7 @@ use netstack3_ip::{
 };
 use packet::{EmptyBuf, InnerPacketBuilder, Serializer};
 use packet_formats::icmp::ndp::options::{NdpNonce, NdpOptionBuilder};
-use packet_formats::icmp::ndp::{NeighborSolicitation, OptionSequenceBuilder, RouterSolicitation};
+use packet_formats::icmp::ndp::{OptionSequenceBuilder, RouterSolicitation};
 use packet_formats::icmp::IcmpZeroCode;
 
 use crate::context::prelude::*;
@@ -99,7 +99,7 @@ where
                     let addr_sub = addr_id.addr_sub();
                     match config {
                         Some(Ipv6AddrConfig::Slaac(config)) => {
-                            Some(SlaacAddressEntry { addr_sub: *addr_sub, config: *config })
+                            Some(SlaacAddressEntry { addr_sub: addr_sub, config: *config })
                         }
                         None | Some(Ipv6AddrConfig::Manual(_)) => None,
                     }
@@ -183,7 +183,7 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
                 config,
                 Some(Ipv6AddrConfig::Slaac(c)) => c
             );
-            and_then(SlaacAddressEntryMut { addr_sub: *addr_sub, config }, bindings_ctx)
+            and_then(SlaacAddressEntryMut { addr_sub: addr_sub, config }, bindings_ctx)
         })
     }
 
@@ -714,8 +714,8 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
     }
 }
 
-impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>>
-    DadAddressContext<BC>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceAddressState>>
+    DadAddressContext<Ipv6, BC>
     for CoreCtxWithIpDeviceConfiguration<'_, &'_ Ipv6DeviceConfiguration, L, BC>
 {
     fn with_address_assigned<O, F: FnOnce(&mut bool) -> O>(
@@ -738,7 +738,12 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>
             .write_lock_with::<crate::lock_ordering::Ipv6DeviceAddressState, _>(|c| c.right());
         state.should_perform_dad()
     }
+}
 
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>>
+    Ipv6DadAddressContext<BC>
+    for CoreCtxWithIpDeviceConfiguration<'_, &'_ Ipv6DeviceConfiguration, L, BC>
+{
     fn join_multicast_group(
         &mut self,
         bindings_ctx: &mut BC,
@@ -774,18 +779,18 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>
     }
 }
 
-impl<'a, Config, BC, L> CoreEventContext<DadEvent<DeviceId<BC>>>
+impl<'a, I: IpDeviceIpExt, Config, BC, L> CoreEventContext<DadEvent<I, DeviceId<BC>>>
     for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 where
     BC: BindingsContext,
 {
-    type OuterEvent = IpDeviceEvent<DeviceId<BC>, Ipv6, BC::Instant>;
+    type OuterEvent = IpDeviceEvent<DeviceId<BC>, I, BC::Instant>;
 
-    fn convert_event(event: DadEvent<DeviceId<BC>>) -> Self::OuterEvent {
+    fn convert_event(event: DadEvent<I, DeviceId<BC>>) -> Self::OuterEvent {
         match event {
             DadEvent::AddressAssigned { device, addr } => IpDeviceEvent::AddressStateChanged {
                 device,
-                addr: addr.into_specified(),
+                addr: addr.into(),
                 state: IpAddressState::Assigned,
             },
         }
@@ -797,7 +802,7 @@ impl<
         Config: Borrow<Ipv6DeviceConfiguration>,
         BC: BindingsContext,
         L: LockBefore<crate::lock_ordering::Ipv6DeviceAddressDad>,
-    > DadContext<BC> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
+    > DadContext<Ipv6, BC> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 {
     type DadAddressCtx<'b> = CoreCtxWithIpDeviceConfiguration<
         'b,
@@ -806,7 +811,7 @@ impl<
         BC,
     >;
 
-    fn with_dad_state<O, F: FnOnce(DadStateRef<'_, Self::DadAddressCtx<'_>, BC>) -> O>(
+    fn with_dad_state<O, F: FnOnce(DadStateRef<'_, Ipv6, Self::DadAddressCtx<'_>, BC>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         addr: &Self::AddressId,
@@ -838,28 +843,51 @@ impl<
             max_dad_transmits: &config.ip_config.dad_transmits,
         })
     }
-
-    fn send_dad_packet(
+    /// Sends an NDP Neighbor Solicitation message for DAD to the local-link.
+    ///
+    /// The message will be sent with the unspecified (all-zeroes) source
+    /// address.
+    fn send_dad_probe(
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
-        dst_ip: MulticastAddr<Ipv6Addr>,
-        message: NeighborSolicitation,
-        nonce: NdpNonce<&[u8]>,
-    ) -> Result<(), ()> {
-        let options = [NdpOptionBuilder::Nonce(nonce)];
-        ip::icmp::send_ndp_packet(
+        Ipv6DadSentProbeData { dst_ip, message, nonce }: Ipv6DadSentProbeData,
+    ) {
+        // Do not include the source link-layer option when the NS
+        // message as DAD messages are sent with the unspecified source
+        // address which must not hold a source link-layer option.
+        //
+        // As per RFC 4861 section 4.3,
+        //
+        //   Possible options:
+        //
+        //      Source link-layer address
+        //           The link-layer address for the sender. MUST NOT be
+        //           included when the source IP address is the
+        //           unspecified address. Otherwise, on link layers
+        //           that have addresses this option MUST be included in
+        //           multicast solicitations and SHOULD be included in
+        //           unicast solicitations.
+        let src_ip = None;
+        let options = [NdpOptionBuilder::Nonce(NdpNonce::from(&nonce))];
+
+        let result = ip::icmp::send_ndp_packet(
             self,
             bindings_ctx,
             device_id,
-            None,
+            src_ip,
             dst_ip.into_specified(),
             OptionSequenceBuilder::new(options.iter()).into_serializer(),
             ip::icmp::NdpMessage::NeighborSolicitation { message, code: IcmpZeroCode },
-        )
-        .map_err(|IpSendFrameError { serializer: _, error }| {
-            debug!("error sending DAD packet: {error:?}")
-        })
+        );
+        match result {
+            Ok(()) => {}
+            Err(IpSendFrameError { serializer: _, error }) => {
+                // TODO(https://fxbug.dev/42165912): Either panic or guarantee
+                // that this error can't happen statically.
+                debug!("error sending DAD packet: {error:?}")
+            }
+        }
     }
 }
 
@@ -1463,11 +1491,11 @@ impl<BC: BindingsContext, L> IpAddressIdSpecContext for CoreCtx<'_, BC, L> {
 }
 
 impl<L, BT: BindingsTypes>
-    CoreTimerContext<DadTimerId<WeakDeviceId<BT>, WeakAddressId<Ipv6AddressEntry<BT>>>, BT>
+    CoreTimerContext<DadTimerId<Ipv6, WeakDeviceId<BT>, WeakAddressId<Ipv6AddressEntry<BT>>>, BT>
     for CoreCtx<'_, BT, L>
 {
     fn convert_timer(
-        dispatch_id: DadTimerId<WeakDeviceId<BT>, WeakAddressId<Ipv6AddressEntry<BT>>>,
+        dispatch_id: DadTimerId<Ipv6, WeakDeviceId<BT>, WeakAddressId<Ipv6AddressEntry<BT>>>,
     ) -> BT::DispatchId {
         IpDeviceTimerId::<Ipv6, _, _>::from(Ipv6DeviceTimerId::from(dispatch_id)).into()
     }
@@ -1575,7 +1603,7 @@ impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<Ipv4AddressEntry<BT>>
 impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<Ipv6AddressEntry<BT>>
     for crate::lock_ordering::Ipv6DeviceAddressDad
 {
-    type Data = Ipv6DadState<BT>;
+    type Data = DadState<Ipv6, BT>;
 }
 
 impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<Ipv6AddressEntry<BT>>

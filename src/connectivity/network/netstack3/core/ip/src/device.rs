@@ -48,7 +48,9 @@ use crate::internal::counters::IpCounters;
 use crate::internal::device::config::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
 };
-use crate::internal::device::dad::{DadAddressStateLookupResult, DadHandler, DadTimerId};
+use crate::internal::device::dad::{
+    DadHandler, DadIncomingProbeResult, DadIpExt, DadTimerId, Ipv6ProbeResultMetadata,
+};
 use crate::internal::device::nud::NudIpHandler;
 use crate::internal::device::route_discovery::{
     Ipv6DiscoveredRoute, Ipv6DiscoveredRouteTimerId, RouteDiscoveryHandler,
@@ -159,7 +161,7 @@ where
 #[allow(missing_docs)]
 pub enum Ipv6DeviceTimerId<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> {
     Mld(MldTimerId<D>),
-    Dad(DadTimerId<D, A>),
+    Dad(DadTimerId<Ipv6, D, A>),
     Rs(RsTimerId<D>),
     RouteDiscovery(Ipv6DiscoveredRouteTimerId<D>),
     Slaac(SlaacTimerId<D>),
@@ -208,10 +210,10 @@ impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> From<MldTimerId<D>>
     }
 }
 
-impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> From<DadTimerId<D, A>>
+impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> From<DadTimerId<Ipv6, D, A>>
     for Ipv6DeviceTimerId<D, A>
 {
-    fn from(id: DadTimerId<D, A>) -> Ipv6DeviceTimerId<D, A> {
+    fn from(id: DadTimerId<Ipv6, D, A>) -> Ipv6DeviceTimerId<D, A> {
         Ipv6DeviceTimerId::Dad(id)
     }
 }
@@ -248,7 +250,7 @@ impl<
             + TimerHandler<BC, Ipv6DiscoveredRouteTimerId<D>>
             + TimerHandler<BC, MldTimerId<D>>
             + TimerHandler<BC, SlaacTimerId<D>>
-            + TimerHandler<BC, DadTimerId<D, A>>,
+            + TimerHandler<BC, DadTimerId<Ipv6, D, A>>,
     > HandleableTimer<CC, BC> for Ipv6DeviceTimerId<D, A>
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, timer: BC::UniqueTimerId) {
@@ -263,7 +265,7 @@ impl<
 }
 
 /// An extension trait adding IP device properties.
-pub trait IpDeviceIpExt: IpDeviceStateIpExt + AssignedAddrIpExt + gmp::IpExt {
+pub trait IpDeviceIpExt: IpDeviceStateIpExt + AssignedAddrIpExt + gmp::IpExt + DadIpExt {
     /// IP layer state kept by the device.
     type State<BT: IpDeviceStateBindingsTypes>: AsRef<IpDeviceState<Self, BT>>
         + AsMut<IpDeviceState<Self, BT>>;
@@ -1030,15 +1032,12 @@ impl<
         };
 
         match self.with_ipv6_device_configuration(device_id, |_config, mut core_ctx| {
-            core_ctx.handle_incoming_dad_neighbor_solicitation(
-                bindings_ctx,
-                device_id,
-                &addr_id,
-                nonce,
-            )
+            core_ctx.handle_incoming_probe(bindings_ctx, device_id, &addr_id, nonce)
         }) {
-            DadAddressStateLookupResult::Assigned => IpAddressState::Assigned,
-            DadAddressStateLookupResult::Tentative { matched_nonce: true } => {
+            DadIncomingProbeResult::Assigned => IpAddressState::Assigned,
+            DadIncomingProbeResult::Tentative {
+                meta: Ipv6ProbeResultMetadata { matched_nonce: true },
+            } => {
                 self.counters().version_rx.drop_looped_back_dad_probe.increment();
 
                 // Per RFC 7527 section 4.2, "the receiver compares the nonce
@@ -1051,8 +1050,10 @@ impl<
                 // looped back to us, so don't remove the address.
                 IpAddressState::Tentative
             }
-            DadAddressStateLookupResult::Uninitialized
-            | DadAddressStateLookupResult::Tentative { matched_nonce: false } => {
+            DadIncomingProbeResult::Uninitialized
+            | DadIncomingProbeResult::Tentative {
+                meta: Ipv6ProbeResultMetadata { matched_nonce: false },
+            } => {
                 // Per RFC 7527 section 4.2, "If the received NS(DAD) message
                 // includes a nonce and no match is found with any stored nonce,
                 // the node SHOULD log a system management message for a

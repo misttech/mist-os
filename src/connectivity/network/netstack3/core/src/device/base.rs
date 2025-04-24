@@ -40,12 +40,12 @@ use netstack3_device::{
 };
 use netstack3_filter::ProofOfEgressCheck;
 use netstack3_ip::device::{
-    AddressId, AddressIdIter, AssignedAddressState as _, DualStackIpDeviceState,
+    AddressId, AddressIdIter, AssignedAddressState as _, DadState, DualStackIpDeviceState,
     IpDeviceAddressContext, IpDeviceConfigurationContext, IpDeviceFlags, IpDeviceIpExt,
     IpDeviceSendContext, IpDeviceStateContext, Ipv4AddressEntry, Ipv4AddressState,
-    Ipv4DeviceConfiguration, Ipv6AddressEntry, Ipv6AddressState, Ipv6DadState,
-    Ipv6DeviceConfiguration, Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
-    Ipv6NetworkLearnedParameters, PrimaryAddressId, WeakAddressId,
+    Ipv4DeviceConfiguration, Ipv6AddressEntry, Ipv6AddressState, Ipv6DeviceConfiguration,
+    Ipv6DeviceConfigurationContext, Ipv6DeviceContext, Ipv6NetworkLearnedParameters,
+    PrimaryAddressId, WeakAddressId,
 };
 use netstack3_ip::nud::{
     ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler, NudIpHandler, NudUserConfig,
@@ -639,7 +639,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         let mut state = ip_device_state(self, device_id);
         let addr_id = state
             .write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>()
-            .add(Ipv6AddressEntry::new(addr, Ipv6DadState::Uninitialized, config));
+            .add(Ipv6AddressEntry::new(addr, DadState::Uninitialized, config));
         addr_id
     }
 

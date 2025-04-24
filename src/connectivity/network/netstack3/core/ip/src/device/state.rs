@@ -28,9 +28,7 @@ use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 use packet_formats::utils::NonZeroDuration;
 
 use crate::internal::counters::{IpCounters, IpCountersIpExt};
-use crate::internal::device::dad::{
-    DadBindingsTypes, DEFAULT_DAD_ENABLED_IPV4, DEFAULT_DAD_ENABLED_IPV6,
-};
+use crate::internal::device::dad::{DadState, DEFAULT_DAD_ENABLED_IPV4, DEFAULT_DAD_ENABLED_IPV6};
 use crate::internal::device::route_discovery::Ipv6RouteDiscoveryState;
 use crate::internal::device::router_solicitation::RsState;
 use crate::internal::device::slaac::{SlaacConfiguration, SlaacState};
@@ -42,8 +40,6 @@ use crate::internal::gmp::igmp::{IgmpConfig, IgmpCounters, IgmpTimerId, IgmpType
 use crate::internal::gmp::mld::{MldConfig, MldCounters, MldTimerId, MldTypeLayout};
 use crate::internal::gmp::{GmpGroupState, GmpState, GmpTimerId, GmpTypeLayout, MulticastGroupSet};
 use crate::internal::types::RawMetric;
-
-use super::dad::NonceCollection;
 
 /// The default value for *RetransTimer* as defined in [RFC 4861 section 10].
 ///
@@ -862,35 +858,6 @@ impl<BT: IpDeviceStateBindingsTypes> DualStackIpDeviceState<BT> {
     }
 }
 
-/// The various states DAD may be in for an address.
-#[derive(Derivative)]
-#[derivative(Debug(bound = ""))]
-pub enum Ipv6DadState<BT: DadBindingsTypes> {
-    /// The address is assigned to an interface and can be considered bound to
-    /// it (all packets destined to the address will be accepted).
-    Assigned,
-
-    /// The address is considered unassigned to an interface for normal
-    /// operations, but has the intention of being assigned in the future (e.g.
-    /// once NDP's Duplicate Address Detection is completed).
-    ///
-    /// When `dad_transmits_remaining` is `None`, then no more DAD messages need
-    /// to be sent and DAD may be resolved.
-    #[allow(missing_docs)]
-    Tentative {
-        dad_transmits_remaining: Option<NonZeroU16>,
-        timer: BT::Timer,
-        nonces: NonceCollection,
-        /// Initialized to false, and exists as a sentinel so that extra
-        /// transmits are added only after the first looped-back probe is
-        /// detected.
-        added_extra_transmits_after_detecting_looped_back_ns: bool,
-    },
-
-    /// The address has not yet been initialized.
-    Uninitialized,
-}
-
 /// Configuration for a temporary IPv6 address assigned via SLAAC.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct TemporarySlaacConfig<Instant> {
@@ -1362,7 +1329,7 @@ impl<Inst: Instant> Inspectable for Ipv6AddressState<Inst> {
 #[derivative(Debug(bound = ""))]
 pub struct Ipv6AddressEntry<BT: IpDeviceStateBindingsTypes> {
     addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
-    dad_state: Mutex<Ipv6DadState<BT>>,
+    dad_state: Mutex<DadState<Ipv6, BT>>,
     state: RwLock<Ipv6AddressState<BT::Instant>>,
 }
 
@@ -1370,12 +1337,12 @@ impl<BT: IpDeviceStateBindingsTypes> Ipv6AddressEntry<BT> {
     /// Constructs a new `Ipv6AddressEntry`.
     pub fn new(
         addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
-        dad_state: Ipv6DadState<BT>,
+        dad_state: DadState<Ipv6, BT>,
         config: Ipv6AddrConfig<BT::Instant>,
     ) -> Self {
         let assigned = match dad_state {
-            Ipv6DadState::Assigned => true,
-            Ipv6DadState::Tentative { .. } | Ipv6DadState::Uninitialized => false,
+            DadState::Assigned => true,
+            DadState::Tentative { .. } | DadState::Uninitialized => false,
         };
 
         Self {
@@ -1394,8 +1361,10 @@ impl<BT: IpDeviceStateBindingsTypes> Ipv6AddressEntry<BT> {
     }
 }
 
-impl<BT: IpDeviceStateBindingsTypes> OrderedLockAccess<Ipv6DadState<BT>> for Ipv6AddressEntry<BT> {
-    type Lock = Mutex<Ipv6DadState<BT>>;
+impl<BT: IpDeviceStateBindingsTypes> OrderedLockAccess<DadState<Ipv6, BT>>
+    for Ipv6AddressEntry<BT>
+{
+    type Lock = Mutex<DadState<Ipv6, BT>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.dad_state)
     }
@@ -1460,11 +1429,10 @@ mod tests {
         let _: AddressId<_> = ipv6
             .add(Ipv6AddressEntry::new(
                 AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap(),
-                Ipv6DadState::Tentative {
+                DadState::Tentative {
                     dad_transmits_remaining: None,
                     timer: bindings_ctx.new_timer(()),
-                    nonces: Default::default(),
-                    added_extra_transmits_after_detecting_looped_back_ns: false,
+                    ip_specific_state: Default::default(),
                 },
                 Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig {
                     inner: SlaacConfig::Stable {
@@ -1482,7 +1450,7 @@ mod tests {
         assert_eq!(
             ipv6.add(Ipv6AddressEntry::new(
                 AddrSubnet::new(ADDRESS, PREFIX_LEN + 1).unwrap(),
-                Ipv6DadState::Assigned,
+                DadState::Assigned,
                 Ipv6AddrConfig::Manual(Ipv6AddrManualConfig {
                     properties: CommonAddressProperties { valid_until, ..Default::default() },
                     ..Default::default()
