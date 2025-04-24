@@ -98,7 +98,7 @@ impl DefineSubsystemConfiguration<(&BluetoothConfig, &PlatformMediaConfig)>
 
             let offload_type = match media_config.audio {
                 Some(AudioConfig::FullStack(_)) => "dai",
-                Some(AudioConfig::PartialStack) | Some(AudioConfig::DeviceRegistry(_)) => "codec",
+                Some(AudioConfig::DeviceRegistry(_)) => "codec",
                 None => return Err(format_err!("Bluetooth HFP requires an audio stack")),
             };
 

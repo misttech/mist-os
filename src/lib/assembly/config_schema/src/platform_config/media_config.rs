@@ -35,9 +35,6 @@ pub enum AudioConfig {
     /// Use the full AudioCore stack.
     FullStack(AudioCoreConfig),
 
-    /// Use the partial AudioDeviceRegistry stack.
-    PartialStack,
-
     /// Use AudioDeviceRegistry (the "partial" stack).
     DeviceRegistry(AudioDeviceRegistryConfig),
 }
