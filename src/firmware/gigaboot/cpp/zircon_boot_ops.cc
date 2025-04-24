@@ -112,7 +112,7 @@ bool AddZbiItems(ZirconBootOps* ops, zbi_header_t* image, size_t capacity,
 
 bool ReadPermanentAttributes(ZirconBootOps* ops, AvbAtxPermanentAttributes* attribute) {
   ZX_ASSERT(attribute);
-  const cpp20::span<const uint8_t> perm_attr = GetPermanentAttributes();
+  const std::span<const uint8_t> perm_attr = GetPermanentAttributes();
   if (perm_attr.size() != sizeof(AvbAtxPermanentAttributes)) {
     return false;
   }
@@ -123,7 +123,7 @@ bool ReadPermanentAttributes(ZirconBootOps* ops, AvbAtxPermanentAttributes* attr
 
 bool ReadPermanentAttributesHash(ZirconBootOps* ops, uint8_t* hash) {
   ZX_ASSERT(hash);
-  const cpp20::span<const uint8_t> perm_attr_hash = GetPermanentAttributesHash();
+  const std::span<const uint8_t> perm_attr_hash = GetPermanentAttributesHash();
   memcpy(hash, perm_attr_hash.data(), perm_attr_hash.size());
   return true;
 }

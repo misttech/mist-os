@@ -1,10 +1,11 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#include <lib/stdcompat/span.h>
+
 #include <lib/zx/result.h>
 
 #include <array>
+#include <span>
 #include <string_view>
 
 #ifndef SRC_FIRMWARE_GIGABOOT_CPP_CMDLINE_H_
@@ -21,7 +22,7 @@ class Commandline {
 
   // Given an empty buffer, serialize the command line to a string.
   // If successful, returns the length of the command line string.
-  zx::result<size_t> ToString(cpp20::span<char> cmdline);
+  zx::result<size_t> ToString(std::span<char> cmdline);
 
   // Add or update a flag or key/value entry to the command line.
   // Returns true on success.
@@ -48,7 +49,7 @@ class Commandline {
   };
 
   std::array<CommandlineEntry, kMaxCmdlineItems> entries_;
-  cpp20::span<CommandlineEntry> valid_entries_ = {entries_.begin(), 0};
+  std::span<CommandlineEntry> valid_entries_ = {entries_.begin(), 0};
 };
 
 }  // namespace gigaboot

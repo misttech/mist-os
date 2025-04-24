@@ -31,7 +31,7 @@ extern "C" efi_status generate_efi_memory_attributes_table_item(
 namespace gigaboot {
 namespace {
 
-uint8_t CalculateChecksum(cpp20::span<const uint8_t> bytes) {
+uint8_t CalculateChecksum(std::span<const uint8_t> bytes) {
   // Add an explicit init of 64 bit 0 so that the sum doesn't overflow.
   int64_t intermediate = std::reduce(bytes.begin(), bytes.end(), 0ll);
   return static_cast<uint8_t>(0x100 - (intermediate & 0xFF));
@@ -50,7 +50,7 @@ class BootZbiItemTest : public ::testing::Test {
   MockStubService &stub_service() { return stub_service_; }
   ZbiContext &context() { return zbi_context_; }
 
-  cpp20::span<uint8_t> buffer() { return buffer_; }
+  std::span<uint8_t> buffer() { return buffer_; }
 
  private:
   MockStubService stub_service_;
@@ -104,8 +104,7 @@ class AcpiTableTest : public BootZbiItemTest {
         .xsdt_address = reinterpret_cast<uint64_t>(&sdt_holder_.sdt_table),
         .extended_checksum = 0,
     };
-    cpp20::span<const uint8_t> acpi_bytes(reinterpret_cast<const uint8_t *>(&rsdp),
-                                          kAcpiRsdpV1Size);
+    std::span<const uint8_t> acpi_bytes(reinterpret_cast<const uint8_t *>(&rsdp), kAcpiRsdpV1Size);
     rsdp.checksum = CalculateChecksum(acpi_bytes);
 
     acpi_bytes = {reinterpret_cast<const uint8_t *>(&rsdp), rsdp.length};
@@ -165,7 +164,7 @@ TEST_F(BootZbiItemTest, AddMemoryItems) {
   std::vector<zbitl::ByteView> items = FindItems(buffer().data(), ZBI_TYPE_MEM_CONFIG);
   ASSERT_EQ(items.size(), 1ULL);
 
-  cpp20::span<const zbi_mem_range_t> zbi_mem_ranges = {
+  std::span<const zbi_mem_range_t> zbi_mem_ranges = {
       reinterpret_cast<const zbi_mem_range_t *>(items[0].data()),
       items[0].size() / sizeof(zbi_mem_range_t)};
   ASSERT_EQ(zbi_mem_ranges.size(), 4ULL);
@@ -335,7 +334,7 @@ TEST_F(AcpiTableTest, NoSdtTable) {
   AcpiRsdp &rsdp = config_table().rsdp();
   rsdp.xsdt_address = 0;
   rsdp.extended_checksum = 0;
-  cpp20::span<const uint8_t> rsdp_bytes = {reinterpret_cast<const uint8_t *>(&rsdp), rsdp.length};
+  std::span<const uint8_t> rsdp_bytes = {reinterpret_cast<const uint8_t *>(&rsdp), rsdp.length};
   rsdp.extended_checksum = CalculateChecksum(rsdp_bytes);
 
   auto cleanup = SetupEfiGlobalState(config_table());

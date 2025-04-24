@@ -52,9 +52,9 @@ namespace gigaboot {
 
 class PartitionCustomizer {
  public:
-  static cpp20::span<const PartitionMap::PartitionEntry> PARTITION_SPAN;
+  static std::span<const PartitionMap::PartitionEntry> PARTITION_SPAN;
 
-  explicit PartitionCustomizer(cpp20::span<const PartitionMap::PartitionEntry> span) {
+  explicit PartitionCustomizer(std::span<const PartitionMap::PartitionEntry> span) {
     old_span_ = PARTITION_SPAN;
     PARTITION_SPAN = span;
   }
@@ -62,12 +62,12 @@ class PartitionCustomizer {
   ~PartitionCustomizer() { PARTITION_SPAN = old_span_; }
 
  private:
-  cpp20::span<const PartitionMap::PartitionEntry> old_span_;
+  std::span<const PartitionMap::PartitionEntry> old_span_;
 };
 
-cpp20::span<const PartitionMap::PartitionEntry> PartitionCustomizer::PARTITION_SPAN = {};
+std::span<const PartitionMap::PartitionEntry> PartitionCustomizer::PARTITION_SPAN = {};
 
-const cpp20::span<const PartitionMap::PartitionEntry> GetPartitionCustomizations() {
+const std::span<const PartitionMap::PartitionEntry> GetPartitionCustomizations() {
   return PartitionCustomizer::PARTITION_SPAN;
 }
 

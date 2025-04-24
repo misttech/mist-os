@@ -4,12 +4,12 @@
 #ifndef SRC_FIRMWARE_GIGABOOT_CPP_ACPI_H_
 #define SRC_FIRMWARE_GIGABOOT_CPP_ACPI_H_
 
-#include <lib/stdcompat/span.h>
 #include <lib/zbi-format/cpu.h>
 #include <lib/zbi-format/driver-config.h>
 
 #include <array>
 #include <optional>
+#include <span>
 #include <variant>
 
 #include <efi/types.h>
@@ -115,7 +115,7 @@ struct __attribute__((packed)) AcpiMadt {
   // Given an out-parameter span of topology nodes,
   // returns a span of CPU topology nodes.
   // The 'nodes' param is the space provided for the return value.
-  cpp20::span<zbi_topology_node_t> GetTopology(cpp20::span<zbi_topology_node_t> nodes) const;
+  std::span<zbi_topology_node_t> GetTopology(std::span<zbi_topology_node_t> nodes) const;
 
   struct GicDescriptor {
     std::variant<zbi_dcfg_arm_gic_v2_driver_t, zbi_dcfg_arm_gic_v3_driver_t> driver;

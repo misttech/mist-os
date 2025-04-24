@@ -63,7 +63,7 @@ def main() -> int:
                 // found in the LICENSE file.
 
                 #include <stdint.h>
-                #include <lib/stdcompat/span.h>
+                #include <span>
 
                 namespace {
                     %s
@@ -72,16 +72,16 @@ def main() -> int:
                 }
 
                 namespace gigaboot {
-                    const cpp20::span<const uint8_t> GetPermanentAttributes() {
-                        return cpp20::span{%s};
+                    const std::span<const uint8_t> GetPermanentAttributes() {
+                        return std::span{%s};
                     }
 
-                    const cpp20::span<const uint8_t> GetPermanentAttributesHash() {
-                        return cpp20::span{%s};
+                    const std::span<const uint8_t> GetPermanentAttributesHash() {
+                        return std::span{%s};
                     }
 
-                    const cpp20::span<const uint8_t> GetGblEfiApp() {
-                        return cpp20::span{%s};
+                    const std::span<const uint8_t> GetGblEfiApp() {
+                        return std::span{%s};
                     }
                 }
                 """

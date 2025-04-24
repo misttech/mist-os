@@ -6,7 +6,8 @@
 
 #include <lib/efi/testing/stub_boot_services.h>
 #include <lib/efi/testing/stub_runtime_services.h>
-#include <lib/stdcompat/span.h>
+
+#include <span>
 
 #include <efi/variable/variable_id.h>
 #include <gmock/gmock.h>
@@ -194,8 +195,8 @@ TEST_F(EfiVariablesStubTest, GetVariableNotThere) {
 
 // Helper function to work around matching `fbl::Vector`
 // Alternative is to add `using value_type = T;` to `fbl::Vector` class;
-cpp20::span<const uint8_t> ToSpan(const efi::VariableValue& value) {
-  return cpp20::span<const uint8_t>(value.begin(), value.end());
+std::span<const uint8_t> ToSpan(const efi::VariableValue& value) {
+  return std::span<const uint8_t>(value.begin(), value.end());
 }
 
 TEST_F(EfiVariablesStubTest, GetVariableGood) {

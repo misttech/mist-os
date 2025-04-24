@@ -48,6 +48,7 @@ source_set("lib") {
 
   public_deps = [
     "//sdk/lib/fit",
+    "//sdk/lib/stdcompat",
     "//sdk/lib/zbi-format",
     "//src/firmware/gigaboot/lib:bootbyte",
     "//src/firmware/gigaboot/lib:inet",

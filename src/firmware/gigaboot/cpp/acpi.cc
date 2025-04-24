@@ -4,7 +4,6 @@
 
 #include "acpi.h"
 
-#include <lib/stdcompat/span.h>
 #include <lib/zbi-format/cpu.h>
 #include <lib/zbi-format/driver-config.h>
 #include <stdio.h>
@@ -12,6 +11,7 @@
 
 #include <algorithm>
 #include <numeric>
+#include <span>
 
 #include <efi/types.h>
 #include <phys/efi/main.h>
@@ -67,8 +67,8 @@ const SdtHeader* TraverseEntries(const SdtHeader* table, AcpiTableSignature sig)
   // 32 is an educated guess about the maximum number of headers in the array.
   size_t num_entries = (table->length - sizeof(*table)) / sizeof(PtrNum);
   std::array<PtrNum, 32> aligned_ptrs;
-  cpp20::span<PtrNum> aligned_ptr_span(aligned_ptrs.begin(),
-                                       std::min(num_entries, aligned_ptrs.size()));
+  std::span<PtrNum> aligned_ptr_span(aligned_ptrs.begin(),
+                                     std::min(num_entries, aligned_ptrs.size()));
   memcpy(aligned_ptr_span.data(), reinterpret_cast<const uint8_t*>(table + 1),
          aligned_ptr_span.size_bytes());
 
@@ -153,8 +153,7 @@ uint32_t AcpiSpcr::GetKdrv() const {
   }
 }
 
-cpp20::span<zbi_topology_node_t> AcpiMadt::GetTopology(
-    cpp20::span<zbi_topology_node_t> nodes) const {
+std::span<zbi_topology_node_t> AcpiMadt::GetTopology(std::span<zbi_topology_node_t> nodes) const {
   auto last_node = nodes.begin();
 
   for (const auto& controller : controllers()) {
@@ -201,7 +200,7 @@ cpp20::span<zbi_topology_node_t> AcpiMadt::GetTopology(
     ++last_node;
   }
 
-  return cpp20::span<zbi_topology_node_t>(nodes.begin(), last_node);
+  return std::span<zbi_topology_node_t>(nodes.begin(), last_node);
 }
 
 std::optional<AcpiMadt::GicDescriptor> AcpiMadt::GetGicDriver() const {
@@ -291,8 +290,8 @@ zbi_dcfg_simple_t AcpiSpcr::DeriveUartDriver() const {
 
 const AcpiRsdp* FindAcpiRsdp() {
   const AcpiRsdp* rsdp = nullptr;
-  cpp20::span<const efi_configuration_table> entries(gEfiSystemTable->ConfigurationTable,
-                                                     gEfiSystemTable->NumberOfTableEntries);
+  std::span<const efi_configuration_table> entries(gEfiSystemTable->ConfigurationTable,
+                                                   gEfiSystemTable->NumberOfTableEntries);
 
   for (const efi_configuration_table& entry : entries) {
     // Check if this entry is an ACPI RSD PTR.
@@ -313,7 +312,7 @@ const AcpiRsdp* FindAcpiRsdp() {
   // Verify the checksum of this table. Both V1 and V2 RSDPs should pass the
   // V1 checksum, which only covers the first 20 bytes of the table.
   // The checksum adds all the bytes and passes if the result is 0.
-  cpp20::span<const uint8_t> acpi_bytes(reinterpret_cast<const uint8_t*>(rsdp), kAcpiRsdpV1Size);
+  std::span<const uint8_t> acpi_bytes(reinterpret_cast<const uint8_t*>(rsdp), kAcpiRsdpV1Size);
   if (uint8_t res = std::reduce(acpi_bytes.begin(), acpi_bytes.end(), 0ull) & 0xFF; res) {
     printf("RSDP V1 checksum failed\n");
     return nullptr;

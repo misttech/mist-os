@@ -12,6 +12,7 @@
 #include <array>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string_view>
 
 #include <fbl/vector.h>
@@ -37,7 +38,7 @@ class EfiGptBlockDevice {
                                          size_t length);
 
   gpt_header_t const &GptHeader() const { return gpt_header_; }
-  cpp20::span<const std::array<char, GPT_NAME_LEN / 2>> ListPartitionNames() const;
+  std::span<const std::array<char, GPT_NAME_LEN / 2>> ListPartitionNames() const;
 
   size_t BlockSize() { return block_io_protocol_->Media->BlockSize; }
   uint64_t LastBlock() { return block_io_protocol_->Media->LastBlock; }

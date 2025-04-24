@@ -2,6 +2,7 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
+
 #include <lib/cksum.h>
 #include <lib/zircon_boot/test/mock_zircon_boot_ops.h>
 #include <zircon/hw/gpt.h>
@@ -14,8 +15,8 @@ uint32_t AbrCrc32(const void* buf, size_t buf_size) {
   return crc32(0, reinterpret_cast<const uint8_t*>(buf), buf_size);
 }
 
-zx::result<cpp20::span<uint8_t>> MockZirconBootOps::GetPartitionSpan(const char* part_name,
-                                                                     size_t offset, size_t size) {
+zx::result<std::span<uint8_t>> MockZirconBootOps::GetPartitionSpan(const char* part_name,
+                                                                   size_t offset, size_t size) {
   auto part = partitions_.find(part_name);
   if (part == partitions_.end()) {
     return zx::error(ZX_ERR_NOT_FOUND);
@@ -24,7 +25,7 @@ zx::result<cpp20::span<uint8_t>> MockZirconBootOps::GetPartitionSpan(const char*
   if (offset > data.size() || data.size() - offset < size) {
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
-  return zx::ok(cpp20::span<uint8_t>(data.data() + offset, size));
+  return zx::ok(std::span<uint8_t>(data.data() + offset, size));
 }
 
 zx::result<> MockZirconBootOps::ReadFromPartition(const char* part_name, size_t offset, size_t size,

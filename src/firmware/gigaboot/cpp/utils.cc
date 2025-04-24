@@ -367,7 +367,7 @@ fit::result<efi_status, efi_guid> ToGuid(std::string_view guid_str) {
     return true;
   };
 
-  cpp20::span<uint8_t> buf(reinterpret_cast<uint8_t*>(&guid), sizeof(guid));
+  std::span<uint8_t> buf(reinterpret_cast<uint8_t*>(&guid), sizeof(guid));
   if (ParseByte(guid_str, buf[3]) &&   // |   aa   |    3      |
       ParseByte(guid_str, buf[2]) &&   // |   bb   |    2      |
       ParseByte(guid_str, buf[1]) &&   // |   cc   |    1      |
@@ -435,7 +435,7 @@ fbl::Vector<char> ToStr(const efi_guid& g) {
   fbl::Vector<char> res;
   res.resize(kEfiGuidStrLen + 1);
 
-  cpp20::span<const uint8_t> buf(reinterpret_cast<const uint8_t*>(&g), sizeof(g));
+  std::span<const uint8_t> buf(reinterpret_cast<const uint8_t*>(&g), sizeof(g));
 
   snprintf(res.data(), res.size(),
            "%02x%02x%02x%02x-"          // aabbccdd-

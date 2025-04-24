@@ -1,6 +1,7 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #include "network.h"
 
 #include "gmock/gmock.h"
@@ -88,7 +89,7 @@ TEST_F(NetworkTest, CreateAgentAndTx) {
   efi_managed_network_sync_completion_token token;
 
   ASSERT_TRUE(agent
-                  .SendV6LocalFrame(dest, cpp20::span<const uint8_t>(payload, std::size(payload)),
+                  .SendV6LocalFrame(dest, std::span<const uint8_t>(payload, std::size(payload)),
                                     callback, &token)
                   .is_ok());
 

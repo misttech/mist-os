@@ -26,6 +26,7 @@ test("gigaboot_unittests") {
   public_deps = [
     "..:lib",
     "//sdk/lib/fit",
+    "//sdk/lib/stdcompat",
     "//src/firmware/gigaboot/lib:shared",
     "//src/firmware/lib/abr:in_tree",
     "//src/firmware/lib/fastboot/test:utils",

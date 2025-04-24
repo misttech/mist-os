@@ -4,10 +4,10 @@
 
 #include "gbl_efi_fastboot_protocol.h"
 
-#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
 #include <functional>
+#include <span>
 #include <string_view>
 
 #include <phys/efi/main.h>
@@ -38,16 +38,16 @@ constexpr struct Variable {
 };
 
 /// Gets the list of variables
-cpp20::span<const Variable> variables() { return cpp20::span<const Variable>(kVariables); }
+std::span<const Variable> variables() { return std::span<const Variable>(kVariables); }
 
 EFIAPI efi_status GetVar(struct gbl_efi_fastboot_protocol* self, const char* const* args,
                          size_t num_args, uint8_t* buf, size_t* bufsize) {
-  const cpp20::span<const char* const> args_span{args, num_args};
+  const std::span<const char* const> args_span{args, num_args};
   if (args_span.empty() || !bufsize) {
     return EFI_INVALID_PARAMETER;
   }
 
-  cpp20::span<uint8_t> out{buf, *bufsize};
+  std::span<uint8_t> out{buf, *bufsize};
   for (size_t i = 0; i < variables().size(); i++) {
     const Variable& var = variables()[i];
     if (std::string_view(args_span[0]) != var.name()) {

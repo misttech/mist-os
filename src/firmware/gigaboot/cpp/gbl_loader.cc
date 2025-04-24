@@ -59,16 +59,16 @@ efi_status InstallGblProtocols() {
 
 }  // namespace
 
-cpp20::span<uint8_t> GblFdt();
-cpp20::span<uint8_t> GblFdtZbiBlob();
-cpp20::span<uint8_t> GblFdtPermAttr();
-cpp20::span<uint8_t> GblFdtPermAttrHash();
-cpp20::span<uint8_t> GblFdtStopInFastboot();
+std::span<uint8_t> GblFdt();
+std::span<uint8_t> GblFdtZbiBlob();
+std::span<uint8_t> GblFdtPermAttr();
+std::span<uint8_t> GblFdtPermAttrHash();
+std::span<uint8_t> GblFdtStopInFastboot();
 
-const cpp20::span<const uint8_t> GetGblEfiApp();
+const std::span<const uint8_t> GetGblEfiApp();
 
 zx::result<> LaunchGbl(bool stop_in_fastboot) {
-  const cpp20::span<const uint8_t> app = GetGblEfiApp();
+  const std::span<const uint8_t> app = GetGblEfiApp();
 
   // Allocates boot buffer and copies over the embedded GBL EFI app blob. This is because
   // `LoadImage()` requires a non-const pointer for the source buffer parameter.
@@ -97,7 +97,7 @@ zx::result<> LaunchGbl(bool stop_in_fastboot) {
   uintptr_t fdt_zbi_blob_addr = reinterpret_cast<uintptr_t>(GblFdtZbiBlob().data());
   size_t zbi_alignment = size_t{ZBI_ALIGNMENT};
   uintptr_t aligned_addr = DivideRoundUp(fdt_zbi_blob_addr, zbi_alignment) * zbi_alignment;
-  cpp20::span<uint8_t> aligned = GblFdtZbiBlob().subspan(aligned_addr - fdt_zbi_blob_addr);
+  std::span<uint8_t> aligned = GblFdtZbiBlob().subspan(aligned_addr - fdt_zbi_blob_addr);
   zbi_header_t* zbi = reinterpret_cast<zbi_header_t*>(aligned.data());
   size_t capacity = aligned.size();
   if (zbi_result_t res = zbi_init(zbi, capacity); res != ZBI_RESULT_OK) {
@@ -123,8 +123,8 @@ zx::result<> LaunchGbl(bool stop_in_fastboot) {
     return zx::error(static_cast<int>(res));
   }
 
-  auto mems = cpp20::span{reinterpret_cast<zbi_mem_range_t*>(mem_payload),
-                          payload_len / sizeof(zbi_mem_range_t)};
+  auto mems = std::span{reinterpret_cast<zbi_mem_range_t*>(mem_payload),
+                        payload_len / sizeof(zbi_mem_range_t)};
   auto collected = CollectPeripheralMemoryItems(&context, mems);
   if (collected.is_error()) {
     printf("Failed to collect peripheral memory ZBI items: %d\n", collected.error_value());

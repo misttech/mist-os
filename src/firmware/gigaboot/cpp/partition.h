@@ -5,10 +5,10 @@
 #ifndef SRC_FIRMWARE_GIGABOOT_CPP_PARTITION_H_
 #define SRC_FIRMWARE_GIGABOOT_CPP_PARTITION_H_
 
-#include <lib/stdcompat/span.h>
 #include <zircon/hw/gpt.h>
 
 #include <optional>
+#include <span>
 #include <string_view>
 
 #include <fbl/vector.h>
@@ -31,7 +31,7 @@ class PartitionMap {
   // If any partition entry besides the final one has a min_size_bytes of SIZE_MAX,
   // GeneratePartitionMap will return std::nullopt
   static std::optional<PartitionMap> GeneratePartitionMap(
-      cpp20::span<const PartitionEntry> const partitions);
+      std::span<const PartitionEntry> const partitions);
 
   fbl::Vector<PartitionEntry> const& partitions() const { return partitions_; }
 
