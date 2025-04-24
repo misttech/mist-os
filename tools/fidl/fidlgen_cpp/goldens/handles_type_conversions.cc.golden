@@ -91,10 +91,6 @@ namespace internal {
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::test_handles::FdfHandles WireNaturalConversionTraits<::test_handles::wire::FdfHandles, ::test_handles::FdfHandles>::ToNatural(::test_handles::wire::FdfHandles src) {
   return ::test_handles::FdfHandles{{
       .fdf_channel_handle = WireNaturalConversionTraits<::fdf::Channel, ::fdf::Channel>::ToNatural(std::move(src.fdf_channel_handle)),
@@ -109,10 +105,6 @@ namespace internal {
       .server_end_driver = WireNaturalConversionTraits<::fdf::ServerEnd<::test_handles::DriverProtocol>, ::fdf::ServerEnd<::test_handles::DriverProtocol>>::ToWire(arena, std::move(src.server_end_driver())),
   };
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
 #pragma clang diagnostic pop

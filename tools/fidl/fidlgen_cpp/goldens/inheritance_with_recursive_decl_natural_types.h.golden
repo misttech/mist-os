@@ -76,10 +76,6 @@ class ParentFirstRequest {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class ChildSecondRequest {
  private:
   struct Storage_;
@@ -127,10 +123,6 @@ class ChildSecondRequest {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 inline ParentFirstRequest::ParentFirstRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline ParentFirstRequest::ParentFirstRequest(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> request) noexcept
     : storage_({.request = std::move(request)}) {}
@@ -142,10 +134,6 @@ inline ParentFirstRequest& ParentFirstRequest::request(::fidl::ServerEnd<::test_
   storage_.request = std::move(value);
   return *this;
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 inline ChildSecondRequest::ChildSecondRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline ChildSecondRequest::ChildSecondRequest(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> request) noexcept
@@ -186,10 +174,6 @@ struct IsStruct<::test_inheritancewithrecursivedecl::ParentFirstRequest> : publi
 template <>
 struct internal::NaturalCodingTraits<::test_inheritancewithrecursivedecl::ParentFirstRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_inheritancewithrecursivedecl::ParentFirstRequest, 4> {};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct IsResource<::test_inheritancewithrecursivedecl::ChildSecondRequest> : public std::true_type {};

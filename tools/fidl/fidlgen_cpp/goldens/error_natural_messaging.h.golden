@@ -16,10 +16,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-}  // namespace fidl
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_error::Example::Foo> {
   using Request = ::test_error::ExampleFooRequest;
@@ -71,10 +67,6 @@ class ::fidl::internal::NaturalClientImpl<::test_error::Example> final : public 
   ::fidl::internal::NaturalThenable<::test_error::Example::Foo> Foo(const ::fidl::Request<::test_error::Example::Foo>& request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_error::Example> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_error::Example>> {
@@ -87,10 +79,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_error::Example> final
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_error::Example> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -126,9 +114,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_error::Example> final : pu
       : IncomingEventDispatcher(event_handler) {}
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_error::Example> : public ::fidl::internal::WeakEventSenderBase {
  public:

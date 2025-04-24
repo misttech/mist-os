@@ -31,12 +31,4 @@
       ::fidl::internal::NaturalClone(storage_.array)};
 }
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop

@@ -32,10 +32,6 @@ namespace driverservice {
 #ifdef __Fuchsia__
 class DriverOnlyService;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class DriverOnlyService final {
  public:
   class Handler;

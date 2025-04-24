@@ -17,10 +17,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-}  // namespace fidl
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_placementofattributes::ExampleProtocol::Method> {
   using Request = ::test_placementofattributes::ExampleProtocolMethodRequest;
@@ -37,10 +33,6 @@ class ::fidl::internal::NaturalClientImpl<::test_placementofattributes::ExampleP
   ::fit::result<::fidl::OneWayError> Method(const ::fidl::Request<::test_placementofattributes::ExampleProtocol::Method>& request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_placementofattributes::ExampleProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_placementofattributes::ExampleProtocol>> {
@@ -53,10 +45,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_placementofattributes::Exam
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_placementofattributes::ExampleProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -92,9 +80,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_placementofattributes::Exa
       : IncomingEventDispatcher(event_handler) {}
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_placementofattributes::ExampleProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:

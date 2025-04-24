@@ -16,10 +16,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-}  // namespace fidl
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible> {
   using Request = ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest;
@@ -85,10 +81,6 @@ class ::fidl::internal::NaturalClientImpl<::test_requestflexibleenvelope::Protoc
   ::fidl::internal::NaturalThenable<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict> RequestFlexibleResponseStrict(const ::fidl::Request<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>& request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_requestflexibleenvelope::Protocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_requestflexibleenvelope::Protocol>> {
@@ -103,10 +95,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_requestflexibleenvelope::Pr
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_requestflexibleenvelope::Protocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -142,9 +130,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_requestflexibleenvelope::P
       : IncomingEventDispatcher(event_handler) {}
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_requestflexibleenvelope::Protocol> : public ::fidl::internal::WeakEventSenderBase {
  public:

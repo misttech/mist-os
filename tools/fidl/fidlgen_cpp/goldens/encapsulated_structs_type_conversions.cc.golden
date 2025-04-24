@@ -75,10 +75,6 @@ namespace internal {
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::test_encapsulatedstructs::TopLevelStruct WireNaturalConversionTraits<::test_encapsulatedstructs::wire::TopLevelStruct, ::test_encapsulatedstructs::TopLevelStruct>::ToNatural(::test_encapsulatedstructs::wire::TopLevelStruct src) {
   return ::test_encapsulatedstructs::TopLevelStruct{{
       .a = WireNaturalConversionTraits<::test_encapsulatedstructs::wire::StructPaddingTestStruct, ::test_encapsulatedstructs::StructPaddingTestStruct>::ToNatural(std::move(src.a)),
@@ -91,10 +87,6 @@ namespace internal {
       .b = WireNaturalConversionTraits<::test_encapsulatedstructs::wire::NonInlineStructTestStruct, ::test_encapsulatedstructs::NonInlineStructTestStruct>::ToWire(arena, std::move(src.b())),
   };
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
 #pragma clang diagnostic pop

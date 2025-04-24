@@ -39,25 +39,10 @@ struct ::fidl::internal::WireMethodTypes<::test_doccomments::Interface::Method> 
   using Completer = fidl::Completer<>;
 };
 
-namespace test_doccomments {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-}  // namespace test_doccomments
-
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_doccomments::Interface::OnEvent> {
   static constexpr bool HasRequestPayload = false;
 };
-
-namespace test_doccomments {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace test_doccomments
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_doccomments::Interface> final {
@@ -98,9 +83,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalEvent<::test_doccomments::Interface::OnEvent> final {
   FIDL_ALIGNDECL
@@ -142,9 +124,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_doccomments::Int
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_doccomments::Interface::OnEvent>> : public std::true_type {};
 template <>
@@ -162,9 +141,6 @@ struct TypeTraits<::fidl::internal::TransactionalEvent<::test_doccomments::Inter
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 }  // namespace fidl
 
 template <>

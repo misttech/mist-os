@@ -11,10 +11,6 @@
 void ::test_versions::wire::Struct::_CloseHandles() {
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 auto ::test_versions::wire::Union::Which() const -> ::test_versions::wire::Union::Tag {
   ZX_ASSERT(!has_invalid_tag());
   switch (ordinal_) {
@@ -57,10 +53,6 @@ void ::test_versions::wire::Union::_CloseHandles() {
       break;
   }
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 bool ::fidl::WireTableFrame<::test_versions::wire::Table>::HasUnknownData() const {
   return false;

@@ -191,10 +191,6 @@ zx_status_t StructWithNullableProtocol::Clone(StructWithNullableProtocol* _resul
   return ZX_OK;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 extern "C" const fidl_type_t test_nullable_StructWithNullableRequestTable;
 const fidl_type_t* StructWithNullableRequest::FidlType = &test_nullable_StructWithNullableRequestTable;
 

@@ -69,21 +69,9 @@ struct FdfHandles;
 
 using AliasedPlainHandle = ::zx::handle;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 using AliasedSubtypeHandle = ::zx::vmo;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 using AliasedRightsHandle = ::zx::vmo;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 struct Handles {
   ::zx::handle plain_handle = {};
@@ -158,10 +146,6 @@ struct Handles {
 
   void _CloseHandles();
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 struct FdfHandles {
   ::fdf::Channel fdf_channel_handle = {};
@@ -365,9 +349,6 @@ struct ::fidl::internal::WireCodingTraits<::test_handles::wire::Handles, ::fidl:
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsResource<::test_handles::wire::FdfHandles> : public std::true_type {};
 

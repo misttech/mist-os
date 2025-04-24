@@ -390,10 +390,6 @@ class StructWithNullableProtocol {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class StructWithNullableRequest {
  private:
   struct Storage_;
@@ -839,10 +835,6 @@ inline StructWithNullableProtocol& StructWithNullableProtocol::val(::fidl::Clien
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 inline StructWithNullableRequest::StructWithNullableRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline StructWithNullableRequest::StructWithNullableRequest(::fidl::ServerEnd<::test_nullable::SimpleProtocol> val) noexcept
     : storage_({.val = std::move(val)}) {}
@@ -1034,10 +1026,6 @@ struct IsStruct<::test_nullable::StructWithNullableProtocol> : public std::true_
 template <>
 struct internal::NaturalCodingTraits<::test_nullable::StructWithNullableProtocol, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_nullable::StructWithNullableProtocol, 4> {};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct IsResource<::test_nullable::StructWithNullableRequest> : public std::true_type {};

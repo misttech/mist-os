@@ -147,13 +147,6 @@ class ::fidl::WireServer<::test_protocolrequest::Child> : public ::fidl::interna
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-}  // namespace fidl
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_protocolrequest::Parent::GetChild> {
@@ -172,14 +165,6 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolrequest::Parent::GetChil
           ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChild>, ::fidl::internal::ChannelTransport>>;
 };
 
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-}  // namespace fidl
-
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_protocolrequest::Parent::GetChildRequest> {
   static constexpr bool HasRequestPayload = false;
@@ -197,14 +182,6 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolrequest::Parent::GetChil
           ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest>, ::fidl::internal::ChannelTransport>>;
 };
 
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-}  // namespace fidl
-
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_protocolrequest::Parent::TakeChild> {
   static constexpr bool HasRequestPayload = true;
@@ -212,14 +189,6 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolrequest::Parent::TakeChi
 
   using Completer = fidl::Completer<>;
 };
-
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-}  // namespace fidl
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_protocolrequest::Parent::TakeChildRequest> {
@@ -279,10 +248,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct ::fidl::WireResponse<::test_protocolrequest::Parent::GetChild> final : public ::test_protocolrequest::wire::ParentGetChildResponse {
   explicit WireResponse(::test_protocolrequest::wire::ParentGetChildResponse base);
@@ -321,9 +286,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest> final {
   FIDL_ALIGNDECL
@@ -341,10 +303,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest> final : public ::test_protocolrequest::wire::ParentGetChildRequestResponse {
@@ -384,9 +342,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild> final {
   FIDL_ALIGNDECL
@@ -408,9 +363,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest> final {
   FIDL_ALIGNDECL
@@ -493,9 +445,6 @@ struct TypeTraits<::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest>> : public std::true_type {};
 template <>
@@ -552,9 +501,6 @@ struct TypeTraits<::fidl::WireResponse<::test_protocolrequest::Parent::GetChildR
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>> : public std::true_type {};
 template <>
@@ -574,9 +520,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest:
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>> : public std::true_type {};
 template <>
@@ -596,9 +539,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest:
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 }  // namespace fidl
 
 template <>
@@ -987,12 +927,6 @@ class ::fidl::WireServer<::test_protocolrequest::Parent> : public ::fidl::intern
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireWeakOnewayClientImpl<::test_protocolrequest::Child> : public ::fidl::internal::ClientImplBase {
@@ -1055,10 +989,6 @@ class ::fidl::internal::WireBufferEventSender<::test_protocolrequest::Child>
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::WireWeakOnewayClientImpl<::test_protocolrequest::Parent> : public ::fidl::internal::ClientImplBase {
  public:
@@ -1116,9 +1046,6 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_protocolrequest::Parent> f
   ::fidl::WireResult<::test_protocolrequest::Parent::GetChildRequest> GetChildRequest();
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakEventSender<::test_protocolrequest::Parent> : public ::fidl::internal::WeakEventSenderBase {
  public:

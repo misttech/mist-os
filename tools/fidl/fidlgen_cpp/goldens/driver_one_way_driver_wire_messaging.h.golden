@@ -38,13 +38,6 @@ struct ::fidl::internal::WireMethodTypes<::test_driveroneway::OneWay::Send> {
   using Completer = fidl::Completer<>;
 };
 
-namespace test_driveroneway {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace test_driveroneway
-
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_driveroneway::OneWay> final {
   WireServerDispatcher() = delete;
@@ -109,9 +102,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_driveroneway::On
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 }  // namespace fidl
 
 template <>
@@ -203,12 +193,6 @@ class ::fdf::WireServer<::test_driveroneway::OneWay> : public ::fidl::internal::
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_driveroneway::OneWay> : public ::fdf::internal::BufferClientImplBase {

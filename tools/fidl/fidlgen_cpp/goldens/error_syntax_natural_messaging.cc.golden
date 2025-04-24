@@ -90,20 +90,12 @@ fidl::internal::NaturalSyncClientImpl<::test_errorsyntax::ExampleUseOfErrorSynta
       msg.Call(_client_end().handle(), response_storage.view()), nullptr);
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::Status fidl::SyncEventHandler<::test_errorsyntax::ExampleUseOfErrorSyntax>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax> client_end) {
   ::fidl::internal::IncomingEventsStorage<::test_errorsyntax::ExampleUseOfErrorSyntax> event_storage;
   fidl::internal::NaturalEventDispatcher<::test_errorsyntax::ExampleUseOfErrorSyntax> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
 

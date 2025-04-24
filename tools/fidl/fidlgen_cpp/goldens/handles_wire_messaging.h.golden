@@ -146,12 +146,6 @@ class ::fidl::WireServer<::test_handles::SomeProtocol> : public ::fidl::internal
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireWeakOnewayClientImpl<::test_handles::SomeProtocol> : public ::fidl::internal::ClientImplBase {

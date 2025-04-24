@@ -74,10 +74,6 @@ namespace internal {
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::test_nullable::StructWithNullableRequest WireNaturalConversionTraits<::test_nullable::wire::StructWithNullableRequest, ::test_nullable::StructWithNullableRequest>::ToNatural(::test_nullable::wire::StructWithNullableRequest src) {
   return ::test_nullable::StructWithNullableRequest(WireNaturalConversionTraits<::fidl::ServerEnd<::test_nullable::SimpleProtocol>, ::fidl::ServerEnd<::test_nullable::SimpleProtocol>>::ToNatural(std::move(src.val)));
 }

@@ -18,11 +18,9 @@ constexpr const ::test::typesinprotocols::Bits Bits::kMask = ::test::typesinprot
 
 #endif  // (__cplusplus < 201703)
 
-
 #if (__cplusplus < 201703)
 constexpr const ::test::typesinprotocols::Enum Enum::VAL = ::test::typesinprotocols::Enum(1u);
 #endif  // (__cplusplus < 201703)
-
 
 extern "C" const fidl_type_t test_typesinprotocols_StructTable;
 const fidl_type_t* Struct::FidlType = &test_typesinprotocols_StructTable;
@@ -32,7 +30,7 @@ void Struct::Encode(::fidl::Encoder* _encoder, size_t _offset,
   if (::fidl::IsMemcpyCompatible<Struct>::value) {
     memcpy(_encoder->template GetPtr<Struct>(_offset), this, sizeof(Struct));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
-    
+
   }
 }
 
@@ -50,7 +48,6 @@ zx_status_t Struct::Clone(Struct* _result) const {
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_typesinprotocols_TableTable;
 const fidl_type_t* Table::FidlType = &test_typesinprotocols_TableTable;
@@ -91,8 +88,6 @@ void Table::Decode(::fidl::Decoder* _decoder, Table* _value, size_t _offset) {
   base = _decoder->GetOffset(encoded->data);
   count = encoded->count;
 
-  
-
   return;
 
   // Clear unset values.
@@ -103,7 +98,6 @@ clear_all:
 zx_status_t Table::Clone(Table* result) const {
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_typesinprotocols_UnionTable;
 const fidl_type_t* Union::FidlType = &test_typesinprotocols_UnionTable;
@@ -152,7 +146,6 @@ Union Union::WithB(bool&& val) {
   result.set_b(std::move(val));
   return result;
 }
-
 
 void Union::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -205,7 +198,6 @@ void Union::Decode(::fidl::Decoder* _decoder, Union* value, size_t offset) {
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -253,13 +245,13 @@ void Union::Destroy() {
   switch (tag_) {
     case ::test::typesinprotocols::Union::Tag::kB:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Union::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Union::Tag::Invalid);
 }
@@ -281,7 +273,6 @@ void Union::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
   }
 }
 
-
 #ifdef __Fuchsia__
 
 extern "C" const fidl_type_t test_typesinprotocols_ResourceStructTable;
@@ -292,7 +283,7 @@ void ResourceStruct::Encode(::fidl::Encoder* _encoder, size_t _offset,
   if (::fidl::IsMemcpyCompatible<ResourceStruct>::value) {
     memcpy(_encoder->template GetPtr<ResourceStruct>(_offset), this, sizeof(ResourceStruct));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
-    
+
   }
 }
 
@@ -310,12 +301,6 @@ zx_status_t ResourceStruct::Clone(ResourceStruct* _result) const {
     return _status;
   return ZX_OK;
 }
-
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 
 extern "C" const fidl_type_t test_typesinprotocols_ResourceTableTable;
 const fidl_type_t* ResourceTable::FidlType = &test_typesinprotocols_ResourceTableTable;
@@ -356,7 +341,6 @@ void ResourceTable::Decode(::fidl::Decoder* _decoder, ResourceTable* _value, siz
   base = _decoder->GetOffset(encoded->data);
   count = encoded->count;
 
-  
   if (count > 0) {
     for (uint64_t ordinal = 1; ordinal <= count; ordinal++) {
       if (IsOrdinalKnown(ordinal)) {
@@ -379,12 +363,6 @@ clear_all:
 zx_status_t ResourceTable::Clone(ResourceTable* result) const {
   return ZX_OK;
 }
-
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 
 extern "C" const fidl_type_t test_typesinprotocols_ResourceUnionTable;
 const fidl_type_t* ResourceUnion::FidlType = &test_typesinprotocols_ResourceUnionTable;
@@ -433,7 +411,6 @@ ResourceUnion ResourceUnion::WithB(bool&& val) {
   result.set_b(std::move(val));
   return result;
 }
-
 
 void ResourceUnion::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -486,7 +463,6 @@ void ResourceUnion::Decode(::fidl::Decoder* _decoder, ResourceUnion* value, size
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -536,13 +512,13 @@ void ResourceUnion::Destroy() {
   switch (tag_) {
     case ::test::typesinprotocols::ResourceUnion::Tag::kB:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::ResourceUnion::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::ResourceUnion::Tag::Invalid);
 }
@@ -566,8 +542,6 @@ void ResourceUnion::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
 
 #endif  // __Fuchsia__
 
-
-
 extern "C" const fidl_type_t test_typesinprotocols_BasicTable;
 const fidl_type_t* Basic::FidlType = &test_typesinprotocols_BasicTable;
 
@@ -587,7 +561,7 @@ void Basic::Encode(::fidl::Encoder* _encoder, size_t _offset,
     ::fidl::Encode(_encoder, &float64, _offset + 40);
     ::fidl::Encode(_encoder, &string, _offset + 48);
     ::fidl::Encode(_encoder, &opt_string, _offset + 64);
-    
+
   }
 }
 
@@ -650,7 +624,6 @@ zx_status_t Basic::Clone(Basic* _result) const {
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_typesinprotocols_CompoundTable;
 const fidl_type_t* Compound::FidlType = &test_typesinprotocols_CompoundTable;
 
@@ -665,7 +638,7 @@ void Compound::Encode(::fidl::Encoder* _encoder, size_t _offset,
     ::fidl::Encode(_encoder, &union_, _offset + 32);
     ::fidl::Encode(_encoder, &opt_struct, _offset + 48);
     ::fidl::Encode(_encoder, &opt_union, _offset + 56);
-    
+
   }
 }
 
@@ -708,7 +681,6 @@ zx_status_t Compound::Clone(Compound* _result) const {
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_typesinprotocols_ArrayBasicTable;
 const fidl_type_t* ArrayBasic::FidlType = &test_typesinprotocols_ArrayBasicTable;
 
@@ -728,7 +700,7 @@ void ArrayBasic::Encode(::fidl::Encoder* _encoder, size_t _offset,
     ::fidl::Encode(_encoder, &array_float64, _offset + 184);
     ::fidl::Encode(_encoder, &array_string, _offset + 224);
     ::fidl::Encode(_encoder, &array_opt_string, _offset + 304);
-    
+
   }
 }
 
@@ -791,7 +763,6 @@ zx_status_t ArrayBasic::Clone(ArrayBasic* _result) const {
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_typesinprotocols_ArrayCompoundTable;
 const fidl_type_t* ArrayCompound::FidlType = &test_typesinprotocols_ArrayCompoundTable;
 
@@ -806,7 +777,7 @@ void ArrayCompound::Encode(::fidl::Encoder* _encoder, size_t _offset,
     ::fidl::Encode(_encoder, &array_union, _offset + 128);
     ::fidl::Encode(_encoder, &array_opt_struct, _offset + 208);
     ::fidl::Encode(_encoder, &array_opt_union, _offset + 248);
-    
+
   }
 }
 
@@ -849,7 +820,6 @@ zx_status_t ArrayCompound::Clone(ArrayCompound* _result) const {
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_typesinprotocols_VectorBasicTable;
 const fidl_type_t* VectorBasic::FidlType = &test_typesinprotocols_VectorBasicTable;
 
@@ -869,7 +839,7 @@ void VectorBasic::Encode(::fidl::Encoder* _encoder, size_t _offset,
     ::fidl::Encode(_encoder, &vector_float64, _offset + 144);
     ::fidl::Encode(_encoder, &vector_string, _offset + 160);
     ::fidl::Encode(_encoder, &vector_opt_string, _offset + 176);
-    
+
   }
 }
 
@@ -932,7 +902,6 @@ zx_status_t VectorBasic::Clone(VectorBasic* _result) const {
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_typesinprotocols_VectorCompoundTable;
 const fidl_type_t* VectorCompound::FidlType = &test_typesinprotocols_VectorCompoundTable;
 
@@ -947,7 +916,7 @@ void VectorCompound::Encode(::fidl::Encoder* _encoder, size_t _offset,
     ::fidl::Encode(_encoder, &vector_union, _offset + 64);
     ::fidl::Encode(_encoder, &vector_opt_struct, _offset + 80);
     ::fidl::Encode(_encoder, &vector_opt_union, _offset + 96);
-    
+
   }
 }
 
@@ -990,7 +959,6 @@ zx_status_t VectorCompound::Clone(VectorCompound* _result) const {
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_typesinprotocols_VectorOptionalTable;
 const fidl_type_t* VectorOptional::FidlType = &test_typesinprotocols_VectorOptionalTable;
 
@@ -1002,7 +970,7 @@ void VectorOptional::Encode(::fidl::Encoder* _encoder, size_t _offset,
     ::fidl::Encode(_encoder, &opt_vector_string, _offset + 16);
     ::fidl::Encode(_encoder, &opt_vector_struct, _offset + 32);
     ::fidl::Encode(_encoder, &opt_vector_opt_struct, _offset + 48);
-    
+
   }
 }
 
@@ -1033,7 +1001,6 @@ zx_status_t VectorOptional::Clone(VectorOptional* _result) const {
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_typesinprotocols_ArrayVectorNestedTable;
 const fidl_type_t* ArrayVectorNested::FidlType = &test_typesinprotocols_ArrayVectorNestedTable;
 
@@ -1045,7 +1012,7 @@ void ArrayVectorNested::Encode(::fidl::Encoder* _encoder, size_t _offset,
     ::fidl::Encode(_encoder, &array_vector_uint8, _offset + 32);
     ::fidl::Encode(_encoder, &vector_array_uint8, _offset + 112);
     ::fidl::Encode(_encoder, &vector_vector_uint8, _offset + 128);
-    
+
   }
 }
 
@@ -1076,7 +1043,6 @@ zx_status_t ArrayVectorNested::Clone(ArrayVectorNested* _result) const {
   return ZX_OK;
 }
 
-
 #ifdef __Fuchsia__
 
 extern "C" const fidl_type_t test_typesinprotocols_ResourceTable;
@@ -1091,17 +1057,17 @@ void Resource::Encode(::fidl::Encoder* _encoder, size_t _offset,
       .object_type = ZX_OBJ_TYPE_NONE,
       .rights = 0x80000000,
     });
-    
+
     ::fidl::Encode(_encoder, &vmo, _offset + 4, ::fidl::HandleInformation {
       .object_type = ZX_OBJ_TYPE_VMO,
       .rights = 0x80000000,
     });
-    
+
     ::fidl::Encode(_encoder, &client_end, _offset + 8, ::fidl::HandleInformation {
       .object_type = ZX_OBJ_TYPE_CHANNEL,
       .rights = ZX_DEFAULT_CHANNEL_RIGHTS,
     });
-    
+
     ::fidl::Encode(_encoder, &server_end, _offset + 12, ::fidl::HandleInformation {
       .object_type = ZX_OBJ_TYPE_CHANNEL,
       .rights = ZX_DEFAULT_CHANNEL_RIGHTS,
@@ -1109,44 +1075,44 @@ void Resource::Encode(::fidl::Encoder* _encoder, size_t _offset,
     ::fidl::Encode(_encoder, &struct_, _offset + 16);
     ::fidl::Encode(_encoder, &table, _offset + 24);
     ::fidl::Encode(_encoder, &union_, _offset + 40);
-    
+
     ::fidl::Encode(_encoder, &opt_handle, _offset + 56, ::fidl::HandleInformation {
       .object_type = ZX_OBJ_TYPE_NONE,
       .rights = 0x80000000,
     });
-    
+
     ::fidl::Encode(_encoder, &opt_vmo, _offset + 60, ::fidl::HandleInformation {
       .object_type = ZX_OBJ_TYPE_VMO,
       .rights = 0x80000000,
     });
-    
+
     ::fidl::Encode(_encoder, &opt_client_end, _offset + 64, ::fidl::HandleInformation {
       .object_type = ZX_OBJ_TYPE_CHANNEL,
       .rights = ZX_DEFAULT_CHANNEL_RIGHTS,
     });
-    
+
     ::fidl::Encode(_encoder, &opt_server_end, _offset + 68, ::fidl::HandleInformation {
       .object_type = ZX_OBJ_TYPE_CHANNEL,
       .rights = ZX_DEFAULT_CHANNEL_RIGHTS,
     });
     ::fidl::Encode(_encoder, &opt_struct, _offset + 72);
     ::fidl::Encode(_encoder, &opt_union, _offset + 80);
-    
+
     ::fidl::Encode(_encoder, &array_handle, _offset + 96, ::fidl::HandleInformation {
       .object_type = ZX_OBJ_TYPE_NONE,
       .rights = 0x80000000,
     });
-    
+
     ::fidl::Encode(_encoder, &array_vmo, _offset + 116, ::fidl::HandleInformation {
       .object_type = ZX_OBJ_TYPE_VMO,
       .rights = 0x80000000,
     });
-    
+
     ::fidl::Encode(_encoder, &array_client_end, _offset + 136, ::fidl::HandleInformation {
       .object_type = ZX_OBJ_TYPE_CHANNEL,
       .rights = ZX_DEFAULT_CHANNEL_RIGHTS,
     });
-    
+
     ::fidl::Encode(_encoder, &array_server_end, _offset + 156, ::fidl::HandleInformation {
       .object_type = ZX_OBJ_TYPE_CHANNEL,
       .rights = ZX_DEFAULT_CHANNEL_RIGHTS,
@@ -1154,22 +1120,22 @@ void Resource::Encode(::fidl::Encoder* _encoder, size_t _offset,
     ::fidl::Encode(_encoder, &array_struct, _offset + 176);
     ::fidl::Encode(_encoder, &array_table, _offset + 184);
     ::fidl::Encode(_encoder, &array_union, _offset + 264);
-    
+
     ::fidl::Encode(_encoder, &vector_handle, _offset + 344, ::fidl::HandleInformation {
       .object_type = ZX_OBJ_TYPE_NONE,
       .rights = 0x80000000,
     });
-    
+
     ::fidl::Encode(_encoder, &vector_vmo, _offset + 360, ::fidl::HandleInformation {
       .object_type = ZX_OBJ_TYPE_VMO,
       .rights = 0x80000000,
     });
-    
+
     ::fidl::Encode(_encoder, &vector_client_end, _offset + 376, ::fidl::HandleInformation {
       .object_type = ZX_OBJ_TYPE_CHANNEL,
       .rights = ZX_DEFAULT_CHANNEL_RIGHTS,
     });
-    
+
     ::fidl::Encode(_encoder, &vector_server_end, _offset + 392, ::fidl::HandleInformation {
       .object_type = ZX_OBJ_TYPE_CHANNEL,
       .rights = ZX_DEFAULT_CHANNEL_RIGHTS,
@@ -1177,7 +1143,7 @@ void Resource::Encode(::fidl::Encoder* _encoder, size_t _offset,
     ::fidl::Encode(_encoder, &vector_struct, _offset + 408);
     ::fidl::Encode(_encoder, &vector_table, _offset + 424);
     ::fidl::Encode(_encoder, &vector_union, _offset + 440);
-    
+
   }
 }
 
@@ -1302,8 +1268,6 @@ zx_status_t Resource::Clone(Resource* _result) const {
 
 #endif  // __Fuchsia__
 
-
-
 extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
 const fidl_type_t* Protocol_ErrorBasic_Result::FidlType = &test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
 
@@ -1356,7 +1320,6 @@ Protocol_ErrorBasic_Result Protocol_ErrorBasic_Result::WithErr(uint32_t&& val) {
   result.set_err(std::move(val));
   return result;
 }
-
 
 void Protocol_ErrorBasic_Result::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -1427,7 +1390,6 @@ void Protocol_ErrorBasic_Result::Decode(::fidl::Decoder* _decoder, Protocol_Erro
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -1482,10 +1444,10 @@ void Protocol_ErrorBasic_Result::Destroy() {
       break;
     case ::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::Invalid);
 }
@@ -1508,7 +1470,6 @@ void Protocol_ErrorBasic_Result::EnsureStorageInitialized(::fidl_xunion_tag_t ta
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
 const fidl_type_t* Protocol_ErrorCompound_Result::FidlType = &test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
@@ -1562,7 +1523,6 @@ Protocol_ErrorCompound_Result Protocol_ErrorCompound_Result::WithErr(uint32_t&& 
   result.set_err(std::move(val));
   return result;
 }
-
 
 void Protocol_ErrorCompound_Result::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -1633,7 +1593,6 @@ void Protocol_ErrorCompound_Result::Decode(::fidl::Decoder* _decoder, Protocol_E
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -1688,10 +1647,10 @@ void Protocol_ErrorCompound_Result::Destroy() {
       break;
     case ::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::Invalid);
 }
@@ -1714,7 +1673,6 @@ void Protocol_ErrorCompound_Result::EnsureStorageInitialized(::fidl_xunion_tag_t
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
 const fidl_type_t* Protocol_ErrorArrayBasic_Result::FidlType = &test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
@@ -1768,7 +1726,6 @@ Protocol_ErrorArrayBasic_Result Protocol_ErrorArrayBasic_Result::WithErr(uint32_
   result.set_err(std::move(val));
   return result;
 }
-
 
 void Protocol_ErrorArrayBasic_Result::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -1839,7 +1796,6 @@ void Protocol_ErrorArrayBasic_Result::Decode(::fidl::Decoder* _decoder, Protocol
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -1894,10 +1850,10 @@ void Protocol_ErrorArrayBasic_Result::Destroy() {
       break;
     case ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::Invalid);
 }
@@ -1920,7 +1876,6 @@ void Protocol_ErrorArrayBasic_Result::EnsureStorageInitialized(::fidl_xunion_tag
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
 const fidl_type_t* Protocol_ErrorArrayCompound_Result::FidlType = &test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
@@ -1974,7 +1929,6 @@ Protocol_ErrorArrayCompound_Result Protocol_ErrorArrayCompound_Result::WithErr(u
   result.set_err(std::move(val));
   return result;
 }
-
 
 void Protocol_ErrorArrayCompound_Result::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -2045,7 +1999,6 @@ void Protocol_ErrorArrayCompound_Result::Decode(::fidl::Decoder* _decoder, Proto
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -2100,10 +2053,10 @@ void Protocol_ErrorArrayCompound_Result::Destroy() {
       break;
     case ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::Invalid);
 }
@@ -2126,7 +2079,6 @@ void Protocol_ErrorArrayCompound_Result::EnsureStorageInitialized(::fidl_xunion_
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
 const fidl_type_t* Protocol_ErrorVectorBasic_Result::FidlType = &test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
@@ -2180,7 +2132,6 @@ Protocol_ErrorVectorBasic_Result Protocol_ErrorVectorBasic_Result::WithErr(uint3
   result.set_err(std::move(val));
   return result;
 }
-
 
 void Protocol_ErrorVectorBasic_Result::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -2251,7 +2202,6 @@ void Protocol_ErrorVectorBasic_Result::Decode(::fidl::Decoder* _decoder, Protoco
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -2306,10 +2256,10 @@ void Protocol_ErrorVectorBasic_Result::Destroy() {
       break;
     case ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::Invalid);
 }
@@ -2332,7 +2282,6 @@ void Protocol_ErrorVectorBasic_Result::EnsureStorageInitialized(::fidl_xunion_ta
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
 const fidl_type_t* Protocol_ErrorVectorCompound_Result::FidlType = &test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
@@ -2386,7 +2335,6 @@ Protocol_ErrorVectorCompound_Result Protocol_ErrorVectorCompound_Result::WithErr
   result.set_err(std::move(val));
   return result;
 }
-
 
 void Protocol_ErrorVectorCompound_Result::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -2457,7 +2405,6 @@ void Protocol_ErrorVectorCompound_Result::Decode(::fidl::Decoder* _decoder, Prot
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -2512,10 +2459,10 @@ void Protocol_ErrorVectorCompound_Result::Destroy() {
       break;
     case ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::Invalid);
 }
@@ -2538,7 +2485,6 @@ void Protocol_ErrorVectorCompound_Result::EnsureStorageInitialized(::fidl_xunion
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
 const fidl_type_t* Protocol_ErrorVectorOptional_Result::FidlType = &test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
@@ -2592,7 +2538,6 @@ Protocol_ErrorVectorOptional_Result Protocol_ErrorVectorOptional_Result::WithErr
   result.set_err(std::move(val));
   return result;
 }
-
 
 void Protocol_ErrorVectorOptional_Result::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -2663,7 +2608,6 @@ void Protocol_ErrorVectorOptional_Result::Decode(::fidl::Decoder* _decoder, Prot
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -2718,10 +2662,10 @@ void Protocol_ErrorVectorOptional_Result::Destroy() {
       break;
     case ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::Invalid);
 }
@@ -2744,7 +2688,6 @@ void Protocol_ErrorVectorOptional_Result::EnsureStorageInitialized(::fidl_xunion
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
 const fidl_type_t* Protocol_ErrorArrayVectorNested_Result::FidlType = &test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
@@ -2798,7 +2741,6 @@ Protocol_ErrorArrayVectorNested_Result Protocol_ErrorArrayVectorNested_Result::W
   result.set_err(std::move(val));
   return result;
 }
-
 
 void Protocol_ErrorArrayVectorNested_Result::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -2869,7 +2811,6 @@ void Protocol_ErrorArrayVectorNested_Result::Decode(::fidl::Decoder* _decoder, P
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -2924,10 +2865,10 @@ void Protocol_ErrorArrayVectorNested_Result::Destroy() {
       break;
     case ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::Invalid);
 }
@@ -2950,7 +2891,6 @@ void Protocol_ErrorArrayVectorNested_Result::EnsureStorageInitialized(::fidl_xun
     }
   }
 }
-
 
 #ifdef __Fuchsia__
 
@@ -3006,7 +2946,6 @@ Protocol_ErrorResource_Result Protocol_ErrorResource_Result::WithErr(uint32_t&& 
   result.set_err(std::move(val));
   return result;
 }
-
 
 void Protocol_ErrorResource_Result::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -3077,7 +3016,6 @@ void Protocol_ErrorResource_Result::Decode(::fidl::Decoder* _decoder, Protocol_E
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -3132,10 +3070,10 @@ void Protocol_ErrorResource_Result::Destroy() {
       break;
     case ::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::Invalid);
 }
@@ -3161,7 +3099,6 @@ void Protocol_ErrorResource_Result::EnsureStorageInitialized(::fidl_xunion_tag_t
 
 #endif  // __Fuchsia__
 
-
 //
 // Proxies and stubs definitions
 //
@@ -3170,94 +3107,40 @@ void Protocol_ErrorResource_Result::EnsureStorageInitialized(::fidl_xunion_tag_t
 
   namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_BasicTable;
-  
-  
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_CompoundTable;
-  
-  
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayBasicTable;
-  
-  
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayCompoundTable;
-  
-  
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorBasicTable;
-  
-  
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorCompoundTable;
-  
-  
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorOptionalTable;
-  
-  
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayVectorNestedTable;
-  
-  
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ResourceTable;
-  
-  
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorResource_ResultTable;
-  
-  
 
 }  // namespace _internal
 
@@ -3642,7 +3525,6 @@ zx_status_t Protocol_Proxy::Dispatch_(::fidl::HLCPPIncomingMessage message) {
   }
   return status;
 }
-
 
 void Protocol_Proxy::OneWayBasic(uint8_t uint8, uint16_t uint16, uint32_t uint32, uint64_t uint64, int8_t int8, int16_t int16, int32_t int32, int64_t int64, float float32, double float64, ::std::string string, ::fidl::StringPtr opt_string) {
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_OneWayBasic_Ordinal, ::test::typesinprotocols::internal::kProtocol_OneWayBasic_DynamicFlags);

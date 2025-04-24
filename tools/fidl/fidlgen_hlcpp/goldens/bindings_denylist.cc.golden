@@ -1450,10 +1450,6 @@ OnlyCppAndDeps_SyncProxy::OnlyCppAndDeps_SyncProxy(::zx::channel channel)
 
 OnlyCppAndDeps_SyncProxy::~OnlyCppAndDeps_SyncProxy() = default;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyDartRequestTable;
 
@@ -1891,10 +1887,6 @@ zx_status_t DenyEachBinding_SyncProxy::OnlyDenySyzkaller(bool a, ::test::binding
   return ZX_OK;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 Allowed::~Allowed() = default;
 
 const fidl_type_t* ::test::bindingsdenylist::Allowed_RequestDecoder::GetType(uint64_t ordinal, bool* out_needs_response, bool* out_is_known) {
@@ -1992,10 +1984,6 @@ Allowed_SyncProxy::Allowed_SyncProxy(::zx::channel channel)
     : proxy_(::std::move(channel)) {}
 
 Allowed_SyncProxy::~Allowed_SyncProxy() = default;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 ImportsSameNameContext::~ImportsSameNameContext() = default;
 

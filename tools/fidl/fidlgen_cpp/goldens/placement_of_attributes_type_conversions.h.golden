@@ -104,9 +104,6 @@ struct WireTypeForNaturalType<::test_placementofattributes::ExampleUnion> {
   using type = ::test_placementofattributes::wire::ExampleUnion;
 };
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 #pragma clang diagnostic pop
 
 }  // namespace internal

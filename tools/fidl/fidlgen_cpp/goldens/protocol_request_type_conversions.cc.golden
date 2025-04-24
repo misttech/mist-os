@@ -21,10 +21,6 @@ namespace internal {
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::test_protocolrequest::ParentGetChildRequestResponse WireNaturalConversionTraits<::test_protocolrequest::wire::ParentGetChildRequestResponse, ::test_protocolrequest::ParentGetChildRequestResponse>::ToNatural(::test_protocolrequest::wire::ParentGetChildRequestResponse src) {
   return ::test_protocolrequest::ParentGetChildRequestResponse(WireNaturalConversionTraits<::fidl::ServerEnd<::test_protocolrequest::Child>, ::fidl::ServerEnd<::test_protocolrequest::Child>>::ToNatural(std::move(src.r)));
 }
@@ -33,10 +29,6 @@ namespace internal {
       .r = WireNaturalConversionTraits<::fidl::ServerEnd<::test_protocolrequest::Child>, ::fidl::ServerEnd<::test_protocolrequest::Child>>::ToWire(arena, std::move(src.r())),
   };
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 ::test_protocolrequest::ParentTakeChildRequest WireNaturalConversionTraits<::test_protocolrequest::wire::ParentTakeChildRequest, ::test_protocolrequest::ParentTakeChildRequest>::ToNatural(::test_protocolrequest::wire::ParentTakeChildRequest src) {
   return ::test_protocolrequest::ParentTakeChildRequest(WireNaturalConversionTraits<::fidl::ClientEnd<::test_protocolrequest::Child>, ::fidl::ClientEnd<::test_protocolrequest::Child>>::ToNatural(std::move(src.c)));
@@ -47,10 +39,6 @@ namespace internal {
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::test_protocolrequest::ParentTakeChildRequestRequest WireNaturalConversionTraits<::test_protocolrequest::wire::ParentTakeChildRequestRequest, ::test_protocolrequest::ParentTakeChildRequestRequest>::ToNatural(::test_protocolrequest::wire::ParentTakeChildRequestRequest src) {
   return ::test_protocolrequest::ParentTakeChildRequestRequest(WireNaturalConversionTraits<::fidl::ServerEnd<::test_protocolrequest::Child>, ::fidl::ServerEnd<::test_protocolrequest::Child>>::ToNatural(std::move(src.r)));
 }
@@ -59,10 +47,6 @@ namespace internal {
       .r = WireNaturalConversionTraits<::fidl::ServerEnd<::test_protocolrequest::Child>, ::fidl::ServerEnd<::test_protocolrequest::Child>>::ToWire(arena, std::move(src.r())),
   };
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 ::fidl::Response<::test_protocolrequest::Parent::GetChild> WireNaturalConversionTraits<::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>, ::fidl::Response<::test_protocolrequest::Parent::GetChild>>::ToNatural(::fidl::WireResponse<::test_protocolrequest::Parent::GetChild> src) {
   return ::fidl::Response<::test_protocolrequest::Parent::GetChild>(

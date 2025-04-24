@@ -88,10 +88,6 @@ namespace test_service {
   return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::internal::WireEventDispatcher<::test_service::FirstProtocol>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_service::FirstProtocol>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
@@ -101,10 +97,6 @@ namespace test_service {
   fidl::internal::WireEventDispatcher<::test_service::FirstProtocol> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_service::FirstProtocol>::entries_[] = {
     {
@@ -152,9 +144,6 @@ fidl::WireServer<::test_service::FirstProtocol>::Handler fidl::WireServer<::test
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_service::FirstProtocol::MethodOnFirst>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_service::kFirstProtocol_MethodOnFirst_Ordinal, ::test_service::kFirstProtocol_MethodOnFirst_DynamicFlags);
 }
@@ -188,10 +177,6 @@ fidl::internal::WireSyncBufferClientImpl<::test_service::FirstProtocol>::MethodO
   return ::fidl::WireUnownedResult<::test_service::FirstProtocol::MethodOnFirst>(
       ::fidl::UnownedClientEnd<::test_service::FirstProtocol>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
 }
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 namespace test_service {
 
@@ -272,10 +257,6 @@ namespace test_service {
   return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::internal::WireEventDispatcher<::test_service::SecondProtocol>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_service::SecondProtocol>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
@@ -285,10 +266,6 @@ namespace test_service {
   fidl::internal::WireEventDispatcher<::test_service::SecondProtocol> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_service::SecondProtocol>::entries_[] = {
     {
@@ -336,9 +313,6 @@ fidl::WireServer<::test_service::SecondProtocol>::Handler fidl::WireServer<::tes
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_service::SecondProtocol::MethodOnSecond>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_service::kSecondProtocol_MethodOnSecond_Ordinal, ::test_service::kSecondProtocol_MethodOnSecond_DynamicFlags);
 }
@@ -372,9 +346,5 @@ fidl::internal::WireSyncBufferClientImpl<::test_service::SecondProtocol>::Method
   return ::fidl::WireUnownedResult<::test_service::SecondProtocol::MethodOnSecond>(
       ::fidl::UnownedClientEnd<::test_service::SecondProtocol>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
 }
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop

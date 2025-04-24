@@ -372,10 +372,6 @@ constexpr uint64_t kExampleUseOfErrorSyntax_CallWhichMayFail_Ordinal = 0x3424ff8
 constexpr ::fidl::MessageDynamicFlags kExampleUseOfErrorSyntax_CallWhichMayFail_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 }  // namespace internal
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class ExampleUseOfErrorSyntax {
  public:
   using Proxy_ = ::test::errorsyntax::ExampleUseOfErrorSyntax_Proxy;

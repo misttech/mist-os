@@ -86,10 +86,6 @@ class Struct {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class Table {
  private:
   struct Storage_;
@@ -126,10 +122,6 @@ class Table {
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalTableMember<Storage_, uint32_t, fidl::internal::NaturalCodingConstraintEmpty>{
       1, &Storage_::x});
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class Union {
  private:
@@ -214,10 +206,6 @@ class Union {
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 inline Struct::Struct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline Struct::Struct(uint32_t x) noexcept
     : storage_({.x = std::move(x)}) {}
@@ -229,10 +217,6 @@ inline Struct& Struct::x(uint32_t value) {
   storage_.x = std::move(value);
   return *this;
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 inline Table::Table(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 
@@ -270,10 +254,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_versions::Struct, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_versions::Struct, 4> {};
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct IsResource<::test_versions::Table> : public std::true_type {};
 template <>
@@ -293,10 +273,6 @@ struct IsTable<::test_versions::Table> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_versions::Table, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_versions::Table> {};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct IsResource<::test_versions::Union> : public std::true_type {};

@@ -51,10 +51,6 @@ zx_status_t Struct::Clone(Struct* _result) const {
   return ZX_OK;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 extern "C" const fidl_type_t test_versions_TableTable;
 const fidl_type_t* Table::FidlType = &test_versions_TableTable;
 
@@ -187,10 +183,6 @@ zx_status_t Table::Clone(Table* result) const {
   }
   return ZX_OK;
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 extern "C" const fidl_type_t test_versions_UnionTable;
 const fidl_type_t* Union::FidlType = &test_versions_UnionTable;
@@ -471,10 +463,6 @@ OtherProtocol_SyncProxy::OtherProtocol_SyncProxy(::zx::channel channel)
     : proxy_(::std::move(channel)) {}
 
 OtherProtocol_SyncProxy::~OtherProtocol_SyncProxy() = default;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 Protocol::~Protocol() = default;
 

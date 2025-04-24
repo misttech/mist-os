@@ -44,10 +44,6 @@ zx_status_t ParentGetChildResponse::Clone(ParentGetChildResponse* _result) const
   return ZX_OK;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 extern "C" const fidl_type_t test_protocolrequest_ParentGetChildRequestResponseTable;
 const fidl_type_t* ParentGetChildRequestResponse::FidlType = &test_protocolrequest_ParentGetChildRequestResponseTable;
 
@@ -78,10 +74,6 @@ zx_status_t ParentGetChildRequestResponse::Clone(ParentGetChildRequestResponse* 
   return ZX_OK;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 extern "C" const fidl_type_t test_protocolrequest_ParentTakeChildRequestTable;
 const fidl_type_t* ParentTakeChildRequest::FidlType = &test_protocolrequest_ParentTakeChildRequestTable;
 
@@ -111,10 +103,6 @@ zx_status_t ParentTakeChildRequest::Clone(ParentTakeChildRequest* _result) const
     return _status;
   return ZX_OK;
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 extern "C" const fidl_type_t test_protocolrequest_ParentTakeChildRequestRequestTable;
 const fidl_type_t* ParentTakeChildRequestRequest::FidlType = &test_protocolrequest_ParentTakeChildRequestRequestTable;
@@ -251,10 +239,6 @@ Child_SyncProxy::Child_SyncProxy(::zx::channel channel)
     : proxy_(::std::move(channel)) {}
 
 Child_SyncProxy::~Child_SyncProxy() = default;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_protocolrequest_ParentGetChildResponseTable;

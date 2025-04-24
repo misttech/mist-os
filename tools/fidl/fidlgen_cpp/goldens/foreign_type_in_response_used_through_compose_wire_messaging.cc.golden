@@ -121,10 +121,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_foreigntypeinresponseusedthroughco
       });
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::internal::WireEventDispatcher<::test_foreigntypeinresponseusedthroughcompose::Top>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_foreigntypeinresponseusedthroughcompose::Top>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
@@ -134,10 +130,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_foreigntypeinresponseusedthroughco
   fidl::internal::WireEventDispatcher<::test_foreigntypeinresponseusedthroughcompose::Top> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_foreigntypeinresponseusedthroughcompose::Top>::entries_[] = {
     {
@@ -185,9 +177,6 @@ fidl::WireServer<::test_foreigntypeinresponseusedthroughcompose::Top>::Handler f
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void fidl::internal::WireCompleterImpl<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo>::Reply(const ::test_bottom::wire::Foo& foo) {
   return MakeReply(foo);
 }
@@ -236,9 +225,6 @@ fidl::internal::WireCompleterBase<::test_foreigntypeinresponseusedthroughcompose
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_foreigntypeinresponseusedthroughcompose::kTop_GetFoo_Ordinal, ::test_foreigntypeinresponseusedthroughcompose::kTop_GetFoo_DynamicFlags);
 }
@@ -316,9 +302,5 @@ fidl::internal::WireSyncBufferClientImpl<::test_foreigntypeinresponseusedthrough
   return ::fidl::WireUnownedResult<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo>(
       ::fidl::UnownedClientEnd<::test_foreigntypeinresponseusedthroughcompose::Top>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
 }
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop

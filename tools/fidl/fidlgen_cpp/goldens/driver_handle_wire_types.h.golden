@@ -49,19 +49,11 @@ struct ClientEndWrapper {
   void _CloseHandles();
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 struct ServerEndWrapper {
   ::fdf::ServerEnd<::test_driverhandle::DriverProtocol> value = {};
 
   void _CloseHandles();
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 }  // namespace wire
 }  // namespace test_driverhandle
@@ -318,10 +310,6 @@ inline ::fidl::WireTableExternalBuilder<::test_driverhandle::wire::T> T::Externa
   return ::fidl::WireTableExternalBuilder<::test_driverhandle::wire::T>(std::move(frame));
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 struct HandlesInProtocolSendHandlesRequest {
   using T = test_driverhandle::wire::T;
 
@@ -386,9 +374,6 @@ struct ::fidl::internal::WireCodingTraits<::test_driverhandle::wire::ClientEndWr
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsResource<::test_driverhandle::wire::ServerEndWrapper> : public std::true_type {};
 
@@ -438,9 +423,6 @@ struct ::fidl::internal::WireCodingTraits<::test_driverhandle::wire::ServerEndWr
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsResource<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest> : public std::true_type {};
 
@@ -490,9 +472,6 @@ struct ::fidl::internal::WireCodingTraits<::test_driverhandle::wire::HandlesInPr
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsResource<::test_driverhandle::wire::T> : public std::true_type {};
 

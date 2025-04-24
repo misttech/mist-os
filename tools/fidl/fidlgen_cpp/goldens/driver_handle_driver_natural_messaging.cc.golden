@@ -6,14 +6,6 @@
 
 #ifdef __Fuchsia__
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_driverhandle::DriverProtocol>::entries_[] = {};
 
 const ::fidl::internal::MethodEntry* fidl::internal::NaturalServerDispatcher<::test_driverhandle::DriverProtocol>::entries_end_ =
@@ -63,10 +55,6 @@ namespace test_driverhandle {
 
 #endif  // __Fuchsia__
 }  // namespace test_driverhandle
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
 

@@ -12,10 +12,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictOneWay> {
   using Completer = fidl::Completer<>;
@@ -618,10 +614,6 @@ class ::fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInt
   ::fit::result<::fidl::OneWayError> FlexibleOneWay() const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_unknowninteractions::UnknownInteractionsDriverProtocol> : public ::fidl::internal::BaseEventHandlerInterface, public ::fidl::UnknownEventHandler<::test_unknowninteractions::UnknownInteractionsDriverProtocol> {
  public:
@@ -1220,10 +1212,6 @@ class ::fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInt
   ::fit::result<::fidl::OneWayError> FlexibleOneWay() const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol> : public ::fidl::internal::BaseEventHandlerInterface, public ::fidl::UnknownEventHandler<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol> {
  public:
@@ -1702,10 +1690,6 @@ class ::fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInt
 
   ::fit::result<::fidl::OneWayError> StrictOneWay() const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol> : public ::fidl::internal::BaseEventHandlerInterface {

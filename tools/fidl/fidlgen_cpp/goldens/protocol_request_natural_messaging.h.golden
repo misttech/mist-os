@@ -45,10 +45,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocolrequest::Child> fin
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_protocolrequest::Child> : public ::fidl::internal::BaseEventHandlerInterface {
  public:
@@ -83,9 +79,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_protocolrequest::Child> fi
       : IncomingEventDispatcher(event_handler) {}
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_protocolrequest::Child> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -228,10 +221,6 @@ class ::fidl::internal::NaturalClientImpl<::test_protocolrequest::Parent> final 
   ::fit::result<::fidl::OneWayError> TakeChildRequest(::fidl::Request<::test_protocolrequest::Parent::TakeChildRequest> request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_protocolrequest::Parent> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_protocolrequest::Parent>> {
@@ -250,10 +239,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocolrequest::Parent> fi
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_protocolrequest::Parent> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -289,9 +274,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_protocolrequest::Parent> f
       : IncomingEventDispatcher(event_handler) {}
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_protocolrequest::Parent> : public ::fidl::internal::WeakEventSenderBase {
  public:

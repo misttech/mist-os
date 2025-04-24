@@ -12,10 +12,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_drivertwoway::TwoWay::Add> {
   using Request = ::test_drivertwoway::TwoWayAddRequest;
@@ -50,10 +46,6 @@ class ::fidl::internal::NaturalClientImpl<::test_drivertwoway::TwoWay> final : p
   using NaturalClientBase::NaturalClientBase;
   ::fidl::internal::NaturalThenable<::test_drivertwoway::TwoWay::Add> Add(const ::fidl::Request<::test_drivertwoway::TwoWay::Add>& request) const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_drivertwoway::TwoWay> : public ::fidl::internal::BaseEventHandlerInterface {

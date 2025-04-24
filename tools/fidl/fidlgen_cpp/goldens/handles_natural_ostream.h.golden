@@ -21,10 +21,6 @@ struct fidl::ostream::Formatter<::test_handles::Handles> {
   static std::ostream& Format(std::ostream& os, const ::test_handles::Handles& value);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct fidl::ostream::Formatter<::test_handles::FdfHandles> {
   static std::ostream& Format(std::ostream& os, const ::test_handles::FdfHandles& value);
@@ -37,10 +33,6 @@ namespace test_handles {
 #ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_handles::Handles& value);
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_handles::FdfHandles& value);
 

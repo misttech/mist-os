@@ -38,10 +38,6 @@ namespace test_driveroneway {
 
 #ifdef __Fuchsia__
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_driveroneway::OneWay>::entries_[] = {
     {
         ::test_driveroneway::kOneWay_Send_Ordinal,

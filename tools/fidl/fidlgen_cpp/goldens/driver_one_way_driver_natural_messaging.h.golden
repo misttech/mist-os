@@ -12,10 +12,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_driveroneway::OneWay::Send> {
   using Request = ::test_driveroneway::OneWaySendRequest;
@@ -30,10 +26,6 @@ class ::fidl::internal::NaturalClientImpl<::test_driveroneway::OneWay> final : p
   using NaturalClientBase::NaturalClientBase;
   ::fit::result<::fidl::OneWayError> Send(const ::fidl::Request<::test_driveroneway::OneWay::Send>& request) const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_driveroneway::OneWay> : public ::fidl::internal::BaseEventHandlerInterface {

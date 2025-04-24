@@ -140,9 +140,6 @@ struct WireTypeForNaturalType<::test_table::SixtyFourOrdinalTable> {
   using type = ::test_table::wire::SixtyFourOrdinalTable;
 };
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 #pragma clang diagnostic pop
 
 }  // namespace internal

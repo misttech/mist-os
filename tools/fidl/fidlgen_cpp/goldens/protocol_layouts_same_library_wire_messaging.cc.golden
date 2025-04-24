@@ -9,14 +9,10 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-
-  
-
   namespace test_protocollayoutssamelibrary {
 
   [[maybe_unused]]
   constexpr uint64_t kComposedProtocol_OneWayAnonComposed_Ordinal = 7960710870216447007lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kComposedProtocol_OneWayAnonComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -27,11 +23,9 @@
 
     static_assert(sizeof(::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest)
         == ::fidl::TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest>::kPrimarySize);
-  
 
   [[maybe_unused]]
   constexpr uint64_t kComposedProtocol_TwoWayAnonComposed_Ordinal = 8107448265006659060lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kComposedProtocol_TwoWayAnonComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -48,11 +42,9 @@
           == ::fidl::TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>>::kPrimarySize);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>, header) == 0);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>, body) == sizeof(fidl_message_header_t));
-  
 
   [[maybe_unused]]
   constexpr uint64_t kComposedProtocol_TwoWayAnonComposedWithError_Ordinal = 5751989932125743144lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kComposedProtocol_TwoWayAnonComposedWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -69,11 +61,9 @@
           == ::fidl::TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>>::kPrimarySize);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>, header) == 0);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>, body) == sizeof(fidl_message_header_t));
-  
 
   [[maybe_unused]]
   constexpr uint64_t kComposedProtocol_OnAnonComposed_Ordinal = 5307191872315199016lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kComposedProtocol_OnAnonComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -81,11 +71,9 @@
       == ::fidl::TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed>>::kPrimarySize);
     static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed>, header) == 0);
       static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed>, body) == sizeof(fidl_message_header_t));
-  
 
   [[maybe_unused]]
   constexpr uint64_t kComposedProtocol_OneWayNamedComposed_Ordinal = 1159174053475281336lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kComposedProtocol_OneWayNamedComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -96,11 +84,9 @@
 
     static_assert(sizeof(::test_protocollayoutssamelibrary::wire::TablePayload)
         == ::fidl::TypeTraits<::test_protocollayoutssamelibrary::wire::TablePayload>::kPrimarySize);
-  
 
   [[maybe_unused]]
   constexpr uint64_t kComposedProtocol_TwoWayNamedComposed_Ordinal = 5022872388073111636lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kComposedProtocol_TwoWayNamedComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -117,11 +103,9 @@
           == ::fidl::TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>>::kPrimarySize);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>, header) == 0);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>, body) == sizeof(fidl_message_header_t));
-  
 
   [[maybe_unused]]
   constexpr uint64_t kComposedProtocol_TwoWayNamedComposedWithError_Ordinal = 4973436213756973807lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kComposedProtocol_TwoWayNamedComposedWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -138,11 +122,9 @@
           == ::fidl::TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>>::kPrimarySize);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>, header) == 0);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>, body) == sizeof(fidl_message_header_t));
-  
 
   [[maybe_unused]]
   constexpr uint64_t kComposedProtocol_OnNamedComposed_Ordinal = 1712755118419701115lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kComposedProtocol_OnNamedComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -202,7 +184,6 @@
 
 #ifdef __Fuchsia__
 
-
 ::fidl::WireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>::WireResult(
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>* request
@@ -223,12 +204,6 @@
 }
 
 ::fidl::WireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>(result) {}
-
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 
     ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>::WireUnownedResult(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>* request) {
       constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>();
@@ -282,7 +257,6 @@
 
 #ifdef __Fuchsia__
 
-
 ::fidl::WireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>::WireResult(
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>* request
@@ -303,12 +277,6 @@
 }
 
 ::fidl::WireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>(result) {}
-
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 
     ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>::WireUnownedResult(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>* request) {
       constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>();
@@ -362,7 +330,6 @@
 
 #ifdef __Fuchsia__
 
-
 ::fidl::WireResult<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>::WireResult(
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>* request
@@ -376,12 +343,6 @@
 }
 
 ::fidl::WireResult<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>(result) {}
-
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 
     ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>::WireUnownedResult(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>* request) {
       constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>();
@@ -412,7 +373,6 @@
 
 #ifdef __Fuchsia__
 
-
 ::fidl::WireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>::WireResult(
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>* request
@@ -433,12 +393,6 @@
 }
 
 ::fidl::WireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>(result) {}
-
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 
     ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>::WireUnownedResult(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>* request) {
       constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>();
@@ -492,7 +446,6 @@
 
 #ifdef __Fuchsia__
 
-
 ::fidl::WireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>::WireResult(
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>* request
@@ -513,12 +466,6 @@
 }
 
 ::fidl::WireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>(result) {}
-
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 
     ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>::WireUnownedResult(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>* request) {
       constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>();
@@ -569,9 +516,6 @@
     }
 
   ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>::WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>(result) {}
-
-
-  
 
 #ifdef __Fuchsia__
 
@@ -663,8 +607,6 @@
   return ::fidl::internal::WireBufferThenable<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>{
       _client_base(), ::fidl::WriteOptions{}, _allocator(), _buffer_size, &_request};
 }
-  
-
 
   ::fidl::WireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>
   fidl::internal::WireWeakSyncClientImpl<::test_protocollayoutssamelibrary::ComposedProtocol>::TwoWayAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedRequest ComposedProtocolTwoWayAnonComposedRequest) {
@@ -674,8 +616,6 @@
           return ::fidl::WireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol>(_transport->get<::fidl::internal::ChannelTransport>()), &_request);
         });
   }
-  
-
 
   ::fidl::WireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>
   fidl::internal::WireWeakSyncClientImpl<::test_protocollayoutssamelibrary::ComposedProtocol>::TwoWayAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest ComposedProtocolTwoWayAnonComposedWithErrorRequest) {
@@ -685,8 +625,6 @@
           return ::fidl::WireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol>(_transport->get<::fidl::internal::ChannelTransport>()), &_request);
         });
   }
-  
-
 
   ::fidl::WireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>
   fidl::internal::WireWeakSyncClientImpl<::test_protocollayoutssamelibrary::ComposedProtocol>::TwoWayNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload) {
@@ -696,8 +634,6 @@
           return ::fidl::WireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol>(_transport->get<::fidl::internal::ChannelTransport>()), &_request);
         });
   }
-  
-
 
   ::fidl::WireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>
   fidl::internal::WireWeakSyncClientImpl<::test_protocollayoutssamelibrary::ComposedProtocol>::TwoWayNamedComposedWithError(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload) {
@@ -708,19 +644,8 @@
         });
   }
 
-#endif  // __Fuchsia__
-
-
-
-
-
-#ifdef __Fuchsia__
-
-
 ::fidl::internal::WireEventDispatcher<::test_protocollayoutssamelibrary::ComposedProtocol>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_protocollayoutssamelibrary::ComposedProtocol>* event_handler)
 : IncomingEventDispatcher(event_handler) {}
-
-
 
   ::fidl::Status fidl::WireSyncEventHandler<::test_protocollayoutssamelibrary::ComposedProtocol>::HandleOneEvent(
       ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> client_end) {
@@ -764,13 +689,6 @@
         return ::fidl::Status::UnknownOrdinal();
     }
   }
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_protocollayoutssamelibrary::ComposedProtocol>::entries_[] = {
     { ::test_protocollayoutssamelibrary::kComposedProtocol_OneWayAnonComposed_Ordinal,
@@ -881,14 +799,11 @@ const ::fidl::internal::MethodEntry* fidl::internal::WireServerDispatcher<::test
     impl, msg, storage_view, txn, entries_, entries_end_);
 }
 
-
-
 void fidl::internal::WireServerDispatcher<::test_protocollayoutssamelibrary::ComposedProtocol>::Dispatch(::fidl::WireServer<::test_protocollayoutssamelibrary::ComposedProtocol>* impl, ::fidl::IncomingHeaderAndMessage&& msg,
     internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
   ::fidl::internal::Dispatch(impl, msg, storage_view, txn, entries_, entries_end_,
   &unknown_method_handler_entry_);
 }
-
 
 void fidl::WireServer<::test_protocollayoutssamelibrary::ComposedProtocol>::dispatch_message(
     ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
@@ -902,11 +817,6 @@ fidl::WireServer<::test_protocollayoutssamelibrary::ComposedProtocol>::Handler f
   };
 }
 
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>::Reply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse ComposedProtocolTwoWayAnonComposedResponse) {
   return MakeReply(ComposedProtocolTwoWayAnonComposedResponse);
@@ -922,7 +832,6 @@ fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::ComposedPro
   return _core()->SendReply(&_response_message.GetOutgoingMessage(),
                             ::fidl::internal::OutgoingTransportContext());
 }
-
 
 void
 fidl::internal::WireBufferCompleterImpl<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>::Reply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse ComposedProtocolTwoWayAnonComposedResponse) {
@@ -958,11 +867,6 @@ fidl::internal::WireCompleterBase<::test_protocollayoutssamelibrary::ComposedPro
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>::Reply(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResponse*> result) {
   if (result.is_ok()) {
@@ -991,7 +895,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
   fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>::ReplyError(uint32_t error) {
     return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult::WithErr(std::move(error)));
   }
-
 
 void
 fidl::internal::WireBufferCompleterImpl<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>::Reply(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResponse*> result) {
@@ -1040,11 +943,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
     return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult::WithErr(std::move(error)));
   }
 
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>::Reply(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload) {
   return MakeReply(TablePayload);
@@ -1060,7 +958,6 @@ fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::ComposedPro
   return _core()->SendReply(&_response_message.GetOutgoingMessage(),
                             ::fidl::internal::OutgoingTransportContext());
 }
-
 
 void
 fidl::internal::WireBufferCompleterImpl<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>::Reply(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload) {
@@ -1096,11 +993,6 @@ fidl::internal::WireCompleterBase<::test_protocollayoutssamelibrary::ComposedPro
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>::Reply(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::wire::UnionPayload*> result) {
   if (result.is_ok()) {
@@ -1129,7 +1021,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
   fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>::ReplyError(uint32_t error) {
     return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult::WithErr(std::move(error)));
   }
-
 
 void
 fidl::internal::WireBufferCompleterImpl<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>::Reply(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::wire::UnionPayload*> result) {
@@ -1178,15 +1069,10 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
     return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult::WithErr(std::move(error)));
   }
 
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayAnonComposed>::TransactionalRequest() {
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kComposedProtocol_OneWayAnonComposed_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_OneWayAnonComposed_DynamicFlags);
   }
 
-  
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayAnonComposed>::TransactionalRequest(::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest)
     : body(::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest { ComposedProtocolOneWayAnonComposedRequest } ) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kComposedProtocol_OneWayAnonComposed_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_OneWayAnonComposed_DynamicFlags);
@@ -1210,17 +1096,10 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayAnonComposed>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayAnonComposed>, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
-#endif  // __Fuchsia__
-
-    
-    
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>::TransactionalRequest() {
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayAnonComposed_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayAnonComposed_DynamicFlags);
   }
 
-  
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>::TransactionalRequest(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedRequest ComposedProtocolTwoWayAnonComposedRequest)
     : body(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedRequest { ComposedProtocolTwoWayAnonComposedRequest } ) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayAnonComposed_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayAnonComposed_DynamicFlags);
@@ -1246,15 +1125,8 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
 
 #endif  // __Fuchsia__
 
-    
-    
-
-
-  
     ::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>::WireResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse ComposedProtocolTwoWayAnonComposedResponse) : ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse(ComposedProtocolTwoWayAnonComposedResponse){}
 
-
-  
     ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>::TransactionalResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse ComposedProtocolTwoWayAnonComposedResponse)
     : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>(ComposedProtocolTwoWayAnonComposedResponse)) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayAnonComposed_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayAnonComposed_DynamicFlags);
@@ -1263,7 +1135,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayAnonComposed_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayAnonComposed_DynamicFlags);
   }
 
-  
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -1280,7 +1151,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-
 
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
@@ -1301,15 +1171,12 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-    
-    
 
 #ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>::TransactionalRequest() {
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayAnonComposedWithError_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayAnonComposedWithError_DynamicFlags);
   }
 
-  
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>::TransactionalRequest(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest ComposedProtocolTwoWayAnonComposedWithErrorRequest)
     : body(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest { ComposedProtocolTwoWayAnonComposedWithErrorRequest } ) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayAnonComposedWithError_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayAnonComposedWithError_DynamicFlags);
@@ -1335,15 +1202,8 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
 
 #endif  // __Fuchsia__
 
-    
-    
-
-
-  
     ::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>::WireResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult ComposedProtocolTwoWayAnonComposedWithErrorResult) : ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult(ComposedProtocolTwoWayAnonComposedWithErrorResult){}
 
-
-  
     ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>::TransactionalResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult ComposedProtocolTwoWayAnonComposedWithErrorResult)
     : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>(ComposedProtocolTwoWayAnonComposedWithErrorResult)) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayAnonComposedWithError_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayAnonComposedWithError_DynamicFlags);
@@ -1352,7 +1212,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayAnonComposedWithError_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayAnonComposedWithError_DynamicFlags);
   }
 
-  
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -1369,7 +1228,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-
 
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
@@ -1390,10 +1248,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-    
-    
-    
-    
 
 #ifdef __Fuchsia__
 
@@ -1424,17 +1278,10 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed>, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
-#endif  // __Fuchsia__
-
-    
-    
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>::TransactionalRequest() {
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kComposedProtocol_OneWayNamedComposed_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_OneWayNamedComposed_DynamicFlags);
   }
 
-  
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>::TransactionalRequest(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload)
     : body(::test_protocollayoutssamelibrary::wire::TablePayload { TablePayload } ) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kComposedProtocol_OneWayNamedComposed_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_OneWayNamedComposed_DynamicFlags);
@@ -1458,17 +1305,10 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
-#endif  // __Fuchsia__
-
-    
-    
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>::TransactionalRequest() {
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayNamedComposed_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayNamedComposed_DynamicFlags);
   }
 
-  
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>::TransactionalRequest(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload)
     : body(::test_protocollayoutssamelibrary::wire::UnionPayload { UnionPayload } ) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayNamedComposed_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayNamedComposed_DynamicFlags);
@@ -1494,15 +1334,8 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
 
 #endif  // __Fuchsia__
 
-    
-    
-
-
-  
     ::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>::WireResponse(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload) : ::test_protocollayoutssamelibrary::wire::TablePayload(TablePayload){}
 
-
-  
     ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>::TransactionalResponse(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload)
     : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>(TablePayload)) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayNamedComposed_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayNamedComposed_DynamicFlags);
@@ -1511,7 +1344,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayNamedComposed_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayNamedComposed_DynamicFlags);
   }
 
-  
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -1528,7 +1360,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-
 
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
@@ -1549,15 +1380,12 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-    
-    
 
 #ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>::TransactionalRequest() {
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayNamedComposedWithError_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayNamedComposedWithError_DynamicFlags);
   }
 
-  
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>::TransactionalRequest(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload)
     : body(::test_protocollayoutssamelibrary::wire::TablePayload { TablePayload } ) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayNamedComposedWithError_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayNamedComposedWithError_DynamicFlags);
@@ -1583,15 +1411,8 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
 
 #endif  // __Fuchsia__
 
-    
-    
-
-
-  
     ::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>::WireResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult ComposedProtocolTwoWayNamedComposedWithErrorResult) : ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult(ComposedProtocolTwoWayNamedComposedWithErrorResult){}
 
-
-  
     ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>::TransactionalResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult ComposedProtocolTwoWayNamedComposedWithErrorResult)
     : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>(ComposedProtocolTwoWayNamedComposedWithErrorResult)) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayNamedComposedWithError_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayNamedComposedWithError_DynamicFlags);
@@ -1600,7 +1421,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayNamedComposedWithError_Ordinal, ::test_protocollayoutssamelibrary::kComposedProtocol_TwoWayNamedComposedWithError_DynamicFlags);
   }
 
-  
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -1617,7 +1437,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-
 
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
@@ -1638,10 +1457,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-    
-    
-    
-    
 
 #ifdef __Fuchsia__
 
@@ -1673,10 +1488,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposed>, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
 #endif  // __Fuchsia__
-
-    
-    
-
 
       ::fidl::OneWayStatus
       fidl::internal::WireSyncClientImpl<::test_protocollayoutssamelibrary::ComposedProtocol>::OneWayAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest) {
@@ -1756,9 +1567,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
         return ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>(
           ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
       }
-  
-  
-
 
 #ifdef __Fuchsia__
 
@@ -1864,17 +1672,12 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
   return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-
 #endif  // __Fuchsia__
-
-
-  
 
   namespace test_protocollayoutssamelibrary {
 
   [[maybe_unused]]
   constexpr uint64_t kMainProtocol_OneWayAnonComposed_Ordinal = 7960710870216447007lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kMainProtocol_OneWayAnonComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -1885,11 +1688,9 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 
     static_assert(sizeof(::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest)
         == ::fidl::TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest>::kPrimarySize);
-  
 
   [[maybe_unused]]
   constexpr uint64_t kMainProtocol_TwoWayAnonComposed_Ordinal = 8107448265006659060lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kMainProtocol_TwoWayAnonComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -1906,11 +1707,9 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
           == ::fidl::TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>>::kPrimarySize);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>, header) == 0);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>, body) == sizeof(fidl_message_header_t));
-  
 
   [[maybe_unused]]
   constexpr uint64_t kMainProtocol_TwoWayAnonComposedWithError_Ordinal = 5751989932125743144lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kMainProtocol_TwoWayAnonComposedWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -1927,11 +1726,9 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
           == ::fidl::TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>>::kPrimarySize);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>, header) == 0);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>, body) == sizeof(fidl_message_header_t));
-  
 
   [[maybe_unused]]
   constexpr uint64_t kMainProtocol_OnAnonComposed_Ordinal = 5307191872315199016lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnAnonComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -1939,11 +1736,9 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
       == ::fidl::TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed>>::kPrimarySize);
     static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed>, header) == 0);
       static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed>, body) == sizeof(fidl_message_header_t));
-  
 
   [[maybe_unused]]
   constexpr uint64_t kMainProtocol_OneWayNamedComposed_Ordinal = 1159174053475281336lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kMainProtocol_OneWayNamedComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -1954,11 +1749,9 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 
     static_assert(sizeof(::test_protocollayoutssamelibrary::wire::TablePayload)
         == ::fidl::TypeTraits<::test_protocollayoutssamelibrary::wire::TablePayload>::kPrimarySize);
-  
 
   [[maybe_unused]]
   constexpr uint64_t kMainProtocol_TwoWayNamedComposed_Ordinal = 5022872388073111636lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kMainProtocol_TwoWayNamedComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -1975,11 +1768,9 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
           == ::fidl::TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>>::kPrimarySize);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>, header) == 0);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>, body) == sizeof(fidl_message_header_t));
-  
 
   [[maybe_unused]]
   constexpr uint64_t kMainProtocol_TwoWayNamedComposedWithError_Ordinal = 4973436213756973807lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kMainProtocol_TwoWayNamedComposedWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -1996,11 +1787,9 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
           == ::fidl::TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>>::kPrimarySize);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>, header) == 0);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>, body) == sizeof(fidl_message_header_t));
-  
 
   [[maybe_unused]]
   constexpr uint64_t kMainProtocol_OnNamedComposed_Ordinal = 1712755118419701115lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnNamedComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -2008,11 +1797,9 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
       == ::fidl::TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>>::kPrimarySize);
     static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>, header) == 0);
       static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>, body) == sizeof(fidl_message_header_t));
-  
 
   [[maybe_unused]]
   constexpr uint64_t kMainProtocol_OneWayLocal_Ordinal = 4131125523789731521lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kMainProtocol_OneWayLocal_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -2023,11 +1810,9 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 
     static_assert(sizeof(::test_protocollayoutssamelibrary::wire::TablePayload)
         == ::fidl::TypeTraits<::test_protocollayoutssamelibrary::wire::TablePayload>::kPrimarySize);
-  
 
   [[maybe_unused]]
   constexpr uint64_t kMainProtocol_TwoWayLocal_Ordinal = 2781407403924167255lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kMainProtocol_TwoWayLocal_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -2044,11 +1829,9 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
           == ::fidl::TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>>::kPrimarySize);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>, header) == 0);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>, body) == sizeof(fidl_message_header_t));
-  
 
   [[maybe_unused]]
   constexpr uint64_t kMainProtocol_TwoWayLocalWithError_Ordinal = 5367158046384127463lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kMainProtocol_TwoWayLocalWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -2065,11 +1848,9 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
           == ::fidl::TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>>::kPrimarySize);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>, header) == 0);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>, body) == sizeof(fidl_message_header_t));
-  
 
   [[maybe_unused]]
   constexpr uint64_t kMainProtocol_OnLocal_Ordinal = 8208103053879750285lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnLocal_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -2077,11 +1858,9 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
       == ::fidl::TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocal>>::kPrimarySize);
     static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocal>, header) == 0);
       static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocal>, body) == sizeof(fidl_message_header_t));
-  
 
   [[maybe_unused]]
   constexpr uint64_t kMainProtocol_OneWayAnon_Ordinal = 8596232895075765804lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kMainProtocol_OneWayAnon_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -2092,11 +1871,9 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 
     static_assert(sizeof(::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAnonRequest)
         == ::fidl::TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAnonRequest>::kPrimarySize);
-  
 
   [[maybe_unused]]
   constexpr uint64_t kMainProtocol_TwoWayAnon_Ordinal = 4600336371166510638lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kMainProtocol_TwoWayAnon_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -2113,11 +1890,9 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
           == ::fidl::TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>>::kPrimarySize);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>, header) == 0);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>, body) == sizeof(fidl_message_header_t));
-  
 
   [[maybe_unused]]
   constexpr uint64_t kMainProtocol_TwoWayAnonWithError_Ordinal = 2104032160763523653lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kMainProtocol_TwoWayAnonWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -2134,11 +1909,9 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
           == ::fidl::TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>>::kPrimarySize);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>, header) == 0);
       static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>, body) == sizeof(fidl_message_header_t));
-  
 
   [[maybe_unused]]
   constexpr uint64_t kMainProtocol_OnAnon_Ordinal = 977183060572945300lu;
-  
 
   [[maybe_unused]]
   constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnAnon_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
@@ -2198,7 +1971,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 
 #ifdef __Fuchsia__
 
-
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>::WireResult(
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>* request
@@ -2219,12 +1991,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 }
 
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>(result) {}
-
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 
     ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>::WireUnownedResult(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>* request) {
       constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>();
@@ -2278,7 +2044,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 
 #ifdef __Fuchsia__
 
-
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>::WireResult(
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>* request
@@ -2299,12 +2064,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 }
 
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>(result) {}
-
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 
     ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>::WireUnownedResult(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>* request) {
       constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>();
@@ -2358,7 +2117,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 
 #ifdef __Fuchsia__
 
-
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>::WireResult(
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>* request
@@ -2372,12 +2130,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 }
 
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>(result) {}
-
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 
     ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>::WireUnownedResult(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>* request) {
       constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>();
@@ -2408,7 +2160,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 
 #ifdef __Fuchsia__
 
-
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>::WireResult(
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>* request
@@ -2429,12 +2180,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 }
 
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>(result) {}
-
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 
     ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>::WireUnownedResult(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>* request) {
       constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>();
@@ -2488,7 +2233,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 
 #ifdef __Fuchsia__
 
-
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>::WireResult(
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>* request
@@ -2509,12 +2253,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 }
 
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>(result) {}
-
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 
     ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>::WireUnownedResult(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>* request) {
       constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>();
@@ -2568,7 +2306,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 
 #ifdef __Fuchsia__
 
-
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal>::WireResult(
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal>* request
@@ -2582,12 +2319,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 }
 
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal>(result) {}
-
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 
     ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal>::WireUnownedResult(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal>* request) {
       constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal>();
@@ -2618,7 +2349,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 
 #ifdef __Fuchsia__
 
-
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>::WireResult(
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>* request
@@ -2639,12 +2369,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 }
 
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>(result) {}
-
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 
     ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>::WireUnownedResult(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>* request) {
       constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>();
@@ -2698,7 +2422,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 
 #ifdef __Fuchsia__
 
-
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>::WireResult(
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>* request
@@ -2719,12 +2442,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 }
 
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>(result) {}
-
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 
     ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>::WireUnownedResult(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>* request) {
       constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>();
@@ -2778,7 +2495,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 
 #ifdef __Fuchsia__
 
-
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>::WireResult(
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>* request
@@ -2792,12 +2508,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 }
 
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>(result) {}
-
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 
     ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>::WireUnownedResult(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>* request) {
       constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>();
@@ -2828,7 +2538,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 
 #ifdef __Fuchsia__
 
-
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>::WireResult(
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>* request
@@ -2849,12 +2558,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 }
 
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>(result) {}
-
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 
     ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>::WireUnownedResult(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>* request) {
       constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>();
@@ -2908,7 +2611,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 
 #ifdef __Fuchsia__
 
-
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>::WireResult(
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>* request
@@ -2929,12 +2631,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 }
 
 ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>(result) {}
-
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 
     ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>::WireUnownedResult(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>* request) {
       constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>();
@@ -2985,9 +2681,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
     }
 
   ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>::WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>(result) {}
-
-
-  
 
 #ifdef __Fuchsia__
 
@@ -3167,8 +2860,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
   return ::fidl::internal::WireBufferThenable<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>{
       _client_base(), ::fidl::WriteOptions{}, _allocator(), _buffer_size, &_request};
 }
-  
-
 
   ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>
   fidl::internal::WireWeakSyncClientImpl<::test_protocollayoutssamelibrary::MainProtocol>::TwoWayAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedRequest ComposedProtocolTwoWayAnonComposedRequest) {
@@ -3178,8 +2869,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
           return ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol>(_transport->get<::fidl::internal::ChannelTransport>()), &_request);
         });
   }
-  
-
 
   ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>
   fidl::internal::WireWeakSyncClientImpl<::test_protocollayoutssamelibrary::MainProtocol>::TwoWayAnonComposedWithError(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest ComposedProtocolTwoWayAnonComposedWithErrorRequest) {
@@ -3189,8 +2878,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
           return ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol>(_transport->get<::fidl::internal::ChannelTransport>()), &_request);
         });
   }
-  
-
 
   ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>
   fidl::internal::WireWeakSyncClientImpl<::test_protocollayoutssamelibrary::MainProtocol>::TwoWayNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload) {
@@ -3200,8 +2887,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
           return ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol>(_transport->get<::fidl::internal::ChannelTransport>()), &_request);
         });
   }
-  
-
 
   ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>
   fidl::internal::WireWeakSyncClientImpl<::test_protocollayoutssamelibrary::MainProtocol>::TwoWayNamedComposedWithError(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload) {
@@ -3211,8 +2896,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
           return ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol>(_transport->get<::fidl::internal::ChannelTransport>()), &_request);
         });
   }
-  
-
 
   ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>
   fidl::internal::WireWeakSyncClientImpl<::test_protocollayoutssamelibrary::MainProtocol>::TwoWayLocal(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload) {
@@ -3222,8 +2905,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
           return ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol>(_transport->get<::fidl::internal::ChannelTransport>()), &_request);
         });
   }
-  
-
 
   ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>
   fidl::internal::WireWeakSyncClientImpl<::test_protocollayoutssamelibrary::MainProtocol>::TwoWayLocalWithError(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload) {
@@ -3233,8 +2914,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
           return ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol>(_transport->get<::fidl::internal::ChannelTransport>()), &_request);
         });
   }
-  
-
 
   ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>
   fidl::internal::WireWeakSyncClientImpl<::test_protocollayoutssamelibrary::MainProtocol>::TwoWayAnon(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonRequest MainProtocolTwoWayAnonRequest) {
@@ -3244,8 +2923,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
           return ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>(::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol>(_transport->get<::fidl::internal::ChannelTransport>()), &_request);
         });
   }
-  
-
 
   ::fidl::WireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>
   fidl::internal::WireWeakSyncClientImpl<::test_protocollayoutssamelibrary::MainProtocol>::TwoWayAnonWithError(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorRequest MainProtocolTwoWayAnonWithErrorRequest) {
@@ -3256,19 +2933,8 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
         });
   }
 
-#endif  // __Fuchsia__
-
-
-
-
-
-#ifdef __Fuchsia__
-
-
 ::fidl::internal::WireEventDispatcher<::test_protocollayoutssamelibrary::MainProtocol>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_protocollayoutssamelibrary::MainProtocol>* event_handler)
 : IncomingEventDispatcher(event_handler) {}
-
-
 
   ::fidl::Status fidl::WireSyncEventHandler<::test_protocollayoutssamelibrary::MainProtocol>::HandleOneEvent(
       ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client_end) {
@@ -3338,13 +3004,6 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
         return ::fidl::Status::UnknownOrdinal();
     }
   }
-
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_protocollayoutssamelibrary::MainProtocol>::entries_[] = {
     { ::test_protocollayoutssamelibrary::kMainProtocol_OneWayAnonComposed_Ordinal,
@@ -3551,14 +3210,11 @@ const ::fidl::internal::MethodEntry* fidl::internal::WireServerDispatcher<::test
     impl, msg, storage_view, txn, entries_, entries_end_);
 }
 
-
-
 void fidl::internal::WireServerDispatcher<::test_protocollayoutssamelibrary::MainProtocol>::Dispatch(::fidl::WireServer<::test_protocollayoutssamelibrary::MainProtocol>* impl, ::fidl::IncomingHeaderAndMessage&& msg,
     internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
   ::fidl::internal::Dispatch(impl, msg, storage_view, txn, entries_, entries_end_,
   &unknown_method_handler_entry_);
 }
-
 
 void fidl::WireServer<::test_protocollayoutssamelibrary::MainProtocol>::dispatch_message(
     ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
@@ -3572,11 +3228,6 @@ fidl::WireServer<::test_protocollayoutssamelibrary::MainProtocol>::Handler fidl:
   };
 }
 
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>::Reply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse ComposedProtocolTwoWayAnonComposedResponse) {
   return MakeReply(ComposedProtocolTwoWayAnonComposedResponse);
@@ -3592,7 +3243,6 @@ fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtoco
   return _core()->SendReply(&_response_message.GetOutgoingMessage(),
                             ::fidl::internal::OutgoingTransportContext());
 }
-
 
 void
 fidl::internal::WireBufferCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>::Reply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse ComposedProtocolTwoWayAnonComposedResponse) {
@@ -3628,11 +3278,6 @@ fidl::internal::WireCompleterBase<::test_protocollayoutssamelibrary::MainProtoco
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>::Reply(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResponse*> result) {
   if (result.is_ok()) {
@@ -3661,7 +3306,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
   fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>::ReplyError(uint32_t error) {
     return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult::WithErr(std::move(error)));
   }
-
 
 void
 fidl::internal::WireBufferCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>::Reply(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResponse*> result) {
@@ -3710,11 +3354,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
     return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult::WithErr(std::move(error)));
   }
 
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>::Reply(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload) {
   return MakeReply(TablePayload);
@@ -3730,7 +3369,6 @@ fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtoco
   return _core()->SendReply(&_response_message.GetOutgoingMessage(),
                             ::fidl::internal::OutgoingTransportContext());
 }
-
 
 void
 fidl::internal::WireBufferCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>::Reply(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload) {
@@ -3766,11 +3404,6 @@ fidl::internal::WireCompleterBase<::test_protocollayoutssamelibrary::MainProtoco
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>::Reply(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::wire::UnionPayload*> result) {
   if (result.is_ok()) {
@@ -3799,7 +3432,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
   fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>::ReplyError(uint32_t error) {
     return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult::WithErr(std::move(error)));
   }
-
 
 void
 fidl::internal::WireBufferCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>::Reply(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::wire::UnionPayload*> result) {
@@ -3848,11 +3480,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
     return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult::WithErr(std::move(error)));
   }
 
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>::Reply(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload) {
   return MakeReply(TablePayload);
@@ -3868,7 +3495,6 @@ fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtoco
   return _core()->SendReply(&_response_message.GetOutgoingMessage(),
                             ::fidl::internal::OutgoingTransportContext());
 }
-
 
 void
 fidl::internal::WireBufferCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>::Reply(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload) {
@@ -3904,11 +3530,6 @@ fidl::internal::WireCompleterBase<::test_protocollayoutssamelibrary::MainProtoco
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>::Reply(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::wire::UnionPayload*> result) {
   if (result.is_ok()) {
@@ -3937,7 +3558,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLoca
   fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>::ReplyError(uint32_t error) {
     return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult::WithErr(std::move(error)));
   }
-
 
 void
 fidl::internal::WireBufferCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>::Reply(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::wire::UnionPayload*> result) {
@@ -3986,11 +3606,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLoca
     return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult::WithErr(std::move(error)));
   }
 
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>::Reply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonResponse MainProtocolTwoWayAnonResponse) {
   return MakeReply(MainProtocolTwoWayAnonResponse);
@@ -4006,7 +3621,6 @@ fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtoco
   return _core()->SendReply(&_response_message.GetOutgoingMessage(),
                             ::fidl::internal::OutgoingTransportContext());
 }
-
 
 void
 fidl::internal::WireBufferCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>::Reply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonResponse MainProtocolTwoWayAnonResponse) {
@@ -4042,11 +3656,6 @@ fidl::internal::WireCompleterBase<::test_protocollayoutssamelibrary::MainProtoco
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>::Reply(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResponse*> result) {
   if (result.is_ok()) {
@@ -4075,7 +3684,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>::ReplyError(uint32_t error) {
     return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult::WithErr(std::move(error)));
   }
-
 
 void
 fidl::internal::WireBufferCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>::Reply(::fit::result<uint32_t, ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResponse*> result) {
@@ -4124,15 +3732,10 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
     return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult::WithErr(std::move(error)));
   }
 
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnonComposed>::TransactionalRequest() {
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_OneWayAnonComposed_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_OneWayAnonComposed_DynamicFlags);
   }
 
-  
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnonComposed>::TransactionalRequest(::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest)
     : body(::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest { ComposedProtocolOneWayAnonComposedRequest } ) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_OneWayAnonComposed_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_OneWayAnonComposed_DynamicFlags);
@@ -4156,17 +3759,10 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnonComposed>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnonComposed>, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
-#endif  // __Fuchsia__
-
-    
-    
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>::TransactionalRequest() {
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonComposed_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonComposed_DynamicFlags);
   }
 
-  
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>::TransactionalRequest(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedRequest ComposedProtocolTwoWayAnonComposedRequest)
     : body(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedRequest { ComposedProtocolTwoWayAnonComposedRequest } ) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonComposed_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonComposed_DynamicFlags);
@@ -4192,15 +3788,8 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
 
 #endif  // __Fuchsia__
 
-    
-    
-
-
-  
     ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>::WireResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse ComposedProtocolTwoWayAnonComposedResponse) : ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse(ComposedProtocolTwoWayAnonComposedResponse){}
 
-
-  
     ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>::TransactionalResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse ComposedProtocolTwoWayAnonComposedResponse)
     : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>(ComposedProtocolTwoWayAnonComposedResponse)) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonComposed_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonComposed_DynamicFlags);
@@ -4209,7 +3798,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonComposed_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonComposed_DynamicFlags);
   }
 
-  
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -4226,7 +3814,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-
 
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
@@ -4247,15 +3834,12 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-    
-    
 
 #ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>::TransactionalRequest() {
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonComposedWithError_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonComposedWithError_DynamicFlags);
   }
 
-  
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>::TransactionalRequest(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest ComposedProtocolTwoWayAnonComposedWithErrorRequest)
     : body(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest { ComposedProtocolTwoWayAnonComposedWithErrorRequest } ) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonComposedWithError_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonComposedWithError_DynamicFlags);
@@ -4281,15 +3865,8 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
 
 #endif  // __Fuchsia__
 
-    
-    
-
-
-  
     ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>::WireResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult ComposedProtocolTwoWayAnonComposedWithErrorResult) : ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult(ComposedProtocolTwoWayAnonComposedWithErrorResult){}
 
-
-  
     ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>::TransactionalResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult ComposedProtocolTwoWayAnonComposedWithErrorResult)
     : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>(ComposedProtocolTwoWayAnonComposedWithErrorResult)) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonComposedWithError_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonComposedWithError_DynamicFlags);
@@ -4298,7 +3875,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonComposedWithError_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonComposedWithError_DynamicFlags);
   }
 
-  
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -4315,7 +3891,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-
 
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
@@ -4336,10 +3911,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-    
-    
-    
-    
 
 #ifdef __Fuchsia__
 
@@ -4370,17 +3941,10 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed>, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
-#endif  // __Fuchsia__
-
-    
-    
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>::TransactionalRequest() {
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_OneWayNamedComposed_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_OneWayNamedComposed_DynamicFlags);
   }
 
-  
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>::TransactionalRequest(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload)
     : body(::test_protocollayoutssamelibrary::wire::TablePayload { TablePayload } ) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_OneWayNamedComposed_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_OneWayNamedComposed_DynamicFlags);
@@ -4404,17 +3968,10 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
-#endif  // __Fuchsia__
-
-    
-    
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>::TransactionalRequest() {
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayNamedComposed_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayNamedComposed_DynamicFlags);
   }
 
-  
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>::TransactionalRequest(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload)
     : body(::test_protocollayoutssamelibrary::wire::UnionPayload { UnionPayload } ) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayNamedComposed_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayNamedComposed_DynamicFlags);
@@ -4440,15 +3997,8 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
 
 #endif  // __Fuchsia__
 
-    
-    
-
-
-  
     ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>::WireResponse(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload) : ::test_protocollayoutssamelibrary::wire::TablePayload(TablePayload){}
 
-
-  
     ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>::TransactionalResponse(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload)
     : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>(TablePayload)) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayNamedComposed_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayNamedComposed_DynamicFlags);
@@ -4457,7 +4007,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayNamedComposed_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayNamedComposed_DynamicFlags);
   }
 
-  
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -4474,7 +4023,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-
 
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
@@ -4495,15 +4043,12 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-    
-    
 
 #ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>::TransactionalRequest() {
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayNamedComposedWithError_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayNamedComposedWithError_DynamicFlags);
   }
 
-  
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>::TransactionalRequest(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload)
     : body(::test_protocollayoutssamelibrary::wire::TablePayload { TablePayload } ) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayNamedComposedWithError_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayNamedComposedWithError_DynamicFlags);
@@ -4529,15 +4074,8 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
 
 #endif  // __Fuchsia__
 
-    
-    
-
-
-  
     ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>::WireResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult ComposedProtocolTwoWayNamedComposedWithErrorResult) : ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult(ComposedProtocolTwoWayNamedComposedWithErrorResult){}
 
-
-  
     ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>::TransactionalResponse(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult ComposedProtocolTwoWayNamedComposedWithErrorResult)
     : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>(ComposedProtocolTwoWayNamedComposedWithErrorResult)) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayNamedComposedWithError_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayNamedComposedWithError_DynamicFlags);
@@ -4546,7 +4084,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayNamedComposedWithError_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayNamedComposedWithError_DynamicFlags);
   }
 
-  
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -4563,7 +4100,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-
 
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
@@ -4584,10 +4120,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-    
-    
-    
-    
 
 #ifdef __Fuchsia__
 
@@ -4618,17 +4150,10 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
-#endif  // __Fuchsia__
-
-    
-    
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal>::TransactionalRequest() {
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_OneWayLocal_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_OneWayLocal_DynamicFlags);
   }
 
-  
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal>::TransactionalRequest(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload)
     : body(::test_protocollayoutssamelibrary::wire::TablePayload { TablePayload } ) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_OneWayLocal_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_OneWayLocal_DynamicFlags);
@@ -4652,17 +4177,10 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal>, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
-#endif  // __Fuchsia__
-
-    
-    
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>::TransactionalRequest() {
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayLocal_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayLocal_DynamicFlags);
   }
 
-  
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>::TransactionalRequest(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload)
     : body(::test_protocollayoutssamelibrary::wire::UnionPayload { UnionPayload } ) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayLocal_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayLocal_DynamicFlags);
@@ -4688,15 +4206,8 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
 
 #endif  // __Fuchsia__
 
-    
-    
-
-
-  
     ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>::WireResponse(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload) : ::test_protocollayoutssamelibrary::wire::TablePayload(TablePayload){}
 
-
-  
     ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>::TransactionalResponse(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload)
     : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>(TablePayload)) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayLocal_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayLocal_DynamicFlags);
@@ -4705,7 +4216,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayLocal_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayLocal_DynamicFlags);
   }
 
-  
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -4722,7 +4232,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-
 
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
@@ -4743,15 +4252,12 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-    
-    
 
 #ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>::TransactionalRequest() {
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayLocalWithError_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayLocalWithError_DynamicFlags);
   }
 
-  
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>::TransactionalRequest(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload)
     : body(::test_protocollayoutssamelibrary::wire::TablePayload { TablePayload } ) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayLocalWithError_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayLocalWithError_DynamicFlags);
@@ -4777,15 +4283,8 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
 
 #endif  // __Fuchsia__
 
-    
-    
-
-
-  
     ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>::WireResponse(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult MainProtocolTwoWayLocalWithErrorResult) : ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult(MainProtocolTwoWayLocalWithErrorResult){}
 
-
-  
     ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>::TransactionalResponse(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult MainProtocolTwoWayLocalWithErrorResult)
     : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>(MainProtocolTwoWayLocalWithErrorResult)) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayLocalWithError_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayLocalWithError_DynamicFlags);
@@ -4794,7 +4293,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayLocalWithError_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayLocalWithError_DynamicFlags);
   }
 
-  
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -4811,7 +4309,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-
 
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
@@ -4832,10 +4329,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-    
-    
-    
-    
 
 #ifdef __Fuchsia__
 
@@ -4866,17 +4359,10 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocal>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocal>, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
-#endif  // __Fuchsia__
-
-    
-    
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>::TransactionalRequest() {
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_OneWayAnon_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_OneWayAnon_DynamicFlags);
   }
 
-  
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>::TransactionalRequest(::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAnonRequest MainProtocolOneWayAnonRequest)
     : body(::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAnonRequest { MainProtocolOneWayAnonRequest } ) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_OneWayAnon_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_OneWayAnon_DynamicFlags);
@@ -4900,17 +4386,10 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
-#endif  // __Fuchsia__
-
-    
-    
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>::TransactionalRequest() {
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnon_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnon_DynamicFlags);
   }
 
-  
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>::TransactionalRequest(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonRequest MainProtocolTwoWayAnonRequest)
     : body(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonRequest { MainProtocolTwoWayAnonRequest } ) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnon_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnon_DynamicFlags);
@@ -4936,15 +4415,8 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
 
 #endif  // __Fuchsia__
 
-    
-    
-
-
-  
     ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>::WireResponse(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonResponse MainProtocolTwoWayAnonResponse) : ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonResponse(MainProtocolTwoWayAnonResponse){}
 
-
-  
     ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>::TransactionalResponse(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonResponse MainProtocolTwoWayAnonResponse)
     : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>(MainProtocolTwoWayAnonResponse)) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnon_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnon_DynamicFlags);
@@ -4953,7 +4425,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnon_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnon_DynamicFlags);
   }
 
-  
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -4970,7 +4441,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-
 
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
@@ -4991,15 +4461,12 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-    
-    
 
 #ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>::TransactionalRequest() {
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonWithError_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonWithError_DynamicFlags);
   }
 
-  
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>::TransactionalRequest(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorRequest MainProtocolTwoWayAnonWithErrorRequest)
     : body(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorRequest { MainProtocolTwoWayAnonWithErrorRequest } ) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonWithError_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonWithError_DynamicFlags);
@@ -5025,15 +4492,8 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
 
 #endif  // __Fuchsia__
 
-    
-    
-
-
-  
     ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>::WireResponse(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult MainProtocolTwoWayAnonWithErrorResult) : ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult(MainProtocolTwoWayAnonWithErrorResult){}
 
-
-  
     ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>::TransactionalResponse(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult MainProtocolTwoWayAnonWithErrorResult)
     : body(::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>(MainProtocolTwoWayAnonWithErrorResult)) {
       ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonWithError_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonWithError_DynamicFlags);
@@ -5042,7 +4502,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
     ::fidl::InitTxnHeader(&header, 0, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonWithError_Ordinal, ::test_protocollayoutssamelibrary::kMainProtocol_TwoWayAnonWithError_DynamicFlags);
   }
 
-  
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
     internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -5059,7 +4518,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-
 
   template <bool IsRecursive>
   void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
@@ -5080,10 +4538,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>, ::fidl::internal::WireCodingConstraintEmpty, true>;
   template
   struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-    
-    
-    
-    
 
 #ifdef __Fuchsia__
 
@@ -5115,10 +4569,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
   template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnon>, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
 #endif  // __Fuchsia__
-
-    
-    
-
 
       ::fidl::OneWayStatus
       fidl::internal::WireSyncClientImpl<::test_protocollayoutssamelibrary::MainProtocol>::OneWayAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest) {
@@ -5276,9 +4726,6 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
         return ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>(
           ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
       }
-  
-  
-
 
 #ifdef __Fuchsia__
 
@@ -5486,12 +4933,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
   return ::fidl::OneWayStatus{::fidl::Status{_message}};
 }
 
-
 #endif  // __Fuchsia__
 
-
 #pragma clang diagnostic pop
-
-
-
 

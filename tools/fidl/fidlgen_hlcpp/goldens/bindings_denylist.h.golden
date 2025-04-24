@@ -19,9 +19,6 @@ namespace bindingsdenylist {
 class OnlyCppAndDeps;
 using OnlyCppAndDepsHandle = ::fidl::InterfaceHandle<OnlyCppAndDeps>;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 class OnlyHlcpp;
 
 #endif  // __Fuchsia__
@@ -60,10 +57,6 @@ class DenyEachBinding_OnlyDenySyzkaller_Result;
 
 class DenyEachBinding;
 using DenyEachBindingHandle = ::fidl::InterfaceHandle<DenyEachBinding>;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class Allowed;
 using AllowedHandle = ::fidl::InterfaceHandle<Allowed>;
@@ -985,10 +978,6 @@ class DenyEachBinding_ResponseEncoder {
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class Allowed_RequestEncoder {
  public:
 };
@@ -1630,14 +1619,7 @@ class OnlyCppAndDeps_Sync;
 using OnlyCppAndDepsSyncPtr = ::fidl::SynchronousInterfacePtr<OnlyCppAndDeps>;
 class OnlyCppAndDeps_SyncProxy;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 class OnlyHlcpp;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 using DenyEachBindingPtr = ::fidl::InterfacePtr<DenyEachBinding>;
 class DenyEachBinding_Proxy;
@@ -1670,10 +1652,6 @@ constexpr uint64_t kDenyEachBinding_OnlyDenySyzkaller_Ordinal = 0x202ee614a749e9
 constexpr ::fidl::MessageDynamicFlags kDenyEachBinding_OnlyDenySyzkaller_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 }  // namespace internal
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 using AllowedPtr = ::fidl::InterfacePtr<Allowed>;
 class Allowed_Proxy;
 class Allowed_Stub;
@@ -1681,10 +1659,6 @@ class Allowed_EventSender;
 class Allowed_Sync;
 using AllowedSyncPtr = ::fidl::SynchronousInterfacePtr<Allowed>;
 class Allowed_SyncProxy;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 using ImportsSameNameContextPtr = ::fidl::InterfacePtr<ImportsSameNameContext>;
 class ImportsSameNameContext_Proxy;
@@ -1704,10 +1678,6 @@ constexpr uint64_t kImportsSameNameContext_AlwaysAppearsInImportingLibrary_Ordin
 
 constexpr ::fidl::MessageDynamicFlags kImportsSameNameContext_AlwaysAppearsInImportingLibrary_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 }  // namespace internal
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class OnlyCppAndDeps {
  public:
@@ -1780,10 +1750,6 @@ class OnlyCppAndDeps_SyncProxy : public ::test::bindingsdenylist::OnlyCppAndDeps
   friend class ::fidl::SynchronousInterfacePtr<OnlyCppAndDeps>;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class OnlyHlcpp final {
  public:
   class Handler;
@@ -1807,10 +1773,6 @@ class OnlyHlcpp::Handler final {
 
  private:
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class DenyEachBinding {
  public:
@@ -1938,10 +1900,6 @@ class DenyEachBinding_SyncProxy : public ::test::bindingsdenylist::DenyEachBindi
   friend class ::fidl::SynchronousInterfacePtr<DenyEachBinding>;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class Allowed {
  public:
   using Proxy_ = ::test::bindingsdenylist::Allowed_Proxy;
@@ -2012,10 +1970,6 @@ class Allowed_SyncProxy : public ::test::bindingsdenylist::Allowed_Sync {
   ::fidl::internal::SynchronousProxy proxy_;
   friend class ::fidl::SynchronousInterfacePtr<Allowed>;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class ImportsSameNameContext {
  public:

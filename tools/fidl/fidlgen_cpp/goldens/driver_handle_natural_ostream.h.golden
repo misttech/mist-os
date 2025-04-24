@@ -20,27 +20,15 @@ struct fidl::ostream::Formatter<::test_driverhandle::ClientEndWrapper> {
   static std::ostream& Format(std::ostream& os, const ::test_driverhandle::ClientEndWrapper& value);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct fidl::ostream::Formatter<::test_driverhandle::ServerEndWrapper> {
   static std::ostream& Format(std::ostream& os, const ::test_driverhandle::ServerEndWrapper& value);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct fidl::ostream::Formatter<::test_driverhandle::T> {
   static std::ostream& Format(std::ostream& os, const ::test_driverhandle::T& value);
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct fidl::ostream::Formatter<::test_driverhandle::HandlesInProtocolSendHandlesRequest> {
@@ -55,21 +43,9 @@ namespace test_driverhandle {
 
 std::ostream& operator<<(std::ostream& os, const ::test_driverhandle::ClientEndWrapper& value);
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_driverhandle::ServerEndWrapper& value);
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_driverhandle::T& value);
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_driverhandle::HandlesInProtocolSendHandlesRequest& value);
 

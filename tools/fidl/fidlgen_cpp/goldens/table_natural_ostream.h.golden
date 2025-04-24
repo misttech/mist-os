@@ -65,8 +65,4 @@ std::ostream& operator<<(std::ostream& os, const ::test_table::SixtyFourOrdinalT
 
 }  // namespace test_table
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop

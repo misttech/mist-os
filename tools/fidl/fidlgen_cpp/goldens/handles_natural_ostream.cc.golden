@@ -86,10 +86,6 @@ std::ostream& fidl::ostream::Formatter<::test_handles::Handles>::Format(std::ost
   return os;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& fidl::ostream::Formatter<::test_handles::FdfHandles>::Format(std::ostream& os, const ::test_handles::FdfHandles& value) {
   os << "test_handles::FdfHandles";
   os << "{ ";
@@ -112,10 +108,6 @@ namespace test_handles {
 std::ostream& operator<<(std::ostream& os, const ::test_handles::Handles& value) {
   return fidl::ostream::Formatter<::test_handles::Handles>::Format(os, value);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_handles::FdfHandles& value) {
   return fidl::ostream::Formatter<::test_handles::FdfHandles>::Format(os, value);

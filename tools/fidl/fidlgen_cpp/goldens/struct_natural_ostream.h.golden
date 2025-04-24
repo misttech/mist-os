@@ -29,8 +29,4 @@ std::ostream& operator<<(std::ostream& os, const ::test_struct::BasicStruct& val
 
 }  // namespace test_struct
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop

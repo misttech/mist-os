@@ -142,10 +142,6 @@ inline zx_status_t Clone(const ::test::encapsulatedstructs::NonInlineStructTestS
 
 using NonInlineStructTestStructPtr = ::std::unique_ptr<NonInlineStructTestStruct>;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class TopLevelStruct final {
  public:
   static const fidl_type_t* FidlType;
@@ -317,10 +313,6 @@ struct Equality<::test::encapsulatedstructs::NonInlineStructTestStruct> {
     return true;
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct CodingTraits<::test::encapsulatedstructs::TopLevelStruct>

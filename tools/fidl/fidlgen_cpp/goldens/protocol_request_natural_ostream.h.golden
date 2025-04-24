@@ -19,27 +19,15 @@ struct fidl::ostream::Formatter<::test_protocolrequest::ParentGetChildResponse> 
   static std::ostream& Format(std::ostream& os, const ::test_protocolrequest::ParentGetChildResponse& value);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct fidl::ostream::Formatter<::test_protocolrequest::ParentGetChildRequestResponse> {
   static std::ostream& Format(std::ostream& os, const ::test_protocolrequest::ParentGetChildRequestResponse& value);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct fidl::ostream::Formatter<::test_protocolrequest::ParentTakeChildRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocolrequest::ParentTakeChildRequest& value);
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct fidl::ostream::Formatter<::test_protocolrequest::ParentTakeChildRequestRequest> {
@@ -54,21 +42,9 @@ namespace test_protocolrequest {
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocolrequest::ParentGetChildResponse& value);
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocolrequest::ParentGetChildRequestResponse& value);
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocolrequest::ParentTakeChildRequest& value);
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocolrequest::ParentTakeChildRequestRequest& value);
 

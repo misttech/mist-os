@@ -71,10 +71,6 @@ struct fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxHandleInResultR
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxHandleInResultResponse& value);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxHandleInResultResult> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxHandleInResultResult& value);
@@ -105,18 +101,10 @@ struct fidl::ostream::Formatter<::test_protocols::ChannelProtocolTakeHandleReque
   static std::ostream& Format(std::ostream& os, const ::test_protocols::ChannelProtocolTakeHandleRequest& value);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct fidl::ostream::Formatter<::test_protocols::ChannelProtocolMutateSocketRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::ChannelProtocolMutateSocketRequest& value);
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct fidl::ostream::Formatter<::test_protocols::ChannelProtocolMutateSocketResponse> {
@@ -136,90 +124,50 @@ struct fidl::ostream::Formatter<::test_protocols::HandleRightsProtocolNoResponse
   static std::ostream& Format(std::ostream& os, const ::test_protocols::HandleRightsProtocolNoResponseMethodRequest& value);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct fidl::ostream::Formatter<::test_protocols::HandleRightsProtocolResponseMethodRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::HandleRightsProtocolResponseMethodRequest& value);
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct fidl::ostream::Formatter<::test_protocols::HandleRightsProtocolResponseMethodResponse> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::HandleRightsProtocolResponseMethodResponse& value);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct fidl::ostream::Formatter<::test_protocols::HandleRightsProtocolAnEventRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::HandleRightsProtocolAnEventRequest& value);
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct fidl::ostream::Formatter<::test_protocols::ProtocolEnds> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::ProtocolEnds& value);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct fidl::ostream::Formatter<::test_protocols::WithProtocolEndsClientEndsRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithProtocolEndsClientEndsRequest& value);
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct fidl::ostream::Formatter<::test_protocols::WithProtocolEndsClientEndsResponse> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithProtocolEndsClientEndsResponse& value);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct fidl::ostream::Formatter<::test_protocols::WithProtocolEndsServerEndsRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithProtocolEndsServerEndsRequest& value);
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct fidl::ostream::Formatter<::test_protocols::WithProtocolEndsServerEndsResponse> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithProtocolEndsServerEndsResponse& value);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct fidl::ostream::Formatter<::test_protocols::WithProtocolEndsStructContainingEndsRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithProtocolEndsStructContainingEndsRequest& value);
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct fidl::ostream::Formatter<::test_protocols::WithProtocolEndsStructContainingEndsResponse> {
@@ -277,10 +225,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSynt
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxHandleInResultResponse& value);
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxHandleInResultResult& value);
 
 #endif  // __Fuchsia__
@@ -297,15 +241,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocols::ChannelProtoc
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::ChannelProtocolTakeHandleRequest& value);
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::ChannelProtocolMutateSocketRequest& value);
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::ChannelProtocolMutateSocketResponse& value);
 
@@ -317,63 +253,23 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocols::SyscallProtoc
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::HandleRightsProtocolNoResponseMethodRequest& value);
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::HandleRightsProtocolResponseMethodRequest& value);
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::HandleRightsProtocolResponseMethodResponse& value);
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::HandleRightsProtocolAnEventRequest& value);
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::ProtocolEnds& value);
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithProtocolEndsClientEndsRequest& value);
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithProtocolEndsClientEndsResponse& value);
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithProtocolEndsServerEndsRequest& value);
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithProtocolEndsServerEndsResponse& value);
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithProtocolEndsStructContainingEndsRequest& value);
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithProtocolEndsStructContainingEndsResponse& value);
 

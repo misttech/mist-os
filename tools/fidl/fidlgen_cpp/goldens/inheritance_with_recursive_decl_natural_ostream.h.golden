@@ -19,10 +19,6 @@ struct fidl::ostream::Formatter<::test_inheritancewithrecursivedecl::ParentFirst
   static std::ostream& Format(std::ostream& os, const ::test_inheritancewithrecursivedecl::ParentFirstRequest& value);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct fidl::ostream::Formatter<::test_inheritancewithrecursivedecl::ChildSecondRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_inheritancewithrecursivedecl::ChildSecondRequest& value);
@@ -35,10 +31,6 @@ namespace test_inheritancewithrecursivedecl {
 #ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_inheritancewithrecursivedecl::ParentFirstRequest& value);
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_inheritancewithrecursivedecl::ChildSecondRequest& value);
 

@@ -33,27 +33,11 @@ class SomeProtocol_ResponseEncoder {
  public:
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 using aliased_plain_handle = ::zx::handle;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 using aliased_subtype_handle = ::zx::vmo;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 using aliased_rights_handle = ::zx::vmo;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class Handles final {
  public:
@@ -295,10 +279,6 @@ class SomeProtocol_EventSender;
 class SomeProtocol_Sync;
 using SomeProtocolSyncPtr = ::fidl::SynchronousInterfacePtr<SomeProtocol>;
 class SomeProtocol_SyncProxy;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class SomeProtocol {
  public:

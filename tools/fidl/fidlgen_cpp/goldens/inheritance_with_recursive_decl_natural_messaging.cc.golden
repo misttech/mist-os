@@ -48,24 +48,12 @@ fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedecl::Paren
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::Status fidl::SyncEventHandler<::test_inheritancewithrecursivedecl::Parent>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Parent> client_end) {
   ::fidl::internal::IncomingEventsStorage<::test_inheritancewithrecursivedecl::Parent> event_storage;
   fidl::internal::NaturalEventDispatcher<::test_inheritancewithrecursivedecl::Parent> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_inheritancewithrecursivedecl::Parent>::entries_[] = {
     {
@@ -168,24 +156,12 @@ fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedecl::Child
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::Status fidl::SyncEventHandler<::test_inheritancewithrecursivedecl::Child>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Child> client_end) {
   ::fidl::internal::IncomingEventsStorage<::test_inheritancewithrecursivedecl::Child> event_storage;
   fidl::internal::NaturalEventDispatcher<::test_inheritancewithrecursivedecl::Child> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_inheritancewithrecursivedecl::Child>::entries_[] = {
     {

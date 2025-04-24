@@ -61,21 +61,9 @@ class FdfHandles;
 
 using AliasedPlainHandle = ::zx::handle;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 using AliasedSubtypeHandle = ::zx::vmo;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 using AliasedRightsHandle = ::zx::vmo;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class Handles {
  private:
@@ -635,10 +623,6 @@ class Handles {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class FdfHandles {
  private:
   struct Storage_;
@@ -716,10 +700,6 @@ class FdfHandles {
                                                    ::fidl::internal::NaturalStructMember<Storage_, ::fdf::ClientEnd<::test_handles::DriverProtocol>, fidl::internal::NaturalCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, false>>{&Storage_::client_end_driver, 4}, ::fidl::internal::NaturalStructMember<Storage_, ::fdf::ServerEnd<::test_handles::DriverProtocol>, fidl::internal::NaturalCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, false>>{&Storage_::server_end_driver, 8});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 inline Handles::Handles(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline Handles::Handles(::zx::handle plain_handle, ::zx::bti bti_handle, ::zx::channel channel_handle, ::zx::clock clock_handle, ::zx::debuglog debuglog_handle, ::zx::event event_handle, ::zx::eventpair eventpair_handle, ::zx::exception exception_handle, ::zx::fifo fifo_handle, ::zx::guest guest_handle, ::zx::interrupt interrupt_handle, ::zx::iob iob_handle, ::zx::iommu iommu_handle, ::zx::job job_handle, ::zx::msi msi_handle, ::zx::pager pager_handle, ::zx::pmt pmt_handle, ::zx::port port_handle, ::zx::process process_handle, ::zx::profile profile_handle, ::zx::resource resource_handle, ::zx::socket socket_handle, ::zx::stream stream_handle, ::zx::suspend_token suspendtoken_handle, ::zx::thread thread_handle, ::zx::timer timer_handle, ::zx::vcpu vcpu_handle, ::zx::vmar vmar_handle, ::zx::vmo vmo_handle, ::zx::vmo rights_handle, ::zx::handle aliased_plain_handle_field, ::zx::vmo aliased_subtype_handle_field, ::zx::vmo aliased_rights_handle_field, ::fidl::ClientEnd<::test_handles::SomeProtocol> some_protocol, ::fidl::ServerEnd<::test_handles::SomeProtocol> request_some_protocol) noexcept
@@ -937,10 +917,6 @@ inline Handles& Handles::request_some_protocol(::fidl::ServerEnd<::test_handles:
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 inline FdfHandles::FdfHandles(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline FdfHandles::FdfHandles(::fdf::Channel fdf_channel_handle, ::fdf::ClientEnd<::test_handles::DriverProtocol> client_end_driver, ::fdf::ServerEnd<::test_handles::DriverProtocol> server_end_driver) noexcept
     : storage_({.fdf_channel_handle = std::move(fdf_channel_handle),
@@ -992,10 +968,6 @@ struct IsStruct<::test_handles::Handles> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_handles::Handles, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_handles::Handles, 140> {};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct IsResource<::test_handles::FdfHandles> : public std::true_type {};

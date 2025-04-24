@@ -263,9 +263,6 @@ class Table;
 class Interface;
 using InterfaceHandle = ::fidl::InterfaceHandle<Interface>;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 class Service;
 
 #endif  // __Fuchsia__
@@ -885,14 +882,7 @@ constexpr uint64_t kInterface_OnEvent_Ordinal = 0x663f6d5971bef0lu;
 constexpr ::fidl::MessageDynamicFlags kInterface_OnEvent_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 }  // namespace internal
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 class Service;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 /// interface comment #1
 ///
@@ -984,10 +974,6 @@ class Interface_SyncProxy : public ::test::doccomments::Interface_Sync {
   ::fidl::internal::SynchronousProxy proxy_;
   friend class ::fidl::SynchronousInterfacePtr<Interface>;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 /// service comment #1
 ///

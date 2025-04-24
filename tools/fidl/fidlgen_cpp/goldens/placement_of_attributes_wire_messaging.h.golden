@@ -39,13 +39,6 @@ struct ::fidl::internal::WireMethodTypes<::test_placementofattributes::ExamplePr
   using Completer = fidl::Completer<>;
 };
 
-namespace test_placementofattributes {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace test_placementofattributes
-
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_placementofattributes::ExampleProtocol> final {
   WireServerDispatcher() = delete;
@@ -110,9 +103,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_placementofattri
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 }  // namespace fidl
 
 template <>
@@ -249,12 +239,6 @@ class ::fidl::WireServer<::test_placementofattributes::ExampleProtocol> : public
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireWeakOnewayClientImpl<::test_placementofattributes::ExampleProtocol> : public ::fidl::internal::ClientImplBase {

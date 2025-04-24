@@ -49,13 +49,6 @@ struct ::fidl::internal::WireMethodTypes<::test_error::Example::Foo> {
           ::fidl::internal::TransactionalRequest<::test_error::Example::Foo>, ::fidl::internal::ChannelTransport>>;
 };
 
-namespace test_error {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace test_error
-
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_error::Example> final {
   WireServerDispatcher() = delete;
@@ -390,12 +383,6 @@ class ::fidl::WireServer<::test_error::Example> : public ::fidl::internal::Incom
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireWeakOnewayClientImpl<::test_error::Example> : public ::fidl::internal::ClientImplBase {

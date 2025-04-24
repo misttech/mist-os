@@ -332,10 +332,6 @@ constexpr uint64_t kEmptyProtocol_SendAndReceive_Ordinal = 0x76a931254962cealu;
 constexpr ::fidl::MessageDynamicFlags kEmptyProtocol_SendAndReceive_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 }  // namespace internal
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class EmptyProtocol {
  public:
   using Proxy_ = ::test::emptystruct::EmptyProtocol_Proxy;

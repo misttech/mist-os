@@ -96,10 +96,6 @@ namespace test_doccomments {
   return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::internal::WireEventDispatcher<::test_doccomments::Interface>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_doccomments::Interface>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
@@ -130,10 +126,6 @@ fidl::internal::WireEventDispatcher<::test_doccomments::Interface>::DispatchEven
       return ::fidl::Status::UnknownOrdinal();
   }
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_doccomments::Interface>::entries_[] = {
     {
@@ -181,9 +173,6 @@ fidl::WireServer<::test_doccomments::Interface>::Handler fidl::WireServer<::test
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_doccomments::Interface::Method>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_doccomments::kInterface_Method_Ordinal, ::test_doccomments::kInterface_Method_DynamicFlags);
 }
@@ -201,10 +190,6 @@ void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<:
 
 template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_doccomments::Interface::Method>, ::fidl::internal::WireCodingConstraintEmpty, true>;
 template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_doccomments::Interface::Method>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 ::fidl::internal::TransactionalEvent<::test_doccomments::Interface::OnEvent>::TransactionalEvent() {
   ::fidl::InitTxnHeader(&header, 0, ::test_doccomments::kInterface_OnEvent_Ordinal, ::test_doccomments::kInterface_OnEvent_DynamicFlags);

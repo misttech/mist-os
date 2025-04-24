@@ -17,10 +17,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-}  // namespace fidl
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail> {
   using Request = ::test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest;
@@ -116,10 +112,6 @@ class ::fidl::internal::NaturalClientImpl<::test_errorsyntax::ExampleUseOfErrorS
   ::fidl::internal::NaturalThenable<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail> CallWhichMayFail(const ::fidl::Request<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>& request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_errorsyntax::ExampleUseOfErrorSyntax> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_errorsyntax::ExampleUseOfErrorSyntax>> {
@@ -134,10 +126,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_errorsyntax::ExampleUseOfEr
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_errorsyntax::ExampleUseOfErrorSyntax> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -173,9 +161,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_errorsyntax::ExampleUseOfE
       : IncomingEventDispatcher(event_handler) {}
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_errorsyntax::ExampleUseOfErrorSyntax> : public ::fidl::internal::WeakEventSenderBase {
  public:

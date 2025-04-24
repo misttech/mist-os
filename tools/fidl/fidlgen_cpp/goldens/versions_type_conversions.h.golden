@@ -55,10 +55,6 @@ struct WireTypeForNaturalType<::test_versions::Struct> {
   using type = ::test_versions::wire::Struct;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct WireNaturalConversionTraits<::test_versions::wire::Table, ::test_versions::Table> {
   static ::test_versions::Table ToNatural(::test_versions::wire::Table src);
@@ -73,10 +69,6 @@ template <>
 struct WireTypeForNaturalType<::test_versions::Table> {
   using type = ::test_versions::wire::Table;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct WireNaturalConversionTraits<::test_versions::wire::Union, ::test_versions::Union> {
@@ -98,10 +90,6 @@ template <>
 struct WireTypeForNaturalType<::test_versions::Union> {
   using type = ::test_versions::wire::Union;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
 #pragma clang diagnostic pop

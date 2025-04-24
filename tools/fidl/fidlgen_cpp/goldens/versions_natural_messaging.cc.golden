@@ -11,28 +11,12 @@
 
 #ifdef __Fuchsia__
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::Status fidl::SyncEventHandler<::test_versions::OtherProtocol>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_versions::OtherProtocol> client_end) {
   ::fidl::internal::IncomingEventsStorage<::test_versions::OtherProtocol> event_storage;
   fidl::internal::NaturalEventDispatcher<::test_versions::OtherProtocol> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_versions::OtherProtocol>::entries_[] = {};
 
@@ -88,10 +72,6 @@ fidl::internal::NaturalSyncClientImpl<::test_versions::Protocol>::Foo() {
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::Status fidl::SyncEventHandler<::test_versions::Protocol>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_versions::Protocol> client_end) {
   ::fidl::internal::IncomingEventsStorage<::test_versions::Protocol> event_storage;
@@ -123,14 +103,6 @@ fidl::internal::NaturalEventDispatcher<::test_versions::Protocol>::DispatchEvent
       return ::fidl::Status::UnknownOrdinal();
   }
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_versions::Protocol>::entries_[] = {
     {

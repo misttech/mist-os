@@ -16,10 +16,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-}  // namespace fidl
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> {
   using Response = ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse;
@@ -81,10 +77,6 @@ class ::fidl::internal::NaturalClientImpl<::test_union::TestProtocol> final : pu
   ::fidl::internal::NaturalThenable<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> FlexibleUnionHenceResponseMustBeHeapAllocated() const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_union::TestProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_union::TestProtocol>> {
@@ -99,10 +91,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_union::TestProtocol> final
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_union::TestProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -138,9 +126,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_union::TestProtocol> final
       : IncomingEventDispatcher(event_handler) {}
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_union::TestProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:

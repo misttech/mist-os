@@ -16,10 +16,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-}  // namespace fidl
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_nullable::SimpleProtocol::Add> {
   using Request = ::test_nullable::SimpleProtocolAddRequest;
@@ -56,10 +52,6 @@ class ::fidl::internal::NaturalClientImpl<::test_nullable::SimpleProtocol> final
   ::fidl::internal::NaturalThenable<::test_nullable::SimpleProtocol::Add> Add(const ::fidl::Request<::test_nullable::SimpleProtocol::Add>& request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_nullable::SimpleProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_nullable::SimpleProtocol>> {
@@ -72,10 +64,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_nullable::SimpleProtocol> f
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_nullable::SimpleProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -111,9 +99,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_nullable::SimpleProtocol> 
       : IncomingEventDispatcher(event_handler) {}
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_nullable::SimpleProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:

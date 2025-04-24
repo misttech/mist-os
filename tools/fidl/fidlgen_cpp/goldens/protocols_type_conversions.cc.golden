@@ -169,10 +169,6 @@ namespace internal {
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::test_protocols::ChannelProtocolMutateSocketRequest WireNaturalConversionTraits<::test_protocols::wire::ChannelProtocolMutateSocketRequest, ::test_protocols::ChannelProtocolMutateSocketRequest>::ToNatural(::test_protocols::wire::ChannelProtocolMutateSocketRequest src) {
   return ::test_protocols::ChannelProtocolMutateSocketRequest(WireNaturalConversionTraits<::zx::socket, ::zx::socket>::ToNatural(std::move(src.a)));
 }
@@ -181,10 +177,6 @@ namespace internal {
       .a = WireNaturalConversionTraits<::zx::socket, ::zx::socket>::ToWire(arena, std::move(src.a())),
   };
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 ::test_protocols::ChannelProtocolMutateSocketResponse WireNaturalConversionTraits<::test_protocols::wire::ChannelProtocolMutateSocketResponse, ::test_protocols::ChannelProtocolMutateSocketResponse>::ToNatural(::test_protocols::wire::ChannelProtocolMutateSocketResponse src) {
   return ::test_protocols::ChannelProtocolMutateSocketResponse(WireNaturalConversionTraits<::zx::socket, ::zx::socket>::ToNatural(std::move(src.b)));
@@ -221,10 +213,6 @@ namespace internal {
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::test_protocols::HandleRightsProtocolResponseMethodRequest WireNaturalConversionTraits<::test_protocols::wire::HandleRightsProtocolResponseMethodRequest, ::test_protocols::HandleRightsProtocolResponseMethodRequest>::ToNatural(::test_protocols::wire::HandleRightsProtocolResponseMethodRequest src) {
   return ::test_protocols::HandleRightsProtocolResponseMethodRequest(WireNaturalConversionTraits<::zx::socket, ::zx::socket>::ToNatural(std::move(src.h)));
 }
@@ -233,10 +221,6 @@ namespace internal {
       .h = WireNaturalConversionTraits<::zx::socket, ::zx::socket>::ToWire(arena, std::move(src.h())),
   };
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 ::test_protocols::HandleRightsProtocolResponseMethodResponse WireNaturalConversionTraits<::test_protocols::wire::HandleRightsProtocolResponseMethodResponse, ::test_protocols::HandleRightsProtocolResponseMethodResponse>::ToNatural(::test_protocols::wire::HandleRightsProtocolResponseMethodResponse src) {
   return ::test_protocols::HandleRightsProtocolResponseMethodResponse(WireNaturalConversionTraits<::zx::socket, ::zx::socket>::ToNatural(std::move(src.h)));
@@ -247,10 +231,6 @@ namespace internal {
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::test_protocols::HandleRightsProtocolAnEventRequest WireNaturalConversionTraits<::test_protocols::wire::HandleRightsProtocolAnEventRequest, ::test_protocols::HandleRightsProtocolAnEventRequest>::ToNatural(::test_protocols::wire::HandleRightsProtocolAnEventRequest src) {
   return ::test_protocols::HandleRightsProtocolAnEventRequest(WireNaturalConversionTraits<::zx::socket, ::zx::socket>::ToNatural(std::move(src.h)));
 }
@@ -259,10 +239,6 @@ namespace internal {
       .h = WireNaturalConversionTraits<::zx::socket, ::zx::socket>::ToWire(arena, std::move(src.h())),
   };
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 ::test_protocols::ProtocolEnds WireNaturalConversionTraits<::test_protocols::wire::ProtocolEnds, ::test_protocols::ProtocolEnds>::ToNatural(::test_protocols::wire::ProtocolEnds src) {
   return ::test_protocols::ProtocolEnds{{
@@ -281,10 +257,6 @@ namespace internal {
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::test_protocols::WithProtocolEndsClientEndsRequest WireNaturalConversionTraits<::test_protocols::wire::WithProtocolEndsClientEndsRequest, ::test_protocols::WithProtocolEndsClientEndsRequest>::ToNatural(::test_protocols::wire::WithProtocolEndsClientEndsRequest src) {
   return ::test_protocols::WithProtocolEndsClientEndsRequest(WireNaturalConversionTraits<::fidl::ClientEnd<::test_protocols::DiscoverableProtocol>, ::fidl::ClientEnd<::test_protocols::DiscoverableProtocol>>::ToNatural(std::move(src.in)));
 }
@@ -293,10 +265,6 @@ namespace internal {
       .in = WireNaturalConversionTraits<::fidl::ClientEnd<::test_protocols::DiscoverableProtocol>, ::fidl::ClientEnd<::test_protocols::DiscoverableProtocol>>::ToWire(arena, std::move(src.in())),
   };
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 ::test_protocols::WithProtocolEndsClientEndsResponse WireNaturalConversionTraits<::test_protocols::wire::WithProtocolEndsClientEndsResponse, ::test_protocols::WithProtocolEndsClientEndsResponse>::ToNatural(::test_protocols::wire::WithProtocolEndsClientEndsResponse src) {
   return ::test_protocols::WithProtocolEndsClientEndsResponse(WireNaturalConversionTraits<::fidl::ClientEnd<::test_protocols::DiscoverableProtocol>, ::fidl::ClientEnd<::test_protocols::DiscoverableProtocol>>::ToNatural(std::move(src.out)));
@@ -307,10 +275,6 @@ namespace internal {
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::test_protocols::WithProtocolEndsServerEndsRequest WireNaturalConversionTraits<::test_protocols::wire::WithProtocolEndsServerEndsRequest, ::test_protocols::WithProtocolEndsServerEndsRequest>::ToNatural(::test_protocols::wire::WithProtocolEndsServerEndsRequest src) {
   return ::test_protocols::WithProtocolEndsServerEndsRequest(WireNaturalConversionTraits<::fidl::ServerEnd<::test_protocols::DiscoverableProtocol>, ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol>>::ToNatural(std::move(src.in)));
 }
@@ -319,10 +283,6 @@ namespace internal {
       .in = WireNaturalConversionTraits<::fidl::ServerEnd<::test_protocols::DiscoverableProtocol>, ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol>>::ToWire(arena, std::move(src.in())),
   };
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 ::test_protocols::WithProtocolEndsServerEndsResponse WireNaturalConversionTraits<::test_protocols::wire::WithProtocolEndsServerEndsResponse, ::test_protocols::WithProtocolEndsServerEndsResponse>::ToNatural(::test_protocols::wire::WithProtocolEndsServerEndsResponse src) {
   return ::test_protocols::WithProtocolEndsServerEndsResponse(WireNaturalConversionTraits<::fidl::ServerEnd<::test_protocols::DiscoverableProtocol>, ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol>>::ToNatural(std::move(src.out)));
@@ -333,10 +293,6 @@ namespace internal {
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::test_protocols::WithProtocolEndsStructContainingEndsRequest WireNaturalConversionTraits<::test_protocols::wire::WithProtocolEndsStructContainingEndsRequest, ::test_protocols::WithProtocolEndsStructContainingEndsRequest>::ToNatural(::test_protocols::wire::WithProtocolEndsStructContainingEndsRequest src) {
   return ::test_protocols::WithProtocolEndsStructContainingEndsRequest(WireNaturalConversionTraits<::test_protocols::wire::ProtocolEnds, ::test_protocols::ProtocolEnds>::ToNatural(std::move(src.in)));
 }
@@ -345,10 +301,6 @@ namespace internal {
       .in = WireNaturalConversionTraits<::test_protocols::wire::ProtocolEnds, ::test_protocols::ProtocolEnds>::ToWire(arena, std::move(src.in())),
   };
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 ::test_protocols::WithProtocolEndsStructContainingEndsResponse WireNaturalConversionTraits<::test_protocols::wire::WithProtocolEndsStructContainingEndsResponse, ::test_protocols::WithProtocolEndsStructContainingEndsResponse>::ToNatural(::test_protocols::wire::WithProtocolEndsStructContainingEndsResponse src) {
   return ::test_protocols::WithProtocolEndsStructContainingEndsResponse(WireNaturalConversionTraits<::test_protocols::wire::ProtocolEnds, ::test_protocols::ProtocolEnds>::ToNatural(std::move(src.out)));

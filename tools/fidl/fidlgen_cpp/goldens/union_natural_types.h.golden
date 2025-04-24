@@ -13,147 +13,76 @@
 #include <fidl/test.union/cpp/markers.h>
 #include <fidl/test.union/cpp/common_types.h>
 
-
 #ifdef __Fuchsia__
 
   #include <lib/zx/channel.h>
-  
 
 #endif  // __Fuchsia__
-
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
 namespace test_union {
 
-
-
-
-
 class Pizza;
-
 
 class Pasta;
 
-
 class NullableUnionStruct;
-
 
 class Empty;
 
-
 class TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse;
-
 
 class TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse;
 
-
 class StructWithNullableUnion;
-
 
 class UnionSandwich;
 
-
-
-
-
 class PizzaOrPasta;
-
-
 
 class ExplicitPizzaOrPasta;
 
-
-
 class FlexiblePizzaOrPasta;
-
-
 
 class StrictPizzaOrPasta;
 
-
-
 class Union;
-
-
 
 class FlexibleUnion;
 
-
-
 class StrictUnion;
-
-
 
 class FieldCollision;
 
-
-
 class ExplicitUnion;
-
-
 
 class ReverseOrdinalUnion;
 
-
-
 class FlexibleFoo;
-
-
 
 class StrictFoo;
 
-
-
 class ExplicitFoo;
-
-
 
 class ExplicitStrictFoo;
 
-
-
 class OlderSimpleUnion;
-
-
 
 class NewerSimpleUnion;
 
-
-
 class StrictSimpleUnion;
-
-
 
 class UnionContainingEmptyStruct;
 
-
-
 class StrictBoundedUnion;
-
-
 
 class ExplicitFlexibleUnion;
 
-
-
 class UnionWithAttributes;
 
-
-
 class EmptyFlexibleUnion;
-
-
-
-
-
-
-  
-
-
-
-
 
 class Pizza {
  private:
@@ -179,20 +108,19 @@ class Pizza {
     bool operator!=(const Pizza& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_union::Pizza, 16>::Equal(this, &other);
     }
-    
+
       const ::std::vector<::std::string> &
     toppings() const {
       return storage_.toppings;
     }
 
-    
     ::std::vector<::std::string>& toppings() {
       return storage_.toppings;
     }
 
     // Setter for toppings.
     //
-    
+
     Pizza& toppings(::std::vector<::std::string> value);
 
   Pizza(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -213,15 +141,6 @@ class Pizza {
   static constexpr auto kPadding = std::make_tuple();
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class Pasta {
  private:
@@ -247,20 +166,19 @@ class Pasta {
     bool operator!=(const Pasta& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_union::Pasta, 16>::Equal(this, &other);
     }
-    
+
       const ::std::string &
     sauce() const {
       return storage_.sauce;
     }
 
-    
     ::std::string& sauce() {
       return storage_.sauce;
     }
 
     // Setter for sauce.
     //
-    
+
     Pasta& sauce(::std::string value);
 
   Pasta(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -281,17 +199,6 @@ class Pasta {
   static constexpr auto kPadding = std::make_tuple();
 
 };
-
-
-  
-  
-  
-  
-  
-
-
-
-
 
 class PizzaOrPasta {
  private:
@@ -352,7 +259,7 @@ class PizzaOrPasta {
 
     // Sets the union to hold the pizza member.
     //
-    
+
     PizzaOrPasta& pizza(::test_union::Pizza value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -373,7 +280,7 @@ class PizzaOrPasta {
 
     // Sets the union to hold the pasta member.
     //
-    
+
     PizzaOrPasta& pasta(::test_union::Pasta value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -413,15 +320,6 @@ class PizzaOrPasta {
   }
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class ExplicitPizzaOrPasta {
  private:
@@ -482,7 +380,7 @@ class ExplicitPizzaOrPasta {
 
     // Sets the union to hold the pizza member.
     //
-    
+
     ExplicitPizzaOrPasta& pizza(::test_union::Pizza value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -503,7 +401,7 @@ class ExplicitPizzaOrPasta {
 
     // Sets the union to hold the pasta member.
     //
-    
+
     ExplicitPizzaOrPasta& pasta(::test_union::Pasta value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -543,15 +441,6 @@ class ExplicitPizzaOrPasta {
   }
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class FlexiblePizzaOrPasta {
  private:
@@ -616,7 +505,7 @@ class FlexiblePizzaOrPasta {
 
     // Sets the union to hold the pizza member.
     //
-    
+
     FlexiblePizzaOrPasta& pizza(::test_union::Pizza value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -637,7 +526,7 @@ class FlexiblePizzaOrPasta {
 
     // Sets the union to hold the pasta member.
     //
-    
+
     FlexiblePizzaOrPasta& pasta(::test_union::Pasta value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -676,15 +565,6 @@ class FlexiblePizzaOrPasta {
   }
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class StrictPizzaOrPasta {
  private:
@@ -745,7 +625,7 @@ class StrictPizzaOrPasta {
 
     // Sets the union to hold the pizza member.
     //
-    
+
     StrictPizzaOrPasta& pizza(::test_union::Pizza value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -766,7 +646,7 @@ class StrictPizzaOrPasta {
 
     // Sets the union to hold the pasta member.
     //
-    
+
     StrictPizzaOrPasta& pasta(::test_union::Pasta value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -806,15 +686,6 @@ class StrictPizzaOrPasta {
   }
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class Union {
  private:
@@ -877,7 +748,7 @@ class Union {
 
     // Sets the union to hold the primitive member.
     //
-    
+
     Union& primitive(int32_t value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -898,7 +769,7 @@ class Union {
 
     // Sets the union to hold the string_needs_constructor member.
     //
-    
+
     Union& string_needs_constructor(::std::string value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -919,7 +790,7 @@ class Union {
 
     // Sets the union to hold the vector_string_also_needs_constructor member.
     //
-    
+
     Union& vector_string_also_needs_constructor(::std::vector<::std::string> value) {
       storage_->emplace<3>(std::move(value));
       return *this;
@@ -962,15 +833,6 @@ class Union {
   }
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class FlexibleUnion {
  private:
@@ -1037,7 +899,7 @@ class FlexibleUnion {
 
     // Sets the union to hold the primitive member.
     //
-    
+
     FlexibleUnion& primitive(int32_t value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -1058,7 +920,7 @@ class FlexibleUnion {
 
     // Sets the union to hold the string_needs_constructor member.
     //
-    
+
     FlexibleUnion& string_needs_constructor(::std::string value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -1079,7 +941,7 @@ class FlexibleUnion {
 
     // Sets the union to hold the vector_string_also_needs_constructor member.
     //
-    
+
     FlexibleUnion& vector_string_also_needs_constructor(::std::vector<::std::string> value) {
       storage_->emplace<3>(std::move(value));
       return *this;
@@ -1121,15 +983,6 @@ class FlexibleUnion {
   }
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class StrictUnion {
  private:
@@ -1192,7 +1045,7 @@ class StrictUnion {
 
     // Sets the union to hold the primitive member.
     //
-    
+
     StrictUnion& primitive(int32_t value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -1213,7 +1066,7 @@ class StrictUnion {
 
     // Sets the union to hold the string_needs_constructor member.
     //
-    
+
     StrictUnion& string_needs_constructor(::std::string value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -1234,7 +1087,7 @@ class StrictUnion {
 
     // Sets the union to hold the vector_string_also_needs_constructor member.
     //
-    
+
     StrictUnion& vector_string_also_needs_constructor(::std::vector<::std::string> value) {
       storage_->emplace<3>(std::move(value));
       return *this;
@@ -1277,15 +1130,6 @@ class StrictUnion {
   }
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class FieldCollision {
  private:
@@ -1344,7 +1188,7 @@ class FieldCollision {
 
     // Sets the union to hold the field_collision_tag member.
     //
-    
+
     FieldCollision& field_collision_tag(int32_t value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -1381,15 +1225,6 @@ class FieldCollision {
   }
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class ExplicitUnion {
  private:
@@ -1450,7 +1285,7 @@ class ExplicitUnion {
 
     // Sets the union to hold the primitive member.
     //
-    
+
     ExplicitUnion& primitive(int32_t value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -1471,7 +1306,7 @@ class ExplicitUnion {
 
     // Sets the union to hold the string_needs_constructor member.
     //
-    
+
     ExplicitUnion& string_needs_constructor(::std::string value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -1511,15 +1346,6 @@ class ExplicitUnion {
   }
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class ReverseOrdinalUnion {
  private:
@@ -1580,7 +1406,7 @@ class ReverseOrdinalUnion {
 
     // Sets the union to hold the first member.
     //
-    
+
     ReverseOrdinalUnion& first(uint32_t value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -1601,7 +1427,7 @@ class ReverseOrdinalUnion {
 
     // Sets the union to hold the second member.
     //
-    
+
     ReverseOrdinalUnion& second(uint32_t value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -1642,13 +1468,6 @@ class ReverseOrdinalUnion {
 
 };
 
-
-  
-
-
-
-
-
 class NullableUnionStruct {
  private:
   struct Storage_;
@@ -1673,20 +1492,19 @@ class NullableUnionStruct {
     bool operator!=(const NullableUnionStruct& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_union::NullableUnionStruct, 16>::Equal(this, &other);
     }
-    
+
       const ::fidl::Box<::test_union::Union> &
     the_union() const {
       return storage_.the_union;
     }
 
-    
     ::fidl::Box<::test_union::Union>& the_union() {
       return storage_.the_union;
     }
 
     // Setter for the_union.
     //
-    
+
     NullableUnionStruct& the_union(::fidl::Box<::test_union::Union> value);
 
   NullableUnionStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -1707,17 +1525,6 @@ class NullableUnionStruct {
   static constexpr auto kPadding = std::make_tuple();
 
 };
-
-
-  
-  
-  
-  
-  
-
-
-
-
 
 class FlexibleFoo {
  private:
@@ -1782,7 +1589,7 @@ class FlexibleFoo {
 
     // Sets the union to hold the s member.
     //
-    
+
     FlexibleFoo& s(::std::string value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -1803,7 +1610,7 @@ class FlexibleFoo {
 
     // Sets the union to hold the i member.
     //
-    
+
     FlexibleFoo& i(int32_t value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -1842,15 +1649,6 @@ class FlexibleFoo {
   }
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class StrictFoo {
  private:
@@ -1911,7 +1709,7 @@ class StrictFoo {
 
     // Sets the union to hold the s member.
     //
-    
+
     StrictFoo& s(::std::string value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -1932,7 +1730,7 @@ class StrictFoo {
 
     // Sets the union to hold the i member.
     //
-    
+
     StrictFoo& i(int32_t value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -1972,15 +1770,6 @@ class StrictFoo {
   }
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class ExplicitFoo {
  private:
@@ -2045,7 +1834,7 @@ class ExplicitFoo {
 
     // Sets the union to hold the i member.
     //
-    
+
     ExplicitFoo& i(int32_t value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -2066,7 +1855,7 @@ class ExplicitFoo {
 
     // Sets the union to hold the s member.
     //
-    
+
     ExplicitFoo& s(::std::string value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -2105,15 +1894,6 @@ class ExplicitFoo {
   }
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class ExplicitStrictFoo {
  private:
@@ -2174,7 +1954,7 @@ class ExplicitStrictFoo {
 
     // Sets the union to hold the i member.
     //
-    
+
     ExplicitStrictFoo& i(int32_t value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -2195,7 +1975,7 @@ class ExplicitStrictFoo {
 
     // Sets the union to hold the s member.
     //
-    
+
     ExplicitStrictFoo& s(::std::string value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -2235,15 +2015,6 @@ class ExplicitStrictFoo {
   }
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class OlderSimpleUnion {
  private:
@@ -2308,7 +2079,7 @@ class OlderSimpleUnion {
 
     // Sets the union to hold the i member.
     //
-    
+
     OlderSimpleUnion& i(int64_t value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -2329,7 +2100,7 @@ class OlderSimpleUnion {
 
     // Sets the union to hold the f member.
     //
-    
+
     OlderSimpleUnion& f(float value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -2368,15 +2139,6 @@ class OlderSimpleUnion {
   }
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class NewerSimpleUnion {
  private:
@@ -2443,7 +2205,7 @@ class NewerSimpleUnion {
 
     // Sets the union to hold the i member.
     //
-    
+
     NewerSimpleUnion& i(int64_t value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -2464,7 +2226,7 @@ class NewerSimpleUnion {
 
     // Sets the union to hold the s member.
     //
-    
+
     NewerSimpleUnion& s(::std::string value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -2485,7 +2247,7 @@ class NewerSimpleUnion {
 
     // Sets the union to hold the v member.
     //
-    
+
     NewerSimpleUnion& v(::std::vector<::std::string> value) {
       storage_->emplace<3>(std::move(value));
       return *this;
@@ -2527,15 +2289,6 @@ class NewerSimpleUnion {
   }
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class StrictSimpleUnion {
  private:
@@ -2598,7 +2351,7 @@ class StrictSimpleUnion {
 
     // Sets the union to hold the i member.
     //
-    
+
     StrictSimpleUnion& i(int32_t value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -2619,7 +2372,7 @@ class StrictSimpleUnion {
 
     // Sets the union to hold the f member.
     //
-    
+
     StrictSimpleUnion& f(float value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -2640,7 +2393,7 @@ class StrictSimpleUnion {
 
     // Sets the union to hold the s member.
     //
-    
+
     StrictSimpleUnion& s(::std::string value) {
       storage_->emplace<3>(std::move(value));
       return *this;
@@ -2684,13 +2437,6 @@ class StrictSimpleUnion {
 
 };
 
-
-  
-
-
-
-
-
 class Empty {
  private:
   struct Storage_;
@@ -2715,20 +2461,19 @@ class Empty {
     bool operator!=(const Empty& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_union::Empty, 1>::Equal(this, &other);
     }
-    
+
       uint8_t
     __reserved() const {
       return storage_.__reserved;
     }
 
-    
     uint8_t& __reserved() {
       return storage_.__reserved;
     }
 
     // Setter for __reserved.
     //
-    
+
     Empty& __reserved(uint8_t value);
 
   Empty(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -2750,17 +2495,6 @@ class Empty {
   static constexpr auto kPadding = std::make_tuple();
 
 };
-
-
-  
-  
-  
-  
-  
-
-
-
-
 
 class UnionContainingEmptyStruct {
  private:
@@ -2823,7 +2557,7 @@ class UnionContainingEmptyStruct {
 
     // Sets the union to hold the empty member.
     //
-    
+
     UnionContainingEmptyStruct& empty(::test_union::Empty value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -2859,15 +2593,6 @@ class UnionContainingEmptyStruct {
   }
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class StrictBoundedUnion {
  private:
@@ -2926,7 +2651,7 @@ class StrictBoundedUnion {
 
     // Sets the union to hold the v member.
     //
-    
+
     StrictBoundedUnion& v(::std::vector<uint8_t> value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -2964,13 +2689,6 @@ class StrictBoundedUnion {
 
 };
 
-
-  
-
-
-
-
-
 class TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse {
  private:
   struct Storage_;
@@ -2995,20 +2713,19 @@ class TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse {
     bool operator!=(const TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, 16>::Equal(this, &other);
     }
-    
+
       const ::test_union::StrictBoundedUnion &
     xu() const {
       return storage_.xu;
     }
 
-    
     ::test_union::StrictBoundedUnion& xu() {
       return storage_.xu;
     }
 
     // Setter for xu.
     //
-    
+
     TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse& xu(::test_union::StrictBoundedUnion value);
 
   TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -3029,15 +2746,6 @@ class TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse {
   static constexpr auto kPadding = std::make_tuple();
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse {
  private:
@@ -3063,20 +2771,19 @@ class TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse {
     bool operator!=(const TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, 16>::Equal(this, &other);
     }
-    
+
       const ::test_union::OlderSimpleUnion &
     xu() const {
       return storage_.xu;
     }
 
-    
     ::test_union::OlderSimpleUnion& xu() {
       return storage_.xu;
     }
 
     // Setter for xu.
     //
-    
+
     TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse& xu(::test_union::OlderSimpleUnion value);
 
   TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -3097,18 +2804,6 @@ class TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse {
   static constexpr auto kPadding = std::make_tuple();
 
 };
-
-
-  
-  
-  
-  
-  
-  
-
-
-
-
 
 class StructWithNullableUnion {
  private:
@@ -3134,20 +2829,19 @@ class StructWithNullableUnion {
     bool operator!=(const StructWithNullableUnion& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_union::StructWithNullableUnion, 16>::Equal(this, &other);
     }
-    
+
       const ::fidl::Box<::test_union::OlderSimpleUnion> &
     x1() const {
       return storage_.x1;
     }
 
-    
     ::fidl::Box<::test_union::OlderSimpleUnion>& x1() {
       return storage_.x1;
     }
 
     // Setter for x1.
     //
-    
+
     StructWithNullableUnion& x1(::fidl::Box<::test_union::OlderSimpleUnion> value);
 
   StructWithNullableUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -3168,17 +2862,6 @@ class StructWithNullableUnion {
   static constexpr auto kPadding = std::make_tuple();
 
 };
-
-
-  
-  
-  
-  
-  
-
-
-
-
 
 class ExplicitFlexibleUnion {
  private:
@@ -3243,7 +2926,7 @@ class ExplicitFlexibleUnion {
 
     // Sets the union to hold the i member.
     //
-    
+
     ExplicitFlexibleUnion& i(int64_t value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -3264,7 +2947,7 @@ class ExplicitFlexibleUnion {
 
     // Sets the union to hold the f member.
     //
-    
+
     ExplicitFlexibleUnion& f(float value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -3304,13 +2987,6 @@ class ExplicitFlexibleUnion {
 
 };
 
-
-  
-
-
-
-
-
 class UnionSandwich {
  private:
   struct Storage_;
@@ -3335,50 +3011,47 @@ class UnionSandwich {
     bool operator!=(const UnionSandwich& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_union::UnionSandwich, 32>::Equal(this, &other);
     }
-    
+
       uint32_t
     a() const {
       return storage_.a;
     }
 
-    
     uint32_t& a() {
       return storage_.a;
     }
 
     // Setter for a.
     //
-    
+
     UnionSandwich& a(uint32_t value);
-    
+
       const ::test_union::ExplicitFlexibleUnion &
     u() const {
       return storage_.u;
     }
 
-    
     ::test_union::ExplicitFlexibleUnion& u() {
       return storage_.u;
     }
 
     // Setter for u.
     //
-    
+
     UnionSandwich& u(::test_union::ExplicitFlexibleUnion value);
-    
+
       uint32_t
     b() const {
       return storage_.b;
     }
 
-    
     uint32_t& b() {
       return storage_.b;
     }
 
     // Setter for b.
     //
-    
+
     UnionSandwich& b(uint32_t value);
 
   UnionSandwich(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -3413,17 +3086,6 @@ class UnionSandwich {
       });
 
 };
-
-
-  
-  
-  
-  
-  
-
-
-
-
 
 class UnionWithAttributes {
  private:
@@ -3486,7 +3148,7 @@ class UnionWithAttributes {
 
     // Sets the union to hold the x member.
     //
-    
+
     UnionWithAttributes& x(int64_t value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -3522,15 +3184,6 @@ class UnionWithAttributes {
   }
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class EmptyFlexibleUnion {
  private:
@@ -3604,14 +3257,6 @@ class EmptyFlexibleUnion {
 
 };
 
-
-
-
-  
-  
-
-  
-
   inline Pizza::Pizza(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline Pizza::Pizza(::std::vector<::std::string> toppings) noexcept
     : storage_({
@@ -3630,13 +3275,6 @@ class EmptyFlexibleUnion {
       storage_.toppings = std::move(value);
       return *this;
     }
-
-  
-  
-  
-  
-
-  
 
   inline Pasta::Pasta(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline Pasta::Pasta(::std::string sauce) noexcept
@@ -3657,33 +3295,6 @@ class EmptyFlexibleUnion {
       return *this;
     }
 
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-
-  
-
   inline NullableUnionStruct::NullableUnionStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline NullableUnionStruct::NullableUnionStruct(::fidl::Box<::test_union::Union> the_union) noexcept
     : storage_({
@@ -3702,27 +3313,6 @@ class EmptyFlexibleUnion {
       storage_.the_union = std::move(value);
       return *this;
     }
-
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-
-  
 
   inline Empty::Empty(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline Empty::Empty(uint8_t __reserved) noexcept
@@ -3743,17 +3333,6 @@ class EmptyFlexibleUnion {
       return *this;
     }
 
-  
-  
-  
-  
-  
-  
-  
-  
-
-  
-
   inline TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse(::test_union::StrictBoundedUnion xu) noexcept
     : storage_({
@@ -3772,13 +3351,6 @@ class EmptyFlexibleUnion {
       storage_.xu = std::move(value);
       return *this;
     }
-
-  
-  
-  
-  
-
-  
 
   inline TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse(::test_union::OlderSimpleUnion xu) noexcept
@@ -3799,15 +3371,6 @@ class EmptyFlexibleUnion {
       return *this;
     }
 
-  
-  
-  
-  
-  
-  
-
-  
-
   inline StructWithNullableUnion::StructWithNullableUnion(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline StructWithNullableUnion::StructWithNullableUnion(::fidl::Box<::test_union::OlderSimpleUnion> x1) noexcept
     : storage_({
@@ -3826,15 +3389,6 @@ class EmptyFlexibleUnion {
       storage_.x1 = std::move(value);
       return *this;
     }
-
-  
-  
-  
-  
-  
-  
-
-  
 
   inline UnionSandwich::UnionSandwich(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline UnionSandwich::UnionSandwich(uint32_t a, ::test_union::ExplicitFlexibleUnion u, uint32_t b) noexcept
@@ -3867,20 +3421,9 @@ class EmptyFlexibleUnion {
       return *this;
     }
 
-  
-  
-  
-  
-  
-  
-
 }  // namespace test_union
 namespace fidl {
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::Pizza> : public std::true_type {};
 
@@ -3900,10 +3443,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::Pizza, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_union::Pizza, 16> {};
 
-  
-  
-
-  
   template <>
   struct IsFidlType<::test_union::Pasta> : public std::true_type {};
 
@@ -3923,10 +3462,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::Pasta, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_union::Pasta, 16> {};
 
-  
-  
-
-  
   template <>
   struct IsFidlType<::test_union::NullableUnionStruct> : public std::true_type {};
 
@@ -3946,10 +3481,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::NullableUnionStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_union::NullableUnionStruct, 16> {};
 
-  
-  
-
-  
   template <>
   struct IsFidlType<::test_union::Empty> : public std::true_type {};
 
@@ -3969,10 +3500,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::Empty, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_union::Empty> {};
 
-  
-  
-
-  
   template <>
   struct IsFidlType<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> : public std::true_type {};
 
@@ -3992,10 +3519,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, 16> {};
 
-  
-  
-
-  
   template <>
   struct IsFidlType<::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> : public std::true_type {};
 
@@ -4015,10 +3538,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, 16> {};
 
-  
-  
-
-  
   template <>
   struct IsFidlType<::test_union::StructWithNullableUnion> : public std::true_type {};
 
@@ -4038,10 +3557,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::StructWithNullableUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_union::StructWithNullableUnion, 16> {};
 
-  
-  
-
-  
   template <>
   struct IsFidlType<::test_union::UnionSandwich> : public std::true_type {};
 
@@ -4061,12 +3576,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::UnionSandwich, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_union::UnionSandwich, 32> {};
 
-  
-
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::PizzaOrPasta> : public std::true_type {};
 
@@ -4086,10 +3595,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::PizzaOrPasta, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::PizzaOrPasta> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::ExplicitPizzaOrPasta> : public std::true_type {};
 
@@ -4109,10 +3614,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::ExplicitPizzaOrPasta, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::ExplicitPizzaOrPasta> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::FlexiblePizzaOrPasta> : public std::true_type {};
 
@@ -4132,10 +3633,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::FlexiblePizzaOrPasta, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::FlexiblePizzaOrPasta> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::StrictPizzaOrPasta> : public std::true_type {};
 
@@ -4155,10 +3652,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::StrictPizzaOrPasta, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::StrictPizzaOrPasta> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::Union> : public std::true_type {};
 
@@ -4178,10 +3671,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::Union, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::Union> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::FlexibleUnion> : public std::true_type {};
 
@@ -4201,10 +3690,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::FlexibleUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::FlexibleUnion> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::StrictUnion> : public std::true_type {};
 
@@ -4224,10 +3709,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::StrictUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::StrictUnion> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::FieldCollision> : public std::true_type {};
 
@@ -4247,10 +3728,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::FieldCollision, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::FieldCollision> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::ExplicitUnion> : public std::true_type {};
 
@@ -4270,10 +3747,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::ExplicitUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::ExplicitUnion> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::ReverseOrdinalUnion> : public std::true_type {};
 
@@ -4293,10 +3766,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::ReverseOrdinalUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::ReverseOrdinalUnion> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::FlexibleFoo> : public std::true_type {};
 
@@ -4316,10 +3785,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::FlexibleFoo, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::FlexibleFoo> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::StrictFoo> : public std::true_type {};
 
@@ -4339,10 +3804,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::StrictFoo, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::StrictFoo> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::ExplicitFoo> : public std::true_type {};
 
@@ -4362,10 +3823,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::ExplicitFoo, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::ExplicitFoo> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::ExplicitStrictFoo> : public std::true_type {};
 
@@ -4385,10 +3842,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::ExplicitStrictFoo, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::ExplicitStrictFoo> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::OlderSimpleUnion> : public std::true_type {};
 
@@ -4408,10 +3861,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::OlderSimpleUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::OlderSimpleUnion> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::NewerSimpleUnion> : public std::true_type {};
 
@@ -4431,10 +3880,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::NewerSimpleUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::NewerSimpleUnion> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::StrictSimpleUnion> : public std::true_type {};
 
@@ -4454,10 +3899,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::StrictSimpleUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::StrictSimpleUnion> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::UnionContainingEmptyStruct> : public std::true_type {};
 
@@ -4477,10 +3918,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::UnionContainingEmptyStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::UnionContainingEmptyStruct> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::StrictBoundedUnion> : public std::true_type {};
 
@@ -4500,10 +3937,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::StrictBoundedUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::StrictBoundedUnion> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::ExplicitFlexibleUnion> : public std::true_type {};
 
@@ -4523,10 +3956,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::ExplicitFlexibleUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::ExplicitFlexibleUnion> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::UnionWithAttributes> : public std::true_type {};
 
@@ -4546,10 +3975,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_union::UnionWithAttributes, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::UnionWithAttributes> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_union::EmptyFlexibleUnion> : public std::true_type {};
 
@@ -4568,10 +3993,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_union::EmptyFlexibleUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::EmptyFlexibleUnion> {};
-
-
-
-
 
 #pragma clang diagnostic pop
 

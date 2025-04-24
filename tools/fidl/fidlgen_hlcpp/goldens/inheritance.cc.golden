@@ -241,10 +241,6 @@ zx_status_t super_SyncProxy::foo(::std::string s, int64_t* out_y) {
   return ZX_OK;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 sub::~sub() = default;
 
 const fidl_type_t* ::test::inheritance::sub_RequestDecoder::GetType(uint64_t ordinal, bool* out_needs_response, bool* out_is_known) {

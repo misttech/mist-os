@@ -50,13 +50,6 @@ struct ::fidl::internal::WireMethodTypes<::test_inheritance::Super::Foo> {
           ::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo>, ::fidl::internal::ChannelTransport>>;
 };
 
-namespace test_inheritance {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace test_inheritance
-
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_inheritance::Super> final {
   WireServerDispatcher() = delete;
@@ -388,13 +381,6 @@ class ::fidl::WireServer<::test_inheritance::Super> : public ::fidl::internal::I
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-}  // namespace fidl
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_inheritance::Sub::Foo> {
@@ -755,12 +741,6 @@ class ::fidl::WireServer<::test_inheritance::Sub> : public ::fidl::internal::Inc
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireWeakOnewayClientImpl<::test_inheritance::Super> : public ::fidl::internal::ClientImplBase {
@@ -831,10 +811,6 @@ class ::fidl::internal::WireBufferEventSender<::test_inheritance::Super>
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::WireWeakOnewayClientImpl<::test_inheritance::Sub> : public ::fidl::internal::ClientImplBase {
  public:
@@ -872,9 +848,6 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_inheritance::Sub> final : 
   ::fidl::WireResult<::test_inheritance::Sub::Foo> Foo(::fidl::StringView s);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakEventSender<::test_inheritance::Sub> : public ::fidl::internal::WeakEventSenderBase {
  public:

@@ -127,10 +127,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_inheritance::Super>::Foo(::fidl::S
       });
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::internal::WireEventDispatcher<::test_inheritance::Super>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_inheritance::Super>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
@@ -140,10 +136,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_inheritance::Super>::Foo(::fidl::S
   fidl::internal::WireEventDispatcher<::test_inheritance::Super> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_inheritance::Super>::entries_[] = {
     {
@@ -192,9 +184,6 @@ fidl::WireServer<::test_inheritance::Super>::Handler fidl::WireServer<::test_inh
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void fidl::internal::WireCompleterImpl<::test_inheritance::Super::Foo>::Reply(int64_t y) {
   return MakeReply(y);
 }
@@ -243,9 +232,6 @@ fidl::internal::WireCompleterBase<::test_inheritance::Super::Foo>::WireCompleter
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_inheritance::ksuper_foo_Ordinal, ::test_inheritance::ksuper_foo_DynamicFlags);
 }
@@ -332,10 +318,6 @@ fidl::internal::WireSyncBufferClientImpl<::test_inheritance::Super>::Foo(::fidl:
   return ::fidl::WireUnownedResult<::test_inheritance::Super::Foo>(
       ::fidl::UnownedClientEnd<::test_inheritance::Super>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
 }
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 namespace test_inheritance {
 
@@ -455,10 +437,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_inheritance::Sub>::Foo(::fidl::Str
       });
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::internal::WireEventDispatcher<::test_inheritance::Sub>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_inheritance::Sub>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
@@ -468,10 +446,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_inheritance::Sub>::Foo(::fidl::Str
   fidl::internal::WireEventDispatcher<::test_inheritance::Sub> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_inheritance::Sub>::entries_[] = {
     {
@@ -520,9 +494,6 @@ fidl::WireServer<::test_inheritance::Sub>::Handler fidl::WireServer<::test_inher
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void fidl::internal::WireCompleterImpl<::test_inheritance::Sub::Foo>::Reply(int64_t y) {
   return MakeReply(y);
 }
@@ -571,9 +542,6 @@ fidl::internal::WireCompleterBase<::test_inheritance::Sub::Foo>::WireCompleterBa
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_inheritance::ksub_foo_Ordinal, ::test_inheritance::ksub_foo_DynamicFlags);
 }
@@ -660,9 +628,5 @@ fidl::internal::WireSyncBufferClientImpl<::test_inheritance::Sub>::Foo(::fidl::S
   return ::fidl::WireUnownedResult<::test_inheritance::Sub::Foo>(
       ::fidl::UnownedClientEnd<::test_inheritance::Sub>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
 }
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop

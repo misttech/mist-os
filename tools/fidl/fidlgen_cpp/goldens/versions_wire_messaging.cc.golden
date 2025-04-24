@@ -11,10 +11,6 @@
 
 #ifdef __Fuchsia__
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::internal::WireEventDispatcher<::test_versions::OtherProtocol>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_versions::OtherProtocol>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
@@ -24,10 +20,6 @@
   fidl::internal::WireEventDispatcher<::test_versions::OtherProtocol> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_versions::OtherProtocol>::entries_[] = {};
 
@@ -58,10 +50,6 @@ fidl::WireServer<::test_versions::OtherProtocol>::Handler fidl::WireServer<::tes
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
 
@@ -144,10 +132,6 @@ namespace test_versions {
   return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::internal::WireEventDispatcher<::test_versions::Protocol>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_versions::Protocol>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
@@ -182,10 +166,6 @@ fidl::internal::WireEventDispatcher<::test_versions::Protocol>::DispatchEvent(
       return ::fidl::Status::UnknownOrdinal();
   }
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_versions::Protocol>::entries_[] = {
     {
@@ -249,9 +229,6 @@ fidl::WireServer<::test_versions::Protocol>::Handler fidl::WireServer<::test_ver
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_versions::kProtocol_Foo_Ordinal, ::test_versions::kProtocol_Foo_DynamicFlags);
 }
@@ -285,9 +262,5 @@ fidl::internal::WireSyncBufferClientImpl<::test_versions::Protocol>::Foo() {
   return ::fidl::WireUnownedResult<::test_versions::Protocol::Foo>(
       ::fidl::UnownedClientEnd<::test_versions::Protocol>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
 }
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop

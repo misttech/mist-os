@@ -12,16 +12,8 @@
 
 #ifdef __Fuchsia__
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::internal::WireEventDispatcher<::test_driverhandle::DriverProtocol>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_driverhandle::DriverProtocol>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_driverhandle::DriverProtocol>::entries_[] = {};
 
@@ -52,10 +44,6 @@ fdf::WireServer<::test_driverhandle::DriverProtocol>::Handler fdf::WireServer<::
     (void)::fdf::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
 
@@ -92,12 +80,6 @@ static_assert(offsetof(::test_driverhandle::wire::HandlesInProtocolSendHandlesRe
   outgoing.Write(client_end.handle(), std::move(write_options));
   SetStatus(outgoing);
 }
-namespace test_driverhandle {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace test_driverhandle
 
 ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_driverhandle::HandlesInProtocol>::SendHandles(::test_driverhandle::wire::T t) {
   FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
@@ -137,10 +119,6 @@ namespace test_driverhandle {
 
 ::fidl::internal::WireEventDispatcher<::test_driverhandle::HandlesInProtocol>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_driverhandle::HandlesInProtocol>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_driverhandle::HandlesInProtocol>::entries_[] = {
     {
@@ -191,9 +169,6 @@ fdf::WireServer<::test_driverhandle::HandlesInProtocol>::Handler fdf::WireServer
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_driverhandle::kHandlesInProtocol_SendHandles_Ordinal, ::test_driverhandle::kHandlesInProtocol_SendHandles_DynamicFlags);
 }
@@ -223,10 +198,6 @@ void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<:
 
 template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>, ::fidl::internal::WireCodingConstraintEmpty, true>;
 template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
 

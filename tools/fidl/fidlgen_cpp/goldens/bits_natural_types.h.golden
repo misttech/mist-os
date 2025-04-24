@@ -12,16 +12,9 @@
 #include <cinttypes>
 #include <string>
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace test_bits {
-
-}  // namespace test_bits
 namespace fidl {
 
 template <>

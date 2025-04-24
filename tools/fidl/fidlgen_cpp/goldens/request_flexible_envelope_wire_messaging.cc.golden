@@ -142,10 +142,6 @@ namespace test_requestflexibleenvelope {
 
 ::fidl::WireResult<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>(result) {}
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::WireUnownedResult<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>::WireUnownedResult(::fidl::UnownedClientEnd<::test_requestflexibleenvelope::Protocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>* request) {
   constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> allocation = allocator.TryAllocate(buffer_size);
@@ -238,10 +234,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_requestflexibleenvelope::Protocol>
       });
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::internal::WireEventDispatcher<::test_requestflexibleenvelope::Protocol>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_requestflexibleenvelope::Protocol>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
@@ -251,10 +243,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_requestflexibleenvelope::Protocol>
   fidl::internal::WireEventDispatcher<::test_requestflexibleenvelope::Protocol> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_requestflexibleenvelope::Protocol>::entries_[] = {
     {
@@ -319,9 +307,6 @@ fidl::WireServer<::test_requestflexibleenvelope::Protocol>::Handler fidl::WireSe
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void fidl::internal::WireCompleterImpl<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible>::Reply(::test_requestflexibleenvelope::wire::FlexibleFoo f) {
   return MakeReply(f);
 }
@@ -370,9 +355,6 @@ fidl::internal::WireCompleterBase<::test_requestflexibleenvelope::Protocol::Requ
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void fidl::internal::WireCompleterImpl<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>::Reply(::test_requestflexibleenvelope::wire::StrictFoo f) {
   return MakeReply(f);
 }
@@ -421,9 +403,6 @@ fidl::internal::WireCompleterBase<::test_requestflexibleenvelope::Protocol::Requ
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_requestflexibleenvelope::kProtocol_RequestStrictResponseFlexible_Ordinal, ::test_requestflexibleenvelope::kProtocol_RequestStrictResponseFlexible_DynamicFlags);
 }
@@ -597,9 +576,5 @@ fidl::internal::WireSyncBufferClientImpl<::test_requestflexibleenvelope::Protoco
   return ::fidl::WireUnownedResult<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>(
       ::fidl::UnownedClientEnd<::test_requestflexibleenvelope::Protocol>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
 }
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop

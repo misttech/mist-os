@@ -121,10 +121,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_transitivedependenciescompose::Top
       });
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::internal::WireEventDispatcher<::test_transitivedependenciescompose::Top>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_transitivedependenciescompose::Top>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
@@ -134,10 +130,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_transitivedependenciescompose::Top
   fidl::internal::WireEventDispatcher<::test_transitivedependenciescompose::Top> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_transitivedependenciescompose::Top>::entries_[] = {
     {
@@ -185,9 +177,6 @@ fidl::WireServer<::test_transitivedependenciescompose::Top>::Handler fidl::WireS
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void fidl::internal::WireCompleterImpl<::test_transitivedependenciescompose::Top::GetFoo>::Reply(const ::test_bottom::wire::Foo& foo) {
   return MakeReply(foo);
 }
@@ -236,9 +225,6 @@ fidl::internal::WireCompleterBase<::test_transitivedependenciescompose::Top::Get
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_transitivedependenciescompose::Top::GetFoo>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_transitivedependenciescompose::kTop_GetFoo_Ordinal, ::test_transitivedependenciescompose::kTop_GetFoo_DynamicFlags);
 }
@@ -316,9 +302,5 @@ fidl::internal::WireSyncBufferClientImpl<::test_transitivedependenciescompose::T
   return ::fidl::WireUnownedResult<::test_transitivedependenciescompose::Top::GetFoo>(
       ::fidl::UnownedClientEnd<::test_transitivedependenciescompose::Top>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
 }
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop

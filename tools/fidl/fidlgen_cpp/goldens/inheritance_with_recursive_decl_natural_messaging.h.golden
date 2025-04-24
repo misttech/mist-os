@@ -16,10 +16,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-}  // namespace fidl
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_inheritancewithrecursivedecl::Parent::First> {
   using Request = ::test_inheritancewithrecursivedecl::ParentFirstRequest;
@@ -36,10 +32,6 @@ class ::fidl::internal::NaturalClientImpl<::test_inheritancewithrecursivedecl::P
   ::fit::result<::fidl::OneWayError> First(::fidl::Request<::test_inheritancewithrecursivedecl::Parent::First> request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedecl::Parent> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedecl::Parent>> {
@@ -52,10 +44,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedec
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_inheritancewithrecursivedecl::Parent> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -91,9 +79,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_inheritancewithrecursivede
       : IncomingEventDispatcher(event_handler) {}
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_inheritancewithrecursivedecl::Parent> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -188,10 +173,6 @@ class ::fidl::internal::NaturalClientImpl<::test_inheritancewithrecursivedecl::C
   ::fit::result<::fidl::OneWayError> Second(::fidl::Request<::test_inheritancewithrecursivedecl::Child::Second> request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedecl::Child> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedecl::Child>> {
@@ -206,10 +187,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedec
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_inheritancewithrecursivedecl::Child> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -245,9 +222,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_inheritancewithrecursivede
       : IncomingEventDispatcher(event_handler) {}
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_inheritancewithrecursivedecl::Child> : public ::fidl::internal::WeakEventSenderBase {
  public:

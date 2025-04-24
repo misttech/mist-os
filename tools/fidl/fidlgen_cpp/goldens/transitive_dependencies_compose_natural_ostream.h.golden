@@ -14,10 +14,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace test_transitivedependenciescompose {
-
-}  // namespace test_transitivedependenciescompose
-
 #ifdef __Fuchsia__
 
 template <>

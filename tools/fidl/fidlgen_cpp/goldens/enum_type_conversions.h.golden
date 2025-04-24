@@ -53,9 +53,6 @@ struct WireTypeForNaturalType<::test_enum::MyEmptyFlexibleEnum> {
   using type = ::test_enum::wire::MyEmptyFlexibleEnum;
 };
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 #pragma clang diagnostic pop
 
 }  // namespace internal

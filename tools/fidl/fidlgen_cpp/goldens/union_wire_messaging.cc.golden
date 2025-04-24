@@ -130,10 +130,6 @@ namespace test_union {
 
 ::fidl::WireResult<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>(result) {}
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::WireUnownedResult<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>::WireUnownedResult(::fidl::UnownedClientEnd<::test_union::TestProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>* request) {
   constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> allocation = allocator.TryAllocate(buffer_size);
@@ -226,10 +222,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_union::TestProtocol>::FlexibleUnio
       });
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::internal::WireEventDispatcher<::test_union::TestProtocol>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_union::TestProtocol>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
@@ -239,10 +231,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_union::TestProtocol>::FlexibleUnio
   fidl::internal::WireEventDispatcher<::test_union::TestProtocol> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_union::TestProtocol>::entries_[] = {
     {
@@ -305,9 +293,6 @@ fidl::WireServer<::test_union::TestProtocol>::Handler fidl::WireServer<::test_un
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void fidl::internal::WireCompleterImpl<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>::Reply(::test_union::wire::StrictBoundedUnion xu) {
   return MakeReply(xu);
 }
@@ -356,9 +341,6 @@ fidl::internal::WireCompleterBase<::test_union::TestProtocol::StrictUnionHenceRe
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void fidl::internal::WireCompleterImpl<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>::Reply(::test_union::wire::OlderSimpleUnion xu) {
   return MakeReply(xu);
 }
@@ -407,9 +389,6 @@ fidl::internal::WireCompleterBase<::test_union::TestProtocol::FlexibleUnionHence
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_union::kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Ordinal, ::test_union::kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_DynamicFlags);
 }
@@ -565,9 +544,5 @@ fidl::internal::WireSyncBufferClientImpl<::test_union::TestProtocol>::FlexibleUn
   return ::fidl::WireUnownedResult<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>(
       ::fidl::UnownedClientEnd<::test_union::TestProtocol>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
 }
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop

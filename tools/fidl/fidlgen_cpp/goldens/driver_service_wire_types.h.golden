@@ -28,9 +28,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace test_driverservice {
-
-}  // namespace test_driverservice
 namespace fidl {
 
 #pragma clang diagnostic pop

@@ -49,13 +49,6 @@ struct ::fidl::internal::WireMethodTypes<::test_anonymous::SomeProtocol::SomeMet
           ::fidl::internal::TransactionalRequest<::test_anonymous::SomeProtocol::SomeMethod>, ::fidl::internal::ChannelTransport>>;
 };
 
-namespace test_anonymous {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace test_anonymous
-
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_anonymous::SomeProtocol> final {
   WireServerDispatcher() = delete;
@@ -390,12 +383,6 @@ class ::fidl::WireServer<::test_anonymous::SomeProtocol> : public ::fidl::intern
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireWeakOnewayClientImpl<::test_anonymous::SomeProtocol> : public ::fidl::internal::ClientImplBase {

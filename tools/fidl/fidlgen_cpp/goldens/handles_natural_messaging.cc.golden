@@ -11,28 +11,12 @@
 
 #ifdef __Fuchsia__
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::Status fidl::SyncEventHandler<::test_handles::SomeProtocol>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_handles::SomeProtocol> client_end) {
   ::fidl::internal::IncomingEventsStorage<::test_handles::SomeProtocol> event_storage;
   fidl::internal::NaturalEventDispatcher<::test_handles::SomeProtocol> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_handles::SomeProtocol>::entries_[] = {};
 

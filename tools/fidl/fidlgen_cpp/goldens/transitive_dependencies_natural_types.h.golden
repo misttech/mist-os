@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <fidl/test.middle/cpp/natural_types.h>
 #include <fidl/test.transitivedependencies/cpp/common_types.h>
 #include <fidl/test.transitivedependencies/cpp/markers.h>
 #include <lib/fidl/cpp/natural_coding_traits.h>
@@ -11,12 +12,6 @@
 
 #include <cinttypes>
 #include <string>
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
-#include <fidl/test.middle/cpp/natural_types.h>
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 

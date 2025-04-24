@@ -3815,10 +3815,6 @@ constexpr uint64_t kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_O
 constexpr ::fidl::MessageDynamicFlags kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 }  // namespace internal
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class TestProtocol {
  public:
   using Proxy_ = ::test::union_::TestProtocol_Proxy;

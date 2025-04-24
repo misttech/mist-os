@@ -601,10 +601,6 @@ constexpr uint64_t kProtocol_RequestFlexibleResponseStrict_Ordinal = 0x480c77690
 constexpr ::fidl::MessageDynamicFlags kProtocol_RequestFlexibleResponseStrict_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 }  // namespace internal
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class Protocol {
  public:
   using Proxy_ = ::test::requestflexibleenvelope::Protocol_Proxy;

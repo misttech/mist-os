@@ -16,10 +16,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-}  // namespace fidl
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownInteractionsProtocol::StrictOneWay> {
   using Completer = fidl::Completer<>;
@@ -661,10 +657,6 @@ class ::fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInt
   ::fit::result<::fidl::OneWayError> FlexibleOneWay() const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_unknowninteractions::UnknownInteractionsProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_unknowninteractions::UnknownInteractionsProtocol>> {
@@ -711,10 +703,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_unknowninteractions::Unknow
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_unknowninteractions::UnknownInteractionsProtocol> : public ::fidl::internal::BaseEventHandlerInterface, public ::fidl::UnknownEventHandler<::test_unknowninteractions::UnknownInteractionsProtocol> {
@@ -769,9 +757,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_unknowninteractions::Unkno
       internal::MessageStorageViewBase* storage_view) override;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -1431,10 +1416,6 @@ class ::fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInt
   ::fit::result<::fidl::OneWayError> FlexibleOneWay() const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_unknowninteractions::UnknownInteractionsAjarProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_unknowninteractions::UnknownInteractionsAjarProtocol>> {
@@ -1465,10 +1446,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_unknowninteractions::Unknow
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_unknowninteractions::UnknownInteractionsAjarProtocol> : public ::fidl::internal::BaseEventHandlerInterface, public ::fidl::UnknownEventHandler<::test_unknowninteractions::UnknownInteractionsAjarProtocol> {
@@ -1523,9 +1500,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_unknowninteractions::Unkno
       internal::MessageStorageViewBase* storage_view) override;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsAjarProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -2047,10 +2021,6 @@ class ::fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInt
   ::fit::result<::fidl::OneWayError> StrictOneWay() const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_unknowninteractions::UnknownInteractionsClosedProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_unknowninteractions::UnknownInteractionsClosedProtocol>> {
@@ -2079,10 +2049,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_unknowninteractions::Unknow
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_unknowninteractions::UnknownInteractionsClosedProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -2129,9 +2095,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_unknowninteractions::Unkno
       internal::MessageStorageViewBase* storage_view) override;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_unknowninteractions::UnknownInteractionsClosedProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:

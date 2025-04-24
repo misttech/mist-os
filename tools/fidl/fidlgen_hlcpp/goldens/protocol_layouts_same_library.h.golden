@@ -9,41 +9,29 @@
 namespace test {
 namespace protocollayoutssamelibrary {
 
-
 //
 // Domain objects declarations
 //
 
-
 class TablePayload;
-
 
 class UnionPayload;
 
-
 class ComposedProtocolOneWayAnonComposedRequest;
-
 
 class ComposedProtocolTwoWayAnonComposedRequest;
 
-
 class ComposedProtocolTwoWayAnonComposedResponse;
-
 
 class ComposedProtocolTwoWayAnonComposedWithErrorRequest;
 
-
 class ComposedProtocol_TwoWayAnonComposedWithError_Response;
-
 
 class ComposedProtocol_TwoWayAnonComposedWithError_Result;
 
-
 class ComposedProtocolOnAnonComposedRequest;
 
-
 class ComposedProtocol_TwoWayNamedComposedWithError_Result;
-
 
 #ifdef __Fuchsia__
 
@@ -52,31 +40,21 @@ using ComposedProtocolHandle = ::fidl::InterfaceHandle<ComposedProtocol>;
 
 #endif  // __Fuchsia__
 
-
-
 class MainProtocol_TwoWayLocalWithError_Result;
-
 
 class MainProtocolOneWayAnonRequest;
 
-
 class MainProtocolTwoWayAnonRequest;
-
 
 class MainProtocolTwoWayAnonResponse;
 
-
 class MainProtocolTwoWayAnonWithErrorRequest;
-
 
 class MainProtocol_TwoWayAnonWithError_Response;
 
-
 class MainProtocol_TwoWayAnonWithError_Result;
 
-
 class MainProtocolOnAnonRequest;
-
 
 #ifdef __Fuchsia__
 
@@ -85,15 +63,12 @@ using MainProtocolHandle = ::fidl::InterfaceHandle<MainProtocol>;
 
 #endif  // __Fuchsia__
 
-
-
-
 class TablePayload final {
  public:
   static const fidl_type_t* FidlType;
   /// Returns whether no field is set.
   bool IsEmpty() const;
-  
+
   const uint16_t& a() const {
     ZX_ASSERT(field_presence_.IsSet<0>());
     return a_value_.value;
@@ -101,7 +76,7 @@ class TablePayload final {
   bool has_a() const {
     return field_presence_.IsSet<0>();
   }
-  
+
   uint16_t* mutable_a() {
     if (!field_presence_.IsSet<0>()) {
       field_presence_.Set<0>();
@@ -165,8 +140,6 @@ class TablePayload final {
 
 using TablePayloadPtr = ::std::unique_ptr<TablePayload>;
 
-
-
 class UnionPayload final {
  public:
   static const fidl_type_t* FidlType;
@@ -177,11 +150,10 @@ class UnionPayload final {
   UnionPayload(UnionPayload&&);
   UnionPayload& operator=(UnionPayload&&);
 
-  
   static UnionPayload WithB(bool&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
-  
+
     kB = 1,  // 0x1
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
@@ -198,12 +170,12 @@ class UnionPayload final {
   }
 
   bool is_b() const { return tag_ == ::test::protocollayoutssamelibrary::UnionPayload::Tag::kB; }
-  
+
   bool& b() {
     EnsureStorageInitialized(::test::protocollayoutssamelibrary::UnionPayload::Tag::kB);
     return b_;
   }
-  
+
   const bool& b() const {
     ZX_ASSERT(is_b());
     return b_;
@@ -211,9 +183,9 @@ class UnionPayload final {
   UnionPayload& set_b(bool value);
 
   ::test::protocollayoutssamelibrary::UnionPayload::Tag Which() const {
-    
+
     return ::test::protocollayoutssamelibrary::UnionPayload::Tag(tag_);
-    
+
   }
 
   // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
@@ -241,14 +213,12 @@ inline zx_status_t Clone(const ::test::protocollayoutssamelibrary::UnionPayload&
 
 using UnionPayloadPtr = ::std::unique_ptr<UnionPayload>;
 
-
-
 class ComposedProtocolOneWayAnonComposedRequest final {
  public:
   static const fidl_type_t* FidlType;
   /// Returns whether no field is set.
   bool IsEmpty() const;
-  
+
   const uint16_t& a() const {
     ZX_ASSERT(field_presence_.IsSet<0>());
     return a_value_.value;
@@ -256,7 +226,7 @@ class ComposedProtocolOneWayAnonComposedRequest final {
   bool has_a() const {
     return field_presence_.IsSet<0>();
   }
-  
+
   uint16_t* mutable_a() {
     if (!field_presence_.IsSet<0>()) {
       field_presence_.Set<0>();
@@ -320,8 +290,6 @@ class ComposedProtocolOneWayAnonComposedRequest final {
 
 using ComposedProtocolOneWayAnonComposedRequestPtr = ::std::unique_ptr<ComposedProtocolOneWayAnonComposedRequest>;
 
-
-
 class ComposedProtocolTwoWayAnonComposedRequest final {
  public:
   static const fidl_type_t* FidlType;
@@ -332,11 +300,10 @@ class ComposedProtocolTwoWayAnonComposedRequest final {
   ComposedProtocolTwoWayAnonComposedRequest(ComposedProtocolTwoWayAnonComposedRequest&&);
   ComposedProtocolTwoWayAnonComposedRequest& operator=(ComposedProtocolTwoWayAnonComposedRequest&&);
 
-  
   static ComposedProtocolTwoWayAnonComposedRequest WithB(bool&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
-  
+
     kB = 1,  // 0x1
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
@@ -353,12 +320,12 @@ class ComposedProtocolTwoWayAnonComposedRequest final {
   }
 
   bool is_b() const { return tag_ == ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest::Tag::kB; }
-  
+
   bool& b() {
     EnsureStorageInitialized(::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest::Tag::kB);
     return b_;
   }
-  
+
   const bool& b() const {
     ZX_ASSERT(is_b());
     return b_;
@@ -366,9 +333,9 @@ class ComposedProtocolTwoWayAnonComposedRequest final {
   ComposedProtocolTwoWayAnonComposedRequest& set_b(bool value);
 
   ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest::Tag Which() const {
-    
+
     return ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest::Tag(tag_);
-    
+
   }
 
   // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
@@ -396,14 +363,12 @@ inline zx_status_t Clone(const ::test::protocollayoutssamelibrary::ComposedProto
 
 using ComposedProtocolTwoWayAnonComposedRequestPtr = ::std::unique_ptr<ComposedProtocolTwoWayAnonComposedRequest>;
 
-
-
 class ComposedProtocolTwoWayAnonComposedResponse final {
  public:
   static const fidl_type_t* FidlType;
   /// Returns whether no field is set.
   bool IsEmpty() const;
-  
+
   const uint16_t& a() const {
     ZX_ASSERT(field_presence_.IsSet<0>());
     return a_value_.value;
@@ -411,7 +376,7 @@ class ComposedProtocolTwoWayAnonComposedResponse final {
   bool has_a() const {
     return field_presence_.IsSet<0>();
   }
-  
+
   uint16_t* mutable_a() {
     if (!field_presence_.IsSet<0>()) {
       field_presence_.Set<0>();
@@ -475,14 +440,12 @@ class ComposedProtocolTwoWayAnonComposedResponse final {
 
 using ComposedProtocolTwoWayAnonComposedResponsePtr = ::std::unique_ptr<ComposedProtocolTwoWayAnonComposedResponse>;
 
-
-
 class ComposedProtocolTwoWayAnonComposedWithErrorRequest final {
  public:
   static const fidl_type_t* FidlType;
   /// Returns whether no field is set.
   bool IsEmpty() const;
-  
+
   const uint16_t& a() const {
     ZX_ASSERT(field_presence_.IsSet<0>());
     return a_value_.value;
@@ -490,7 +453,7 @@ class ComposedProtocolTwoWayAnonComposedWithErrorRequest final {
   bool has_a() const {
     return field_presence_.IsSet<0>();
   }
-  
+
   uint16_t* mutable_a() {
     if (!field_presence_.IsSet<0>()) {
       field_presence_.Set<0>();
@@ -554,8 +517,6 @@ class ComposedProtocolTwoWayAnonComposedWithErrorRequest final {
 
 using ComposedProtocolTwoWayAnonComposedWithErrorRequestPtr = ::std::unique_ptr<ComposedProtocolTwoWayAnonComposedWithErrorRequest>;
 
-
-
 class ComposedProtocol_TwoWayAnonComposedWithError_Response final {
  public:
   static const fidl_type_t* FidlType;
@@ -566,11 +527,10 @@ class ComposedProtocol_TwoWayAnonComposedWithError_Response final {
   ComposedProtocol_TwoWayAnonComposedWithError_Response(ComposedProtocol_TwoWayAnonComposedWithError_Response&&);
   ComposedProtocol_TwoWayAnonComposedWithError_Response& operator=(ComposedProtocol_TwoWayAnonComposedWithError_Response&&);
 
-  
   static ComposedProtocol_TwoWayAnonComposedWithError_Response WithB(bool&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
-  
+
     kB = 1,  // 0x1
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
@@ -587,12 +547,12 @@ class ComposedProtocol_TwoWayAnonComposedWithError_Response final {
   }
 
   bool is_b() const { return tag_ == ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response::Tag::kB; }
-  
+
   bool& b() {
     EnsureStorageInitialized(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response::Tag::kB);
     return b_;
   }
-  
+
   const bool& b() const {
     ZX_ASSERT(is_b());
     return b_;
@@ -600,9 +560,9 @@ class ComposedProtocol_TwoWayAnonComposedWithError_Response final {
   ComposedProtocol_TwoWayAnonComposedWithError_Response& set_b(bool value);
 
   ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response::Tag Which() const {
-    
+
     return ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response::Tag(tag_);
-    
+
   }
 
   // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
@@ -630,8 +590,6 @@ inline zx_status_t Clone(const ::test::protocollayoutssamelibrary::ComposedProto
 
 using ComposedProtocol_TwoWayAnonComposedWithError_ResponsePtr = ::std::unique_ptr<ComposedProtocol_TwoWayAnonComposedWithError_Response>;
 
-
-
 class ComposedProtocol_TwoWayAnonComposedWithError_Result final {
  public:
   static const fidl_type_t* FidlType;
@@ -642,12 +600,11 @@ class ComposedProtocol_TwoWayAnonComposedWithError_Result final {
   ComposedProtocol_TwoWayAnonComposedWithError_Result(ComposedProtocol_TwoWayAnonComposedWithError_Result&&);
   ComposedProtocol_TwoWayAnonComposedWithError_Result& operator=(ComposedProtocol_TwoWayAnonComposedWithError_Result&&);
 
-  
   static ComposedProtocol_TwoWayAnonComposedWithError_Result WithResponse(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response&&);
   static ComposedProtocol_TwoWayAnonComposedWithError_Result WithErr(uint32_t&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
-  
+
     kResponse = 1,  // 0x1
     kErr = 2,  // 0x2
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
@@ -665,12 +622,12 @@ class ComposedProtocol_TwoWayAnonComposedWithError_Result final {
   }
 
   bool is_response() const { return tag_ == ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result::Tag::kResponse; }
-  
+
   ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response& response() {
     EnsureStorageInitialized(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result::Tag::kResponse);
     return response_;
   }
-  
+
   const ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response& response() const {
     ZX_ASSERT(is_response());
     return response_;
@@ -678,12 +635,12 @@ class ComposedProtocol_TwoWayAnonComposedWithError_Result final {
   ComposedProtocol_TwoWayAnonComposedWithError_Result& set_response(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response value);
 
   bool is_err() const { return tag_ == ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result::Tag::kErr; }
-  
+
   uint32_t& err() {
     EnsureStorageInitialized(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result::Tag::kErr);
     return err_;
   }
-  
+
   const uint32_t& err() const {
     ZX_ASSERT(is_err());
     return err_;
@@ -691,9 +648,9 @@ class ComposedProtocol_TwoWayAnonComposedWithError_Result final {
   ComposedProtocol_TwoWayAnonComposedWithError_Result& set_err(uint32_t value);
 
   ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result::Tag Which() const {
-    
+
     return ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result::Tag(tag_);
-    
+
   }
 
   // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
@@ -743,8 +700,6 @@ inline zx_status_t Clone(const ::test::protocollayoutssamelibrary::ComposedProto
 
 using ComposedProtocol_TwoWayAnonComposedWithError_ResultPtr = ::std::unique_ptr<ComposedProtocol_TwoWayAnonComposedWithError_Result>;
 
-
-
 class ComposedProtocolOnAnonComposedRequest final {
  public:
   static const fidl_type_t* FidlType;
@@ -755,11 +710,10 @@ class ComposedProtocolOnAnonComposedRequest final {
   ComposedProtocolOnAnonComposedRequest(ComposedProtocolOnAnonComposedRequest&&);
   ComposedProtocolOnAnonComposedRequest& operator=(ComposedProtocolOnAnonComposedRequest&&);
 
-  
   static ComposedProtocolOnAnonComposedRequest WithB(bool&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
-  
+
     kB = 1,  // 0x1
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
@@ -776,12 +730,12 @@ class ComposedProtocolOnAnonComposedRequest final {
   }
 
   bool is_b() const { return tag_ == ::test::protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest::Tag::kB; }
-  
+
   bool& b() {
     EnsureStorageInitialized(::test::protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest::Tag::kB);
     return b_;
   }
-  
+
   const bool& b() const {
     ZX_ASSERT(is_b());
     return b_;
@@ -789,9 +743,9 @@ class ComposedProtocolOnAnonComposedRequest final {
   ComposedProtocolOnAnonComposedRequest& set_b(bool value);
 
   ::test::protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest::Tag Which() const {
-    
+
     return ::test::protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest::Tag(tag_);
-    
+
   }
 
   // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
@@ -819,8 +773,6 @@ inline zx_status_t Clone(const ::test::protocollayoutssamelibrary::ComposedProto
 
 using ComposedProtocolOnAnonComposedRequestPtr = ::std::unique_ptr<ComposedProtocolOnAnonComposedRequest>;
 
-
-
 class ComposedProtocol_TwoWayNamedComposedWithError_Result final {
  public:
   static const fidl_type_t* FidlType;
@@ -831,12 +783,11 @@ class ComposedProtocol_TwoWayNamedComposedWithError_Result final {
   ComposedProtocol_TwoWayNamedComposedWithError_Result(ComposedProtocol_TwoWayNamedComposedWithError_Result&&);
   ComposedProtocol_TwoWayNamedComposedWithError_Result& operator=(ComposedProtocol_TwoWayNamedComposedWithError_Result&&);
 
-  
   static ComposedProtocol_TwoWayNamedComposedWithError_Result WithResponse(::test::protocollayoutssamelibrary::UnionPayload&&);
   static ComposedProtocol_TwoWayNamedComposedWithError_Result WithErr(uint32_t&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
-  
+
     kResponse = 1,  // 0x1
     kErr = 2,  // 0x2
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
@@ -854,12 +805,12 @@ class ComposedProtocol_TwoWayNamedComposedWithError_Result final {
   }
 
   bool is_response() const { return tag_ == ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result::Tag::kResponse; }
-  
+
   ::test::protocollayoutssamelibrary::UnionPayload& response() {
     EnsureStorageInitialized(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result::Tag::kResponse);
     return response_;
   }
-  
+
   const ::test::protocollayoutssamelibrary::UnionPayload& response() const {
     ZX_ASSERT(is_response());
     return response_;
@@ -867,12 +818,12 @@ class ComposedProtocol_TwoWayNamedComposedWithError_Result final {
   ComposedProtocol_TwoWayNamedComposedWithError_Result& set_response(::test::protocollayoutssamelibrary::UnionPayload value);
 
   bool is_err() const { return tag_ == ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result::Tag::kErr; }
-  
+
   uint32_t& err() {
     EnsureStorageInitialized(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result::Tag::kErr);
     return err_;
   }
-  
+
   const uint32_t& err() const {
     ZX_ASSERT(is_err());
     return err_;
@@ -880,9 +831,9 @@ class ComposedProtocol_TwoWayNamedComposedWithError_Result final {
   ComposedProtocol_TwoWayNamedComposedWithError_Result& set_err(uint32_t value);
 
   ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result::Tag Which() const {
-    
+
     return ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result::Tag(tag_);
-    
+
   }
 
   // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
@@ -932,22 +883,18 @@ inline zx_status_t Clone(const ::test::protocollayoutssamelibrary::ComposedProto
 
 using ComposedProtocol_TwoWayNamedComposedWithError_ResultPtr = ::std::unique_ptr<ComposedProtocol_TwoWayNamedComposedWithError_Result>;
 
-
 #ifdef __Fuchsia__
 
   namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOneWayAnonComposedRequestTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedRequestTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_TablePayloadTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_UnionPayloadTable;
-  
-  
 
 }  // namespace _internal
 
@@ -956,58 +903,49 @@ class ComposedProtocol_RequestEncoder {
   static ::fidl::HLCPPOutgoingMessage OneWayAnonComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest* ComposedProtocolOneWayAnonComposedRequest) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolOneWayAnonComposedRequest, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest* ComposedProtocolTwoWayAnonComposedRequest) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolTwoWayAnonComposedRequest, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest* ComposedProtocolTwoWayAnonComposedWithErrorRequest) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolTwoWayAnonComposedWithErrorRequest, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OneWayNamedComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::TablePayload* TablePayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, TablePayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayNamedComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::UnionPayload* UnionPayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnionPayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayNamedComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::TablePayload* TablePayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, TablePayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
 };
-  
+
   namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedResponseTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable;
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
-  
 
 }  // namespace _internal
 
@@ -1016,51 +954,42 @@ class ComposedProtocol_ResponseEncoder {
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse* ComposedProtocolTwoWayAnonComposedResponse) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolTwoWayAnonComposedResponse, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result* ComposedProtocol_TwoWayAnonComposedWithError_Result) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocol_TwoWayAnonComposedWithError_Result, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnAnonComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest* ComposedProtocolOnAnonComposedRequest) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolOnAnonComposedRequest, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayNamedComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::TablePayload* TablePayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, TablePayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayNamedComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result* ComposedProtocol_TwoWayNamedComposedWithError_Result) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocol_TwoWayNamedComposedWithError_Result, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnNamedComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::UnionPayload* UnionPayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnionPayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
 };
 
 #endif  // __Fuchsia__
-
-
-
 
 class MainProtocol_TwoWayLocalWithError_Result final {
  public:
@@ -1072,12 +1001,11 @@ class MainProtocol_TwoWayLocalWithError_Result final {
   MainProtocol_TwoWayLocalWithError_Result(MainProtocol_TwoWayLocalWithError_Result&&);
   MainProtocol_TwoWayLocalWithError_Result& operator=(MainProtocol_TwoWayLocalWithError_Result&&);
 
-  
   static MainProtocol_TwoWayLocalWithError_Result WithResponse(::test::protocollayoutssamelibrary::UnionPayload&&);
   static MainProtocol_TwoWayLocalWithError_Result WithErr(uint32_t&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
-  
+
     kResponse = 1,  // 0x1
     kErr = 2,  // 0x2
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
@@ -1095,12 +1023,12 @@ class MainProtocol_TwoWayLocalWithError_Result final {
   }
 
   bool is_response() const { return tag_ == ::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result::Tag::kResponse; }
-  
+
   ::test::protocollayoutssamelibrary::UnionPayload& response() {
     EnsureStorageInitialized(::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result::Tag::kResponse);
     return response_;
   }
-  
+
   const ::test::protocollayoutssamelibrary::UnionPayload& response() const {
     ZX_ASSERT(is_response());
     return response_;
@@ -1108,12 +1036,12 @@ class MainProtocol_TwoWayLocalWithError_Result final {
   MainProtocol_TwoWayLocalWithError_Result& set_response(::test::protocollayoutssamelibrary::UnionPayload value);
 
   bool is_err() const { return tag_ == ::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result::Tag::kErr; }
-  
+
   uint32_t& err() {
     EnsureStorageInitialized(::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result::Tag::kErr);
     return err_;
   }
-  
+
   const uint32_t& err() const {
     ZX_ASSERT(is_err());
     return err_;
@@ -1121,9 +1049,9 @@ class MainProtocol_TwoWayLocalWithError_Result final {
   MainProtocol_TwoWayLocalWithError_Result& set_err(uint32_t value);
 
   ::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result::Tag Which() const {
-    
+
     return ::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result::Tag(tag_);
-    
+
   }
 
   // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
@@ -1173,14 +1101,12 @@ inline zx_status_t Clone(const ::test::protocollayoutssamelibrary::MainProtocol_
 
 using MainProtocol_TwoWayLocalWithError_ResultPtr = ::std::unique_ptr<MainProtocol_TwoWayLocalWithError_Result>;
 
-
-
 class MainProtocolOneWayAnonRequest final {
  public:
   static const fidl_type_t* FidlType;
   /// Returns whether no field is set.
   bool IsEmpty() const;
-  
+
   const uint16_t& a() const {
     ZX_ASSERT(field_presence_.IsSet<0>());
     return a_value_.value;
@@ -1188,7 +1114,7 @@ class MainProtocolOneWayAnonRequest final {
   bool has_a() const {
     return field_presence_.IsSet<0>();
   }
-  
+
   uint16_t* mutable_a() {
     if (!field_presence_.IsSet<0>()) {
       field_presence_.Set<0>();
@@ -1252,8 +1178,6 @@ class MainProtocolOneWayAnonRequest final {
 
 using MainProtocolOneWayAnonRequestPtr = ::std::unique_ptr<MainProtocolOneWayAnonRequest>;
 
-
-
 class MainProtocolTwoWayAnonRequest final {
  public:
   static const fidl_type_t* FidlType;
@@ -1264,12 +1188,11 @@ class MainProtocolTwoWayAnonRequest final {
   MainProtocolTwoWayAnonRequest(MainProtocolTwoWayAnonRequest&&);
   MainProtocolTwoWayAnonRequest& operator=(MainProtocolTwoWayAnonRequest&&);
 
-  
   static MainProtocolTwoWayAnonRequest WithB(bool&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
   kUnknown = 0,
-  
+
     kB = 1,  // 0x1
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
@@ -1286,12 +1209,12 @@ class MainProtocolTwoWayAnonRequest final {
   }
 
   bool is_b() const { return tag_ == ::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest::Tag::kB; }
-  
+
   bool& b() {
     EnsureStorageInitialized(::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest::Tag::kB);
     return b_;
   }
-  
+
   const bool& b() const {
     ZX_ASSERT(is_b());
     return b_;
@@ -1300,7 +1223,7 @@ class MainProtocolTwoWayAnonRequest final {
   MainProtocolTwoWayAnonRequest& SetUnknownData(fidl_xunion_tag_t ordinal, std::vector<uint8_t> bytes);
 
   ::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest::Tag Which() const {
-    
+
     switch (tag_) {
       case ::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest::Tag::Invalid:
       case ::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest::Tag::kB:
@@ -1308,7 +1231,7 @@ class MainProtocolTwoWayAnonRequest final {
       default:
         return ::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest::Tag::kUnknown;
     }
-    
+
   }
 
   // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
@@ -1343,14 +1266,12 @@ inline zx_status_t Clone(const ::test::protocollayoutssamelibrary::MainProtocolT
 
 using MainProtocolTwoWayAnonRequestPtr = ::std::unique_ptr<MainProtocolTwoWayAnonRequest>;
 
-
-
 class MainProtocolTwoWayAnonResponse final {
  public:
   static const fidl_type_t* FidlType;
   /// Returns whether no field is set.
   bool IsEmpty() const;
-  
+
   const uint16_t& a() const {
     ZX_ASSERT(field_presence_.IsSet<0>());
     return a_value_.value;
@@ -1358,7 +1279,7 @@ class MainProtocolTwoWayAnonResponse final {
   bool has_a() const {
     return field_presence_.IsSet<0>();
   }
-  
+
   uint16_t* mutable_a() {
     if (!field_presence_.IsSet<0>()) {
       field_presence_.Set<0>();
@@ -1422,14 +1343,12 @@ class MainProtocolTwoWayAnonResponse final {
 
 using MainProtocolTwoWayAnonResponsePtr = ::std::unique_ptr<MainProtocolTwoWayAnonResponse>;
 
-
-
 class MainProtocolTwoWayAnonWithErrorRequest final {
  public:
   static const fidl_type_t* FidlType;
   /// Returns whether no field is set.
   bool IsEmpty() const;
-  
+
   const uint16_t& a() const {
     ZX_ASSERT(field_presence_.IsSet<0>());
     return a_value_.value;
@@ -1437,7 +1356,7 @@ class MainProtocolTwoWayAnonWithErrorRequest final {
   bool has_a() const {
     return field_presence_.IsSet<0>();
   }
-  
+
   uint16_t* mutable_a() {
     if (!field_presence_.IsSet<0>()) {
       field_presence_.Set<0>();
@@ -1501,8 +1420,6 @@ class MainProtocolTwoWayAnonWithErrorRequest final {
 
 using MainProtocolTwoWayAnonWithErrorRequestPtr = ::std::unique_ptr<MainProtocolTwoWayAnonWithErrorRequest>;
 
-
-
 class MainProtocol_TwoWayAnonWithError_Response final {
  public:
   static const fidl_type_t* FidlType;
@@ -1513,12 +1430,11 @@ class MainProtocol_TwoWayAnonWithError_Response final {
   MainProtocol_TwoWayAnonWithError_Response(MainProtocol_TwoWayAnonWithError_Response&&);
   MainProtocol_TwoWayAnonWithError_Response& operator=(MainProtocol_TwoWayAnonWithError_Response&&);
 
-  
   static MainProtocol_TwoWayAnonWithError_Response WithB(bool&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
   kUnknown = 0,
-  
+
     kB = 1,  // 0x1
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
@@ -1535,12 +1451,12 @@ class MainProtocol_TwoWayAnonWithError_Response final {
   }
 
   bool is_b() const { return tag_ == ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response::Tag::kB; }
-  
+
   bool& b() {
     EnsureStorageInitialized(::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response::Tag::kB);
     return b_;
   }
-  
+
   const bool& b() const {
     ZX_ASSERT(is_b());
     return b_;
@@ -1549,7 +1465,7 @@ class MainProtocol_TwoWayAnonWithError_Response final {
   MainProtocol_TwoWayAnonWithError_Response& SetUnknownData(fidl_xunion_tag_t ordinal, std::vector<uint8_t> bytes);
 
   ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response::Tag Which() const {
-    
+
     switch (tag_) {
       case ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response::Tag::Invalid:
       case ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response::Tag::kB:
@@ -1557,7 +1473,7 @@ class MainProtocol_TwoWayAnonWithError_Response final {
       default:
         return ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response::Tag::kUnknown;
     }
-    
+
   }
 
   // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
@@ -1592,8 +1508,6 @@ inline zx_status_t Clone(const ::test::protocollayoutssamelibrary::MainProtocol_
 
 using MainProtocol_TwoWayAnonWithError_ResponsePtr = ::std::unique_ptr<MainProtocol_TwoWayAnonWithError_Response>;
 
-
-
 class MainProtocol_TwoWayAnonWithError_Result final {
  public:
   static const fidl_type_t* FidlType;
@@ -1604,12 +1518,11 @@ class MainProtocol_TwoWayAnonWithError_Result final {
   MainProtocol_TwoWayAnonWithError_Result(MainProtocol_TwoWayAnonWithError_Result&&);
   MainProtocol_TwoWayAnonWithError_Result& operator=(MainProtocol_TwoWayAnonWithError_Result&&);
 
-  
   static MainProtocol_TwoWayAnonWithError_Result WithResponse(::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response&&);
   static MainProtocol_TwoWayAnonWithError_Result WithErr(uint32_t&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
-  
+
     kResponse = 1,  // 0x1
     kErr = 2,  // 0x2
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
@@ -1627,12 +1540,12 @@ class MainProtocol_TwoWayAnonWithError_Result final {
   }
 
   bool is_response() const { return tag_ == ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result::Tag::kResponse; }
-  
+
   ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response& response() {
     EnsureStorageInitialized(::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result::Tag::kResponse);
     return response_;
   }
-  
+
   const ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response& response() const {
     ZX_ASSERT(is_response());
     return response_;
@@ -1640,12 +1553,12 @@ class MainProtocol_TwoWayAnonWithError_Result final {
   MainProtocol_TwoWayAnonWithError_Result& set_response(::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response value);
 
   bool is_err() const { return tag_ == ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result::Tag::kErr; }
-  
+
   uint32_t& err() {
     EnsureStorageInitialized(::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result::Tag::kErr);
     return err_;
   }
-  
+
   const uint32_t& err() const {
     ZX_ASSERT(is_err());
     return err_;
@@ -1653,9 +1566,9 @@ class MainProtocol_TwoWayAnonWithError_Result final {
   MainProtocol_TwoWayAnonWithError_Result& set_err(uint32_t value);
 
   ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result::Tag Which() const {
-    
+
     return ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result::Tag(tag_);
-    
+
   }
 
   // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
@@ -1705,8 +1618,6 @@ inline zx_status_t Clone(const ::test::protocollayoutssamelibrary::MainProtocol_
 
 using MainProtocol_TwoWayAnonWithError_ResultPtr = ::std::unique_ptr<MainProtocol_TwoWayAnonWithError_Result>;
 
-
-
 class MainProtocolOnAnonRequest final {
  public:
   static const fidl_type_t* FidlType;
@@ -1717,12 +1628,11 @@ class MainProtocolOnAnonRequest final {
   MainProtocolOnAnonRequest(MainProtocolOnAnonRequest&&);
   MainProtocolOnAnonRequest& operator=(MainProtocolOnAnonRequest&&);
 
-  
   static MainProtocolOnAnonRequest WithB(bool&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
   kUnknown = 0,
-  
+
     kB = 1,  // 0x1
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
@@ -1739,12 +1649,12 @@ class MainProtocolOnAnonRequest final {
   }
 
   bool is_b() const { return tag_ == ::test::protocollayoutssamelibrary::MainProtocolOnAnonRequest::Tag::kB; }
-  
+
   bool& b() {
     EnsureStorageInitialized(::test::protocollayoutssamelibrary::MainProtocolOnAnonRequest::Tag::kB);
     return b_;
   }
-  
+
   const bool& b() const {
     ZX_ASSERT(is_b());
     return b_;
@@ -1753,7 +1663,7 @@ class MainProtocolOnAnonRequest final {
   MainProtocolOnAnonRequest& SetUnknownData(fidl_xunion_tag_t ordinal, std::vector<uint8_t> bytes);
 
   ::test::protocollayoutssamelibrary::MainProtocolOnAnonRequest::Tag Which() const {
-    
+
     switch (tag_) {
       case ::test::protocollayoutssamelibrary::MainProtocolOnAnonRequest::Tag::Invalid:
       case ::test::protocollayoutssamelibrary::MainProtocolOnAnonRequest::Tag::kB:
@@ -1761,7 +1671,7 @@ class MainProtocolOnAnonRequest final {
       default:
         return ::test::protocollayoutssamelibrary::MainProtocolOnAnonRequest::Tag::kUnknown;
     }
-    
+
   }
 
   // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
@@ -1796,28 +1706,14 @@ inline zx_status_t Clone(const ::test::protocollayoutssamelibrary::MainProtocolO
 
 using MainProtocolOnAnonRequestPtr = ::std::unique_ptr<MainProtocolOnAnonRequest>;
 
-
 #ifdef __Fuchsia__
 
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
   namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOneWayAnonRequestTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonRequestTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorRequestTable;
-  
 
 }  // namespace _internal
 
@@ -1826,107 +1722,84 @@ class MainProtocol_RequestEncoder {
   static ::fidl::HLCPPOutgoingMessage OneWayAnonComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest* ComposedProtocolOneWayAnonComposedRequest) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolOneWayAnonComposedRequest, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest* ComposedProtocolTwoWayAnonComposedRequest) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolTwoWayAnonComposedRequest, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest* ComposedProtocolTwoWayAnonComposedWithErrorRequest) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolTwoWayAnonComposedWithErrorRequest, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OneWayNamedComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::TablePayload* TablePayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, TablePayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayNamedComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::UnionPayload* UnionPayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnionPayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayNamedComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::TablePayload* TablePayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, TablePayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OneWayLocal(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::TablePayload* TablePayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, TablePayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayLocal(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::UnionPayload* UnionPayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnionPayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayLocalWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::TablePayload* TablePayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, TablePayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OneWayAnon(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::MainProtocolOneWayAnonRequest* MainProtocolOneWayAnonRequest) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, MainProtocolOneWayAnonRequest, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnon(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest* MainProtocolTwoWayAnonRequest) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, MainProtocolTwoWayAnonRequest, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest* MainProtocolTwoWayAnonWithErrorRequest) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, MainProtocolTwoWayAnonWithErrorRequest, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
 };
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
+
   namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonResponseTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOnAnonRequestTable;
 
 }  // namespace _internal
@@ -1936,92 +1809,78 @@ class MainProtocol_ResponseEncoder {
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse* ComposedProtocolTwoWayAnonComposedResponse) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolTwoWayAnonComposedResponse, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result* ComposedProtocol_TwoWayAnonComposedWithError_Result) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocol_TwoWayAnonComposedWithError_Result, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnAnonComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest* ComposedProtocolOnAnonComposedRequest) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocolOnAnonComposedRequest, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayNamedComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::TablePayload* TablePayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, TablePayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayNamedComposedWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result* ComposedProtocol_TwoWayNamedComposedWithError_Result) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, ComposedProtocol_TwoWayNamedComposedWithError_Result, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnNamedComposed(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::UnionPayload* UnionPayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnionPayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayLocal(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::TablePayload* TablePayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, TablePayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayLocalWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result* MainProtocol_TwoWayLocalWithError_Result) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, MainProtocol_TwoWayLocalWithError_Result, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnLocal(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::UnionPayload* UnionPayload) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, UnionPayload, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnon(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse* MainProtocolTwoWayAnonResponse) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, MainProtocolTwoWayAnonResponse, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage TwoWayAnonWithError(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result* MainProtocol_TwoWayAnonWithError_Result) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, MainProtocol_TwoWayAnonWithError_Result, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
   static ::fidl::HLCPPOutgoingMessage OnAnon(::fidl::MessageEncoder* _encoder, ::test::protocollayoutssamelibrary::MainProtocolOnAnonRequest* MainProtocolOnAnonRequest) {
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, MainProtocolOnAnonRequest, 0 + sizeof(fidl_message_header_t));
-    
 
     return _encoder->GetMessage();
   }
 };
 
 #endif  // __Fuchsia__
-
-
 
 }  // namespace protocollayoutssamelibrary
 }  // namespace test
@@ -2100,7 +1959,7 @@ struct Equality<::test::protocollayoutssamelibrary::UnionPayload> {
         return true;
       case ::test::protocollayoutssamelibrary::UnionPayload::Tag::kB:
         return ::fidl::Equals(_lhs.b_, _rhs.b_);
-      
+
       default:
         return false;
       }
@@ -2179,7 +2038,7 @@ struct Equality<::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonCo
         return true;
       case ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest::Tag::kB:
         return ::fidl::Equals(_lhs.b_, _rhs.b_);
-      
+
       default:
         return false;
       }
@@ -2282,7 +2141,7 @@ struct Equality<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonC
         return true;
       case ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response::Tag::kB:
         return ::fidl::Equals(_lhs.b_, _rhs.b_);
-      
+
       default:
         return false;
       }
@@ -2339,7 +2198,7 @@ struct Equality<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonC
         return ::fidl::Equals(_lhs.response_, _rhs.response_);
       case ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result::Tag::kErr:
         return ::fidl::Equals(_lhs.err_, _rhs.err_);
-      
+
       default:
         return false;
       }
@@ -2394,7 +2253,7 @@ struct Equality<::test::protocollayoutssamelibrary::ComposedProtocolOnAnonCompos
         return true;
       case ::test::protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest::Tag::kB:
         return ::fidl::Equals(_lhs.b_, _rhs.b_);
-      
+
       default:
         return false;
       }
@@ -2451,7 +2310,7 @@ struct Equality<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamed
         return ::fidl::Equals(_lhs.response_, _rhs.response_);
       case ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result::Tag::kErr:
         return ::fidl::Equals(_lhs.err_, _rhs.err_);
-      
+
       default:
         return false;
       }
@@ -2508,7 +2367,7 @@ struct Equality<::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWith
         return ::fidl::Equals(_lhs.response_, _rhs.response_);
       case ::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result::Tag::kErr:
         return ::fidl::Equals(_lhs.err_, _rhs.err_);
-      
+
       default:
         return false;
       }
@@ -2745,7 +2604,7 @@ struct Equality<::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithE
         return ::fidl::Equals(_lhs.response_, _rhs.response_);
       case ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result::Tag::kErr:
         return ::fidl::Equals(_lhs.err_, _rhs.err_);
-      
+
       default:
         return false;
       }
@@ -2857,12 +2716,6 @@ constexpr uint64_t kComposedProtocol_OnNamedComposed_Ordinal = 0x17c4edb4a4a36d7
 
 constexpr ::fidl::MessageDynamicFlags kComposedProtocol_OnNamedComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;}  // namespace internal
 
-#endif  // __Fuchsia__
-
-
-
-#ifdef __Fuchsia__
-
 using MainProtocolPtr = ::fidl::InterfacePtr<MainProtocol>;
 class MainProtocol_Proxy;
 class MainProtocol_Stub;
@@ -2937,10 +2790,6 @@ constexpr uint64_t kMainProtocol_OnAnon_Ordinal = 0xd8fa6d0f5fabb94lu;
 
 constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnAnon_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;}  // namespace internal
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class ComposedProtocol {
  public:
   using Proxy_ = ::test::protocollayoutssamelibrary::ComposedProtocol_Proxy;
@@ -2948,32 +2797,31 @@ class ComposedProtocol {
   using EventSender_ = ::test::protocollayoutssamelibrary::ComposedProtocol_EventSender;
   using Sync_ = ::test::protocollayoutssamelibrary::ComposedProtocol_Sync;
   virtual ~ComposedProtocol();
-      
+
   virtual void OneWayAnonComposed(::test::protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest) = 0;
   using TwoWayAnonComposedCallback =
       fit::function<void(::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse)>;
-      
+
   virtual void TwoWayAnonComposed(::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest ComposedProtocolTwoWayAnonComposedRequest, TwoWayAnonComposedCallback callback) = 0;
   using TwoWayAnonComposedWithErrorCallback =
       fit::function<void(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result)>;
-      
+
   virtual void TwoWayAnonComposedWithError(::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest ComposedProtocolTwoWayAnonComposedWithErrorRequest, TwoWayAnonComposedWithErrorCallback callback) = 0;
   using OnAnonComposedCallback =
       fit::function<void(::test::protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest)>;
-      
+
   virtual void OneWayNamedComposed(::test::protocollayoutssamelibrary::TablePayload TablePayload) = 0;
   using TwoWayNamedComposedCallback =
       fit::function<void(::test::protocollayoutssamelibrary::TablePayload)>;
-      
+
   virtual void TwoWayNamedComposed(::test::protocollayoutssamelibrary::UnionPayload UnionPayload, TwoWayNamedComposedCallback callback) = 0;
   using TwoWayNamedComposedWithErrorCallback =
       fit::function<void(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result)>;
-      
+
   virtual void TwoWayNamedComposedWithError(::test::protocollayoutssamelibrary::TablePayload TablePayload, TwoWayNamedComposedWithErrorCallback callback) = 0;
   using OnNamedComposedCallback =
       fit::function<void(::test::protocollayoutssamelibrary::UnionPayload)>;
 
-  
 };
 
 class ComposedProtocol_RequestDecoder {
@@ -3042,9 +2890,6 @@ class ComposedProtocol_Proxy final : public ::fidl::internal::Proxy, public Comp
   void TwoWayNamedComposedWithError(::test::protocollayoutssamelibrary::TablePayload TablePayload, TwoWayNamedComposedWithErrorCallback callback) override;
   OnNamedComposedCallback OnNamedComposed;
 
-  
-
-
  private:
   ComposedProtocol_Proxy(const ::test::protocollayoutssamelibrary::ComposedProtocol_Proxy&) = delete;
   ComposedProtocol_Proxy& operator=(const ::test::protocollayoutssamelibrary::ComposedProtocol_Proxy&) = delete;
@@ -3089,10 +2934,6 @@ class ComposedProtocol_SyncProxy : public ::test::protocollayoutssamelibrary::Co
   friend class ::fidl::SynchronousInterfacePtr<ComposedProtocol>;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class MainProtocol {
  public:
   using Proxy_ = ::test::protocollayoutssamelibrary::MainProtocol_Proxy;
@@ -3100,56 +2941,55 @@ class MainProtocol {
   using EventSender_ = ::test::protocollayoutssamelibrary::MainProtocol_EventSender;
   using Sync_ = ::test::protocollayoutssamelibrary::MainProtocol_Sync;
   virtual ~MainProtocol();
-      
+
   virtual void OneWayAnonComposed(::test::protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest) = 0;
   using TwoWayAnonComposedCallback =
       fit::function<void(::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse)>;
-      
+
   virtual void TwoWayAnonComposed(::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest ComposedProtocolTwoWayAnonComposedRequest, TwoWayAnonComposedCallback callback) = 0;
   using TwoWayAnonComposedWithErrorCallback =
       fit::function<void(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result)>;
-      
+
   virtual void TwoWayAnonComposedWithError(::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest ComposedProtocolTwoWayAnonComposedWithErrorRequest, TwoWayAnonComposedWithErrorCallback callback) = 0;
   using OnAnonComposedCallback =
       fit::function<void(::test::protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest)>;
-      
+
   virtual void OneWayNamedComposed(::test::protocollayoutssamelibrary::TablePayload TablePayload) = 0;
   using TwoWayNamedComposedCallback =
       fit::function<void(::test::protocollayoutssamelibrary::TablePayload)>;
-      
+
   virtual void TwoWayNamedComposed(::test::protocollayoutssamelibrary::UnionPayload UnionPayload, TwoWayNamedComposedCallback callback) = 0;
   using TwoWayNamedComposedWithErrorCallback =
       fit::function<void(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result)>;
-      
+
   virtual void TwoWayNamedComposedWithError(::test::protocollayoutssamelibrary::TablePayload TablePayload, TwoWayNamedComposedWithErrorCallback callback) = 0;
   using OnNamedComposedCallback =
       fit::function<void(::test::protocollayoutssamelibrary::UnionPayload)>;
-      
+
   virtual void OneWayLocal(::test::protocollayoutssamelibrary::TablePayload TablePayload) = 0;
   using TwoWayLocalCallback =
       fit::function<void(::test::protocollayoutssamelibrary::TablePayload)>;
-      
+
   virtual void TwoWayLocal(::test::protocollayoutssamelibrary::UnionPayload UnionPayload, TwoWayLocalCallback callback) = 0;
   using TwoWayLocalWithErrorCallback =
       fit::function<void(::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result)>;
-      
+
   virtual void TwoWayLocalWithError(::test::protocollayoutssamelibrary::TablePayload TablePayload, TwoWayLocalWithErrorCallback callback) = 0;
   using OnLocalCallback =
       fit::function<void(::test::protocollayoutssamelibrary::UnionPayload)>;
-      
+
   virtual void OneWayAnon(::test::protocollayoutssamelibrary::MainProtocolOneWayAnonRequest MainProtocolOneWayAnonRequest) = 0;
   using TwoWayAnonCallback =
       fit::function<void(::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse)>;
-      
+
   virtual void TwoWayAnon(::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest MainProtocolTwoWayAnonRequest, TwoWayAnonCallback callback) = 0;
   using TwoWayAnonWithErrorCallback =
       fit::function<void(::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result)>;
-      
+
   virtual void TwoWayAnonWithError(::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest MainProtocolTwoWayAnonWithErrorRequest, TwoWayAnonWithErrorCallback callback) = 0;
   using OnAnonCallback =
       fit::function<void(::test::protocollayoutssamelibrary::MainProtocolOnAnonRequest)>;
 
-  
 };
 
 class MainProtocol_RequestDecoder {
@@ -3252,9 +3092,6 @@ class MainProtocol_Proxy final : public ::fidl::internal::Proxy, public MainProt
   void TwoWayAnonWithError(::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest MainProtocolTwoWayAnonWithErrorRequest, TwoWayAnonWithErrorCallback callback) override;
   OnAnonCallback OnAnon;
 
-  
-
-
  private:
   MainProtocol_Proxy(const ::test::protocollayoutssamelibrary::MainProtocol_Proxy&) = delete;
   MainProtocol_Proxy& operator=(const ::test::protocollayoutssamelibrary::MainProtocol_Proxy&) = delete;
@@ -3317,5 +3154,4 @@ class MainProtocol_SyncProxy : public ::test::protocollayoutssamelibrary::MainPr
 
 }  // namespace protocollayoutssamelibrary
 }  // namespace test
-
 

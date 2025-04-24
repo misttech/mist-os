@@ -23,45 +23,25 @@ struct fidl::ostream::Formatter<::test_handlesintypes::TableWithHandle> {
   static std::ostream& Format(std::ostream& os, const ::test_handlesintypes::TableWithHandle& value);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct fidl::ostream::Formatter<::test_handlesintypes::UnionWithHandle> {
   static std::ostream& Format(std::ostream& os, const ::test_handlesintypes::UnionWithHandle& value);
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct fidl::ostream::Formatter<::test_handlesintypes::HandlesInTypes> {
   static std::ostream& Format(std::ostream& os, const ::test_handlesintypes::HandlesInTypes& value);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct fidl::ostream::Formatter<::test_handlesintypes::EmptyResourceStruct> {
   static std::ostream& Format(std::ostream& os, const ::test_handlesintypes::EmptyResourceStruct& value);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct fidl::ostream::Formatter<::test_handlesintypes::EmptyResourceTable> {
   static std::ostream& Format(std::ostream& os, const ::test_handlesintypes::EmptyResourceTable& value);
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct fidl::ostream::Formatter<::test_handlesintypes::EmptyResourceUnion> {
@@ -78,42 +58,18 @@ std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::ObjType&
 
 std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::TableWithHandle& value);
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::UnionWithHandle& value);
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::HandlesInTypes& value);
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::EmptyResourceStruct& value);
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::EmptyResourceTable& value);
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::EmptyResourceUnion& value);
 
 #endif  // __Fuchsia__
 
 }  // namespace test_handlesintypes
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop

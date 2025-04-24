@@ -16,10 +16,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-}  // namespace fidl
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_doccomments::Interface::Method> {
   using Completer = fidl::Completer<>;
@@ -41,10 +37,6 @@ class ::fidl::internal::NaturalClientImpl<::test_doccomments::Interface> final :
   ::fit::result<::fidl::OneWayError> Method() const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_doccomments::Interface> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_doccomments::Interface>> {
@@ -60,10 +52,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_doccomments::Interface> fin
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_doccomments::Interface> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -110,9 +98,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_doccomments::Interface> fi
       internal::MessageStorageViewBase* storage_view) override;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_doccomments::Interface> : public ::fidl::internal::WeakEventSenderBase {
  public:

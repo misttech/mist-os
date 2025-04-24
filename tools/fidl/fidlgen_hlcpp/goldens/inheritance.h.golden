@@ -22,10 +22,6 @@ class SuperFooResponse;
 class super;
 using superHandle = ::fidl::InterfaceHandle<super>;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class sub;
 using subHandle = ::fidl::InterfaceHandle<sub>;
 
@@ -103,10 +99,6 @@ class super_ResponseEncoder {
     return _encoder->GetMessage();
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class sub_RequestEncoder {
  public:
@@ -206,10 +198,6 @@ constexpr uint64_t ksuper_foo_Ordinal = 0x68a61c2a230db8b8lu;
 constexpr ::fidl::MessageDynamicFlags ksuper_foo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 }  // namespace internal
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 using subPtr = ::fidl::InterfacePtr<sub>;
 class sub_Proxy;
 class sub_Stub;
@@ -224,10 +212,6 @@ constexpr uint64_t ksub_foo_Ordinal = 0x68a61c2a230db8b8lu;
 
 constexpr ::fidl::MessageDynamicFlags ksub_foo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 }  // namespace internal
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class super {
  public:
@@ -310,10 +294,6 @@ class super_SyncProxy : public ::test::inheritance::super_Sync {
   ::fidl::internal::SynchronousProxy proxy_;
   friend class ::fidl::SynchronousInterfacePtr<super>;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class sub {
  public:

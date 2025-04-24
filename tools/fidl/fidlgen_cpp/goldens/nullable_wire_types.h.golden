@@ -76,10 +76,6 @@ struct StructWithNullableProtocol {
   void _CloseHandles();
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 struct StructWithNullableRequest {
   ::fidl::ServerEnd<::test_nullable::SimpleProtocol> val = {};
 
@@ -477,9 +473,6 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNulla
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsResource<::test_nullable::wire::StructWithNullableRequest> : public std::true_type {};
 

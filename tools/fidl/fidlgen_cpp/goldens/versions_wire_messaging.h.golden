@@ -149,13 +149,6 @@ class ::fidl::WireServer<::test_versions::OtherProtocol> : public ::fidl::intern
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-}  // namespace fidl
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_versions::Protocol::Foo> {
@@ -234,9 +227,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_versions::Protoc
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 }  // namespace fidl
 
 template <>
@@ -557,10 +547,6 @@ class ::fidl::internal::WireBufferEventSender<::test_versions::OtherProtocol>
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::WireWeakOnewayClientImpl<::test_versions::Protocol> : public ::fidl::internal::ClientImplBase {
  public:
@@ -596,9 +582,6 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_versions::Protocol> final 
   using WireWeakOnewayClientImpl::WireWeakOnewayClientImpl;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakEventSender<::test_versions::Protocol> : public ::fidl::internal::WeakEventSenderBase {
  public:

@@ -46,10 +46,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::OnlyCppAn
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::OnlyCppAndDeps> : public ::fidl::internal::BaseEventHandlerInterface {
  public:
@@ -84,9 +80,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_bindingsdenylist::OnlyCppA
       : IncomingEventDispatcher(event_handler) {}
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_bindingsdenylist::OnlyCppAndDeps> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -377,10 +370,6 @@ class ::fidl::internal::NaturalClientImpl<::test_bindingsdenylist::DenyEachBindi
   ::fidl::internal::NaturalThenable<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller> OnlyDenySyzkaller(const ::fidl::Request<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller>& request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::DenyEachBinding> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::DenyEachBinding>> {
@@ -401,10 +390,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::DenyEachB
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::DenyEachBinding> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -440,9 +425,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_bindingsdenylist::DenyEach
       : IncomingEventDispatcher(event_handler) {}
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_bindingsdenylist::DenyEachBinding> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -579,19 +561,11 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::DenyEa
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_bindingsdenylist::Allowed> final : public ::fidl::internal::NaturalClientBase {
  public:
   using NaturalClientBase::NaturalClientBase;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::Allowed> final
@@ -603,10 +577,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::Allowed> 
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::Allowed> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -642,9 +612,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_bindingsdenylist::Allowed>
       : IncomingEventDispatcher(event_handler) {}
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_bindingsdenylist::Allowed> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -729,10 +696,6 @@ class ::fidl::internal::NaturalClientImpl<::test_bindingsdenylist::ImportsSameNa
   ::fit::result<::fidl::OneWayError> AlwaysAppearsInImportingLibrary() const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::ImportsSameNameContext> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::ImportsSameNameContext>> {
@@ -747,10 +710,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::ImportsSa
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::ImportsSameNameContext> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -786,9 +745,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_bindingsdenylist::ImportsS
       : IncomingEventDispatcher(event_handler) {}
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_bindingsdenylist::ImportsSameNameContext> : public ::fidl::internal::WeakEventSenderBase {
  public:

@@ -576,10 +576,6 @@ namespace internal {
   }
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayBasic> WireNaturalConversionTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayBasic>, ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayBasic>>::ToNatural(::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayBasic> src) {
   return ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayBasic>(
       WireNaturalConversionTraits<::test_typesinprotocols::wire::Basic, ::test_typesinprotocols::Basic>::ToNatural(std::move(src)));

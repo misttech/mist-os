@@ -114,12 +114,6 @@ class ::fdf::WireServer<::test_handles::DriverProtocol> : public ::fidl::interna
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_handles::DriverProtocol> : public ::fdf::internal::BufferClientImplBase {

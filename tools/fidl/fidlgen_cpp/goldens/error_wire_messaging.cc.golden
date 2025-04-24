@@ -126,10 +126,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_error::Example>::Foo(::fidl::Strin
       });
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::internal::WireEventDispatcher<::test_error::Example>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_error::Example>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
@@ -139,10 +135,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_error::Example>::Foo(::fidl::Strin
   fidl::internal::WireEventDispatcher<::test_error::Example> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_error::Example>::entries_[] = {
     {
@@ -191,9 +183,6 @@ fidl::WireServer<::test_error::Example>::Handler fidl::WireServer<::test_error::
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void fidl::internal::WireCompleterImpl<::test_error::Example::Foo>::Reply(::fit::result<uint32_t, ::test_error::wire::ExampleFooResponse*> result) {
   if (result.is_ok()) {
     return MakeReply(::test_error::wire::ExampleFooResult::WithResponse(::fidl::ObjectView<::test_error::wire::ExampleFooResponse>::FromExternal(result.value())));
@@ -268,9 +257,6 @@ void fidl::internal::WireBufferCompleterImpl<::test_error::Example::Foo>::ReplyE
   return MakeReply(::test_error::wire::ExampleFooResult::WithErr(std::move(error)));
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_error::Example::Foo>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_error::kExample_foo_Ordinal, ::test_error::kExample_foo_DynamicFlags);
 }
@@ -356,9 +342,5 @@ fidl::internal::WireSyncBufferClientImpl<::test_error::Example>::Foo(::fidl::Str
   return ::fidl::WireUnownedResult<::test_error::Example::Foo>(
       ::fidl::UnownedClientEnd<::test_error::Example>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
 }
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop

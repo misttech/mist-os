@@ -16,10 +16,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-}  // namespace fidl
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_service::FirstProtocol::MethodOnFirst> {
   using Completer = fidl::Completer<>;
@@ -34,10 +30,6 @@ class ::fidl::internal::NaturalClientImpl<::test_service::FirstProtocol> final :
   ::fit::result<::fidl::OneWayError> MethodOnFirst() const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_service::FirstProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_service::FirstProtocol>> {
@@ -50,10 +42,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_service::FirstProtocol> fin
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_service::FirstProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -89,9 +77,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_service::FirstProtocol> fi
       : IncomingEventDispatcher(event_handler) {}
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_service::FirstProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -174,10 +159,6 @@ class ::fidl::internal::NaturalClientImpl<::test_service::SecondProtocol> final 
   ::fit::result<::fidl::OneWayError> MethodOnSecond() const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_service::SecondProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_service::SecondProtocol>> {
@@ -190,10 +171,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_service::SecondProtocol> fi
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_service::SecondProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -229,9 +206,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_service::SecondProtocol> f
       : IncomingEventDispatcher(event_handler) {}
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_service::SecondProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:

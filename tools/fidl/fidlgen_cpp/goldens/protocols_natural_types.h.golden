@@ -13,153 +13,92 @@
 #include <fidl/test.protocols/cpp/markers.h>
 #include <fidl/test.protocols/cpp/common_types.h>
 
-
 #ifdef __Fuchsia__
 
   #include <lib/zx/channel.h>
   #include <lib/zx/handle.h>
   #include <lib/zx/socket.h>
-  
 
 #endif  // __Fuchsia__
-
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
 namespace test_protocols {
 
-
-
-
-
 class WithAndWithoutRequestResponseNoRequestWithResponseResponse;
-
 
 class WithAndWithoutRequestResponseWithRequestNoResponseRequest;
 
-
 class WithAndWithoutRequestResponseWithRequestEmptyResponseRequest;
-
 
 class WithAndWithoutRequestResponseWithRequestWithResponseRequest;
 
-
 class WithAndWithoutRequestResponseWithRequestWithResponseResponse;
-
 
 class WithAndWithoutRequestResponseOnWithResponseRequest;
 
-
 class WithErrorSyntaxResponseAsStructResponse;
-
 
 class WithErrorSyntaxErrorAsPrimitiveResponse;
 
-
 class WithErrorSyntaxErrorAsEnumResponse;
-
 
 class WithErrorSyntaxHandleInResultResponse;
 
-
 class ChannelProtocolMethodARequest;
-
 
 class ChannelProtocolEventARequest;
 
-
 class ChannelProtocolMethodBRequest;
-
 
 class ChannelProtocolMethodBResponse;
 
-
 class ChannelProtocolTakeHandleRequest;
-
 
 class ChannelProtocolMutateSocketRequest;
 
-
 class ChannelProtocolMutateSocketResponse;
-
 
 class SyscallProtocolMethodCRequest;
 
-
 class HandleRightsProtocolNoResponseMethodRequest;
-
 
 class HandleRightsProtocolResponseMethodRequest;
 
-
 class HandleRightsProtocolResponseMethodResponse;
-
 
 class HandleRightsProtocolAnEventRequest;
 
-
 class ProtocolEnds;
-
 
 class WithProtocolEndsClientEndsRequest;
 
-
 class WithProtocolEndsClientEndsResponse;
-
 
 class WithProtocolEndsServerEndsRequest;
 
-
 class WithProtocolEndsServerEndsResponse;
-
 
 class WithProtocolEndsStructContainingEndsRequest;
 
-
 class WithProtocolEndsStructContainingEndsResponse;
-
 
 class ManyParametersFifteenRequest;
 
-
 class MethodWithUnionUnionMethodRequest;
-
 
 class MethodWithUnionUnionMethodResponse;
 
-
-
-
-
 class WithErrorSyntaxResponseAsStructResult;
-
-
 
 class WithErrorSyntaxErrorAsPrimitiveResult;
 
-
-
 class WithErrorSyntaxErrorAsEnumResult;
-
-
 
 class WithErrorSyntaxHandleInResultResult;
 
-
-
 class TheUnion;
-
-
-
-
-
-
-  
-
-
-
-
 
 class WithAndWithoutRequestResponseNoRequestWithResponseResponse {
  private:
@@ -185,20 +124,19 @@ class WithAndWithoutRequestResponseNoRequestWithResponseResponse {
     bool operator!=(const WithAndWithoutRequestResponseNoRequestWithResponseResponse& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse, 16>::Equal(this, &other);
     }
-    
+
       const ::std::string &
     ret() const {
       return storage_.ret;
     }
 
-    
     ::std::string& ret() {
       return storage_.ret;
     }
 
     // Setter for ret.
     //
-    
+
     WithAndWithoutRequestResponseNoRequestWithResponseResponse& ret(::std::string value);
 
   WithAndWithoutRequestResponseNoRequestWithResponseResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -219,15 +157,6 @@ class WithAndWithoutRequestResponseNoRequestWithResponseResponse {
   static constexpr auto kPadding = std::make_tuple();
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class WithAndWithoutRequestResponseWithRequestNoResponseRequest {
  private:
@@ -253,20 +182,19 @@ class WithAndWithoutRequestResponseWithRequestNoResponseRequest {
     bool operator!=(const WithAndWithoutRequestResponseWithRequestNoResponseRequest& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestNoResponseRequest, 16>::Equal(this, &other);
     }
-    
+
       const ::std::string &
     arg() const {
       return storage_.arg;
     }
 
-    
     ::std::string& arg() {
       return storage_.arg;
     }
 
     // Setter for arg.
     //
-    
+
     WithAndWithoutRequestResponseWithRequestNoResponseRequest& arg(::std::string value);
 
   WithAndWithoutRequestResponseWithRequestNoResponseRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -287,15 +215,6 @@ class WithAndWithoutRequestResponseWithRequestNoResponseRequest {
   static constexpr auto kPadding = std::make_tuple();
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class WithAndWithoutRequestResponseWithRequestEmptyResponseRequest {
  private:
@@ -321,20 +240,19 @@ class WithAndWithoutRequestResponseWithRequestEmptyResponseRequest {
     bool operator!=(const WithAndWithoutRequestResponseWithRequestEmptyResponseRequest& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest, 16>::Equal(this, &other);
     }
-    
+
       const ::std::string &
     arg() const {
       return storage_.arg;
     }
 
-    
     ::std::string& arg() {
       return storage_.arg;
     }
 
     // Setter for arg.
     //
-    
+
     WithAndWithoutRequestResponseWithRequestEmptyResponseRequest& arg(::std::string value);
 
   WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -355,15 +273,6 @@ class WithAndWithoutRequestResponseWithRequestEmptyResponseRequest {
   static constexpr auto kPadding = std::make_tuple();
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class WithAndWithoutRequestResponseWithRequestWithResponseRequest {
  private:
@@ -389,20 +298,19 @@ class WithAndWithoutRequestResponseWithRequestWithResponseRequest {
     bool operator!=(const WithAndWithoutRequestResponseWithRequestWithResponseRequest& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseRequest, 16>::Equal(this, &other);
     }
-    
+
       const ::std::string &
     arg() const {
       return storage_.arg;
     }
 
-    
     ::std::string& arg() {
       return storage_.arg;
     }
 
     // Setter for arg.
     //
-    
+
     WithAndWithoutRequestResponseWithRequestWithResponseRequest& arg(::std::string value);
 
   WithAndWithoutRequestResponseWithRequestWithResponseRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -423,15 +331,6 @@ class WithAndWithoutRequestResponseWithRequestWithResponseRequest {
   static constexpr auto kPadding = std::make_tuple();
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class WithAndWithoutRequestResponseWithRequestWithResponseResponse {
  private:
@@ -457,20 +356,19 @@ class WithAndWithoutRequestResponseWithRequestWithResponseResponse {
     bool operator!=(const WithAndWithoutRequestResponseWithRequestWithResponseResponse& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse, 16>::Equal(this, &other);
     }
-    
+
       const ::std::string &
     ret() const {
       return storage_.ret;
     }
 
-    
     ::std::string& ret() {
       return storage_.ret;
     }
 
     // Setter for ret.
     //
-    
+
     WithAndWithoutRequestResponseWithRequestWithResponseResponse& ret(::std::string value);
 
   WithAndWithoutRequestResponseWithRequestWithResponseResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -491,15 +389,6 @@ class WithAndWithoutRequestResponseWithRequestWithResponseResponse {
   static constexpr auto kPadding = std::make_tuple();
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class WithAndWithoutRequestResponseOnWithResponseRequest {
  private:
@@ -525,20 +414,19 @@ class WithAndWithoutRequestResponseOnWithResponseRequest {
     bool operator!=(const WithAndWithoutRequestResponseOnWithResponseRequest& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseOnWithResponseRequest, 16>::Equal(this, &other);
     }
-    
+
       const ::std::string &
     ret() const {
       return storage_.ret;
     }
 
-    
     ::std::string& ret() {
       return storage_.ret;
     }
 
     // Setter for ret.
     //
-    
+
     WithAndWithoutRequestResponseOnWithResponseRequest& ret(::std::string value);
 
   WithAndWithoutRequestResponseOnWithResponseRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -559,21 +447,6 @@ class WithAndWithoutRequestResponseOnWithResponseRequest {
   static constexpr auto kPadding = std::make_tuple();
 
 };
-
-
-  
-  
-  
-  
-  
-  
-  
-  
-  
-
-
-
-
 
 class WithErrorSyntaxResponseAsStructResponse {
  private:
@@ -599,50 +472,47 @@ class WithErrorSyntaxResponseAsStructResponse {
     bool operator!=(const WithErrorSyntaxResponseAsStructResponse& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxResponseAsStructResponse, 24>::Equal(this, &other);
     }
-    
+
       int64_t
     a() const {
       return storage_.a;
     }
 
-    
     int64_t& a() {
       return storage_.a;
     }
 
     // Setter for a.
     //
-    
+
     WithErrorSyntaxResponseAsStructResponse& a(int64_t value);
-    
+
       int64_t
     b() const {
       return storage_.b;
     }
 
-    
     int64_t& b() {
       return storage_.b;
     }
 
     // Setter for b.
     //
-    
+
     WithErrorSyntaxResponseAsStructResponse& b(int64_t value);
-    
+
       int64_t
     c() const {
       return storage_.c;
     }
 
-    
     int64_t& c() {
       return storage_.c;
     }
 
     // Setter for c.
     //
-    
+
     WithErrorSyntaxResponseAsStructResponse& c(int64_t value);
 
   WithErrorSyntaxResponseAsStructResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -672,17 +542,6 @@ class WithErrorSyntaxResponseAsStructResponse {
   static constexpr auto kPadding = std::make_tuple();
 
 };
-
-
-  
-  
-  
-  
-  
-
-
-
-
 
 class WithErrorSyntaxResponseAsStructResult {
  private:
@@ -743,7 +602,7 @@ class WithErrorSyntaxResponseAsStructResult {
 
     // Sets the union to hold the response member.
     //
-    
+
     WithErrorSyntaxResponseAsStructResult& response(::test_protocols::WithErrorSyntaxResponseAsStructResponse value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -764,7 +623,7 @@ class WithErrorSyntaxResponseAsStructResult {
 
     // Sets the union to hold the err member.
     //
-    
+
     WithErrorSyntaxResponseAsStructResult& err(uint32_t value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -805,13 +664,6 @@ class WithErrorSyntaxResponseAsStructResult {
 
 };
 
-
-  
-
-
-
-
-
 class WithErrorSyntaxErrorAsPrimitiveResponse {
  private:
   struct Storage_;
@@ -836,20 +688,19 @@ class WithErrorSyntaxErrorAsPrimitiveResponse {
     bool operator!=(const WithErrorSyntaxErrorAsPrimitiveResponse& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse, 1>::Equal(this, &other);
     }
-    
+
       uint8_t
     __reserved() const {
       return storage_.__reserved;
     }
 
-    
     uint8_t& __reserved() {
       return storage_.__reserved;
     }
 
     // Setter for __reserved.
     //
-    
+
     WithErrorSyntaxErrorAsPrimitiveResponse& __reserved(uint8_t value);
 
   WithErrorSyntaxErrorAsPrimitiveResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -871,17 +722,6 @@ class WithErrorSyntaxErrorAsPrimitiveResponse {
   static constexpr auto kPadding = std::make_tuple();
 
 };
-
-
-  
-  
-  
-  
-  
-
-
-
-
 
 class WithErrorSyntaxErrorAsPrimitiveResult {
  private:
@@ -942,7 +782,7 @@ class WithErrorSyntaxErrorAsPrimitiveResult {
 
     // Sets the union to hold the response member.
     //
-    
+
     WithErrorSyntaxErrorAsPrimitiveResult& response(::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -963,7 +803,7 @@ class WithErrorSyntaxErrorAsPrimitiveResult {
 
     // Sets the union to hold the err member.
     //
-    
+
     WithErrorSyntaxErrorAsPrimitiveResult& err(uint32_t value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -1004,13 +844,6 @@ class WithErrorSyntaxErrorAsPrimitiveResult {
 
 };
 
-
-  
-
-
-
-
-
 class WithErrorSyntaxErrorAsEnumResponse {
  private:
   struct Storage_;
@@ -1035,20 +868,19 @@ class WithErrorSyntaxErrorAsEnumResponse {
     bool operator!=(const WithErrorSyntaxErrorAsEnumResponse& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxErrorAsEnumResponse, 1>::Equal(this, &other);
     }
-    
+
       uint8_t
     __reserved() const {
       return storage_.__reserved;
     }
 
-    
     uint8_t& __reserved() {
       return storage_.__reserved;
     }
 
     // Setter for __reserved.
     //
-    
+
     WithErrorSyntaxErrorAsEnumResponse& __reserved(uint8_t value);
 
   WithErrorSyntaxErrorAsEnumResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -1070,17 +902,6 @@ class WithErrorSyntaxErrorAsEnumResponse {
   static constexpr auto kPadding = std::make_tuple();
 
 };
-
-
-  
-  
-  
-  
-  
-
-
-
-
 
 class WithErrorSyntaxErrorAsEnumResult {
  private:
@@ -1141,7 +962,7 @@ class WithErrorSyntaxErrorAsEnumResult {
 
     // Sets the union to hold the response member.
     //
-    
+
     WithErrorSyntaxErrorAsEnumResult& response(::test_protocols::WithErrorSyntaxErrorAsEnumResponse value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -1162,7 +983,7 @@ class WithErrorSyntaxErrorAsEnumResult {
 
     // Sets the union to hold the err member.
     //
-    
+
     WithErrorSyntaxErrorAsEnumResult& err(::test_protocols::ErrorEnum value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -1203,14 +1024,7 @@ class WithErrorSyntaxErrorAsEnumResult {
 
 };
 
-
-  
-
-
-
 #ifdef __Fuchsia__
-
-
 
 class WithErrorSyntaxHandleInResultResponse {
  private:
@@ -1227,20 +1041,19 @@ class WithErrorSyntaxHandleInResultResponse {
 
   WithErrorSyntaxHandleInResultResponse(WithErrorSyntaxHandleInResultResponse&&) noexcept = default;
   WithErrorSyntaxHandleInResultResponse& operator=(WithErrorSyntaxHandleInResultResponse&&) noexcept = default;
-    
+
       const ::zx::handle &
     h() const {
       return storage_.h;
     }
 
-    
     ::zx::handle& h() {
       return storage_.h;
     }
 
     // Setter for h.
     //
-    
+
     WithErrorSyntaxHandleInResultResponse& h(::zx::handle value);
 
   WithErrorSyntaxHandleInResultResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -1260,22 +1073,6 @@ class WithErrorSyntaxHandleInResultResponse {
   static constexpr auto kPadding = std::make_tuple();
 
 };
-
-
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-  
-  
-
-
-
-#ifdef __Fuchsia__
-
-
 
 class WithErrorSyntaxHandleInResultResult {
  private:
@@ -1322,7 +1119,7 @@ class WithErrorSyntaxHandleInResultResult {
 
     // Sets the union to hold the response member.
     //
-    
+
     WithErrorSyntaxHandleInResultResult& response(::test_protocols::WithErrorSyntaxHandleInResultResponse value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -1343,7 +1140,7 @@ class WithErrorSyntaxHandleInResultResult {
 
     // Sets the union to hold the err member.
     //
-    
+
     WithErrorSyntaxHandleInResultResult& err(uint32_t value) {
       storage_->emplace<2>(std::move(value));
       return *this;
@@ -1383,18 +1180,7 @@ class WithErrorSyntaxHandleInResultResult {
 
 };
 
-
-
 #endif  // __Fuchsia__
-
-  
-  
-  
-  
-
-
-
-
 
 class ChannelProtocolMethodARequest {
  private:
@@ -1420,35 +1206,33 @@ class ChannelProtocolMethodARequest {
     bool operator!=(const ChannelProtocolMethodARequest& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_protocols::ChannelProtocolMethodARequest, 16>::Equal(this, &other);
     }
-    
+
       int64_t
     a() const {
       return storage_.a;
     }
 
-    
     int64_t& a() {
       return storage_.a;
     }
 
     // Setter for a.
     //
-    
+
     ChannelProtocolMethodARequest& a(int64_t value);
-    
+
       int64_t
     b() const {
       return storage_.b;
     }
 
-    
     int64_t& b() {
       return storage_.b;
     }
 
     // Setter for b.
     //
-    
+
     ChannelProtocolMethodARequest& b(int64_t value);
 
   ChannelProtocolMethodARequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -1475,15 +1259,6 @@ class ChannelProtocolMethodARequest {
 
 };
 
-
-  
-  
-  
-
-
-
-
-
 class ChannelProtocolEventARequest {
  private:
   struct Storage_;
@@ -1508,35 +1283,33 @@ class ChannelProtocolEventARequest {
     bool operator!=(const ChannelProtocolEventARequest& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_protocols::ChannelProtocolEventARequest, 16>::Equal(this, &other);
     }
-    
+
       int64_t
     a() const {
       return storage_.a;
     }
 
-    
     int64_t& a() {
       return storage_.a;
     }
 
     // Setter for a.
     //
-    
+
     ChannelProtocolEventARequest& a(int64_t value);
-    
+
       int64_t
     b() const {
       return storage_.b;
     }
 
-    
     int64_t& b() {
       return storage_.b;
     }
 
     // Setter for b.
     //
-    
+
     ChannelProtocolEventARequest& b(int64_t value);
 
   ChannelProtocolEventARequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -1563,15 +1336,6 @@ class ChannelProtocolEventARequest {
 
 };
 
-
-  
-  
-  
-
-
-
-
-
 class ChannelProtocolMethodBRequest {
  private:
   struct Storage_;
@@ -1596,35 +1360,33 @@ class ChannelProtocolMethodBRequest {
     bool operator!=(const ChannelProtocolMethodBRequest& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_protocols::ChannelProtocolMethodBRequest, 16>::Equal(this, &other);
     }
-    
+
       int64_t
     a() const {
       return storage_.a;
     }
 
-    
     int64_t& a() {
       return storage_.a;
     }
 
     // Setter for a.
     //
-    
+
     ChannelProtocolMethodBRequest& a(int64_t value);
-    
+
       int64_t
     b() const {
       return storage_.b;
     }
 
-    
     int64_t& b() {
       return storage_.b;
     }
 
     // Setter for b.
     //
-    
+
     ChannelProtocolMethodBRequest& b(int64_t value);
 
   ChannelProtocolMethodBRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -1651,15 +1413,6 @@ class ChannelProtocolMethodBRequest {
 
 };
 
-
-  
-  
-  
-
-
-
-
-
 class ChannelProtocolMethodBResponse {
  private:
   struct Storage_;
@@ -1684,20 +1437,19 @@ class ChannelProtocolMethodBResponse {
     bool operator!=(const ChannelProtocolMethodBResponse& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_protocols::ChannelProtocolMethodBResponse, 8>::Equal(this, &other);
     }
-    
+
       int64_t
     result() const {
       return storage_.result;
     }
 
-    
     int64_t& result() {
       return storage_.result;
     }
 
     // Setter for result.
     //
-    
+
     ChannelProtocolMethodBResponse& result(int64_t value);
 
   ChannelProtocolMethodBResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -1720,16 +1472,7 @@ class ChannelProtocolMethodBResponse {
 
 };
 
-
-  
-  
-  
-
-
-
 #ifdef __Fuchsia__
-
-
 
 class ChannelProtocolTakeHandleRequest {
  private:
@@ -1746,20 +1489,19 @@ class ChannelProtocolTakeHandleRequest {
 
   ChannelProtocolTakeHandleRequest(ChannelProtocolTakeHandleRequest&&) noexcept = default;
   ChannelProtocolTakeHandleRequest& operator=(ChannelProtocolTakeHandleRequest&&) noexcept = default;
-    
+
       const ::zx::handle &
     h() const {
       return storage_.h;
     }
 
-    
     ::zx::handle& h() {
       return storage_.h;
     }
 
     // Setter for h.
     //
-    
+
     ChannelProtocolTakeHandleRequest& h(::zx::handle value);
 
   ChannelProtocolTakeHandleRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -1780,20 +1522,6 @@ class ChannelProtocolTakeHandleRequest {
 
 };
 
-
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-
-
-#ifdef __Fuchsia__
-
-
-
 class ChannelProtocolMutateSocketRequest {
  private:
   struct Storage_;
@@ -1809,20 +1537,19 @@ class ChannelProtocolMutateSocketRequest {
 
   ChannelProtocolMutateSocketRequest(ChannelProtocolMutateSocketRequest&&) noexcept = default;
   ChannelProtocolMutateSocketRequest& operator=(ChannelProtocolMutateSocketRequest&&) noexcept = default;
-    
+
       const ::zx::socket &
     a() const {
       return storage_.a;
     }
 
-    
     ::zx::socket& a() {
       return storage_.a;
     }
 
     // Setter for a.
     //
-    
+
     ChannelProtocolMutateSocketRequest& a(::zx::socket value);
 
   ChannelProtocolMutateSocketRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -1843,20 +1570,6 @@ class ChannelProtocolMutateSocketRequest {
 
 };
 
-
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-
-
-#ifdef __Fuchsia__
-
-
-
 class ChannelProtocolMutateSocketResponse {
  private:
   struct Storage_;
@@ -1872,20 +1585,19 @@ class ChannelProtocolMutateSocketResponse {
 
   ChannelProtocolMutateSocketResponse(ChannelProtocolMutateSocketResponse&&) noexcept = default;
   ChannelProtocolMutateSocketResponse& operator=(ChannelProtocolMutateSocketResponse&&) noexcept = default;
-    
+
       const ::zx::socket &
     b() const {
       return storage_.b;
     }
 
-    
     ::zx::socket& b() {
       return storage_.b;
     }
 
     // Setter for b.
     //
-    
+
     ChannelProtocolMutateSocketResponse& b(::zx::socket value);
 
   ChannelProtocolMutateSocketResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -1906,20 +1618,7 @@ class ChannelProtocolMutateSocketResponse {
 
 };
 
-
-
 #endif  // __Fuchsia__
-
-  
-  
-  
-  
-  
-  
-
-
-
-
 
 class SyscallProtocolMethodCRequest {
  private:
@@ -1945,35 +1644,33 @@ class SyscallProtocolMethodCRequest {
     bool operator!=(const SyscallProtocolMethodCRequest& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_protocols::SyscallProtocolMethodCRequest, 16>::Equal(this, &other);
     }
-    
+
       int64_t
     a() const {
       return storage_.a;
     }
 
-    
     int64_t& a() {
       return storage_.a;
     }
 
     // Setter for a.
     //
-    
+
     SyscallProtocolMethodCRequest& a(int64_t value);
-    
+
       int64_t
     b() const {
       return storage_.b;
     }
 
-    
     int64_t& b() {
       return storage_.b;
     }
 
     // Setter for b.
     //
-    
+
     SyscallProtocolMethodCRequest& b(int64_t value);
 
   SyscallProtocolMethodCRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -2000,25 +1697,7 @@ class SyscallProtocolMethodCRequest {
 
 };
 
-
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-
-
-
 #ifdef __Fuchsia__
-
-
 
 class HandleRightsProtocolNoResponseMethodRequest {
  private:
@@ -2035,20 +1714,19 @@ class HandleRightsProtocolNoResponseMethodRequest {
 
   HandleRightsProtocolNoResponseMethodRequest(HandleRightsProtocolNoResponseMethodRequest&&) noexcept = default;
   HandleRightsProtocolNoResponseMethodRequest& operator=(HandleRightsProtocolNoResponseMethodRequest&&) noexcept = default;
-    
+
       const ::zx::socket &
     h() const {
       return storage_.h;
     }
 
-    
     ::zx::socket& h() {
       return storage_.h;
     }
 
     // Setter for h.
     //
-    
+
     HandleRightsProtocolNoResponseMethodRequest& h(::zx::socket value);
 
   HandleRightsProtocolNoResponseMethodRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -2069,20 +1747,6 @@ class HandleRightsProtocolNoResponseMethodRequest {
 
 };
 
-
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-
-
-#ifdef __Fuchsia__
-
-
-
 class HandleRightsProtocolResponseMethodRequest {
  private:
   struct Storage_;
@@ -2098,20 +1762,19 @@ class HandleRightsProtocolResponseMethodRequest {
 
   HandleRightsProtocolResponseMethodRequest(HandleRightsProtocolResponseMethodRequest&&) noexcept = default;
   HandleRightsProtocolResponseMethodRequest& operator=(HandleRightsProtocolResponseMethodRequest&&) noexcept = default;
-    
+
       const ::zx::socket &
     h() const {
       return storage_.h;
     }
 
-    
     ::zx::socket& h() {
       return storage_.h;
     }
 
     // Setter for h.
     //
-    
+
     HandleRightsProtocolResponseMethodRequest& h(::zx::socket value);
 
   HandleRightsProtocolResponseMethodRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -2132,20 +1795,6 @@ class HandleRightsProtocolResponseMethodRequest {
 
 };
 
-
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-
-
-#ifdef __Fuchsia__
-
-
-
 class HandleRightsProtocolResponseMethodResponse {
  private:
   struct Storage_;
@@ -2161,20 +1810,19 @@ class HandleRightsProtocolResponseMethodResponse {
 
   HandleRightsProtocolResponseMethodResponse(HandleRightsProtocolResponseMethodResponse&&) noexcept = default;
   HandleRightsProtocolResponseMethodResponse& operator=(HandleRightsProtocolResponseMethodResponse&&) noexcept = default;
-    
+
       const ::zx::socket &
     h() const {
       return storage_.h;
     }
 
-    
     ::zx::socket& h() {
       return storage_.h;
     }
 
     // Setter for h.
     //
-    
+
     HandleRightsProtocolResponseMethodResponse& h(::zx::socket value);
 
   HandleRightsProtocolResponseMethodResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -2195,20 +1843,6 @@ class HandleRightsProtocolResponseMethodResponse {
 
 };
 
-
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-
-
-#ifdef __Fuchsia__
-
-
-
 class HandleRightsProtocolAnEventRequest {
  private:
   struct Storage_;
@@ -2224,20 +1858,19 @@ class HandleRightsProtocolAnEventRequest {
 
   HandleRightsProtocolAnEventRequest(HandleRightsProtocolAnEventRequest&&) noexcept = default;
   HandleRightsProtocolAnEventRequest& operator=(HandleRightsProtocolAnEventRequest&&) noexcept = default;
-    
+
       const ::zx::socket &
     h() const {
       return storage_.h;
     }
 
-    
     ::zx::socket& h() {
       return storage_.h;
     }
 
     // Setter for h.
     //
-    
+
     HandleRightsProtocolAnEventRequest& h(::zx::socket value);
 
   HandleRightsProtocolAnEventRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -2258,23 +1891,6 @@ class HandleRightsProtocolAnEventRequest {
 
 };
 
-
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-  
-  
-  
-
-
-
-#ifdef __Fuchsia__
-
-
-
 class ProtocolEnds {
  private:
   struct Storage_;
@@ -2290,65 +1906,61 @@ class ProtocolEnds {
 
   ProtocolEnds(ProtocolEnds&&) noexcept = default;
   ProtocolEnds& operator=(ProtocolEnds&&) noexcept = default;
-    
+
       const ::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> &
     client() const {
       return storage_.client;
     }
 
-    
     ::fidl::ClientEnd<::test_protocols::DiscoverableProtocol>& client() {
       return storage_.client;
     }
 
     // Setter for client.
     //
-    
+
     ProtocolEnds& client(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> value);
-    
+
       const ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> &
     server() const {
       return storage_.server;
     }
 
-    
     ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol>& server() {
       return storage_.server;
     }
 
     // Setter for server.
     //
-    
+
     ProtocolEnds& server(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> value);
-    
+
       const ::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> &
     client_opt() const {
       return storage_.client_opt;
     }
 
-    
     ::fidl::ClientEnd<::test_protocols::DiscoverableProtocol>& client_opt() {
       return storage_.client_opt;
     }
 
     // Setter for client_opt.
     //
-    
+
     ProtocolEnds& client_opt(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> value);
-    
+
       const ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> &
     server_opt() const {
       return storage_.server_opt;
     }
 
-    
     ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol>& server_opt() {
       return storage_.server_opt;
     }
 
     // Setter for server_opt.
     //
-    
+
     ProtocolEnds& server_opt(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> value);
 
   ProtocolEnds(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -2378,20 +1990,6 @@ class ProtocolEnds {
 
 };
 
-
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-
-
-#ifdef __Fuchsia__
-
-
-
 class WithProtocolEndsClientEndsRequest {
  private:
   struct Storage_;
@@ -2407,20 +2005,19 @@ class WithProtocolEndsClientEndsRequest {
 
   WithProtocolEndsClientEndsRequest(WithProtocolEndsClientEndsRequest&&) noexcept = default;
   WithProtocolEndsClientEndsRequest& operator=(WithProtocolEndsClientEndsRequest&&) noexcept = default;
-    
+
       const ::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> &
     in() const {
       return storage_.in;
     }
 
-    
     ::fidl::ClientEnd<::test_protocols::DiscoverableProtocol>& in() {
       return storage_.in;
     }
 
     // Setter for in.
     //
-    
+
     WithProtocolEndsClientEndsRequest& in(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> value);
 
   WithProtocolEndsClientEndsRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -2441,20 +2038,6 @@ class WithProtocolEndsClientEndsRequest {
 
 };
 
-
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-
-
-#ifdef __Fuchsia__
-
-
-
 class WithProtocolEndsClientEndsResponse {
  private:
   struct Storage_;
@@ -2470,20 +2053,19 @@ class WithProtocolEndsClientEndsResponse {
 
   WithProtocolEndsClientEndsResponse(WithProtocolEndsClientEndsResponse&&) noexcept = default;
   WithProtocolEndsClientEndsResponse& operator=(WithProtocolEndsClientEndsResponse&&) noexcept = default;
-    
+
       const ::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> &
     out() const {
       return storage_.out;
     }
 
-    
     ::fidl::ClientEnd<::test_protocols::DiscoverableProtocol>& out() {
       return storage_.out;
     }
 
     // Setter for out.
     //
-    
+
     WithProtocolEndsClientEndsResponse& out(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> value);
 
   WithProtocolEndsClientEndsResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -2504,20 +2086,6 @@ class WithProtocolEndsClientEndsResponse {
 
 };
 
-
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-
-
-#ifdef __Fuchsia__
-
-
-
 class WithProtocolEndsServerEndsRequest {
  private:
   struct Storage_;
@@ -2533,20 +2101,19 @@ class WithProtocolEndsServerEndsRequest {
 
   WithProtocolEndsServerEndsRequest(WithProtocolEndsServerEndsRequest&&) noexcept = default;
   WithProtocolEndsServerEndsRequest& operator=(WithProtocolEndsServerEndsRequest&&) noexcept = default;
-    
+
       const ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> &
     in() const {
       return storage_.in;
     }
 
-    
     ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol>& in() {
       return storage_.in;
     }
 
     // Setter for in.
     //
-    
+
     WithProtocolEndsServerEndsRequest& in(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> value);
 
   WithProtocolEndsServerEndsRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -2567,20 +2134,6 @@ class WithProtocolEndsServerEndsRequest {
 
 };
 
-
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-
-
-#ifdef __Fuchsia__
-
-
-
 class WithProtocolEndsServerEndsResponse {
  private:
   struct Storage_;
@@ -2596,20 +2149,19 @@ class WithProtocolEndsServerEndsResponse {
 
   WithProtocolEndsServerEndsResponse(WithProtocolEndsServerEndsResponse&&) noexcept = default;
   WithProtocolEndsServerEndsResponse& operator=(WithProtocolEndsServerEndsResponse&&) noexcept = default;
-    
+
       const ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> &
     out() const {
       return storage_.out;
     }
 
-    
     ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol>& out() {
       return storage_.out;
     }
 
     // Setter for out.
     //
-    
+
     WithProtocolEndsServerEndsResponse& out(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> value);
 
   WithProtocolEndsServerEndsResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -2630,20 +2182,6 @@ class WithProtocolEndsServerEndsResponse {
 
 };
 
-
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-
-
-#ifdef __Fuchsia__
-
-
-
 class WithProtocolEndsStructContainingEndsRequest {
  private:
   struct Storage_;
@@ -2659,20 +2197,19 @@ class WithProtocolEndsStructContainingEndsRequest {
 
   WithProtocolEndsStructContainingEndsRequest(WithProtocolEndsStructContainingEndsRequest&&) noexcept = default;
   WithProtocolEndsStructContainingEndsRequest& operator=(WithProtocolEndsStructContainingEndsRequest&&) noexcept = default;
-    
+
       const ::test_protocols::ProtocolEnds &
     in() const {
       return storage_.in;
     }
 
-    
     ::test_protocols::ProtocolEnds& in() {
       return storage_.in;
     }
 
     // Setter for in.
     //
-    
+
     WithProtocolEndsStructContainingEndsRequest& in(::test_protocols::ProtocolEnds value);
 
   WithProtocolEndsStructContainingEndsRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -2693,20 +2230,6 @@ class WithProtocolEndsStructContainingEndsRequest {
 
 };
 
-
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-
-
-#ifdef __Fuchsia__
-
-
-
 class WithProtocolEndsStructContainingEndsResponse {
  private:
   struct Storage_;
@@ -2722,20 +2245,19 @@ class WithProtocolEndsStructContainingEndsResponse {
 
   WithProtocolEndsStructContainingEndsResponse(WithProtocolEndsStructContainingEndsResponse&&) noexcept = default;
   WithProtocolEndsStructContainingEndsResponse& operator=(WithProtocolEndsStructContainingEndsResponse&&) noexcept = default;
-    
+
       const ::test_protocols::ProtocolEnds &
     out() const {
       return storage_.out;
     }
 
-    
     ::test_protocols::ProtocolEnds& out() {
       return storage_.out;
     }
 
     // Setter for out.
     //
-    
+
     WithProtocolEndsStructContainingEndsResponse& out(::test_protocols::ProtocolEnds value);
 
   WithProtocolEndsStructContainingEndsResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -2756,20 +2278,7 @@ class WithProtocolEndsStructContainingEndsResponse {
 
 };
 
-
-
 #endif  // __Fuchsia__
-
-  
-  
-  
-  
-  
-  
-
-
-
-
 
 class ManyParametersFifteenRequest {
  private:
@@ -2795,230 +2304,215 @@ class ManyParametersFifteenRequest {
     bool operator!=(const ManyParametersFifteenRequest& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_protocols::ManyParametersFifteenRequest, 15>::Equal(this, &other);
     }
-    
+
       bool
     p1() const {
       return storage_.p1;
     }
 
-    
     bool& p1() {
       return storage_.p1;
     }
 
     // Setter for p1.
     //
-    
+
     ManyParametersFifteenRequest& p1(bool value);
-    
+
       bool
     p2() const {
       return storage_.p2;
     }
 
-    
     bool& p2() {
       return storage_.p2;
     }
 
     // Setter for p2.
     //
-    
+
     ManyParametersFifteenRequest& p2(bool value);
-    
+
       bool
     p3() const {
       return storage_.p3;
     }
 
-    
     bool& p3() {
       return storage_.p3;
     }
 
     // Setter for p3.
     //
-    
+
     ManyParametersFifteenRequest& p3(bool value);
-    
+
       bool
     p4() const {
       return storage_.p4;
     }
 
-    
     bool& p4() {
       return storage_.p4;
     }
 
     // Setter for p4.
     //
-    
+
     ManyParametersFifteenRequest& p4(bool value);
-    
+
       bool
     p5() const {
       return storage_.p5;
     }
 
-    
     bool& p5() {
       return storage_.p5;
     }
 
     // Setter for p5.
     //
-    
+
     ManyParametersFifteenRequest& p5(bool value);
-    
+
       bool
     p6() const {
       return storage_.p6;
     }
 
-    
     bool& p6() {
       return storage_.p6;
     }
 
     // Setter for p6.
     //
-    
+
     ManyParametersFifteenRequest& p6(bool value);
-    
+
       bool
     p7() const {
       return storage_.p7;
     }
 
-    
     bool& p7() {
       return storage_.p7;
     }
 
     // Setter for p7.
     //
-    
+
     ManyParametersFifteenRequest& p7(bool value);
-    
+
       bool
     p8() const {
       return storage_.p8;
     }
 
-    
     bool& p8() {
       return storage_.p8;
     }
 
     // Setter for p8.
     //
-    
+
     ManyParametersFifteenRequest& p8(bool value);
-    
+
       bool
     p9() const {
       return storage_.p9;
     }
 
-    
     bool& p9() {
       return storage_.p9;
     }
 
     // Setter for p9.
     //
-    
+
     ManyParametersFifteenRequest& p9(bool value);
-    
+
       bool
     p10() const {
       return storage_.p10;
     }
 
-    
     bool& p10() {
       return storage_.p10;
     }
 
     // Setter for p10.
     //
-    
+
     ManyParametersFifteenRequest& p10(bool value);
-    
+
       bool
     p11() const {
       return storage_.p11;
     }
 
-    
     bool& p11() {
       return storage_.p11;
     }
 
     // Setter for p11.
     //
-    
+
     ManyParametersFifteenRequest& p11(bool value);
-    
+
       bool
     p12() const {
       return storage_.p12;
     }
 
-    
     bool& p12() {
       return storage_.p12;
     }
 
     // Setter for p12.
     //
-    
+
     ManyParametersFifteenRequest& p12(bool value);
-    
+
       bool
     p13() const {
       return storage_.p13;
     }
 
-    
     bool& p13() {
       return storage_.p13;
     }
 
     // Setter for p13.
     //
-    
+
     ManyParametersFifteenRequest& p13(bool value);
-    
+
       bool
     p14() const {
       return storage_.p14;
     }
 
-    
     bool& p14() {
       return storage_.p14;
     }
 
     // Setter for p14.
     //
-    
+
     ManyParametersFifteenRequest& p14(bool value);
-    
+
       bool
     p15() const {
       return storage_.p15;
     }
 
-    
     bool& p15() {
       return storage_.p15;
     }
 
     // Setter for p15.
     //
-    
+
     ManyParametersFifteenRequest& p15(bool value);
 
   ManyParametersFifteenRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -3097,20 +2591,6 @@ class ManyParametersFifteenRequest {
 
 };
 
-
-  
-  
-  
-  
-  
-  
-  
-  
-
-
-
-
-
 class TheUnion {
  private:
   using Storage_ =
@@ -3172,7 +2652,7 @@ class TheUnion {
 
     // Sets the union to hold the v member.
     //
-    
+
     TheUnion& v(uint32_t value) {
       storage_->emplace<1>(std::move(value));
       return *this;
@@ -3209,13 +2689,6 @@ class TheUnion {
 
 };
 
-
-  
-
-
-
-
-
 class MethodWithUnionUnionMethodRequest {
  private:
   struct Storage_;
@@ -3240,20 +2713,19 @@ class MethodWithUnionUnionMethodRequest {
     bool operator!=(const MethodWithUnionUnionMethodRequest& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_protocols::MethodWithUnionUnionMethodRequest, 16>::Equal(this, &other);
     }
-    
+
       const ::test_protocols::TheUnion &
     u() const {
       return storage_.u;
     }
 
-    
     ::test_protocols::TheUnion& u() {
       return storage_.u;
     }
 
     // Setter for u.
     //
-    
+
     MethodWithUnionUnionMethodRequest& u(::test_protocols::TheUnion value);
 
   MethodWithUnionUnionMethodRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -3274,15 +2746,6 @@ class MethodWithUnionUnionMethodRequest {
   static constexpr auto kPadding = std::make_tuple();
 
 };
-
-
-  
-  
-  
-
-
-
-
 
 class MethodWithUnionUnionMethodResponse {
  private:
@@ -3308,20 +2771,19 @@ class MethodWithUnionUnionMethodResponse {
     bool operator!=(const MethodWithUnionUnionMethodResponse& other) const noexcept {
       return !::fidl::internal::NaturalStructCodingTraits<::test_protocols::MethodWithUnionUnionMethodResponse, 16>::Equal(this, &other);
     }
-    
+
       const ::fidl::Box<::test_protocols::TheUnion> &
     u() const {
       return storage_.u;
     }
 
-    
     ::fidl::Box<::test_protocols::TheUnion>& u() {
       return storage_.u;
     }
 
     // Setter for u.
     //
-    
+
     MethodWithUnionUnionMethodResponse& u(::fidl::Box<::test_protocols::TheUnion> value);
 
   MethodWithUnionUnionMethodResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
@@ -3343,19 +2805,6 @@ class MethodWithUnionUnionMethodResponse {
 
 };
 
-
-  
-  
-  
-  
-  
-
-
-  
-  
-
-  
-
   inline WithAndWithoutRequestResponseNoRequestWithResponseResponse::WithAndWithoutRequestResponseNoRequestWithResponseResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline WithAndWithoutRequestResponseNoRequestWithResponseResponse::WithAndWithoutRequestResponseNoRequestWithResponseResponse(::std::string ret) noexcept
     : storage_({
@@ -3374,13 +2823,6 @@ class MethodWithUnionUnionMethodResponse {
       storage_.ret = std::move(value);
       return *this;
     }
-
-  
-  
-  
-  
-
-  
 
   inline WithAndWithoutRequestResponseWithRequestNoResponseRequest::WithAndWithoutRequestResponseWithRequestNoResponseRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline WithAndWithoutRequestResponseWithRequestNoResponseRequest::WithAndWithoutRequestResponseWithRequestNoResponseRequest(::std::string arg) noexcept
@@ -3401,13 +2843,6 @@ class MethodWithUnionUnionMethodResponse {
       return *this;
     }
 
-  
-  
-  
-  
-
-  
-
   inline WithAndWithoutRequestResponseWithRequestEmptyResponseRequest::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline WithAndWithoutRequestResponseWithRequestEmptyResponseRequest::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(::std::string arg) noexcept
     : storage_({
@@ -3426,13 +2861,6 @@ class MethodWithUnionUnionMethodResponse {
       storage_.arg = std::move(value);
       return *this;
     }
-
-  
-  
-  
-  
-
-  
 
   inline WithAndWithoutRequestResponseWithRequestWithResponseRequest::WithAndWithoutRequestResponseWithRequestWithResponseRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline WithAndWithoutRequestResponseWithRequestWithResponseRequest::WithAndWithoutRequestResponseWithRequestWithResponseRequest(::std::string arg) noexcept
@@ -3453,13 +2881,6 @@ class MethodWithUnionUnionMethodResponse {
       return *this;
     }
 
-  
-  
-  
-  
-
-  
-
   inline WithAndWithoutRequestResponseWithRequestWithResponseResponse::WithAndWithoutRequestResponseWithRequestWithResponseResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline WithAndWithoutRequestResponseWithRequestWithResponseResponse::WithAndWithoutRequestResponseWithRequestWithResponseResponse(::std::string ret) noexcept
     : storage_({
@@ -3479,13 +2900,6 @@ class MethodWithUnionUnionMethodResponse {
       return *this;
     }
 
-  
-  
-  
-  
-
-  
-
   inline WithAndWithoutRequestResponseOnWithResponseRequest::WithAndWithoutRequestResponseOnWithResponseRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline WithAndWithoutRequestResponseOnWithResponseRequest::WithAndWithoutRequestResponseOnWithResponseRequest(::std::string ret) noexcept
     : storage_({
@@ -3504,17 +2918,6 @@ class MethodWithUnionUnionMethodResponse {
       storage_.ret = std::move(value);
       return *this;
     }
-
-  
-  
-  
-  
-  
-  
-  
-  
-
-  
 
   inline WithErrorSyntaxResponseAsStructResponse::WithErrorSyntaxResponseAsStructResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline WithErrorSyntaxResponseAsStructResponse::WithErrorSyntaxResponseAsStructResponse(int64_t a, int64_t b, int64_t c) noexcept
@@ -3547,15 +2950,6 @@ class MethodWithUnionUnionMethodResponse {
       return *this;
     }
 
-  
-  
-  
-  
-  
-  
-
-  
-
   inline WithErrorSyntaxErrorAsPrimitiveResponse::WithErrorSyntaxErrorAsPrimitiveResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline WithErrorSyntaxErrorAsPrimitiveResponse::WithErrorSyntaxErrorAsPrimitiveResponse(uint8_t __reserved) noexcept
     : storage_({
@@ -3574,15 +2968,6 @@ class MethodWithUnionUnionMethodResponse {
       storage_.__reserved = std::move(value);
       return *this;
     }
-
-  
-  
-  
-  
-  
-  
-
-  
 
   inline WithErrorSyntaxErrorAsEnumResponse::WithErrorSyntaxErrorAsEnumResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline WithErrorSyntaxErrorAsEnumResponse::WithErrorSyntaxErrorAsEnumResponse(uint8_t __reserved) noexcept
@@ -3603,16 +2988,7 @@ class MethodWithUnionUnionMethodResponse {
       return *this;
     }
 
-  
-  
-  
-  
-  
-  
-
-  
 #ifdef __Fuchsia__
-
 
   inline WithErrorSyntaxHandleInResultResponse::WithErrorSyntaxHandleInResultResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline WithErrorSyntaxHandleInResultResponse::WithErrorSyntaxHandleInResultResponse(::zx::handle h) noexcept
@@ -3628,19 +3004,7 @@ class MethodWithUnionUnionMethodResponse {
       return *this;
     }
 
-  
-
 #endif  // __Fuchsia__
-
-  
-  
-  
-  
-  
-  
-  
-
-  
 
   inline ChannelProtocolMethodARequest::ChannelProtocolMethodARequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline ChannelProtocolMethodARequest::ChannelProtocolMethodARequest(int64_t a, int64_t b) noexcept
@@ -3667,13 +3031,6 @@ class MethodWithUnionUnionMethodResponse {
       return *this;
     }
 
-  
-  
-  
-  
-
-  
-
   inline ChannelProtocolEventARequest::ChannelProtocolEventARequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline ChannelProtocolEventARequest::ChannelProtocolEventARequest(int64_t a, int64_t b) noexcept
     : storage_({
@@ -3698,13 +3055,6 @@ class MethodWithUnionUnionMethodResponse {
       storage_.b = std::move(value);
       return *this;
     }
-
-  
-  
-  
-  
-
-  
 
   inline ChannelProtocolMethodBRequest::ChannelProtocolMethodBRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline ChannelProtocolMethodBRequest::ChannelProtocolMethodBRequest(int64_t a, int64_t b) noexcept
@@ -3731,13 +3081,6 @@ class MethodWithUnionUnionMethodResponse {
       return *this;
     }
 
-  
-  
-  
-  
-
-  
-
   inline ChannelProtocolMethodBResponse::ChannelProtocolMethodBResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline ChannelProtocolMethodBResponse::ChannelProtocolMethodBResponse(int64_t result) noexcept
     : storage_({
@@ -3757,14 +3100,7 @@ class MethodWithUnionUnionMethodResponse {
       return *this;
     }
 
-  
-  
-  
-  
-
-  
 #ifdef __Fuchsia__
-
 
   inline ChannelProtocolTakeHandleRequest::ChannelProtocolTakeHandleRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline ChannelProtocolTakeHandleRequest::ChannelProtocolTakeHandleRequest(::zx::handle h) noexcept
@@ -3780,18 +3116,6 @@ class MethodWithUnionUnionMethodResponse {
       return *this;
     }
 
-  
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-  
-#ifdef __Fuchsia__
-
-
   inline ChannelProtocolMutateSocketRequest::ChannelProtocolMutateSocketRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline ChannelProtocolMutateSocketRequest::ChannelProtocolMutateSocketRequest(::zx::socket a) noexcept
     : storage_({
@@ -3805,18 +3129,6 @@ class MethodWithUnionUnionMethodResponse {
       storage_.a = std::move(value);
       return *this;
     }
-
-  
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-  
-#ifdef __Fuchsia__
-
 
   inline ChannelProtocolMutateSocketResponse::ChannelProtocolMutateSocketResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline ChannelProtocolMutateSocketResponse::ChannelProtocolMutateSocketResponse(::zx::socket b) noexcept
@@ -3832,17 +3144,7 @@ class MethodWithUnionUnionMethodResponse {
       return *this;
     }
 
-  
-
 #endif  // __Fuchsia__
-
-  
-  
-  
-  
-  
-
-  
 
   inline SyscallProtocolMethodCRequest::SyscallProtocolMethodCRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline SyscallProtocolMethodCRequest::SyscallProtocolMethodCRequest(int64_t a, int64_t b) noexcept
@@ -3869,20 +3171,7 @@ class MethodWithUnionUnionMethodResponse {
       return *this;
     }
 
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-
-  
 #ifdef __Fuchsia__
-
 
   inline HandleRightsProtocolNoResponseMethodRequest::HandleRightsProtocolNoResponseMethodRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline HandleRightsProtocolNoResponseMethodRequest::HandleRightsProtocolNoResponseMethodRequest(::zx::socket h) noexcept
@@ -3898,18 +3187,6 @@ class MethodWithUnionUnionMethodResponse {
       return *this;
     }
 
-  
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-  
-#ifdef __Fuchsia__
-
-
   inline HandleRightsProtocolResponseMethodRequest::HandleRightsProtocolResponseMethodRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline HandleRightsProtocolResponseMethodRequest::HandleRightsProtocolResponseMethodRequest(::zx::socket h) noexcept
     : storage_({
@@ -3923,18 +3200,6 @@ class MethodWithUnionUnionMethodResponse {
       storage_.h = std::move(value);
       return *this;
     }
-
-  
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-  
-#ifdef __Fuchsia__
-
 
   inline HandleRightsProtocolResponseMethodResponse::HandleRightsProtocolResponseMethodResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline HandleRightsProtocolResponseMethodResponse::HandleRightsProtocolResponseMethodResponse(::zx::socket h) noexcept
@@ -3950,18 +3215,6 @@ class MethodWithUnionUnionMethodResponse {
       return *this;
     }
 
-  
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-  
-#ifdef __Fuchsia__
-
-
   inline HandleRightsProtocolAnEventRequest::HandleRightsProtocolAnEventRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline HandleRightsProtocolAnEventRequest::HandleRightsProtocolAnEventRequest(::zx::socket h) noexcept
     : storage_({
@@ -3975,20 +3228,6 @@ class MethodWithUnionUnionMethodResponse {
       storage_.h = std::move(value);
       return *this;
     }
-
-  
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-  
-  
-
-  
-#ifdef __Fuchsia__
-
 
   inline ProtocolEnds::ProtocolEnds(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline ProtocolEnds::ProtocolEnds(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> client, ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> server, ::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> client_opt, ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> server_opt) noexcept
@@ -4022,18 +3261,6 @@ class MethodWithUnionUnionMethodResponse {
       return *this;
     }
 
-  
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-  
-#ifdef __Fuchsia__
-
-
   inline WithProtocolEndsClientEndsRequest::WithProtocolEndsClientEndsRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline WithProtocolEndsClientEndsRequest::WithProtocolEndsClientEndsRequest(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> in) noexcept
     : storage_({
@@ -4047,18 +3274,6 @@ class MethodWithUnionUnionMethodResponse {
       storage_.in = std::move(value);
       return *this;
     }
-
-  
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-  
-#ifdef __Fuchsia__
-
 
   inline WithProtocolEndsClientEndsResponse::WithProtocolEndsClientEndsResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline WithProtocolEndsClientEndsResponse::WithProtocolEndsClientEndsResponse(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> out) noexcept
@@ -4074,18 +3289,6 @@ class MethodWithUnionUnionMethodResponse {
       return *this;
     }
 
-  
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-  
-#ifdef __Fuchsia__
-
-
   inline WithProtocolEndsServerEndsRequest::WithProtocolEndsServerEndsRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline WithProtocolEndsServerEndsRequest::WithProtocolEndsServerEndsRequest(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> in) noexcept
     : storage_({
@@ -4099,18 +3302,6 @@ class MethodWithUnionUnionMethodResponse {
       storage_.in = std::move(value);
       return *this;
     }
-
-  
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-  
-#ifdef __Fuchsia__
-
 
   inline WithProtocolEndsServerEndsResponse::WithProtocolEndsServerEndsResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline WithProtocolEndsServerEndsResponse::WithProtocolEndsServerEndsResponse(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> out) noexcept
@@ -4126,18 +3317,6 @@ class MethodWithUnionUnionMethodResponse {
       return *this;
     }
 
-  
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-  
-#ifdef __Fuchsia__
-
-
   inline WithProtocolEndsStructContainingEndsRequest::WithProtocolEndsStructContainingEndsRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline WithProtocolEndsStructContainingEndsRequest::WithProtocolEndsStructContainingEndsRequest(::test_protocols::ProtocolEnds in) noexcept
     : storage_({
@@ -4151,18 +3330,6 @@ class MethodWithUnionUnionMethodResponse {
       storage_.in = std::move(value);
       return *this;
     }
-
-  
-
-#endif  // __Fuchsia__
-
-  
-  
-  
-
-  
-#ifdef __Fuchsia__
-
 
   inline WithProtocolEndsStructContainingEndsResponse::WithProtocolEndsStructContainingEndsResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline WithProtocolEndsStructContainingEndsResponse::WithProtocolEndsStructContainingEndsResponse(::test_protocols::ProtocolEnds out) noexcept
@@ -4178,17 +3345,7 @@ class MethodWithUnionUnionMethodResponse {
       return *this;
     }
 
-  
-
 #endif  // __Fuchsia__
-
-  
-  
-  
-  
-  
-
-  
 
   inline ManyParametersFifteenRequest::ManyParametersFifteenRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline ManyParametersFifteenRequest::ManyParametersFifteenRequest(bool p1, bool p2, bool p3, bool p4, bool p5, bool p6, bool p7, bool p8, bool p9, bool p10, bool p11, bool p12, bool p13, bool p14, bool p15) noexcept
@@ -4293,17 +3450,6 @@ class MethodWithUnionUnionMethodResponse {
       return *this;
     }
 
-  
-  
-  
-  
-  
-  
-  
-  
-
-  
-
   inline MethodWithUnionUnionMethodRequest::MethodWithUnionUnionMethodRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline MethodWithUnionUnionMethodRequest::MethodWithUnionUnionMethodRequest(::test_protocols::TheUnion u) noexcept
     : storage_({
@@ -4322,13 +3468,6 @@ class MethodWithUnionUnionMethodResponse {
       storage_.u = std::move(value);
       return *this;
     }
-
-  
-  
-  
-  
-
-  
 
   inline MethodWithUnionUnionMethodResponse::MethodWithUnionUnionMethodResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
     inline MethodWithUnionUnionMethodResponse::MethodWithUnionUnionMethodResponse(::fidl::Box<::test_protocols::TheUnion> u) noexcept
@@ -4349,18 +3488,9 @@ class MethodWithUnionUnionMethodResponse {
       return *this;
     }
 
-  
-  
-  
-  
-
 }  // namespace test_protocols
 namespace fidl {
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse> : public std::true_type {};
 
@@ -4380,10 +3510,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse, 16> {};
 
-  
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::WithAndWithoutRequestResponseWithRequestNoResponseRequest> : public std::true_type {};
 
@@ -4403,10 +3529,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestNoResponseRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestNoResponseRequest, 16> {};
 
-  
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest> : public std::true_type {};
 
@@ -4426,10 +3548,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest, 16> {};
 
-  
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseRequest> : public std::true_type {};
 
@@ -4449,10 +3567,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseRequest, 16> {};
 
-  
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse> : public std::true_type {};
 
@@ -4472,10 +3586,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse, 16> {};
 
-  
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::WithAndWithoutRequestResponseOnWithResponseRequest> : public std::true_type {};
 
@@ -4495,10 +3605,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::WithAndWithoutRequestResponseOnWithResponseRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseOnWithResponseRequest, 16> {};
 
-  
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::WithErrorSyntaxResponseAsStructResponse> : public std::true_type {};
 
@@ -4518,10 +3624,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::WithErrorSyntaxResponseAsStructResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxResponseAsStructResponse, 24> {};
 
-  
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse> : public std::true_type {};
 
@@ -4541,10 +3643,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse> {};
 
-  
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::WithErrorSyntaxErrorAsEnumResponse> : public std::true_type {};
 
@@ -4564,12 +3662,8 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::WithErrorSyntaxErrorAsEnumResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_protocols::WithErrorSyntaxErrorAsEnumResponse> {};
 
-  
-  
 #ifdef __Fuchsia__
 
-
-  
   template <>
   struct IsResource<::test_protocols::WithErrorSyntaxHandleInResultResponse> : public std::true_type {};
   template <>
@@ -4591,13 +3685,8 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::WithErrorSyntaxHandleInResultResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxHandleInResultResponse, 4> {};
 
-  
-
 #endif  // __Fuchsia__
 
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::ChannelProtocolMethodARequest> : public std::true_type {};
 
@@ -4617,10 +3706,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::ChannelProtocolMethodARequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::ChannelProtocolMethodARequest, 16> {};
 
-  
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::ChannelProtocolEventARequest> : public std::true_type {};
 
@@ -4640,10 +3725,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::ChannelProtocolEventARequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::ChannelProtocolEventARequest, 16> {};
 
-  
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::ChannelProtocolMethodBRequest> : public std::true_type {};
 
@@ -4663,10 +3744,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::ChannelProtocolMethodBRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::ChannelProtocolMethodBRequest, 16> {};
 
-  
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::ChannelProtocolMethodBResponse> : public std::true_type {};
 
@@ -4686,12 +3763,8 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::ChannelProtocolMethodBResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::ChannelProtocolMethodBResponse, 8> {};
 
-  
-  
 #ifdef __Fuchsia__
 
-
-  
   template <>
   struct IsResource<::test_protocols::ChannelProtocolTakeHandleRequest> : public std::true_type {};
   template <>
@@ -4713,15 +3786,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::ChannelProtocolTakeHandleRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::ChannelProtocolTakeHandleRequest, 4> {};
 
-  
-
-#endif  // __Fuchsia__
-
-  
-#ifdef __Fuchsia__
-
-
-  
   template <>
   struct IsResource<::test_protocols::ChannelProtocolMutateSocketRequest> : public std::true_type {};
   template <>
@@ -4743,15 +3807,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::ChannelProtocolMutateSocketRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::ChannelProtocolMutateSocketRequest, 4> {};
 
-  
-
-#endif  // __Fuchsia__
-
-  
-#ifdef __Fuchsia__
-
-
-  
   template <>
   struct IsResource<::test_protocols::ChannelProtocolMutateSocketResponse> : public std::true_type {};
   template <>
@@ -4773,13 +3828,8 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::ChannelProtocolMutateSocketResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::ChannelProtocolMutateSocketResponse, 4> {};
 
-  
-
 #endif  // __Fuchsia__
 
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::SyscallProtocolMethodCRequest> : public std::true_type {};
 
@@ -4799,12 +3849,8 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::SyscallProtocolMethodCRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::SyscallProtocolMethodCRequest, 16> {};
 
-  
-  
 #ifdef __Fuchsia__
 
-
-  
   template <>
   struct IsResource<::test_protocols::HandleRightsProtocolNoResponseMethodRequest> : public std::true_type {};
   template <>
@@ -4826,15 +3872,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::HandleRightsProtocolNoResponseMethodRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::HandleRightsProtocolNoResponseMethodRequest, 4> {};
 
-  
-
-#endif  // __Fuchsia__
-
-  
-#ifdef __Fuchsia__
-
-
-  
   template <>
   struct IsResource<::test_protocols::HandleRightsProtocolResponseMethodRequest> : public std::true_type {};
   template <>
@@ -4856,15 +3893,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::HandleRightsProtocolResponseMethodRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::HandleRightsProtocolResponseMethodRequest, 4> {};
 
-  
-
-#endif  // __Fuchsia__
-
-  
-#ifdef __Fuchsia__
-
-
-  
   template <>
   struct IsResource<::test_protocols::HandleRightsProtocolResponseMethodResponse> : public std::true_type {};
   template <>
@@ -4886,15 +3914,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::HandleRightsProtocolResponseMethodResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::HandleRightsProtocolResponseMethodResponse, 4> {};
 
-  
-
-#endif  // __Fuchsia__
-
-  
-#ifdef __Fuchsia__
-
-
-  
   template <>
   struct IsResource<::test_protocols::HandleRightsProtocolAnEventRequest> : public std::true_type {};
   template <>
@@ -4916,15 +3935,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::HandleRightsProtocolAnEventRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::HandleRightsProtocolAnEventRequest, 4> {};
 
-  
-
-#endif  // __Fuchsia__
-
-  
-#ifdef __Fuchsia__
-
-
-  
   template <>
   struct IsResource<::test_protocols::ProtocolEnds> : public std::true_type {};
   template <>
@@ -4946,15 +3956,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::ProtocolEnds, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::ProtocolEnds, 16> {};
 
-  
-
-#endif  // __Fuchsia__
-
-  
-#ifdef __Fuchsia__
-
-
-  
   template <>
   struct IsResource<::test_protocols::WithProtocolEndsClientEndsRequest> : public std::true_type {};
   template <>
@@ -4976,15 +3977,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::WithProtocolEndsClientEndsRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithProtocolEndsClientEndsRequest, 4> {};
 
-  
-
-#endif  // __Fuchsia__
-
-  
-#ifdef __Fuchsia__
-
-
-  
   template <>
   struct IsResource<::test_protocols::WithProtocolEndsClientEndsResponse> : public std::true_type {};
   template <>
@@ -5006,15 +3998,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::WithProtocolEndsClientEndsResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithProtocolEndsClientEndsResponse, 4> {};
 
-  
-
-#endif  // __Fuchsia__
-
-  
-#ifdef __Fuchsia__
-
-
-  
   template <>
   struct IsResource<::test_protocols::WithProtocolEndsServerEndsRequest> : public std::true_type {};
   template <>
@@ -5036,15 +4019,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::WithProtocolEndsServerEndsRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithProtocolEndsServerEndsRequest, 4> {};
 
-  
-
-#endif  // __Fuchsia__
-
-  
-#ifdef __Fuchsia__
-
-
-  
   template <>
   struct IsResource<::test_protocols::WithProtocolEndsServerEndsResponse> : public std::true_type {};
   template <>
@@ -5066,15 +4040,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::WithProtocolEndsServerEndsResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithProtocolEndsServerEndsResponse, 4> {};
 
-  
-
-#endif  // __Fuchsia__
-
-  
-#ifdef __Fuchsia__
-
-
-  
   template <>
   struct IsResource<::test_protocols::WithProtocolEndsStructContainingEndsRequest> : public std::true_type {};
   template <>
@@ -5096,15 +4061,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::WithProtocolEndsStructContainingEndsRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithProtocolEndsStructContainingEndsRequest, 16> {};
 
-  
-
-#endif  // __Fuchsia__
-
-  
-#ifdef __Fuchsia__
-
-
-  
   template <>
   struct IsResource<::test_protocols::WithProtocolEndsStructContainingEndsResponse> : public std::true_type {};
   template <>
@@ -5126,13 +4082,8 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::WithProtocolEndsStructContainingEndsResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithProtocolEndsStructContainingEndsResponse, 16> {};
 
-  
-
 #endif  // __Fuchsia__
 
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::ManyParametersFifteenRequest> : public std::true_type {};
 
@@ -5152,10 +4103,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::ManyParametersFifteenRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::ManyParametersFifteenRequest, 15> {};
 
-  
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::MethodWithUnionUnionMethodRequest> : public std::true_type {};
 
@@ -5175,10 +4122,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::MethodWithUnionUnionMethodRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::MethodWithUnionUnionMethodRequest, 16> {};
 
-  
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::MethodWithUnionUnionMethodResponse> : public std::true_type {};
 
@@ -5198,12 +4141,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::MethodWithUnionUnionMethodResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocols::MethodWithUnionUnionMethodResponse, 16> {};
 
-  
-
-
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::WithErrorSyntaxResponseAsStructResult> : public std::true_type {};
 
@@ -5223,10 +4160,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::WithErrorSyntaxResponseAsStructResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocols::WithErrorSyntaxResponseAsStructResult> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult> : public std::true_type {};
 
@@ -5246,10 +4179,6 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult> {};
 
-
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::WithErrorSyntaxErrorAsEnumResult> : public std::true_type {};
 
@@ -5269,12 +4198,8 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::WithErrorSyntaxErrorAsEnumResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocols::WithErrorSyntaxErrorAsEnumResult> {};
 
-
-  
 #ifdef __Fuchsia__
 
-
-  
   template <>
   struct IsResource<::test_protocols::WithErrorSyntaxHandleInResultResult> : public std::true_type {};
   template <>
@@ -5296,13 +4221,8 @@ namespace fidl {
   struct internal::NaturalCodingTraits<::test_protocols::WithErrorSyntaxHandleInResultResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocols::WithErrorSyntaxHandleInResultResult> {};
 
-
-
 #endif  // __Fuchsia__
 
-  
-
-  
   template <>
   struct IsFidlType<::test_protocols::TheUnion> : public std::true_type {};
 
@@ -5321,9 +4241,6 @@ namespace fidl {
   template <>
   struct internal::NaturalCodingTraits<::test_protocols::TheUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocols::TheUnion> {};
-
-
-
 
   template <>
   struct internal::NaturalCodingTraits<::test_protocols::ErrorEnum, ::fidl::internal::NaturalCodingConstraintEmpty> {

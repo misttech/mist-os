@@ -43,10 +43,6 @@ struct ParentFirstRequest {
   void _CloseHandles();
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 struct ChildSecondRequest {
   ::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> request = {};
 
@@ -109,9 +105,6 @@ struct ::fidl::internal::WireCodingTraits<::test_inheritancewithrecursivedecl::w
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsResource<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest> : public std::true_type {};
 

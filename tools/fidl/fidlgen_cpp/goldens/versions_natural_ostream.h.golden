@@ -27,18 +27,10 @@ struct fidl::ostream::Formatter<::test_versions::Struct> {
   static std::ostream& Format(std::ostream& os, const ::test_versions::Struct& value);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct fidl::ostream::Formatter<::test_versions::Table> {
   static std::ostream& Format(std::ostream& os, const ::test_versions::Table& value);
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct fidl::ostream::Formatter<::test_versions::Union> {
@@ -57,15 +49,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_versions::Enum& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_versions::Struct& value);
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_versions::Table& value);
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_versions::Union& value);
 

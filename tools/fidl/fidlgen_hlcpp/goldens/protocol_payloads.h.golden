@@ -1156,10 +1156,6 @@ constexpr uint64_t kMainProtocol_OnAnon_Ordinal = 0x42d321dacc4df000lu;
 constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnAnon_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 }  // namespace internal
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class MainProtocol {
  public:
   using Proxy_ = ::test::protocolpayloads::MainProtocol_Proxy;

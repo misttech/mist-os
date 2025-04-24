@@ -82,10 +82,6 @@ class ClientEndWrapper {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class ServerEndWrapper {
  private:
   struct Storage_;
@@ -132,10 +128,6 @@ class ServerEndWrapper {
       &Storage_::value, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class T {
  private:
@@ -184,10 +176,6 @@ class T {
                                                    ::fidl::internal::NaturalTableMember<Storage_, ::fdf::ClientEnd<::test_driverhandle::DriverProtocol>, fidl::internal::NaturalCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, false>>{2, &Storage_::fdf_handle});
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class HandlesInProtocolSendHandlesRequest {
  private:
   struct Storage_;
@@ -235,10 +223,6 @@ class HandlesInProtocolSendHandlesRequest {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 inline ClientEndWrapper::ClientEndWrapper(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline ClientEndWrapper::ClientEndWrapper(::fdf::ClientEnd<::test_driverhandle::DriverProtocol> value) noexcept
     : storage_({.value = std::move(value)}) {}
@@ -250,10 +234,6 @@ inline ClientEndWrapper& ClientEndWrapper::value(::fdf::ClientEnd<::test_driverh
   storage_.value = std::move(value);
   return *this;
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 inline ServerEndWrapper::ServerEndWrapper(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline ServerEndWrapper::ServerEndWrapper(::fdf::ServerEnd<::test_driverhandle::DriverProtocol> value) noexcept
@@ -267,10 +247,6 @@ inline ServerEndWrapper& ServerEndWrapper::value(::fdf::ServerEnd<::test_driverh
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 inline T::T(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 
 inline T::T(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : T(Storage_{}) {}
@@ -282,10 +258,6 @@ inline T& T::fdf_handle(std::optional<::fdf::ClientEnd<::test_driverhandle::Driv
   storage_.fdf_handle = std::move(value);
   return *this;
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 inline HandlesInProtocolSendHandlesRequest::HandlesInProtocolSendHandlesRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline HandlesInProtocolSendHandlesRequest::HandlesInProtocolSendHandlesRequest(::test_driverhandle::T t) noexcept
@@ -327,10 +299,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_driverhandle::ClientEndWrapper, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_driverhandle::ClientEndWrapper, 4> {};
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct IsResource<::test_driverhandle::ServerEndWrapper> : public std::true_type {};
 template <>
@@ -352,10 +320,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_driverhandle::ServerEndWrapper, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_driverhandle::ServerEndWrapper, 4> {};
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct IsResource<::test_driverhandle::HandlesInProtocolSendHandlesRequest> : public std::true_type {};
 template <>
@@ -376,10 +340,6 @@ struct IsStruct<::test_driverhandle::HandlesInProtocolSendHandlesRequest> : publ
 template <>
 struct internal::NaturalCodingTraits<::test_driverhandle::HandlesInProtocolSendHandlesRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_driverhandle::HandlesInProtocolSendHandlesRequest, 16> {};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct IsResource<::test_driverhandle::T> : public std::true_type {};

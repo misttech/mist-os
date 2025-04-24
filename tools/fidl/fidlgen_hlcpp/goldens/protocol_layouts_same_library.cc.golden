@@ -113,8 +113,6 @@ void TablePayload::Decode(::fidl::Decoder* _decoder, TablePayload* _value, size_
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -134,7 +132,6 @@ zx_status_t TablePayload::Clone(TablePayload* result) const {
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_UnionPayloadTable;
 const fidl_type_t* UnionPayload::FidlType = &test_protocollayoutssamelibrary_UnionPayloadTable;
@@ -175,7 +172,6 @@ UnionPayload UnionPayload::WithB(bool&& val) {
   result.set_b(std::move(val));
   return result;
 }
-
 
 void UnionPayload::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -223,7 +219,6 @@ void UnionPayload::Decode(::fidl::Decoder* _decoder, UnionPayload* value, size_t
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -260,10 +255,10 @@ void UnionPayload::Destroy() {
   switch (tag_) {
     case ::test::protocollayoutssamelibrary::UnionPayload::Tag::kB:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::protocollayoutssamelibrary::UnionPayload::Tag::Invalid);
 }
@@ -283,7 +278,6 @@ void UnionPayload::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOneWayAnonComposedRequestTable;
 const fidl_type_t* ComposedProtocolOneWayAnonComposedRequest::FidlType = &test_protocollayoutssamelibrary_ComposedProtocolOneWayAnonComposedRequestTable;
@@ -386,8 +380,6 @@ void ComposedProtocolOneWayAnonComposedRequest::Decode(::fidl::Decoder* _decoder
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -407,7 +399,6 @@ zx_status_t ComposedProtocolOneWayAnonComposedRequest::Clone(ComposedProtocolOne
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedRequestTable;
 const fidl_type_t* ComposedProtocolTwoWayAnonComposedRequest::FidlType = &test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedRequestTable;
@@ -448,7 +439,6 @@ ComposedProtocolTwoWayAnonComposedRequest ComposedProtocolTwoWayAnonComposedRequ
   result.set_b(std::move(val));
   return result;
 }
-
 
 void ComposedProtocolTwoWayAnonComposedRequest::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -496,7 +486,6 @@ void ComposedProtocolTwoWayAnonComposedRequest::Decode(::fidl::Decoder* _decoder
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -533,10 +522,10 @@ void ComposedProtocolTwoWayAnonComposedRequest::Destroy() {
   switch (tag_) {
     case ::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest::Tag::kB:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest::Tag::Invalid);
 }
@@ -556,7 +545,6 @@ void ComposedProtocolTwoWayAnonComposedRequest::EnsureStorageInitialized(::fidl_
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedResponseTable;
 const fidl_type_t* ComposedProtocolTwoWayAnonComposedResponse::FidlType = &test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedResponseTable;
@@ -659,8 +647,6 @@ void ComposedProtocolTwoWayAnonComposedResponse::Decode(::fidl::Decoder* _decode
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -680,7 +666,6 @@ zx_status_t ComposedProtocolTwoWayAnonComposedResponse::Clone(ComposedProtocolTw
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable;
 const fidl_type_t* ComposedProtocolTwoWayAnonComposedWithErrorRequest::FidlType = &test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable;
@@ -783,8 +768,6 @@ void ComposedProtocolTwoWayAnonComposedWithErrorRequest::Decode(::fidl::Decoder*
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -804,7 +787,6 @@ zx_status_t ComposedProtocolTwoWayAnonComposedWithErrorRequest::Clone(ComposedPr
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResponseTable;
 const fidl_type_t* ComposedProtocol_TwoWayAnonComposedWithError_Response::FidlType = &test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResponseTable;
@@ -845,7 +827,6 @@ ComposedProtocol_TwoWayAnonComposedWithError_Response ComposedProtocol_TwoWayAno
   result.set_b(std::move(val));
   return result;
 }
-
 
 void ComposedProtocol_TwoWayAnonComposedWithError_Response::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -893,7 +874,6 @@ void ComposedProtocol_TwoWayAnonComposedWithError_Response::Decode(::fidl::Decod
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -930,10 +910,10 @@ void ComposedProtocol_TwoWayAnonComposedWithError_Response::Destroy() {
   switch (tag_) {
     case ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response::Tag::kB:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response::Tag::Invalid);
 }
@@ -953,7 +933,6 @@ void ComposedProtocol_TwoWayAnonComposedWithError_Response::EnsureStorageInitial
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
 const fidl_type_t* ComposedProtocol_TwoWayAnonComposedWithError_Result::FidlType = &test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
@@ -1007,7 +986,6 @@ ComposedProtocol_TwoWayAnonComposedWithError_Result ComposedProtocol_TwoWayAnonC
   result.set_err(std::move(val));
   return result;
 }
-
 
 void ComposedProtocol_TwoWayAnonComposedWithError_Result::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -1078,7 +1056,6 @@ void ComposedProtocol_TwoWayAnonComposedWithError_Result::Decode(::fidl::Decoder
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -1133,10 +1110,10 @@ void ComposedProtocol_TwoWayAnonComposedWithError_Result::Destroy() {
       break;
     case ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result::Tag::Invalid);
 }
@@ -1159,7 +1136,6 @@ void ComposedProtocol_TwoWayAnonComposedWithError_Result::EnsureStorageInitializ
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable;
 const fidl_type_t* ComposedProtocolOnAnonComposedRequest::FidlType = &test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable;
@@ -1200,7 +1176,6 @@ ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest::Wit
   result.set_b(std::move(val));
   return result;
 }
-
 
 void ComposedProtocolOnAnonComposedRequest::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -1248,7 +1223,6 @@ void ComposedProtocolOnAnonComposedRequest::Decode(::fidl::Decoder* _decoder, Co
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -1285,10 +1259,10 @@ void ComposedProtocolOnAnonComposedRequest::Destroy() {
   switch (tag_) {
     case ::test::protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest::Tag::kB:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest::Tag::Invalid);
 }
@@ -1308,7 +1282,6 @@ void ComposedProtocolOnAnonComposedRequest::EnsureStorageInitialized(::fidl_xuni
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
 const fidl_type_t* ComposedProtocol_TwoWayNamedComposedWithError_Result::FidlType = &test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
@@ -1362,7 +1335,6 @@ ComposedProtocol_TwoWayNamedComposedWithError_Result ComposedProtocol_TwoWayName
   result.set_err(std::move(val));
   return result;
 }
-
 
 void ComposedProtocol_TwoWayNamedComposedWithError_Result::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -1433,7 +1405,6 @@ void ComposedProtocol_TwoWayNamedComposedWithError_Result::Decode(::fidl::Decode
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -1488,10 +1459,10 @@ void ComposedProtocol_TwoWayNamedComposedWithError_Result::Destroy() {
       break;
     case ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result::Tag::Invalid);
 }
@@ -1514,7 +1485,6 @@ void ComposedProtocol_TwoWayNamedComposedWithError_Result::EnsureStorageInitiali
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
 const fidl_type_t* MainProtocol_TwoWayLocalWithError_Result::FidlType = &test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
@@ -1568,7 +1538,6 @@ MainProtocol_TwoWayLocalWithError_Result MainProtocol_TwoWayLocalWithError_Resul
   result.set_err(std::move(val));
   return result;
 }
-
 
 void MainProtocol_TwoWayLocalWithError_Result::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -1639,7 +1608,6 @@ void MainProtocol_TwoWayLocalWithError_Result::Decode(::fidl::Decoder* _decoder,
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -1694,10 +1662,10 @@ void MainProtocol_TwoWayLocalWithError_Result::Destroy() {
       break;
     case ::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result::Tag::Invalid);
 }
@@ -1720,7 +1688,6 @@ void MainProtocol_TwoWayLocalWithError_Result::EnsureStorageInitialized(::fidl_x
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOneWayAnonRequestTable;
 const fidl_type_t* MainProtocolOneWayAnonRequest::FidlType = &test_protocollayoutssamelibrary_MainProtocolOneWayAnonRequestTable;
@@ -1823,8 +1790,6 @@ void MainProtocolOneWayAnonRequest::Decode(::fidl::Decoder* _decoder, MainProtoc
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -1844,7 +1809,6 @@ zx_status_t MainProtocolOneWayAnonRequest::Clone(MainProtocolOneWayAnonRequest* 
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonRequestTable;
 const fidl_type_t* MainProtocolTwoWayAnonRequest::FidlType = &test_protocollayoutssamelibrary_MainProtocolTwoWayAnonRequestTable;
@@ -1893,7 +1857,6 @@ MainProtocolTwoWayAnonRequest MainProtocolTwoWayAnonRequest::WithB(bool&& val) {
   result.set_b(std::move(val));
   return result;
 }
-
 
 void MainProtocolTwoWayAnonRequest::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -1946,7 +1909,6 @@ void MainProtocolTwoWayAnonRequest::Decode(::fidl::Decoder* _decoder, MainProtoc
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -1994,13 +1956,13 @@ void MainProtocolTwoWayAnonRequest::Destroy() {
   switch (tag_) {
     case ::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest::Tag::kB:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest::Tag::Invalid);
 }
@@ -2021,7 +1983,6 @@ void MainProtocolTwoWayAnonRequest::EnsureStorageInitialized(::fidl_xunion_tag_t
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonResponseTable;
 const fidl_type_t* MainProtocolTwoWayAnonResponse::FidlType = &test_protocollayoutssamelibrary_MainProtocolTwoWayAnonResponseTable;
@@ -2124,8 +2085,6 @@ void MainProtocolTwoWayAnonResponse::Decode(::fidl::Decoder* _decoder, MainProto
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -2145,7 +2104,6 @@ zx_status_t MainProtocolTwoWayAnonResponse::Clone(MainProtocolTwoWayAnonResponse
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorRequestTable;
 const fidl_type_t* MainProtocolTwoWayAnonWithErrorRequest::FidlType = &test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorRequestTable;
@@ -2248,8 +2206,6 @@ void MainProtocolTwoWayAnonWithErrorRequest::Decode(::fidl::Decoder* _decoder, M
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -2269,7 +2225,6 @@ zx_status_t MainProtocolTwoWayAnonWithErrorRequest::Clone(MainProtocolTwoWayAnon
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResponseTable;
 const fidl_type_t* MainProtocol_TwoWayAnonWithError_Response::FidlType = &test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResponseTable;
@@ -2318,7 +2273,6 @@ MainProtocol_TwoWayAnonWithError_Response MainProtocol_TwoWayAnonWithError_Respo
   result.set_b(std::move(val));
   return result;
 }
-
 
 void MainProtocol_TwoWayAnonWithError_Response::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -2371,7 +2325,6 @@ void MainProtocol_TwoWayAnonWithError_Response::Decode(::fidl::Decoder* _decoder
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -2419,13 +2372,13 @@ void MainProtocol_TwoWayAnonWithError_Response::Destroy() {
   switch (tag_) {
     case ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response::Tag::kB:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response::Tag::Invalid);
 }
@@ -2446,7 +2399,6 @@ void MainProtocol_TwoWayAnonWithError_Response::EnsureStorageInitialized(::fidl_
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable;
 const fidl_type_t* MainProtocol_TwoWayAnonWithError_Result::FidlType = &test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable;
@@ -2500,7 +2452,6 @@ MainProtocol_TwoWayAnonWithError_Result MainProtocol_TwoWayAnonWithError_Result:
   result.set_err(std::move(val));
   return result;
 }
-
 
 void MainProtocol_TwoWayAnonWithError_Result::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -2571,7 +2522,6 @@ void MainProtocol_TwoWayAnonWithError_Result::Decode(::fidl::Decoder* _decoder, 
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -2626,10 +2576,10 @@ void MainProtocol_TwoWayAnonWithError_Result::Destroy() {
       break;
     case ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result::Tag::Invalid);
 }
@@ -2652,7 +2602,6 @@ void MainProtocol_TwoWayAnonWithError_Result::EnsureStorageInitialized(::fidl_xu
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOnAnonRequestTable;
 const fidl_type_t* MainProtocolOnAnonRequest::FidlType = &test_protocollayoutssamelibrary_MainProtocolOnAnonRequestTable;
@@ -2701,7 +2650,6 @@ MainProtocolOnAnonRequest MainProtocolOnAnonRequest::WithB(bool&& val) {
   result.set_b(std::move(val));
   return result;
 }
-
 
 void MainProtocolOnAnonRequest::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -2754,7 +2702,6 @@ void MainProtocolOnAnonRequest::Decode(::fidl::Decoder* _decoder, MainProtocolOn
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -2802,13 +2749,13 @@ void MainProtocolOnAnonRequest::Destroy() {
   switch (tag_) {
     case ::test::protocollayoutssamelibrary::MainProtocolOnAnonRequest::Tag::kB:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::protocollayoutssamelibrary::MainProtocolOnAnonRequest::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::protocollayoutssamelibrary::MainProtocolOnAnonRequest::Tag::Invalid);
 }
@@ -2838,29 +2785,22 @@ void MainProtocolOnAnonRequest::EnsureStorageInitialized(::fidl_xunion_tag_t tag
 
   namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOneWayAnonComposedRequestTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedRequestTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedResponseTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_TablePayloadTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_UnionPayloadTable;
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
-  
-  
 
 }  // namespace _internal
 
@@ -2979,7 +2919,6 @@ zx_status_t ComposedProtocol_Proxy::Dispatch_(::fidl::HLCPPIncomingMessage messa
   }
   return status;
 }
-
 
 void ComposedProtocol_Proxy::OneWayAnonComposed(::test::protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest) {
   ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kComposedProtocol_OneWayAnonComposed_Ordinal, ::test::protocollayoutssamelibrary::internal::kComposedProtocol_OneWayAnonComposed_DynamicFlags);
@@ -3302,49 +3241,19 @@ zx_status_t ComposedProtocol_SyncProxy::TwoWayNamedComposedWithError(::test::pro
   return ZX_OK;
 }
 
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
   namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOneWayAnonRequestTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonRequestTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonResponseTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorRequestTable;
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOnAnonRequestTable;
 
 }  // namespace _internal
@@ -3540,7 +3449,6 @@ zx_status_t MainProtocol_Proxy::Dispatch_(::fidl::HLCPPIncomingMessage message) 
   }
   return status;
 }
-
 
 void MainProtocol_Proxy::OneWayAnonComposed(::test::protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest) {
   ::fidl::MessageEncoder _encoder(::test::protocollayoutssamelibrary::internal::kMainProtocol_OneWayAnonComposed_Ordinal, ::test::protocollayoutssamelibrary::internal::kMainProtocol_OneWayAnonComposed_DynamicFlags);

@@ -77,10 +77,6 @@ struct NonInlineStructTestStruct {
   void _CloseHandles();
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 struct TopLevelStruct {
   ::test_encapsulatedstructs::wire::StructPaddingTestStruct a = {};
 
@@ -355,9 +351,6 @@ struct ::fidl::internal::WireCodingTraits<::test_encapsulatedstructs::wire::NonI
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsResource<::test_encapsulatedstructs::wire::TopLevelStruct> : public std::true_type {};
 

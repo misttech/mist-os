@@ -140,10 +140,6 @@ namespace test_errorsyntax {
 
 ::fidl::WireResult<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>(result) {}
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::WireUnownedResult<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>::WireUnownedResult(::fidl::UnownedClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>* request) {
   constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> allocation = allocator.TryAllocate(buffer_size);
@@ -236,10 +232,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_errorsyntax::ExampleUseOfErrorSynt
       });
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::internal::WireEventDispatcher<::test_errorsyntax::ExampleUseOfErrorSyntax>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_errorsyntax::ExampleUseOfErrorSyntax>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
@@ -249,10 +241,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_errorsyntax::ExampleUseOfErrorSynt
   fidl::internal::WireEventDispatcher<::test_errorsyntax::ExampleUseOfErrorSyntax> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_errorsyntax::ExampleUseOfErrorSyntax>::entries_[] = {
     {
@@ -317,9 +305,6 @@ fidl::WireServer<::test_errorsyntax::ExampleUseOfErrorSyntax>::Handler fidl::Wir
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void fidl::internal::WireCompleterImpl<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>::Reply(::fit::result<uint32_t, ::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailResponse*> result) {
   if (result.is_ok()) {
     return MakeReply(::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailResult::WithResponse(::fidl::ObjectView<::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailResponse>::FromExternal(result.value())));
@@ -394,9 +379,6 @@ void fidl::internal::WireBufferCompleterImpl<::test_errorsyntax::ExampleUseOfErr
   return MakeReply(::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailResult::WithErr(std::move(error)));
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void fidl::internal::WireCompleterImpl<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>::Reply(::fit::result<uint32_t, ::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResponse*> result) {
   if (result.is_ok()) {
     return MakeReply(::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult::WithResponse(::fidl::ObjectView<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResponse>::FromExternal(result.value())));
@@ -471,9 +453,6 @@ void fidl::internal::WireBufferCompleterImpl<::test_errorsyntax::ExampleUseOfErr
   return MakeReply(::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult::WithErr(std::move(error)));
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_errorsyntax::kExampleUseOfErrorSyntax_ComposedCallWhichMayFail_Ordinal, ::test_errorsyntax::kExampleUseOfErrorSyntax_ComposedCallWhichMayFail_DynamicFlags);
 }
@@ -645,9 +624,5 @@ fidl::internal::WireSyncBufferClientImpl<::test_errorsyntax::ExampleUseOfErrorSy
   return ::fidl::WireUnownedResult<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>(
       ::fidl::UnownedClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
 }
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop

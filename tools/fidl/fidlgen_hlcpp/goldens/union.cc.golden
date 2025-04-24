@@ -20,7 +20,7 @@ void Pizza::Encode(::fidl::Encoder* _encoder, size_t _offset,
   if (::fidl::IsMemcpyCompatible<Pizza>::value) {
     memcpy(_encoder->template GetPtr<Pizza>(_offset), this, sizeof(Pizza));
   } else {::fidl::Encode(_encoder, &toppings, _offset + 0);
-    
+
   }
 }
 
@@ -39,7 +39,6 @@ zx_status_t Pizza::Clone(Pizza* _result) const {
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_union_PastaTable;
 const fidl_type_t* Pasta::FidlType = &test_union_PastaTable;
 
@@ -48,7 +47,7 @@ void Pasta::Encode(::fidl::Encoder* _encoder, size_t _offset,
   if (::fidl::IsMemcpyCompatible<Pasta>::value) {
     memcpy(_encoder->template GetPtr<Pasta>(_offset), this, sizeof(Pasta));
   } else {::fidl::Encode(_encoder, &sauce, _offset + 0);
-    
+
   }
 }
 
@@ -66,7 +65,6 @@ zx_status_t Pasta::Clone(Pasta* _result) const {
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_union_PizzaOrPastaTable;
 const fidl_type_t* PizzaOrPasta::FidlType = &test_union_PizzaOrPastaTable;
@@ -122,7 +120,6 @@ PizzaOrPasta PizzaOrPasta::WithPasta(::test::union_::Pasta&& val) {
   result.set_pasta(std::move(val));
   return result;
 }
-
 
 void PizzaOrPasta::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -193,7 +190,6 @@ void PizzaOrPasta::Decode(::fidl::Decoder* _decoder, PizzaOrPasta* value, size_t
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -252,10 +248,10 @@ void PizzaOrPasta::Destroy() {
     case ::test::union_::PizzaOrPasta::Tag::kPasta:
       pasta_.~decltype(pasta_)();
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::PizzaOrPasta::Tag::Invalid);
 }
@@ -278,7 +274,6 @@ void PizzaOrPasta::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_union_ExplicitPizzaOrPastaTable;
 const fidl_type_t* ExplicitPizzaOrPasta::FidlType = &test_union_ExplicitPizzaOrPastaTable;
@@ -334,7 +329,6 @@ ExplicitPizzaOrPasta ExplicitPizzaOrPasta::WithPasta(::test::union_::Pasta&& val
   result.set_pasta(std::move(val));
   return result;
 }
-
 
 void ExplicitPizzaOrPasta::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -405,7 +399,6 @@ void ExplicitPizzaOrPasta::Decode(::fidl::Decoder* _decoder, ExplicitPizzaOrPast
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -464,10 +457,10 @@ void ExplicitPizzaOrPasta::Destroy() {
     case ::test::union_::ExplicitPizzaOrPasta::Tag::kPasta:
       pasta_.~decltype(pasta_)();
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::ExplicitPizzaOrPasta::Tag::Invalid);
 }
@@ -490,7 +483,6 @@ void ExplicitPizzaOrPasta::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_union_FlexiblePizzaOrPastaTable;
 const fidl_type_t* FlexiblePizzaOrPasta::FidlType = &test_union_FlexiblePizzaOrPastaTable;
@@ -554,7 +546,6 @@ FlexiblePizzaOrPasta FlexiblePizzaOrPasta::WithPasta(::test::union_::Pasta&& val
   result.set_pasta(std::move(val));
   return result;
 }
-
 
 void FlexiblePizzaOrPasta::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -630,7 +621,6 @@ void FlexiblePizzaOrPasta::Decode(::fidl::Decoder* _decoder, FlexiblePizzaOrPast
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -700,13 +690,13 @@ void FlexiblePizzaOrPasta::Destroy() {
     case ::test::union_::FlexiblePizzaOrPasta::Tag::kPasta:
       pasta_.~decltype(pasta_)();
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::union_::FlexiblePizzaOrPasta::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::FlexiblePizzaOrPasta::Tag::Invalid);
 }
@@ -730,7 +720,6 @@ void FlexiblePizzaOrPasta::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_union_StrictPizzaOrPastaTable;
 const fidl_type_t* StrictPizzaOrPasta::FidlType = &test_union_StrictPizzaOrPastaTable;
@@ -786,7 +775,6 @@ StrictPizzaOrPasta StrictPizzaOrPasta::WithPasta(::test::union_::Pasta&& val) {
   result.set_pasta(std::move(val));
   return result;
 }
-
 
 void StrictPizzaOrPasta::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -857,7 +845,6 @@ void StrictPizzaOrPasta::Decode(::fidl::Decoder* _decoder, StrictPizzaOrPasta* v
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -916,10 +903,10 @@ void StrictPizzaOrPasta::Destroy() {
     case ::test::union_::StrictPizzaOrPasta::Tag::kPasta:
       pasta_.~decltype(pasta_)();
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::StrictPizzaOrPasta::Tag::Invalid);
 }
@@ -942,7 +929,6 @@ void StrictPizzaOrPasta::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_union_UnionTable;
 const fidl_type_t* Union::FidlType = &test_union_UnionTable;
@@ -1009,7 +995,6 @@ Union Union::WithVectorStringAlsoNeedsConstructor(::std::vector<::std::string>&&
   result.set_VectorStringAlsoNeedsConstructor(std::move(val));
   return result;
 }
-
 
 void Union::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -1103,7 +1088,6 @@ void Union::Decode(::fidl::Decoder* _decoder, Union* value, size_t offset) {
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -1176,10 +1160,10 @@ void Union::Destroy() {
     case ::test::union_::Union::Tag::kVectorStringAlsoNeedsConstructor:
       VectorStringAlsoNeedsConstructor_.~decltype(VectorStringAlsoNeedsConstructor_)();
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::Union::Tag::Invalid);
 }
@@ -1205,7 +1189,6 @@ void Union::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_union_FlexibleUnionTable;
 const fidl_type_t* FlexibleUnion::FidlType = &test_union_FlexibleUnionTable;
@@ -1280,7 +1263,6 @@ FlexibleUnion FlexibleUnion::WithVectorStringAlsoNeedsConstructor(::std::vector<
   result.set_VectorStringAlsoNeedsConstructor(std::move(val));
   return result;
 }
-
 
 void FlexibleUnion::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -1379,7 +1361,6 @@ void FlexibleUnion::Decode(::fidl::Decoder* _decoder, FlexibleUnion* value, size
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -1463,13 +1444,13 @@ void FlexibleUnion::Destroy() {
     case ::test::union_::FlexibleUnion::Tag::kVectorStringAlsoNeedsConstructor:
       VectorStringAlsoNeedsConstructor_.~decltype(VectorStringAlsoNeedsConstructor_)();
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::union_::FlexibleUnion::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::FlexibleUnion::Tag::Invalid);
 }
@@ -1496,7 +1477,6 @@ void FlexibleUnion::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_union_StrictUnionTable;
 const fidl_type_t* StrictUnion::FidlType = &test_union_StrictUnionTable;
@@ -1563,7 +1543,6 @@ StrictUnion StrictUnion::WithVectorStringAlsoNeedsConstructor(::std::vector<::st
   result.set_VectorStringAlsoNeedsConstructor(std::move(val));
   return result;
 }
-
 
 void StrictUnion::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -1657,7 +1636,6 @@ void StrictUnion::Decode(::fidl::Decoder* _decoder, StrictUnion* value, size_t o
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -1730,10 +1708,10 @@ void StrictUnion::Destroy() {
     case ::test::union_::StrictUnion::Tag::kVectorStringAlsoNeedsConstructor:
       VectorStringAlsoNeedsConstructor_.~decltype(VectorStringAlsoNeedsConstructor_)();
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::StrictUnion::Tag::Invalid);
 }
@@ -1759,7 +1737,6 @@ void StrictUnion::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_union_FieldCollisionTable;
 const fidl_type_t* FieldCollision::FidlType = &test_union_FieldCollisionTable;
@@ -1800,7 +1777,6 @@ FieldCollision FieldCollision::WithFieldCollisionTag(int32_t&& val) {
   result.set_field_collision_tag(std::move(val));
   return result;
 }
-
 
 void FieldCollision::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -1848,7 +1824,6 @@ void FieldCollision::Decode(::fidl::Decoder* _decoder, FieldCollision* value, si
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -1885,10 +1860,10 @@ void FieldCollision::Destroy() {
   switch (tag_) {
     case ::test::union_::FieldCollision::Tag::kFieldCollisionTag:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::FieldCollision::Tag::Invalid);
 }
@@ -1908,7 +1883,6 @@ void FieldCollision::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_union_ExplicitUnionTable;
 const fidl_type_t* ExplicitUnion::FidlType = &test_union_ExplicitUnionTable;
@@ -1962,7 +1936,6 @@ ExplicitUnion ExplicitUnion::WithStringNeedsConstructor(::std::string&& val) {
   result.set_StringNeedsConstructor(std::move(val));
   return result;
 }
-
 
 void ExplicitUnion::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -2033,7 +2006,6 @@ void ExplicitUnion::Decode(::fidl::Decoder* _decoder, ExplicitUnion* value, size
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -2088,10 +2060,10 @@ void ExplicitUnion::Destroy() {
     case ::test::union_::ExplicitUnion::Tag::kStringNeedsConstructor:
       StringNeedsConstructor_.~decltype(StringNeedsConstructor_)();
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::ExplicitUnion::Tag::Invalid);
 }
@@ -2114,7 +2086,6 @@ void ExplicitUnion::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_union_ReverseOrdinalUnionTable;
 const fidl_type_t* ReverseOrdinalUnion::FidlType = &test_union_ReverseOrdinalUnionTable;
@@ -2166,7 +2137,6 @@ ReverseOrdinalUnion ReverseOrdinalUnion::WithSecond(uint32_t&& val) {
   result.set_second(std::move(val));
   return result;
 }
-
 
 void ReverseOrdinalUnion::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -2237,7 +2207,6 @@ void ReverseOrdinalUnion::Decode(::fidl::Decoder* _decoder, ReverseOrdinalUnion*
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -2288,10 +2257,10 @@ void ReverseOrdinalUnion::Destroy() {
       break;
     case ::test::union_::ReverseOrdinalUnion::Tag::kSecond:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::ReverseOrdinalUnion::Tag::Invalid);
 }
@@ -2315,7 +2284,6 @@ void ReverseOrdinalUnion::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
   }
 }
 
-
 extern "C" const fidl_type_t test_union_NullableUnionStructTable;
 const fidl_type_t* NullableUnionStruct::FidlType = &test_union_NullableUnionStructTable;
 
@@ -2324,7 +2292,7 @@ void NullableUnionStruct::Encode(::fidl::Encoder* _encoder, size_t _offset,
   if (::fidl::IsMemcpyCompatible<NullableUnionStruct>::value) {
     memcpy(_encoder->template GetPtr<NullableUnionStruct>(_offset), this, sizeof(NullableUnionStruct));
   } else {::fidl::Encode(_encoder, &the_union, _offset + 0);
-    
+
   }
 }
 
@@ -2342,7 +2310,6 @@ zx_status_t NullableUnionStruct::Clone(NullableUnionStruct* _result) const {
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_union_FlexibleFooTable;
 const fidl_type_t* FlexibleFoo::FidlType = &test_union_FlexibleFooTable;
@@ -2404,7 +2371,6 @@ FlexibleFoo FlexibleFoo::WithI(int32_t&& val) {
   result.set_i(std::move(val));
   return result;
 }
-
 
 void FlexibleFoo::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -2480,7 +2446,6 @@ void FlexibleFoo::Decode(::fidl::Decoder* _decoder, FlexibleFoo* value, size_t o
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -2546,13 +2511,13 @@ void FlexibleFoo::Destroy() {
       break;
     case ::test::union_::FlexibleFoo::Tag::kI:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::union_::FlexibleFoo::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::FlexibleFoo::Tag::Invalid);
 }
@@ -2576,7 +2541,6 @@ void FlexibleFoo::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_union_StrictFooTable;
 const fidl_type_t* StrictFoo::FidlType = &test_union_StrictFooTable;
@@ -2630,7 +2594,6 @@ StrictFoo StrictFoo::WithI(int32_t&& val) {
   result.set_i(std::move(val));
   return result;
 }
-
 
 void StrictFoo::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -2701,7 +2664,6 @@ void StrictFoo::Decode(::fidl::Decoder* _decoder, StrictFoo* value, size_t offse
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -2756,10 +2718,10 @@ void StrictFoo::Destroy() {
       break;
     case ::test::union_::StrictFoo::Tag::kI:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::StrictFoo::Tag::Invalid);
 }
@@ -2782,7 +2744,6 @@ void StrictFoo::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_union_ExplicitFooTable;
 const fidl_type_t* ExplicitFoo::FidlType = &test_union_ExplicitFooTable;
@@ -2844,7 +2805,6 @@ ExplicitFoo ExplicitFoo::WithS(::std::string&& val) {
   result.set_s(std::move(val));
   return result;
 }
-
 
 void ExplicitFoo::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -2920,7 +2880,6 @@ void ExplicitFoo::Decode(::fidl::Decoder* _decoder, ExplicitFoo* value, size_t o
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -2986,13 +2945,13 @@ void ExplicitFoo::Destroy() {
     case ::test::union_::ExplicitFoo::Tag::kS:
       s_.~decltype(s_)();
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::union_::ExplicitFoo::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::ExplicitFoo::Tag::Invalid);
 }
@@ -3016,7 +2975,6 @@ void ExplicitFoo::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_union_ExplicitStrictFooTable;
 const fidl_type_t* ExplicitStrictFoo::FidlType = &test_union_ExplicitStrictFooTable;
@@ -3070,7 +3028,6 @@ ExplicitStrictFoo ExplicitStrictFoo::WithS(::std::string&& val) {
   result.set_s(std::move(val));
   return result;
 }
-
 
 void ExplicitStrictFoo::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -3141,7 +3098,6 @@ void ExplicitStrictFoo::Decode(::fidl::Decoder* _decoder, ExplicitStrictFoo* val
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -3196,10 +3152,10 @@ void ExplicitStrictFoo::Destroy() {
     case ::test::union_::ExplicitStrictFoo::Tag::kS:
       s_.~decltype(s_)();
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::ExplicitStrictFoo::Tag::Invalid);
 }
@@ -3222,7 +3178,6 @@ void ExplicitStrictFoo::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_union_OlderSimpleUnionTable;
 const fidl_type_t* OlderSimpleUnion::FidlType = &test_union_OlderSimpleUnionTable;
@@ -3282,7 +3237,6 @@ OlderSimpleUnion OlderSimpleUnion::WithF(float&& val) {
   result.set_f(std::move(val));
   return result;
 }
-
 
 void OlderSimpleUnion::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -3358,7 +3312,6 @@ void OlderSimpleUnion::Decode(::fidl::Decoder* _decoder, OlderSimpleUnion* value
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -3420,13 +3373,13 @@ void OlderSimpleUnion::Destroy() {
       break;
     case ::test::union_::OlderSimpleUnion::Tag::kF:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::union_::OlderSimpleUnion::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::OlderSimpleUnion::Tag::Invalid);
 }
@@ -3450,7 +3403,6 @@ void OlderSimpleUnion::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_union_NewerSimpleUnionTable;
 const fidl_type_t* NewerSimpleUnion::FidlType = &test_union_NewerSimpleUnionTable;
@@ -3525,7 +3477,6 @@ NewerSimpleUnion NewerSimpleUnion::WithV(::std::vector<::std::string>&& val) {
   result.set_v(std::move(val));
   return result;
 }
-
 
 void NewerSimpleUnion::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -3624,7 +3575,6 @@ void NewerSimpleUnion::Decode(::fidl::Decoder* _decoder, NewerSimpleUnion* value
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -3708,13 +3658,13 @@ void NewerSimpleUnion::Destroy() {
     case ::test::union_::NewerSimpleUnion::Tag::kV:
       v_.~decltype(v_)();
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::union_::NewerSimpleUnion::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::NewerSimpleUnion::Tag::Invalid);
 }
@@ -3741,7 +3691,6 @@ void NewerSimpleUnion::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_union_StrictSimpleUnionTable;
 const fidl_type_t* StrictSimpleUnion::FidlType = &test_union_StrictSimpleUnionTable;
@@ -3806,7 +3755,6 @@ StrictSimpleUnion StrictSimpleUnion::WithS(::std::string&& val) {
   result.set_s(std::move(val));
   return result;
 }
-
 
 void StrictSimpleUnion::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -3900,7 +3848,6 @@ void StrictSimpleUnion::Decode(::fidl::Decoder* _decoder, StrictSimpleUnion* val
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -3969,10 +3916,10 @@ void StrictSimpleUnion::Destroy() {
     case ::test::union_::StrictSimpleUnion::Tag::kS:
       s_.~decltype(s_)();
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::StrictSimpleUnion::Tag::Invalid);
 }
@@ -3999,7 +3946,6 @@ void StrictSimpleUnion::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
   }
 }
 
-
 extern "C" const fidl_type_t test_union_EmptyTable;
 const fidl_type_t* Empty::FidlType = &test_union_EmptyTable;
 
@@ -4008,7 +3954,7 @@ void Empty::Encode(::fidl::Encoder* _encoder, size_t _offset,
   if (::fidl::IsMemcpyCompatible<Empty>::value) {
     memcpy(_encoder->template GetPtr<Empty>(_offset), this, sizeof(Empty));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
-    
+
   }
 }
 
@@ -4026,7 +3972,6 @@ zx_status_t Empty::Clone(Empty* _result) const {
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_union_UnionContainingEmptyStructTable;
 const fidl_type_t* UnionContainingEmptyStruct::FidlType = &test_union_UnionContainingEmptyStructTable;
@@ -4077,7 +4022,6 @@ UnionContainingEmptyStruct UnionContainingEmptyStruct::WithEmpty(::test::union_:
   result.set_empty(std::move(val));
   return result;
 }
-
 
 void UnionContainingEmptyStruct::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -4130,7 +4074,6 @@ void UnionContainingEmptyStruct::Decode(::fidl::Decoder* _decoder, UnionContaini
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -4182,13 +4125,13 @@ void UnionContainingEmptyStruct::Destroy() {
     case ::test::union_::UnionContainingEmptyStruct::Tag::kEmpty:
       empty_.~decltype(empty_)();
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::union_::UnionContainingEmptyStruct::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::UnionContainingEmptyStruct::Tag::Invalid);
 }
@@ -4209,7 +4152,6 @@ void UnionContainingEmptyStruct::EnsureStorageInitialized(::fidl_xunion_tag_t ta
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_union_StrictBoundedUnionTable;
 const fidl_type_t* StrictBoundedUnion::FidlType = &test_union_StrictBoundedUnionTable;
@@ -4252,7 +4194,6 @@ StrictBoundedUnion StrictBoundedUnion::WithV(::std::vector<uint8_t>&& val) {
   result.set_v(std::move(val));
   return result;
 }
-
 
 void StrictBoundedUnion::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -4300,7 +4241,6 @@ void StrictBoundedUnion::Decode(::fidl::Decoder* _decoder, StrictBoundedUnion* v
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -4341,10 +4281,10 @@ void StrictBoundedUnion::Destroy() {
     case ::test::union_::StrictBoundedUnion::Tag::kV:
       v_.~decltype(v_)();
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::StrictBoundedUnion::Tag::Invalid);
 }
@@ -4365,7 +4305,6 @@ void StrictBoundedUnion::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
   }
 }
 
-
 extern "C" const fidl_type_t test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable;
 const fidl_type_t* TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse::FidlType = &test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable;
 
@@ -4374,7 +4313,7 @@ void TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse::Encode(::f
   if (::fidl::IsMemcpyCompatible<TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>::value) {
     memcpy(_encoder->template GetPtr<TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>(_offset), this, sizeof(TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse));
   } else {::fidl::Encode(_encoder, &xu, _offset + 0);
-    
+
   }
 }
 
@@ -4393,7 +4332,6 @@ zx_status_t TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse::Clo
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable;
 const fidl_type_t* TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse::FidlType = &test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable;
 
@@ -4402,7 +4340,7 @@ void TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse::Encode(:
   if (::fidl::IsMemcpyCompatible<TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>::value) {
     memcpy(_encoder->template GetPtr<TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>(_offset), this, sizeof(TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse));
   } else {::fidl::Encode(_encoder, &xu, _offset + 0);
-    
+
   }
 }
 
@@ -4421,7 +4359,6 @@ zx_status_t TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse::C
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_union_StructWithNullableUnionTable;
 const fidl_type_t* StructWithNullableUnion::FidlType = &test_union_StructWithNullableUnionTable;
 
@@ -4430,7 +4367,7 @@ void StructWithNullableUnion::Encode(::fidl::Encoder* _encoder, size_t _offset,
   if (::fidl::IsMemcpyCompatible<StructWithNullableUnion>::value) {
     memcpy(_encoder->template GetPtr<StructWithNullableUnion>(_offset), this, sizeof(StructWithNullableUnion));
   } else {::fidl::Encode(_encoder, &x1, _offset + 0);
-    
+
   }
 }
 
@@ -4448,7 +4385,6 @@ zx_status_t StructWithNullableUnion::Clone(StructWithNullableUnion* _result) con
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_union_ExplicitFlexibleUnionTable;
 const fidl_type_t* ExplicitFlexibleUnion::FidlType = &test_union_ExplicitFlexibleUnionTable;
@@ -4508,7 +4444,6 @@ ExplicitFlexibleUnion ExplicitFlexibleUnion::WithF(float&& val) {
   result.set_f(std::move(val));
   return result;
 }
-
 
 void ExplicitFlexibleUnion::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -4584,7 +4519,6 @@ void ExplicitFlexibleUnion::Decode(::fidl::Decoder* _decoder, ExplicitFlexibleUn
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -4646,13 +4580,13 @@ void ExplicitFlexibleUnion::Destroy() {
       break;
     case ::test::union_::ExplicitFlexibleUnion::Tag::kF:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::union_::ExplicitFlexibleUnion::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::ExplicitFlexibleUnion::Tag::Invalid);
 }
@@ -4677,7 +4611,6 @@ void ExplicitFlexibleUnion::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
   }
 }
 
-
 extern "C" const fidl_type_t test_union_UnionSandwichTable;
 const fidl_type_t* UnionSandwich::FidlType = &test_union_UnionSandwichTable;
 
@@ -4688,7 +4621,7 @@ void UnionSandwich::Encode(::fidl::Encoder* _encoder, size_t _offset,
   } else {::fidl::Encode(_encoder, &a, _offset + 0);
     ::fidl::Encode(_encoder, &u, _offset + 8);
     ::fidl::Encode(_encoder, &b, _offset + 24);
-    
+
   }
 }
 
@@ -4714,7 +4647,6 @@ zx_status_t UnionSandwich::Clone(UnionSandwich* _result) const {
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_union_UnionWithAttributesTable;
 const fidl_type_t* UnionWithAttributes::FidlType = &test_union_UnionWithAttributesTable;
@@ -4763,7 +4695,6 @@ UnionWithAttributes UnionWithAttributes::WithX(int64_t&& val) {
   result.set_x(std::move(val));
   return result;
 }
-
 
 void UnionWithAttributes::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -4816,7 +4747,6 @@ void UnionWithAttributes::Decode(::fidl::Decoder* _decoder, UnionWithAttributes*
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -4864,13 +4794,13 @@ void UnionWithAttributes::Destroy() {
   switch (tag_) {
     case ::test::union_::UnionWithAttributes::Tag::kX:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::union_::UnionWithAttributes::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::UnionWithAttributes::Tag::Invalid);
 }
@@ -4891,7 +4821,6 @@ void UnionWithAttributes::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_union_EmptyFlexibleUnionTable;
 const fidl_type_t* EmptyFlexibleUnion::FidlType = &test_union_EmptyFlexibleUnionTable;
@@ -4929,8 +4858,6 @@ EmptyFlexibleUnion& EmptyFlexibleUnion::operator=(EmptyFlexibleUnion&& other) {
   return *this;
 }
 
-
-
 void EmptyFlexibleUnion::Encode(::fidl::Encoder* encoder, size_t offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
 
@@ -4957,7 +4884,6 @@ void EmptyFlexibleUnion::Decode(::fidl::Decoder* _decoder, EmptyFlexibleUnion* v
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
 }
 
 zx_status_t EmptyFlexibleUnion::Clone(EmptyFlexibleUnion* result) const {
@@ -4980,13 +4906,13 @@ EmptyFlexibleUnion& EmptyFlexibleUnion::SetUnknownData(fidl_xunion_tag_t ordinal
 
 void EmptyFlexibleUnion::Destroy() {
   switch (tag_) {
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::union_::EmptyFlexibleUnion::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::EmptyFlexibleUnion::Tag::Invalid);
 }
@@ -5011,11 +4937,9 @@ void EmptyFlexibleUnion::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
 
 #ifdef __Fuchsia__
 
-  
   namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable;
 
 }  // namespace _internal
@@ -5075,7 +4999,6 @@ zx_status_t TestProtocol_Proxy::Dispatch_(::fidl::HLCPPIncomingMessage message) 
   }
   return status;
 }
-
 
 namespace {
 

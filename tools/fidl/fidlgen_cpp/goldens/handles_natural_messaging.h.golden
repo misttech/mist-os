@@ -46,10 +46,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_handles::SomeProtocol> fina
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_handles::SomeProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
  public:
@@ -84,9 +80,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_handles::SomeProtocol> fin
       : IncomingEventDispatcher(event_handler) {}
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_handles::SomeProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:

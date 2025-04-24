@@ -38,27 +38,11 @@ struct ::fidl::internal::WireMethodTypes<::test_emptystruct::EmptyProtocol::Send
   using Completer = fidl::Completer<>;
 };
 
-namespace test_emptystruct {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-}  // namespace test_emptystruct
-
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_emptystruct::EmptyProtocol::Receive> {
   static constexpr bool HasRequestPayload = true;
   using Request = ::test_emptystruct::wire::EmptyProtocolReceiveRequest;
 };
-
-namespace test_emptystruct {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-}  // namespace test_emptystruct
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_emptystruct::EmptyProtocol::SendAndReceive> {
@@ -77,13 +61,6 @@ struct ::fidl::internal::WireMethodTypes<::test_emptystruct::EmptyProtocol::Send
       ::fidl::internal::UnownedEncodedMessage<
           ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive>, ::fidl::internal::ChannelTransport>>;
 };
-
-namespace test_emptystruct {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace test_emptystruct
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_emptystruct::EmptyProtocol> final {
@@ -127,9 +104,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive> final {
   FIDL_ALIGNDECL
@@ -153,9 +127,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<:
       internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive> final {
   FIDL_ALIGNDECL
@@ -236,9 +207,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_emptystruct::Emp
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive>> : public std::true_type {};
 template <>
@@ -256,9 +224,6 @@ struct TypeTraits<::fidl::internal::TransactionalEvent<::test_emptystruct::Empty
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive>> : public std::true_type {};
 template <>
@@ -556,12 +521,6 @@ class ::fidl::WireServer<::test_emptystruct::EmptyProtocol> : public ::fidl::int
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireWeakOnewayClientImpl<::test_emptystruct::EmptyProtocol> : public ::fidl::internal::ClientImplBase {

@@ -50,10 +50,6 @@ struct Struct {
   void _CloseHandles();
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 }  // namespace wire
 }  // namespace test_versions
 
@@ -259,10 +255,6 @@ inline ::fidl::WireTableExternalBuilder<::test_versions::wire::Table> Table::Ext
   return ::fidl::WireTableExternalBuilder<::test_versions::wire::Table>(std::move(frame));
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class Union {
  public:
   Union() : ordinal_(::test_versions::wire::Union::Ordinal::Invalid), envelope_{} {}
@@ -407,9 +399,6 @@ struct ::fidl::internal::WireCodingTraits<::test_versions::wire::Struct, ::fidl:
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsResource<::test_versions::wire::Table> : public std::true_type {};
 
@@ -500,9 +489,6 @@ struct ::fidl::internal::WireCodingTraits<::test_versions::wire::Table, ::fidl::
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsResource<::test_versions::wire::Union> : public std::true_type {};
 

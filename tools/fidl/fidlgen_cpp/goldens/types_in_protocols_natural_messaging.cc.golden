@@ -912,10 +912,6 @@ fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::OneWay
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::Status fidl::SyncEventHandler<::test_typesinprotocols::Protocol>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_typesinprotocols::Protocol> client_end) {
   ::fidl::internal::IncomingEventsStorage<::test_typesinprotocols::Protocol> event_storage;
@@ -1031,10 +1027,6 @@ fidl::internal::NaturalEventDispatcher<::test_typesinprotocols::Protocol>::Dispa
       return ::fidl::Status::UnknownOrdinal();
   }
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 ::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_typesinprotocols::Protocol>::EventBasic(const ::test_typesinprotocols::Basic& payload) {
   ::fidl::internal::NaturalMessageEncoder _encoder{

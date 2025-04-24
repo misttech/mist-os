@@ -115,13 +115,6 @@ class ::fdf::WireServer<::test_driverhandle::DriverProtocol> : public ::fidl::in
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-}  // namespace fidl
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_driverhandle::HandlesInProtocol::SendHandles> {
@@ -208,9 +201,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_driverhandle::Ha
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 }  // namespace fidl
 
 template <>
@@ -302,12 +292,6 @@ class ::fdf::WireServer<::test_driverhandle::HandlesInProtocol> : public ::fidl:
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_driverhandle::DriverProtocol> : public ::fdf::internal::BufferClientImplBase {
@@ -356,10 +340,6 @@ class ::fidl::internal::WireBufferEventSender<::test_driverhandle::DriverProtoco
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_driverhandle::HandlesInProtocol> : public ::fdf::internal::BufferClientImplBase {
  public:
@@ -394,9 +374,6 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_driverhandle::HandlesInPro
   using WireWeakOnewayClientImpl::WireWeakOnewayClientImpl;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakBufferEventSender<::test_driverhandle::HandlesInProtocol> : public ::fdf::internal::WeakBufferEventSenderBase {
  public:

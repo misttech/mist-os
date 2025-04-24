@@ -47,14 +47,6 @@ struct ::fidl::internal::WireMethodTypes<::test_union::TestProtocol::StrictUnion
           ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>, ::fidl::internal::ChannelTransport>>;
 };
 
-namespace test_union {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-}  // namespace test_union
-
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> {
   static constexpr bool HasRequestPayload = false;
@@ -71,13 +63,6 @@ struct ::fidl::internal::WireMethodTypes<::test_union::TestProtocol::FlexibleUni
       ::fidl::internal::UnownedEncodedMessage<
           ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>, ::fidl::internal::ChannelTransport>>;
 };
-
-namespace test_union {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace test_union
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_union::TestProtocol> final {
@@ -617,12 +602,6 @@ class ::fidl::WireServer<::test_union::TestProtocol> : public ::fidl::internal::
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireWeakOnewayClientImpl<::test_union::TestProtocol> : public ::fidl::internal::ClientImplBase {

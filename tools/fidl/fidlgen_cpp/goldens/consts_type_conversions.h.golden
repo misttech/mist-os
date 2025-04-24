@@ -38,9 +38,6 @@ struct WireTypeForNaturalType<::test_consts::EnumType> {
   using type = ::test_consts::wire::EnumType;
 };
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 #pragma clang diagnostic pop
 
 }  // namespace internal

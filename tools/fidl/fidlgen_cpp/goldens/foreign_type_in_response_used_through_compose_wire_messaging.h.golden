@@ -49,13 +49,6 @@ struct ::fidl::internal::WireMethodTypes<::test_foreigntypeinresponseusedthrough
           ::fidl::internal::TransactionalRequest<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo>, ::fidl::internal::ChannelTransport>>;
 };
 
-namespace test_foreigntypeinresponseusedthroughcompose {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace test_foreigntypeinresponseusedthroughcompose
-
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_foreigntypeinresponseusedthroughcompose::Top> final {
   WireServerDispatcher() = delete;
@@ -382,12 +375,6 @@ class ::fidl::WireServer<::test_foreigntypeinresponseusedthroughcompose::Top> : 
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireWeakOnewayClientImpl<::test_foreigntypeinresponseusedthroughcompose::Top> : public ::fidl::internal::ClientImplBase {

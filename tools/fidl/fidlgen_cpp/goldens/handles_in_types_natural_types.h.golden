@@ -74,10 +74,6 @@ class TableWithHandle {
       1, &Storage_::h});
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class UnionWithHandle {
  private:
   using Storage_ =
@@ -160,10 +156,6 @@ class UnionWithHandle {
     }
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class HandlesInTypes {
  private:
@@ -295,10 +287,6 @@ class HandlesInTypes {
                                                    });
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class EmptyResourceStruct {
  private:
   struct Storage_;
@@ -346,10 +334,6 @@ class EmptyResourceStruct {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class EmptyResourceTable {
  private:
   struct Storage_;
@@ -376,10 +360,6 @@ class EmptyResourceTable {
   friend struct ::fidl::internal::MemberVisitor<::test_handlesintypes::EmptyResourceTable>;
   static constexpr auto kMembers = std::make_tuple();
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class EmptyResourceUnion {
  private:
@@ -438,10 +418,6 @@ class EmptyResourceUnion {
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 inline TableWithHandle::TableWithHandle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 
 inline TableWithHandle::TableWithHandle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TableWithHandle(Storage_{}) {}
@@ -449,10 +425,6 @@ inline TableWithHandle& TableWithHandle::h(std::optional<::zx::vmo> value) {
   storage_.h = std::move(value);
   return *this;
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 inline HandlesInTypes::HandlesInTypes(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline HandlesInTypes::HandlesInTypes(::zx::vmo normal_handle, ::std::vector<::zx::vmo> handle_in_vec, ::std::array<::zx::vmo, 5> handle_in_array, ::std::vector<::std::array<::zx::vmo, 5>> handle_in_mixed_vec_array, ::test_handlesintypes::TableWithHandle table_with_handle, ::test_handlesintypes::UnionWithHandle union_with_handle) noexcept
@@ -496,10 +468,6 @@ inline HandlesInTypes& HandlesInTypes::union_with_handle(::test_handlesintypes::
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 inline EmptyResourceStruct::EmptyResourceStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline EmptyResourceStruct::EmptyResourceStruct(uint8_t __reserved) noexcept
     : storage_({.__reserved = std::move(__reserved)}) {}
@@ -511,10 +479,6 @@ inline EmptyResourceStruct& EmptyResourceStruct::__reserved(uint8_t value) {
   storage_.__reserved = std::move(value);
   return *this;
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 inline EmptyResourceTable::EmptyResourceTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 
@@ -548,10 +512,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_handlesintypes::HandlesInTypes, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_handlesintypes::HandlesInTypes, 96> {};
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct IsResource<::test_handlesintypes::EmptyResourceStruct> : public std::true_type {};
 template <>
@@ -573,10 +533,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_handlesintypes::EmptyResourceStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_handlesintypes::EmptyResourceStruct> {};
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct IsResource<::test_handlesintypes::TableWithHandle> : public std::true_type {};
 template <>
@@ -596,10 +552,6 @@ struct IsTable<::test_handlesintypes::TableWithHandle> : public std::true_type {
 
 template <>
 struct internal::NaturalCodingTraits<::test_handlesintypes::TableWithHandle, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_handlesintypes::TableWithHandle> {};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct IsResource<::test_handlesintypes::EmptyResourceTable> : public std::true_type {};
@@ -621,10 +573,6 @@ struct IsTable<::test_handlesintypes::EmptyResourceTable> : public std::true_typ
 template <>
 struct internal::NaturalCodingTraits<::test_handlesintypes::EmptyResourceTable, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_handlesintypes::EmptyResourceTable> {};
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct IsResource<::test_handlesintypes::UnionWithHandle> : public std::true_type {};
 template <>
@@ -645,10 +593,6 @@ struct IsUnion<::test_handlesintypes::UnionWithHandle> : public std::true_type {
 template <>
 struct internal::NaturalCodingTraits<::test_handlesintypes::UnionWithHandle, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_handlesintypes::UnionWithHandle> {};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct IsResource<::test_handlesintypes::EmptyResourceUnion> : public std::true_type {};

@@ -11,10 +11,6 @@
 
 #ifdef __Fuchsia__
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::internal::WireEventDispatcher<::test_handles::SomeProtocol>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_handles::SomeProtocol>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
@@ -24,10 +20,6 @@
   fidl::internal::WireEventDispatcher<::test_handles::SomeProtocol> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_handles::SomeProtocol>::entries_[] = {};
 
@@ -58,10 +50,6 @@ fidl::WireServer<::test_handles::SomeProtocol>::Handler fidl::WireServer<::test_
     (void)::fidl::BindServer(dispatcher, std::move(request), impl);
   };
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
 

@@ -12,10 +12,6 @@
       ::fidl::internal::NaturalClone(storage_.__reserved)};
 }
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
 ::test_typesinprotocols::Basic::Storage_ test_typesinprotocols::Basic::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.uint8),
@@ -113,17 +109,9 @@
       ::fidl::internal::NaturalClone(storage_.vector_vector_uint8)};
 }
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
 ::test_typesinprotocols::Table::Storage_ test_typesinprotocols::Table::CloneStorage_() const {
   return Storage_{};
 }
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 std::shared_ptr<::test_typesinprotocols::Union::Storage_> test_typesinprotocols::Union::CloneStorage_() const {
   const Storage_& storage = *storage_;
@@ -136,10 +124,6 @@ std::shared_ptr<::test_typesinprotocols::Union::Storage_> test_typesinprotocols:
       return std::make_shared<Storage_>();
   }
 }
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 std::shared_ptr<::test_typesinprotocols::ProtocolErrorBasicResult::Storage_> test_typesinprotocols::ProtocolErrorBasicResult::CloneStorage_() const {
   const Storage_& storage = *storage_;
@@ -268,9 +252,5 @@ std::shared_ptr<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult::S
       return std::make_shared<Storage_>();
   }
 }
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop

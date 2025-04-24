@@ -56,12 +56,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_drivertwow
   }
   arena_ = std::move(response_storage.arena);
 }
-namespace test_drivertwoway {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace test_drivertwoway
 
 ::fidl::internal::WireBufferThenable<::test_drivertwoway::TwoWay::Add> fidl::internal::WireWeakAsyncBufferClientImpl<::test_drivertwoway::TwoWay>::Add(uint16_t addend1, uint16_t addend2) {
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_drivertwoway::TwoWay::Add>();
@@ -94,10 +88,6 @@ namespace test_drivertwoway {
 
 ::fidl::internal::WireEventDispatcher<::test_drivertwoway::TwoWay>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_drivertwoway::TwoWay>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_drivertwoway::TwoWay>::entries_[] = {
     {
@@ -148,9 +138,6 @@ fdf::WireServer<::test_drivertwoway::TwoWay>::Handler fdf::WireServer<::test_dri
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void fidl::internal::WireBufferCompleterImpl<::test_drivertwoway::TwoWay::Add>::Reply(uint16_t sum) {
   return MakeReply(sum);
 }
@@ -169,9 +156,6 @@ void fidl::internal::WireBufferCompleterImpl<::test_drivertwoway::TwoWay::Add>::
           _arena().get()));
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_drivertwoway::kTwoWay_Add_Ordinal, ::test_drivertwoway::kTwoWay_Add_DynamicFlags);
 }
@@ -244,9 +228,5 @@ void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<
 
 template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>, ::fidl::internal::WireCodingConstraintEmpty, true>;
 template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop

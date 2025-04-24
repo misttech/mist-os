@@ -20,10 +20,6 @@ namespace transitivedependenciescompose {
 class Top;
 using TopHandle = ::fidl::InterfaceHandle<Top>;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class Top_RequestEncoder {
  public:
   static ::fidl::HLCPPOutgoingMessage GetFoo(::fidl::MessageEncoder* _encoder) {
@@ -74,10 +70,6 @@ constexpr uint64_t kTop_GetFoo_Ordinal = 0x245770d9d719c667lu;
 
 constexpr ::fidl::MessageDynamicFlags kTop_GetFoo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 }  // namespace internal
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class Top {
  public:

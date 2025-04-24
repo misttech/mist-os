@@ -118,10 +118,6 @@ class TableWithHandle final {
 
 using TableWithHandlePtr = ::std::unique_ptr<TableWithHandle>;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class UnionWithHandle final {
  public:
   static const fidl_type_t* FidlType;
@@ -214,10 +210,6 @@ inline zx_status_t Clone(const ::test::handlesintypes::UnionWithHandle& value,
 
 using UnionWithHandlePtr = ::std::unique_ptr<UnionWithHandle>;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class HandlesInTypes final {
  public:
   static const fidl_type_t* FidlType;
@@ -249,10 +241,6 @@ inline zx_status_t Clone(const ::test::handlesintypes::HandlesInTypes& _value,
 
 using HandlesInTypesPtr = ::std::unique_ptr<HandlesInTypes>;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class EmptyResourceStruct final {
  public:
   static const fidl_type_t* FidlType;
@@ -273,10 +261,6 @@ inline zx_status_t Clone(const ::test::handlesintypes::EmptyResourceStruct& _val
 }
 
 using EmptyResourceStructPtr = ::std::unique_ptr<EmptyResourceStruct>;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class EmptyResourceTable final {
  public:
@@ -323,10 +307,6 @@ class EmptyResourceTable final {
 };
 
 using EmptyResourceTablePtr = ::std::unique_ptr<EmptyResourceTable>;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class EmptyResourceUnion final {
  public:
@@ -462,10 +442,6 @@ struct Equality<::test::handlesintypes::TableWithHandle> {
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct IsFidlXUnion<::test::handlesintypes::UnionWithHandle> : public std::true_type {};
 
@@ -521,10 +497,6 @@ struct Equality<::test::handlesintypes::UnionWithHandle> {
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct CodingTraits<::test::handlesintypes::HandlesInTypes>
     : public EncodableCodingTraits<::test::handlesintypes::HandlesInTypes, 96> {};
@@ -566,10 +538,6 @@ struct Equality<::test::handlesintypes::HandlesInTypes> {
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct CodingTraits<::test::handlesintypes::EmptyResourceStruct>
     : public EncodableCodingTraits<::test::handlesintypes::EmptyResourceStruct, 1> {};
@@ -593,10 +561,6 @@ struct Equality<::test::handlesintypes::EmptyResourceStruct> {
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct CodingTraits<::test::handlesintypes::EmptyResourceTable>
     : public EncodableCodingTraits<::test::handlesintypes::EmptyResourceTable, 16> {};
@@ -611,10 +575,6 @@ struct Equality<::test::handlesintypes::EmptyResourceTable> {
     return true;
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct IsFidlXUnion<::test::handlesintypes::EmptyResourceUnion> : public std::true_type {};

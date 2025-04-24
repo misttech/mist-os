@@ -45,10 +45,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_versions::OtherProtocol> fi
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_versions::OtherProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
  public:
@@ -83,9 +79,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_versions::OtherProtocol> f
       : IncomingEventDispatcher(event_handler) {}
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_versions::OtherProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -163,10 +156,6 @@ class ::fidl::internal::NaturalClientImpl<::test_versions::Protocol> final : pub
   ::fit::result<::fidl::OneWayError> Foo() const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_versions::Protocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_versions::Protocol>> {
@@ -179,10 +168,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_versions::Protocol> final
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_versions::Protocol> : public ::fidl::internal::BaseEventHandlerInterface, public ::fidl::UnknownEventHandler<::test_versions::Protocol> {
@@ -221,9 +206,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_versions::Protocol> final 
       internal::MessageStorageViewBase* storage_view) override;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_versions::Protocol> : public ::fidl::internal::WeakEventSenderBase {
  public:

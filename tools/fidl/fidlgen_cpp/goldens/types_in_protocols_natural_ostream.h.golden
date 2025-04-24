@@ -39,18 +39,10 @@ struct fidl::ostream::Formatter<::test_typesinprotocols::ResourceStruct> {
   static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ResourceStruct& value);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct fidl::ostream::Formatter<::test_typesinprotocols::ResourceTable> {
   static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ResourceTable& value);
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct fidl::ostream::Formatter<::test_typesinprotocols::ResourceUnion> {
@@ -157,15 +149,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Union&
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ResourceStruct& value);
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ResourceTable& value);
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ResourceUnion& value);
 

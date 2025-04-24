@@ -51,8 +51,6 @@ void EmptyTable::Decode(::fidl::Decoder* _decoder, EmptyTable* _value, size_t _o
   base = _decoder->GetOffset(encoded->data);
   count = encoded->count;
 
-  
-
   return;
 
   // Clear unset values.
@@ -63,7 +61,6 @@ clear_all:
 zx_status_t EmptyTable::Clone(EmptyTable* result) const {
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_table_SimpleTableTable;
 const fidl_type_t* SimpleTable::FidlType = &test_table_SimpleTableTable;
@@ -228,8 +225,6 @@ void SimpleTable::Decode(::fidl::Decoder* _decoder, SimpleTable* _value, size_t 
     goto done_5;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -258,7 +253,6 @@ zx_status_t SimpleTable::Clone(SimpleTable* result) const {
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_table_OlderSimpleTableTable;
 const fidl_type_t* OlderSimpleTable::FidlType = &test_table_OlderSimpleTableTable;
@@ -361,8 +355,6 @@ void OlderSimpleTable::Decode(::fidl::Decoder* _decoder, OlderSimpleTable* _valu
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -382,7 +374,6 @@ zx_status_t OlderSimpleTable::Clone(OlderSimpleTable* result) const {
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_table_NewerSimpleTableTable;
 const fidl_type_t* NewerSimpleTable::FidlType = &test_table_NewerSimpleTableTable;
@@ -609,8 +600,6 @@ void NewerSimpleTable::Decode(::fidl::Decoder* _decoder, NewerSimpleTable* _valu
     goto done_6;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -648,7 +637,6 @@ zx_status_t NewerSimpleTable::Clone(NewerSimpleTable* result) const {
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_table_ReverseOrdinalTableTable;
 const fidl_type_t* ReverseOrdinalTable::FidlType = &test_table_ReverseOrdinalTableTable;
@@ -875,8 +863,6 @@ void ReverseOrdinalTable::Decode(::fidl::Decoder* _decoder, ReverseOrdinalTable*
     goto done_3;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -914,7 +900,6 @@ zx_status_t ReverseOrdinalTable::Clone(ReverseOrdinalTable* result) const {
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_table_TableWithAttributesTable;
 const fidl_type_t* TableWithAttributes::FidlType = &test_table_TableWithAttributesTable;
@@ -1017,8 +1002,6 @@ void TableWithAttributes::Decode(::fidl::Decoder* _decoder, TableWithAttributes*
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -1038,7 +1021,6 @@ zx_status_t TableWithAttributes::Clone(TableWithAttributes* result) const {
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_table_ExtensionTableTable;
 const fidl_type_t* ExtensionTable::FidlType = &test_table_ExtensionTableTable;
@@ -1079,8 +1061,6 @@ void ExtensionTable::Decode(::fidl::Decoder* _decoder, ExtensionTable* _value, s
   base = _decoder->GetOffset(encoded->data);
   count = encoded->count;
 
-  
-
   return;
 
   // Clear unset values.
@@ -1091,7 +1071,6 @@ clear_all:
 zx_status_t ExtensionTable::Clone(ExtensionTable* result) const {
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_table_SixtyFourOrdinalTableTable;
 const fidl_type_t* SixtyFourOrdinalTable::FidlType = &test_table_SixtyFourOrdinalTableTable;
@@ -5099,8 +5078,6 @@ void SixtyFourOrdinalTable::Decode(::fidl::Decoder* _decoder, SixtyFourOrdinalTa
   } else {
     goto done_64;
   }
-
-  
 
   return;
 

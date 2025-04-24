@@ -122,9 +122,6 @@ struct WireTypeForNaturalType<::test_arrays::UnionLargeArray> {
   using type = ::test_arrays::wire::UnionLargeArray;
 };
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 #pragma clang diagnostic pop
 
 }  // namespace internal

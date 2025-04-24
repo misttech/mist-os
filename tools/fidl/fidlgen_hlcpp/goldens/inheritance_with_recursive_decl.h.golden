@@ -29,10 +29,6 @@ class ChildSecondRequest;
 class Child;
 using ChildHandle = ::fidl::InterfaceHandle<Child>;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class ParentFirstRequest final {
  public:
   static const fidl_type_t* FidlType;
@@ -53,10 +49,6 @@ inline zx_status_t Clone(const ::test::inheritancewithrecursivedecl::ParentFirst
 }
 
 using ParentFirstRequestPtr = ::std::unique_ptr<ParentFirstRequest>;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_inheritancewithrecursivedecl_ParentFirstRequestTable;
@@ -80,10 +72,6 @@ class Parent_ResponseEncoder {
  public:
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class ChildSecondRequest final {
  public:
   static const fidl_type_t* FidlType;
@@ -104,10 +92,6 @@ inline zx_status_t Clone(const ::test::inheritancewithrecursivedecl::ChildSecond
 }
 
 using ChildSecondRequestPtr = ::std::unique_ptr<ChildSecondRequest>;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_inheritancewithrecursivedecl_ChildSecondRequestTable;
@@ -171,10 +155,6 @@ struct Equality<::test::inheritancewithrecursivedecl::ParentFirstRequest> {
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct CodingTraits<::test::inheritancewithrecursivedecl::ChildSecondRequest>
     : public EncodableCodingTraits<::test::inheritancewithrecursivedecl::ChildSecondRequest, 4> {};
@@ -224,10 +204,6 @@ constexpr uint64_t kParent_First_Ordinal = 0x3723835775b3455blu;
 constexpr ::fidl::MessageDynamicFlags kParent_First_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 }  // namespace internal
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 using ChildPtr = ::fidl::InterfacePtr<Child>;
 class Child_Proxy;
 class Child_Stub;
@@ -246,10 +222,6 @@ constexpr uint64_t kChild_Second_Ordinal = 0x23521821ca109865lu;
 
 constexpr ::fidl::MessageDynamicFlags kChild_Second_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 }  // namespace internal
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class Parent {
  public:
@@ -329,10 +301,6 @@ class Parent_SyncProxy : public ::test::inheritancewithrecursivedecl::Parent_Syn
   ::fidl::internal::SynchronousProxy proxy_;
   friend class ::fidl::SynchronousInterfacePtr<Parent>;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class Child {
  public:

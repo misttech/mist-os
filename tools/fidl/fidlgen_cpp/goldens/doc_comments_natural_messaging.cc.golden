@@ -51,10 +51,6 @@ fidl::internal::NaturalSyncClientImpl<::test_doccomments::Interface>::Method() {
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::Status fidl::SyncEventHandler<::test_doccomments::Interface>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_doccomments::Interface> client_end) {
   ::fidl::internal::IncomingEventsStorage<::test_doccomments::Interface> event_storage;
@@ -83,10 +79,6 @@ fidl::internal::NaturalEventDispatcher<::test_doccomments::Interface>::DispatchE
   }
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_doccomments::Interface>::OnEvent() {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_doccomments::kInterface_OnEvent_Ordinal, ::test_doccomments::kInterface_OnEvent_DynamicFlags};
@@ -101,10 +93,6 @@ fidl::internal::NaturalEventDispatcher<::test_doccomments::Interface>::DispatchE
   _encoded_message.Write(_transport());
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_doccomments::Interface>::entries_[] = {
     {

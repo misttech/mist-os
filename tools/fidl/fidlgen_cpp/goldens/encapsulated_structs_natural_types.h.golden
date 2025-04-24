@@ -400,10 +400,6 @@ class NonInlineStructTestStruct {
   });
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class TopLevelStruct {
  private:
   struct Storage_;
@@ -581,10 +577,6 @@ inline NonInlineStructTestStruct& NonInlineStructTestStruct::h(::zx::handle valu
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 inline TopLevelStruct::TopLevelStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline TopLevelStruct::TopLevelStruct(::test_encapsulatedstructs::StructPaddingTestStruct a, ::test_encapsulatedstructs::NonInlineStructTestStruct b) noexcept
     : storage_({.a = std::move(a),
@@ -706,10 +698,6 @@ struct IsStruct<::test_encapsulatedstructs::NonInlineStructTestStruct> : public 
 template <>
 struct internal::NaturalCodingTraits<::test_encapsulatedstructs::NonInlineStructTestStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::NonInlineStructTestStruct, 16> {};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct IsResource<::test_encapsulatedstructs::TopLevelStruct> : public std::true_type {};

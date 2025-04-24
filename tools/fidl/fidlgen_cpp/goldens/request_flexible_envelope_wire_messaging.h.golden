@@ -48,14 +48,6 @@ struct ::fidl::internal::WireMethodTypes<::test_requestflexibleenvelope::Protoco
           ::fidl::internal::TransactionalRequest<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible>, ::fidl::internal::ChannelTransport>>;
 };
 
-namespace test_requestflexibleenvelope {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-}  // namespace test_requestflexibleenvelope
-
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict> {
   static constexpr bool HasRequestPayload = true;
@@ -73,13 +65,6 @@ struct ::fidl::internal::WireMethodTypes<::test_requestflexibleenvelope::Protoco
       ::fidl::internal::UnownedEncodedMessage<
           ::fidl::internal::TransactionalRequest<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>, ::fidl::internal::ChannelTransport>>;
 };
-
-namespace test_requestflexibleenvelope {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace test_requestflexibleenvelope
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_requestflexibleenvelope::Protocol> final {
@@ -629,12 +614,6 @@ class ::fidl::WireServer<::test_requestflexibleenvelope::Protocol> : public ::fi
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireWeakOnewayClientImpl<::test_requestflexibleenvelope::Protocol> : public ::fidl::internal::ClientImplBase {

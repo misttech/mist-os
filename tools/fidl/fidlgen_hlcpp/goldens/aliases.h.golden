@@ -39,10 +39,6 @@ using vec_of_strings_at_most_5 = ::std::vector<::std::string>;
 
 using channel = ::zx::channel;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 using alias_of_channel = ::zx::channel;
 
 #endif  // __Fuchsia__

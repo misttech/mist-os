@@ -482,10 +482,6 @@ struct WireTypeForNaturalType<::test_typesinprotocols::ProtocolErrorResourceResu
   using type = ::test_typesinprotocols::wire::ProtocolErrorResourceResult;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct WireNaturalConversionTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayBasic>, ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayBasic>> {
   static ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayBasic> ToNatural(::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayBasic> src);

@@ -21,10 +21,6 @@ namespace internal {
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::test_versions::Table WireNaturalConversionTraits<::test_versions::wire::Table, ::test_versions::Table>::ToNatural(::test_versions::wire::Table src) {
   ::test_versions::Table dst;
   if (src.has_x()) {
@@ -42,10 +38,6 @@ namespace internal {
   }
   return builder.Build();
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 ::test_versions::Union WireNaturalConversionTraits<::test_versions::wire::Union, ::test_versions::Union>::ToNatural(::test_versions::wire::Union src) {
   switch (src.Which()) {
@@ -65,10 +57,6 @@ namespace internal {
       return ::test_versions::wire::Union();
   }
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
 #pragma clang diagnostic pop

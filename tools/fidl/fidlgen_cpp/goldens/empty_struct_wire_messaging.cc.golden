@@ -118,10 +118,6 @@ namespace test_emptystruct {
 
 ::fidl::WireResult<::test_emptystruct::EmptyProtocol::SendAndReceive>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_emptystruct::EmptyProtocol::SendAndReceive>(result) {}
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::WireUnownedResult<::test_emptystruct::EmptyProtocol::SendAndReceive>::WireUnownedResult(::fidl::UnownedClientEnd<::test_emptystruct::EmptyProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive>* request) {
   constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_emptystruct::EmptyProtocol::SendAndReceive>();
   ::fit::result<::fidl::Error, ::fidl::BufferSpan> allocation = allocator.TryAllocate(buffer_size);
@@ -214,10 +210,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_emptystruct::EmptyProtocol>::SendA
       });
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::internal::WireEventDispatcher<::test_emptystruct::EmptyProtocol>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_emptystruct::EmptyProtocol>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
@@ -249,10 +241,6 @@ fidl::internal::WireEventDispatcher<::test_emptystruct::EmptyProtocol>::Dispatch
       return ::fidl::Status::UnknownOrdinal();
   }
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_emptystruct::EmptyProtocol>::entries_[] = {
     {
@@ -317,9 +305,6 @@ fidl::WireServer<::test_emptystruct::EmptyProtocol>::Handler fidl::WireServer<::
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void fidl::internal::WireCompleterImpl<::test_emptystruct::EmptyProtocol::SendAndReceive>::Reply(const ::test_emptystruct::wire::Empty& e) {
   return MakeReply(e);
 }
@@ -368,9 +353,6 @@ fidl::internal::WireCompleterBase<::test_emptystruct::EmptyProtocol::SendAndRece
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_emptystruct::kEmptyProtocol_Send_Ordinal, ::test_emptystruct::kEmptyProtocol_Send_DynamicFlags);
 }
@@ -397,10 +379,6 @@ void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<:
 
 template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send>, ::fidl::internal::WireCodingConstraintEmpty, true>;
 template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send>, ::fidl::internal::WireCodingConstraintEmpty, false>;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 ::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive>::TransactionalEvent(const ::test_emptystruct::wire::Empty& e)
     : body{e} {
@@ -429,9 +407,6 @@ void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::t
 template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive>, ::fidl::internal::WireCodingConstraintEmpty, true>;
 template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive>, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_emptystruct::kEmptyProtocol_SendAndReceive_Ordinal, ::test_emptystruct::kEmptyProtocol_SendAndReceive_DynamicFlags);
 }

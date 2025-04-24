@@ -25,15 +25,8 @@ void ::test_handlesintypes::wire::HandlesInTypes::_CloseHandles() {
   union_with_handle._CloseHandles();
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void ::test_handlesintypes::wire::EmptyResourceStruct::_CloseHandles() {
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 auto ::test_handlesintypes::wire::UnionWithHandle::Which() const -> ::test_handlesintypes::wire::UnionWithHandle::Tag {
   ZX_ASSERT(!has_invalid_tag());
@@ -82,10 +75,6 @@ void ::test_handlesintypes::wire::UnionWithHandle::_CloseHandles() {
   }
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 auto ::test_handlesintypes::wire::EmptyResourceUnion::Which() const -> ::test_handlesintypes::wire::EmptyResourceUnion::Tag {
   ZX_ASSERT(!has_invalid_tag());
   return ::test_handlesintypes::wire::EmptyResourceUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
@@ -118,10 +107,6 @@ void ::test_handlesintypes::wire::EmptyResourceUnion::_CloseHandles() {
   }
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 bool ::fidl::WireTableFrame<::test_handlesintypes::wire::TableWithHandle>::HasUnknownData() const {
   return false;
 }
@@ -149,10 +134,6 @@ void ::test_handlesintypes::wire::TableWithHandle::_CloseHandles() {
     h().reset();
   }
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 bool ::fidl::WireTableFrame<::test_handlesintypes::wire::EmptyResourceTable>::HasUnknownData() const {
   return false;

@@ -36,10 +36,6 @@ using VecOfStringsAtMost5 = ::std::vector<::std::string>;
 
 using Channel = ::zx::channel;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 using AliasOfChannel = ::zx::channel;
 
 #endif  // __Fuchsia__
@@ -207,10 +203,6 @@ class ExampleOfUseOfAliases {
                                                        .mask = 0xffffffff00000000,
                                                    });
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 inline ExampleOfUseOfAliases::ExampleOfUseOfAliases(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline ExampleOfUseOfAliases::ExampleOfUseOfAliases(uint32_t field_of_u32, ::std::vector<::std::string> field_of_vec_of_strings, ::std::vector<::std::string> field_of_vec_of_strings_at_most_nine, ::std::vector<::std::string> field_of_vec_of_strings_at_most_5, ::std::vector<::test_someotherlibrary::ReferenceMe> field_of_vec_of_ref_me_at_most_5, ::zx::channel field_of_channel, ::zx::channel field_of_client_end, ::zx::channel field_of_nullable_client_end) noexcept

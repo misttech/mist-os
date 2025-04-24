@@ -52,10 +52,6 @@ struct EmptyResourceStruct {
   void _CloseHandles();
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 }  // namespace wire
 }  // namespace test_handlesintypes
 
@@ -261,10 +257,6 @@ inline ::fidl::WireTableExternalBuilder<::test_handlesintypes::wire::TableWithHa
   return ::fidl::WireTableExternalBuilder<::test_handlesintypes::wire::TableWithHandle>(std::move(frame));
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 }  // namespace wire
 }  // namespace test_handlesintypes
 
@@ -419,10 +411,6 @@ inline ::fidl::WireTableExternalBuilder<::test_handlesintypes::wire::EmptyResour
   return ::fidl::WireTableExternalBuilder<::test_handlesintypes::wire::EmptyResourceTable>(std::move(frame));
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class UnionWithHandle {
  public:
   UnionWithHandle() : ordinal_(::test_handlesintypes::wire::UnionWithHandle::Ordinal::Invalid), envelope_{} {}
@@ -481,10 +469,6 @@ class UnionWithHandle {
   ::fidl::UntypedEnvelope envelope_;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class EmptyResourceUnion {
  public:
   EmptyResourceUnion() : ordinal_(::test_handlesintypes::wire::EmptyResourceUnion::Ordinal::Invalid), envelope_{} {}
@@ -522,10 +506,6 @@ class EmptyResourceUnion {
   FIDL_ALIGNDECL
   ::fidl::UntypedEnvelope envelope_;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 struct HandlesInTypes {
   ::zx::vmo normal_handle = {};
@@ -652,9 +632,6 @@ struct ::fidl::internal::WireCodingTraits<::test_handlesintypes::wire::HandlesIn
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsResource<::test_handlesintypes::wire::EmptyResourceStruct> : public std::true_type {};
 
@@ -707,9 +684,6 @@ struct ::fidl::internal::WireCodingTraits<::test_handlesintypes::wire::EmptyReso
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsResource<::test_handlesintypes::wire::TableWithHandle> : public std::true_type {};
 
@@ -800,9 +774,6 @@ struct ::fidl::internal::WireCodingTraits<::test_handlesintypes::wire::TableWith
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsResource<::test_handlesintypes::wire::EmptyResourceTable> : public std::true_type {};
 
@@ -881,9 +852,6 @@ struct ::fidl::internal::WireCodingTraits<::test_handlesintypes::wire::EmptyReso
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsResource<::test_handlesintypes::wire::UnionWithHandle> : public std::true_type {};
 
@@ -997,9 +965,6 @@ template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_handlesintypes::wire::UnionWithHandle, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
     : public ::fidl::internal::WireCodingTraits<::test_handlesintypes::wire::UnionWithHandle, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsResource<::test_handlesintypes::wire::EmptyResourceUnion> : public std::true_type {};
 

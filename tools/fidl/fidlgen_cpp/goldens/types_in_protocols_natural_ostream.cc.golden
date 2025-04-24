@@ -502,17 +502,9 @@ std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Resour
   return fidl::ostream::Formatter<::test_typesinprotocols::ResourceStruct>::Format(os, value);
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ResourceTable& value) {
   return fidl::ostream::Formatter<::test_typesinprotocols::ResourceTable>::Format(os, value);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ResourceUnion& value) {
   return fidl::ostream::Formatter<::test_typesinprotocols::ResourceUnion>::Format(os, value);

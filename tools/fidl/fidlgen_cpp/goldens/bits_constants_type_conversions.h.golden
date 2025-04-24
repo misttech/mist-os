@@ -29,9 +29,6 @@ struct WireTypeForNaturalType<::test_bitsconstants::BitsType> {
   using type = ::test_bitsconstants::wire::BitsType;
 };
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 #pragma clang diagnostic pop
 
 }  // namespace internal

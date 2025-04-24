@@ -43,10 +43,6 @@ std::ostream& fidl::ostream::Formatter<::test_handlesintypes::HandlesInTypes>::F
   return os;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& fidl::ostream::Formatter<::test_handlesintypes::EmptyResourceStruct>::Format(std::ostream& os, const ::test_handlesintypes::EmptyResourceStruct& value) {
   os << "test_handlesintypes::EmptyResourceStruct";
   os << "{ ";
@@ -55,10 +51,6 @@ std::ostream& fidl::ostream::Formatter<::test_handlesintypes::EmptyResourceStruc
   os << "}";
   return os;
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& fidl::ostream::Formatter<::test_handlesintypes::TableWithHandle>::Format(std::ostream& os, const ::test_handlesintypes::TableWithHandle& value) {
   os << "test_handlesintypes::TableWithHandle";
@@ -71,20 +63,12 @@ std::ostream& fidl::ostream::Formatter<::test_handlesintypes::TableWithHandle>::
   return os;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& fidl::ostream::Formatter<::test_handlesintypes::EmptyResourceTable>::Format(std::ostream& os, const ::test_handlesintypes::EmptyResourceTable& value) {
   os << "test_handlesintypes::EmptyResourceTable";
   os << "{ ";
   os << "}";
   return os;
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& fidl::ostream::Formatter<::test_handlesintypes::UnionWithHandle>::Format(std::ostream& os, const ::test_handlesintypes::UnionWithHandle& value) {
   os << "test_handlesintypes::UnionWithHandle::";
@@ -97,10 +81,6 @@ std::ostream& fidl::ostream::Formatter<::test_handlesintypes::UnionWithHandle>::
   }
   return os;
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& fidl::ostream::Formatter<::test_handlesintypes::EmptyResourceUnion>::Format(std::ostream& os, const ::test_handlesintypes::EmptyResourceUnion& value) {
   os << "test_handlesintypes::EmptyResourceUnion::";
@@ -125,41 +105,21 @@ std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::TableWit
   return fidl::ostream::Formatter<::test_handlesintypes::TableWithHandle>::Format(os, value);
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::UnionWithHandle& value) {
   return fidl::ostream::Formatter<::test_handlesintypes::UnionWithHandle>::Format(os, value);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::HandlesInTypes& value) {
   return fidl::ostream::Formatter<::test_handlesintypes::HandlesInTypes>::Format(os, value);
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::EmptyResourceStruct& value) {
   return fidl::ostream::Formatter<::test_handlesintypes::EmptyResourceStruct>::Format(os, value);
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::EmptyResourceTable& value) {
   return fidl::ostream::Formatter<::test_handlesintypes::EmptyResourceTable>::Format(os, value);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::EmptyResourceUnion& value) {
   return fidl::ostream::Formatter<::test_handlesintypes::EmptyResourceUnion>::Format(os, value);

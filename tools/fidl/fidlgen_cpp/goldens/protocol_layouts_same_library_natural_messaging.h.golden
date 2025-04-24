@@ -16,10 +16,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-}  // namespace fidl
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayAnonComposed> {
   using Request = ::test_protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest;
@@ -201,10 +197,6 @@ class ::fidl::internal::NaturalClientImpl<::test_protocollayoutssamelibrary::Com
   ::fit::result<::fidl::OneWayError> OneWayNamedComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>& request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_protocollayoutssamelibrary::ComposedProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_protocollayoutssamelibrary::ComposedProtocol>> {
@@ -227,10 +219,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocollayoutssamelibrary:
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_protocollayoutssamelibrary::ComposedProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -273,9 +261,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_protocollayoutssamelibrary
       internal::MessageStorageViewBase* storage_view) override;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_protocollayoutssamelibrary::ComposedProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -774,10 +759,6 @@ class ::fidl::internal::NaturalClientImpl<::test_protocollayoutssamelibrary::Mai
   ::fit::result<::fidl::OneWayError> OneWayAnon(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>& request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_protocollayoutssamelibrary::MainProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_protocollayoutssamelibrary::MainProtocol>> {
@@ -812,10 +793,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocollayoutssamelibrary:
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_protocollayoutssamelibrary::MainProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -862,9 +839,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_protocollayoutssamelibrary
       internal::MessageStorageViewBase* storage_view) override;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_protocollayoutssamelibrary::MainProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:

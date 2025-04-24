@@ -351,10 +351,6 @@ constexpr uint64_t kExample_foo_Ordinal = 0xf5f1179dc411e44lu;
 constexpr ::fidl::MessageDynamicFlags kExample_foo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 }  // namespace internal
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class Example {
  public:
   using Proxy_ = ::test::error::Example_Proxy;

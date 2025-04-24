@@ -16,10 +16,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-}  // namespace fidl
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_anonymous::SomeProtocol::SomeMethod> {
   using Request = ::test_anonymous::SomeProtocolSomeMethodRequest;
@@ -71,10 +67,6 @@ class ::fidl::internal::NaturalClientImpl<::test_anonymous::SomeProtocol> final 
   ::fidl::internal::NaturalThenable<::test_anonymous::SomeProtocol::SomeMethod> SomeMethod(const ::fidl::Request<::test_anonymous::SomeProtocol::SomeMethod>& request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_anonymous::SomeProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_anonymous::SomeProtocol>> {
@@ -87,10 +79,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_anonymous::SomeProtocol> fi
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_anonymous::SomeProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -126,9 +114,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_anonymous::SomeProtocol> f
       : IncomingEventDispatcher(event_handler) {}
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_anonymous::SomeProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:

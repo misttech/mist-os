@@ -80,10 +80,6 @@ class ParentGetChildResponse {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class ParentGetChildRequestResponse {
  private:
   struct Storage_;
@@ -130,10 +126,6 @@ class ParentGetChildRequestResponse {
       &Storage_::r, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class ParentTakeChildRequest {
  private:
@@ -182,10 +174,6 @@ class ParentTakeChildRequest {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class ParentTakeChildRequestRequest {
  private:
   struct Storage_;
@@ -233,10 +221,6 @@ class ParentTakeChildRequestRequest {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 inline ParentGetChildResponse::ParentGetChildResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline ParentGetChildResponse::ParentGetChildResponse(::fidl::ClientEnd<::test_protocolrequest::Child> c) noexcept
     : storage_({.c = std::move(c)}) {}
@@ -248,10 +232,6 @@ inline ParentGetChildResponse& ParentGetChildResponse::c(::fidl::ClientEnd<::tes
   storage_.c = std::move(value);
   return *this;
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 inline ParentGetChildRequestResponse::ParentGetChildRequestResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline ParentGetChildRequestResponse::ParentGetChildRequestResponse(::fidl::ServerEnd<::test_protocolrequest::Child> r) noexcept
@@ -265,10 +245,6 @@ inline ParentGetChildRequestResponse& ParentGetChildRequestResponse::r(::fidl::S
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 inline ParentTakeChildRequest::ParentTakeChildRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline ParentTakeChildRequest::ParentTakeChildRequest(::fidl::ClientEnd<::test_protocolrequest::Child> c) noexcept
     : storage_({.c = std::move(c)}) {}
@@ -280,10 +256,6 @@ inline ParentTakeChildRequest& ParentTakeChildRequest::c(::fidl::ClientEnd<::tes
   storage_.c = std::move(value);
   return *this;
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 inline ParentTakeChildRequestRequest::ParentTakeChildRequestRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline ParentTakeChildRequestRequest::ParentTakeChildRequestRequest(::fidl::ServerEnd<::test_protocolrequest::Child> r) noexcept
@@ -325,10 +297,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_protocolrequest::ParentGetChildResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolrequest::ParentGetChildResponse, 4> {};
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct IsResource<::test_protocolrequest::ParentGetChildRequestResponse> : public std::true_type {};
 template <>
@@ -350,10 +318,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_protocolrequest::ParentGetChildRequestResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolrequest::ParentGetChildRequestResponse, 4> {};
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct IsResource<::test_protocolrequest::ParentTakeChildRequest> : public std::true_type {};
 template <>
@@ -374,10 +338,6 @@ struct IsStruct<::test_protocolrequest::ParentTakeChildRequest> : public std::tr
 template <>
 struct internal::NaturalCodingTraits<::test_protocolrequest::ParentTakeChildRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolrequest::ParentTakeChildRequest, 4> {};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct IsResource<::test_protocolrequest::ParentTakeChildRequestRequest> : public std::true_type {};

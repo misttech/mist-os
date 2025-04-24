@@ -17,10 +17,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-}  // namespace fidl
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayouts::MainProtocol::OneWayAnonComposed> {
   using Request = ::test_protocollayouts_imported::ComposedProtocolOneWayAnonComposedRequest;
@@ -463,10 +459,6 @@ class ::fidl::internal::NaturalClientImpl<::test_protocollayouts::MainProtocol> 
   ::fit::result<::fidl::OneWayError> OneWayAnon(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayAnon>& request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::MainProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::MainProtocol>> {
@@ -507,10 +499,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::MainProtoc
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_protocollayouts::MainProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -559,9 +547,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_protocollayouts::MainProto
       internal::MessageStorageViewBase* storage_view) override;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_protocollayouts::MainProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -1024,10 +1009,6 @@ class ::fidl::internal::NaturalClientImpl<::test_protocollayouts::OpenProtocol> 
   ::fit::result<::fidl::OneWayError> FlexibleOneWayNamedPayload(const ::fidl::Request<::test_protocollayouts::OpenProtocol::FlexibleOneWayNamedPayload>& request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::OpenProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::OpenProtocol>> {
@@ -1052,10 +1033,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::OpenProtoc
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_protocollayouts::OpenProtocol> : public ::fidl::internal::BaseEventHandlerInterface, public ::fidl::UnknownEventHandler<::test_protocollayouts::OpenProtocol> {
@@ -1098,9 +1075,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_protocollayouts::OpenProto
       internal::MessageStorageViewBase* storage_view) override;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_protocollayouts::OpenProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:

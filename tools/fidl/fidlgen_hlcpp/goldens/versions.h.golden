@@ -153,16 +153,9 @@ class Union;
 class OtherProtocol;
 using OtherProtocolHandle = ::fidl::InterfaceHandle<OtherProtocol>;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class Protocol;
 using ProtocolHandle = ::fidl::InterfaceHandle<Protocol>;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 class Service;
 
 #endif  // __Fuchsia__
@@ -193,10 +186,6 @@ inline zx_status_t Clone(const ::test::versions::Struct& _value,
 }
 
 using StructPtr = ::std::unique_ptr<Struct>;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class Table final {
  public:
@@ -275,10 +264,6 @@ class Table final {
 };
 
 using TablePtr = ::std::unique_ptr<Table>;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class Union final {
  public:
@@ -372,10 +357,6 @@ inline zx_status_t Clone(const ::test::versions::Union& value,
 
 using UnionPtr = ::std::unique_ptr<Union>;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class OtherProtocol_RequestEncoder {
  public:
 };
@@ -383,10 +364,6 @@ class OtherProtocol_RequestEncoder {
 class OtherProtocol_ResponseEncoder {
  public:
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class Protocol_RequestEncoder {
  public:
@@ -490,10 +467,6 @@ struct Equality<::test::versions::Struct> {
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct CodingTraits<::test::versions::Table>
     : public EncodableCodingTraits<::test::versions::Table, 16> {};
@@ -518,10 +491,6 @@ struct Equality<::test::versions::Table> {
     return true;
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct IsFidlXUnion<::test::versions::Union> : public std::true_type {};
@@ -597,10 +566,6 @@ class OtherProtocol_Sync;
 using OtherProtocolSyncPtr = ::fidl::SynchronousInterfacePtr<OtherProtocol>;
 class OtherProtocol_SyncProxy;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 using ProtocolPtr = ::fidl::InterfacePtr<Protocol>;
 class Protocol_Proxy;
 class Protocol_Stub;
@@ -616,14 +581,7 @@ constexpr uint64_t kProtocol_Foo_Ordinal = 0x567a8096af6e6139lu;
 constexpr ::fidl::MessageDynamicFlags kProtocol_Foo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 }  // namespace internal
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 class Service;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class OtherProtocol {
  public:
@@ -695,10 +653,6 @@ class OtherProtocol_SyncProxy : public ::test::versions::OtherProtocol_Sync {
   ::fidl::internal::SynchronousProxy proxy_;
   friend class ::fidl::SynchronousInterfacePtr<OtherProtocol>;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class Protocol {
  public:
@@ -794,10 +748,6 @@ class Protocol_SyncProxy : public ::test::versions::Protocol_Sync {
   ::fidl::internal::SynchronousProxy proxy_;
   friend class ::fidl::SynchronousInterfacePtr<Protocol>;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class Service final {
  public:

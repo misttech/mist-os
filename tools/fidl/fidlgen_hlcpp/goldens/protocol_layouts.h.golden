@@ -41,10 +41,6 @@ class MainProtocolOnAnonRequest;
 class MainProtocol;
 using MainProtocolHandle = ::fidl::InterfaceHandle<MainProtocol>;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class OpenProtocol;
 using OpenProtocolHandle = ::fidl::InterfaceHandle<OpenProtocol>;
 
@@ -1243,10 +1239,6 @@ class MainProtocol_ResponseEncoder {
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocolFlexibleOneWayRequestTable;
 
@@ -1955,10 +1947,6 @@ constexpr uint64_t kMainProtocol_OnAnon_Ordinal = 0x64f7b1ec1ba0810blu;
 constexpr ::fidl::MessageDynamicFlags kMainProtocol_OnAnon_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 }  // namespace internal
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 using OpenProtocolPtr = ::fidl::InterfacePtr<OpenProtocol>;
 class OpenProtocol_Proxy;
 class OpenProtocol_Stub;
@@ -2005,10 +1993,6 @@ constexpr uint64_t kOpenProtocol_FlexibleOneWayNamedPayload_Ordinal = 0x152c0b4a
 
 constexpr ::fidl::MessageDynamicFlags kOpenProtocol_FlexibleOneWayNamedPayload_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 }  // namespace internal
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class MainProtocol {
  public:
@@ -2260,10 +2244,6 @@ class MainProtocol_SyncProxy : public ::test::protocollayouts::MainProtocol_Sync
   ::fidl::internal::SynchronousProxy proxy_;
   friend class ::fidl::SynchronousInterfacePtr<MainProtocol>;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class OpenProtocol {
  public:

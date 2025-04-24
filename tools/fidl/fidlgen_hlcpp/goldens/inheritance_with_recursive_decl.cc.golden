@@ -44,10 +44,6 @@ zx_status_t ParentFirstRequest::Clone(ParentFirstRequest* _result) const {
   return ZX_OK;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 extern "C" const fidl_type_t test_inheritancewithrecursivedecl_ChildSecondRequestTable;
 const fidl_type_t* ChildSecondRequest::FidlType = &test_inheritancewithrecursivedecl_ChildSecondRequestTable;
 
@@ -209,10 +205,6 @@ zx_status_t Parent_SyncProxy::First(::fidl::InterfaceRequest<::test::inheritance
   const fidl_type_t* req_type = &::test::inheritancewithrecursivedecl::_internal::test_inheritancewithrecursivedecl_ParentFirstRequestTable;
   return proxy_.Send(req_type, ::test::inheritancewithrecursivedecl::Parent_RequestEncoder::First(&_encoder, &request));
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_inheritancewithrecursivedecl_ChildSecondRequestTable;

@@ -60,10 +60,6 @@ std::ostream& fidl::ostream::Formatter<::test_encapsulatedstructs::NonInlineStru
   return os;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& fidl::ostream::Formatter<::test_encapsulatedstructs::TopLevelStruct>::Format(std::ostream& os, const ::test_encapsulatedstructs::TopLevelStruct& value) {
   os << "test_encapsulatedstructs::TopLevelStruct";
   os << "{ ";
@@ -100,10 +96,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_encapsulatedstructs::Str
 std::ostream& operator<<(std::ostream& os, const ::test_encapsulatedstructs::NonInlineStructTestStruct& value) {
   return fidl::ostream::Formatter<::test_encapsulatedstructs::NonInlineStructTestStruct>::Format(os, value);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_encapsulatedstructs::TopLevelStruct& value) {
   return fidl::ostream::Formatter<::test_encapsulatedstructs::TopLevelStruct>::Format(os, value);

@@ -18,10 +18,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-}  // namespace fidl
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo> {
   using Response = ::test_middle::MiddleGetFooResponse;
@@ -56,10 +52,6 @@ class ::fidl::internal::NaturalClientImpl<::test_foreigntypeinresponseusedthroug
   ::fidl::internal::NaturalThenable<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo> GetFoo() const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_foreigntypeinresponseusedthroughcompose::Top> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_foreigntypeinresponseusedthroughcompose::Top>> {
@@ -72,10 +64,6 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_foreigntypeinresponseusedth
         _transport().get<::fidl::internal::ChannelTransport>());
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_foreigntypeinresponseusedthroughcompose::Top> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -111,9 +99,6 @@ class ::fidl::internal::NaturalEventDispatcher<::test_foreigntypeinresponseusedt
       : IncomingEventDispatcher(event_handler) {}
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_foreigntypeinresponseusedthroughcompose::Top> : public ::fidl::internal::WeakEventSenderBase {
  public:

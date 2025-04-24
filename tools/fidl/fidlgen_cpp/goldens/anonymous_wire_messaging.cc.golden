@@ -127,10 +127,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_anonymous::SomeProtocol>::SomeMeth
       });
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::internal::WireEventDispatcher<::test_anonymous::SomeProtocol>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_anonymous::SomeProtocol>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
@@ -140,10 +136,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_anonymous::SomeProtocol>::SomeMeth
   fidl::internal::WireEventDispatcher<::test_anonymous::SomeProtocol> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_anonymous::SomeProtocol>::entries_[] = {
     {
@@ -192,9 +184,6 @@ fidl::WireServer<::test_anonymous::SomeProtocol>::Handler fidl::WireServer<::tes
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void fidl::internal::WireCompleterImpl<::test_anonymous::SomeProtocol::SomeMethod>::Reply(::fit::result<::test_anonymous::wire::SomeProtocolSomeMethodError, ::test_anonymous::wire::SomeProtocolSomeMethodResponse*> result) {
   if (result.is_ok()) {
     return MakeReply(::test_anonymous::wire::SomeProtocolSomeMethodResult::WithResponse(std::move(*result.value())));
@@ -269,9 +258,6 @@ void fidl::internal::WireBufferCompleterImpl<::test_anonymous::SomeProtocol::Som
   return MakeReply(::test_anonymous::wire::SomeProtocolSomeMethodResult::WithErr(std::move(error)));
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_anonymous::SomeProtocol::SomeMethod>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_anonymous::kSomeProtocol_SomeMethod_Ordinal, ::test_anonymous::kSomeProtocol_SomeMethod_DynamicFlags);
 }
@@ -357,9 +343,5 @@ fidl::internal::WireSyncBufferClientImpl<::test_anonymous::SomeProtocol>::SomeMe
   return ::fidl::WireUnownedResult<::test_anonymous::SomeProtocol::SomeMethod>(
       ::fidl::UnownedClientEnd<::test_anonymous::SomeProtocol>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
 }
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop

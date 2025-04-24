@@ -14,19 +14,11 @@
 
 #ifdef __Fuchsia__
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_driverhandle::DriverProtocol> final : public ::fidl::internal::NaturalClientBase {
  public:
   using NaturalClientBase::NaturalClientBase;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_driverhandle::DriverProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -112,10 +104,6 @@ class ::fidl::internal::NaturalClientImpl<::test_driverhandle::HandlesInProtocol
   using NaturalClientBase::NaturalClientBase;
   ::fit::result<::fidl::OneWayError> SendHandles(::fidl::Request<::test_driverhandle::HandlesInProtocol::SendHandles> request) const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_driverhandle::HandlesInProtocol> : public ::fidl::internal::BaseEventHandlerInterface {

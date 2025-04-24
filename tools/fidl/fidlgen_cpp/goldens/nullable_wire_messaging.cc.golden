@@ -128,10 +128,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_nullable::SimpleProtocol>::Add(int
       });
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::internal::WireEventDispatcher<::test_nullable::SimpleProtocol>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_nullable::SimpleProtocol>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
@@ -141,10 +137,6 @@ fidl::internal::WireWeakSyncClientImpl<::test_nullable::SimpleProtocol>::Add(int
   fidl::internal::WireEventDispatcher<::test_nullable::SimpleProtocol> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_nullable::SimpleProtocol>::entries_[] = {
     {
@@ -193,9 +185,6 @@ fidl::WireServer<::test_nullable::SimpleProtocol>::Handler fidl::WireServer<::te
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void fidl::internal::WireCompleterImpl<::test_nullable::SimpleProtocol::Add>::Reply(int32_t sum) {
   return MakeReply(sum);
 }
@@ -244,9 +233,6 @@ fidl::internal::WireCompleterBase<::test_nullable::SimpleProtocol::Add>::WireCom
   return *this;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_nullable::SimpleProtocol::Add>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_nullable::kSimpleProtocol_Add_Ordinal, ::test_nullable::kSimpleProtocol_Add_DynamicFlags);
 }
@@ -333,9 +319,5 @@ fidl::internal::WireSyncBufferClientImpl<::test_nullable::SimpleProtocol>::Add(i
   return ::fidl::WireUnownedResult<::test_nullable::SimpleProtocol::Add>(
       ::fidl::UnownedClientEnd<::test_nullable::SimpleProtocol>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
 }
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop

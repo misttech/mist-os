@@ -50,14 +50,6 @@ struct ::fidl::internal::WireMethodTypes<::test_errorsyntax::ExampleUseOfErrorSy
           ::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>, ::fidl::internal::ChannelTransport>>;
 };
 
-namespace test_errorsyntax {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-}  // namespace test_errorsyntax
-
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail> {
   static constexpr bool HasRequestPayload = true;
@@ -76,13 +68,6 @@ struct ::fidl::internal::WireMethodTypes<::test_errorsyntax::ExampleUseOfErrorSy
       ::fidl::internal::UnownedEncodedMessage<
           ::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>, ::fidl::internal::ChannelTransport>>;
 };
-
-namespace test_errorsyntax {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace test_errorsyntax
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_errorsyntax::ExampleUseOfErrorSyntax> final {
@@ -638,12 +623,6 @@ class ::fidl::WireServer<::test_errorsyntax::ExampleUseOfErrorSyntax> : public :
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireWeakOnewayClientImpl<::test_errorsyntax::ExampleUseOfErrorSyntax> : public ::fidl::internal::ClientImplBase {

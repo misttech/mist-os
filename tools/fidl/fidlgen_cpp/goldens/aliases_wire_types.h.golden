@@ -45,10 +45,6 @@ using VecOfStringsAtMost5 = ::fidl::VectorView<::fidl::StringView>;
 
 using Channel = ::zx::channel;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 using AliasOfChannel = ::zx::channel;
 
 #endif  // __Fuchsia__

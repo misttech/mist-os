@@ -116,10 +116,6 @@ struct WireTypeForNaturalType<::test_nullable::StructWithNullableProtocol> {
   using type = ::test_nullable::wire::StructWithNullableProtocol;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct WireNaturalConversionTraits<::test_nullable::wire::StructWithNullableRequest, ::test_nullable::StructWithNullableRequest> {
   static ::test_nullable::StructWithNullableRequest ToNatural(::test_nullable::wire::StructWithNullableRequest src);

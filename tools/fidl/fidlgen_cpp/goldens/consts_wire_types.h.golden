@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <fidl/test.consts/cpp/common_types.h>
+#include <fidl/test.consts/cpp/markers.h>
 #include <lib/fidl/cpp/wire/array.h>
 #include <lib/fidl/cpp/wire/envelope.h>
 #include <lib/fidl/cpp/wire/internal/framework_err.h>
@@ -16,12 +18,6 @@
 #include <lib/stdcompat/optional.h>
 
 #include <cinttypes>
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
-#include <fidl/test.consts/cpp/common_types.h>
-#include <fidl/test.consts/cpp/markers.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"

@@ -147,10 +147,6 @@ zx_status_t TableWithHandle::Clone(TableWithHandle* result) const {
   return ZX_OK;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 extern "C" const fidl_type_t test_handlesintypes_UnionWithHandleTable;
 const fidl_type_t* UnionWithHandle::FidlType = &test_handlesintypes_UnionWithHandleTable;
 
@@ -331,10 +327,6 @@ void UnionWithHandle::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
   }
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 extern "C" const fidl_type_t test_handlesintypes_HandlesInTypesTable;
 const fidl_type_t* HandlesInTypes::FidlType = &test_handlesintypes_HandlesInTypesTable;
 
@@ -402,10 +394,6 @@ zx_status_t HandlesInTypes::Clone(HandlesInTypes* _result) const {
   return ZX_OK;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 extern "C" const fidl_type_t test_handlesintypes_EmptyResourceStructTable;
 const fidl_type_t* EmptyResourceStruct::FidlType = &test_handlesintypes_EmptyResourceStructTable;
 
@@ -432,10 +420,6 @@ zx_status_t EmptyResourceStruct::Clone(EmptyResourceStruct* _result) const {
     return _status;
   return ZX_OK;
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 extern "C" const fidl_type_t test_handlesintypes_EmptyResourceTableTable;
 const fidl_type_t* EmptyResourceTable::FidlType = &test_handlesintypes_EmptyResourceTableTable;
@@ -498,10 +482,6 @@ clear_all:
 zx_status_t EmptyResourceTable::Clone(EmptyResourceTable* result) const {
   return ZX_OK;
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 extern "C" const fidl_type_t test_handlesintypes_EmptyResourceUnionTable;
 const fidl_type_t* EmptyResourceUnion::FidlType = &test_handlesintypes_EmptyResourceUnionTable;

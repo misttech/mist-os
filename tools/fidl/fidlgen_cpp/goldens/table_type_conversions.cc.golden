@@ -682,9 +682,6 @@ namespace internal {
   return builder.Build();
 }
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 #pragma clang diagnostic pop
 
 }  // namespace internal

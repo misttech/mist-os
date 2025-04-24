@@ -12,58 +12,34 @@ void ::test_protocols::wire::WithErrorSyntaxHandleInResultResponse::_CloseHandle
   h.reset();
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void ::test_protocols::wire::ChannelProtocolTakeHandleRequest::_CloseHandles() {
   h.reset();
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void ::test_protocols::wire::ChannelProtocolMutateSocketRequest::_CloseHandles() {
   a.reset();
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void ::test_protocols::wire::ChannelProtocolMutateSocketResponse::_CloseHandles() {
   b.reset();
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void ::test_protocols::wire::HandleRightsProtocolNoResponseMethodRequest::_CloseHandles() {
   h.reset();
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void ::test_protocols::wire::HandleRightsProtocolResponseMethodRequest::_CloseHandles() {
   h.reset();
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void ::test_protocols::wire::HandleRightsProtocolResponseMethodResponse::_CloseHandles() {
   h.reset();
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void ::test_protocols::wire::HandleRightsProtocolAnEventRequest::_CloseHandles() {
   h.reset();
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void ::test_protocols::wire::ProtocolEnds::_CloseHandles() {
   client.reset();
   server.reset();
@@ -71,44 +47,26 @@ void ::test_protocols::wire::ProtocolEnds::_CloseHandles() {
   server_opt.reset();
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void ::test_protocols::wire::WithProtocolEndsClientEndsRequest::_CloseHandles() {
   in.reset();
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void ::test_protocols::wire::WithProtocolEndsClientEndsResponse::_CloseHandles() {
   out.reset();
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void ::test_protocols::wire::WithProtocolEndsServerEndsRequest::_CloseHandles() {
   in.reset();
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void ::test_protocols::wire::WithProtocolEndsServerEndsResponse::_CloseHandles() {
   out.reset();
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void ::test_protocols::wire::WithProtocolEndsStructContainingEndsRequest::_CloseHandles() {
   in._CloseHandles();
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void ::test_protocols::wire::WithProtocolEndsStructContainingEndsResponse::_CloseHandles() {
   out._CloseHandles();
 }

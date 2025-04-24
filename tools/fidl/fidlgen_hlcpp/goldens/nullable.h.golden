@@ -186,10 +186,6 @@ class SimpleProtocol_ResponseEncoder {
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class StructWithNullableProtocol final {
  public:
   static const fidl_type_t* FidlType;
@@ -210,10 +206,6 @@ inline zx_status_t Clone(const ::test::nullable::StructWithNullableProtocol& _va
 }
 
 using StructWithNullableProtocolPtr = ::std::unique_ptr<StructWithNullableProtocol>;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class StructWithNullableRequest final {
  public:
@@ -541,10 +533,6 @@ struct Equality<::test::nullable::StructWithNullableProtocol> {
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct CodingTraits<::test::nullable::StructWithNullableRequest>
     : public EncodableCodingTraits<::test::nullable::StructWithNullableRequest, 4> {};
@@ -720,10 +708,6 @@ constexpr uint64_t kSimpleProtocol_Add_Ordinal = 0x7ee19cf19ae30276lu;
 
 constexpr ::fidl::MessageDynamicFlags kSimpleProtocol_Add_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 }  // namespace internal
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class SimpleProtocol {
  public:

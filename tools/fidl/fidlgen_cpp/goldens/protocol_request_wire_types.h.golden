@@ -47,29 +47,17 @@ struct ParentGetChildResponse {
   void _CloseHandles();
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 struct ParentGetChildRequestResponse {
   ::fidl::ServerEnd<::test_protocolrequest::Child> r = {};
 
   void _CloseHandles();
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 struct ParentTakeChildRequest {
   ::fidl::ClientEnd<::test_protocolrequest::Child> c = {};
 
   void _CloseHandles();
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 struct ParentTakeChildRequestRequest {
   ::fidl::ServerEnd<::test_protocolrequest::Child> r = {};
@@ -133,9 +121,6 @@ struct ::fidl::internal::WireCodingTraits<::test_protocolrequest::wire::ParentGe
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsResource<::test_protocolrequest::wire::ParentGetChildRequestResponse> : public std::true_type {};
 
@@ -185,9 +170,6 @@ struct ::fidl::internal::WireCodingTraits<::test_protocolrequest::wire::ParentGe
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsResource<::test_protocolrequest::wire::ParentTakeChildRequest> : public std::true_type {};
 
@@ -237,9 +219,6 @@ struct ::fidl::internal::WireCodingTraits<::test_protocolrequest::wire::ParentTa
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsResource<::test_protocolrequest::wire::ParentTakeChildRequestRequest> : public std::true_type {};
 

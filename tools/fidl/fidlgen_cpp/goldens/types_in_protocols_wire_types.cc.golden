@@ -11,9 +11,6 @@
 void ::test_typesinprotocols::wire::ResourceStruct::_CloseHandles() {
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 void ::test_typesinprotocols::wire::Resource::_CloseHandles() {
   handle.reset();
   vmo.reset();

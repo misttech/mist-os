@@ -48,13 +48,6 @@ struct ::fidl::internal::WireMethodTypes<::test_drivertwoway::TwoWay::Add> {
           ::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>, ::fidl::internal::DriverTransport>>;
 };
 
-namespace test_drivertwoway {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace test_drivertwoway
-
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_drivertwoway::TwoWay> final {
   WireServerDispatcher() = delete;
@@ -342,12 +335,6 @@ class ::fdf::WireServer<::test_drivertwoway::TwoWay> : public ::fidl::internal::
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_drivertwoway::TwoWay> : public ::fdf::internal::BufferClientImplBase {

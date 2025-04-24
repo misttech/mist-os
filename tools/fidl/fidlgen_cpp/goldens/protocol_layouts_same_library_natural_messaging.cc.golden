@@ -223,10 +223,6 @@ fidl::internal::NaturalSyncClientImpl<::test_protocollayoutssamelibrary::Compose
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::Status fidl::SyncEventHandler<::test_protocollayoutssamelibrary::ComposedProtocol>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> client_end) {
   ::fidl::internal::IncomingEventsStorage<::test_protocollayoutssamelibrary::ComposedProtocol> event_storage;
@@ -265,10 +261,6 @@ fidl::internal::NaturalEventDispatcher<::test_protocollayoutssamelibrary::Compos
       return ::fidl::Status::UnknownOrdinal();
   }
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 ::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_protocollayoutssamelibrary::ComposedProtocol>::OnAnonComposed(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest& payload) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
@@ -875,10 +867,6 @@ fidl::internal::NaturalSyncClientImpl<::test_protocollayoutssamelibrary::MainPro
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::Status fidl::SyncEventHandler<::test_protocollayoutssamelibrary::MainProtocol>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client_end) {
   ::fidl::internal::IncomingEventsStorage<::test_protocollayoutssamelibrary::MainProtocol> event_storage;
@@ -939,10 +927,6 @@ fidl::internal::NaturalEventDispatcher<::test_protocollayoutssamelibrary::MainPr
       return ::fidl::Status::UnknownOrdinal();
   }
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 ::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_protocollayoutssamelibrary::MainProtocol>::OnAnonComposed(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest& payload) {
   ::fidl::internal::NaturalMessageEncoder _encoder{

@@ -40,13 +40,6 @@ struct ::fidl::internal::WireMethodTypes<::test_inheritancewithrecursivedecl::Pa
   using Completer = fidl::Completer<>;
 };
 
-namespace test_inheritancewithrecursivedecl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace test_inheritancewithrecursivedecl
-
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_inheritancewithrecursivedecl::Parent> final {
   WireServerDispatcher() = delete;
@@ -114,9 +107,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritancewithr
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 }  // namespace fidl
 
 template <>
@@ -253,13 +243,6 @@ class ::fidl::WireServer<::test_inheritancewithrecursivedecl::Parent> : public :
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-}  // namespace fidl
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_inheritancewithrecursivedecl::Child::First> {
@@ -268,14 +251,6 @@ struct ::fidl::internal::WireMethodTypes<::test_inheritancewithrecursivedecl::Ch
 
   using Completer = fidl::Completer<>;
 };
-
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-}  // namespace fidl
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_inheritancewithrecursivedecl::Child::Second> {
@@ -338,9 +313,6 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second> final {
   FIDL_ALIGNDECL
@@ -386,9 +358,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritancewithr
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>> : public std::true_type {};
 template <>
@@ -408,9 +377,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritancewithr
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 }  // namespace fidl
 
 template <>
@@ -593,12 +559,6 @@ class ::fidl::WireServer<::test_inheritancewithrecursivedecl::Child> : public ::
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireWeakOnewayClientImpl<::test_inheritancewithrecursivedecl::Parent> : public ::fidl::internal::ClientImplBase {
@@ -667,10 +627,6 @@ class ::fidl::internal::WireBufferEventSender<::test_inheritancewithrecursivedec
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::WireWeakOnewayClientImpl<::test_inheritancewithrecursivedecl::Child> : public ::fidl::internal::ClientImplBase {
  public:
@@ -712,9 +668,6 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_inheritancewithrecursivede
   using WireWeakOnewayClientImpl::WireWeakOnewayClientImpl;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakEventSender<::test_inheritancewithrecursivedecl::Child> : public ::fidl::internal::WeakEventSenderBase {
  public:

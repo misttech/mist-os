@@ -94,10 +94,6 @@ namespace test_placementofattributes {
   return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::fidl::internal::WireEventDispatcher<::test_placementofattributes::ExampleProtocol>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_placementofattributes::ExampleProtocol>* event_handler)
     : IncomingEventDispatcher(event_handler) {}
 
@@ -107,10 +103,6 @@ namespace test_placementofattributes {
   fidl::internal::WireEventDispatcher<::test_placementofattributes::ExampleProtocol> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_placementofattributes::ExampleProtocol>::entries_[] = {
     {
@@ -159,9 +151,6 @@ fidl::WireServer<::test_placementofattributes::ExampleProtocol>::Handler fidl::W
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 ::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_placementofattributes::kExampleProtocol_Method_Ordinal, ::test_placementofattributes::kExampleProtocol_Method_DynamicFlags);
 }
@@ -204,9 +193,5 @@ fidl::internal::WireSyncBufferClientImpl<::test_placementofattributes::ExamplePr
   return ::fidl::WireUnownedResult<::test_placementofattributes::ExampleProtocol::Method>(
       ::fidl::UnownedClientEnd<::test_placementofattributes::ExampleProtocol>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
 }
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop

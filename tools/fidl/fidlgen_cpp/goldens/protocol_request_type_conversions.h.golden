@@ -37,10 +37,6 @@ struct WireTypeForNaturalType<::test_protocolrequest::ParentGetChildResponse> {
   using type = ::test_protocolrequest::wire::ParentGetChildResponse;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct WireNaturalConversionTraits<::test_protocolrequest::wire::ParentGetChildRequestResponse, ::test_protocolrequest::ParentGetChildRequestResponse> {
   static ::test_protocolrequest::ParentGetChildRequestResponse ToNatural(::test_protocolrequest::wire::ParentGetChildRequestResponse src);
@@ -55,10 +51,6 @@ template <>
 struct WireTypeForNaturalType<::test_protocolrequest::ParentGetChildRequestResponse> {
   using type = ::test_protocolrequest::wire::ParentGetChildRequestResponse;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct WireNaturalConversionTraits<::test_protocolrequest::wire::ParentTakeChildRequest, ::test_protocolrequest::ParentTakeChildRequest> {
@@ -75,10 +67,6 @@ struct WireTypeForNaturalType<::test_protocolrequest::ParentTakeChildRequest> {
   using type = ::test_protocolrequest::wire::ParentTakeChildRequest;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct WireNaturalConversionTraits<::test_protocolrequest::wire::ParentTakeChildRequestRequest, ::test_protocolrequest::ParentTakeChildRequestRequest> {
   static ::test_protocolrequest::ParentTakeChildRequestRequest ToNatural(::test_protocolrequest::wire::ParentTakeChildRequestRequest src);
@@ -93,10 +81,6 @@ template <>
 struct WireTypeForNaturalType<::test_protocolrequest::ParentTakeChildRequestRequest> {
   using type = ::test_protocolrequest::wire::ParentTakeChildRequestRequest;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct WireNaturalConversionTraits<::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>, ::fidl::Response<::test_protocolrequest::Parent::GetChild>> {

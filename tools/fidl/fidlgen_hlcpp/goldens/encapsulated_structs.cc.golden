@@ -178,10 +178,6 @@ zx_status_t NonInlineStructTestStruct::Clone(NonInlineStructTestStruct* _result)
   return ZX_OK;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 extern "C" const fidl_type_t test_encapsulatedstructs_TopLevelStructTable;
 const fidl_type_t* TopLevelStruct::FidlType = &test_encapsulatedstructs_TopLevelStructTable;
 
