@@ -113,6 +113,30 @@ impl NodeBuilder {
         self
     }
 
+    /// Triggers the callback if |condition| is true.
+    pub fn pipe_if<F>(self, condition: bool, callback: F) -> Self
+    where
+        F: FnOnce(Self) -> Self,
+    {
+        if condition {
+            callback(self)
+        } else {
+            self
+        }
+    }
+
+    /// Triggers the callback if |value| has a some value in it.
+    pub fn pipe_opt<T, F>(self, value: Option<T>, callback: F) -> Self
+    where
+        F: FnOnce(Self, T) -> Self,
+    {
+        if let Some(value) = value {
+            callback(self, value)
+        } else {
+            self
+        }
+    }
+
     /// Finalize the construction of the node for use with [`Node::add_child`] or
     /// [`Node::add_owned_child`].
     pub fn build(self) -> NodeAddArgs {
