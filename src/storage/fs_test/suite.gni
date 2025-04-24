@@ -40,6 +40,10 @@ template("fs_test_config") {
     data = config_outputs[0]
     schema = "//src/storage/fs_test/fs_test.schema.json"
     deps = [ ":${name}_fs_test_config" ]
+
+    # TODO(https://fxbug.dev/42168969): Update schema to
+    # "http://json-schema.org/draft-07/schema#" and remove this line.
+    use_valico = false
   }
 }
 

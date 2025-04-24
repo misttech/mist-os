@@ -585,6 +585,10 @@ template("fidl_library") {
     data = invoker.fidl_ir_json
     schema = "//tools/fidl/fidlc/schema.json"
     deps = [ ":$compilation_target_name" ]
+
+    # TODO(https://fxbug.dev/42168969): Update schema to
+    # "http://json-schema.org/draft-07/schema#" and remove this line.
+    use_valico = false
   }
 
   group(main_target_name) {

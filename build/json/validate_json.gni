@@ -23,7 +23,7 @@ import("//build/compiled_action.gni")
 #     [bool] If true, the |data| file may contain C-style comments
 #     (`/* block */` and `// inline`) that will be ignored.
 #
-#   use_valico (optional; default is false)
+#   use_valico (optional; default is true)
 #     [bool] If true, a valico-based validator will be used instead of the
 #     previous rapidjson-based version.
 #
@@ -44,7 +44,7 @@ template("validate_json") {
   assert(defined(invoker.data), "data is required")
   assert(defined(invoker.schema), "schema is required")
   allow_comments = defined(invoker.allow_comments) && invoker.allow_comments
-  use_valico = defined(invoker.use_valico) && invoker.use_valico
+  use_valico = !defined(invoker.use_valico) || invoker.use_valico
 
   compiled_action(target_name) {
     forward_variables_from(invoker,
