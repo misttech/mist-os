@@ -691,6 +691,12 @@ pub fn net_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNod
     );
     dir.entry(
         current_task,
+        "ip6_tables_names",
+        BytesFile::new_node(b"filter\nmangle\nraw\n".to_vec()),
+        mode!(IFREG, 0o644),
+    );
+    dir.entry(
+        current_task,
         "psched",
         StubSysctl::new_node("/proc/net/psched", bug_ref!("https://fxbug.dev/322874710")),
         mode!(IFREG, 0o444),
