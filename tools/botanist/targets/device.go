@@ -20,6 +20,7 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/bootserver"
 	"go.fuchsia.dev/fuchsia/tools/botanist"
+	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/iomisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/lib/retry"
@@ -553,6 +554,37 @@ func (t *Device) provisionSSHKey(ctx context.Context) error {
 	return <-waitChan
 }
 
+// GetFastbootFlashImages returns the images needed for fastboot flashing.
+func GetFastbootFlashImages(ctx context.Context, pbPath string, ffx *ffxutil.FFXInstance) (map[string]*bootserver.Image, error) {
+	dtbo, err := ffx.GetImageFromPB(ctx, pbPath, "a", "dtbo", "")
+	if err != nil {
+		return nil, fmt.Errorf("GetImageFromPB dtbo: %w", err)
+	}
+	if dtbo == nil {
+		return nil, fmt.Errorf("failed to find dtbo image from product bundle %s", pbPath)
+	}
+
+	zbi, err := ffx.GetImageFromPB(ctx, pbPath, "a", "zbi", "")
+	if err != nil {
+		return nil, fmt.Errorf("GetImageFromPB zbi: %w", err)
+	}
+	if zbi == nil {
+		return nil, fmt.Errorf("failed to find zbi image from product bundle %s", pbPath)
+	}
+
+	fvmImage, err := ffx.GetImageFromPB(ctx, pbPath, "a", "fvm", "")
+	if err != nil {
+		return nil, fmt.Errorf("GetImageFromPB fvm: %w", err)
+	}
+	if fvmImage == nil {
+		fvmImage, err = ffx.GetImageFromPB(ctx, pbPath, "a", "fxfs.fastboot", "")
+		if err != nil {
+			return nil, fmt.Errorf("failed to find fvm image from product bundle %s", pbPath)
+		}
+	}
+	return map[string]*bootserver.Image{"dtbo": dtbo, "zbi": zbi, "fvm": fvmImage}, nil
+}
+
 // fastbootFlash runs fastboot commands directly to flash the device.
 func (t *Device) fastbootFlash(ctx context.Context, pbPath string, images []bootserver.Image) error {
 	fastboot := getImageByName(images, "exe.linux-x64_fastboot")
@@ -560,32 +592,14 @@ func (t *Device) fastbootFlash(ctx context.Context, pbPath string, images []boot
 		return errors.New("fastboot not found")
 	}
 
-	dtbo, err := t.ffx.GetImageFromPB(ctx, pbPath, "a", "dtbo", "")
+	flashImages, err := GetFastbootFlashImages(ctx, pbPath, t.ffx.FFXInstance)
 	if err != nil {
-		return fmt.Errorf("GetImageFromPB dtbo: %w", err)
+		return err
 	}
-	if dtbo == nil {
-		return fmt.Errorf("failed to find dtbo image from product bundle %s", pbPath)
-	}
+	dtbo := flashImages["dtbo"]
+	zbi := flashImages["zbi"]
+	fvmImage := flashImages["fvm"]
 
-	zbi, err := t.ffx.GetImageFromPB(ctx, pbPath, "a", "zbi", "")
-	if err != nil {
-		return fmt.Errorf("GetImageFromPB zbi: %w", err)
-	}
-	if zbi == nil {
-		return fmt.Errorf("failed to find zbi image from product bundle %s", pbPath)
-	}
-
-	fvmImage, err := t.ffx.GetImageFromPB(ctx, pbPath, "a", "fvm", "")
-	if err != nil {
-		return fmt.Errorf("GetImageFromPB fvm: %w", err)
-	}
-	if fvmImage == nil {
-		fvmImage, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fxfs.fastboot", "")
-		if err != nil {
-			return fmt.Errorf("failed to find fvm image from product bundle %s", pbPath)
-		}
-	}
 	cmds := [][]string{
 		{"flash", "boot_a", zbi.Path},
 		{"flash", "boot_b", zbi.Path},

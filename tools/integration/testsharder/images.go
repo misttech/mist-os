@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"go.fuchsia.dev/fuchsia/tools/botanist/targets"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
@@ -91,21 +92,41 @@ func AddImageDeps(ctx context.Context, s *Shard, buildDir string, images []build
 	if s.Env.TargetsEmulator() {
 		artifactsGroup = "emu"
 	}
-	artifacts, err := ffx.GetPBArtifacts(ctx, filepath.Join(buildDir, pbPath), artifactsGroup)
-	if err != nil {
-		return err
-	}
-	for _, a := range artifacts {
-		imageDeps = append(imageDeps, filepath.Join(pbPath, a))
-	}
-	bootloaderArtifacts, err := ffx.GetPBArtifacts(ctx, filepath.Join(buildDir, pbPath), "bootloader")
-	if err != nil {
-		return err
-	}
-	for _, a := range bootloaderArtifacts {
-		parts := strings.SplitN(a, ":", 2)
-		if parts[0] == "firmware_fat" {
-			imageDeps = append(imageDeps, filepath.Join(pbPath, parts[1]))
+	// TODO(https://fxbug.dev/380130504): Remove once non-sparse images are no longer included
+	// in the product bundle.
+	if s.Env.Dimensions.DeviceType() == "Sorrel" {
+		flashImages, err := targets.GetFastbootFlashImages(ctx, filepath.Join(buildDir, pbPath), ffx.(*ffxutil.FFXInstance))
+		if err != nil {
+			return err
+		}
+		for _, img := range flashImages {
+			if img == nil {
+				continue
+			}
+			rel, err := filepath.Rel(buildDir, img.Path)
+			if err != nil {
+				return fmt.Errorf("failed to get image path relative to the build dir: %w", err)
+			}
+			imageDeps = append(imageDeps, rel)
+		}
+		imageDeps = append(imageDeps, filepath.Join(pbPath, "product_bundle.json"))
+	} else {
+		artifacts, err := ffx.GetPBArtifacts(ctx, filepath.Join(buildDir, pbPath), artifactsGroup)
+		if err != nil {
+			return err
+		}
+		for _, a := range artifacts {
+			imageDeps = append(imageDeps, filepath.Join(pbPath, a))
+		}
+		bootloaderArtifacts, err := ffx.GetPBArtifacts(ctx, filepath.Join(buildDir, pbPath), "bootloader")
+		if err != nil {
+			return err
+		}
+		for _, a := range bootloaderArtifacts {
+			parts := strings.SplitN(a, ":", 2)
+			if parts[0] == "firmware_fat" {
+				imageDeps = append(imageDeps, filepath.Join(pbPath, parts[1]))
+			}
 		}
 	}
 
