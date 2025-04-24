@@ -514,6 +514,8 @@ class AmlG12CompositeTest : public testing::Test {
 TEST_F(AmlG12CompositeTest, CompositeProperties) {
   fidl::Result result = client_->GetProperties();
   ASSERT_TRUE(result.is_ok());
+  ASSERT_EQ("Amlogic", result->properties().manufacturer().value());
+  ASSERT_EQ("g12", result->properties().product().value());
   ASSERT_EQ(fuchsia_hardware_audio::kClockDomainMonotonic,
             result->properties().clock_domain().value());
 }

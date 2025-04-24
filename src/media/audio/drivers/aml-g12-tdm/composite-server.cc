@@ -276,8 +276,11 @@ void AudioCompositeServer::Reset(ResetCompleter::Sync& completer) {
 
 void AudioCompositeServer::GetProperties(
     fidl::Server<fuchsia_hardware_audio::Composite>::GetPropertiesCompleter::Sync& completer) {
-  fuchsia_hardware_audio::CompositeProperties props;
-  props.clock_domain(fuchsia_hardware_audio::kClockDomainMonotonic);
+  fuchsia_hardware_audio::CompositeProperties props{{
+      .manufacturer = "Amlogic",
+      .product = "g12",
+      .clock_domain = fuchsia_hardware_audio::kClockDomainMonotonic,
+  }};
   completer.Reply(std::move(props));
 }
 
