@@ -706,8 +706,6 @@ source_set("handoff") {
   ]
 
   public_deps = [
-    "//sdk/lib/stdcompat",
-
     # arch-handoff.h has #include <lib/zbi-format/driver-config.h>
     "//sdk/lib/zbi-format",
 

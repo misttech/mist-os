@@ -10,9 +10,9 @@
 // Note: we refrain from using the ktl namespace as <phys/handoff.h> is
 // expected to be compiled in the userboot toolchain.
 
-#include <lib/stdcompat/span.h>
 #include <stdint.h>
 
+#include <span>
 #include <string_view>
 
 // PhysHandoffPtr provides a "smart pointer" style API for pointers handed off
@@ -126,8 +126,8 @@ class PhysHandoffPtr {
   typename Traits::ExportType ptr_{};
 };
 
-// PhysHandoffSpan<T> is to cpp20::span<T> as PhysHandoffPtr<T> is to T*.
-// It has get() and release() methods that return cpp20::span<T>.
+// PhysHandoffSpan<T> is to std::span<T> as PhysHandoffPtr<T> is to T*.
+// It has get() and release() methods that return std::span<T>.
 
 template <typename T, PhysHandoffPtrEncoding Encoding, PhysHandoffPtrLifetime Lifetime>
 class PhysHandoffSpan {
@@ -146,9 +146,9 @@ class PhysHandoffSpan {
   bool empty() const { return size() == 0; }
 
 #if HANDOFF_PTR_DEREF
-  cpp20::span<T> get() const { return {ptr_.get(), size_}; }
+  std::span<T> get() const { return {ptr_.get(), size_}; }
 
-  cpp20::span<T> release() { return {ptr_.release(), size_}; }
+  std::span<T> release() { return {ptr_.release(), size_}; }
 #endif
 
  private:
@@ -170,12 +170,12 @@ class PhysHandoffString : public PhysHandoffSpan<const char, Encoding, Lifetime>
 
 #ifdef HANDOFF_PTR_DEREF
   std::string_view get() const {
-    cpp20::span str = Base::get();
+    std::span str = Base::get();
     return {str.data(), str.size()};
   }
 
   std::string_view release() {
-    cpp20::span str = Base::release();
+    std::span str = Base::release();
     return {str.data(), str.size()};
   }
 #endif

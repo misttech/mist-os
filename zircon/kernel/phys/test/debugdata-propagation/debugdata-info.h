@@ -4,16 +4,14 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include <lib/stdcompat/array.h>
-#include <lib/stdcompat/span.h>
+#ifndef ZIRCON_KERNEL_PHYS_TEST_DEBUGDATA_PROPAGATION_DEBUGDATA_INFO_H_
+#define ZIRCON_KERNEL_PHYS_TEST_DEBUGDATA_PROPAGATION_DEBUGDATA_INFO_H_
+
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/item.h>
 
 #include <array>
 #include <string_view>
-
-#ifndef ZIRCON_KERNEL_PHYS_TEST_DEBUGDATA_PROPAGATION_DEBUGDATA_INFO_H_
-#define ZIRCON_KERNEL_PHYS_TEST_DEBUGDATA_PROPAGATION_DEBUGDATA_INFO_H_
 
 struct Debugdata {
   std::string_view sink;
@@ -28,7 +26,7 @@ struct Debugdata {
   constexpr uint32_t aligned_size() const { return zbitl::AlignedPayloadLength(size()); }
 };
 
-inline constexpr auto kDebugdataItems = cpp20::to_array<Debugdata>({
+inline constexpr auto kDebugdataItems = std::to_array<Debugdata>({
     {
         .sink = "debug-data-sink-1",
         .payload = "Hello World!\n",

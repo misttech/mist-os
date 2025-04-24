@@ -22,7 +22,6 @@
 #include <lib/arch/ticks.h>
 #include <lib/crypto/entropy_pool.h>
 #include <lib/memalloc/range.h>
-#include <lib/stdcompat/span.h>
 #include <lib/uart/all.h>
 #include <lib/zbi-format/board.h>
 #include <lib/zbi-format/cpu.h>
