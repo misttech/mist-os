@@ -405,6 +405,7 @@ multiconst!(zx_signals_t, [
     ZX_VMO_ZERO_CHILDREN        = ZX_OBJECT_SIGNAL_3;
 
     // Counter
+    ZX_COUNTER_SIGNALED          = ZX_OBJECT_SIGNAL_3;
     ZX_COUNTER_POSITIVE          = ZX_OBJECT_SIGNAL_4;
     ZX_COUNTER_NON_POSITIVE      = ZX_OBJECT_SIGNAL_5;
 ]);

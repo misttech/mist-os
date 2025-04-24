@@ -179,6 +179,7 @@ typedef uint32_t zx_signals_t;
 #define ZX_IOB_PEER_CLOSED          __ZX_OBJECT_PEER_CLOSED
 
 // Counter
+#define ZX_COUNTER_SIGNALED          __ZX_OBJECT_SIGNALED
 #define ZX_COUNTER_POSITIVE          __ZX_OBJECT_SIGNAL_4
 #define ZX_COUNTER_NON_POSITIVE      __ZX_OBJECT_SIGNAL_5
 

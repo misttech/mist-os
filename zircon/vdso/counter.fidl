@@ -31,6 +31,10 @@ closed protocol Counter {
     /// asserted.  Otherwise `ZX_COUNTER_NON_POSITIVE` is asserted.  Exactly one of
     /// these two signals is always asserted, and never both at once.
     ///
+    /// Additionally, the signal `ZX_COUNTER_SIGNALED` may be set or cleared on the
+    /// counter using [`zx_object_signal()`]. This is independent of the value of the
+    /// counter or the state of the other signals.
+    ///
     /// The newly-created handle will have rights `ZX_RIGHTS_BASIC`, `ZX_RIGHTS_IO`, and
     /// `ZX_RIGHT_SIGNAL`.  The value will be zero and the signal
     /// `ZX_COUNTER_NON_POSITIVE` will be asserted on the newly-created object.
@@ -71,6 +75,7 @@ closed protocol Counter {
     /// [`zx_handle_close()`]: handle_close.md
     /// [`zx_handle_duplicate()`]: handle_duplicate.md
     /// [`zx_handle_replace()`]: handle_replace.md
+    /// [`zx_object_signal()`]: object_signal.md
     /// [`zx_object_wait_async()`]: object_wait_async.md
     /// [`zx_object_wait_many()`]: object_wait_many.md
     /// [`zx_object_wait_one()`]: object_wait_one.md

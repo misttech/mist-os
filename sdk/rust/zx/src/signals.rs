@@ -82,6 +82,7 @@ bitflags! {
         const CLOCK_UPDATED       = ZX_CLOCK_UPDATED;
 
         // Counter
+        const COUNTER_SIGNALED    = ZX_COUNTER_SIGNALED;
         const COUNTER_POSITIVE    = ZX_COUNTER_POSITIVE;
         const COUNTER_NON_POSITIVE    = ZX_COUNTER_NON_POSITIVE;
 
