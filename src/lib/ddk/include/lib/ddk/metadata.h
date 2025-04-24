@@ -16,12 +16,6 @@
 // serialized using the convention for FIDL data persistence, which
 // adds wire format metadata in front of the encoded content.
 
-// MAC Address for Ethernet, Wifi, Bluetooth, etc.
-// Content: uint8_t[] (variable length based on type of MAC address)
-// TODO(b/373918767): Remove once no longer used.
-#define DEVICE_METADATA_MAC_ADDRESS 0x43414D6D  // mMAC
-static_assert(DEVICE_METADATA_MAC_ADDRESS == ZBI_TYPE_DRV_MAC_ADDRESS, "");
-
 // Partition map for raw block device.
 // Content: bootdata_partition_map_t
 #define DEVICE_METADATA_PARTITION_MAP 0x5452506D  // mPRT
