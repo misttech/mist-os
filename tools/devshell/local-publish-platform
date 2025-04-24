@@ -73,7 +73,7 @@ EOF
 }
 
 main() {
-    local bazel_sdk_path="${FUCHSIA_BUILD_DIR}/$(build/api/client print bazel_sdk_info | fx-command-run jq -r ".[0].location")"
+    local bazel_sdk_path="${FUCHSIA_BUILD_DIR}/$(build/api/client print bazel_sdk_info | fx-command-run jq -r ' .[] | select(.name == "final_fuchsia_sdk") | .location')"
     local rules_fuchsia_path="${FUCHSIA_BUILD_DIR}/$(build/api/client print rules_fuchsia_info | fx-command-run jq -r ".[0].location")"
     local platform_aibs_path="${FUCHSIA_BUILD_DIR}/$(build/api/client print platform_artifacts| fx-command-run jq -r ".[0].path")"
 

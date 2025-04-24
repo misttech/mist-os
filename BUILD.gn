@@ -361,6 +361,10 @@ build_api_module("args") {
 #
 # Type: list(scope)
 #
+#  name
+#    Required: The name of the SDK.
+#    Type: string
+#
 #  location
 #    Required: Directory where the Bazel SDK is generated
 #    Type: string

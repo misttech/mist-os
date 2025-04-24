@@ -47,7 +47,7 @@ create the Bazel SDK.
 
 The output of the build can be found by running the following command from the root
 of the repository. This path is relative to the current out directory.
-`build/api/client print bazel_sdk_info | fx jq  '.[] .location'`
+`build/api/client print bazel_sdk_info | select(.name == "final_fuchsia_sdk") | fx jq  '.[] .location'`
 
 ### Overriding @fuchsia_sdk and @rules_fuchsia
 
@@ -59,7 +59,7 @@ It can be helpful to put the path in an environment variable and create an alias
 since this needs to be pass to each invocation of bazel.
 
 ```bash
-export FUCHSIA_SDK_PATH="$(fx get-build-dir)/$(${FUCHSIA_DIR}/build/api/client print bazel_sdk_info | fx jq -r '.[] .location')"
+export FUCHSIA_SDK_PATH="$(fx get-build-dir)/$(${FUCHSIA_DIR}/build/api/client print bazel_sdk_info | fx jq -r '.[]  | select(.name == "final_fuchsia_sdk") | .location')"
 export RULES_FUCHSIA_PATH="$(fx get-build-dir)/$(${FUCHSIA_DIR}/build/api/client print rules_fuchsia_info | fx jq -r '.[] .location')"
 export SDK_OVERRIDE=("--override_repository=fuchsia_sdk=$FUCHSIA_SDK_PATH" "--override_repository=rules_fuchsia=$RULES_FUCHSIA_PATH")
 ```
