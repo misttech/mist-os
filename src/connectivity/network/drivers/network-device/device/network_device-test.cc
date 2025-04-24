@@ -3556,6 +3556,24 @@ TEST_F(NetworkDeviceTest, SessionNoDualLeaseWatch) {
   }
 }
 
+// Regression test for a crash observed when primary session takeover happens as
+// part of attaching a new port to a paused session.
+TEST_F(NetworkDeviceTest, SessionTakeoverOnAttach) {
+  ASSERT_OK(CreateDeviceWithPort13());
+  TestSession session1;
+  TestSession session2;
+  ASSERT_OK(OpenSession(&session1, netdev::wire::SessionFlags::kPrimary));
+  ASSERT_OK(AttachSessionPort(session1, port13_));
+  ASSERT_OK(WaitSessionStarted());
+  ASSERT_OK(OpenSession(&session2, netdev::wire::SessionFlags::kPrimary));
+
+  ASSERT_OK(DetachSessionPort(session1, port13_));
+  ASSERT_OK(session1.Close());
+  ASSERT_OK(WaitSessionDied());
+  ASSERT_OK(AttachSessionPort(session2, port13_));
+  ASSERT_OK(WaitSessionStarted());
+}
+
 class NetworkDeviceShimTest : public ::testing::Test {
  public:
   NetworkDeviceShimTest() = default;
