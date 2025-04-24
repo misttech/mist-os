@@ -10,18 +10,21 @@
 pub mod guest;
 
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::num::NonZeroU64;
 use std::ops::DerefMut as _;
 use std::path::Path;
 use std::pin::pin;
+use std::sync::{Arc, Mutex};
 
-use fidl::endpoints::ProtocolMarker;
+use fidl::endpoints::{ProtocolMarker, Proxy as _};
 use fidl_fuchsia_net_dhcp_ext::{self as fnet_dhcp_ext, ClientProviderExt};
 use fidl_fuchsia_net_ext::{self as fnet_ext};
 use fidl_fuchsia_net_interfaces_ext::admin::Control;
 use fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext};
 use fnet_ext::{FromExt as _, IntoExt as _};
 use fnet_interfaces_admin::GrantForInterfaceAuthorization;
+use zx::AsHandleRef;
 use {
     fidl_fuchsia_hardware_network as fnetwork, fidl_fuchsia_io as fio, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_dhcp as fnet_dhcp, fidl_fuchsia_net_interfaces as fnet_interfaces,
@@ -105,7 +108,15 @@ impl TestSandbox {
                 ..Default::default()
             },
         )?;
-        Ok(TestRealm { realm, name, _sandbox: self })
+        Ok(TestRealm(Arc::new(TestRealmInner {
+            realm,
+            name,
+            _sandbox: self,
+            shutdown_on_drop: Mutex::new(ShutdownOnDropConfig {
+                enabled: true,
+                ignore_monikers: HashSet::new(),
+            }),
+        })))
     }
 
     /// Creates a realm with no components.
@@ -249,23 +260,136 @@ pub struct InterfaceConfig<'a> {
     pub ipv6_dad_transmits: Option<u16>,
 }
 
-/// A realm within a netemul sandbox.
-#[must_use]
-#[derive(Clone)]
-pub struct TestRealm<'a> {
+#[derive(Debug)]
+struct ShutdownOnDropConfig {
+    enabled: bool,
+    ignore_monikers: HashSet<String>,
+}
+
+struct TestRealmInner<'a> {
     realm: fnetemul::ManagedRealmProxy,
     name: Cow<'a, str>,
     _sandbox: &'a TestSandbox,
+    shutdown_on_drop: Mutex<ShutdownOnDropConfig>,
 }
+
+impl Drop for TestRealmInner<'_> {
+    fn drop(&mut self) {
+        let ShutdownOnDropConfig { enabled, ignore_monikers } =
+            self.shutdown_on_drop.get_mut().unwrap();
+        if !*enabled {
+            return;
+        }
+        let ignore_monikers = std::mem::take(ignore_monikers);
+        let mut crashed = match self.shutdown_sync() {
+            Ok(crashed) => crashed,
+            Err(e) => {
+                // If we observe a FIDL closed error don't panic. This likely
+                // just means the realm or listener were already shutdown, due
+                // to a pipelined realm building error, for example.
+                if !e.is_closed() {
+                    panic!("error verifying clean shutdown on test realm {}: {:?}", self.name, e);
+                }
+                return;
+            }
+        };
+
+        crashed.retain(|m| !ignore_monikers.contains(m));
+        if !crashed.is_empty() {
+            panic!(
+                "TestRealm {} found unclean component stops with monikers: {:?}",
+                self.name, crashed
+            );
+        }
+    }
+}
+
+impl TestRealmInner<'_> {
+    fn shutdown_sync(&self) -> std::result::Result<Vec<String>, fidl::Error> {
+        let (listener, server_end) = fidl::endpoints::create_sync_proxy();
+        self.realm.get_crash_listener(server_end)?;
+        self.realm.shutdown()?;
+        // Wait for the realm to go away.
+        let _: zx::Signals = self
+            .realm
+            .as_channel()
+            .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::MonotonicInstant::INFINITE)
+            .to_result()
+            .expect("wait channel closed");
+        // Drive the listener to get the monikers of any components that did not
+        // exit cleanly.
+        let mut unclean_stop = Vec::new();
+        while let Some(unclean) =
+            listener.next(zx::MonotonicInstant::INFINITE).map(|v| (!v.is_empty()).then_some(v))?
+        {
+            unclean_stop.extend(unclean);
+        }
+        Ok(unclean_stop)
+    }
+}
+
+/// A realm within a netemul sandbox.
+///
+/// Note: A [`TestRealm`] by default attempts to perform a checked shutdown of
+/// the realm on drop. Which panics if any unclean component exits occur. This
+/// behavior can be opted out with
+/// [`TestRealm::set_checked_shutdown_on_drop`].
+#[must_use]
+#[derive(Clone)]
+pub struct TestRealm<'a>(Arc<TestRealmInner<'a>>);
 
 impl<'a> std::fmt::Debug for TestRealm<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        let Self { realm: _, name, _sandbox } = self;
-        f.debug_struct("TestRealm").field("name", name).finish_non_exhaustive()
+        let Self(inner) = self;
+        let TestRealmInner { realm: _, name, _sandbox, shutdown_on_drop } = &**inner;
+        f.debug_struct("TestRealm")
+            .field("name", name)
+            .field("shutdown_on_drop", shutdown_on_drop)
+            .finish_non_exhaustive()
     }
 }
 
 impl<'a> TestRealm<'a> {
+    fn realm(&self) -> &fnetemul::ManagedRealmProxy {
+        let Self(inner) = self;
+        &inner.realm
+    }
+
+    /// Returns the realm name.
+    pub fn name(&self) -> &str {
+        let Self(inner) = self;
+        &inner.name
+    }
+
+    /// Changes the behavior when `TestRealm` (and all its clones) are dropped.
+    ///
+    /// When `shutdown_on_drop` is `true` (the default value on creation), then
+    /// dropping a `TestRealm` performs a synchornous shutdown of the entire
+    /// component tree under the realm and *panics* if any unexpected
+    /// termination codes are observed.
+    pub fn set_checked_shutdown_on_drop(&self, shutdown_on_drop: bool) {
+        let Self(inner) = self;
+        inner.shutdown_on_drop.lock().unwrap().enabled = shutdown_on_drop;
+    }
+
+    /// Adds `monikers` to a list of monikers whose exit status is _ignored_
+    /// when `TestRealm` is dropped.
+    ///
+    /// This can be used for components that are not long-living or use nonzero
+    /// exit codes that are caught as crashes otherwise.
+    pub fn ignore_checked_shutdown_monikers(
+        &self,
+        monikers: impl IntoIterator<Item: Into<String>>,
+    ) {
+        let Self(inner) = self;
+        inner
+            .shutdown_on_drop
+            .lock()
+            .unwrap()
+            .ignore_monikers
+            .extend(monikers.into_iter().map(|m| m.into()));
+    }
+
     /// Connects to a protocol within the realm.
     pub fn connect_to_protocol<S>(&self) -> Result<S::Proxy>
     where
@@ -304,7 +428,7 @@ impl<'a> TestRealm<'a> {
     pub fn open_diagnostics_directory(&self, child_name: &str) -> Result<fio::DirectoryProxy> {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let () = self
-            .realm
+            .realm()
             .open_diagnostics_directory(child_name, server_end)
             .context("open diagnostics dir")?;
         Ok(proxy)
@@ -315,7 +439,7 @@ impl<'a> TestRealm<'a> {
         &self,
         server_end: fidl::endpoints::ServerEnd<S>,
     ) -> Result {
-        self.realm
+        self.realm()
             .connect_to_protocol(S::PROTOCOL_NAME, None, server_end.into_channel())
             .context("connect to protocol")
     }
@@ -329,19 +453,19 @@ impl<'a> TestRealm<'a> {
         child: &str,
         server_end: fidl::endpoints::ServerEnd<S>,
     ) -> Result {
-        self.realm
+        self.realm()
             .connect_to_protocol(protocol_path, Some(child), server_end.into_channel())
             .context("connect to protocol")
     }
 
     /// Gets the moniker of the root of the managed realm.
     pub async fn get_moniker(&self) -> Result<String> {
-        self.realm.get_moniker().await.context("failed to call get moniker")
+        self.realm().get_moniker().await.context("failed to call get moniker")
     }
 
     /// Starts the specified child component of the managed realm.
     pub async fn start_child_component(&self, child_name: &str) -> Result {
-        self.realm
+        self.realm()
             .start_child_component(child_name)
             .await?
             .map_err(zx::Status::from_raw)
@@ -350,7 +474,7 @@ impl<'a> TestRealm<'a> {
 
     /// Stops the specified child component of the managed realm.
     pub async fn stop_child_component(&self, child_name: &str) -> Result {
-        self.realm
+        self.realm()
             .stop_child_component(child_name)
             .await?
             .map_err(zx::Status::from_raw)
@@ -544,7 +668,7 @@ impl<'a> TestRealm<'a> {
         device: fidl::endpoints::ClientEnd<fnetemul_network::DeviceProxy_Marker>,
     ) -> Result {
         let path = path.to_str().with_context(|| format!("convert {} to str", path.display()))?;
-        self.realm
+        self.realm()
             .add_device(path, device)
             .await
             .context("add device")?
@@ -564,7 +688,7 @@ impl<'a> TestRealm<'a> {
     /// Removes a device from the realm's virtual device filesystem.
     pub async fn remove_virtual_device(&self, path: &Path) -> Result {
         let path = path.to_str().with_context(|| format!("convert {} to str", path.display()))?;
-        self.realm
+        self.realm()
             .remove_device(path)
             .await
             .context("remove device")?
@@ -651,9 +775,12 @@ impl<'a> TestRealm<'a> {
     /// and get cleaned up, such as [`TestEndpoint`]s, which components in the
     /// realm might be interacting with.
     pub async fn shutdown(&self) -> Result {
-        let () = self.realm.shutdown().context("call shutdown")?;
+        let () = self.realm().shutdown().context("call shutdown")?;
+        // Turn off shutdown on drop from now on, we're already shutting down
+        // here.
+        self.set_checked_shutdown_on_drop(false);
         let events = self
-            .realm
+            .realm()
             .take_event_stream()
             .try_collect::<Vec<_>>()
             .await
@@ -666,7 +793,7 @@ impl<'a> TestRealm<'a> {
     /// Returns a stream that yields monikers of unclean exits in the realm.
     pub async fn get_crash_stream(&self) -> Result<impl futures::Stream<Item = Result<String>>> {
         let (listener, server_end) = fidl::endpoints::create_proxy();
-        self.realm.get_crash_listener(server_end).context("creating CrashListener")?;
+        self.realm().get_crash_listener(server_end).context("creating CrashListener")?;
         Ok(futures::stream::try_unfold(listener, |listener| async move {
             let next = listener.next().await.context("listener fetch next moniker")?;
             Result::Ok(if next.is_empty() {
@@ -711,7 +838,7 @@ impl<'a> TestRealm<'a> {
 
         let ((), ()) = futures::future::try_join(send_fut, recv_fut)
             .await
-            .with_context(|| format!("failed to ping from {} to {}", self.name, addr,))?;
+            .with_context(|| format!("failed to ping from {} to {}", self.name(), addr,))?;
         Ok(())
     }
 
