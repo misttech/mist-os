@@ -132,7 +132,6 @@ class Wlan(AsyncAdapter, wlan.Wlan):
         )
 
     @asyncmethod
-    # pylint: disable-next=invalid-overridden-method
     async def connect(
         self,
         ssid: str,
@@ -236,7 +235,6 @@ class Wlan(AsyncAdapter, wlan.Wlan):
         return True
 
     @asyncmethod
-    # pylint: disable-next=invalid-overridden-method
     async def create_iface(
         self, phy_id: int, role: WlanMacRole, sta_addr: str | None = None
     ) -> int:
@@ -279,7 +277,6 @@ class Wlan(AsyncAdapter, wlan.Wlan):
         return create_iface_response.iface_id
 
     @asyncmethod
-    # pylint: disable-next=invalid-overridden-method
     async def destroy_iface(self, iface_id: int) -> None:
         """Destroy WLAN interface by ID.
 
@@ -302,7 +299,6 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             ) from status
 
     @asyncmethod
-    # pylint: disable-next=invalid-overridden-method
     async def disconnect(self) -> None:
         """Disconnect all client WLAN connections.
 
@@ -325,7 +321,6 @@ class Wlan(AsyncAdapter, wlan.Wlan):
                     ) from status
 
     @asyncmethod
-    # pylint: disable-next=invalid-overridden-method
     async def get_country(self, phy_id: int) -> CountryCode:
         """Queries the currently configured country code from phy `phy_id`.
 
@@ -352,7 +347,6 @@ class Wlan(AsyncAdapter, wlan.Wlan):
         )
 
     @asyncmethod
-    # pylint: disable-next=invalid-overridden-method
     async def get_iface_id_list(self) -> Sequence[int]:
         """Get list of wlan iface IDs on device.
 
@@ -373,7 +367,6 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             ) from status
 
     @asyncmethod
-    # pylint: disable-next=invalid-overridden-method
     async def get_phy_id_list(self) -> Sequence[int]:
         """Get list of phy ids on device.
 
@@ -391,7 +384,6 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             ) from status
 
     @asyncmethod
-    # pylint: disable-next=invalid-overridden-method
     async def query_iface(self, iface_id: int) -> QueryIfaceResponse:
         """Retrieves interface info for given wlan iface id.
 
@@ -418,7 +410,6 @@ class Wlan(AsyncAdapter, wlan.Wlan):
         return QueryIfaceResponse.from_fidl(query_iface_response.resp)
 
     @asyncmethod
-    # pylint: disable-next=invalid-overridden-method
     async def scan_for_bss_info(self) -> dict[str, list[BssDescription]]:
         """Scans and returns BSS info.
 
@@ -552,7 +543,6 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             ) from status
 
     @asyncmethod
-    # pylint: disable-next=invalid-overridden-method
     async def status(self) -> ClientStatusResponse:
         """Request connection status
 
@@ -594,41 +584,47 @@ class ConnectTransactionEventHandler(f_wlan_sme.ConnectTransactionEventHandler):
         self._connect_results = connect_results
 
     async def on_connect_result(
-        self, req: f_wlan_sme.ConnectTransactionOnConnectResultRequest
+        self, request: f_wlan_sme.ConnectTransactionOnConnectResultRequest
     ) -> None:
         """Return the result of the initial connection request or later
         SME-initiated reconnection."""
         _LOGGER.debug(
-            "ConnectTransaction.OnConnectResult() called with %s", req
+            "ConnectTransaction.OnConnectResult() called with %s", request
         )
-        await self._connect_results.put(req.result)
+        await self._connect_results.put(request.result)
 
     def on_disconnect(
-        self, req: f_wlan_sme.ConnectTransactionOnDisconnectRequest
+        self, request: f_wlan_sme.ConnectTransactionOnDisconnectRequest
     ) -> None:
         """Notify that the client has disconnected.
 
-        If req.disconnect_info indicates that SME is attempting to reconnect by
+        If request.disconnect_info indicates that SME is attempting to reconnect by
         itself, there's not need for caller to intervene for now.
         """
-        _LOGGER.debug("ConnectTransaction.OnDisconnect() called with %s", req)
+        _LOGGER.debug(
+            "ConnectTransaction.OnDisconnect() called with %s", request
+        )
 
     def on_roam_result(
-        self, req: f_wlan_sme.ConnectTransactionOnRoamResultRequest
+        self, request: f_wlan_sme.ConnectTransactionOnRoamResultRequest
     ) -> None:
         """Report the result of a roam attempt."""
-        _LOGGER.debug("ConnectTransaction.OnRoamResult() called with %s", req)
+        _LOGGER.debug(
+            "ConnectTransaction.OnRoamResult() called with %s", request
+        )
 
     def on_signal_report(
-        self, req: f_wlan_sme.ConnectTransactionOnSignalReportRequest
+        self, request: f_wlan_sme.ConnectTransactionOnSignalReportRequest
     ) -> None:
         """Give an update of the latest signal report."""
-        _LOGGER.debug("ConnectTransaction.OnSignalReport() called with %s", req)
+        _LOGGER.debug(
+            "ConnectTransaction.OnSignalReport() called with %s", request
+        )
 
     def on_channel_switched(
-        self, req: f_wlan_sme.ConnectTransactionOnChannelSwitchedRequest
+        self, request: f_wlan_sme.ConnectTransactionOnChannelSwitchedRequest
     ) -> None:
         """Give an update of the channel switching."""
         _LOGGER.debug(
-            "ConnectTransaction.OnChannelSwitched() called with %s", req
+            "ConnectTransaction.OnChannelSwitched() called with %s", request
         )
