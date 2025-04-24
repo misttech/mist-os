@@ -303,4 +303,22 @@ closed protocol ManagedRealm {
     });
     /// Signals that shutdown is complete and the channel will be closed.
     strict -> OnShutdown();
+    /// Creates a new [`CrashListener`] instance scoped to this realm.
+    strict GetCrashListener(resource struct {
+        listener server_end:CrashListener;
+    });
+};
+
+/// A listener that yields component monikers that have exited uncleanly.
+///
+/// `CrashListener` is always scoped to a [`ManagedRealm`].
+closed protocol CrashListener {
+    /// A hanging get call that yields component monikers (relative to the
+    /// [`ManagedRealm`] root) that exited with dirty exit codes.
+    ///
+    /// Yields an empty vector when the realm itself has terminated. The
+    /// listener server end is closed after yielding the empty sentinel.
+    strict Next() -> (struct {
+        crashed_monikers vector<string:fuchsia.component.MAX_MONIKER_LENGTH>:MAX;
+    });
 };

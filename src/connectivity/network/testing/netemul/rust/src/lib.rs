@@ -663,6 +663,21 @@ impl<'a> TestRealm<'a> {
         Ok(())
     }
 
+    /// Returns a stream that yields monikers of unclean exits in the realm.
+    pub async fn get_crash_stream(&self) -> Result<impl futures::Stream<Item = Result<String>>> {
+        let (listener, server_end) = fidl::endpoints::create_proxy();
+        self.realm.get_crash_listener(server_end).context("creating CrashListener")?;
+        Ok(futures::stream::try_unfold(listener, |listener| async move {
+            let next = listener.next().await.context("listener fetch next moniker")?;
+            Result::Ok(if next.is_empty() {
+                None
+            } else {
+                Some((futures::stream::iter(next.into_iter().map(Ok)), listener))
+            })
+        })
+        .try_flatten())
+    }
+
     /// Constructs an ICMP socket.
     pub async fn icmp_socket<Ip: ping::FuchsiaIpExt>(
         &self,

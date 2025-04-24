@@ -4,6 +4,7 @@
 
 use anyhow::{anyhow, Context as _};
 use cm_rust::FidlIntoNative as _;
+use component_events::events::Event;
 use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
 use fidl_fuchsia_netemul::{
     self as fnetemul, ChildDef, ChildUses, ManagedRealmMarker, ManagedRealmRequest, RealmOptions,
@@ -15,6 +16,7 @@ use fuchsia_component_test::{
     RealmBuilderParams, RealmInstance, Ref, Route,
 };
 use futures::channel::mpsc;
+use futures::stream::FusedStream as _;
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use log::{debug, error, info, warn};
 use std::borrow::Cow;
@@ -32,6 +34,7 @@ use {
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     fidl_fuchsia_logger as flogger, fidl_fuchsia_netemul_network as fnetemul_network,
     fidl_fuchsia_sys2 as fsys2, fidl_fuchsia_tracing_provider as ftracing_provider,
+    fuchsia_async as fasync,
 };
 
 type Result<T = (), E = anyhow::Error> = std::result::Result<T, E>;
@@ -687,6 +690,10 @@ impl vfs::directory::entry::GetEntryInfo for DevfsDevice {
     }
 }
 
+fn realm_moniker(realm: &RealmInstance) -> String {
+    format!("{}:{}", REALM_COLLECTION_NAME, realm.root.child_name())
+}
+
 impl ManagedRealm {
     async fn run_service(self) -> Result {
         let Self { server_end, realm, devfs, capability_from_children } = self;
@@ -694,7 +701,7 @@ impl ManagedRealm {
         while let Some(request) = stream.try_next().await.context("FIDL error")? {
             match request {
                 ManagedRealmRequest::GetMoniker { responder } => {
-                    let moniker = format!("{}:{}", REALM_COLLECTION_NAME, realm.root.child_name());
+                    let moniker = realm_moniker(&realm);
                     responder.send(&moniker).context("responding to GetMoniker request")?;
                 }
                 ManagedRealmRequest::ConnectToProtocol {
@@ -934,11 +941,185 @@ impl ManagedRealm {
                         )
                         .context(format!("opening diagnostics dir for {child_name}"))?;
                 }
+                ManagedRealmRequest::GetCrashListener { listener, control_handle: _ } => {
+                    // We must create the event stream now, to ensure that it's
+                    // going to observe any new things happening to the realm
+                    // (like shutdown) after this point given we spawn the
+                    // listener to its own task.
+                    let event_stream =
+                        component_events::events::EventStream::open_at_path("/events/stopped")
+                            .await
+                            .context("failed to subscribe to `Stopped` events")?;
+                    CrashListener {
+                        realm_moniker: realm_moniker(&realm),
+                        server_end: listener,
+                        event_stream,
+                    }
+                    .spawn();
+                }
                 ManagedRealmRequest::Shutdown { control_handle } => {
                     let () = realm.destroy().await.context("destroy realm")?;
                     let () = control_handle
                         .send_on_shutdown()
                         .unwrap_or_else(|e| error!("failed to send OnShutdown event: {:?}", e));
+                    break;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+struct CrashListener {
+    event_stream: component_events::events::EventStream,
+    realm_moniker: String,
+    server_end: fidl::endpoints::ServerEnd<fnetemul::CrashListenerMarker>,
+}
+
+impl CrashListener {
+    fn spawn(self) {
+        // Given the listeners don't really hold any resources that need
+        // synchronization. We can just spawn them on the current scope in fully
+        // detached state. They can observe parent realm termination by the
+        // event stream they create themselves.
+        let _: fasync::JoinHandle<()> = fasync::Scope::current().spawn(async move {
+            self.serve().await.unwrap_or_else(|e| error!("error serving CrashListener: {e:?}"))
+        });
+    }
+
+    fn event_to_crash_moniker(
+        event: fidl_fuchsia_component::Event,
+        realm_moniker: &String,
+        matcher: &component_events::matcher::EventMatcher,
+    ) -> Result<Option<String>> {
+        let descriptor = component_events::descriptor::EventDescriptor::try_from(&event)
+            .context("create event descriptor")?;
+        // NB: matches return an error variant
+        // containing the non-matching details. We just
+        // care that it didn't match.
+        if matcher.matches(&descriptor).is_err() {
+            return Ok(None);
+        }
+        let stopped =
+            component_events::events::Stopped::try_from(event).context("not stopped event")?;
+        let component_events::events::StoppedPayload { status, exit_code } =
+            stopped.result().map_err(|e| anyhow!("stopped error event: {e:?}"))?;
+        // Extract a relative moniker. Expects here are
+        // guaranteed by the created matcher regex above.
+        let moniker = stopped
+            .target_moniker()
+            .strip_prefix(realm_moniker)
+            .expect("moniker should start with realm_moniker");
+        // This is the realm itself shutting down, pass an
+        // empty string down.
+        if moniker.is_empty() {
+            return Ok(Some(String::new()));
+        }
+        let moniker = moniker.strip_prefix('/').expect("moniker should contain separator");
+        // An empty child moniker should not be allowed, something must
+        // be after the separator.
+        assert_ne!(moniker, "");
+        info!("observed component '{moniker}' stop with status={status:?} exit_code={exit_code:?}");
+        let bad = match (status, exit_code) {
+            // A clean exit from CF means ok.
+            (component_events::events::ExitStatus::Clean, _) => false,
+            // A kill return code means the component
+            // doesn't implement shutdown, so it was just
+            // killed.
+            (
+                component_events::events::ExitStatus::Crash(_),
+                Some(zx::sys::ZX_TASK_RETCODE_SYSCALL_KILL),
+            ) => false,
+            // Empty realm components with no elf backing don't generate exit
+            // codes.
+            (component_events::events::ExitStatus::Crash(status), None) => {
+                // Components without program that get killed on shutdown
+                // produce specifically this exit code. Notably the mock
+                // components served by netemul itself.
+                let instance_died_i32 =
+                    i32::try_from(fidl_fuchsia_component::Error::InstanceDied.into_primitive())
+                        .unwrap();
+
+                *status != instance_died_i32
+            }
+            // Assume everything else is a bad exit.
+            (component_events::events::ExitStatus::Crash(_), Some(_)) => true,
+        };
+        Ok(bad.then(|| moniker.to_string()))
+    }
+
+    async fn serve(self) -> Result {
+        let Self { realm_moniker, server_end, event_stream } = self;
+
+        let event_stream =
+            futures::stream::try_unfold(event_stream, |mut event_stream| async move {
+                let event = event_stream.next().await.context("next event")?;
+                Ok::<_, anyhow::Error>(Some((event, event_stream)))
+            });
+        let matcher = component_events::matcher::EventMatcher::ok()
+            .moniker_regex(format!("^{}", realm_moniker))
+            .r#type(fidl_fuchsia_component::EventType::Stopped);
+        let crash_stream = event_stream
+            .try_filter_map(|event| {
+                futures::future::ready(Self::event_to_crash_moniker(
+                    event,
+                    &realm_moniker,
+                    &matcher,
+                ))
+            })
+            .try_take_while(|moniker| futures::future::ok(!moniker.is_empty()))
+            .fuse();
+
+        let mut observed_crash = vec![];
+        let mut request_stream = server_end.into_stream();
+        let mut crash_stream = pin!(crash_stream);
+        let mut hanging_responder = None;
+        loop {
+            enum Work {
+                Request(Option<fnetemul::CrashListenerRequest>),
+                NewData,
+            }
+            let work = futures::select! {
+                r = request_stream.try_next() => {
+                    Work::Request(r.context("serving CrashListener")?)
+                },
+                r = crash_stream.try_next() => {
+                    match r.context("observing stop event stream")? {
+                        Some(moniker) => {
+                            observed_crash.push(moniker);
+                        }
+                        None => {}
+                    }
+                    Work::NewData
+                }
+            };
+
+            match work {
+                Work::Request(Some(req)) => {
+                    let fnetemul::CrashListenerRequest::Next { responder: new_responder } = req;
+                    if hanging_responder.is_some() {
+                        return Err(anyhow!("called Next with hanging response already"));
+                    }
+                    hanging_responder = Some(new_responder);
+                }
+                Work::Request(None) => {
+                    // Request stream terminated, the other end must've hung up
+                    // before observing all output.
+                    break;
+                }
+                Work::NewData => {}
+            }
+
+            if !observed_crash.is_empty() {
+                if let Some(responder) = hanging_responder.take() {
+                    responder.send(&observed_crash[..]).context("responding with crashes")?;
+                    observed_crash.clear();
+                }
+                continue;
+            }
+            if crash_stream.is_terminated() {
+                if let Some(responder) = hanging_responder.take() {
+                    responder.send(&[]).context("responding with sentinel")?;
                     break;
                 }
             }
@@ -956,6 +1137,7 @@ fn split_path_into_dir_and_file_name<'a>(
         .to_str()
         .context("invalid file name")?;
     let parent = path.parent().context("path terminates in a root")?;
+
     Ok((parent, file_name))
 }
 
@@ -1118,9 +1300,7 @@ mod tests {
     use fuchsia_fs::directory as fvfs_watcher;
     use std::convert::TryFrom as _;
     use test_case::test_case;
-    use {
-        fidl_fuchsia_device as fdevice, fidl_fuchsia_netemul as fnetemul, fuchsia_async as fasync,
-    };
+    use {fidl_fuchsia_device as fdevice, fidl_fuchsia_netemul as fnetemul};
 
     // We can't just use a counter for the sandbox identifier, as we do in `main`, because tests
     // each run in separate processes, but use the same backing collection of components created
@@ -1188,6 +1368,7 @@ mod tests {
     const COUNTER_URL: &str = "#meta/counter.cm";
     const COUNTER_ALTERNATIVE_URL: &str = "#meta/counter-alternative.cm";
     const COUNTER_WITHOUT_PROGRAM_URL: &str = "#meta/counter-without-program.cm";
+    const COUNTER_WITH_SHUTDOWN_PROGRAM_URL: &str = "#meta/counter-with-shutdown.cm";
     const COUNTER_CONFIGURATION_NAME: &str = "fuchsia.netemul.test.Config";
     const COUNTER_A_PROTOCOL_NAME: &str = "fuchsia.netemul.test.CounterA";
     const COUNTER_B_PROTOCOL_NAME: &str = "fuchsia.netemul.test.CounterB";
@@ -2883,5 +3064,110 @@ mod tests {
         }
 
         assert_eq!(counter_fut.await.expect("increment failed"), RESPONSE_VALUE);
+    }
+
+    #[fixture(with_sandbox)]
+    #[fuchsia::test]
+    async fn crash_stop_listener(sandbox: fnetemul::SandboxProxy) {
+        #[derive(Copy, Clone, Debug)]
+        enum Variant {
+            WithShutdownAbort,
+            WithShutdownClean,
+            WithoutShutdown,
+        }
+
+        let counter_spec = std::iter::repeat_n(
+            [Variant::WithShutdownAbort, Variant::WithShutdownClean, Variant::WithoutShutdown]
+                .into_iter(),
+            // Create enough components to prove there are no races or missed
+            // events.
+            5,
+        )
+        .flatten()
+        .enumerate()
+        .map(|(i, variant)| {
+            let name = format!("counter{i}");
+            let (url, abort) = match variant {
+                Variant::WithoutShutdown => (COUNTER_URL, false),
+                Variant::WithShutdownAbort => (COUNTER_WITH_SHUTDOWN_PROGRAM_URL, true),
+                Variant::WithShutdownClean => (COUNTER_WITH_SHUTDOWN_PROGRAM_URL, false),
+            };
+            (name, url, abort)
+        });
+
+        let children = counter_spec.clone().map(|(name, url, _abort)| fnetemul::ChildDef {
+            name: Some(name),
+            source: Some(fnetemul::ChildSource::Component(url.to_string())),
+            ..counter_component()
+        });
+
+        // Add a mock child to check it doesn't count as a crash exit.
+        let mock_name = "mock";
+        let (mock_dir, server_end) = fidl::endpoints::create_endpoints();
+        let mut fs = ServiceFs::new();
+        let _: &mut ServiceFsDir<'_, _> =
+            fs.dir("svc").add_fidl_service(|s: fnetemul_test::CounterRequestStream| s);
+        let _: &mut ServiceFs<_> = fs.serve_connection(server_end).expect("serve connection");
+        let children = children.chain(std::iter::once(fnetemul::ChildDef {
+            source: Some(fnetemul::ChildSource::Mock(mock_dir)),
+            name: Some(mock_name.to_string()),
+            exposes: Some(vec![CounterMarker::PROTOCOL_NAME.to_string()]),
+            uses: Some(fnetemul::ChildUses::Capabilities(vec![fnetemul::Capability::LogSink(
+                fnetemul::Empty {},
+            )])),
+            ..Default::default()
+        }));
+
+        let realm = TestRealm::new(
+            &sandbox,
+            fnetemul::RealmOptions { children: Some(children.collect()), ..Default::default() },
+        );
+
+        let realm_ref = &realm;
+        let mut expect_failed = futures::stream::iter(counter_spec)
+            .filter_map(|(name, _, abort)| async move {
+                let counter = realm_ref.connect_to_protocol_from_child::<CounterMarker>(&name);
+                counter.set_abort_on_shutdown(abort).await.expect("calling panic on shutdown");
+                abort.then_some(name)
+            })
+            .collect::<Vec<_>>()
+            .await;
+
+        // Make sure the mock component is alive.
+        {
+            let counter = realm.connect_to_protocol_from_child::<CounterMarker>(mock_name);
+            let _counter_fut = counter.increment();
+            let _counter_request = fs
+                .flatten()
+                .try_next()
+                .await
+                .expect("next request")
+                .expect("service fs ended unexpectedly")
+                .into_increment()
+                .expect("observed wrong request");
+        }
+
+        // Shutdown everything and check what's reported as a crash.
+        let TestRealm { realm } = realm;
+        let (listener, server_end) =
+            fidl::endpoints::create_proxy::<fnetemul::CrashListenerMarker>();
+        realm.get_crash_listener(server_end).expect("new crash listener");
+        realm.shutdown().expect("calling shutdown");
+
+        let mut failed_monikers = vec![];
+        loop {
+            let crashed = listener.next().await.expect("next crash");
+            if crashed.is_empty() {
+                // The channel should close shortly after observing the final
+                // sentinel.
+                let _: zx::Signals =
+                    listener.as_channel().on_closed().await.expect("waiting channel close");
+                break;
+            }
+            failed_monikers.extend(crashed);
+        }
+        expect_failed.sort();
+        failed_monikers.sort();
+        assert_eq!(failed_monikers, expect_failed);
     }
 }

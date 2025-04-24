@@ -24,13 +24,16 @@ rustc_binary("bin") {
   deps = [
     ":config_lib",
     ":fidl_rust",
+    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
     "//sdk/rust/zx",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-runtime",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:futures",
@@ -69,6 +72,12 @@ fuchsia_component("devfs-subdir-user") {
 fuchsia_component("counter-without-program") {
   testonly = true
   manifest = "meta/counter-without-program.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_component("counter-with-shutdown") {
+  testonly = true
+  manifest = "meta/counter-with-shutdown.cml"
   deps = [ ":bin" ]
 }
 

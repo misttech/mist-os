@@ -13,6 +13,7 @@ rustc_binary("bin") {
   name = "netemul_sandbox"
   edition = "2021"
   deps = [
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.test:fuchsia.component.test_rust",
     "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
@@ -24,11 +25,13 @@ rustc_binary("bin") {
     "//src/connectivity/network/testing/netemul/network-context/fidl:network_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",
     "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/lib/cm_rust",
+    "//src/sys/lib/component-events",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
@@ -45,7 +48,6 @@ rustc_binary("bin") {
     "//src/lib/diagnostics/selectors",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
-    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-fs",
     "//src/lib/testing/fixture",
     "//third_party/rust_crates:assert_matches",
@@ -77,6 +79,7 @@ fuchsia_test_component("netemul-sandbox-tests") {
     "//src/connectivity/network/testing/netemul/network-context",
     "//src/connectivity/network/testing/netemul/test-support:counter",
     "//src/connectivity/network/testing/netemul/test-support:counter-alternative",
+    "//src/connectivity/network/testing/netemul/test-support:counter-with-shutdown",
     "//src/connectivity/network/testing/netemul/test-support:counter-without-program",
     "//src/connectivity/network/testing/netemul/test-support:devfs-subdir-user",
     "//src/connectivity/network/tun/network-tun:component",

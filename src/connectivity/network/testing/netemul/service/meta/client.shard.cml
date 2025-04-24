@@ -39,5 +39,11 @@
             from: "parent",
             to: "#sandbox",
         },
+        {
+            event_stream: "stopped",
+            from: "parent",
+            to: "#sandbox",
+            scope: "#sandbox",
+        },
     ],
 }
