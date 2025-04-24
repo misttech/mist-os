@@ -78,7 +78,7 @@ rust_library(
     version = "5.3.1",
     deps = [
         "//third_party/rust_crates/vendor/concurrent-queue-2.5.0:concurrent_queue",
-        "//third_party/rust_crates/vendor/parking-2.0.0:parking",
+        "//third_party/rust_crates/vendor/parking-2.2.1:parking",
         "//third_party/rust_crates/vendor/pin-project-lite-0.2.13:pin_project_lite",
     ],
 )

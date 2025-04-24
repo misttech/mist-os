@@ -5840,7 +5840,7 @@ rust_library("event-listener-v5_3_1") {
   deps += [ ":concurrent-queue-v2_5_0" ]
   deps += [ ":pin-project-lite-v0_2_13" ]
   if (!(current_cpu == "wasm32")) {
-    deps += [ ":parking-v2_0_0" ]
+    deps += [ ":parking-v2_2_1" ]
   }
 
   rustenv = []
@@ -6652,7 +6652,7 @@ rust_library("futures-lite-v1_11_3") {
   deps += [ ":fastrand-v1_4_0" ]
   deps += [ ":futures-core-v0_3_30" ]
   deps += [ ":futures-io-v0_3_30" ]
-  deps += [ ":parking-v2_0_0" ]
+  deps += [ ":parking-v2_2_1" ]
   deps += [ ":pin-project-lite-v0_2_13" ]
   deps += [ ":waker-fn-v1_1_0" ]
 
@@ -10895,19 +10895,19 @@ rust_library("p256-v0_11_1") {
   applicable_licenses = [ ":p256-v0_11_1.license" ]
 }
 
-license("parking-v2_0_0.license") {
+license("parking-v2_2_1.license") {
   public_package_name = "parking"
   license_files = [
-    "//third_party/rust_crates/vendor/parking-2.0.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/parking-2.0.0/LICENSE-MIT",
-    "//third_party/rust_crates/vendor/parking-2.0.0/LICENSE-THIRD-PARTY",
+    "//third_party/rust_crates/vendor/parking-2.2.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/parking-2.2.1/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/parking-2.2.1/LICENSE-THIRD-PARTY",
   ]
 }
 
-rust_library("parking-v2_0_0") {
+rust_library("parking-v2_2_1") {
   crate_name = "parking"
-  crate_root = "//third_party/rust_crates/vendor/parking-2.0.0/src/lib.rs"
-  output_name = "parking-f53320ef53395fc3"
+  crate_root = "//third_party/rust_crates/vendor/parking-2.2.1/src/lib.rs"
+  output_name = "parking-7ffd09426d033a7c"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -10917,13 +10917,13 @@ rust_library("parking-v2_0_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=f53320ef53395fc3",
-    "-Cextra-filename=-f53320ef53395fc3",
+    "-Cmetadata=7ffd09426d033a7c",
+    "-Cextra-filename=-7ffd09426d033a7c",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":parking-v2_0_0.license" ]
+  applicable_licenses = [ ":parking-v2_2_1.license" ]
 }
 
 license("parking_lot-v0_11_1.license") {

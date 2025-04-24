@@ -1,8 +1,19 @@
 //! Thread parking and unparking.
 //!
-//! A parker is in either notified or unnotified state. Method [`park()`][`Parker::park()`] blocks
-//! the current thread until the parker becomes notified and then puts it back into unnotified
-//! state. Method [`unpark()`][`Unparker::unpark()`] puts it into notified state.
+//! A [`Parker`] is in either the notified or unnotified state. The [`park()`][`Parker::park()`] method blocks
+//! the current thread until the [`Parker`] becomes notified and then puts it back into the unnotified
+//! state. The [`unpark()`][`Unparker::unpark()`] method puts it into the notified state.
+//!
+//! This API is similar to [`thread::park()`] and [`Thread::unpark()`] from the standard library.
+//! The difference is that the state "token" managed by those functions is shared across an entire
+//! thread, and anyone can call [`thread::current()`] to access it. If you use `park` and `unpark`,
+//! but you also call a function that uses `park` and `unpark` internally, that function could
+//! cause a deadlock by consuming a wakeup that was intended for you. The [`Parker`] object in this
+//! crate avoids that problem by managing its own state, which isn't shared with unrelated callers.
+//!
+//! [`thread::park()`]: https://doc.rust-lang.org/std/thread/fn.park.html
+//! [`Thread::unpark()`]: https://doc.rust-lang.org/std/thread/struct.Thread.html#method.unpark
+//! [`thread::current()`]: https://doc.rust-lang.org/std/thread/fn.current.html
 //!
 //! # Examples
 //!
@@ -31,14 +42,32 @@
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs, missing_debug_implementations, rust_2018_idioms)]
+#![doc(
+    html_favicon_url = "https://raw.githubusercontent.com/smol-rs/smol/master/assets/images/logo_fullsize_transparent.png"
+)]
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/smol-rs/smol/master/assets/images/logo_fullsize_transparent.png"
+)]
+
+#[cfg(not(all(loom, feature = "loom")))]
+use std::sync;
+
+#[cfg(all(loom, feature = "loom"))]
+use loom::sync;
 
 use std::cell::Cell;
 use std::fmt;
 use std::marker::PhantomData;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::SeqCst;
-use std::sync::{Arc, Condvar, Mutex};
-use std::time::{Duration, Instant};
+use std::sync::Arc;
+use std::task::{Wake, Waker};
+use std::time::Duration;
+
+#[cfg(not(all(loom, feature = "loom")))]
+use std::time::Instant;
+
+use sync::atomic::AtomicUsize;
+use sync::atomic::Ordering::SeqCst;
+use sync::{Condvar, Mutex};
 
 /// Creates a parker and an associated unparker.
 ///
@@ -119,6 +148,7 @@ impl Parker {
     /// // Wait for a notification, or time out after 500 ms.
     /// p.park_timeout(Duration::from_millis(500));
     /// ```
+    #[cfg(not(loom))]
     pub fn park_timeout(&self, duration: Duration) -> bool {
         self.unparker.inner.park(Some(duration))
     }
@@ -138,6 +168,7 @@ impl Parker {
     /// // Wait for a notification, or time out after 500 ms.
     /// p.park_deadline(Instant::now() + Duration::from_millis(500));
     /// ```
+    #[cfg(not(loom))]
     pub fn park_deadline(&self, instant: Instant) -> bool {
         self.unparker
             .inner
@@ -235,6 +266,41 @@ impl Unparker {
     pub fn unpark(&self) -> bool {
         self.inner.unpark()
     }
+
+    /// Indicates whether this unparker will unpark the associated parker.
+    ///
+    /// This can be used to avoid unnecessary work before calling `unpark()`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use parking::Parker;
+    ///
+    /// let p = Parker::new();
+    /// let u = p.unparker();
+    ///
+    /// assert!(u.will_unpark(&p));
+    /// ```
+    pub fn will_unpark(&self, parker: &Parker) -> bool {
+        Arc::ptr_eq(&self.inner, &parker.unparker.inner)
+    }
+
+    /// Indicates whether two unparkers will unpark the same parker.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use parking::Parker;
+    ///
+    /// let p = Parker::new();
+    /// let u1 = p.unparker();
+    /// let u2 = p.unparker();
+    ///
+    /// assert!(u1.same_parker(&u2));
+    /// ```
+    pub fn same_parker(&self, other: &Unparker) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+    }
 }
 
 impl fmt::Debug for Unparker {
@@ -248,6 +314,12 @@ impl Clone for Unparker {
         Unparker {
             inner: self.inner.clone(),
         }
+    }
+}
+
+impl From<Unparker> for Waker {
+    fn from(up: Unparker) -> Self {
+        Waker::from(up.inner)
     }
 }
 
@@ -304,22 +376,35 @@ impl Inner {
                     // Block the current thread on the conditional variable.
                     m = self.cvar.wait(m).unwrap();
 
-                    if self.state.compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst).is_ok() {
+                    if self
+                        .state
+                        .compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst)
+                        .is_ok()
+                    {
                         // got a notification
                         return true;
                     }
                 }
             }
             Some(timeout) => {
-                // Wait with a timeout, and if we spuriously wake up or otherwise wake up from a
-                // notification we just want to unconditionally set `state` back to `EMPTY`, either
-                // consuming a notification or un-flagging ourselves as parked.
-                let (_m, _result) = self.cvar.wait_timeout(m, timeout).unwrap();
+                #[cfg(not(loom))]
+                {
+                    // Wait with a timeout, and if we spuriously wake up or otherwise wake up from a
+                    // notification we just want to unconditionally set `state` back to `EMPTY`, either
+                    // consuming a notification or un-flagging ourselves as parked.
+                    let (_m, _result) = self.cvar.wait_timeout(m, timeout).unwrap();
 
-                match self.state.swap(EMPTY, SeqCst) {
-                    NOTIFIED => true, // got a notification
-                    PARKED => false,  // no notification
-                    n => panic!("inconsistent park_timeout state: {}", n),
+                    match self.state.swap(EMPTY, SeqCst) {
+                        NOTIFIED => true, // got a notification
+                        PARKED => false,  // no notification
+                        n => panic!("inconsistent park_timeout state: {}", n),
+                    }
+                }
+
+                #[cfg(loom)]
+                {
+                    let _ = timeout;
+                    panic!("park_timeout is not supported under loom");
                 }
             }
         }
@@ -348,5 +433,17 @@ impl Inner {
         drop(self.lock.lock().unwrap());
         self.cvar.notify_one();
         true
+    }
+}
+
+impl Wake for Inner {
+    #[inline]
+    fn wake(self: Arc<Self>) {
+        self.unpark();
+    }
+
+    #[inline]
+    fn wake_by_ref(self: &Arc<Self>) {
+        self.unpark();
     }
 }
