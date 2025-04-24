@@ -1594,7 +1594,8 @@ pub async fn replace_child<'a, S: HandleOwner>(
 ///
 /// If |dst.0| already has a child |dst.1|, it is removed from dst.0.  For files, if this was their
 /// last reference, the file is moved to the graveyard.  For directories, the removed directory will
-/// be deleted permanently (and must be empty).
+/// be moved to the graveyard (and must be empty).  The caller is responsible for tombstoning files
+/// (when it is no longer open) and directories (immediately after committing the transaction).
 ///
 /// `sub_dirs_delta` can be used if `src` is a directory and happened to already be a child of
 /// `dst`.
@@ -1627,7 +1628,6 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
             // Directories might have extended attributes which might require multiple transactions
             // to delete, so we delete directories via the graveyard.
             dst.0.store().add_to_graveyard(transaction, old_id);
-            dst.0.store().filesystem().graveyard().queue_tombstone_object(store_id, old_id);
             sub_dirs_delta -= 1;
             ReplacedChild::Directory(old_id)
         }
@@ -1738,11 +1738,27 @@ mod tests {
     use fxfs_crypto::Crypt;
     use fxfs_insecure_crypto::InsecureCrypt;
     use std::collections::HashSet;
+    use std::future::poll_fn;
     use std::sync::Arc;
+    use std::task::Poll;
     use storage_device::fake_device::FakeDevice;
     use storage_device::DeviceHolder;
 
     const TEST_DEVICE_BLOCK_SIZE: u32 = 512;
+
+    async fn yield_to_executor() {
+        let mut done = false;
+        poll_fn(|cx| {
+            if done {
+                Poll::Ready(())
+            } else {
+                done = true;
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
+        })
+        .await;
+    }
 
     #[fuchsia::test]
     async fn test_create_directory() {
@@ -4150,5 +4166,91 @@ mod tests {
 
             fs.close().await.expect("Close failed");
         }
+    }
+
+    #[fuchsia::test]
+    async fn test_replace_directory_and_tombstone_on_remount() {
+        let device = DeviceHolder::new(FakeDevice::new(8192, 4096));
+        let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let crypt = Arc::new(InsecureCrypt::new());
+        {
+            let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
+            let store = root_volume
+                .new_volume("test", NO_OWNER, Some(crypt.clone() as Arc<dyn Crypt>))
+                .await
+                .expect("new_volume failed");
+
+            let mut transaction = fs
+                .clone()
+                .new_transaction(
+                    lock_keys![LockKey::object(
+                        store.store_object_id(),
+                        store.root_directory_object_id()
+                    )],
+                    Options::default(),
+                )
+                .await
+                .expect("new transaction failed");
+
+            let root_directory = Directory::open(&store, store.root_directory_object_id())
+                .await
+                .expect("open failed");
+            let _directory = root_directory
+                .create_child_dir(&mut transaction, "foo")
+                .await
+                .expect("create_child_dir failed");
+            let directory = root_directory
+                .create_child_dir(&mut transaction, "bar")
+                .await
+                .expect("create_child_dir failed");
+            let oid = directory.object_id();
+
+            transaction.commit().await.expect("commit failed");
+
+            let mut transaction = fs
+                .clone()
+                .new_transaction(
+                    lock_keys![LockKey::object(
+                        store.store_object_id(),
+                        store.root_directory_object_id()
+                    )],
+                    Options::default(),
+                )
+                .await
+                .expect("new transaction failed");
+
+            replace_child_with_object(
+                &mut transaction,
+                Some((oid, ObjectDescriptor::Directory)),
+                (&root_directory, "foo"),
+                0,
+                Timestamp::now(),
+            )
+            .await
+            .expect("replace_child_with_object failed");
+
+            // If replace_child_with_object erroneously were to queue a tombstone, this will allow
+            // it to run before we've committed, which will cause the test to fail below when we
+            // remount and try and tombstone the object again.
+            yield_to_executor().await;
+
+            transaction.commit().await.expect("commit failed");
+
+            fs.close().await.expect("close failed");
+        }
+
+        let device = fs.take_device().await;
+        device.reopen(false);
+        let fs = FxFilesystem::open(device).await.expect("open failed");
+        let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
+        let _store = root_volume
+            .volume("test", NO_OWNER, Some(crypt.clone() as Arc<dyn Crypt>))
+            .await
+            .expect("new_volume failed");
+
+        // Allow the graveyard to run.
+        yield_to_executor().await;
+
+        fs.close().await.expect("close failed");
     }
 }

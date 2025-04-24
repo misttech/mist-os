@@ -143,36 +143,14 @@ impl State {
 
     // Mark the state as to be purged. Returns true if there are no open references.
     fn mark_to_be_purged(&self) -> bool {
-        let mut old = self.0.load(Ordering::Relaxed);
-        loop {
-            assert!(!to_be_purged(old));
-            match self.0.compare_exchange_weak(
-                old,
-                old | TO_BE_PURGED,
-                Ordering::Relaxed,
-                Ordering::Relaxed,
-            ) {
-                Ok(_) => return open_count(old) == 0,
-                Err(x) => old = x,
-            }
-        }
+        let old = self.0.fetch_or(TO_BE_PURGED, Ordering::Relaxed);
+        assert!(!to_be_purged(old));
+        open_count(old) == 0
     }
 
     // Mark the state as permanent (to be used when the file is currently marked as temporary).
     fn mark_as_permanent(&self) {
-        let mut old = self.0.load(Ordering::Relaxed);
-        loop {
-            assert!(is_unnamed_temporary(old));
-            match self.0.compare_exchange_weak(
-                old,
-                old & !IS_UNNAMED_TEMPORARY,
-                Ordering::Relaxed,
-                Ordering::Relaxed,
-            ) {
-                Ok(_) => return,
-                Err(x) => old = x,
-            }
-        }
+        assert!(is_unnamed_temporary(self.0.fetch_and(!IS_UNNAMED_TEMPORARY, Ordering::Relaxed)));
     }
 }
 

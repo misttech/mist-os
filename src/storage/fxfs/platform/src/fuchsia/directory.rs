@@ -555,6 +555,11 @@ impl FxDirectory {
                         self.did_remove(dst);
                     }
                     ReplacedChild::Directory(id) => {
+                        let store = self.store();
+                        store
+                            .filesystem()
+                            .graveyard()
+                            .queue_tombstone_object(store.store_object_id(), id);
                         self.did_remove(dst);
                         self.volume().mark_directory_deleted(id);
                     }
@@ -656,6 +661,11 @@ impl MutableDirectory for FxDirectory {
             ReplacedChild::Directory(id) => {
                 transaction
                     .commit_with_callback(|_| {
+                        let store = self.store();
+                        store
+                            .filesystem()
+                            .graveyard()
+                            .queue_tombstone_object(store.store_object_id(), id);
                         self.did_remove(name);
                         self.volume().mark_directory_deleted(id);
                     })
@@ -1097,14 +1107,18 @@ mod tests {
     use fuchsia_fs::directory::{DirEntry, DirentKind};
     use fuchsia_fs::file;
     use futures::{join, StreamExt};
+    use fxfs::lsm_tree::types::{ItemRef, LayerIterator};
+    use fxfs::lsm_tree::Query;
     use fxfs::object_store::transaction::{lock_keys, LockKey};
-    use fxfs::object_store::Timestamp;
+    use fxfs::object_store::{ObjectKey, ObjectKeyData, ObjectValue, Timestamp};
     use fxfs_crypto::FSCRYPT_PADDING;
     use fxfs_insecure_crypto::InsecureCrypt;
     use rand::Rng;
+    use std::future::poll_fn;
     use std::os::fd::AsRawFd;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
+    use std::task::Poll;
     use std::time::Duration;
     use storage_device::fake_device::FakeDevice;
     use storage_device::DeviceHolder;
@@ -1113,6 +1127,20 @@ mod tests {
     use vfs::path::Path;
     use vfs::ObjectRequest;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
+
+    async fn yield_to_executor() {
+        let mut done = false;
+        poll_fn(|cx| {
+            if done {
+                Poll::Ready(())
+            } else {
+                done = true;
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
+        })
+        .await;
+    }
 
     #[fuchsia::test]
     async fn test_open_root_dir() {
@@ -4946,6 +4974,85 @@ mod tests {
             .expect("get_attributes failed");
         assert_eq!(immutable_attributes.change_time, expected_ctime);
         assert_eq!(mutable_attributes.access_time, expected_atime);
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_directory_immediately_tombstoned() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        let dir = open_dir_checked(
+            &root,
+            "foo",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            fio::Options::default(),
+        )
+        .await;
+
+        let (_mutable, immutable) = dir
+            .get_attributes(fio::NodeAttributesQuery::ID)
+            .await
+            .expect("transport error on get_attributes")
+            .expect("get_attributes failed");
+        let foo_object_id = immutable.id.unwrap();
+
+        let dir = open_dir_checked(
+            &root,
+            "bar",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            fio::Options::default(),
+        )
+        .await;
+
+        let (_mutable, immutable) = dir
+            .get_attributes(fio::NodeAttributesQuery::ID)
+            .await
+            .expect("transport error on get_attributes")
+            .expect("get_attributes failed");
+        let bar_object_id = immutable.id.unwrap();
+
+        // Check rename.
+        let (status, dst_token) = root.get_token().await.expect("FIDL call failed");
+        zx::Status::ok(status).expect("get_token failed");
+        root.rename("foo", zx::Event::from(dst_token.unwrap()), "bar")
+            .await
+            .expect("FIDL call failed")
+            .expect("rename failed");
+
+        // Allow the graveyard to run.
+        yield_to_executor().await;
+
+        // The easiest way to verify the object has been deleted is to scan the LSM tree.
+        let assert_not_found = async |oid| {
+            let tree = fixture.volume().volume().store().tree();
+            let layer_set = tree.layer_set();
+            let mut merger = layer_set.merger();
+            let mut iter = merger.query(Query::FullScan).await.unwrap();
+            while let Some(item) = iter.get() {
+                match item {
+                    ItemRef { value: ObjectValue::None, .. } => {}
+                    ItemRef {
+                        key: ObjectKey { object_id, data: ObjectKeyData::Object }, ..
+                    } => {
+                        assert_ne!(*object_id, oid);
+                    }
+                    _ => {}
+                }
+                iter.advance().await.unwrap();
+            }
+        };
+
+        assert_not_found(bar_object_id).await;
+
+        // Now check unlink.
+        root.unlink("bar", &Default::default())
+            .await
+            .expect("FIDL call failed")
+            .expect("unlink failed");
+
+        assert_not_found(foo_object_id).await;
+
         fixture.close().await;
     }
 }
