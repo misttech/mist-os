@@ -41,6 +41,7 @@ pub(super) enum Auditable<'a> {
     FileObject(&'a FileObject),
     FileSystem(&'a FileSystem),
     FsNode(&'a FsNode),
+    IoctlCommand(u16),
     Name(&'a FsStr),
     Task(&'a Task),
     // keep-sorted end
@@ -191,6 +192,9 @@ impl Display for Auditable<'_> {
             }
             Auditable::FileSystem(fs) => {
                 write!(f, " dev=\"{}\"", fs.options.source)
+            }
+            Auditable::IoctlCommand(ioctl) => {
+                write!(f, " ioctlcmd={:#x}", ioctl)
             }
             Auditable::Name(name) => {
                 write!(f, " name=\"{}\"", name)

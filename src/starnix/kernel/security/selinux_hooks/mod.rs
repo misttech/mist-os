@@ -26,7 +26,7 @@ use selinux::{
     FileClass, FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions, FsNodeClass,
     InitialSid, KernelPermission, ProcessPermission, SecurityId, SecurityServer,
 };
-use starnix_logging::{track_stub, BugRef};
+use starnix_logging::{bug_ref, track_stub, BugRef};
 use starnix_sync::Mutex;
 use starnix_types::ownership::WeakRef;
 use starnix_uapi::arc_key::WeakKey;
@@ -148,6 +148,142 @@ fn todo_has_file_permissions(
     }
 
     Ok(())
+}
+
+fn has_file_ioctl_permission(
+    permission_check: &PermissionCheck<'_>,
+    kernel: &Kernel,
+    subject_sid: SecurityId,
+    file: &FileObject,
+    ioctl: u16,
+    audit_context: Auditable<'_>,
+) -> Result<(), Errno> {
+    // Validate that the `subject` has the "fd { use }" permission to the `file`.
+    has_file_permissions(permission_check, kernel, subject_sid, file, &[], audit_context)?;
+
+    // Validate that the `subject` has the `ioctl` permission on the underlying node,
+    // as well as the specified ioctl extended permission.
+    let fs_node = file.node().as_ref().as_ref();
+    if Anon::is_private(fs_node) {
+        return Ok(());
+    }
+    let FsNodeSidAndClass { sid: target_sid, class: target_class } =
+        fs_node_effective_sid_and_class(fs_node);
+
+    let audit_context =
+        &[audit_context, file.into(), fs_node.into(), Auditable::IoctlCommand(ioctl)];
+
+    // Check the `ioctl` permission on the underlying node.
+    //
+    // TODO(https://fxbug.dev/374832936): This permission check duplicates the `ioctl` permission
+    // check that is done as part of `todo_check_ioctl_permission` below. The `ioctl` permission
+    // check here is enforced, while the one in `todo_check_ioctl_permission` is not enforced.
+    // Remove this `check_permission` when changing the `todo_check_ioctl_permission` below to
+    // `check_ioctl_permission`, since at that point both the `ioctl` permission check and the
+    // extended permission check will be enforced by `check_ioctl_permission`.
+    check_permission(
+        permission_check,
+        kernel,
+        subject_sid,
+        target_sid,
+        CommonFsNodePermission::Ioctl.for_class(target_class.clone()),
+        audit_context.into(),
+    )?;
+
+    todo_check_ioctl_permission(
+        permission_check,
+        kernel,
+        subject_sid,
+        target_sid,
+        target_class,
+        ioctl,
+        audit_context.into(),
+    )
+}
+
+fn todo_check_ioctl_permission(
+    permission_check: &PermissionCheck<'_>,
+    kernel: &Kernel,
+    subject_sid: SecurityId,
+    target_sid: SecurityId,
+    target_class: FsNodeClass,
+    ioctl: u16,
+    audit_context: Auditable<'_>,
+) -> Result<(), Errno> {
+    if kernel.features.selinux_test_suite {
+        check_ioctl_permission(
+            permission_check,
+            kernel,
+            subject_sid,
+            target_sid,
+            target_class,
+            ioctl,
+            audit_context,
+        )
+    } else {
+        let ioctl_permission = CommonFsNodePermission::Ioctl.for_class(target_class);
+        let result = permission_check.has_ioctl_permission(
+            subject_sid,
+            target_sid,
+            ioctl_permission.clone(),
+            ioctl,
+        );
+
+        if result.audit {
+            audit_todo_decision(
+                bug_ref!("https://fxbug.dev/374832936"),
+                permission_check,
+                result,
+                subject_sid,
+                target_sid,
+                ioctl_permission.into(),
+                audit_context,
+            );
+        }
+
+        Ok(())
+    }
+}
+
+fn check_ioctl_permission(
+    permission_check: &PermissionCheck<'_>,
+    kernel: &Kernel,
+    subject_sid: SecurityId,
+    target_sid: SecurityId,
+    target_class: FsNodeClass,
+    ioctl: u16,
+    audit_context: Auditable<'_>,
+) -> Result<(), Errno> {
+    let ioctl_permission = CommonFsNodePermission::Ioctl.for_class(target_class);
+    let result = permission_check.has_ioctl_permission(
+        subject_sid,
+        target_sid,
+        ioctl_permission.clone(),
+        ioctl,
+    );
+
+    if result.audit {
+        if !result.permit {
+            kernel
+                .security_state
+                .state
+                .as_ref()
+                .unwrap()
+                .access_denial_count
+                .fetch_add(1, Ordering::Release);
+        }
+
+        audit_decision(
+            permission_check,
+            result.clone(),
+            subject_sid,
+            target_sid,
+            ioctl_permission.into(),
+            audit_context.into(),
+        );
+    }
+
+    result.permit.then_some(Ok(())).unwrap_or_else(|| error!(EACCES))
 }
 
 /// Checks that `current_task` has the specified `permissions` to the `node`.

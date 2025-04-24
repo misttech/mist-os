@@ -7,8 +7,9 @@
 
 use super::bpf::{check_bpf_map_access, check_bpf_prog_access};
 use super::{
-    fs_node_effective_sid_and_class, has_file_permissions, permissions_from_flags,
-    todo_has_fs_node_permissions, FileObjectState, FsNodeSidAndClass, PermissionFlags,
+    fs_node_effective_sid_and_class, has_file_ioctl_permission, has_file_permissions,
+    permissions_from_flags, todo_has_fs_node_permissions, FileObjectState, FsNodeSidAndClass,
+    PermissionFlags,
 };
 use crate::bpf::fs::BpfHandle;
 use crate::mm::{MappingOptions, ProtectionFlags};
@@ -123,25 +124,44 @@ pub(in crate::security) fn check_file_ioctl_access(
     let subject_sid = current_task.security_state.lock().current_sid;
 
     let file_class = file.node().security_state.lock().class;
-    let permissions: &[KernelPermission] = match request {
-        FIBMAP | FIONREAD | FIGETBSZ | FS_IOC_GETFLAGS | FS_IOC_GETVERSION => {
-            &[CommonFsNodePermission::GetAttr.for_class(file_class)]
+    match request {
+        FIBMAP | FIONREAD | FIGETBSZ | FS_IOC_GETFLAGS | FS_IOC_GETVERSION => has_file_permissions(
+            &permission_check,
+            current_task.kernel(),
+            subject_sid,
+            file,
+            &[CommonFsNodePermission::GetAttr.for_class(file_class)],
+            current_task.into(),
+        ),
+        FS_IOC_SETFLAGS | FS_IOC_SETVERSION => has_file_permissions(
+            &permission_check,
+            current_task.kernel(),
+            subject_sid,
+            file,
+            &[CommonFsNodePermission::SetAttr.for_class(file_class)],
+            current_task.into(),
+        ),
+        FIONBIO | FIOASYNC => has_file_permissions(
+            &permission_check,
+            current_task.kernel(),
+            subject_sid,
+            file,
+            &[],
+            current_task.into(),
+        ),
+        _ => {
+            // The ioctl command is the 2 least-significant bytes of `request`.
+            let ioctl = request as u16;
+            has_file_ioctl_permission(
+                &permission_check,
+                current_task.kernel(),
+                subject_sid,
+                file,
+                ioctl,
+                current_task.into(),
+            )
         }
-        FS_IOC_SETFLAGS | FS_IOC_SETVERSION => {
-            &[CommonFsNodePermission::SetAttr.for_class(file_class)]
-        }
-        FIONBIO | FIOASYNC => &[],
-        _ => &[CommonFsNodePermission::Ioctl.for_class(file_class)],
-    };
-
-    has_file_permissions(
-        &permission_check,
-        current_task.kernel(),
-        subject_sid,
-        file,
-        permissions,
-        current_task.into(),
-    )
+    }
 }
 
 /// Returns whether `current_task` can perform a lock operation on the given `file`.
