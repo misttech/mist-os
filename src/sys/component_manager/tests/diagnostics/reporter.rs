@@ -78,6 +78,7 @@ async fn main() {
     assert_eq!(data.len(), 1, "expected 1 match: {:?}", data);
     let hierarchy = data[0].payload.as_ref().unwrap();
     assert_data_tree!(hierarchy, root: {
+        ota_health_verification: contains {},
         "fuchsia.inspect.Health": {
             start_timestamp_nanos: AnyProperty,
             status: "OK"
