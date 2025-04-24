@@ -9,8 +9,9 @@
 #include <lib/boot-options/boot-options.h>
 #include <lib/boot-options/types.h>
 #include <lib/boot-options/word-view.h>
-#include <lib/stdcompat/algorithm.h>
 #include <zircon/compiler.h>
+
+#include <algorithm>
 
 namespace {
 
@@ -128,7 +129,7 @@ constexpr std::string_view OptionName(std::string_view name) { return name; }
 constexpr auto OptionLessThan = [](auto&& a, auto&& b) { return OptionName(a) < OptionName(b); };
 
 constexpr auto CheckSortedNames = [](const auto& names) {
-  return cpp20::is_sorted(names.begin(), names.end(), OptionLessThan);
+  return std::is_sorted(names.begin(), names.end(), OptionLessThan);
 };
 
 // kSortedNames lists Index values in ascending lexicographic order of name.
@@ -138,7 +139,7 @@ constexpr auto kSortedNames = []() {
 #include <lib/boot-options/options.inc>
 #undef DEFINE_OPTION
   };
-  cpp20::sort(names.begin(), names.end(), OptionLessThan);
+  std::sort(names.begin(), names.end(), OptionLessThan);
   return names;
 }();
 
