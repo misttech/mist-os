@@ -18,6 +18,9 @@ pub enum Icmp6EchoMode {
 
     /// ICMPv6 Echo processing enabled only for unicast requests only.
     HandleUnicastOnly = OT_ICMP6_ECHO_HANDLER_UNICAST_ONLY as isize,
+
+    /// ICMPv6 Echo processing enabled for RLOC/ALOC destinations only
+    HandleRlocAlocOnly = OT_ICMP6_ECHO_HANDLER_RLOC_ALOC_ONLY as isize,
 }
 
 impl From<otIcmp6EchoMode> for Icmp6EchoMode {
