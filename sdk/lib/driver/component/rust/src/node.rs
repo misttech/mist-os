@@ -4,7 +4,7 @@
 
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_driver_framework::{
-    NodeAddArgs, NodeControllerMarker, NodeMarker, NodeProperty, NodeProxy, Offer,
+    NodeAddArgs, NodeControllerMarker, NodeMarker, NodeProperty2, NodeProxy, Offer,
 };
 use log::error;
 use zx::Status;
@@ -99,14 +99,10 @@ impl NodeBuilder {
     /// [`PropertyKey`], which includes strings and [`u32`] integers. The `value` argument is
     /// something that can convert into a [`PropertyValue`], which includes strings, [`u32`]
     /// integers, and [`bool`] values.
-    pub fn add_property(
-        mut self,
-        key: impl Into<PropertyKey>,
-        value: impl Into<PropertyValue>,
-    ) -> Self {
-        let key = key.into().0;
+    pub fn add_property(mut self, key: impl Into<String>, value: impl Into<PropertyValue>) -> Self {
+        let key = key.into();
         let value = value.into().0;
-        self.0.properties.get_or_insert_with(|| vec![]).push(NodeProperty { key, value });
+        self.0.properties2.get_or_insert_with(|| vec![]).push(NodeProperty2 { key, value });
         self
     }
 
