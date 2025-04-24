@@ -13,6 +13,12 @@
             url: "#meta/container.cm",
             environment: "#starnix_kernel_env",
         },
+        {
+            name: "mount_pstore",
+            url: "#meta/mount_pstore.cm",
+            startup: "eager",
+            environment: "#debian_container_env",
+        },
     ],
     capabilities: [
         {

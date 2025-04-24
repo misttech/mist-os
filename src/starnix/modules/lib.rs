@@ -24,6 +24,7 @@ use starnix_modules_functionfs::FunctionFs;
 use starnix_modules_fuse::{new_fuse_fs, new_fusectl_fs, open_fuse_device};
 use starnix_modules_loop::{create_loop_control_device, loop_device_init};
 use starnix_modules_overlayfs::new_overlay_fs;
+use starnix_modules_pstore::pstore_fs;
 use starnix_modules_selinuxfs::selinux_fs;
 use starnix_modules_tracefs::trace_fs;
 use starnix_modules_tun::DevTun;
@@ -120,6 +121,7 @@ pub fn register_common_file_systems(_locked: &mut Locked<'_, Unlocked>, kernel: 
     registry.register(b"overlay".into(), new_overlay_fs);
     register_pipe_fs(registry.as_ref());
     registry.register(b"proc".into(), proc_fs);
+    registry.register(b"pstore".into(), pstore_fs);
     registry.register(b"remotefs".into(), new_remote_fs);
     registry.register(b"remotevol".into(), new_remote_vol);
     registry.register(b"selinuxfs".into(), selinux_fs);

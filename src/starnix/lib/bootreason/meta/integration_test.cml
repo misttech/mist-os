@@ -10,6 +10,11 @@
     program: {
         binary: "bin/bootreason_test",
     },
+    use: [
+        {
+            event_stream: [ "stopped" ],
+        },
+    ],
     offer: [
         {
             protocol: [ "fuchsia.kernel.VmexResource" ],

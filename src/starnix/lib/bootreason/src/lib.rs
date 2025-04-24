@@ -5,7 +5,7 @@
 use anyhow::Error;
 use fidl_fuchsia_feedback::{LastRebootInfoProviderMarker, RebootReason};
 use fuchsia_component::client::connect_to_protocol_sync;
-use log::info;
+use log::{debug, info};
 
 /// Timeout for FIDL calls to LastRebootInfoProvider
 const LRIP_FIDL_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::INFINITE;
@@ -40,4 +40,13 @@ pub fn get_android_bootreason() -> Result<&'static str, Error> {
         Some(RebootReason::__SourceBreaking { .. }) => return Ok("reboot,normal"),
         None => return Ok("reboot,unknown"),
     }
+}
+
+/// Get contents for the pstore/console-ramoops* file.
+///
+/// In Linux it contains a limited amount of some of the previous boot's kernel logs.
+pub fn get_console_ramoops() -> Option<Vec<u8>> {
+    debug!("Getting console-ramoops contents");
+    // Placeholder while we figure out how to get the proper logs.
+    Some("Fuchsia Console Ramoops\n".as_bytes().to_vec())
 }
