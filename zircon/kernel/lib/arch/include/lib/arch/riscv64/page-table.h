@@ -10,12 +10,12 @@
 #include <inttypes.h>
 #include <lib/arch/paging.h>
 #include <lib/arch/sysreg.h>
-#include <lib/stdcompat/algorithm.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
 #include <array>
 #include <cstdint>
+#include <optional>
+#include <span>
 
 #include <fbl/bits.h>
 #include <hwreg/bitfields.h>
@@ -116,15 +116,15 @@ struct RiscvPagingTraitsBase {
 };
 
 struct RiscvSv39PagingTraits : public RiscvPagingTraitsBase {
-  static constexpr auto kLevels = cpp20::span{kAllLevels}.subspan(2);
+  static constexpr auto kLevels = std::span{kAllLevels}.subspan(2);
 };
 
 struct RiscvSv48PagingTraits : public RiscvPagingTraitsBase {
-  static constexpr auto kLevels = cpp20::span{kAllLevels}.subspan(1);
+  static constexpr auto kLevels = std::span{kAllLevels}.subspan(1);
 };
 
 struct RiscvSv57PagingTraits : public RiscvPagingTraitsBase {
-  static constexpr auto kLevels = cpp20::span{kAllLevels};
+  static constexpr auto kLevels = std::span{kAllLevels};
 };
 
 template <RiscvPagingLevel Level>

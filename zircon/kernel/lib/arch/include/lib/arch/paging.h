@@ -8,9 +8,9 @@
 
 #include <inttypes.h>
 #include <lib/fit/result.h>
-#include <lib/stdcompat/algorithm.h>
 #include <zircon/assert.h>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -410,7 +410,7 @@ class Paging : public PagingTraits {
   template <LevelType Level>
   static constexpr LevelType kNextLevel = []() {
     static_assert(Level != kLevels.back());
-    constexpr auto it = cpp20::find(kLevels.begin(), kLevels.end(), Level);
+    constexpr auto it = std::find(kLevels.begin(), kLevels.end(), Level);
     static_assert(it != kLevels.end());
     return *std::next(it);
   }();
@@ -843,7 +843,7 @@ class Paging : public PagingTraits {
       PaddrToTableIo&& paddr_to_io,  //
       Visitor&& visitor,             //
       uint64_t vaddr) {              //
-    static_assert(cpp20::find(kLevels.begin(), kLevels.end(), Level) != kLevels.end());
+    static_assert(std::find(kLevels.begin(), kLevels.end(), Level) != kLevels.end());
 
     ZX_DEBUG_ASSERT(table_paddr <= kMaxPhysicalAddress);
     auto io = paddr_to_io(table_paddr);

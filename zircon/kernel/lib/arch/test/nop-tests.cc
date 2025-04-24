@@ -22,7 +22,7 @@ TEST(NopFillTests, Arm64) {
     constexpr size_t kSize = kInsnSize;
     constexpr uint8_t kExpected[kSize] = {0x1f, 0x20, 0x03, 0xd5};
     uint8_t actual[kSize];
-    arch::NopFill<arch::Arm64NopTraits>(cpp20::as_writable_bytes(cpp20::span{actual}));
+    arch::NopFill<arch::Arm64NopTraits>(std::as_writable_bytes(std::span{actual}));
     EXPECT_THAT(actual, ElementsAreArray(kExpected));
   }
 
@@ -34,7 +34,7 @@ TEST(NopFillTests, Arm64) {
         0x1f, 0x20, 0x03, 0xd5,
     };
     uint8_t actual[kSize];
-    arch::NopFill<arch::Arm64NopTraits>(cpp20::as_writable_bytes(cpp20::span{actual}));
+    arch::NopFill<arch::Arm64NopTraits>(std::as_writable_bytes(std::span{actual}));
     EXPECT_THAT(actual, ElementsAreArray(kExpected));
   }
 
@@ -49,7 +49,7 @@ TEST(NopFillTests, Arm64) {
         0x1f, 0x20, 0x03, 0xd5,
     };
     uint8_t actual[kSize];
-    arch::NopFill<arch::Arm64NopTraits>(cpp20::as_writable_bytes(cpp20::span{actual}));
+    arch::NopFill<arch::Arm64NopTraits>(std::as_writable_bytes(std::span{actual}));
     EXPECT_THAT(actual, ElementsAreArray(kExpected));
   }
 
@@ -69,7 +69,7 @@ TEST(NopFillTests, Arm64) {
         0x1f, 0x20, 0x03, 0xd5,
     };
     uint8_t actual[kSize];
-    arch::NopFill<arch::Arm64NopTraits>(cpp20::as_writable_bytes(cpp20::span{actual}));
+    arch::NopFill<arch::Arm64NopTraits>(std::as_writable_bytes(std::span{actual}));
     EXPECT_THAT(actual, ElementsAreArray(kExpected));
   }
 }
@@ -82,7 +82,7 @@ TEST(NopFillTests, X86) {
     constexpr size_t kSize = kInsnSize;
     constexpr uint8_t kExpected[kSize] = {0x90};
     uint8_t actual[kSize];
-    arch::NopFill<arch::X86NopTraits>(cpp20::as_writable_bytes(cpp20::span{actual}));
+    arch::NopFill<arch::X86NopTraits>(std::as_writable_bytes(std::span{actual}));
     EXPECT_THAT(actual, ElementsAreArray(kExpected));
   }
 
@@ -91,7 +91,7 @@ TEST(NopFillTests, X86) {
     constexpr size_t kSize = 2 * kInsnSize;
     constexpr uint8_t kExpected[kSize] = {0x66, 0x90};
     uint8_t actual[kSize];
-    arch::NopFill<arch::X86NopTraits>(cpp20::as_writable_bytes(cpp20::span{actual}));
+    arch::NopFill<arch::X86NopTraits>(std::as_writable_bytes(std::span{actual}));
     EXPECT_THAT(actual, ElementsAreArray(kExpected));
   }
 
@@ -100,7 +100,7 @@ TEST(NopFillTests, X86) {
     constexpr size_t kSize = 3 * kInsnSize;
     constexpr uint8_t kExpected[kSize] = {0x0f, 0x1f, 0x00};
     uint8_t actual[kSize];
-    arch::NopFill<arch::X86NopTraits>(cpp20::as_writable_bytes(cpp20::span{actual}));
+    arch::NopFill<arch::X86NopTraits>(std::as_writable_bytes(std::span{actual}));
     EXPECT_THAT(actual, ElementsAreArray(kExpected));
   }
 
@@ -109,7 +109,7 @@ TEST(NopFillTests, X86) {
     constexpr size_t kSize = 4 * kInsnSize;
     constexpr uint8_t kExpected[kSize] = {0x0f, 0x1f, 0x40, 0x00};
     uint8_t actual[kSize];
-    arch::NopFill<arch::X86NopTraits>(cpp20::as_writable_bytes(cpp20::span{actual}));
+    arch::NopFill<arch::X86NopTraits>(std::as_writable_bytes(std::span{actual}));
     EXPECT_THAT(actual, ElementsAreArray(kExpected));
   }
 
@@ -118,7 +118,7 @@ TEST(NopFillTests, X86) {
     constexpr size_t kSize = 5 * kInsnSize;
     constexpr uint8_t kExpected[kSize] = {0x0f, 0x1f, 0x44, 0x00, 0x00};
     uint8_t actual[kSize];
-    arch::NopFill<arch::X86NopTraits>(cpp20::as_writable_bytes(cpp20::span{actual}));
+    arch::NopFill<arch::X86NopTraits>(std::as_writable_bytes(std::span{actual}));
     EXPECT_THAT(actual, ElementsAreArray(kExpected));
   }
 
@@ -127,7 +127,7 @@ TEST(NopFillTests, X86) {
     constexpr size_t kSize = 6 * kInsnSize;
     constexpr uint8_t kExpected[kSize] = {0x66, 0x0f, 0x1f, 0x44, 0x00, 0x00};
     uint8_t actual[kSize];
-    arch::NopFill<arch::X86NopTraits>(cpp20::as_writable_bytes(cpp20::span{actual}));
+    arch::NopFill<arch::X86NopTraits>(std::as_writable_bytes(std::span{actual}));
     EXPECT_THAT(actual, ElementsAreArray(kExpected));
   }
 
@@ -136,7 +136,7 @@ TEST(NopFillTests, X86) {
     constexpr size_t kSize = 7 * kInsnSize;
     constexpr uint8_t kExpected[kSize] = {0x0f, 0x1f, 0x80, 0x00, 0x00, 0x00, 0x00};
     uint8_t actual[kSize];
-    arch::NopFill<arch::X86NopTraits>(cpp20::as_writable_bytes(cpp20::span{actual}));
+    arch::NopFill<arch::X86NopTraits>(std::as_writable_bytes(std::span{actual}));
     EXPECT_THAT(actual, ElementsAreArray(kExpected));
   }
 
@@ -145,7 +145,7 @@ TEST(NopFillTests, X86) {
     constexpr size_t kSize = 8 * kInsnSize;
     constexpr uint8_t kExpected[kSize] = {0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00};
     uint8_t actual[kSize];
-    arch::NopFill<arch::X86NopTraits>(cpp20::as_writable_bytes(cpp20::span{actual}));
+    arch::NopFill<arch::X86NopTraits>(std::as_writable_bytes(std::span{actual}));
     EXPECT_THAT(actual, ElementsAreArray(kExpected));
   }
 
@@ -154,7 +154,7 @@ TEST(NopFillTests, X86) {
     constexpr size_t kSize = 9 * kInsnSize;
     constexpr uint8_t kExpected[kSize] = {0x66, 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00};
     uint8_t actual[kSize];
-    arch::NopFill<arch::X86NopTraits>(cpp20::as_writable_bytes(cpp20::span{actual}));
+    arch::NopFill<arch::X86NopTraits>(std::as_writable_bytes(std::span{actual}));
     EXPECT_THAT(actual, ElementsAreArray(kExpected));
   }
 
@@ -164,7 +164,7 @@ TEST(NopFillTests, X86) {
     constexpr uint8_t kExpected[kSize] = {0x66, 0x66, 0x0f, 0x1f, 0x84,
                                           0x00, 0x00, 0x00, 0x00, 0x00};
     uint8_t actual[kSize];
-    arch::NopFill<arch::X86NopTraits>(cpp20::as_writable_bytes(cpp20::span{actual}));
+    arch::NopFill<arch::X86NopTraits>(std::as_writable_bytes(std::span{actual}));
     EXPECT_THAT(actual, ElementsAreArray(kExpected));
   }
 
@@ -174,7 +174,7 @@ TEST(NopFillTests, X86) {
     constexpr uint8_t kExpected[kSize] = {0x66, 0x66, 0x66, 0x0f, 0x1f, 0x84,
                                           0x00, 0x00, 0x00, 0x00, 0x00};
     uint8_t actual[kSize];
-    arch::NopFill<arch::X86NopTraits>(cpp20::as_writable_bytes(cpp20::span{actual}));
+    arch::NopFill<arch::X86NopTraits>(std::as_writable_bytes(std::span{actual}));
     EXPECT_THAT(actual, ElementsAreArray(kExpected));
   }
 
@@ -184,7 +184,7 @@ TEST(NopFillTests, X86) {
     constexpr uint8_t kExpected[kSize] = {0x66, 0x66, 0x66, 0x66, 0x0f, 0x1f,
                                           0x84, 0x00, 0x00, 0x00, 0x00, 0x00};
     uint8_t actual[kSize];
-    arch::NopFill<arch::X86NopTraits>(cpp20::as_writable_bytes(cpp20::span{actual}));
+    arch::NopFill<arch::X86NopTraits>(std::as_writable_bytes(std::span{actual}));
     EXPECT_THAT(actual, ElementsAreArray(kExpected));
   }
 
@@ -194,7 +194,7 @@ TEST(NopFillTests, X86) {
     constexpr uint8_t kExpected[kSize] = {0x66, 0x66, 0x66, 0x66, 0x66, 0x0f, 0x1f,
                                           0x84, 0x00, 0x00, 0x00, 0x00, 0x00};
     uint8_t actual[kSize];
-    arch::NopFill<arch::X86NopTraits>(cpp20::as_writable_bytes(cpp20::span{actual}));
+    arch::NopFill<arch::X86NopTraits>(std::as_writable_bytes(std::span{actual}));
     EXPECT_THAT(actual, ElementsAreArray(kExpected));
   }
 
@@ -204,7 +204,7 @@ TEST(NopFillTests, X86) {
     constexpr uint8_t kExpected[kSize] = {0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x0f,
                                           0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00};
     uint8_t actual[kSize];
-    arch::NopFill<arch::X86NopTraits>(cpp20::as_writable_bytes(cpp20::span{actual}));
+    arch::NopFill<arch::X86NopTraits>(std::as_writable_bytes(std::span{actual}));
     EXPECT_THAT(actual, ElementsAreArray(kExpected));
   }
 
@@ -214,7 +214,7 @@ TEST(NopFillTests, X86) {
     constexpr uint8_t kExpected[kSize] = {0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x0f,
                                           0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00};
     uint8_t actual[kSize];
-    arch::NopFill<arch::X86NopTraits>(cpp20::as_writable_bytes(cpp20::span{actual}));
+    arch::NopFill<arch::X86NopTraits>(std::as_writable_bytes(std::span{actual}));
     EXPECT_THAT(actual, ElementsAreArray(kExpected));
   }
 
@@ -231,7 +231,7 @@ TEST(NopFillTests, X86) {
         0x0f, 0x1f, 0x44, 0x00, 0x00,              // Size-5 nop.
     };
     uint8_t actual[kSize];
-    arch::NopFill<arch::X86NopTraits>(cpp20::as_writable_bytes(cpp20::span{actual}));
+    arch::NopFill<arch::X86NopTraits>(std::as_writable_bytes(std::span{actual}));
     EXPECT_THAT(actual, ElementsAreArray(kExpected));
   }
 }

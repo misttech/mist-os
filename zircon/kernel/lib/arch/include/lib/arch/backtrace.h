@@ -8,11 +8,11 @@
 #define ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_BACKTRACE_H_
 
 #include <lib/arch/internal/arch-backtrace.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/compiler.h>
 
 #include <cstdint>
 #include <iterator>
+#include <span>
 #include <type_traits>
 #include <utility>
 
@@ -29,7 +29,7 @@ namespace arch {
 // doesn't already record it there, such as when the collecting function has
 // no frame pointer itself.
 template <class Backtrace>
-inline size_t StoreBacktrace(Backtrace&& bt, cpp20::span<uintptr_t> pcs, void* raptr = nullptr) {
+inline size_t StoreBacktrace(Backtrace&& bt, std::span<uintptr_t> pcs, void* raptr = nullptr) {
   if (pcs.empty()) [[unlikely]] {
     return 0;
   }
@@ -185,9 +185,9 @@ class ShadowCallStackBacktrace {
 
   ShadowCallStackBacktrace(const ShadowCallStackBacktrace&) = default;
 
-  explicit ShadowCallStackBacktrace(cpp20::span<const uintptr_t> stack) : stack_(stack) {}
+  explicit ShadowCallStackBacktrace(std::span<const uintptr_t> stack) : stack_(stack) {}
 
-  ShadowCallStackBacktrace(cpp20::span<const uintptr_t> stack, uintptr_t sp) : stack_(stack) {
+  ShadowCallStackBacktrace(std::span<const uintptr_t> stack, uintptr_t sp) : stack_(stack) {
     ShrinkToSp(sp);
   }
 
@@ -224,7 +224,7 @@ class ShadowCallStackBacktrace {
   }
 
  private:
-  cpp20::span<const uintptr_t> stack_;
+  std::span<const uintptr_t> stack_;
 };
 
 #if __has_feature(shadow_call_stack)

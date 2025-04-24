@@ -10,10 +10,10 @@
 #include <lib/arch/arm64/nop.h>
 #include <lib/arch/riscv64/nop.h>
 #include <lib/arch/x86/nop.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
 #include <cstddef>
+#include <span>
 
 namespace arch {
 
@@ -43,7 +43,7 @@ template <typename NopTraits
           = RiscvNopTraits
 #endif
           >
-void NopFill(cpp20::span<std::byte> instructions) {
+void NopFill(std::span<std::byte> instructions) {
   static_assert(!NopTraits::kNopPatterns.empty());
   static_assert(!NopTraits::kNopPatterns[0].empty());
   static constexpr size_t kInsnAlignment = sizeof(NopTraits::kNopPatterns[0][0]);

@@ -21,7 +21,7 @@ void X86StandardSegments::Init() {
 }
 
 arch::GdtRegister64 X86StandardSegments::gdt_pointer() {
-  return GdtRegister64::Make(cpp20::span{&gdt_, 1});
+  return GdtRegister64::Make(std::span{&gdt_, 1});
 }
 
 #ifdef __x86_64__

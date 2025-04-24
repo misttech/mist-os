@@ -8,13 +8,13 @@
 #define ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_ARM64_PAGE_TABLE_H_
 
 #include <lib/arch/paging.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <type_traits>
 #include <utility>
 
@@ -156,7 +156,7 @@ struct ArmPagingTraits {
         return 3;
     }
   }();
-  static constexpr auto kLevels = cpp20::span{kAllLevels}.subspan(kFirstLevelIndex);
+  static constexpr auto kLevels = std::span{kAllLevels}.subspan(kFirstLevelIndex);
 
   static constexpr bool kExecuteOnlyAllowed = false;
 

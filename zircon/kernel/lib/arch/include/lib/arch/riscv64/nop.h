@@ -7,9 +7,9 @@
 #ifndef ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_RISCV64_NOP_H_
 #define ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_RISCV64_NOP_H_
 
-#include <lib/stdcompat/span.h>
-
 #include <array>
+#include <cstdint>
+#include <span>
 
 namespace arch {
 
@@ -20,9 +20,9 @@ struct RiscvNopTraits {
   static constexpr uint16_t kCnop[] = {0x01};
   static constexpr uint16_t kNop[] = {0x13, 0};
 
-  static constexpr std::array<cpp20::span<const uint16_t>, 2> kNopPatterns = {
-      cpp20::span{kNop},
-      cpp20::span{kCnop},
+  static constexpr std::array<std::span<const uint16_t>, 2> kNopPatterns = {
+      std::span{kNop},
+      std::span{kCnop},
   };
 };
 
