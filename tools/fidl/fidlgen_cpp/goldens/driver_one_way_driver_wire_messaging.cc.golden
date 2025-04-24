@@ -17,6 +17,12 @@ constexpr uint64_t kOneWay_Send_Ordinal = 7942965975761529343lu;
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kOneWay_Send_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>) == ::fidl::TypeTraits<::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>>::kPrimarySize);
+static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>, header) == 0);
+static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>, body) == sizeof(fidl_message_header_t));
+
+static_assert(sizeof(::test_driveroneway::wire::OneWaySendRequest) == ::fidl::TypeTraits<::test_driveroneway::wire::OneWaySendRequest>::kPrimarySize);
+static_assert(offsetof(::test_driveroneway::wire::OneWaySendRequest, payload) == 0);
 
 #ifdef __Fuchsia__
 }  // namespace test_driveroneway
@@ -80,6 +86,9 @@ namespace test_driveroneway {
 
 #ifdef __Fuchsia__
 
+::fidl::internal::WireEventDispatcher<::test_driveroneway::OneWay>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_driveroneway::OneWay>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
@@ -127,12 +136,41 @@ void fdf::WireServer<::test_driveroneway::OneWay>::dispatch_message(
   ::fidl::internal::WireServerDispatcher<::test_driveroneway::OneWay>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
+fdf::WireServer<::test_driveroneway::OneWay>::Handler fdf::WireServer<::test_driveroneway::OneWay>::bind_handler(fdf_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_driveroneway::OneWay> request) {
+    (void)::fdf::BindServer(dispatcher, std::move(request), impl);
+  };
+}
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-void ::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>::_InitHeader() {
+::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_driveroneway::kOneWay_Send_Ordinal, ::test_driveroneway::kOneWay_Send_DynamicFlags);
 }
+
+::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>::TransactionalRequest(const ::test_driveroneway::wire::Payload& payload)
+    : body(::test_driveroneway::wire::OneWaySendRequest{payload}) {
+  ::fidl::InitTxnHeader(&header, 0, ::test_driveroneway::kOneWay_Send_Ordinal, ::test_driveroneway::kOneWay_Send_DynamicFlags);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
+                                                                                                                                                                                     ::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  *position.As<fidl_message_header_t>() = value->header;
+  WireCodingTraits<::test_driveroneway::wire::OneWaySendRequest, WireCodingConstraintEmpty, IsRecursive>::Encode(
+      encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  WireCodingTraits<::test_driveroneway::wire::OneWaySendRequest, WireCodingConstraintEmpty, IsRecursive>::Decode(
+      decoder, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
 #endif  // __Fuchsia__
 

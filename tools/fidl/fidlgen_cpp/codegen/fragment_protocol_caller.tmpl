@@ -21,18 +21,9 @@ class {{ .WireSyncClientImpl }} final :
     {{- end }}
     // {{- template "Method:ClientAllocationComment:Helper" . }}
     {{ if .HasResponse }}{{ .WireResult }}{{ else }}::fidl::OneWayStatus{{ end }}
-    {{ .Name }}({{- RenderParams .RequestArgs }}) {
-      {{ .WireTransactionalRequest }} _request{ {{ RenderForwardParams .RequestArgs }} };
-      return {{ .WireResult }}(_client_end(), &_request);
-    }
+    {{ .Name }}({{- RenderParams .RequestArgs }});
 {{ "" }}
   {{- end }}
-
- private:
-  {{ .UnownedClientEnd }} _client_end() const {
-    return {{ .UnownedClientEnd }}(
-      _transport().get<{{ .Transport.Type }}>());
-  }
 };
 
 template <>
@@ -43,22 +34,33 @@ class {{ .WireSyncBufferClientImpl }} final :
     {{- .Docs }}
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
     {{ if .HasResponse }}{{ .WireUnownedResult }}{{ else }}::fidl::OneWayStatus{{ end }}
-    {{ .Name }}({{ RenderParams .RequestArgs }}) {
-      {{ .WireTransactionalRequest }} _request{ {{ RenderForwardParams .RequestArgs }} };
-      return {{ .WireUnownedResult }}(_client_end(), _allocator(), &_request);
-    }
+    {{ .Name }}({{ RenderParams .RequestArgs }});
 {{ "" }}
   {{- end }}
-
- private:
-  {{ .UnownedClientEnd }} _client_end() const {
-    return {{ .UnownedClientEnd }}(
-      _transport().get<{{ .Transport.Type }}>());
-  }
 };
 {{- end }}
 
+{{- define "Protocol:Caller:WireMessagingSource" }}
+  {{- if eq .Transport.Name "Channel" }}
+    {{- $protocol := . }}
+    {{- range .ClientMethods }}
+      {{ if .HasResponse }}{{ .WireResult }}{{ else }}::fidl::OneWayStatus{{ end }}
+      {{ $protocol.WireSyncClientImpl.NoLeading }}::{{ .Name }}({{- RenderParams .RequestArgs }}) {
+        {{ .WireTransactionalRequest }} _request{ {{ RenderForwardParams .RequestArgs }} };
+        return {{ .WireResult }}(
+          {{ $protocol.UnownedClientEnd }}(_transport().get<{{ $protocol.Transport.Type }}>()), &_request);
+      }
 
+      {{ if .HasResponse }}{{ .WireUnownedResult }}{{ else }}::fidl::OneWayStatus{{ end }}
+      {{ $protocol.WireSyncBufferClientImpl.NoLeading }}::{{ .Name }}({{ RenderParams .RequestArgs }}) {
+        {{ .WireTransactionalRequest }} _request{ {{ RenderForwardParams .RequestArgs }} };
+        return {{ .WireUnownedResult }}(
+          {{ $protocol.UnownedClientEnd }}(_transport().get<{{ $protocol.Transport.Type }}>()), _allocator(), &_request);
+      }
+
+    {{- end }}
+  {{ end }}
+{{- end }}
 
 {{- define "Protocol:Caller:NaturalMessagingHeader" }}
 {{- EnsureNamespace "" }}

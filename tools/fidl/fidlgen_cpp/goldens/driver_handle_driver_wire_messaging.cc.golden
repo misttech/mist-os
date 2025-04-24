@@ -16,6 +16,9 @@
 
 #ifdef __Fuchsia__
 
+::fidl::internal::WireEventDispatcher<::test_driverhandle::DriverProtocol>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_driverhandle::DriverProtocol>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
@@ -44,6 +47,12 @@ void fdf::WireServer<::test_driverhandle::DriverProtocol>::dispatch_message(
   ::fidl::internal::WireServerDispatcher<::test_driverhandle::DriverProtocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
+fdf::WireServer<::test_driverhandle::DriverProtocol>::Handler fdf::WireServer<::test_driverhandle::DriverProtocol>::bind_handler(fdf_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_driverhandle::DriverProtocol> request) {
+    (void)::fdf::BindServer(dispatcher, std::move(request), impl);
+  };
+}
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
@@ -57,6 +66,12 @@ constexpr uint64_t kHandlesInProtocol_SendHandles_Ordinal = 8904504160365833729l
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kHandlesInProtocol_SendHandles_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>) == ::fidl::TypeTraits<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>>::kPrimarySize);
+static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>, header) == 0);
+static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>, body) == sizeof(fidl_message_header_t));
+
+static_assert(sizeof(::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest) == ::fidl::TypeTraits<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest>::kPrimarySize);
+static_assert(offsetof(::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest, t) == 0);
 
 #ifdef __Fuchsia__
 }  // namespace test_driverhandle
@@ -120,6 +135,9 @@ namespace test_driverhandle {
 
 #ifdef __Fuchsia__
 
+::fidl::internal::WireEventDispatcher<::test_driverhandle::HandlesInProtocol>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_driverhandle::HandlesInProtocol>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
@@ -167,12 +185,44 @@ void fdf::WireServer<::test_driverhandle::HandlesInProtocol>::dispatch_message(
   ::fidl::internal::WireServerDispatcher<::test_driverhandle::HandlesInProtocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
+fdf::WireServer<::test_driverhandle::HandlesInProtocol>::Handler fdf::WireServer<::test_driverhandle::HandlesInProtocol>::bind_handler(fdf_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_driverhandle::HandlesInProtocol> request) {
+    (void)::fdf::BindServer(dispatcher, std::move(request), impl);
+  };
+}
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-void ::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>::_InitHeader() {
+::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_driverhandle::kHandlesInProtocol_SendHandles_Ordinal, ::test_driverhandle::kHandlesInProtocol_SendHandles_DynamicFlags);
 }
+
+::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>::TransactionalRequest(::test_driverhandle::wire::T t)
+    : body(::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest{t}) {
+  ::fidl::InitTxnHeader(&header, 0, ::test_driverhandle::kHandlesInProtocol_SendHandles_Ordinal, ::test_driverhandle::kHandlesInProtocol_SendHandles_DynamicFlags);
+}
+void ::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>::_CloseHandles() {
+  body._CloseHandles();
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
+                                                                                                                                                                                                       ::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  *position.As<fidl_message_header_t>() = value->header;
+  WireCodingTraits<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest, WireCodingConstraintEmpty, IsRecursive>::Encode(
+      encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  WireCodingTraits<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest, WireCodingConstraintEmpty, IsRecursive>::Decode(
+      decoder, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
 #endif  // __Fuchsia__
 

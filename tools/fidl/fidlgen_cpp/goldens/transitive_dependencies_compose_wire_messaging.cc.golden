@@ -16,6 +16,11 @@ constexpr uint64_t kTop_GetFoo_Ordinal = 2618685789258237543lu;
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kTop_GetFoo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+static_assert(sizeof(::fidl::WireResponse<::test_transitivedependenciescompose::Top::GetFoo>) == ::fidl::TypeTraits<::fidl::WireResponse<::test_transitivedependenciescompose::Top::GetFoo>>::kPrimarySize);
+static_assert(offsetof(::fidl::WireResponse<::test_transitivedependenciescompose::Top::GetFoo>, foo) == 0);
+static_assert(sizeof(::fidl::internal::TransactionalResponse<::test_transitivedependenciescompose::Top::GetFoo>) == ::fidl::TypeTraits<::fidl::internal::TransactionalResponse<::test_transitivedependenciescompose::Top::GetFoo>>::kPrimarySize);
+static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_transitivedependenciescompose::Top::GetFoo>, header) == 0);
+static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_transitivedependenciescompose::Top::GetFoo>, body) == sizeof(fidl_message_header_t));
 #ifdef __Fuchsia__
 }  // namespace test_transitivedependenciescompose
 
@@ -35,12 +40,15 @@ constexpr ::fidl::MessageDynamicFlags kTop_GetFoo_DynamicFlags = ::fidl::Message
     ExtractValueFromDecoded(decoded_.pointer());
   }
 }
+
+::fidl::WireResult<::test_transitivedependenciescompose::Top::GetFoo>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_transitivedependenciescompose::Top::GetFoo>(result) {}
 namespace test_transitivedependenciescompose {
 
 #endif  // __Fuchsia__
 
-#ifdef __Fuchsia__
 }  // namespace test_transitivedependenciescompose
+
+#ifdef __Fuchsia__
 
 ::fidl::WireUnownedResult<::test_transitivedependenciescompose::Top::GetFoo>::WireUnownedResult(::fidl::UnownedClientEnd<::test_transitivedependenciescompose::Top> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_transitivedependenciescompose::Top::GetFoo>* request) {
   constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_transitivedependenciescompose::Top::GetFoo>();
@@ -71,11 +79,24 @@ namespace test_transitivedependenciescompose {
     ExtractValueFromDecoded(decoded_.pointer());
   }
 }
-namespace test_transitivedependenciescompose {
 
 #endif  // __Fuchsia__
 
-}  // namespace test_transitivedependenciescompose
+::fidl::WireUnownedResult<::test_transitivedependenciescompose::Top::GetFoo>::WireUnownedResult(::fidl::WireResponse<::test_transitivedependenciescompose::Top::GetFoo>* response)
+    : ::fidl::BaseWireResult<::test_transitivedependenciescompose::Top::GetFoo>(fidl::Status::Ok()), decoded_(response) {
+  ExtractValueFromDecoded(decoded_.pointer());
+}
+
+::fidl::WireUnownedResult<::test_transitivedependenciescompose::Top::GetFoo>::WireUnownedResult(
+    ::fit::result<::fidl::Error, ::fidl::DecodedValue<::fidl::WireResponse<::test_transitivedependenciescompose::Top::GetFoo>>>&& decoded,
+    ::fidl::internal::MessageStorageViewBase* storage_view) : ::fidl::BaseWireResult<::test_transitivedependenciescompose::Top::GetFoo>(::fidl::internal::StatusFromResult(decoded)) {
+  if (decoded.is_ok()) {
+    decoded_ = std::move(decoded.value());
+    ExtractValueFromDecoded(decoded_.pointer());
+  }
+}
+
+::fidl::WireUnownedResult<::test_transitivedependenciescompose::Top::GetFoo>::WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_transitivedependenciescompose::Top::GetFoo>(result) {}
 
 #ifdef __Fuchsia__
 
@@ -103,6 +124,9 @@ fidl::internal::WireWeakSyncClientImpl<::test_transitivedependenciescompose::Top
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+
+::fidl::internal::WireEventDispatcher<::test_transitivedependenciescompose::Top>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_transitivedependenciescompose::Top>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
 
 ::fidl::Status fidl::WireSyncEventHandler<::test_transitivedependenciescompose::Top>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_transitivedependenciescompose::Top> client_end) {
@@ -155,6 +179,12 @@ void fidl::WireServer<::test_transitivedependenciescompose::Top>::dispatch_messa
   ::fidl::internal::WireServerDispatcher<::test_transitivedependenciescompose::Top>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
+fidl::WireServer<::test_transitivedependenciescompose::Top>::Handler fidl::WireServer<::test_transitivedependenciescompose::Top>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_transitivedependenciescompose::Top> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
+}
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
@@ -194,17 +224,97 @@ void fidl::internal::WireBufferCompleterImpl<::test_transitivedependenciescompos
                             ::fidl::internal::OutgoingTransportContext());
 }
 
-#endif  // __Fuchsia__
+fidl::internal::WireCompleterBase<::test_transitivedependenciescompose::Top::GetFoo>::WireCompleterBase(::fidl::Transaction* transaction, bool owned, bool expects_reply)
+    : CompleterBase(transaction, owned, expects_reply),
+      WireCompleterImpl(this) {}
+fidl::internal::WireCompleterBase<::test_transitivedependenciescompose::Top::GetFoo>::WireCompleterBase(WireCompleterBase&& other) noexcept
+    : CompleterBase(std::move(other)), WireCompleterImpl(this) {}
 
-#ifdef __Fuchsia__
-void ::fidl::internal::TransactionalRequest<::test_transitivedependenciescompose::Top::GetFoo>::_InitHeader() {
-  ::fidl::InitTxnHeader(&header, 0, ::test_transitivedependenciescompose::kTop_GetFoo_Ordinal, ::test_transitivedependenciescompose::kTop_GetFoo_DynamicFlags);
+::fidl::internal::WireCompleterBase<::test_transitivedependenciescompose::Top::GetFoo>& fidl::internal::WireCompleterBase<::test_transitivedependenciescompose::Top::GetFoo>::operator=(WireCompleterBase&& other) noexcept {
+  CompleterBase::operator=(std::move(other));
+  WireCompleterImpl::_set_core(this);
+  return *this;
 }
 
 #endif  // __Fuchsia__
 
-void ::fidl::internal::TransactionalResponse<::test_transitivedependenciescompose::Top::GetFoo>::_InitHeader() {
+#ifdef __Fuchsia__
+::fidl::internal::TransactionalRequest<::test_transitivedependenciescompose::Top::GetFoo>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_transitivedependenciescompose::kTop_GetFoo_Ordinal, ::test_transitivedependenciescompose::kTop_GetFoo_DynamicFlags);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_transitivedependenciescompose::Top::GetFoo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
+                                                                                                                                                                                                     ::fidl::internal::TransactionalRequest<::test_transitivedependenciescompose::Top::GetFoo>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  *position.As<fidl_message_header_t>() = value->header;
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_transitivedependenciescompose::Top::GetFoo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+}
+
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_transitivedependenciescompose::Top::GetFoo>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_transitivedependenciescompose::Top::GetFoo>, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
+#endif  // __Fuchsia__
+
+::fidl::WireResponse<::test_transitivedependenciescompose::Top::GetFoo>::WireResponse(::test_bottom::wire::BottomGetFooResponse base) : ::test_bottom::wire::BottomGetFooResponse(std::move(base)) {}
+::fidl::WireResponse<::test_transitivedependenciescompose::Top::GetFoo>::WireResponse(const ::test_bottom::wire::Foo& foo) : ::test_bottom::wire::BottomGetFooResponse{.foo = std::move(foo)} {}
+
+::fidl::internal::TransactionalResponse<::test_transitivedependenciescompose::Top::GetFoo>::TransactionalResponse(const ::test_bottom::wire::Foo& foo)
+    : body(::fidl::WireResponse<::test_transitivedependenciescompose::Top::GetFoo>(foo)) {
+  ::fidl::InitTxnHeader(&header, 0, ::test_transitivedependenciescompose::kTop_GetFoo_Ordinal, ::test_transitivedependenciescompose::kTop_GetFoo_DynamicFlags);
+}
+::fidl::internal::TransactionalResponse<::test_transitivedependenciescompose::Top::GetFoo>::TransactionalResponse() {
+  ::fidl::InitTxnHeader(&header, 0, ::test_transitivedependenciescompose::kTop_GetFoo_Ordinal, ::test_transitivedependenciescompose::kTop_GetFoo_DynamicFlags);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_transitivedependenciescompose::Top::GetFoo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    internal::WireEncoder* encoder, ::fidl::WireResponse<::test_transitivedependenciescompose::Top::GetFoo>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  fidl::internal::WireCodingTraits<::test_bottom::wire::BottomGetFooResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+      encoder, value, position, recursion_depth);
+}
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_transitivedependenciescompose::Top::GetFoo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  fidl::internal::WireCodingTraits<::test_bottom::wire::BottomGetFooResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+      decoder, position, recursion_depth);
+}
+template struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_transitivedependenciescompose::Top::GetFoo>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_transitivedependenciescompose::Top::GetFoo>, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_transitivedependenciescompose::Top::GetFoo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
+                                                                                                                                                                                                      ::fidl::internal::TransactionalResponse<::test_transitivedependenciescompose::Top::GetFoo>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  *position.As<fidl_message_header_t>() = value->header;
+  WireCodingTraits<::fidl::WireResponse<::test_transitivedependenciescompose::Top::GetFoo>, WireCodingConstraintEmpty, IsRecursive>::Encode(
+      encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_transitivedependenciescompose::Top::GetFoo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  WireCodingTraits<::fidl::WireResponse<::test_transitivedependenciescompose::Top::GetFoo>, WireCodingConstraintEmpty, IsRecursive>::Decode(
+      decoder, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_transitivedependenciescompose::Top::GetFoo>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_transitivedependenciescompose::Top::GetFoo>, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
+::fidl::WireResult<::test_transitivedependenciescompose::Top::GetFoo>
+fidl::internal::WireSyncClientImpl<::test_transitivedependenciescompose::Top>::GetFoo() {
+  ::fidl::internal::TransactionalRequest<::test_transitivedependenciescompose::Top::GetFoo> _request{};
+  return ::fidl::WireResult<::test_transitivedependenciescompose::Top::GetFoo>(
+      ::fidl::UnownedClientEnd<::test_transitivedependenciescompose::Top>(_transport().get<::fidl::internal::ChannelTransport>()), &_request);
+}
+
+::fidl::WireUnownedResult<::test_transitivedependenciescompose::Top::GetFoo>
+fidl::internal::WireSyncBufferClientImpl<::test_transitivedependenciescompose::Top>::GetFoo() {
+  ::fidl::internal::TransactionalRequest<::test_transitivedependenciescompose::Top::GetFoo> _request{};
+  return ::fidl::WireUnownedResult<::test_transitivedependenciescompose::Top::GetFoo>(
+      ::fidl::UnownedClientEnd<::test_transitivedependenciescompose::Top>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
 }
 
 #ifdef __Fuchsia__

@@ -75,19 +75,10 @@ struct ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedec
   fidl_message_header_t header;
 
   ::test_inheritancewithrecursivedecl::wire::ParentFirstRequest body;
-  explicit TransactionalRequest(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request)
-      : body(::test_inheritancewithrecursivedecl::wire::ParentFirstRequest{std::move(request)}) {
-    _InitHeader();
-  }
-  TransactionalRequest() {
-    _InitHeader();
-  }
-  void _CloseHandles() {
-    body._CloseHandles();
-  }
+  explicit TransactionalRequest(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request);
 
- private:
-  void _InitHeader();
+  TransactionalRequest();
+  void _CloseHandles();
 };
 
 template <bool IsRecursive>
@@ -95,16 +86,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = 4 + sizeof(fidl_message_header_t);
 
-  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #endif  // __Fuchsia__
@@ -130,12 +113,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritancewithr
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First>) == TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First>, body) == sizeof(fidl_message_header_t));
-static_assert(sizeof(::test_inheritancewithrecursivedecl::wire::ParentFirstRequest) == TypeTraits<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest>::kPrimarySize);
-static_assert(offsetof(::test_inheritancewithrecursivedecl::wire::ParentFirstRequest, request) == 0);
 
 #endif  // __Fuchsia__
 
@@ -165,7 +142,7 @@ class [[nodiscard]] ::fidl::WireResult<::test_inheritancewithrecursivedecl::Pare
       ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Parent> client,
       ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First>* request);
 
-  explicit WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_inheritancewithrecursivedecl::Parent::First>(result) {}
+  explicit WireResult(const ::fidl::Status& result);
   WireResult(WireResult&&) = delete;
   WireResult(const WireResult&) = delete;
   WireResult& operator=(WireResult&&) = delete;
@@ -179,9 +156,9 @@ class [[nodiscard]] ::fidl::WireUnownedResult<::test_inheritancewithrecursivedec
   explicit WireUnownedResult(::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Parent> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First>* request);
   explicit WireUnownedResult(
       ::fit::result<::fidl::Error>&& decoded,
-      ::fidl::internal::MessageStorageViewBase* storage_view) : ::fidl::BaseWireResult<::test_inheritancewithrecursivedecl::Parent::First>(::fidl::internal::StatusFromResult(decoded)) {}
+      ::fidl::internal::MessageStorageViewBase* storage_view);
 
-  explicit WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_inheritancewithrecursivedecl::Parent::First>(result) {}
+  explicit WireUnownedResult(const ::fidl::Status& result);
   WireUnownedResult(WireUnownedResult&&) = default;
   WireUnownedResult(const WireUnownedResult&) = delete;
   WireUnownedResult& operator=(WireUnownedResult&&) = default;
@@ -219,8 +196,7 @@ class ::fidl::WireSyncEventHandler<::test_inheritancewithrecursivedecl::Parent>
 template <>
 class ::fidl::internal::WireEventDispatcher<::test_inheritancewithrecursivedecl::Parent> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::WireEventHandlerInterface<::test_inheritancewithrecursivedecl::Parent>> {
  public:
-  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_inheritancewithrecursivedecl::Parent>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_inheritancewithrecursivedecl::Parent>* event_handler);
 };
 
 // Methods to make a sync FIDL call directly on an unowned handle or a
@@ -231,16 +207,7 @@ class ::fidl::internal::WireSyncClientImpl<::test_inheritancewithrecursivedecl::
  public:
   // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
   ::fidl::OneWayStatus
-  First(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request) {
-    ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First> _request{std::move(request)};
-    return ::fidl::WireResult<::test_inheritancewithrecursivedecl::Parent::First>(_client_end(), &_request);
-  }
-
- private:
-  ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Parent> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Parent>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  First(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request);
 };
 
 template <>
@@ -248,16 +215,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_inheritancewithrecursive
  public:
   // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
   ::fidl::OneWayStatus
-  First(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request) {
-    ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First> _request{std::move(request)};
-    return ::fidl::WireUnownedResult<::test_inheritancewithrecursivedecl::Parent::First>(_client_end(), _allocator(), &_request);
-  }
-
- private:
-  ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Parent> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Parent>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  First(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request);
 };
 
 // Pure-virtual interface to be implemented by a server.
@@ -288,11 +246,7 @@ class ::fidl::WireServer<::test_inheritancewithrecursivedecl::Parent> : public :
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
@@ -369,19 +323,10 @@ struct ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedec
   fidl_message_header_t header;
 
   ::test_inheritancewithrecursivedecl::wire::ParentFirstRequest body;
-  explicit TransactionalRequest(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request)
-      : body(::test_inheritancewithrecursivedecl::wire::ParentFirstRequest{std::move(request)}) {
-    _InitHeader();
-  }
-  TransactionalRequest() {
-    _InitHeader();
-  }
-  void _CloseHandles() {
-    body._CloseHandles();
-  }
+  explicit TransactionalRequest(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request);
 
- private:
-  void _InitHeader();
+  TransactionalRequest();
+  void _CloseHandles();
 };
 
 template <bool IsRecursive>
@@ -389,16 +334,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = 4 + sizeof(fidl_message_header_t);
 
-  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #endif  // __Fuchsia__
@@ -410,19 +347,10 @@ struct ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedec
   fidl_message_header_t header;
 
   ::test_inheritancewithrecursivedecl::wire::ChildSecondRequest body;
-  explicit TransactionalRequest(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request)
-      : body(::test_inheritancewithrecursivedecl::wire::ChildSecondRequest{std::move(request)}) {
-    _InitHeader();
-  }
-  TransactionalRequest() {
-    _InitHeader();
-  }
-  void _CloseHandles() {
-    body._CloseHandles();
-  }
+  explicit TransactionalRequest(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request);
 
- private:
-  void _InitHeader();
+  TransactionalRequest();
+  void _CloseHandles();
 };
 
 template <bool IsRecursive>
@@ -430,16 +358,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = 4 + sizeof(fidl_message_header_t);
 
-  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #endif  // __Fuchsia__
@@ -466,12 +386,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritancewithr
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First>) == TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First>, body) == sizeof(fidl_message_header_t));
-static_assert(sizeof(::test_inheritancewithrecursivedecl::wire::ParentFirstRequest) == TypeTraits<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest>::kPrimarySize);
-static_assert(offsetof(::test_inheritancewithrecursivedecl::wire::ParentFirstRequest, request) == 0);
-
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
@@ -493,12 +407,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritancewithr
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>) == TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>, body) == sizeof(fidl_message_header_t));
-static_assert(sizeof(::test_inheritancewithrecursivedecl::wire::ChildSecondRequest) == TypeTraits<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest>::kPrimarySize);
-static_assert(offsetof(::test_inheritancewithrecursivedecl::wire::ChildSecondRequest, request) == 0);
 
 #endif  // __Fuchsia__
 
@@ -528,7 +436,7 @@ class [[nodiscard]] ::fidl::WireResult<::test_inheritancewithrecursivedecl::Chil
       ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Child> client,
       ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First>* request);
 
-  explicit WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_inheritancewithrecursivedecl::Child::First>(result) {}
+  explicit WireResult(const ::fidl::Status& result);
   WireResult(WireResult&&) = delete;
   WireResult(const WireResult&) = delete;
   WireResult& operator=(WireResult&&) = delete;
@@ -542,9 +450,9 @@ class [[nodiscard]] ::fidl::WireUnownedResult<::test_inheritancewithrecursivedec
   explicit WireUnownedResult(::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Child> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First>* request);
   explicit WireUnownedResult(
       ::fit::result<::fidl::Error>&& decoded,
-      ::fidl::internal::MessageStorageViewBase* storage_view) : ::fidl::BaseWireResult<::test_inheritancewithrecursivedecl::Child::First>(::fidl::internal::StatusFromResult(decoded)) {}
+      ::fidl::internal::MessageStorageViewBase* storage_view);
 
-  explicit WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_inheritancewithrecursivedecl::Child::First>(result) {}
+  explicit WireUnownedResult(const ::fidl::Status& result);
   WireUnownedResult(WireUnownedResult&&) = default;
   WireUnownedResult(const WireUnownedResult&) = delete;
   WireUnownedResult& operator=(WireUnownedResult&&) = default;
@@ -559,7 +467,7 @@ class [[nodiscard]] ::fidl::WireResult<::test_inheritancewithrecursivedecl::Chil
       ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Child> client,
       ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>* request);
 
-  explicit WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_inheritancewithrecursivedecl::Child::Second>(result) {}
+  explicit WireResult(const ::fidl::Status& result);
   WireResult(WireResult&&) = delete;
   WireResult(const WireResult&) = delete;
   WireResult& operator=(WireResult&&) = delete;
@@ -573,9 +481,9 @@ class [[nodiscard]] ::fidl::WireUnownedResult<::test_inheritancewithrecursivedec
   explicit WireUnownedResult(::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Child> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>* request);
   explicit WireUnownedResult(
       ::fit::result<::fidl::Error>&& decoded,
-      ::fidl::internal::MessageStorageViewBase* storage_view) : ::fidl::BaseWireResult<::test_inheritancewithrecursivedecl::Child::Second>(::fidl::internal::StatusFromResult(decoded)) {}
+      ::fidl::internal::MessageStorageViewBase* storage_view);
 
-  explicit WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_inheritancewithrecursivedecl::Child::Second>(result) {}
+  explicit WireUnownedResult(const ::fidl::Status& result);
   WireUnownedResult(WireUnownedResult&&) = default;
   WireUnownedResult(const WireUnownedResult&) = delete;
   WireUnownedResult& operator=(WireUnownedResult&&) = default;
@@ -613,8 +521,7 @@ class ::fidl::WireSyncEventHandler<::test_inheritancewithrecursivedecl::Child>
 template <>
 class ::fidl::internal::WireEventDispatcher<::test_inheritancewithrecursivedecl::Child> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::WireEventHandlerInterface<::test_inheritancewithrecursivedecl::Child>> {
  public:
-  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_inheritancewithrecursivedecl::Child>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_inheritancewithrecursivedecl::Child>* event_handler);
 };
 
 // Methods to make a sync FIDL call directly on an unowned handle or a
@@ -625,23 +532,11 @@ class ::fidl::internal::WireSyncClientImpl<::test_inheritancewithrecursivedecl::
  public:
   // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
   ::fidl::OneWayStatus
-  First(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request) {
-    ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First> _request{std::move(request)};
-    return ::fidl::WireResult<::test_inheritancewithrecursivedecl::Child::First>(_client_end(), &_request);
-  }
+  First(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request);
 
   // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
   ::fidl::OneWayStatus
-  Second(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request) {
-    ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second> _request{std::move(request)};
-    return ::fidl::WireResult<::test_inheritancewithrecursivedecl::Child::Second>(_client_end(), &_request);
-  }
-
- private:
-  ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Child> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Child>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  Second(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request);
 };
 
 template <>
@@ -649,23 +544,11 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_inheritancewithrecursive
  public:
   // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
   ::fidl::OneWayStatus
-  First(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request) {
-    ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First> _request{std::move(request)};
-    return ::fidl::WireUnownedResult<::test_inheritancewithrecursivedecl::Child::First>(_client_end(), _allocator(), &_request);
-  }
+  First(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request);
 
   // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
   ::fidl::OneWayStatus
-  Second(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request) {
-    ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second> _request{std::move(request)};
-    return ::fidl::WireUnownedResult<::test_inheritancewithrecursivedecl::Child::Second>(_client_end(), _allocator(), &_request);
-  }
-
- private:
-  ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Child> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Child>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  Second(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request);
 };
 
 // Pure-virtual interface to be implemented by a server.
@@ -703,11 +586,7 @@ class ::fidl::WireServer<::test_inheritancewithrecursivedecl::Child> : public ::
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Child> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(

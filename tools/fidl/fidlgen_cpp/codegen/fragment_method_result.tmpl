@@ -22,7 +22,7 @@ class [[nodiscard]] {{ .WireResult }} final : public {{ .BaseWireResult }} {
       {{ .WireTransactionalRequest }}* request
   );
 
-  explicit {{ .WireResult.Self }}(const ::fidl::Status& result) : {{ .BaseWireResult }}(result) {}
+  explicit {{ .WireResult.Self }}(const ::fidl::Status& result);
   {{ .WireResult.Self }}({{ .WireResult.Self }}&&) = delete;
   {{ .WireResult.Self }}(const {{ .WireResult.Self }}&) = delete;
   {{ .WireResult.Self }}& operator=({{ .WireResult.Self }}&&) = delete;
@@ -71,6 +71,8 @@ class [[nodiscard]] {{ .WireResult }} final : public {{ .BaseWireResult }} {
     SetStatus(outgoing);
   {{- end }}
 }
+
+{{ .WireResult }}::{{ .WireResult.Self }}(const ::fidl::Status& result) : {{ .BaseWireResult }}(result) {}
 
 {{- EndifFuchsia -}}
 {{- end }}

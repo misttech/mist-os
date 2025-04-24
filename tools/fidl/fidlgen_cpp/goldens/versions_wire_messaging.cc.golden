@@ -15,6 +15,9 @@
 
 #ifdef __Fuchsia__
 
+::fidl::internal::WireEventDispatcher<::test_versions::OtherProtocol>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_versions::OtherProtocol>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
+
 ::fidl::Status fidl::WireSyncEventHandler<::test_versions::OtherProtocol>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_versions::OtherProtocol> client_end) {
   ::fidl::internal::IncomingEventsStorage<::test_versions::OtherProtocol> event_storage;
@@ -50,6 +53,12 @@ void fidl::WireServer<::test_versions::OtherProtocol>::dispatch_message(
   ::fidl::internal::WireServerDispatcher<::test_versions::OtherProtocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
+fidl::WireServer<::test_versions::OtherProtocol>::Handler fidl::WireServer<::test_versions::OtherProtocol>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_versions::OtherProtocol> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
+}
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
@@ -76,12 +85,15 @@ constexpr ::fidl::MessageDynamicFlags kProtocol_Foo_DynamicFlags = ::fidl::Messa
   outgoing.Write(client.handle());
   SetStatus(outgoing);
 }
+
+::fidl::WireResult<::test_versions::Protocol::Foo>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_versions::Protocol::Foo>(result) {}
 namespace test_versions {
 
 #endif  // __Fuchsia__
 
-#ifdef __Fuchsia__
 }  // namespace test_versions
+
+#ifdef __Fuchsia__
 
 ::fidl::WireUnownedResult<::test_versions::Protocol::Foo>::WireUnownedResult(::fidl::UnownedClientEnd<::test_versions::Protocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>* request) {
   constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_versions::Protocol::Foo>();
@@ -100,11 +112,14 @@ namespace test_versions {
   outgoing.Write(client_end.handle());
   SetStatus(outgoing);
 }
-namespace test_versions {
 
 #endif  // __Fuchsia__
 
-}  // namespace test_versions
+::fidl::WireUnownedResult<::test_versions::Protocol::Foo>::WireUnownedResult(
+    ::fit::result<::fidl::Error>&& decoded,
+    ::fidl::internal::MessageStorageViewBase* storage_view) : ::fidl::BaseWireResult<::test_versions::Protocol::Foo>(::fidl::internal::StatusFromResult(decoded)) {}
+
+::fidl::WireUnownedResult<::test_versions::Protocol::Foo>::WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_versions::Protocol::Foo>(result) {}
 
 #ifdef __Fuchsia__
 
@@ -132,6 +147,9 @@ namespace test_versions {
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+
+::fidl::internal::WireEventDispatcher<::test_versions::Protocol>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_versions::Protocol>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
 
 ::fidl::Status fidl::WireSyncEventHandler<::test_versions::Protocol>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_versions::Protocol> client_end) {
@@ -225,14 +243,48 @@ void fidl::WireServer<::test_versions::Protocol>::dispatch_message(
   ::fidl::internal::WireServerDispatcher<::test_versions::Protocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-void ::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>::_InitHeader() {
-  ::fidl::InitTxnHeader(&header, 0, ::test_versions::kProtocol_Foo_Ordinal, ::test_versions::kProtocol_Foo_DynamicFlags);
+fidl::WireServer<::test_versions::Protocol>::Handler fidl::WireServer<::test_versions::Protocol>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_versions::Protocol> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
 }
 
 #endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>::TransactionalRequest() {
+  ::fidl::InitTxnHeader(&header, 0, ::test_versions::kProtocol_Foo_Ordinal, ::test_versions::kProtocol_Foo_DynamicFlags);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
+                                                                                                                                                                                  ::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  *position.As<fidl_message_header_t>() = value->header;
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+}
+
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
+#endif  // __Fuchsia__
+
+::fidl::OneWayStatus
+fidl::internal::WireSyncClientImpl<::test_versions::Protocol>::Foo() {
+  ::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo> _request{};
+  return ::fidl::WireResult<::test_versions::Protocol::Foo>(
+      ::fidl::UnownedClientEnd<::test_versions::Protocol>(_transport().get<::fidl::internal::ChannelTransport>()), &_request);
+}
+
+::fidl::OneWayStatus
+fidl::internal::WireSyncBufferClientImpl<::test_versions::Protocol>::Foo() {
+  ::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo> _request{};
+  return ::fidl::WireUnownedResult<::test_versions::Protocol::Foo>(
+      ::fidl::UnownedClientEnd<::test_versions::Protocol>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
+}
 
 #ifdef __Fuchsia__
 

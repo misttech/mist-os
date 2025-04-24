@@ -154,8 +154,6 @@ template <>
 struct IsFidlType<{{ .WireTransactionalRequest }}> : public std::true_type {};
 template <>
 struct IsFidlTransactionalMessage<{{ .WireTransactionalRequest }}> : public std::true_type {};
-{{- if .HasRequestPayload }}
-{{- end }}
 {{- if .Request.IsResource }}
 template <>
 struct IsResource<{{ .WireTransactionalRequest }}> : public std::true_type {};
@@ -174,22 +172,6 @@ struct TypeTraits<{{ .WireTransactionalRequest }}> {
     ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-static_assert(sizeof({{ .WireTransactionalRequest }})
-    == TypeTraits<{{ .WireTransactionalRequest }}>::kPrimarySize);
-static_assert(offsetof({{ .WireTransactionalRequest }}, header) == 0);
-{{- if .RequestArgs }}
-static_assert(offsetof({{ .WireTransactionalRequest }}, body) == sizeof(fidl_message_header_t));
-{{- end }}
-
-{{- if .RequestArgs }}
-static_assert(sizeof({{ .RequestPayload }})
-    == TypeTraits<{{ .RequestPayload }}>::kPrimarySize);
-{{- if .RequestFlattened }}
-{{- range $index, $param := .RequestArgs }}
-static_assert(offsetof({{ $method.RequestPayload }}, {{ $param.Name }}) == {{ $param.OffsetV2 }});
-{{- end }}
-{{- end }}
-{{- end }}
 {{- EndifFuchsia -}}
 {{- end }}
 
@@ -219,13 +201,6 @@ struct TypeTraits<{{ .WireTransactionalEvent }}> {
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-
-static_assert(sizeof({{ .WireTransactionalEvent }})
-    == TypeTraits<{{ .WireTransactionalEvent }}>::kPrimarySize);
-static_assert(offsetof({{ .WireTransactionalEvent }}, header) == 0);
-{{- if .ResponseArgs }}
-static_assert(offsetof({{ .WireTransactionalEvent }}, body) == sizeof(fidl_message_header_t));
-{{- end }}
 
 {{- EndifFuchsia -}}
 
@@ -261,13 +236,6 @@ struct TypeTraits<{{ .WireTransactionalResponse }}> {
     ::fidl::internal::TransactionalMessageKind::kResponse;
 };
 
-static_assert(sizeof({{ .WireTransactionalResponse }})
-    == TypeTraits<{{ .WireTransactionalResponse }}>::kPrimarySize);
-static_assert(offsetof({{ .WireTransactionalResponse }}, header) == 0);
-{{- if .ResponseArgs }}
-static_assert(offsetof({{ .WireTransactionalResponse }}, body) == sizeof(fidl_message_header_t));
-{{- end }}
-
 {{- if .HasResponsePayload }}
 template <>
 struct TypeTraits<{{ .WireResponse }}> {
@@ -283,15 +251,6 @@ struct TypeTraits<{{ .WireResponse }}> {
 };
 {{- end }}
 
-{{- if .ResponseArgs }}
-static_assert(sizeof({{ .WireResponse }})
-    == TypeTraits<{{ .WireResponse }}>::kPrimarySize);
-{{- if .ResponseFlattened }}
-{{- range $index, $param := .ResponseArgs }}
-static_assert(offsetof({{ $method.WireResponse }}, {{ $param.Name }}) == {{ $param.OffsetV2 }});
-{{- end }}
-{{- end }}
-{{- end }}
 {{- if .Response.IsResource }}
 {{- EndifFuchsia -}}
 {{- end }}
@@ -307,12 +266,55 @@ static_assert(offsetof({{ $method.WireResponse }}, {{ $param.Name }}) == {{ $par
 {{ $protocol := . -}}
 
 {{- range .Methods }}
-{{ EnsureNamespace .OrdinalName }}
-[[maybe_unused]]
-constexpr uint64_t {{ .OrdinalName.Name }} = {{ .Ordinal }}lu;
-{{ EnsureNamespace .DynamicFlagsName }}
-[[maybe_unused]]
-constexpr ::fidl::MessageDynamicFlags {{ .DynamicFlagsName.Name }} = {{ .DynamicFlags }};
+  {{ $method := . -}}
+  {{ EnsureNamespace .OrdinalName }}
+  [[maybe_unused]]
+  constexpr uint64_t {{ .OrdinalName.Name }} = {{ .Ordinal }}lu;
+  {{ EnsureNamespace .DynamicFlagsName }}
+  [[maybe_unused]]
+  constexpr ::fidl::MessageDynamicFlags {{ .DynamicFlagsName.Name }} = {{ .DynamicFlags }};
+
+  {{- if .RequestArgs }}
+    static_assert(sizeof({{ .WireTransactionalRequest }})
+        == ::fidl::TypeTraits<{{ .WireTransactionalRequest }}>::kPrimarySize);
+    static_assert(offsetof({{ .WireTransactionalRequest }}, header) == 0);
+    {{- if .RequestArgs }}
+      static_assert(offsetof({{ .WireTransactionalRequest }}, body) == sizeof(fidl_message_header_t));
+    {{- end }}
+
+    static_assert(sizeof({{ .RequestPayload }})
+        == ::fidl::TypeTraits<{{ .RequestPayload }}>::kPrimarySize);
+      {{- if .RequestFlattened }}
+        {{- range $index, $param := .RequestArgs }}
+          static_assert(offsetof({{ $method.RequestPayload }}, {{ $param.Name }}) == {{ $param.OffsetV2 }});
+        {{- end }}
+      {{- end }}
+  {{- end }}
+
+  {{- if .IsEvent }}
+    static_assert(sizeof({{ .WireTransactionalEvent }})
+      == ::fidl::TypeTraits<{{ .WireTransactionalEvent }}>::kPrimarySize);
+    static_assert(offsetof({{ .WireTransactionalEvent }}, header) == 0);
+    {{- if .ResponseArgs }}
+      static_assert(offsetof({{ .WireTransactionalEvent }}, body) == sizeof(fidl_message_header_t));
+    {{- end }}
+  {{- else }}
+    {{- if .ResponseArgs }}
+      static_assert(sizeof({{ .WireResponse }})
+          == ::fidl::TypeTraits<{{ .WireResponse }}>::kPrimarySize);
+      {{- if .ResponseFlattened }}
+        {{- range $index, $param := .ResponseArgs }}
+          static_assert(offsetof({{ $method.WireResponse }}, {{ $param.Name }}) == {{ $param.OffsetV2 }});
+        {{- end }}
+      {{- end }}
+      static_assert(sizeof({{ .WireTransactionalResponse }})
+          == ::fidl::TypeTraits<{{ .WireTransactionalResponse }}>::kPrimarySize);
+      static_assert(offsetof({{ .WireTransactionalResponse }}, header) == 0);
+      static_assert(offsetof({{ .WireTransactionalResponse }}, body) == sizeof(fidl_message_header_t));
+    {{- end }}
+
+  {{- end }}
+
 {{- end }}
 
 {{- /* Client-calling functions do not apply to events. */}}
@@ -368,6 +370,8 @@ constexpr ::fidl::MessageDynamicFlags {{ .DynamicFlagsName.Name }} = {{ .Dynamic
 
   {{- end }}
 {{- end }}
+
+{{ template "Protocol:Caller:WireMessagingSource" . }}
 
 {{- end }}
 

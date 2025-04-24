@@ -106,13 +106,8 @@ struct ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::Strict
   FIDL_ALIGNDECL
   fidl_message_header_t header;
 
-  TransactionalRequest() {
-    _InitHeader();
-  }
+  TransactionalRequest();
   using ResponseType = ::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>;
-
- private:
-  void _InitHeader();
 };
 
 template <bool IsRecursive>
@@ -120,20 +115,16 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = 0 + sizeof(fidl_message_header_t);
 
-  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-  }
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> final : public ::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse {
-  explicit WireResponse(::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse base) : ::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse(std::move(base)) {}
-  explicit WireResponse(::test_union::wire::StrictBoundedUnion xu) : ::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse{.xu = std::move(xu)} {}
+  explicit WireResponse(::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse base);
+  explicit WireResponse(::test_union::wire::StrictBoundedUnion xu);
   WireResponse() = default;
 };
 
@@ -143,15 +134,9 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_union::Tes
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, value, position, recursion_depth);
-  }
+      internal::WireEncoder* encoder, ::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position, recursion_depth);
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <>
@@ -160,16 +145,8 @@ struct ::fidl::internal::TransactionalResponse<::test_union::TestProtocol::Stric
   fidl_message_header_t header;
 
   ::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> body;
-  explicit TransactionalResponse(::test_union::wire::StrictBoundedUnion xu)
-      : body(::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>(xu)) {
-    _InitHeader();
-  }
-  TransactionalResponse() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
+  explicit TransactionalResponse(::test_union::wire::StrictBoundedUnion xu);
+  TransactionalResponse();
 };
 
 template <bool IsRecursive>
@@ -177,16 +154,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = 16 + sizeof(fidl_message_header_t);
 
-  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #ifdef __Fuchsia__
@@ -195,13 +164,8 @@ struct ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::Flexib
   FIDL_ALIGNDECL
   fidl_message_header_t header;
 
-  TransactionalRequest() {
-    _InitHeader();
-  }
+  TransactionalRequest();
   using ResponseType = ::fidl::internal::TransactionalResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>;
-
- private:
-  void _InitHeader();
 };
 
 template <bool IsRecursive>
@@ -209,20 +173,16 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = 0 + sizeof(fidl_message_header_t);
 
-  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-  }
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> final : public ::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse {
-  explicit WireResponse(::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse base) : ::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse(std::move(base)) {}
-  explicit WireResponse(::test_union::wire::OlderSimpleUnion xu) : ::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse{.xu = std::move(xu)} {}
+  explicit WireResponse(::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse base);
+  explicit WireResponse(::test_union::wire::OlderSimpleUnion xu);
   WireResponse() = default;
 };
 
@@ -232,15 +192,9 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_union::Tes
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, value, position, recursion_depth);
-  }
+      internal::WireEncoder* encoder, ::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position, recursion_depth);
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <>
@@ -249,16 +203,8 @@ struct ::fidl::internal::TransactionalResponse<::test_union::TestProtocol::Flexi
   fidl_message_header_t header;
 
   ::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> body;
-  explicit TransactionalResponse(::test_union::wire::OlderSimpleUnion xu)
-      : body(::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>(xu)) {
-    _InitHeader();
-  }
-  TransactionalResponse() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
+  explicit TransactionalResponse(::test_union::wire::OlderSimpleUnion xu);
+  TransactionalResponse();
 };
 
 template <bool IsRecursive>
@@ -266,16 +212,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = 16 + sizeof(fidl_message_header_t);
 
-  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 namespace fidl {
@@ -298,9 +236,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_union::TestProto
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>) == TypeTraits<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>, header) == 0);
-
 #endif  // __Fuchsia__
 
 template <>
@@ -322,10 +257,6 @@ struct TypeTraits<::fidl::internal::TransactionalResponse<::test_union::TestProt
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-
-static_assert(sizeof(::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>) == TypeTraits<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> {
   static constexpr bool kHasServerToClientBody = true;
@@ -338,8 +269,6 @@ struct TypeTraits<::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHe
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-static_assert(sizeof(::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>) == TypeTraits<::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>, xu) == 0);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>> : public std::true_type {};
@@ -357,9 +286,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_union::TestProto
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>) == TypeTraits<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>, header) == 0);
 
 #endif  // __Fuchsia__
 
@@ -382,10 +308,6 @@ struct TypeTraits<::fidl::internal::TransactionalResponse<::test_union::TestProt
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-
-static_assert(sizeof(::fidl::internal::TransactionalResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>) == TypeTraits<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>> {
   static constexpr bool kHasServerToClientBody = true;
@@ -398,8 +320,6 @@ struct TypeTraits<::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnion
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-static_assert(sizeof(::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>) == TypeTraits<::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>, xu) == 0);
 #ifdef __Fuchsia__
 }  // namespace fidl
 
@@ -463,7 +383,7 @@ class [[nodiscard]] ::fidl::WireResult<::test_union::TestProtocol::StrictUnionHe
       ::fidl::UnownedClientEnd<::test_union::TestProtocol> client,
       ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>* request);
 
-  explicit WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>(result) {}
+  explicit WireResult(const ::fidl::Status& result);
   WireResult(WireResult&&) = delete;
   WireResult(const WireResult&) = delete;
   WireResult& operator=(WireResult&&) = delete;
@@ -479,21 +399,12 @@ template <>
 class [[nodiscard]] ::fidl::WireUnownedResult<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> final : public ::fidl::BaseWireResult<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> {
  public:
   explicit WireUnownedResult(::fidl::UnownedClientEnd<::test_union::TestProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>* request);
-  explicit WireUnownedResult(::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>* response)
-      : ::fidl::BaseWireResult<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>(fidl::Status::Ok()), decoded_(response) {
-    ExtractValueFromDecoded(decoded_.pointer());
-  }
-
+  explicit WireUnownedResult(::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>* response);
   explicit WireUnownedResult(
       ::fit::result<::fidl::Error, ::fidl::DecodedValue<::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>>>&& decoded,
-      ::fidl::internal::MessageStorageViewBase* storage_view) : ::fidl::BaseWireResult<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>(::fidl::internal::StatusFromResult(decoded)) {
-    if (decoded.is_ok()) {
-      decoded_ = std::move(decoded.value());
-      ExtractValueFromDecoded(decoded_.pointer());
-    }
-  }
+      ::fidl::internal::MessageStorageViewBase* storage_view);
 
-  explicit WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>(result) {}
+  explicit WireUnownedResult(const ::fidl::Status& result);
   WireUnownedResult(WireUnownedResult&&) = default;
   WireUnownedResult(const WireUnownedResult&) = delete;
   WireUnownedResult& operator=(WireUnownedResult&&) = default;
@@ -516,7 +427,7 @@ class [[nodiscard]] ::fidl::WireResult<::test_union::TestProtocol::FlexibleUnion
       ::fidl::UnownedClientEnd<::test_union::TestProtocol> client,
       ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>* request);
 
-  explicit WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>(result) {}
+  explicit WireResult(const ::fidl::Status& result);
   WireResult(WireResult&&) = delete;
   WireResult(const WireResult&) = delete;
   WireResult& operator=(WireResult&&) = delete;
@@ -532,21 +443,12 @@ template <>
 class [[nodiscard]] ::fidl::WireUnownedResult<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> final : public ::fidl::BaseWireResult<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> {
  public:
   explicit WireUnownedResult(::fidl::UnownedClientEnd<::test_union::TestProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>* request);
-  explicit WireUnownedResult(::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>* response)
-      : ::fidl::BaseWireResult<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>(fidl::Status::Ok()), decoded_(response) {
-    ExtractValueFromDecoded(decoded_.pointer());
-  }
-
+  explicit WireUnownedResult(::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>* response);
   explicit WireUnownedResult(
       ::fit::result<::fidl::Error, ::fidl::DecodedValue<::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>>>&& decoded,
-      ::fidl::internal::MessageStorageViewBase* storage_view) : ::fidl::BaseWireResult<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>(::fidl::internal::StatusFromResult(decoded)) {
-    if (decoded.is_ok()) {
-      decoded_ = std::move(decoded.value());
-      ExtractValueFromDecoded(decoded_.pointer());
-    }
-  }
+      ::fidl::internal::MessageStorageViewBase* storage_view);
 
-  explicit WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>(result) {}
+  explicit WireUnownedResult(const ::fidl::Status& result);
   WireUnownedResult(WireUnownedResult&&) = default;
   WireUnownedResult(const WireUnownedResult&) = delete;
   WireUnownedResult& operator=(WireUnownedResult&&) = default;
@@ -587,8 +489,7 @@ class ::fidl::WireSyncEventHandler<::test_union::TestProtocol>
 template <>
 class ::fidl::internal::WireEventDispatcher<::test_union::TestProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::WireEventHandlerInterface<::test_union::TestProtocol>> {
  public:
-  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_union::TestProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_union::TestProtocol>* event_handler);
 };
 
 // Methods to make a sync FIDL call directly on an unowned handle or a
@@ -599,23 +500,11 @@ class ::fidl::internal::WireSyncClientImpl<::test_union::TestProtocol> final : p
  public:
   // Allocates 80 bytes of message buffer on the stack. No heap allocation necessary.
   ::fidl::WireResult<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>
-  StrictUnionHenceResponseMayBeStackAllocated() {
-    ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> _request{};
-    return ::fidl::WireResult<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>(_client_end(), &_request);
-  }
+  StrictUnionHenceResponseMayBeStackAllocated();
 
   // Allocates 16 bytes of request buffer on the stack. Response is heap-allocated.
   ::fidl::WireResult<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>
-  FlexibleUnionHenceResponseMustBeHeapAllocated() {
-    ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> _request{};
-    return ::fidl::WireResult<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>(_client_end(), &_request);
-  }
-
- private:
-  ::fidl::UnownedClientEnd<::test_union::TestProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_union::TestProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  FlexibleUnionHenceResponseMustBeHeapAllocated();
 };
 
 template <>
@@ -623,23 +512,11 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_union::TestProtocol> fin
  public:
   // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
   ::fidl::WireUnownedResult<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>
-  StrictUnionHenceResponseMayBeStackAllocated() {
-    ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> _request{};
-    return ::fidl::WireUnownedResult<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>(_client_end(), _allocator(), &_request);
-  }
+  StrictUnionHenceResponseMayBeStackAllocated();
 
   // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
   ::fidl::WireUnownedResult<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>
-  FlexibleUnionHenceResponseMustBeHeapAllocated() {
-    ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> _request{};
-    return ::fidl::WireUnownedResult<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>(_client_end(), _allocator(), &_request);
-  }
-
- private:
-  ::fidl::UnownedClientEnd<::test_union::TestProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_union::TestProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  FlexibleUnionHenceResponseMustBeHeapAllocated();
 };
 
 template <>
@@ -667,16 +544,9 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_union::TestProtocol::Stri
 template <>
 class ::fidl::internal::WireCompleterBase<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> : public ::fidl::CompleterBase, public ::fidl::internal::WireCompleterImpl<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> {
  public:
-  WireCompleterBase(::fidl::Transaction* transaction, bool owned, bool expects_reply)
-      : CompleterBase(transaction, owned, expects_reply),
-        WireCompleterImpl(this) {}
-  WireCompleterBase(WireCompleterBase&& other) noexcept
-      : CompleterBase(std::move(other)), WireCompleterImpl(this) {}
-  WireCompleterBase& operator=(WireCompleterBase&& other) noexcept {
-    CompleterBase::operator=(std::move(other));
-    WireCompleterImpl::_set_core(this);
-    return *this;
-  }
+  WireCompleterBase(::fidl::Transaction* transaction, bool owned, bool expects_reply);
+  WireCompleterBase(WireCompleterBase&& other) noexcept;
+  WireCompleterBase& operator=(WireCompleterBase&& other) noexcept;
 };
 
 template <>
@@ -704,16 +574,9 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_union::TestProtocol::Flex
 template <>
 class ::fidl::internal::WireCompleterBase<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> : public ::fidl::CompleterBase, public ::fidl::internal::WireCompleterImpl<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> {
  public:
-  WireCompleterBase(::fidl::Transaction* transaction, bool owned, bool expects_reply)
-      : CompleterBase(transaction, owned, expects_reply),
-        WireCompleterImpl(this) {}
-  WireCompleterBase(WireCompleterBase&& other) noexcept
-      : CompleterBase(std::move(other)), WireCompleterImpl(this) {}
-  WireCompleterBase& operator=(WireCompleterBase&& other) noexcept {
-    CompleterBase::operator=(std::move(other));
-    WireCompleterImpl::_set_core(this);
-    return *this;
-  }
+  WireCompleterBase(::fidl::Transaction* transaction, bool owned, bool expects_reply);
+  WireCompleterBase(WireCompleterBase&& other) noexcept;
+  WireCompleterBase& operator=(WireCompleterBase&& other) noexcept;
 };
 
 // Pure-virtual interface to be implemented by a server.
@@ -747,11 +610,7 @@ class ::fidl::WireServer<::test_union::TestProtocol> : public ::fidl::internal::
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_union::TestProtocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(

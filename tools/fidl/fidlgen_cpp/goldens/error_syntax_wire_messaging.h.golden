@@ -112,17 +112,10 @@ struct ::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfEr
   fidl_message_header_t header;
 
   ::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest body;
-  explicit TransactionalRequest(::fidl::StringView s)
-      : body(::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest{s}) {
-    _InitHeader();
-  }
-  TransactionalRequest() {
-    _InitHeader();
-  }
-  using ResponseType = ::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>;
+  explicit TransactionalRequest(::fidl::StringView s);
 
- private:
-  void _InitHeader();
+  TransactionalRequest();
+  using ResponseType = ::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>;
 };
 
 template <bool IsRecursive>
@@ -130,23 +123,15 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = 16 + sizeof(fidl_message_header_t);
 
-  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail> final : public ::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailResult {
-  explicit WireResponse(::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailResult ParentUsesErrorSyntaxComposedCallWhichMayFailResult) : ::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailResult(ParentUsesErrorSyntaxComposedCallWhichMayFailResult) {}
+  explicit WireResponse(::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailResult ParentUsesErrorSyntaxComposedCallWhichMayFailResult);
   WireResponse() = default;
 };
 
@@ -156,15 +141,9 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_errorsynta
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, value, position, recursion_depth);
-  }
+      internal::WireEncoder* encoder, ::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position, recursion_depth);
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <>
@@ -173,16 +152,8 @@ struct ::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfE
   fidl_message_header_t header;
 
   ::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail> body;
-  explicit TransactionalResponse(::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailResult ParentUsesErrorSyntaxComposedCallWhichMayFailResult)
-      : body(::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>(ParentUsesErrorSyntaxComposedCallWhichMayFailResult)) {
-    _InitHeader();
-  }
-  TransactionalResponse() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
+  explicit TransactionalResponse(::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailResult ParentUsesErrorSyntaxComposedCallWhichMayFailResult);
+  TransactionalResponse();
 };
 
 template <bool IsRecursive>
@@ -190,16 +161,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = 16 + sizeof(fidl_message_header_t);
 
-  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #ifdef __Fuchsia__
@@ -209,17 +172,10 @@ struct ::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfEr
   fidl_message_header_t header;
 
   ::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailRequest body;
-  explicit TransactionalRequest(::fidl::StringView s)
-      : body(::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailRequest{s}) {
-    _InitHeader();
-  }
-  TransactionalRequest() {
-    _InitHeader();
-  }
-  using ResponseType = ::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>;
+  explicit TransactionalRequest(::fidl::StringView s);
 
- private:
-  void _InitHeader();
+  TransactionalRequest();
+  using ResponseType = ::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>;
 };
 
 template <bool IsRecursive>
@@ -227,23 +183,15 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = 16 + sizeof(fidl_message_header_t);
 
-  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailRequest, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailRequest, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail> final : public ::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult {
-  explicit WireResponse(::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult ExampleUseOfErrorSyntaxCallWhichMayFailResult) : ::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult(ExampleUseOfErrorSyntaxCallWhichMayFailResult) {}
+  explicit WireResponse(::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult ExampleUseOfErrorSyntaxCallWhichMayFailResult);
   WireResponse() = default;
 };
 
@@ -253,15 +201,9 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_errorsynta
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, value, position, recursion_depth);
-  }
+      internal::WireEncoder* encoder, ::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position, recursion_depth);
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <>
@@ -270,16 +212,8 @@ struct ::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfE
   fidl_message_header_t header;
 
   ::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail> body;
-  explicit TransactionalResponse(::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult ExampleUseOfErrorSyntaxCallWhichMayFailResult)
-      : body(::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>(ExampleUseOfErrorSyntaxCallWhichMayFailResult)) {
-    _InitHeader();
-  }
-  TransactionalResponse() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
+  explicit TransactionalResponse(::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult ExampleUseOfErrorSyntaxCallWhichMayFailResult);
+  TransactionalResponse();
 };
 
 template <bool IsRecursive>
@@ -287,16 +221,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = 16 + sizeof(fidl_message_header_t);
 
-  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 namespace fidl {
@@ -319,12 +245,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_errorsyntax::Exa
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>) == TypeTraits<::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>, body) == sizeof(fidl_message_header_t));
-static_assert(sizeof(::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest) == TypeTraits<::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest>::kPrimarySize);
-static_assert(offsetof(::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest, s) == 0);
-
 #endif  // __Fuchsia__
 
 template <>
@@ -346,10 +266,6 @@ struct TypeTraits<::fidl::internal::TransactionalResponse<::test_errorsyntax::Ex
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-
-static_assert(sizeof(::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>) == TypeTraits<::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>> {
   static constexpr bool kHasServerToClientBody = true;
@@ -362,7 +278,6 @@ struct TypeTraits<::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSynt
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-static_assert(sizeof(::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>) == TypeTraits<::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>>::kPrimarySize);
 #ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>> : public std::true_type {};
@@ -380,12 +295,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_errorsyntax::Exa
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>) == TypeTraits<::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>, body) == sizeof(fidl_message_header_t));
-static_assert(sizeof(::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailRequest) == TypeTraits<::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailRequest>::kPrimarySize);
-static_assert(offsetof(::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailRequest, s) == 0);
 
 #endif  // __Fuchsia__
 
@@ -408,10 +317,6 @@ struct TypeTraits<::fidl::internal::TransactionalResponse<::test_errorsyntax::Ex
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-
-static_assert(sizeof(::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>) == TypeTraits<::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>> {
   static constexpr bool kHasServerToClientBody = true;
@@ -424,7 +329,6 @@ struct TypeTraits<::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSynt
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-static_assert(sizeof(::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>) == TypeTraits<::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>>::kPrimarySize);
 #ifdef __Fuchsia__
 }  // namespace fidl
 
@@ -488,7 +392,7 @@ class [[nodiscard]] ::fidl::WireResult<::test_errorsyntax::ExampleUseOfErrorSynt
       ::fidl::UnownedClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax> client,
       ::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>* request);
 
-  explicit WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>(result) {}
+  explicit WireResult(const ::fidl::Status& result);
   WireResult(WireResult&&) = delete;
   WireResult(const WireResult&) = delete;
   WireResult& operator=(WireResult&&) = delete;
@@ -504,21 +408,12 @@ template <>
 class [[nodiscard]] ::fidl::WireUnownedResult<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail> final : public ::fidl::BaseWireResult<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail> {
  public:
   explicit WireUnownedResult(::fidl::UnownedClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>* request);
-  explicit WireUnownedResult(::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>* response)
-      : ::fidl::BaseWireResult<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>(fidl::Status::Ok()), decoded_(response) {
-    ExtractValueFromDecoded(decoded_.pointer());
-  }
-
+  explicit WireUnownedResult(::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>* response);
   explicit WireUnownedResult(
       ::fit::result<::fidl::Error, ::fidl::DecodedValue<::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>>>&& decoded,
-      ::fidl::internal::MessageStorageViewBase* storage_view) : ::fidl::BaseWireResult<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>(::fidl::internal::StatusFromResult(decoded)) {
-    if (decoded.is_ok()) {
-      decoded_ = std::move(decoded.value());
-      ExtractValueFromDecoded(decoded_.pointer());
-    }
-  }
+      ::fidl::internal::MessageStorageViewBase* storage_view);
 
-  explicit WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>(result) {}
+  explicit WireUnownedResult(const ::fidl::Status& result);
   WireUnownedResult(WireUnownedResult&&) = default;
   WireUnownedResult(const WireUnownedResult&) = delete;
   WireUnownedResult& operator=(WireUnownedResult&&) = default;
@@ -541,7 +436,7 @@ class [[nodiscard]] ::fidl::WireResult<::test_errorsyntax::ExampleUseOfErrorSynt
       ::fidl::UnownedClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax> client,
       ::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>* request);
 
-  explicit WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>(result) {}
+  explicit WireResult(const ::fidl::Status& result);
   WireResult(WireResult&&) = delete;
   WireResult(const WireResult&) = delete;
   WireResult& operator=(WireResult&&) = delete;
@@ -557,21 +452,12 @@ template <>
 class [[nodiscard]] ::fidl::WireUnownedResult<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail> final : public ::fidl::BaseWireResult<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail> {
  public:
   explicit WireUnownedResult(::fidl::UnownedClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>* request);
-  explicit WireUnownedResult(::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>* response)
-      : ::fidl::BaseWireResult<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>(fidl::Status::Ok()), decoded_(response) {
-    ExtractValueFromDecoded(decoded_.pointer());
-  }
-
+  explicit WireUnownedResult(::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>* response);
   explicit WireUnownedResult(
       ::fit::result<::fidl::Error, ::fidl::DecodedValue<::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>>>&& decoded,
-      ::fidl::internal::MessageStorageViewBase* storage_view) : ::fidl::BaseWireResult<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>(::fidl::internal::StatusFromResult(decoded)) {
-    if (decoded.is_ok()) {
-      decoded_ = std::move(decoded.value());
-      ExtractValueFromDecoded(decoded_.pointer());
-    }
-  }
+      ::fidl::internal::MessageStorageViewBase* storage_view);
 
-  explicit WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>(result) {}
+  explicit WireUnownedResult(const ::fidl::Status& result);
   WireUnownedResult(WireUnownedResult&&) = default;
   WireUnownedResult(const WireUnownedResult&) = delete;
   WireUnownedResult& operator=(WireUnownedResult&&) = default;
@@ -612,8 +498,7 @@ class ::fidl::WireSyncEventHandler<::test_errorsyntax::ExampleUseOfErrorSyntax>
 template <>
 class ::fidl::internal::WireEventDispatcher<::test_errorsyntax::ExampleUseOfErrorSyntax> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::WireEventHandlerInterface<::test_errorsyntax::ExampleUseOfErrorSyntax>> {
  public:
-  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_errorsyntax::ExampleUseOfErrorSyntax>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_errorsyntax::ExampleUseOfErrorSyntax>* event_handler);
 };
 
 // Methods to make a sync FIDL call directly on an unowned handle or a
@@ -624,23 +509,11 @@ class ::fidl::internal::WireSyncClientImpl<::test_errorsyntax::ExampleUseOfError
  public:
   // Allocates 40 bytes of response buffer on the stack. Request is heap-allocated.
   ::fidl::WireResult<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>
-  ComposedCallWhichMayFail(::fidl::StringView s) {
-    ::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail> _request{s};
-    return ::fidl::WireResult<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>(_client_end(), &_request);
-  }
+  ComposedCallWhichMayFail(::fidl::StringView s);
 
   // Allocates 40 bytes of response buffer on the stack. Request is heap-allocated.
   ::fidl::WireResult<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>
-  CallWhichMayFail(::fidl::StringView s) {
-    ::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail> _request{s};
-    return ::fidl::WireResult<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>(_client_end(), &_request);
-  }
-
- private:
-  ::fidl::UnownedClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  CallWhichMayFail(::fidl::StringView s);
 };
 
 template <>
@@ -648,23 +521,11 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_errorsyntax::ExampleUseO
  public:
   // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
   ::fidl::WireUnownedResult<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>
-  ComposedCallWhichMayFail(::fidl::StringView s) {
-    ::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail> _request{s};
-    return ::fidl::WireUnownedResult<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>(_client_end(), _allocator(), &_request);
-  }
+  ComposedCallWhichMayFail(::fidl::StringView s);
 
   // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
   ::fidl::WireUnownedResult<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>
-  CallWhichMayFail(::fidl::StringView s) {
-    ::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail> _request{s};
-    return ::fidl::WireUnownedResult<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>(_client_end(), _allocator(), &_request);
-  }
-
- private:
-  ::fidl::UnownedClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  CallWhichMayFail(::fidl::StringView s);
 };
 
 template <>
@@ -696,16 +557,9 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_errorsyntax::ExampleUseOf
 template <>
 class ::fidl::internal::WireCompleterBase<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail> : public ::fidl::CompleterBase, public ::fidl::internal::WireCompleterImpl<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail> {
  public:
-  WireCompleterBase(::fidl::Transaction* transaction, bool owned, bool expects_reply)
-      : CompleterBase(transaction, owned, expects_reply),
-        WireCompleterImpl(this) {}
-  WireCompleterBase(WireCompleterBase&& other) noexcept
-      : CompleterBase(std::move(other)), WireCompleterImpl(this) {}
-  WireCompleterBase& operator=(WireCompleterBase&& other) noexcept {
-    CompleterBase::operator=(std::move(other));
-    WireCompleterImpl::_set_core(this);
-    return *this;
-  }
+  WireCompleterBase(::fidl::Transaction* transaction, bool owned, bool expects_reply);
+  WireCompleterBase(WireCompleterBase&& other) noexcept;
+  WireCompleterBase& operator=(WireCompleterBase&& other) noexcept;
 };
 
 template <>
@@ -737,16 +591,9 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_errorsyntax::ExampleUseOf
 template <>
 class ::fidl::internal::WireCompleterBase<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail> : public ::fidl::CompleterBase, public ::fidl::internal::WireCompleterImpl<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail> {
  public:
-  WireCompleterBase(::fidl::Transaction* transaction, bool owned, bool expects_reply)
-      : CompleterBase(transaction, owned, expects_reply),
-        WireCompleterImpl(this) {}
-  WireCompleterBase(WireCompleterBase&& other) noexcept
-      : CompleterBase(std::move(other)), WireCompleterImpl(this) {}
-  WireCompleterBase& operator=(WireCompleterBase&& other) noexcept {
-    CompleterBase::operator=(std::move(other));
-    WireCompleterImpl::_set_core(this);
-    return *this;
-  }
+  WireCompleterBase(::fidl::Transaction* transaction, bool owned, bool expects_reply);
+  WireCompleterBase(WireCompleterBase&& other) noexcept;
+  WireCompleterBase& operator=(WireCompleterBase&& other) noexcept;
 };
 
 // Pure-virtual interface to be implemented by a server.
@@ -784,11 +631,7 @@ class ::fidl::WireServer<::test_errorsyntax::ExampleUseOfErrorSyntax> : public :
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_errorsyntax::ExampleUseOfErrorSyntax> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(

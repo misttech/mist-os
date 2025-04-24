@@ -16,6 +16,9 @@
 
 #ifdef __Fuchsia__
 
+::fidl::internal::WireEventDispatcher<::test_handles::DriverProtocol>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_handles::DriverProtocol>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
@@ -42,6 +45,12 @@ void fdf::WireServer<::test_handles::DriverProtocol>::dispatch_message(
     ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
     ::fidl::internal::MessageStorageViewBase* storage_view) {
   ::fidl::internal::WireServerDispatcher<::test_handles::DriverProtocol>::Dispatch(this, std::move(msg), storage_view, txn);
+}
+
+fdf::WireServer<::test_handles::DriverProtocol>::Handler fdf::WireServer<::test_handles::DriverProtocol>::bind_handler(fdf_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_handles::DriverProtocol> request) {
+    (void)::fdf::BindServer(dispatcher, std::move(request), impl);
+  };
 }
 
 #endif  // __Fuchsia__

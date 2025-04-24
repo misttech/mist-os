@@ -15,6 +15,9 @@
 
 #ifdef __Fuchsia__
 
+::fidl::internal::WireEventDispatcher<::test_protocolrequest::Child>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_protocolrequest::Child>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
+
 ::fidl::Status fidl::WireSyncEventHandler<::test_protocolrequest::Child>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_protocolrequest::Child> client_end) {
   ::fidl::internal::IncomingEventsStorage<::test_protocolrequest::Child> event_storage;
@@ -50,6 +53,12 @@ void fidl::WireServer<::test_protocolrequest::Child>::dispatch_message(
   ::fidl::internal::WireServerDispatcher<::test_protocolrequest::Child>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
+fidl::WireServer<::test_protocolrequest::Child>::Handler fidl::WireServer<::test_protocolrequest::Child>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocolrequest::Child> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
+}
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
@@ -63,24 +72,46 @@ constexpr uint64_t kParent_GetChild_Ordinal = 881818649151440699lu;
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kParent_GetChild_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+static_assert(sizeof(::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>) == ::fidl::TypeTraits<::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>>::kPrimarySize);
+static_assert(offsetof(::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>, c) == 0);
+static_assert(sizeof(::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>) == ::fidl::TypeTraits<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>>::kPrimarySize);
+static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>, header) == 0);
+static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>, body) == sizeof(fidl_message_header_t));
 
 [[maybe_unused]]
 constexpr uint64_t kParent_GetChildRequest_Ordinal = 1096855814967598201lu;
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kParent_GetChildRequest_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+static_assert(sizeof(::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>) == ::fidl::TypeTraits<::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>>::kPrimarySize);
+static_assert(offsetof(::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>, r) == 0);
+static_assert(sizeof(::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>) == ::fidl::TypeTraits<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>>::kPrimarySize);
+static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>, header) == 0);
+static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>, body) == sizeof(fidl_message_header_t));
 
 [[maybe_unused]]
 constexpr uint64_t kParent_TakeChild_Ordinal = 4470101341872267920lu;
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kParent_TakeChild_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>) == ::fidl::TypeTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>>::kPrimarySize);
+static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>, header) == 0);
+static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>, body) == sizeof(fidl_message_header_t));
+
+static_assert(sizeof(::test_protocolrequest::wire::ParentTakeChildRequest) == ::fidl::TypeTraits<::test_protocolrequest::wire::ParentTakeChildRequest>::kPrimarySize);
+static_assert(offsetof(::test_protocolrequest::wire::ParentTakeChildRequest, c) == 0);
 
 [[maybe_unused]]
 constexpr uint64_t kParent_TakeChildRequest_Ordinal = 2333981071306416007lu;
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kParent_TakeChildRequest_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>) == ::fidl::TypeTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>>::kPrimarySize);
+static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>, header) == 0);
+static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>, body) == sizeof(fidl_message_header_t));
+
+static_assert(sizeof(::test_protocolrequest::wire::ParentTakeChildRequestRequest) == ::fidl::TypeTraits<::test_protocolrequest::wire::ParentTakeChildRequestRequest>::kPrimarySize);
+static_assert(offsetof(::test_protocolrequest::wire::ParentTakeChildRequestRequest, r) == 0);
 #ifdef __Fuchsia__
 }  // namespace test_protocolrequest
 
@@ -100,12 +131,15 @@ constexpr ::fidl::MessageDynamicFlags kParent_TakeChildRequest_DynamicFlags = ::
     ExtractValueFromDecoded(decoded_.pointer());
   }
 }
+
+::fidl::WireResult<::test_protocolrequest::Parent::GetChild>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocolrequest::Parent::GetChild>(result) {}
 namespace test_protocolrequest {
 
 #endif  // __Fuchsia__
 
-#ifdef __Fuchsia__
 }  // namespace test_protocolrequest
+
+#ifdef __Fuchsia__
 
 ::fidl::WireUnownedResult<::test_protocolrequest::Parent::GetChild>::WireUnownedResult(::fidl::UnownedClientEnd<::test_protocolrequest::Parent> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChild>* request) {
   constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_protocolrequest::Parent::GetChild>();
@@ -136,12 +170,26 @@ namespace test_protocolrequest {
     ExtractValueFromDecoded(decoded_.pointer());
   }
 }
-namespace test_protocolrequest {
 
 #endif  // __Fuchsia__
 
+::fidl::WireUnownedResult<::test_protocolrequest::Parent::GetChild>::WireUnownedResult(::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>* response)
+    : ::fidl::BaseWireResult<::test_protocolrequest::Parent::GetChild>(fidl::Status::Ok()), decoded_(response) {
+  ExtractValueFromDecoded(decoded_.pointer());
+}
+
+::fidl::WireUnownedResult<::test_protocolrequest::Parent::GetChild>::WireUnownedResult(
+    ::fit::result<::fidl::Error, ::fidl::DecodedValue<::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>>>&& decoded,
+    ::fidl::internal::MessageStorageViewBase* storage_view) : ::fidl::BaseWireResult<::test_protocolrequest::Parent::GetChild>(::fidl::internal::StatusFromResult(decoded)) {
+  if (decoded.is_ok()) {
+    decoded_ = std::move(decoded.value());
+    ExtractValueFromDecoded(decoded_.pointer());
+  }
+}
+
+::fidl::WireUnownedResult<::test_protocolrequest::Parent::GetChild>::WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocolrequest::Parent::GetChild>(result) {}
+
 #ifdef __Fuchsia__
-}  // namespace test_protocolrequest
 
 ::fidl::WireResult<::test_protocolrequest::Parent::GetChildRequest>::WireResult(
     ::fidl::UnownedClientEnd<::test_protocolrequest::Parent> client,
@@ -159,12 +207,12 @@ namespace test_protocolrequest {
     ExtractValueFromDecoded(decoded_.pointer());
   }
 }
-namespace test_protocolrequest {
+
+::fidl::WireResult<::test_protocolrequest::Parent::GetChildRequest>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocolrequest::Parent::GetChildRequest>(result) {}
 
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-}  // namespace test_protocolrequest
 
 ::fidl::WireUnownedResult<::test_protocolrequest::Parent::GetChildRequest>::WireUnownedResult(::fidl::UnownedClientEnd<::test_protocolrequest::Parent> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest>* request) {
   constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_protocolrequest::Parent::GetChildRequest>();
@@ -195,12 +243,26 @@ namespace test_protocolrequest {
     ExtractValueFromDecoded(decoded_.pointer());
   }
 }
-namespace test_protocolrequest {
 
 #endif  // __Fuchsia__
 
+::fidl::WireUnownedResult<::test_protocolrequest::Parent::GetChildRequest>::WireUnownedResult(::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>* response)
+    : ::fidl::BaseWireResult<::test_protocolrequest::Parent::GetChildRequest>(fidl::Status::Ok()), decoded_(response) {
+  ExtractValueFromDecoded(decoded_.pointer());
+}
+
+::fidl::WireUnownedResult<::test_protocolrequest::Parent::GetChildRequest>::WireUnownedResult(
+    ::fit::result<::fidl::Error, ::fidl::DecodedValue<::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>>>&& decoded,
+    ::fidl::internal::MessageStorageViewBase* storage_view) : ::fidl::BaseWireResult<::test_protocolrequest::Parent::GetChildRequest>(::fidl::internal::StatusFromResult(decoded)) {
+  if (decoded.is_ok()) {
+    decoded_ = std::move(decoded.value());
+    ExtractValueFromDecoded(decoded_.pointer());
+  }
+}
+
+::fidl::WireUnownedResult<::test_protocolrequest::Parent::GetChildRequest>::WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocolrequest::Parent::GetChildRequest>(result) {}
+
 #ifdef __Fuchsia__
-}  // namespace test_protocolrequest
 
 ::fidl::WireResult<::test_protocolrequest::Parent::TakeChild>::WireResult(
     ::fidl::UnownedClientEnd<::test_protocolrequest::Parent> client,
@@ -212,12 +274,12 @@ namespace test_protocolrequest {
   outgoing.Write(client.handle());
   SetStatus(outgoing);
 }
-namespace test_protocolrequest {
+
+::fidl::WireResult<::test_protocolrequest::Parent::TakeChild>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocolrequest::Parent::TakeChild>(result) {}
 
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-}  // namespace test_protocolrequest
 
 ::fidl::WireUnownedResult<::test_protocolrequest::Parent::TakeChild>::WireUnownedResult(::fidl::UnownedClientEnd<::test_protocolrequest::Parent> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>* request) {
   constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_protocolrequest::Parent::TakeChild>();
@@ -236,12 +298,16 @@ namespace test_protocolrequest {
   outgoing.Write(client_end.handle());
   SetStatus(outgoing);
 }
-namespace test_protocolrequest {
 
 #endif  // __Fuchsia__
 
+::fidl::WireUnownedResult<::test_protocolrequest::Parent::TakeChild>::WireUnownedResult(
+    ::fit::result<::fidl::Error>&& decoded,
+    ::fidl::internal::MessageStorageViewBase* storage_view) : ::fidl::BaseWireResult<::test_protocolrequest::Parent::TakeChild>(::fidl::internal::StatusFromResult(decoded)) {}
+
+::fidl::WireUnownedResult<::test_protocolrequest::Parent::TakeChild>::WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocolrequest::Parent::TakeChild>(result) {}
+
 #ifdef __Fuchsia__
-}  // namespace test_protocolrequest
 
 ::fidl::WireResult<::test_protocolrequest::Parent::TakeChildRequest>::WireResult(
     ::fidl::UnownedClientEnd<::test_protocolrequest::Parent> client,
@@ -253,12 +319,12 @@ namespace test_protocolrequest {
   outgoing.Write(client.handle());
   SetStatus(outgoing);
 }
-namespace test_protocolrequest {
+
+::fidl::WireResult<::test_protocolrequest::Parent::TakeChildRequest>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocolrequest::Parent::TakeChildRequest>(result) {}
 
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-}  // namespace test_protocolrequest
 
 ::fidl::WireUnownedResult<::test_protocolrequest::Parent::TakeChildRequest>::WireUnownedResult(::fidl::UnownedClientEnd<::test_protocolrequest::Parent> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>* request) {
   constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_protocolrequest::Parent::TakeChildRequest>();
@@ -277,11 +343,14 @@ namespace test_protocolrequest {
   outgoing.Write(client_end.handle());
   SetStatus(outgoing);
 }
-namespace test_protocolrequest {
 
 #endif  // __Fuchsia__
 
-}  // namespace test_protocolrequest
+::fidl::WireUnownedResult<::test_protocolrequest::Parent::TakeChildRequest>::WireUnownedResult(
+    ::fit::result<::fidl::Error>&& decoded,
+    ::fidl::internal::MessageStorageViewBase* storage_view) : ::fidl::BaseWireResult<::test_protocolrequest::Parent::TakeChildRequest>(::fidl::internal::StatusFromResult(decoded)) {}
+
+::fidl::WireUnownedResult<::test_protocolrequest::Parent::TakeChildRequest>::WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocolrequest::Parent::TakeChildRequest>(result) {}
 
 #ifdef __Fuchsia__
 
@@ -371,6 +440,9 @@ fidl::internal::WireWeakSyncClientImpl<::test_protocolrequest::Parent>::GetChild
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+
+::fidl::internal::WireEventDispatcher<::test_protocolrequest::Parent>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_protocolrequest::Parent>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
 
 ::fidl::Status fidl::WireSyncEventHandler<::test_protocolrequest::Parent>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_protocolrequest::Parent> client_end) {
@@ -470,6 +542,12 @@ void fidl::WireServer<::test_protocolrequest::Parent>::dispatch_message(
   ::fidl::internal::WireServerDispatcher<::test_protocolrequest::Parent>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
+fidl::WireServer<::test_protocolrequest::Parent>::Handler fidl::WireServer<::test_protocolrequest::Parent>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocolrequest::Parent> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
+}
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
@@ -507,6 +585,18 @@ void fidl::internal::WireBufferCompleterImpl<::test_protocolrequest::Parent::Get
           _allocation->data, _buffer_size, &_response);
   return _core()->SendReply(&_response_message.GetOutgoingMessage(),
                             ::fidl::internal::OutgoingTransportContext());
+}
+
+fidl::internal::WireCompleterBase<::test_protocolrequest::Parent::GetChild>::WireCompleterBase(::fidl::Transaction* transaction, bool owned, bool expects_reply)
+    : CompleterBase(transaction, owned, expects_reply),
+      WireCompleterImpl(this) {}
+fidl::internal::WireCompleterBase<::test_protocolrequest::Parent::GetChild>::WireCompleterBase(WireCompleterBase&& other) noexcept
+    : CompleterBase(std::move(other)), WireCompleterImpl(this) {}
+
+::fidl::internal::WireCompleterBase<::test_protocolrequest::Parent::GetChild>& fidl::internal::WireCompleterBase<::test_protocolrequest::Parent::GetChild>::operator=(WireCompleterBase&& other) noexcept {
+  CompleterBase::operator=(std::move(other));
+  WireCompleterImpl::_set_core(this);
+  return *this;
 }
 
 #endif  // __Fuchsia__
@@ -548,51 +638,282 @@ void fidl::internal::WireBufferCompleterImpl<::test_protocolrequest::Parent::Get
                             ::fidl::internal::OutgoingTransportContext());
 }
 
+fidl::internal::WireCompleterBase<::test_protocolrequest::Parent::GetChildRequest>::WireCompleterBase(::fidl::Transaction* transaction, bool owned, bool expects_reply)
+    : CompleterBase(transaction, owned, expects_reply),
+      WireCompleterImpl(this) {}
+fidl::internal::WireCompleterBase<::test_protocolrequest::Parent::GetChildRequest>::WireCompleterBase(WireCompleterBase&& other) noexcept
+    : CompleterBase(std::move(other)), WireCompleterImpl(this) {}
+
+::fidl::internal::WireCompleterBase<::test_protocolrequest::Parent::GetChildRequest>& fidl::internal::WireCompleterBase<::test_protocolrequest::Parent::GetChildRequest>::operator=(WireCompleterBase&& other) noexcept {
+  CompleterBase::operator=(std::move(other));
+  WireCompleterImpl::_set_core(this);
+  return *this;
+}
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-void ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChild>::_InitHeader() {
+::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChild>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_protocolrequest::kParent_GetChild_Ordinal, ::test_protocolrequest::kParent_GetChild_DynamicFlags);
 }
 
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChild>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
+                                                                                                                                                                                            ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChild>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  *position.As<fidl_message_header_t>() = value->header;
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChild>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+}
+
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChild>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChild>, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
 
-void ::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>::_InitHeader() {
+::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>::WireResponse(::test_protocolrequest::wire::ParentGetChildResponse base) : ::test_protocolrequest::wire::ParentGetChildResponse(std::move(base)) {}
+::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>::WireResponse(::fidl::ClientEnd<::test_protocolrequest::Child>&& c) : ::test_protocolrequest::wire::ParentGetChildResponse{.c = std::move(c)} {}
+
+::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>::TransactionalResponse(::fidl::ClientEnd<::test_protocolrequest::Child>&& c)
+    : body(::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>(std::move(c))) {
   ::fidl::InitTxnHeader(&header, 0, ::test_protocolrequest::kParent_GetChild_Ordinal, ::test_protocolrequest::kParent_GetChild_DynamicFlags);
 }
+::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>::TransactionalResponse() {
+  ::fidl::InitTxnHeader(&header, 0, ::test_protocolrequest::kParent_GetChild_Ordinal, ::test_protocolrequest::kParent_GetChild_DynamicFlags);
+}
+void ::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>::_CloseHandles() {
+  body._CloseHandles();
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  fidl::internal::WireCodingTraits<::test_protocolrequest::wire::ParentGetChildResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+      encoder, value, position, recursion_depth);
+}
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  fidl::internal::WireCodingTraits<::test_protocolrequest::wire::ParentGetChildResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+      decoder, position, recursion_depth);
+}
+template struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
+                                                                                                                                                                                             ::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  *position.As<fidl_message_header_t>() = value->header;
+  WireCodingTraits<::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>, WireCodingConstraintEmpty, IsRecursive>::Encode(
+      encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  WireCodingTraits<::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>, WireCodingConstraintEmpty, IsRecursive>::Decode(
+      decoder, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-void ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest>::_InitHeader() {
+::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_protocolrequest::kParent_GetChildRequest_Ordinal, ::test_protocolrequest::kParent_GetChildRequest_DynamicFlags);
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-void ::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>::_InitHeader() {
-  ::fidl::InitTxnHeader(&header, 0, ::test_protocolrequest::kParent_GetChildRequest_Ordinal, ::test_protocolrequest::kParent_GetChildRequest_DynamicFlags);
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
+                                                                                                                                                                                                   ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  *position.As<fidl_message_header_t>() = value->header;
 }
 
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+}
+
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest>, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-void ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>::_InitHeader() {
+
+::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>::WireResponse(::test_protocolrequest::wire::ParentGetChildRequestResponse base) : ::test_protocolrequest::wire::ParentGetChildRequestResponse(std::move(base)) {}
+::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>::WireResponse(::fidl::ServerEnd<::test_protocolrequest::Child>&& r) : ::test_protocolrequest::wire::ParentGetChildRequestResponse{.r = std::move(r)} {}
+
+::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>::TransactionalResponse(::fidl::ServerEnd<::test_protocolrequest::Child>&& r)
+    : body(::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>(std::move(r))) {
+  ::fidl::InitTxnHeader(&header, 0, ::test_protocolrequest::kParent_GetChildRequest_Ordinal, ::test_protocolrequest::kParent_GetChildRequest_DynamicFlags);
+}
+::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>::TransactionalResponse() {
+  ::fidl::InitTxnHeader(&header, 0, ::test_protocolrequest::kParent_GetChildRequest_Ordinal, ::test_protocolrequest::kParent_GetChildRequest_DynamicFlags);
+}
+void ::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>::_CloseHandles() {
+  body._CloseHandles();
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    internal::WireEncoder* encoder, ::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  fidl::internal::WireCodingTraits<::test_protocolrequest::wire::ParentGetChildRequestResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+      encoder, value, position, recursion_depth);
+}
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  fidl::internal::WireCodingTraits<::test_protocolrequest::wire::ParentGetChildRequestResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+      decoder, position, recursion_depth);
+}
+template struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
+                                                                                                                                                                                                    ::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  *position.As<fidl_message_header_t>() = value->header;
+  WireCodingTraits<::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>, WireCodingConstraintEmpty, IsRecursive>::Encode(
+      encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  WireCodingTraits<::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>, WireCodingConstraintEmpty, IsRecursive>::Decode(
+      decoder, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_protocolrequest::kParent_TakeChild_Ordinal, ::test_protocolrequest::kParent_TakeChild_DynamicFlags);
 }
 
+::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>::TransactionalRequest(::fidl::ClientEnd<::test_protocolrequest::Child>&& c)
+    : body(::test_protocolrequest::wire::ParentTakeChildRequest{std::move(c)}) {
+  ::fidl::InitTxnHeader(&header, 0, ::test_protocolrequest::kParent_TakeChild_Ordinal, ::test_protocolrequest::kParent_TakeChild_DynamicFlags);
+}
+void ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>::_CloseHandles() {
+  body._CloseHandles();
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
+                                                                                                                                                                                             ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  *position.As<fidl_message_header_t>() = value->header;
+  WireCodingTraits<::test_protocolrequest::wire::ParentTakeChildRequest, WireCodingConstraintEmpty, IsRecursive>::Encode(
+      encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  WireCodingTraits<::test_protocolrequest::wire::ParentTakeChildRequest, WireCodingConstraintEmpty, IsRecursive>::Decode(
+      decoder, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-void ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>::_InitHeader() {
+::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_protocolrequest::kParent_TakeChildRequest_Ordinal, ::test_protocolrequest::kParent_TakeChildRequest_DynamicFlags);
 }
 
+::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>::TransactionalRequest(::fidl::ServerEnd<::test_protocolrequest::Child>&& r)
+    : body(::test_protocolrequest::wire::ParentTakeChildRequestRequest{std::move(r)}) {
+  ::fidl::InitTxnHeader(&header, 0, ::test_protocolrequest::kParent_TakeChildRequest_Ordinal, ::test_protocolrequest::kParent_TakeChildRequest_DynamicFlags);
+}
+void ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>::_CloseHandles() {
+  body._CloseHandles();
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
+                                                                                                                                                                                                    ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  *position.As<fidl_message_header_t>() = value->header;
+  WireCodingTraits<::test_protocolrequest::wire::ParentTakeChildRequestRequest, WireCodingConstraintEmpty, IsRecursive>::Encode(
+      encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  WireCodingTraits<::test_protocolrequest::wire::ParentTakeChildRequestRequest, WireCodingConstraintEmpty, IsRecursive>::Decode(
+      decoder, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
 #endif  // __Fuchsia__
+
+::fidl::WireResult<::test_protocolrequest::Parent::GetChild>
+fidl::internal::WireSyncClientImpl<::test_protocolrequest::Parent>::GetChild() {
+  ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChild> _request{};
+  return ::fidl::WireResult<::test_protocolrequest::Parent::GetChild>(
+      ::fidl::UnownedClientEnd<::test_protocolrequest::Parent>(_transport().get<::fidl::internal::ChannelTransport>()), &_request);
+}
+
+::fidl::WireUnownedResult<::test_protocolrequest::Parent::GetChild>
+fidl::internal::WireSyncBufferClientImpl<::test_protocolrequest::Parent>::GetChild() {
+  ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChild> _request{};
+  return ::fidl::WireUnownedResult<::test_protocolrequest::Parent::GetChild>(
+      ::fidl::UnownedClientEnd<::test_protocolrequest::Parent>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
+}
+::fidl::WireResult<::test_protocolrequest::Parent::GetChildRequest>
+fidl::internal::WireSyncClientImpl<::test_protocolrequest::Parent>::GetChildRequest() {
+  ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest> _request{};
+  return ::fidl::WireResult<::test_protocolrequest::Parent::GetChildRequest>(
+      ::fidl::UnownedClientEnd<::test_protocolrequest::Parent>(_transport().get<::fidl::internal::ChannelTransport>()), &_request);
+}
+
+::fidl::WireUnownedResult<::test_protocolrequest::Parent::GetChildRequest>
+fidl::internal::WireSyncBufferClientImpl<::test_protocolrequest::Parent>::GetChildRequest() {
+  ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest> _request{};
+  return ::fidl::WireUnownedResult<::test_protocolrequest::Parent::GetChildRequest>(
+      ::fidl::UnownedClientEnd<::test_protocolrequest::Parent>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
+}
+::fidl::OneWayStatus
+fidl::internal::WireSyncClientImpl<::test_protocolrequest::Parent>::TakeChild(::fidl::ClientEnd<::test_protocolrequest::Child>&& c) {
+  ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild> _request{std::move(c)};
+  return ::fidl::WireResult<::test_protocolrequest::Parent::TakeChild>(
+      ::fidl::UnownedClientEnd<::test_protocolrequest::Parent>(_transport().get<::fidl::internal::ChannelTransport>()), &_request);
+}
+
+::fidl::OneWayStatus
+fidl::internal::WireSyncBufferClientImpl<::test_protocolrequest::Parent>::TakeChild(::fidl::ClientEnd<::test_protocolrequest::Child>&& c) {
+  ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild> _request{std::move(c)};
+  return ::fidl::WireUnownedResult<::test_protocolrequest::Parent::TakeChild>(
+      ::fidl::UnownedClientEnd<::test_protocolrequest::Parent>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
+}
+::fidl::OneWayStatus
+fidl::internal::WireSyncClientImpl<::test_protocolrequest::Parent>::TakeChildRequest(::fidl::ServerEnd<::test_protocolrequest::Child>&& r) {
+  ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest> _request{std::move(r)};
+  return ::fidl::WireResult<::test_protocolrequest::Parent::TakeChildRequest>(
+      ::fidl::UnownedClientEnd<::test_protocolrequest::Parent>(_transport().get<::fidl::internal::ChannelTransport>()), &_request);
+}
+
+::fidl::OneWayStatus
+fidl::internal::WireSyncBufferClientImpl<::test_protocolrequest::Parent>::TakeChildRequest(::fidl::ServerEnd<::test_protocolrequest::Child>&& r) {
+  ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest> _request{std::move(r)};
+  return ::fidl::WireUnownedResult<::test_protocolrequest::Parent::TakeChildRequest>(
+      ::fidl::UnownedClientEnd<::test_protocolrequest::Parent>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
+}
 
 #ifdef __Fuchsia__
 

@@ -74,8 +74,7 @@ class ::fdf::WireAsyncEventHandler<::test_driverhandle::DriverProtocol>
 template <>
 class ::fidl::internal::WireEventDispatcher<::test_driverhandle::DriverProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::WireEventHandlerInterface<::test_driverhandle::DriverProtocol>> {
  public:
-  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_driverhandle::DriverProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_driverhandle::DriverProtocol>* event_handler);
 };
 
 template <>
@@ -109,11 +108,7 @@ class ::fdf::WireServer<::test_driverhandle::DriverProtocol> : public ::fidl::in
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(fdf_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_driverhandle::DriverProtocol> request) {
-      (void)::fdf::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(fdf_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
@@ -174,19 +169,10 @@ struct ::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProt
   fidl_message_header_t header;
 
   ::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest body;
-  explicit TransactionalRequest(::test_driverhandle::wire::T t)
-      : body(::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest{t}) {
-    _InitHeader();
-  }
-  TransactionalRequest() {
-    _InitHeader();
-  }
-  void _CloseHandles() {
-    body._CloseHandles();
-  }
+  explicit TransactionalRequest(::test_driverhandle::wire::T t);
 
- private:
-  void _InitHeader();
+  TransactionalRequest();
+  void _CloseHandles();
 };
 
 template <bool IsRecursive>
@@ -194,16 +180,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = 16 + sizeof(fidl_message_header_t);
 
-  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #endif  // __Fuchsia__
@@ -229,12 +207,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_driverhandle::Ha
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>) == TypeTraits<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>, body) == sizeof(fidl_message_header_t));
-static_assert(sizeof(::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest) == TypeTraits<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest>::kPrimarySize);
-static_assert(offsetof(::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest, t) == 0);
 
 #endif  // __Fuchsia__
 
@@ -274,8 +246,7 @@ class ::fdf::WireAsyncEventHandler<::test_driverhandle::HandlesInProtocol>
 template <>
 class ::fidl::internal::WireEventDispatcher<::test_driverhandle::HandlesInProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::WireEventHandlerInterface<::test_driverhandle::HandlesInProtocol>> {
  public:
-  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_driverhandle::HandlesInProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_driverhandle::HandlesInProtocol>* event_handler);
 };
 
 template <>
@@ -324,11 +295,7 @@ class ::fdf::WireServer<::test_driverhandle::HandlesInProtocol> : public ::fidl:
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(fdf_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_driverhandle::HandlesInProtocol> request) {
-      (void)::fdf::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(fdf_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(

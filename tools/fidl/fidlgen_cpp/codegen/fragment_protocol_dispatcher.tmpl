@@ -109,11 +109,19 @@ void {{ .WireServerDispatcher.NoLeading }}::Dispatch(
 }
 
 {{- EnsureNamespace "" }}
+
 void {{ .WireServer.NoLeading }}::dispatch_message(
     ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
     ::fidl::internal::MessageStorageViewBase* storage_view) {
   {{ .WireServerDispatcher }}::Dispatch(this, std::move(msg), storage_view, txn);
 }
+
+{{ .WireServer.NoLeading }}::Handler {{ .WireServer.NoLeading }}::bind_handler({{ .Dispatcher }}* dispatcher) {
+  return [impl=this, dispatcher=dispatcher]({{ .ServerEnd }} request) {
+      (void) {{ .BindServer }}(dispatcher, std::move(request), impl);
+  };
+}
+
 {{- EndifFuchsia -}}
 
 {{- end }}

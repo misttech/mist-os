@@ -105,8 +105,7 @@ class ::fidl::WireSyncEventHandler<::test_versions::OtherProtocol>
 template <>
 class ::fidl::internal::WireEventDispatcher<::test_versions::OtherProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::WireEventHandlerInterface<::test_versions::OtherProtocol>> {
  public:
-  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_versions::OtherProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_versions::OtherProtocol>* event_handler);
 };
 
 // Methods to make a sync FIDL call directly on an unowned handle or a
@@ -115,21 +114,11 @@ class ::fidl::internal::WireEventDispatcher<::test_versions::OtherProtocol> fina
 template <>
 class ::fidl::internal::WireSyncClientImpl<::test_versions::OtherProtocol> final : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::WireSyncClientImpl<::test_versions::OtherProtocol>> {
  public:
- private:
-  ::fidl::UnownedClientEnd<::test_versions::OtherProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_versions::OtherProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
 };
 
 template <>
 class ::fidl::internal::WireSyncBufferClientImpl<::test_versions::OtherProtocol> final : public ::fidl::internal::SyncEndpointBufferVeneer<::fidl::internal::WireSyncBufferClientImpl<::test_versions::OtherProtocol>> {
  public:
- private:
-  ::fidl::UnownedClientEnd<::test_versions::OtherProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_versions::OtherProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
 };
 
 // Pure-virtual interface to be implemented by a server.
@@ -153,11 +142,7 @@ class ::fidl::WireServer<::test_versions::OtherProtocol> : public ::fidl::intern
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_versions::OtherProtocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
@@ -215,12 +200,7 @@ struct ::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo> fi
   FIDL_ALIGNDECL
   fidl_message_header_t header;
 
-  TransactionalRequest() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
+  TransactionalRequest();
 };
 
 template <bool IsRecursive>
@@ -228,12 +208,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = 0 + sizeof(fidl_message_header_t);
 
-  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-  }
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #endif  // __Fuchsia__
@@ -257,9 +233,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_versions::Protoc
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>) == TypeTraits<::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>, header) == 0);
 
 #endif  // __Fuchsia__
 
@@ -289,7 +262,7 @@ class [[nodiscard]] ::fidl::WireResult<::test_versions::Protocol::Foo> final : p
       ::fidl::UnownedClientEnd<::test_versions::Protocol> client,
       ::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>* request);
 
-  explicit WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_versions::Protocol::Foo>(result) {}
+  explicit WireResult(const ::fidl::Status& result);
   WireResult(WireResult&&) = delete;
   WireResult(const WireResult&) = delete;
   WireResult& operator=(WireResult&&) = delete;
@@ -303,9 +276,9 @@ class [[nodiscard]] ::fidl::WireUnownedResult<::test_versions::Protocol::Foo> fi
   explicit WireUnownedResult(::fidl::UnownedClientEnd<::test_versions::Protocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>* request);
   explicit WireUnownedResult(
       ::fit::result<::fidl::Error>&& decoded,
-      ::fidl::internal::MessageStorageViewBase* storage_view) : ::fidl::BaseWireResult<::test_versions::Protocol::Foo>(::fidl::internal::StatusFromResult(decoded)) {}
+      ::fidl::internal::MessageStorageViewBase* storage_view);
 
-  explicit WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_versions::Protocol::Foo>(result) {}
+  explicit WireUnownedResult(const ::fidl::Status& result);
   WireUnownedResult(WireUnownedResult&&) = default;
   WireUnownedResult(const WireUnownedResult&) = delete;
   WireUnownedResult& operator=(WireUnownedResult&&) = default;
@@ -343,8 +316,7 @@ class ::fidl::WireSyncEventHandler<::test_versions::Protocol>
 template <>
 class ::fidl::internal::WireEventDispatcher<::test_versions::Protocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::WireEventHandlerInterface<::test_versions::Protocol>> {
  public:
-  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_versions::Protocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_versions::Protocol>* event_handler);
   ::fidl::Status DispatchEvent(
       ::fidl::IncomingHeaderAndMessage& msg,
       ::fidl::internal::MessageStorageViewBase* storage_view) override;
@@ -358,16 +330,7 @@ class ::fidl::internal::WireSyncClientImpl<::test_versions::Protocol> final : pu
  public:
   // Allocates 32 bytes of message buffer on the stack. No heap allocation necessary.
   ::fidl::OneWayStatus
-  Foo() {
-    ::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo> _request{};
-    return ::fidl::WireResult<::test_versions::Protocol::Foo>(_client_end(), &_request);
-  }
-
- private:
-  ::fidl::UnownedClientEnd<::test_versions::Protocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_versions::Protocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  Foo();
 };
 
 template <>
@@ -375,16 +338,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_versions::Protocol> fina
  public:
   // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
   ::fidl::OneWayStatus
-  Foo() {
-    ::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo> _request{};
-    return ::fidl::WireUnownedResult<::test_versions::Protocol::Foo>(_client_end(), _allocator(), &_request);
-  }
-
- private:
-  ::fidl::UnownedClientEnd<::test_versions::Protocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_versions::Protocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  Foo();
 };
 
 // Pure-virtual interface to be implemented by a server.
@@ -413,11 +367,7 @@ class ::fidl::WireServer<::test_versions::Protocol> : public ::fidl::internal::I
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_versions::Protocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(

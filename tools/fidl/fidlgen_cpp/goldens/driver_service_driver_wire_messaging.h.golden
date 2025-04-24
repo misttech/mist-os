@@ -74,8 +74,7 @@ class ::fdf::WireAsyncEventHandler<::test_driverservice::SomeDriverProtocol>
 template <>
 class ::fidl::internal::WireEventDispatcher<::test_driverservice::SomeDriverProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::WireEventHandlerInterface<::test_driverservice::SomeDriverProtocol>> {
  public:
-  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_driverservice::SomeDriverProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_driverservice::SomeDriverProtocol>* event_handler);
 };
 
 template <>
@@ -109,11 +108,7 @@ class ::fdf::WireServer<::test_driverservice::SomeDriverProtocol> : public ::fid
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(fdf_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_driverservice::SomeDriverProtocol> request) {
-      (void)::fdf::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(fdf_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(

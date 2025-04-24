@@ -51,8 +51,7 @@ template <>
 class {{ .WireEventDispatcher }} final :
     public ::fidl::internal::IncomingEventDispatcher<{{ .WireEventHandlerInterface }}> {
  public:
-  explicit {{ .WireEventDispatcher.Self }}({{ .WireEventHandlerInterface }}* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit {{ .WireEventDispatcher.Self }}({{ .WireEventHandlerInterface }}* event_handler);
 
   {{- if or .Events .HandlesOneWayUnknownInteractions }}
     ::fidl::Status DispatchEvent(
@@ -68,6 +67,10 @@ class {{ .WireEventDispatcher }} final :
 {{- define "Protocol:EventHandler:WireMessagingSource" }}
 {{ EnsureNamespace "" }}
 {{- IfdefFuchsia }}
+
+{{ .WireEventDispatcher }}::{{ .WireEventDispatcher.Self }}({{ .WireEventHandlerInterface }}* event_handler)
+: IncomingEventDispatcher(event_handler) {}
+
 
 {{ if .Transport.HasEvents }}
   ::fidl::Status {{ .WireSyncEventHandler.NoLeading }}::HandleOneEvent(

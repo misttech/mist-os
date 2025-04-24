@@ -74,16 +74,9 @@ struct ::fidl::internal::TransactionalRequest<::test_placementofattributes::Exam
   fidl_message_header_t header;
 
   ::test_placementofattributes::wire::ExampleProtocolMethodRequest body;
-  explicit TransactionalRequest(const ::test_exampleusing::wire::Empty& arg)
-      : body(::test_placementofattributes::wire::ExampleProtocolMethodRequest{arg}) {
-    _InitHeader();
-  }
-  TransactionalRequest() {
-    _InitHeader();
-  }
+  explicit TransactionalRequest(const ::test_exampleusing::wire::Empty& arg);
 
- private:
-  void _InitHeader();
+  TransactionalRequest();
 };
 
 template <bool IsRecursive>
@@ -91,16 +84,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = 1 + sizeof(fidl_message_header_t);
 
-  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::test_placementofattributes::wire::ExampleProtocolMethodRequest, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::test_placementofattributes::wire::ExampleProtocolMethodRequest, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #endif  // __Fuchsia__
@@ -124,12 +109,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_placementofattri
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method>) == TypeTraits<::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method>, body) == sizeof(fidl_message_header_t));
-static_assert(sizeof(::test_placementofattributes::wire::ExampleProtocolMethodRequest) == TypeTraits<::test_placementofattributes::wire::ExampleProtocolMethodRequest>::kPrimarySize);
-static_assert(offsetof(::test_placementofattributes::wire::ExampleProtocolMethodRequest, arg) == 0);
 
 #endif  // __Fuchsia__
 
@@ -159,7 +138,7 @@ class [[nodiscard]] ::fidl::WireResult<::test_placementofattributes::ExampleProt
       ::fidl::UnownedClientEnd<::test_placementofattributes::ExampleProtocol> client,
       ::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method>* request);
 
-  explicit WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_placementofattributes::ExampleProtocol::Method>(result) {}
+  explicit WireResult(const ::fidl::Status& result);
   WireResult(WireResult&&) = delete;
   WireResult(const WireResult&) = delete;
   WireResult& operator=(WireResult&&) = delete;
@@ -173,9 +152,9 @@ class [[nodiscard]] ::fidl::WireUnownedResult<::test_placementofattributes::Exam
   explicit WireUnownedResult(::fidl::UnownedClientEnd<::test_placementofattributes::ExampleProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method>* request);
   explicit WireUnownedResult(
       ::fit::result<::fidl::Error>&& decoded,
-      ::fidl::internal::MessageStorageViewBase* storage_view) : ::fidl::BaseWireResult<::test_placementofattributes::ExampleProtocol::Method>(::fidl::internal::StatusFromResult(decoded)) {}
+      ::fidl::internal::MessageStorageViewBase* storage_view);
 
-  explicit WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_placementofattributes::ExampleProtocol::Method>(result) {}
+  explicit WireUnownedResult(const ::fidl::Status& result);
   WireUnownedResult(WireUnownedResult&&) = default;
   WireUnownedResult(const WireUnownedResult&) = delete;
   WireUnownedResult& operator=(WireUnownedResult&&) = default;
@@ -213,8 +192,7 @@ class ::fidl::WireSyncEventHandler<::test_placementofattributes::ExampleProtocol
 template <>
 class ::fidl::internal::WireEventDispatcher<::test_placementofattributes::ExampleProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::WireEventHandlerInterface<::test_placementofattributes::ExampleProtocol>> {
  public:
-  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_placementofattributes::ExampleProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_placementofattributes::ExampleProtocol>* event_handler);
 };
 
 // Methods to make a sync FIDL call directly on an unowned handle or a
@@ -225,16 +203,7 @@ class ::fidl::internal::WireSyncClientImpl<::test_placementofattributes::Example
  public:
   // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
   ::fidl::OneWayStatus
-  Method(const ::test_exampleusing::wire::Empty& arg) {
-    ::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method> _request{arg};
-    return ::fidl::WireResult<::test_placementofattributes::ExampleProtocol::Method>(_client_end(), &_request);
-  }
-
- private:
-  ::fidl::UnownedClientEnd<::test_placementofattributes::ExampleProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_placementofattributes::ExampleProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  Method(const ::test_exampleusing::wire::Empty& arg);
 };
 
 template <>
@@ -242,16 +211,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_placementofattributes::E
  public:
   // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
   ::fidl::OneWayStatus
-  Method(const ::test_exampleusing::wire::Empty& arg) {
-    ::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method> _request{arg};
-    return ::fidl::WireUnownedResult<::test_placementofattributes::ExampleProtocol::Method>(_client_end(), _allocator(), &_request);
-  }
-
- private:
-  ::fidl::UnownedClientEnd<::test_placementofattributes::ExampleProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_placementofattributes::ExampleProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  Method(const ::test_exampleusing::wire::Empty& arg);
 };
 
 // Pure-virtual interface to be implemented by a server.
@@ -282,11 +242,7 @@ class ::fidl::WireServer<::test_placementofattributes::ExampleProtocol> : public
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_placementofattributes::ExampleProtocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(

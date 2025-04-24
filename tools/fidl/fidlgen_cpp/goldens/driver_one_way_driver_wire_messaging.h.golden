@@ -73,16 +73,9 @@ struct ::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>
   fidl_message_header_t header;
 
   ::test_driveroneway::wire::OneWaySendRequest body;
-  explicit TransactionalRequest(const ::test_driveroneway::wire::Payload& payload)
-      : body(::test_driveroneway::wire::OneWaySendRequest{payload}) {
-    _InitHeader();
-  }
-  TransactionalRequest() {
-    _InitHeader();
-  }
+  explicit TransactionalRequest(const ::test_driveroneway::wire::Payload& payload);
 
- private:
-  void _InitHeader();
+  TransactionalRequest();
 };
 
 template <bool IsRecursive>
@@ -90,16 +83,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = 4 + sizeof(fidl_message_header_t);
 
-  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::test_driveroneway::wire::OneWaySendRequest, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::test_driveroneway::wire::OneWaySendRequest, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #endif  // __Fuchsia__
@@ -123,12 +108,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_driveroneway::On
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>) == TypeTraits<::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>, body) == sizeof(fidl_message_header_t));
-static_assert(sizeof(::test_driveroneway::wire::OneWaySendRequest) == TypeTraits<::test_driveroneway::wire::OneWaySendRequest>::kPrimarySize);
-static_assert(offsetof(::test_driveroneway::wire::OneWaySendRequest, payload) == 0);
 
 #endif  // __Fuchsia__
 
@@ -168,8 +147,7 @@ class ::fdf::WireAsyncEventHandler<::test_driveroneway::OneWay>
 template <>
 class ::fidl::internal::WireEventDispatcher<::test_driveroneway::OneWay> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::WireEventHandlerInterface<::test_driveroneway::OneWay>> {
  public:
-  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_driveroneway::OneWay>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_driveroneway::OneWay>* event_handler);
 };
 
 template <>
@@ -218,11 +196,7 @@ class ::fdf::WireServer<::test_driveroneway::OneWay> : public ::fidl::internal::
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(fdf_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_driveroneway::OneWay> request) {
-      (void)::fdf::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(fdf_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(

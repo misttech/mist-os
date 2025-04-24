@@ -58,11 +58,7 @@ class {{ .WireServer }} : public ::fidl::internal::IncomingMessageDispatcher
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler({{ .Dispatcher }}* dispatcher) {
-    return [impl=this, dispatcher=dispatcher]({{ .ServerEnd }} request) {
-        (void) {{ .BindServer }}(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler({{ .Dispatcher }}* dispatcher);
 
   private:
   {{- /* Note that this implementation is snake_case to avoid name conflicts. */}}
@@ -71,7 +67,6 @@ class {{ .WireServer }} : public ::fidl::internal::IncomingMessageDispatcher
     ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
 {{- end }}
-
 
 
 {{- define "Protocol:Interface:NaturalMessagingHeader" }}

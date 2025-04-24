@@ -16,6 +16,17 @@ constexpr uint64_t ksuper_foo_Ordinal = 7540745593380780216lu;
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags ksuper_foo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo>) == ::fidl::TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo>>::kPrimarySize);
+static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo>, header) == 0);
+static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo>, body) == sizeof(fidl_message_header_t));
+
+static_assert(sizeof(::test_inheritance::wire::SuperFooRequest) == ::fidl::TypeTraits<::test_inheritance::wire::SuperFooRequest>::kPrimarySize);
+static_assert(offsetof(::test_inheritance::wire::SuperFooRequest, s) == 0);
+static_assert(sizeof(::fidl::WireResponse<::test_inheritance::Super::Foo>) == ::fidl::TypeTraits<::fidl::WireResponse<::test_inheritance::Super::Foo>>::kPrimarySize);
+static_assert(offsetof(::fidl::WireResponse<::test_inheritance::Super::Foo>, y) == 0);
+static_assert(sizeof(::fidl::internal::TransactionalResponse<::test_inheritance::Super::Foo>) == ::fidl::TypeTraits<::fidl::internal::TransactionalResponse<::test_inheritance::Super::Foo>>::kPrimarySize);
+static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_inheritance::Super::Foo>, header) == 0);
+static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_inheritance::Super::Foo>, body) == sizeof(fidl_message_header_t));
 #ifdef __Fuchsia__
 }  // namespace test_inheritance
 
@@ -35,12 +46,15 @@ constexpr ::fidl::MessageDynamicFlags ksuper_foo_DynamicFlags = ::fidl::MessageD
     ExtractValueFromDecoded(decoded_.pointer());
   }
 }
+
+::fidl::WireResult<::test_inheritance::Super::Foo>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_inheritance::Super::Foo>(result) {}
 namespace test_inheritance {
 
 #endif  // __Fuchsia__
 
-#ifdef __Fuchsia__
 }  // namespace test_inheritance
+
+#ifdef __Fuchsia__
 
 ::fidl::WireUnownedResult<::test_inheritance::Super::Foo>::WireUnownedResult(::fidl::UnownedClientEnd<::test_inheritance::Super> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo>* request) {
   constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_inheritance::Super::Foo>();
@@ -71,11 +85,24 @@ namespace test_inheritance {
     ExtractValueFromDecoded(decoded_.pointer());
   }
 }
-namespace test_inheritance {
 
 #endif  // __Fuchsia__
 
-}  // namespace test_inheritance
+::fidl::WireUnownedResult<::test_inheritance::Super::Foo>::WireUnownedResult(::fidl::WireResponse<::test_inheritance::Super::Foo>* response)
+    : ::fidl::BaseWireResult<::test_inheritance::Super::Foo>(fidl::Status::Ok()), decoded_(response) {
+  ExtractValueFromDecoded(decoded_.pointer());
+}
+
+::fidl::WireUnownedResult<::test_inheritance::Super::Foo>::WireUnownedResult(
+    ::fit::result<::fidl::Error, ::fidl::DecodedValue<::fidl::WireResponse<::test_inheritance::Super::Foo>>>&& decoded,
+    ::fidl::internal::MessageStorageViewBase* storage_view) : ::fidl::BaseWireResult<::test_inheritance::Super::Foo>(::fidl::internal::StatusFromResult(decoded)) {
+  if (decoded.is_ok()) {
+    decoded_ = std::move(decoded.value());
+    ExtractValueFromDecoded(decoded_.pointer());
+  }
+}
+
+::fidl::WireUnownedResult<::test_inheritance::Super::Foo>::WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_inheritance::Super::Foo>(result) {}
 
 #ifdef __Fuchsia__
 
@@ -103,6 +130,9 @@ fidl::internal::WireWeakSyncClientImpl<::test_inheritance::Super>::Foo(::fidl::S
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+
+::fidl::internal::WireEventDispatcher<::test_inheritance::Super>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_inheritance::Super>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
 
 ::fidl::Status fidl::WireSyncEventHandler<::test_inheritance::Super>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_inheritance::Super> client_end) {
@@ -156,6 +186,12 @@ void fidl::WireServer<::test_inheritance::Super>::dispatch_message(
   ::fidl::internal::WireServerDispatcher<::test_inheritance::Super>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
+fidl::WireServer<::test_inheritance::Super>::Handler fidl::WireServer<::test_inheritance::Super>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_inheritance::Super> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
+}
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
@@ -195,17 +231,106 @@ void fidl::internal::WireBufferCompleterImpl<::test_inheritance::Super::Foo>::Ma
                             ::fidl::internal::OutgoingTransportContext());
 }
 
-#endif  // __Fuchsia__
+fidl::internal::WireCompleterBase<::test_inheritance::Super::Foo>::WireCompleterBase(::fidl::Transaction* transaction, bool owned, bool expects_reply)
+    : CompleterBase(transaction, owned, expects_reply),
+      WireCompleterImpl(this) {}
+fidl::internal::WireCompleterBase<::test_inheritance::Super::Foo>::WireCompleterBase(WireCompleterBase&& other) noexcept
+    : CompleterBase(std::move(other)), WireCompleterImpl(this) {}
 
-#ifdef __Fuchsia__
-void ::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo>::_InitHeader() {
-  ::fidl::InitTxnHeader(&header, 0, ::test_inheritance::ksuper_foo_Ordinal, ::test_inheritance::ksuper_foo_DynamicFlags);
+::fidl::internal::WireCompleterBase<::test_inheritance::Super::Foo>& fidl::internal::WireCompleterBase<::test_inheritance::Super::Foo>::operator=(WireCompleterBase&& other) noexcept {
+  CompleterBase::operator=(std::move(other));
+  WireCompleterImpl::_set_core(this);
+  return *this;
 }
 
 #endif  // __Fuchsia__
 
-void ::fidl::internal::TransactionalResponse<::test_inheritance::Super::Foo>::_InitHeader() {
+#ifdef __Fuchsia__
+::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_inheritance::ksuper_foo_Ordinal, ::test_inheritance::ksuper_foo_DynamicFlags);
+}
+
+::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo>::TransactionalRequest(::fidl::StringView s)
+    : body(::test_inheritance::wire::SuperFooRequest{s}) {
+  ::fidl::InitTxnHeader(&header, 0, ::test_inheritance::ksuper_foo_Ordinal, ::test_inheritance::ksuper_foo_DynamicFlags);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
+                                                                                                                                                                                  ::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  *position.As<fidl_message_header_t>() = value->header;
+  WireCodingTraits<::test_inheritance::wire::SuperFooRequest, WireCodingConstraintEmpty, IsRecursive>::Encode(
+      encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  WireCodingTraits<::test_inheritance::wire::SuperFooRequest, WireCodingConstraintEmpty, IsRecursive>::Decode(
+      decoder, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo>, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
+#endif  // __Fuchsia__
+
+::fidl::WireResponse<::test_inheritance::Super::Foo>::WireResponse(::test_inheritance::wire::SuperFooResponse base) : ::test_inheritance::wire::SuperFooResponse(std::move(base)) {}
+::fidl::WireResponse<::test_inheritance::Super::Foo>::WireResponse(int64_t y) : ::test_inheritance::wire::SuperFooResponse{.y = std::move(y)} {}
+
+::fidl::internal::TransactionalResponse<::test_inheritance::Super::Foo>::TransactionalResponse(int64_t y)
+    : body(::fidl::WireResponse<::test_inheritance::Super::Foo>(y)) {
+  ::fidl::InitTxnHeader(&header, 0, ::test_inheritance::ksuper_foo_Ordinal, ::test_inheritance::ksuper_foo_DynamicFlags);
+}
+::fidl::internal::TransactionalResponse<::test_inheritance::Super::Foo>::TransactionalResponse() {
+  ::fidl::InitTxnHeader(&header, 0, ::test_inheritance::ksuper_foo_Ordinal, ::test_inheritance::ksuper_foo_DynamicFlags);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_inheritance::Super::Foo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    internal::WireEncoder* encoder, ::fidl::WireResponse<::test_inheritance::Super::Foo>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  fidl::internal::WireCodingTraits<::test_inheritance::wire::SuperFooResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+      encoder, value, position, recursion_depth);
+}
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_inheritance::Super::Foo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  fidl::internal::WireCodingTraits<::test_inheritance::wire::SuperFooResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+      decoder, position, recursion_depth);
+}
+template struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_inheritance::Super::Foo>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_inheritance::Super::Foo>, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_inheritance::Super::Foo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
+                                                                                                                                                                                   ::fidl::internal::TransactionalResponse<::test_inheritance::Super::Foo>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  *position.As<fidl_message_header_t>() = value->header;
+  WireCodingTraits<::fidl::WireResponse<::test_inheritance::Super::Foo>, WireCodingConstraintEmpty, IsRecursive>::Encode(
+      encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_inheritance::Super::Foo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  WireCodingTraits<::fidl::WireResponse<::test_inheritance::Super::Foo>, WireCodingConstraintEmpty, IsRecursive>::Decode(
+      decoder, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_inheritance::Super::Foo>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_inheritance::Super::Foo>, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
+::fidl::WireResult<::test_inheritance::Super::Foo>
+fidl::internal::WireSyncClientImpl<::test_inheritance::Super>::Foo(::fidl::StringView s) {
+  ::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo> _request{s};
+  return ::fidl::WireResult<::test_inheritance::Super::Foo>(
+      ::fidl::UnownedClientEnd<::test_inheritance::Super>(_transport().get<::fidl::internal::ChannelTransport>()), &_request);
+}
+
+::fidl::WireUnownedResult<::test_inheritance::Super::Foo>
+fidl::internal::WireSyncBufferClientImpl<::test_inheritance::Super>::Foo(::fidl::StringView s) {
+  ::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo> _request{s};
+  return ::fidl::WireUnownedResult<::test_inheritance::Super::Foo>(
+      ::fidl::UnownedClientEnd<::test_inheritance::Super>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
 }
 
 #ifdef __Fuchsia__
@@ -219,6 +344,17 @@ constexpr uint64_t ksub_foo_Ordinal = 7540745593380780216lu;
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags ksub_foo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo>) == ::fidl::TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo>>::kPrimarySize);
+static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo>, header) == 0);
+static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo>, body) == sizeof(fidl_message_header_t));
+
+static_assert(sizeof(::test_inheritance::wire::SuperFooRequest) == ::fidl::TypeTraits<::test_inheritance::wire::SuperFooRequest>::kPrimarySize);
+static_assert(offsetof(::test_inheritance::wire::SuperFooRequest, s) == 0);
+static_assert(sizeof(::fidl::WireResponse<::test_inheritance::Sub::Foo>) == ::fidl::TypeTraits<::fidl::WireResponse<::test_inheritance::Sub::Foo>>::kPrimarySize);
+static_assert(offsetof(::fidl::WireResponse<::test_inheritance::Sub::Foo>, y) == 0);
+static_assert(sizeof(::fidl::internal::TransactionalResponse<::test_inheritance::Sub::Foo>) == ::fidl::TypeTraits<::fidl::internal::TransactionalResponse<::test_inheritance::Sub::Foo>>::kPrimarySize);
+static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_inheritance::Sub::Foo>, header) == 0);
+static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_inheritance::Sub::Foo>, body) == sizeof(fidl_message_header_t));
 #ifdef __Fuchsia__
 }  // namespace test_inheritance
 
@@ -238,12 +374,15 @@ constexpr ::fidl::MessageDynamicFlags ksub_foo_DynamicFlags = ::fidl::MessageDyn
     ExtractValueFromDecoded(decoded_.pointer());
   }
 }
+
+::fidl::WireResult<::test_inheritance::Sub::Foo>::WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_inheritance::Sub::Foo>(result) {}
 namespace test_inheritance {
 
 #endif  // __Fuchsia__
 
-#ifdef __Fuchsia__
 }  // namespace test_inheritance
+
+#ifdef __Fuchsia__
 
 ::fidl::WireUnownedResult<::test_inheritance::Sub::Foo>::WireUnownedResult(::fidl::UnownedClientEnd<::test_inheritance::Sub> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo>* request) {
   constexpr uint32_t buffer_size = ::fidl::SyncClientMethodBufferSizeInChannel<::test_inheritance::Sub::Foo>();
@@ -274,11 +413,24 @@ namespace test_inheritance {
     ExtractValueFromDecoded(decoded_.pointer());
   }
 }
-namespace test_inheritance {
 
 #endif  // __Fuchsia__
 
-}  // namespace test_inheritance
+::fidl::WireUnownedResult<::test_inheritance::Sub::Foo>::WireUnownedResult(::fidl::WireResponse<::test_inheritance::Sub::Foo>* response)
+    : ::fidl::BaseWireResult<::test_inheritance::Sub::Foo>(fidl::Status::Ok()), decoded_(response) {
+  ExtractValueFromDecoded(decoded_.pointer());
+}
+
+::fidl::WireUnownedResult<::test_inheritance::Sub::Foo>::WireUnownedResult(
+    ::fit::result<::fidl::Error, ::fidl::DecodedValue<::fidl::WireResponse<::test_inheritance::Sub::Foo>>>&& decoded,
+    ::fidl::internal::MessageStorageViewBase* storage_view) : ::fidl::BaseWireResult<::test_inheritance::Sub::Foo>(::fidl::internal::StatusFromResult(decoded)) {
+  if (decoded.is_ok()) {
+    decoded_ = std::move(decoded.value());
+    ExtractValueFromDecoded(decoded_.pointer());
+  }
+}
+
+::fidl::WireUnownedResult<::test_inheritance::Sub::Foo>::WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_inheritance::Sub::Foo>(result) {}
 
 #ifdef __Fuchsia__
 
@@ -306,6 +458,9 @@ fidl::internal::WireWeakSyncClientImpl<::test_inheritance::Sub>::Foo(::fidl::Str
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+
+::fidl::internal::WireEventDispatcher<::test_inheritance::Sub>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_inheritance::Sub>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
 
 ::fidl::Status fidl::WireSyncEventHandler<::test_inheritance::Sub>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_inheritance::Sub> client_end) {
@@ -359,6 +514,12 @@ void fidl::WireServer<::test_inheritance::Sub>::dispatch_message(
   ::fidl::internal::WireServerDispatcher<::test_inheritance::Sub>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
+fidl::WireServer<::test_inheritance::Sub>::Handler fidl::WireServer<::test_inheritance::Sub>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_inheritance::Sub> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
+}
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
@@ -398,17 +559,106 @@ void fidl::internal::WireBufferCompleterImpl<::test_inheritance::Sub::Foo>::Make
                             ::fidl::internal::OutgoingTransportContext());
 }
 
-#endif  // __Fuchsia__
+fidl::internal::WireCompleterBase<::test_inheritance::Sub::Foo>::WireCompleterBase(::fidl::Transaction* transaction, bool owned, bool expects_reply)
+    : CompleterBase(transaction, owned, expects_reply),
+      WireCompleterImpl(this) {}
+fidl::internal::WireCompleterBase<::test_inheritance::Sub::Foo>::WireCompleterBase(WireCompleterBase&& other) noexcept
+    : CompleterBase(std::move(other)), WireCompleterImpl(this) {}
 
-#ifdef __Fuchsia__
-void ::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo>::_InitHeader() {
-  ::fidl::InitTxnHeader(&header, 0, ::test_inheritance::ksub_foo_Ordinal, ::test_inheritance::ksub_foo_DynamicFlags);
+::fidl::internal::WireCompleterBase<::test_inheritance::Sub::Foo>& fidl::internal::WireCompleterBase<::test_inheritance::Sub::Foo>::operator=(WireCompleterBase&& other) noexcept {
+  CompleterBase::operator=(std::move(other));
+  WireCompleterImpl::_set_core(this);
+  return *this;
 }
 
 #endif  // __Fuchsia__
 
-void ::fidl::internal::TransactionalResponse<::test_inheritance::Sub::Foo>::_InitHeader() {
+#ifdef __Fuchsia__
+::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_inheritance::ksub_foo_Ordinal, ::test_inheritance::ksub_foo_DynamicFlags);
+}
+
+::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo>::TransactionalRequest(::fidl::StringView s)
+    : body(::test_inheritance::wire::SuperFooRequest{s}) {
+  ::fidl::InitTxnHeader(&header, 0, ::test_inheritance::ksub_foo_Ordinal, ::test_inheritance::ksub_foo_DynamicFlags);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
+                                                                                                                                                                                ::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  *position.As<fidl_message_header_t>() = value->header;
+  WireCodingTraits<::test_inheritance::wire::SuperFooRequest, WireCodingConstraintEmpty, IsRecursive>::Encode(
+      encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  WireCodingTraits<::test_inheritance::wire::SuperFooRequest, WireCodingConstraintEmpty, IsRecursive>::Decode(
+      decoder, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo>, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
+#endif  // __Fuchsia__
+
+::fidl::WireResponse<::test_inheritance::Sub::Foo>::WireResponse(::test_inheritance::wire::SuperFooResponse base) : ::test_inheritance::wire::SuperFooResponse(std::move(base)) {}
+::fidl::WireResponse<::test_inheritance::Sub::Foo>::WireResponse(int64_t y) : ::test_inheritance::wire::SuperFooResponse{.y = std::move(y)} {}
+
+::fidl::internal::TransactionalResponse<::test_inheritance::Sub::Foo>::TransactionalResponse(int64_t y)
+    : body(::fidl::WireResponse<::test_inheritance::Sub::Foo>(y)) {
+  ::fidl::InitTxnHeader(&header, 0, ::test_inheritance::ksub_foo_Ordinal, ::test_inheritance::ksub_foo_DynamicFlags);
+}
+::fidl::internal::TransactionalResponse<::test_inheritance::Sub::Foo>::TransactionalResponse() {
+  ::fidl::InitTxnHeader(&header, 0, ::test_inheritance::ksub_foo_Ordinal, ::test_inheritance::ksub_foo_DynamicFlags);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_inheritance::Sub::Foo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    internal::WireEncoder* encoder, ::fidl::WireResponse<::test_inheritance::Sub::Foo>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  fidl::internal::WireCodingTraits<::test_inheritance::wire::SuperFooResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+      encoder, value, position, recursion_depth);
+}
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_inheritance::Sub::Foo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  fidl::internal::WireCodingTraits<::test_inheritance::wire::SuperFooResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+      decoder, position, recursion_depth);
+}
+template struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_inheritance::Sub::Foo>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_inheritance::Sub::Foo>, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_inheritance::Sub::Foo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
+                                                                                                                                                                                 ::fidl::internal::TransactionalResponse<::test_inheritance::Sub::Foo>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  *position.As<fidl_message_header_t>() = value->header;
+  WireCodingTraits<::fidl::WireResponse<::test_inheritance::Sub::Foo>, WireCodingConstraintEmpty, IsRecursive>::Encode(
+      encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_inheritance::Sub::Foo>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  WireCodingTraits<::fidl::WireResponse<::test_inheritance::Sub::Foo>, WireCodingConstraintEmpty, IsRecursive>::Decode(
+      decoder, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_inheritance::Sub::Foo>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_inheritance::Sub::Foo>, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
+::fidl::WireResult<::test_inheritance::Sub::Foo>
+fidl::internal::WireSyncClientImpl<::test_inheritance::Sub>::Foo(::fidl::StringView s) {
+  ::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo> _request{s};
+  return ::fidl::WireResult<::test_inheritance::Sub::Foo>(
+      ::fidl::UnownedClientEnd<::test_inheritance::Sub>(_transport().get<::fidl::internal::ChannelTransport>()), &_request);
+}
+
+::fidl::WireUnownedResult<::test_inheritance::Sub::Foo>
+fidl::internal::WireSyncBufferClientImpl<::test_inheritance::Sub>::Foo(::fidl::StringView s) {
+  ::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo> _request{s};
+  return ::fidl::WireUnownedResult<::test_inheritance::Sub::Foo>(
+      ::fidl::UnownedClientEnd<::test_inheritance::Sub>(_transport().get<::fidl::internal::ChannelTransport>()), _allocator(), &_request);
 }
 
 #ifdef __Fuchsia__

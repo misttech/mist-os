@@ -17,6 +17,18 @@ constexpr uint64_t kTwoWay_Add_Ordinal = 989730524426044687lu;
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kTwoWay_Add_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>) == ::fidl::TypeTraits<::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>>::kPrimarySize);
+static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>, header) == 0);
+static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>, body) == sizeof(fidl_message_header_t));
+
+static_assert(sizeof(::test_drivertwoway::wire::TwoWayAddRequest) == ::fidl::TypeTraits<::test_drivertwoway::wire::TwoWayAddRequest>::kPrimarySize);
+static_assert(offsetof(::test_drivertwoway::wire::TwoWayAddRequest, addend1) == 0);
+static_assert(offsetof(::test_drivertwoway::wire::TwoWayAddRequest, addend2) == 2);
+static_assert(sizeof(::fidl::WireResponse<::test_drivertwoway::TwoWay::Add>) == ::fidl::TypeTraits<::fidl::WireResponse<::test_drivertwoway::TwoWay::Add>>::kPrimarySize);
+static_assert(offsetof(::fidl::WireResponse<::test_drivertwoway::TwoWay::Add>, sum) == 0);
+static_assert(sizeof(::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>) == ::fidl::TypeTraits<::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>>::kPrimarySize);
+static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>, header) == 0);
+static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>, body) == sizeof(fidl_message_header_t));
 
 #ifdef __Fuchsia__
 }  // namespace test_drivertwoway
@@ -80,6 +92,9 @@ namespace test_drivertwoway {
 
 #ifdef __Fuchsia__
 
+::fidl::internal::WireEventDispatcher<::test_drivertwoway::TwoWay>::WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_drivertwoway::TwoWay>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
@@ -127,6 +142,12 @@ void fdf::WireServer<::test_drivertwoway::TwoWay>::dispatch_message(
   ::fidl::internal::WireServerDispatcher<::test_drivertwoway::TwoWay>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
+fdf::WireServer<::test_drivertwoway::TwoWay>::Handler fdf::WireServer<::test_drivertwoway::TwoWay>::bind_handler(fdf_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_drivertwoway::TwoWay> request) {
+    (void)::fdf::BindServer(dispatcher, std::move(request), impl);
+  };
+}
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
@@ -151,15 +172,78 @@ void fidl::internal::WireBufferCompleterImpl<::test_drivertwoway::TwoWay::Add>::
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-void ::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>::_InitHeader() {
+::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>::TransactionalRequest() {
   ::fidl::InitTxnHeader(&header, 0, ::test_drivertwoway::kTwoWay_Add_Ordinal, ::test_drivertwoway::kTwoWay_Add_DynamicFlags);
 }
+
+::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>::TransactionalRequest(uint16_t addend1, uint16_t addend2)
+    : body(::test_drivertwoway::wire::TwoWayAddRequest{addend1, addend2}) {
+  ::fidl::InitTxnHeader(&header, 0, ::test_drivertwoway::kTwoWay_Add_Ordinal, ::test_drivertwoway::kTwoWay_Add_DynamicFlags);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
+                                                                                                                                                                                    ::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  *position.As<fidl_message_header_t>() = value->header;
+  WireCodingTraits<::test_drivertwoway::wire::TwoWayAddRequest, WireCodingConstraintEmpty, IsRecursive>::Encode(
+      encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  WireCodingTraits<::test_drivertwoway::wire::TwoWayAddRequest, WireCodingConstraintEmpty, IsRecursive>::Decode(
+      decoder, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
 #endif  // __Fuchsia__
 
-void ::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>::_InitHeader() {
+::fidl::WireResponse<::test_drivertwoway::TwoWay::Add>::WireResponse(::test_drivertwoway::wire::TwoWayAddResponse base) : ::test_drivertwoway::wire::TwoWayAddResponse(std::move(base)) {}
+::fidl::WireResponse<::test_drivertwoway::TwoWay::Add>::WireResponse(uint16_t sum) : ::test_drivertwoway::wire::TwoWayAddResponse{.sum = std::move(sum)} {}
+
+::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>::TransactionalResponse(uint16_t sum)
+    : body(::fidl::WireResponse<::test_drivertwoway::TwoWay::Add>(sum)) {
   ::fidl::InitTxnHeader(&header, 0, ::test_drivertwoway::kTwoWay_Add_Ordinal, ::test_drivertwoway::kTwoWay_Add_DynamicFlags);
 }
+::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>::TransactionalResponse() {
+  ::fidl::InitTxnHeader(&header, 0, ::test_drivertwoway::kTwoWay_Add_Ordinal, ::test_drivertwoway::kTwoWay_Add_DynamicFlags);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_drivertwoway::TwoWay::Add>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+    internal::WireEncoder* encoder, ::fidl::WireResponse<::test_drivertwoway::TwoWay::Add>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  fidl::internal::WireCodingTraits<::test_drivertwoway::wire::TwoWayAddResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+      encoder, value, position, recursion_depth);
+}
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_drivertwoway::TwoWay::Add>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  fidl::internal::WireCodingTraits<::test_drivertwoway::wire::TwoWayAddResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+      decoder, position, recursion_depth);
+}
+template struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_drivertwoway::TwoWay::Add>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_drivertwoway::TwoWay::Add>, ::fidl::internal::WireCodingConstraintEmpty, false>;
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(internal::WireEncoder* encoder,
+                                                                                                                                                                                     ::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  *position.As<fidl_message_header_t>() = value->header;
+  WireCodingTraits<::fidl::WireResponse<::test_drivertwoway::TwoWay::Add>, WireCodingConstraintEmpty, IsRecursive>::Encode(
+      encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template <bool IsRecursive>
+void ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  WireCodingTraits<::fidl::WireResponse<::test_drivertwoway::TwoWay::Add>, WireCodingConstraintEmpty, IsRecursive>::Decode(
+      decoder, position + sizeof(fidl_message_header_t), recursion_depth);
+}
+
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>, ::fidl::internal::WireCodingConstraintEmpty, true>;
+template struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>, ::fidl::internal::WireCodingConstraintEmpty, false>;
 
 #ifdef __Fuchsia__
 

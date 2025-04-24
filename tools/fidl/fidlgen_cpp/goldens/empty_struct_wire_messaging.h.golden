@@ -113,16 +113,9 @@ struct ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol:
   fidl_message_header_t header;
 
   ::test_emptystruct::wire::EmptyProtocolSendRequest body;
-  explicit TransactionalRequest(const ::test_emptystruct::wire::Empty& e)
-      : body(::test_emptystruct::wire::EmptyProtocolSendRequest{e}) {
-    _InitHeader();
-  }
-  TransactionalRequest() {
-    _InitHeader();
-  }
+  explicit TransactionalRequest(const ::test_emptystruct::wire::Empty& e);
 
- private:
-  void _InitHeader();
+  TransactionalRequest();
 };
 
 template <bool IsRecursive>
@@ -130,16 +123,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = 1 + sizeof(fidl_message_header_t);
 
-  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::test_emptystruct::wire::EmptyProtocolSendRequest, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::test_emptystruct::wire::EmptyProtocolSendRequest, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #endif  // __Fuchsia__
@@ -152,17 +137,9 @@ struct ::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::R
 
   ::fidl::WireEvent<::test_emptystruct::EmptyProtocol::Receive> body;
 
-  explicit TransactionalEvent(const ::test_emptystruct::wire::Empty& e)
-      : body{e} {
-    _InitHeader();
-  }
+  explicit TransactionalEvent(const ::test_emptystruct::wire::Empty& e);
 
-  TransactionalEvent() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
+  TransactionalEvent();
 };
 
 template <bool IsRecursive>
@@ -171,16 +148,9 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalEvent<:
   static constexpr size_t kInlineSize = 1 + sizeof(fidl_message_header_t);
 
   static void Encode(
-      internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireEvent<::test_emptystruct::EmptyProtocol::Receive>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
+      internal::WireEncoder* encoder, ::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireEvent<::test_emptystruct::EmptyProtocol::Receive>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #endif  // __Fuchsia__
@@ -192,17 +162,10 @@ struct ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol:
   fidl_message_header_t header;
 
   ::test_emptystruct::wire::EmptyProtocolSendAndReceiveRequest body;
-  explicit TransactionalRequest(const ::test_emptystruct::wire::Empty& e)
-      : body(::test_emptystruct::wire::EmptyProtocolSendAndReceiveRequest{e}) {
-    _InitHeader();
-  }
-  TransactionalRequest() {
-    _InitHeader();
-  }
-  using ResponseType = ::fidl::internal::TransactionalResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>;
+  explicit TransactionalRequest(const ::test_emptystruct::wire::Empty& e);
 
- private:
-  void _InitHeader();
+  TransactionalRequest();
+  using ResponseType = ::fidl::internal::TransactionalResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>;
 };
 
 template <bool IsRecursive>
@@ -210,24 +173,16 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = 1 + sizeof(fidl_message_header_t);
 
-  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::test_emptystruct::wire::EmptyProtocolSendAndReceiveRequest, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::test_emptystruct::wire::EmptyProtocolSendAndReceiveRequest, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #endif  // __Fuchsia__
 
 template <>
 struct ::fidl::WireResponse<::test_emptystruct::EmptyProtocol::SendAndReceive> final : public ::test_emptystruct::wire::EmptyProtocolSendAndReceiveResponse {
-  explicit WireResponse(::test_emptystruct::wire::EmptyProtocolSendAndReceiveResponse base) : ::test_emptystruct::wire::EmptyProtocolSendAndReceiveResponse(std::move(base)) {}
-  explicit WireResponse(const ::test_emptystruct::wire::Empty& e) : ::test_emptystruct::wire::EmptyProtocolSendAndReceiveResponse{.e = std::move(e)} {}
+  explicit WireResponse(::test_emptystruct::wire::EmptyProtocolSendAndReceiveResponse base);
+  explicit WireResponse(const ::test_emptystruct::wire::Empty& e);
   WireResponse() = default;
 };
 
@@ -237,15 +192,9 @@ struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_emptystruc
   static constexpr size_t kInlineSize = 1;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::fidl::WireResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_emptystruct::wire::EmptyProtocolSendAndReceiveResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, value, position, recursion_depth);
-  }
+      internal::WireEncoder* encoder, ::fidl::WireResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl::internal::WireCodingTraits<::test_emptystruct::wire::EmptyProtocolSendAndReceiveResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position, recursion_depth);
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 template <>
@@ -254,16 +203,8 @@ struct ::fidl::internal::TransactionalResponse<::test_emptystruct::EmptyProtocol
   fidl_message_header_t header;
 
   ::fidl::WireResponse<::test_emptystruct::EmptyProtocol::SendAndReceive> body;
-  explicit TransactionalResponse(const ::test_emptystruct::wire::Empty& e)
-      : body(::fidl::WireResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>(e)) {
-    _InitHeader();
-  }
-  TransactionalResponse() {
-    _InitHeader();
-  }
-
- private:
-  void _InitHeader();
+  explicit TransactionalResponse(const ::test_emptystruct::wire::Empty& e);
+  TransactionalResponse();
 };
 
 template <bool IsRecursive>
@@ -271,16 +212,8 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = 1 + sizeof(fidl_message_header_t);
 
-  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::fidl::WireResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::fidl::WireResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 namespace fidl {
@@ -303,12 +236,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_emptystruct::Emp
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
 
-static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send>) == TypeTraits<::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send>, body) == sizeof(fidl_message_header_t));
-static_assert(sizeof(::test_emptystruct::wire::EmptyProtocolSendRequest) == TypeTraits<::test_emptystruct::wire::EmptyProtocolSendRequest>::kPrimarySize);
-static_assert(offsetof(::test_emptystruct::wire::EmptyProtocolSendRequest, e) == 0);
-
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
@@ -329,10 +256,6 @@ struct TypeTraits<::fidl::internal::TransactionalEvent<::test_emptystruct::Empty
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
 
-static_assert(sizeof(::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive>) == TypeTraits<::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive>, body) == sizeof(fidl_message_header_t));
-
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
@@ -352,12 +275,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_emptystruct::Emp
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive>) == TypeTraits<::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive>, body) == sizeof(fidl_message_header_t));
-static_assert(sizeof(::test_emptystruct::wire::EmptyProtocolSendAndReceiveRequest) == TypeTraits<::test_emptystruct::wire::EmptyProtocolSendAndReceiveRequest>::kPrimarySize);
-static_assert(offsetof(::test_emptystruct::wire::EmptyProtocolSendAndReceiveRequest, e) == 0);
 
 #endif  // __Fuchsia__
 
@@ -380,10 +297,6 @@ struct TypeTraits<::fidl::internal::TransactionalResponse<::test_emptystruct::Em
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-
-static_assert(sizeof(::fidl::internal::TransactionalResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>) == TypeTraits<::fidl::internal::TransactionalResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>> {
   static constexpr bool kHasServerToClientBody = true;
@@ -396,8 +309,6 @@ struct TypeTraits<::fidl::WireResponse<::test_emptystruct::EmptyProtocol::SendAn
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
 };
-static_assert(sizeof(::fidl::WireResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>) == TypeTraits<::fidl::WireResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>>::kPrimarySize);
-static_assert(offsetof(::fidl::WireResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>, e) == 0);
 #ifdef __Fuchsia__
 }  // namespace fidl
 
@@ -440,7 +351,7 @@ class [[nodiscard]] ::fidl::WireResult<::test_emptystruct::EmptyProtocol::Send> 
       ::fidl::UnownedClientEnd<::test_emptystruct::EmptyProtocol> client,
       ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send>* request);
 
-  explicit WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_emptystruct::EmptyProtocol::Send>(result) {}
+  explicit WireResult(const ::fidl::Status& result);
   WireResult(WireResult&&) = delete;
   WireResult(const WireResult&) = delete;
   WireResult& operator=(WireResult&&) = delete;
@@ -454,9 +365,9 @@ class [[nodiscard]] ::fidl::WireUnownedResult<::test_emptystruct::EmptyProtocol:
   explicit WireUnownedResult(::fidl::UnownedClientEnd<::test_emptystruct::EmptyProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send>* request);
   explicit WireUnownedResult(
       ::fit::result<::fidl::Error>&& decoded,
-      ::fidl::internal::MessageStorageViewBase* storage_view) : ::fidl::BaseWireResult<::test_emptystruct::EmptyProtocol::Send>(::fidl::internal::StatusFromResult(decoded)) {}
+      ::fidl::internal::MessageStorageViewBase* storage_view);
 
-  explicit WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_emptystruct::EmptyProtocol::Send>(result) {}
+  explicit WireUnownedResult(const ::fidl::Status& result);
   WireUnownedResult(WireUnownedResult&&) = default;
   WireUnownedResult(const WireUnownedResult&) = delete;
   WireUnownedResult& operator=(WireUnownedResult&&) = default;
@@ -476,7 +387,7 @@ class [[nodiscard]] ::fidl::WireResult<::test_emptystruct::EmptyProtocol::SendAn
       ::fidl::UnownedClientEnd<::test_emptystruct::EmptyProtocol> client,
       ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive>* request);
 
-  explicit WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_emptystruct::EmptyProtocol::SendAndReceive>(result) {}
+  explicit WireResult(const ::fidl::Status& result);
   WireResult(WireResult&&) = delete;
   WireResult(const WireResult&) = delete;
   WireResult& operator=(WireResult&&) = delete;
@@ -492,21 +403,12 @@ template <>
 class [[nodiscard]] ::fidl::WireUnownedResult<::test_emptystruct::EmptyProtocol::SendAndReceive> final : public ::fidl::BaseWireResult<::test_emptystruct::EmptyProtocol::SendAndReceive> {
  public:
   explicit WireUnownedResult(::fidl::UnownedClientEnd<::test_emptystruct::EmptyProtocol> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive>* request);
-  explicit WireUnownedResult(::fidl::WireResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>* response)
-      : ::fidl::BaseWireResult<::test_emptystruct::EmptyProtocol::SendAndReceive>(fidl::Status::Ok()), decoded_(response) {
-    ExtractValueFromDecoded(decoded_.pointer());
-  }
-
+  explicit WireUnownedResult(::fidl::WireResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>* response);
   explicit WireUnownedResult(
       ::fit::result<::fidl::Error, ::fidl::DecodedValue<::fidl::WireResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>>>&& decoded,
-      ::fidl::internal::MessageStorageViewBase* storage_view) : ::fidl::BaseWireResult<::test_emptystruct::EmptyProtocol::SendAndReceive>(::fidl::internal::StatusFromResult(decoded)) {
-    if (decoded.is_ok()) {
-      decoded_ = std::move(decoded.value());
-      ExtractValueFromDecoded(decoded_.pointer());
-    }
-  }
+      ::fidl::internal::MessageStorageViewBase* storage_view);
 
-  explicit WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_emptystruct::EmptyProtocol::SendAndReceive>(result) {}
+  explicit WireUnownedResult(const ::fidl::Status& result);
   WireUnownedResult(WireUnownedResult&&) = default;
   WireUnownedResult(const WireUnownedResult&) = delete;
   WireUnownedResult& operator=(WireUnownedResult&&) = default;
@@ -549,8 +451,7 @@ class ::fidl::WireSyncEventHandler<::test_emptystruct::EmptyProtocol>
 template <>
 class ::fidl::internal::WireEventDispatcher<::test_emptystruct::EmptyProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::WireEventHandlerInterface<::test_emptystruct::EmptyProtocol>> {
  public:
-  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_emptystruct::EmptyProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_emptystruct::EmptyProtocol>* event_handler);
   ::fidl::Status DispatchEvent(
       ::fidl::IncomingHeaderAndMessage& msg,
       ::fidl::internal::MessageStorageViewBase* storage_view) override;
@@ -564,23 +465,11 @@ class ::fidl::internal::WireSyncClientImpl<::test_emptystruct::EmptyProtocol> fi
  public:
   // Allocates 40 bytes of message buffer on the stack. No heap allocation necessary.
   ::fidl::OneWayStatus
-  Send(const ::test_emptystruct::wire::Empty& e) {
-    ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send> _request{e};
-    return ::fidl::WireResult<::test_emptystruct::EmptyProtocol::Send>(_client_end(), &_request);
-  }
+  Send(const ::test_emptystruct::wire::Empty& e);
 
   // Allocates 48 bytes of message buffer on the stack. No heap allocation necessary.
   ::fidl::WireResult<::test_emptystruct::EmptyProtocol::SendAndReceive>
-  SendAndReceive(const ::test_emptystruct::wire::Empty& e) {
-    ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive> _request{e};
-    return ::fidl::WireResult<::test_emptystruct::EmptyProtocol::SendAndReceive>(_client_end(), &_request);
-  }
-
- private:
-  ::fidl::UnownedClientEnd<::test_emptystruct::EmptyProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_emptystruct::EmptyProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  SendAndReceive(const ::test_emptystruct::wire::Empty& e);
 };
 
 template <>
@@ -588,23 +477,11 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_emptystruct::EmptyProtoc
  public:
   // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
   ::fidl::OneWayStatus
-  Send(const ::test_emptystruct::wire::Empty& e) {
-    ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send> _request{e};
-    return ::fidl::WireUnownedResult<::test_emptystruct::EmptyProtocol::Send>(_client_end(), _allocator(), &_request);
-  }
+  Send(const ::test_emptystruct::wire::Empty& e);
 
   // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
   ::fidl::WireUnownedResult<::test_emptystruct::EmptyProtocol::SendAndReceive>
-  SendAndReceive(const ::test_emptystruct::wire::Empty& e) {
-    ::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive> _request{e};
-    return ::fidl::WireUnownedResult<::test_emptystruct::EmptyProtocol::SendAndReceive>(_client_end(), _allocator(), &_request);
-  }
-
- private:
-  ::fidl::UnownedClientEnd<::test_emptystruct::EmptyProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_emptystruct::EmptyProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  SendAndReceive(const ::test_emptystruct::wire::Empty& e);
 };
 
 template <>
@@ -632,16 +509,9 @@ class ::fidl::internal::WireBufferCompleterImpl<::test_emptystruct::EmptyProtoco
 template <>
 class ::fidl::internal::WireCompleterBase<::test_emptystruct::EmptyProtocol::SendAndReceive> : public ::fidl::CompleterBase, public ::fidl::internal::WireCompleterImpl<::test_emptystruct::EmptyProtocol::SendAndReceive> {
  public:
-  WireCompleterBase(::fidl::Transaction* transaction, bool owned, bool expects_reply)
-      : CompleterBase(transaction, owned, expects_reply),
-        WireCompleterImpl(this) {}
-  WireCompleterBase(WireCompleterBase&& other) noexcept
-      : CompleterBase(std::move(other)), WireCompleterImpl(this) {}
-  WireCompleterBase& operator=(WireCompleterBase&& other) noexcept {
-    CompleterBase::operator=(std::move(other));
-    WireCompleterImpl::_set_core(this);
-    return *this;
-  }
+  WireCompleterBase(::fidl::Transaction* transaction, bool owned, bool expects_reply);
+  WireCompleterBase(WireCompleterBase&& other) noexcept;
+  WireCompleterBase& operator=(WireCompleterBase&& other) noexcept;
 };
 
 // Pure-virtual interface to be implemented by a server.
@@ -679,11 +549,7 @@ class ::fidl::WireServer<::test_emptystruct::EmptyProtocol> : public ::fidl::int
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_emptystruct::EmptyProtocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(

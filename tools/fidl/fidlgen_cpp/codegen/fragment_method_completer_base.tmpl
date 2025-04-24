@@ -42,18 +42,11 @@ class {{ .WireBufferCompleterImpl }} : public ::fidl::internal::BufferCompleterI
 template<>
 class {{ .WireCompleterBase }} : public ::fidl::CompleterBase, public {{ .WireCompleterImpl }} {
  public:
-  {{ .WireCompleterBase.Self }}(::fidl::Transaction* transaction, bool owned, bool expects_reply)
-      : CompleterBase(transaction, owned, expects_reply),
-        {{ .WireCompleterImpl.Self }}(this) {}
+  {{ .WireCompleterBase.Self }}(::fidl::Transaction* transaction, bool owned, bool expects_reply);
 
   {{- /* Update `this` pointer after moving the completer. */}}
-  {{ .WireCompleterBase.Self }}({{ .WireCompleterBase.Self }}&& other) noexcept
-      : CompleterBase(std::move(other)), {{ .WireCompleterImpl.Self }}(this) {}
-  {{ .WireCompleterBase.Self }}& operator=({{ .WireCompleterBase.Self }}&& other) noexcept {
-    CompleterBase::operator=(std::move(other));
-    {{ .WireCompleterImpl.Self }}::_set_core(this);
-    return *this;
-  }
+  {{ .WireCompleterBase.Self }}({{ .WireCompleterBase.Self }}&& other) noexcept;
+  {{ .WireCompleterBase.Self }}& operator=({{ .WireCompleterBase.Self }}&& other) noexcept;
 };
 
 {{- end }}
@@ -135,6 +128,21 @@ void
   return _core()->SendReply(&_response_message.GetOutgoingMessage(),
                             ::fidl::internal::OutgoingTransportContext());
 }
+
+{{ .WireCompleterBase.NoLeading }}::{{ .WireCompleterBase.Self }}(::fidl::Transaction* transaction, bool owned, bool expects_reply)
+: CompleterBase(transaction, owned, expects_reply),
+  {{ .WireCompleterImpl.Self }}(this) {}
+
+{{- /* Update `this` pointer after moving the completer. */}}
+{{ .WireCompleterBase.NoLeading }}::{{ .WireCompleterBase.Self }}({{ .WireCompleterBase.Self }}&& other) noexcept
+    : CompleterBase(std::move(other)), {{ .WireCompleterImpl.Self }}(this) {}
+
+{{ .WireCompleterBase }}& {{ .WireCompleterBase.NoLeading }}::operator=({{ .WireCompleterBase.Self }}&& other) noexcept {
+  CompleterBase::operator=(std::move(other));
+  {{ .WireCompleterImpl.Self }}::_set_core(this);
+  return *this;
+}
+
 
 {{- if .HasDomainError }}
   void
