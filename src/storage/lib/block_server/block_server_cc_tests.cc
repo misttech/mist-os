@@ -142,13 +142,13 @@ TEST(BlockServer, Termination) {
   ASSERT_EQ(client_end.status_value(), ZX_OK);
 
   TestInterface test_interface(PartitionInfo{
-                                   .start_block = 0,
-                                   .block_count = kBlocks,
-                                   .block_size = kBlockSize,
-                                   .type_guid = {1, 2, 3, 4},
-                                   .instance_guid = {5, 6, 7, 8},
-                                   .name = "partition",
-                               }, );
+      .start_block = 0,
+      .block_count = kBlocks,
+      .block_size = kBlockSize,
+      .type_guid = {1, 2, 3, 4},
+      .instance_guid = {5, 6, 7, 8},
+      .name = "partition",
+  });
   test_interface.server().Serve(std::move(server_end));
 
   {
@@ -209,13 +209,13 @@ TEST(BlockServer, FailedOnNewSession) {
   ASSERT_EQ(client_end.status_value(), ZX_OK);
 
   TestInterfaceWithFailedOnNewSession test_interface(PartitionInfo{
-                                                         .start_block = 0,
-                                                         .block_count = kBlocks,
-                                                         .block_size = kBlockSize,
-                                                         .type_guid = {1, 2, 3, 4},
-                                                         .instance_guid = {5, 6, 7, 8},
-                                                         .name = "partition",
-                                                     }, );
+      .start_block = 0,
+      .block_count = kBlocks,
+      .block_size = kBlockSize,
+      .type_guid = {1, 2, 3, 4},
+      .instance_guid = {5, 6, 7, 8},
+      .name = "partition",
+  });
 
   std::unique_ptr<block_client::RemoteBlockDevice> client;
 
