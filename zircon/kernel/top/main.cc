@@ -22,6 +22,7 @@
 #include <lib/jtrace/jtrace.h>
 #include <lib/lockup_detector.h>
 #if __mist_os__
+#include <lib/mistos/devmgr/init.h>
 #include <lib/mistos/handoff/handoff.h>
 #endif
 #include <lib/userabi/userboot.h>
@@ -201,6 +202,10 @@ static int bootstrap2(void*) {
   dprintf(SPEW, "initializing late arch\n");
   arch_late_init_percpu();
   lk_primary_cpu_init_level(LK_INIT_LEVEL_ARCH_LATE, LK_INIT_LEVEL_USER - 1);
+
+#ifdef __mist_os__
+  mistos_devmgr_init();
+#endif
 
   // End hand-off before shell initialization, as we want kernel state to be
   // 'finalized' before we run any kernel scripts (e.g., for unit-testing).

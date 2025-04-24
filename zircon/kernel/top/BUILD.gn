@@ -36,25 +36,20 @@ source_set("top") {
     "//zircon/kernel/lib/version",
     "//zircon/kernel/phys:handoff",
     "//zircon/kernel/platform",
-
-    # LK
-    "//third_party/lk/lib/bio",
-    "//third_party/lk/lib/fs/fat",
-
-    # Board Drivers
-    "//vendor/misttech/src/devices/board/drivers/x86",
-
-    # Platform Drivers
-    "//vendor/misttech/src/devices/bus/drivers/platform",
-
-    # LWIP
-    "//vendor/misttech/third_party/lwip",
   ]
 
   if (is_mistos) {
     deps += [
+      "//vendor/misttech/src/devices/misc/drivers/devmgr",
       "//vendor/misttech/zircon/kernel/lib/handoff",
       "//vendor/misttech/zircon/kernel/lib/starnix",
+
+      # LK
+      "//third_party/lk/lib/bio",
+      "//third_party/lk/lib/fs/fat",
+
+      # LWIP
+      "//vendor/misttech/third_party/lwip",
     ]
   }
 }

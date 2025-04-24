@@ -4,11 +4,12 @@
 
 import("//build/zircon/migrated_targets.gni")
 
-zx_library("driver") {
+zx_library("devmgr") {
   sources = [
-    "api.cc",
+    "coordinator.cc",
     "device.cc",
     "driver.cc",
+    "init.cc",
   ]
 
   public_deps = [
@@ -17,6 +18,8 @@ zx_library("driver") {
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//vendor/misttech/src/lib/ddk",
     "//vendor/misttech/src/lib/ddktl",
+    "//zircon/kernel/lib/console",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/lazy_init",
   ]
 }

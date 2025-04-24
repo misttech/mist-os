@@ -9,13 +9,21 @@
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
+#include <fbl/auto_lock.h>
+#include <fbl/intrusive_double_list.h>
+#include <fbl/mutex.h>
+#include <fbl/ref_counted.h>
+#include <fbl/ref_ptr.h>
 #include <ktl/string_view.h>
 #include <misc/drivers/mistos/device.h>
 #include <misc/drivers/mistos/symbols.h>
 
+#include "misc/drivers/mistos/device.h"
+
 namespace mistos {
 
-Driver* CreateDriver(const zircon_driver_ldr_t* driver_loader);
+/*Driver* CreateDriver(const zircon_driver_note_t* note, zx_driver_rec_t* rec,
+                     ktl::unique_ptr<const zx_bind_inst_t[]> binding);*/
 
 class DriverBase {
  public:
@@ -36,7 +44,8 @@ class DriverBase {
   // like to complete synchronously or asynchronously. The driver may override either one of these
   // methods, but must implement one. The asynchronous version will be called over the synchronous
   // version if both are implemented.
-  virtual zx_status_t Start() { return ZX_ERR_NOT_SUPPORTED; }
+  virtual zx::result<> Start() { return zx::error(ZX_ERR_NOT_SUPPORTED); }
+  // virtual void Start(StartCompleter completer) { completer(Start()); }
 
   // This is called after all the driver dispatchers belonging to this driver have been shutdown.
   // This ensures that there are no pending tasks on any of the driver dispatchers that will access
@@ -52,27 +61,58 @@ class DriverBase {
   // DriverStartArgs start_args_;
 };
 
-class Driver : public DriverBase {
+class Driver : public fbl::DoublyLinkedListable<Driver*>, public DriverBase {
   using Base = DriverBase;
 
  public:
-  explicit Driver(device_t device);
+  Driver(device_t device, const zx_protocol_device_t* ops);
   ~Driver() override;
 
-  zx_status_t Start() override;
+  zx::result<> Start() override;
 
   // Returns the context that DFv1 driver provided.
   void* Context() const;
 
+  void* GetInfoResource();
+
+  void* GetIommuResource();
+
+  void* GetMmioResource();
+
+  void* GetMsiResource();
+
+  void* GetPowerResource();
+
+  void* GetIoportResource();
+
+  void* GetIrqResource();
+
+  void* GetSmcResource();
+
+  // zx_status_t GetProperties(device_props_args_t* out_args,
+  //                           const std::string& parent_node_name = "default");
+
   zx_status_t AddDevice(Device* parent, device_add_args_t* args, zx_device_t** out);
 
+  zx_status_t GetProtocol(uint32_t proto_id, void* out);
+  zx_status_t GetFragmentProtocol(const char* fragment, uint32_t proto_id, void* out);
+
+  Device& GetDevice() { return device_; }
+
+  void CompleteStart(zx::result<> result);
+
+  uint32_t GetNextDeviceId() { return next_device_id_++; }
+
  private:
-  friend Driver* CreateDriver(const zircon_driver_ldr_t* driver_loader);
+  friend class Coordinator;
+  /*friend Driver* CreateDriver(const zircon_driver_note_t* note, zx_driver_rec_t* rec,
+                              ktl::unique_ptr<const zx_bind_inst_t[]> binding);*/
 
   // Loads the driver using the provided `vmos`.
-  zx_status_t LoadDriver(const zircon_driver_ldr_t* loader);
+  zx::result<> LoadDriver();
+
   // Starts the DFv1 driver.
-  zx_status_t StartDriver();
+  zx::result<> StartDriver();
 
   std::string_view driver_name_;
   Device device_;
@@ -80,8 +120,8 @@ class Driver : public DriverBase {
   // The next unique device id for devices. Starts at 1 because `device_` has id zero.
   uint32_t next_device_id_ = 1;
 
-  void* library_ = nullptr;
-  zx_driver_rec_t* record_ = nullptr;
+  // void* library_ = nullptr;
+  const zx_driver_rec_t* record_ = nullptr;
   void* context_ = nullptr;
 };
 
