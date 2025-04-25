@@ -79,6 +79,12 @@ uapi::arch_map_data! {
     }
 }
 
+uapi::check_arch_independent_layout! {
+    sched_param {
+        sched_priority,
+    }
+}
+
 pub fn do_clone(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
@@ -742,7 +748,7 @@ pub fn sys_sched_setscheduler(
     current_task: &CurrentTask,
     pid: pid_t,
     policy: u32,
-    param: UserAddress,
+    param: UserRef<sched_param>,
 ) -> Result<(), Errno> {
     if pid < 0 || param.is_null() {
         return error!(EINVAL);
@@ -753,7 +759,7 @@ pub fn sys_sched_setscheduler(
     let rlimit = target_task.thread_group().get_rlimit(Resource::RTPRIO);
 
     security::check_setsched_access(current_task, &target_task)?;
-    let param: sched_param = current_task.read_object(param.into())?;
+    let param = current_task.read_object(param)?;
     let policy = SchedulerPolicy::from_sched_params(policy, param, rlimit)?;
     target_task.set_scheduler_policy(policy)?;
 
@@ -1233,7 +1239,7 @@ pub fn sys_getrusage(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     who: i32,
-    user_usage: UserRef<rusage>,
+    user_usage: MultiArchUserRef<uapi::rusage, uapi::arch32::rusage>,
 ) -> Result<(), Errno> {
     const RUSAGE_SELF: i32 = starnix_uapi::uapi::RUSAGE_SELF as i32;
     const RUSAGE_THREAD: i32 = starnix_uapi::uapi::RUSAGE_THREAD as i32;
@@ -1250,7 +1256,7 @@ pub fn sys_getrusage(
         ru_stime: timeval_from_duration(time_stats.system_time),
         ..rusage::default()
     };
-    current_task.write_object(user_usage, &usage)?;
+    current_task.write_multi_arch_object(user_usage, usage)?;
 
     Ok(())
 }
@@ -1971,20 +1977,25 @@ pub fn sys_vhangup(
 #[cfg(feature = "arch32")]
 mod arch32 {
     pub use super::{
-        sys_execve as sys_arch32_execve, sys_geteuid as sys_arch32_geteuid32,
-        sys_getgid as sys_arch32_getgid32, sys_getppid as sys_arch32_getppid,
+        sys_execve as sys_arch32_execve, sys_getegid as sys_arch32_getegid32,
+        sys_geteuid as sys_arch32_geteuid32, sys_getgid as sys_arch32_getgid32,
+        sys_getpgid as sys_arch32_getpgid, sys_getppid as sys_arch32_getppid,
         sys_getpriority as sys_arch32_getpriority, sys_getresgid as sys_arch32_getresgid32,
         sys_getresuid as sys_arch32_getresuid32, sys_getrlimit as sys_arch32_ugetrlimit,
-        sys_getuid as sys_arch32_getuid32, sys_ptrace as sys_arch32_ptrace,
+        sys_getrusage as sys_arch32_getrusage, sys_getuid as sys_arch32_getuid32,
+        sys_ioprio_set as sys_arch32_ioprio_set, sys_ptrace as sys_arch32_ptrace,
         sys_sched_get_priority_max as sys_arch32_sched_get_priority_max,
         sys_sched_get_priority_min as sys_arch32_sched_get_priority_min,
         sys_sched_getaffinity as sys_arch32_sched_getaffinity,
-        sys_sched_setaffinity as sys_arch32_sched_setaffinity, sys_seccomp as sys_arch32_seccomp,
+        sys_sched_setaffinity as sys_arch32_sched_setaffinity,
+        sys_sched_setscheduler as sys_arch32_sched_setscheduler, sys_seccomp as sys_arch32_seccomp,
         sys_setfsuid as sys_arch32_setfsuid, sys_setfsuid as sys_arch32_setfsuid32,
-        sys_setgroups as sys_arch32_setgroups32, sys_setpgid as sys_arch32_setpgid,
+        sys_setgid as sys_arch32_setgid32, sys_setgroups as sys_arch32_setgroups32,
+        sys_setns as sys_arch32_setns, sys_setpgid as sys_arch32_setpgid,
         sys_setpriority as sys_arch32_setpriority, sys_setresgid as sys_arch32_setresgid32,
         sys_setresuid as sys_arch32_setresuid32, sys_setrlimit as sys_arch32_setrlimit,
         sys_setsid as sys_arch32_setsid, sys_syslog as sys_arch32_syslog,
+        sys_unshare as sys_arch32_unshare,
     };
 }
 
@@ -2324,7 +2335,8 @@ mod tests {
         let requested_params = sched_param { sched_priority: 15 };
         current_task.write_object(mapped_address.into(), &requested_params).unwrap();
 
-        sys_sched_setscheduler(&mut locked, &current_task, 0, SCHED_FIFO, mapped_address).unwrap();
+        sys_sched_setscheduler(&mut locked, &current_task, 0, SCHED_FIFO, mapped_address.into())
+            .unwrap();
 
         let new_scheduler = sys_sched_getscheduler(&mut locked, &current_task, 0).unwrap();
         assert_eq!(new_scheduler, SCHED_FIFO, "task should have been assigned fifo scheduler");

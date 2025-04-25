@@ -22,10 +22,10 @@ use starnix_uapi::auth::CAP_WAKE_ALARM;
 use starnix_uapi::errors::{Errno, EINTR};
 use starnix_uapi::user_address::{MultiArchUserRef, UserRef};
 use starnix_uapi::{
-    errno, error, from_status_like_fdio, pid_t, timespec, timeval, timezone, tms, uapi,
-    CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE,
-    CLOCK_MONOTONIC_RAW, CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME, CLOCK_REALTIME_ALARM,
-    CLOCK_REALTIME_COARSE, CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, MAX_CLOCKS, TIMER_ABSTIME,
+    errno, error, from_status_like_fdio, pid_t, timespec, timezone, tms, uapi, CLOCK_BOOTTIME,
+    CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE, CLOCK_MONOTONIC_RAW,
+    CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME, CLOCK_REALTIME_ALARM, CLOCK_REALTIME_COARSE,
+    CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, MAX_CLOCKS, TIMER_ABSTIME,
 };
 use zx::{
     Task, {self as zx},
@@ -141,8 +141,8 @@ pub fn sys_gettimeofday(
 pub fn sys_settimeofday(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    tv: UserRef<timeval>,
-    _tz: UserRef<timezone>,
+    tv: TimeValPtr,
+    _tz: TimeZonePtr,
 ) -> Result<(), Errno> {
     const SEC_IN_NANOS: i64 = 1_000_000_000;
     const USEC_IN_NANOS: i64 = 1000;
@@ -150,7 +150,7 @@ pub fn sys_settimeofday(
     if let Some(ref proxy) = kernel.time_adjustment_proxy {
         // Setting time is allowed.
         let boot_now = zx::BootInstant::get();
-        let tv = current_task.read_object(tv)?;
+        let tv = current_task.read_multi_arch_object(tv)?;
 
         // Any errors here result in EINVAL, there should be no overflow in "normal" situations.
         let utc_now_sec_as_nanos =
@@ -655,8 +655,8 @@ mod arch32 {
     pub use super::{
         sys_clock_getres as sys_arch32_clock_getres, sys_clock_gettime as sys_arch32_clock_gettime,
         sys_gettimeofday as sys_arch32_gettimeofday, sys_nanosleep as sys_arch32_nanosleep,
-        sys_setitimer as sys_arch32_setitimer, sys_timer_create as sys_arch32_timer_create,
-        sys_timer_delete as sys_arch32_timer_delete,
+        sys_setitimer as sys_arch32_setitimer, sys_settimeofday as sys_arch32_settimeofday,
+        sys_timer_create as sys_arch32_timer_create, sys_timer_delete as sys_arch32_timer_delete,
         sys_timer_getoverrun as sys_arch32_timer_getoverrun,
         sys_timer_gettime as sys_arch32_timer_gettime,
         sys_timer_settime as sys_arch32_timer_settime,

@@ -82,6 +82,14 @@ use std::sync::{atomic, Arc};
 use std::usize;
 use zerocopy::{Immutable, IntoBytes};
 
+uapi::check_arch_independent_layout! {
+    pollfd {
+        fd,
+        events,
+        revents,
+    }
+}
+
 // Constants from bionic/libc/include/sys/stat.h
 const UTIME_NOW: i64 = 0x3fffffff;
 const UTIME_OMIT: i64 = 0x3ffffffe;
@@ -2582,7 +2590,7 @@ pub fn sys_ppoll(
     current_task: &mut CurrentTask,
     user_fds: UserRef<pollfd>,
     num_fds: i32,
-    user_timespec: UserRef<timespec>,
+    user_timespec: TimeSpecPtr,
     user_mask: UserRef<SigSet>,
     sigset_size: usize,
 ) -> Result<usize, Errno> {
@@ -2592,7 +2600,7 @@ pub fn sys_ppoll(
         // Passing -1 to poll is equivalent to an infinite timeout.
         -1
     } else {
-        let ts = current_task.read_object(user_timespec)?;
+        let ts = current_task.read_multi_arch_object(user_timespec)?;
         duration_from_timespec::<zx::MonotonicTimeline>(ts)?.into_millis() as i32
     };
 
@@ -2622,7 +2630,7 @@ pub fn sys_ppoll(
     // handled by the application (i.e. returns ERESTARTNOHAND). However, if
     // [copy out] failed, then the restarted ppoll would use the wrong timeout, so the
     // error should be left as EINTR."
-    match (current_task.write_object(user_timespec, &remaining_timespec), poll_result) {
+    match (current_task.write_multi_arch_object(user_timespec, remaining_timespec), poll_result) {
         // If write was ok, and poll was ok, return poll result.
         (Ok(_), Ok(num_events)) => Ok(num_events),
         (Ok(_), Err(e)) if e == EINTR => {
@@ -3549,21 +3557,28 @@ mod arch32 {
 
     pub use super::{
         sys_chdir as sys_arch32_chdir, sys_chroot as sys_arch32_chroot,
-        sys_dup3 as sys_arch32_dup3, sys_epoll_create1 as sys_arch32_epoll_create1,
-        sys_epoll_ctl as sys_arch32_epoll_ctl, sys_epoll_pwait as sys_arch32_epoll_pwait,
-        sys_epoll_pwait2 as sys_arch32_epoll_pwait2, sys_eventfd2 as sys_arch32_eventfd2,
-        sys_fchmod as sys_arch32_fchmod, sys_fchown as sys_arch32_fchown32,
-        sys_fchown as sys_arch32_fchown, sys_fstatat64 as sys_arch32_fstatat64,
-        sys_fstatfs as sys_arch32_fstatfs, sys_ftruncate as sys_arch32_ftruncate,
+        sys_copy_file_range as sys_arch32_copy_file_range, sys_dup3 as sys_arch32_dup3,
+        sys_epoll_create1 as sys_arch32_epoll_create1, sys_epoll_ctl as sys_arch32_epoll_ctl,
+        sys_epoll_pwait as sys_arch32_epoll_pwait, sys_epoll_pwait2 as sys_arch32_epoll_pwait2,
+        sys_eventfd2 as sys_arch32_eventfd2, sys_fchmod as sys_arch32_fchmod,
+        sys_fchmodat as sys_arch32_fchmodat, sys_fchown as sys_arch32_fchown32,
+        sys_fchown as sys_arch32_fchown, sys_fchownat as sys_arch32_fchownat,
+        sys_fdatasync as sys_arch32_fdatasync, sys_fsetxattr as sys_arch32_fsetxattr,
+        sys_fstatat64 as sys_arch32_fstatat64, sys_fstatfs as sys_arch32_fstatfs,
+        sys_fsync as sys_arch32_fsync, sys_ftruncate as sys_arch32_ftruncate,
         sys_inotify_add_watch as sys_arch32_inotify_add_watch,
         sys_inotify_init1 as sys_arch32_inotify_init1,
-        sys_inotify_rm_watch as sys_arch32_inotify_rm_watch, sys_linkat as sys_arch32_linkat,
-        sys_mknodat as sys_arch32_mknodat, sys_pidfd_getfd as sys_arch32_pidfd_getfd,
-        sys_pidfd_open as sys_arch32_pidfd_open, sys_preadv as sys_arch32_preadv,
+        sys_inotify_rm_watch as sys_arch32_inotify_rm_watch, sys_lgetxattr as sys_arch32_lgetxattr,
+        sys_linkat as sys_arch32_linkat, sys_lsetxattr as sys_arch32_lsetxattr,
+        sys_mkdirat as sys_arch32_mkdirat, sys_mknodat as sys_arch32_mknodat,
+        sys_pidfd_getfd as sys_arch32_pidfd_getfd, sys_pidfd_open as sys_arch32_pidfd_open,
+        sys_ppoll as sys_arch32_ppoll, sys_preadv as sys_arch32_preadv,
         sys_pselect6 as sys_arch32_pselect6, sys_readv as sys_arch32_readv,
         sys_renameat2 as sys_arch32_renameat2, sys_select as sys_arch32__newselect,
-        sys_splice as sys_arch32_splice, sys_statfs as sys_arch32_statfs,
-        sys_tee as sys_arch32_tee, sys_timerfd_create as sys_arch32_timerfd_create,
+        sys_setxattr as sys_arch32_setxattr, sys_splice as sys_arch32_splice,
+        sys_statfs as sys_arch32_statfs, sys_symlinkat as sys_arch32_symlinkat,
+        sys_sync as sys_arch32_sync, sys_tee as sys_arch32_tee,
+        sys_timerfd_create as sys_arch32_timerfd_create,
         sys_timerfd_settime as sys_arch32_timerfd_settime, sys_truncate as sys_arch32_truncate,
         sys_umask as sys_arch32_umask, sys_utimensat as sys_arch32_utimensat,
         sys_vmsplice as sys_arch32_vmsplice,

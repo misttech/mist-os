@@ -803,6 +803,7 @@ mod arch32 {
         sys_mlock2 as sys_arch32_mlock2, sys_mlockall as sys_arch32_mlockall,
         sys_mremap as sys_arch32_mremap, sys_msync as sys_arch32_msync,
         sys_munlock as sys_arch32_munlock, sys_munlockall as sys_arch32_munlockall,
+        sys_process_mrelease as sys_arch32_process_mrelease,
         sys_process_vm_readv as sys_arch32_process_vm_readv,
         sys_userfaultfd as sys_arch32_userfaultfd,
     };
