@@ -17,7 +17,7 @@ use crate::security::selinux_hooks::{
     todo_check_permission, todo_has_file_permissions, CommonFilePermission, ProcessPermission,
 };
 use crate::task::CurrentTask;
-use crate::vfs::{FileHandle, FileObject};
+use crate::vfs::{canonicalize_ioctl_request, FileHandle, FileObject};
 use crate::TODO_DENY;
 use selinux::{CommonFsNodePermission, FsNodeClass, KernelPermission, SecurityServer};
 use starnix_uapi::errors::Errno;
@@ -124,7 +124,7 @@ pub(in crate::security) fn check_file_ioctl_access(
     let subject_sid = current_task.security_state.lock().current_sid;
 
     let file_class = file.node().security_state.lock().class;
-    match request {
+    match canonicalize_ioctl_request(current_task, request) {
         FIBMAP | FIONREAD | FIGETBSZ | FS_IOC_GETFLAGS | FS_IOC_GETVERSION => has_file_permissions(
             &permission_check,
             current_task.kernel(),
