@@ -57,26 +57,27 @@ bool WakeLease::HandleInterrupt(zx::duration timeout) {
     // If we don't acquire a wake lease, store the time we would have held it
     // until. If we start suspension before this time, we'll acquire a wake
     // lease then and hold it until the timeout.
-    prevent_sleep_before_ = zx::clock::get_monotonic().get() + timeout.to_nsecs();
+    prevent_sleep_before_ = zx::clock::get_monotonic() + timeout;
     return false;
   }
 
   // Since we're acquiring a wake lease, reset our sleep prevention time since
   // we don't need to check upon suspension starting.
-  prevent_sleep_before_ = 0;
+  prevent_sleep_before_ = zx::time::infinite_past();
   return AcquireWakeLease(timeout);
 }
 
-bool WakeLease::AcquireWakeLease(zx::duration timeout) {
-  if (!sag_client_) {
-    return false;
-  }
+zx_time_t WakeLease::GetNextTimeout() { return lease_task_.last_deadline().get(); }
 
+bool WakeLease::AcquireWakeLease(zx::duration timeout) {
   if (lease_) {
     // If already holding a lease, cancel the current timeout.
     lease_task_.Cancel();
     wake_lease_last_refreshed_timestamp_.Set(zx::clock::get_monotonic().get());
   } else {
+    if (!sag_client_) {
+      return false;
+    }
     wake_lease_last_attempted_acquisition_timestamp_.Set(zx::clock::get_monotonic().get());
     // If not holding a lease, take one.
     auto result_lease = sag_client_->AcquireWakeLease(fidl::StringView::FromExternal(lease_name_));
@@ -119,7 +120,9 @@ bool WakeLease::AcquireWakeLease(zx::duration timeout) {
     wake_lease_held_.Set(true);
   }
 
-  if (lease_) {
+  // Post a task to drop the lease if we have one, but not if the timeout
+  // is infinity, since that time should never come.
+  if (lease_ && timeout < zx::duration::infinite()) {
     lease_task_.PostDelayed(dispatcher_, timeout);
   }
   return true;
@@ -160,23 +163,33 @@ zx::result<zx::eventpair> WakeLease::GetWakeLeaseCopy() {
 }
 
 void WakeLease::OnResume(OnResumeCompleter::Sync& completer) {
-  system_suspended_ = false;
+  SetSuspended(false);
   completer.Reply();
 }
 
 void WakeLease::OnSuspendStarted(OnSuspendStartedCompleter::Sync& completer) {
+  SetSuspended(true);
+  completer.Reply();
+}
+
+void WakeLease::SetSuspended(bool suspended) {
+  // Do a quick return when we're resumed, because we don't have much to do.
+  if (!suspended) {
+    system_suspended_ = false;
+    return;
+  }
+
   // Check if we've moved past any previously set timeout for which we did
   // NOT acquire a lease because the system wasn't suspended.
-  zx_time_t current_time = zx::clock::get_monotonic().get();
+  zx::time current_time = zx::clock::get_monotonic();
   if (current_time < prevent_sleep_before_) {
     if (log_) {
       fdf::warn("Acquiring lease to honor previously set timeout.");
     }
-    AcquireWakeLease(zx::nsec(prevent_sleep_before_ - current_time));
+    AcquireWakeLease(prevent_sleep_before_ - current_time);
   }
 
   system_suspended_ = true;
-  completer.Reply();
 }
 
 void WakeLease::handle_unknown_method(

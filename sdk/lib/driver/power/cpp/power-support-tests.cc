@@ -34,9 +34,12 @@
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/zx/event.h>
+#include <lib/zx/eventpair.h>
+#include <lib/zx/time.h>
 #include <zircon/errors.h>
 #include <zircon/rights.h>
 #include <zircon/syscalls/object.h>
+#include <zircon/time.h>
 
 #include <optional>
 #include <vector>
@@ -2143,9 +2146,9 @@ TEST_F(PowerLibTest, TestDriverInstanceDep) {
       .get_info(ZX_INFO_HANDLE_BASIC, &info2, sizeof(zx_info_handle_basic_t), nullptr, nullptr);
   EXPECT_EQ(info1.koid, info2.koid);
 }
-
 // TODO(https://fxbug.dev/328527466) This dependency is invalid because it has
 // no level deps add a test that checks we return a proper error
+
 }  // namespace power_lib_test
 
 #endif

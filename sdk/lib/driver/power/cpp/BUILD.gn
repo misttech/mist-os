@@ -52,6 +52,7 @@ test("power-test") {
     "element-description-builder-tests.cc",
     "power-support-tests.cc",
     "types-test.cc",
+    "wake-lease-test.cc",
   ]
   deps = [
     ":cpp",

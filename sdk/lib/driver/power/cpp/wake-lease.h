@@ -69,6 +69,12 @@ class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernor
       fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernorListener> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
+  void SetSuspended(bool suspended);
+
+  // Get the time our next timeout will occur. If there is no currently active
+  // timeout this will be ZX_TIME_INFINITE.
+  zx_time_t GetNextTimeout();
+
  private:
   void HandleTimeout();
 
@@ -83,7 +89,7 @@ class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernor
   bool system_suspended_ = true;
   // Time before which we should take a wake lease if we are informed of
   // suspension.
-  zx_time_t prevent_sleep_before_ = 0;
+  zx::time prevent_sleep_before_ = zx::time::infinite_past();
 
   async::TaskClosureMethod<WakeLease, &WakeLease::HandleTimeout> lease_task_{this};
   zx::eventpair lease_;
