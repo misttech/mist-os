@@ -1093,6 +1093,7 @@ impl Socket {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
+        security::check_socket_connect_access(current_task, self, &peer)?;
         self.ops.connect(&mut locked.cast_locked::<FileOpsCore>(), self, current_task, peer)
     }
 

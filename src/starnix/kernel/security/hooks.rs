@@ -12,7 +12,9 @@ use crate::mm::{MappingOptions, ProtectionFlags};
 use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
-use crate::vfs::socket::{Socket, SocketAddress, SocketDomain, SocketProtocol, SocketType};
+use crate::vfs::socket::{
+    Socket, SocketAddress, SocketDomain, SocketPeer, SocketProtocol, SocketType,
+};
 use crate::vfs::{
     Anon, DirEntryHandle, FileHandle, FileObject, FileSystem, FileSystemHandle, FsNode, FsStr,
     FsString, Mount, NamespaceNode, OutputBuffer, ValueOrSize, XattrOp,
@@ -924,7 +926,7 @@ pub fn check_socket_bind_access(
 pub fn check_socket_connect_access(
     current_task: &CurrentTask,
     socket: &Socket,
-    socket_address: &SocketAddress,
+    socket_peer: &SocketPeer,
 ) -> Result<(), Errno> {
     track_hook_duration!(c"security.hooks.check_socket_connect_access");
     if_selinux_else_default_ok(current_task, |security_server| {
@@ -932,7 +934,7 @@ pub fn check_socket_connect_access(
             &security_server,
             current_task,
             socket,
-            socket_address,
+            socket_peer,
         )
     })
 }

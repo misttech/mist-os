@@ -357,23 +357,17 @@ pub fn sys_connect(
             if name.is_empty() {
                 return error!(ECONNREFUSED);
             }
-            security::check_socket_connect_access(current_task, client_socket, &address)?;
             SocketPeer::Handle(resolve_unix_socket_address(locked, current_task, name.as_ref())?)
         }
         // Connect not available for AF_VSOCK
         SocketAddress::Vsock(_) => return error!(ENOSYS),
         SocketAddress::Inet(ref addr) | SocketAddress::Inet6(ref addr) => {
             log_trace!("connect to inet socket named {:?}", addr);
-            security::check_socket_connect_access(current_task, client_socket, &address)?;
             SocketPeer::Address(address)
         }
-        SocketAddress::Netlink(_) => {
-            security::check_socket_connect_access(current_task, client_socket, &address)?;
-            SocketPeer::Address(address)
-        }
+        SocketAddress::Netlink(_) => SocketPeer::Address(address),
         SocketAddress::Packet(ref addr) => {
             log_trace!("connect to packet socket named {:?}", addr);
-            security::check_socket_connect_access(current_task, client_socket, &address)?;
             SocketPeer::Address(address)
         }
     };

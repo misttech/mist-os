@@ -6,7 +6,7 @@ use super::audit::Auditable;
 use super::fs_node::compute_new_fs_node_sid;
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::socket::{
-    NetlinkFamily, Socket, SocketAddress, SocketDomain, SocketProtocol, SocketType,
+    NetlinkFamily, Socket, SocketAddress, SocketDomain, SocketPeer, SocketProtocol, SocketType,
 };
 use crate::vfs::{Anon, FileSystemHandle, FsNode};
 use selinux::permission_check::PermissionCheck;
@@ -211,7 +211,7 @@ pub(in crate::security) fn check_socket_connect_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     socket: &Socket,
-    _socket_address: &SocketAddress,
+    _socket_peer: &SocketPeer,
 ) -> Result<(), Errno> {
     let socket_node = socket.fs_node().expect("Socket should have FsNode");
 
