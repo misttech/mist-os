@@ -445,6 +445,11 @@ impl<I: IcmpIpExt, B: SplitByteSlice, M: IcmpMessage<I>> IcmpPacketRaw<I, B, M> 
     pub fn message(&self) -> &M {
         &self.header.message
     }
+
+    /// Get the ICMP message body.
+    pub fn message_body(&self) -> &B {
+        &self.message_body
+    }
 }
 
 impl<I: IcmpIpExt, B: SplitByteSliceMut, M: IcmpMessage<I>> IcmpPacketRaw<I, B, M> {

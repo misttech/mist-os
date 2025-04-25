@@ -1745,6 +1745,11 @@ impl<B> TruncatingSerializer<B> {
     pub fn new(buffer: B, direction: TruncateDirection) -> TruncatingSerializer<B> {
         TruncatingSerializer { buffer, direction }
     }
+
+    /// Provides shared access to the inner buffer.
+    pub fn buffer(&self) -> &B {
+        &self.buffer
+    }
 }
 
 impl<B: GrowBuffer + ShrinkBuffer> Serializer for TruncatingSerializer<B> {

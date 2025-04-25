@@ -1224,7 +1224,7 @@ mod tests {
     }
 
     fn tuple_with_port(which: ReplyTuplePort, port: u16) -> Tuple<Ipv4> {
-        packet_with_port(which, port).conntrack_packet().unwrap().tuple
+        packet_with_port(which, port).conntrack_packet().unwrap().tuple().clone()
     }
 
     #[test]

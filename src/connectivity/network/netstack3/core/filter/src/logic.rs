@@ -1469,7 +1469,7 @@ mod tests {
         // The stashed reference should point to the connection that is in the table.
         let (stashed, _dir) =
             metadata.take_connection_and_direction().expect("metadata should include connection");
-        let tuple = packet.conntrack_packet().expect("packet should be trackable").tuple;
+        let tuple = packet.conntrack_packet().expect("packet should be trackable").tuple().clone();
         let table = core_ctx
             .conntrack()
             .get_connection(&tuple)
