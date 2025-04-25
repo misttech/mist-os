@@ -116,8 +116,16 @@ where
         let boot_now = (self.clock_fn)();
         let (boot_reference, utc_reference) = self.state.borrow().get_rtc_reference();
         let diff_nanos = boot_now.into_nanos() - boot_reference.into_nanos();
-        let utc_now = utc_reference + UtcDuration::from_nanos(diff_nanos);
-        Ok(utc_now)
+        if diff_nanos < 0 {
+            // ReadOnlyRtc relies on the boot clock for RTC updates. This allows us to have
+            // correct time estimates during suspend.  However, on reboot, we typically
+            // restart the boot clock, leading to a negative offset adjustment, which is wrong.
+            // To avoid incorrect UTC adjustments, we disallow negative offsets.
+            Err(anyhow!("negative offset adjustment for RTC is not allowed: {}", diff_nanos))
+        } else {
+            let utc_now = utc_reference + UtcDuration::from_nanos(diff_nanos);
+            Ok(utc_now)
+        }
     }
 
     /// Sets a reference point based on the current reading of the boot clock,
@@ -557,6 +565,7 @@ mod test {
             assert_eq!(utc, UtcInstant::from_nanos(42200));
 
             // Time travel is allowed in fake-land. Rewind time a bit, check it.
+            // However, see (*) below.
             (*fake_boot_now.borrow_mut()) -= zx::BootDuration::from_nanos(100);
             let utc = rtc.get().await.unwrap();
             assert_eq!(utc, UtcInstant::from_nanos(42100));
@@ -577,6 +586,12 @@ mod test {
             (*fake_boot_now.borrow_mut()) += zx::BootDuration::from_nanos(300);
             let utc = rtc.get().await.unwrap();
             assert_eq!(utc, UtcInstant::from_nanos(42400));
+
+            // Time travel is allowed in fake-land.
+            // (*) But don't overdo it! If we rewind beyond the reference, then the RTC read should
+            // be rejected.
+            (*fake_boot_now.borrow_mut()) -= zx::BootDuration::from_nanos(500);
+            assert_matches!(rtc.get().await, Err(_));
         }
     }
 }
