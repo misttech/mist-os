@@ -398,7 +398,7 @@ zx::result<> PlatformDevice::CreateNode() {
                          : ZX_ERR_INTERNAL);
   }
 
-  node_controller_ = std::move(std::move(client));
+  node_controller_.Bind(std::move(client), bus()->dispatcher(), this);
 
   return zx::ok();
 }
@@ -718,6 +718,10 @@ void PlatformDevice::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
   fdf::warn("PlatformDevice received unknown method with ordinal: {}", metadata.method_ordinal);
+}
+
+void PlatformDevice::OnBind(fuchsia_driver_framework::NodeControllerOnBindRequest& request) {
+  node_token_ = std::move(request.node_token());
 }
 
 }  // namespace platform_bus
