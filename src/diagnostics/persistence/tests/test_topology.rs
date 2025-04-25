@@ -2,39 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::sync::atomic::{AtomicU16, Ordering};
-
-use fidl::endpoints::DiscoverableProtocolMarker;
+use crate::mock_filesystems::TestFs;
 use fidl_fuchsia_component_sandbox as fsandbox;
+use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
+use fidl_fuchsia_inspect::InspectSinkMarker;
+use fidl_fuchsia_logger::LogSinkMarker;
 use fidl_fuchsia_update::ListenerMarker;
 use fidl_test_persistence_factory::ControllerMarker;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
 };
-use regex::Regex;
-use std::sync::LazyLock;
 
+const ARCHIVIST_URL: &str = "archivist-for-embedding#meta/archivist-for-embedding.cm";
 const SINGLE_COUNTER_URL: &str = "#meta/single_counter_test_component.cm";
 const PERSISTENCE_URL: &str = "#meta/persistence.cm";
-pub static REALM_NAME_PATTERN: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"persistence-test-\d{5}").unwrap());
 
-pub async fn create() -> RealmInstance {
-    static COUNTER: AtomicU16 = AtomicU16::new(0);
-
-    // We want deterministic realm names of a fixed length. Add a fixed-size
-    // variable component so that realm names are unique across test cases.
-    let realm_name = format!("persistence-test-{:05}", COUNTER.fetch_add(1, Ordering::Relaxed));
-    assert!(
-        REALM_NAME_PATTERN.is_match(&realm_name),
-        "{} does not match {:?}",
-        realm_name,
-        *REALM_NAME_PATTERN
-    );
-
-    let builder = RealmBuilder::with_params(RealmBuilderParams::new().realm_name(realm_name))
+pub async fn create(name: &str, fs: &TestFs) -> RealmInstance {
+    let builder = RealmBuilder::with_params(RealmBuilderParams::new().realm_name(name))
         .await
         .expect("Failed to create realm builder");
+
     let single_counter = builder
         .add_child("single_counter", SINGLE_COUNTER_URL, ChildOptions::new())
         .await
@@ -60,9 +47,7 @@ pub async fn create() -> RealmInstance {
         .await
         .expect("Failed to add route for /config/data directory");
 
-    let cache_server = crate::mock_filesystems::create_cache_server(&builder)
-        .await
-        .expect("Failed to create cache server");
+    let cache_server = fs.serve_cache(&builder).await.expect("Failed to create cache server");
     builder
         .add_route(
             Route::new()
@@ -83,7 +68,7 @@ pub async fn create() -> RealmInstance {
     builder
         .add_route(
             Route::new()
-                .capability(Capability::protocol_by_name(ListenerMarker::PROTOCOL_NAME))
+                .capability(Capability::protocol::<ListenerMarker>())
                 .from(&update_server)
                 .to(&persistence),
         )
@@ -92,7 +77,7 @@ pub async fn create() -> RealmInstance {
     builder
         .add_route(
             Route::new()
-                .capability(Capability::protocol_by_name(ControllerMarker::PROTOCOL_NAME))
+                .capability(Capability::protocol::<ControllerMarker>())
                 .from(&update_server)
                 .to(Ref::parent()),
         )
@@ -136,28 +121,93 @@ pub async fn create() -> RealmInstance {
         )
         .await
         .expect("Failed to add fuchsia.component.sandbox routes");
+
+    let archivist = builder
+        .add_child("archivist", ARCHIVIST_URL, ChildOptions::new().eager())
+        .await
+        .expect("Failed to create child archivist");
+
     builder
         .add_route(
             Route::new()
                 .capability(
-                    Capability::protocol_by_name("fuchsia.diagnostics.ArchiveAccessor")
+                    Capability::protocol_by_name("fuchsia.tracing.provider.Registry").optional(),
+                )
+                .capability(Capability::event_stream("capability_requested"))
+                .from(Ref::parent())
+                .to(&archivist),
+        )
+        .await
+        .expect("Failed to add routes from parent to archivist");
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol::<ArchiveAccessorMarker>())
+                .from_dictionary("diagnostics-accessors")
+                .from(&archivist)
+                .to(Ref::parent()),
+        )
+        .await
+        .expect("Failed to add route for ArchiveAccessor");
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(
+                    Capability::protocol::<ArchiveAccessorMarker>()
                         .as_("fuchsia.diagnostics.ArchiveAccessor.feedback"),
                 )
-                .from(Ref::parent())
+                .from_dictionary("diagnostics-accessors")
+                .from(&archivist)
                 .to(&persistence),
         )
         .await
         .expect("Failed to add route for fuchsia.diagnostics.ArchiveAccessor");
+
+    // Override the diagnostics dictionary which normally provides InspectSink
+    // and LogSink capabilities from the top-level archivist.
+    builder
+        .add_capability(cm_rust::CapabilityDecl::Dictionary(cm_rust::DictionaryDecl {
+            name: "diagnostics".parse().unwrap(),
+            source_path: None,
+        }))
+        .await
+        .expect("Failed to override the diagnostics dictionary");
+
+    // Expose InspectSink from local archivist to isolate tests from each other.
     builder
         .add_route(
             Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .from(Ref::parent())
-                .to(&persistence)
-                .to(&single_counter),
+                .capability(Capability::protocol::<InspectSinkMarker>())
+                .from(&archivist)
+                .to(Ref::dictionary("self/diagnostics")),
         )
         .await
-        .expect("Failed to add route for fuchsia.logger.LogSink");
+        .expect("Failed to add route for InspectSink");
+
+    // Expose LogSink from parent to view component logs in the test output.
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol::<LogSinkMarker>())
+                .from_dictionary("diagnostics")
+                .from(Ref::parent())
+                .to(Ref::dictionary("self/diagnostics")),
+        )
+        .await
+        .expect("Failed to add route for LogSink");
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::dictionary("diagnostics"))
+                .from(Ref::self_())
+                .to(&single_counter)
+                .to(&persistence),
+        )
+        .await
+        .expect("Failed to add route for diagnostics dictionary");
 
     builder
         .add_route(

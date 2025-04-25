@@ -147,9 +147,9 @@ pub fn forget_old_data(config: &Config) {
 pub(crate) fn write(service_name: &ServiceName, tag: &Tag, data: &PersistSchema) {
     // /cache/ may be deleted any time. It's OK to try to create CURRENT_PATH if it already exists.
     let path = format!("{}/{}", CURRENT_PATH, service_name);
-    fs::create_dir_all(&path)
-        .map_err(|e| warn!("Could not create directory {}: {:?}", path, e))
-        .ok();
+    if let Err(e) = fs::create_dir_all(&path) {
+        warn!("Could not create directory {}: {:?}", path, e);
+    }
     let data = match serde_json::to_string(data) {
         Ok(data) => data,
         Err(e) => {
@@ -157,9 +157,9 @@ pub(crate) fn write(service_name: &ServiceName, tag: &Tag, data: &PersistSchema)
             return;
         }
     };
-    fs::write(format!("{}/{}", path, tag), data)
-        .map_err(|e| warn!("Could not write file {}/{}: {:?}", path, tag, e))
-        .ok();
+    if let Err(e) = fs::write(format!("{}/{}", path, tag), data) {
+        warn!("Could not write file {}/{}: {:?}", path, tag, e);
+    }
 }
 
 pub(crate) struct ServiceEntry {

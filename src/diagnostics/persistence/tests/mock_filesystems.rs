@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Error;
+use anyhow::{Context, Error};
 use fidl_fuchsia_io as fio;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{ChildOptions, ChildRef, RealmBuilder};
 use futures::prelude::*;
-use std::fs;
+use tempfile::TempDir;
 use vfs::file::vmo::read_only;
 use vfs::pseudo_directory;
 use vfs::test_utils::assertions::reexport::StreamExt;
@@ -44,38 +44,45 @@ pub(crate) async fn create_config_data(builder: &RealmBuilder) -> Result<ChildRe
         .await?)
 }
 
-/// Create a /cache directory under /tmp so we can serve it as a directory to supply a "/cache"
-/// directory to persistence in create_cache_server().
-pub(crate) fn setup_backing_directories() {
-    let path = "/tmp/cache";
-    fs::create_dir_all(path)
-        .map_err(|err| log::warn!(path:%, err:?; "Could not create directory"))
-        .ok();
+pub struct TestFs {
+    cache: TempDir,
 }
 
-pub(crate) async fn create_cache_server(builder: &RealmBuilder) -> Result<ChildRef, Error> {
-    // Add a mock component that provides the `cache` directory to the realm.
-    //let cache_server =
-    Ok(builder
-        .add_local_child(
-            "cache-server",
-            move |handles| {
-                let cache_dir_proxy = fuchsia_fs::directory::open_in_namespace(
-                    "/tmp/cache",
-                    fio::PERM_READABLE | fio::PERM_WRITABLE,
-                )
-                .unwrap();
-                async move {
-                    let mut fs = ServiceFs::new();
-                    fs.add_remote("cache", cache_dir_proxy);
-                    fs.serve_connection(handles.outgoing_dir)
-                        .expect("failed to serve cache ServiceFs");
-                    fs.collect::<()>().await;
-                    Ok::<(), anyhow::Error>(())
-                }
-                .boxed()
-            },
-            ChildOptions::new(),
-        )
-        .await?)
+impl TestFs {
+    pub fn new() -> Self {
+        Self { cache: TempDir::new().expect("Failed to create temporary directory") }
+    }
+
+    pub fn cache(&self) -> &str {
+        self.cache.path().to_str().context("Failed to convert path to string").unwrap()
+    }
+
+    /// Add a mock component that provides the `cache` directory to the realm.
+    pub async fn serve_cache(&self, builder: &RealmBuilder) -> Result<ChildRef, Error> {
+        let cache_path = self.cache().to_string();
+
+        builder
+            .add_local_child(
+                "cache-server",
+                move |handles| {
+                    let cache_dir_proxy = fuchsia_fs::directory::open_in_namespace(
+                        &cache_path,
+                        fio::PERM_READABLE | fio::PERM_WRITABLE,
+                    )
+                    .unwrap();
+                    async move {
+                        let mut fs = ServiceFs::new();
+                        fs.add_remote("cache", cache_dir_proxy);
+                        fs.serve_connection(handles.outgoing_dir)
+                            .expect("failed to serve cache ServiceFs");
+                        fs.collect::<()>().await;
+                        Ok::<(), anyhow::Error>(())
+                    }
+                    .boxed()
+                },
+                ChildOptions::new(),
+            )
+            .await
+            .context("Failed to add cache-server")
+    }
 }
