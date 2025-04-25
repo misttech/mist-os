@@ -18,7 +18,7 @@ bazel_content_hash_definitions = [
       "//third_party/boringssl/src",
       "//third_party/boringssl/BUILD.generated.bzl",
       "//third_party/boringssl/BUILD.generated_tests.bzl",
-      "//build/bazel/local_repositories/boringssl/BUILD.boringssl",
+      "//build/bazel/repository_rules/boringssl_BUILD.bazel",
     ]
   },
   {

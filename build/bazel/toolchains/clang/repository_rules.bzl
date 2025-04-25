@@ -32,7 +32,7 @@ def _generate_prebuilt_clang_toolchain_impl(repo_ctx):
     repo_ctx.file("WORKSPACE.bazel", content = "")
 
     repo_ctx.symlink(
-        workspace_dir + "/build/bazel/toolchains/clang/prebuilt_clang.BUILD.bazel",
+        repo_ctx.path(Label("@//build/bazel/toolchains/clang:prebuilt_clang.BUILD.bazel")),
         "BUILD.bazel",
     )
 
@@ -65,7 +65,7 @@ def _generate_prebuilt_llvm_repository_impl(repo_ctx):
 
     # Resolve full path of script before executing it, this ensures that the repository
     # rule will be re-run everytime the invoked script is modified.
-    script_path = str(repo_ctx.path(Label("@//:build/bazel/scripts/symlink-directory.py")))
+    script_path = str(repo_ctx.path(Label("@//build/bazel/scripts:symlink-directory.py")))
 
     repo_ctx.execute(
         [
@@ -78,7 +78,7 @@ def _generate_prebuilt_llvm_repository_impl(repo_ctx):
 
     # Symlink the BUILD.bazel file.
     repo_ctx.symlink(
-        workspace_dir + "/build/bazel/toolchains/clang/prebuilt_llvm.BUILD.bazel",
+        repo_ctx.path("@//build/bazel/toolchains/clang:prebuilt_llvm.BUILD.bazel"),
         "BUILD.bazel",
     )
 

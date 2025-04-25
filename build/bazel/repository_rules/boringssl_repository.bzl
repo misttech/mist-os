@@ -20,7 +20,7 @@ def _boringssl_repository_impl(repo_ctx):
     # which generates the build file contents.
     repo_ctx.execute(
         [
-            repo_ctx.path(workspace_dir + "/build/bazel/scripts/hardlink-directory.py"),
+            repo_ctx.path(Label("@//build/bazel:scripts/hardlink-directory.py")),
             "--fuchsia-dir",
             workspace_dir,
             src_dir,
@@ -47,7 +47,7 @@ def _boringssl_repository_impl(repo_ctx):
 
     # Add a BUILD file which exposes the cc_library target.
     repo_ctx.file("BUILD.bazel", content = repo_ctx.read(
-        repo_ctx.path(workspace_dir + "/build/bazel/local_repositories/boringssl/BUILD.boringssl"),
+        repo_ctx.path(Label("@//build/bazel/repository_rules:boringssl_BUILD.bazel")),
     ), executable = False)
 
 boringssl_repository = repository_rule(

@@ -20,7 +20,7 @@
 """Clang toolchain repository extensions."""
 
 load(
-    "//:build/bazel/toolchains/clang/repository_rules.bzl",
+    "//build/bazel/toolchains/clang:repository_rules.bzl",
     "generate_prebuilt_toolchain_repository",
 )
 

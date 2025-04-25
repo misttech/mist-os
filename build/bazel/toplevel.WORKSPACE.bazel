@@ -140,7 +140,7 @@ ninja_output_dir = build_config.ninja_output_dir
 # exporting generating configuration constants related to the ICU library flavors
 # buildifier: disable=load-on-top
 load(
-    "//:build/bazel/icu/repository_rules.bzl",
+    "//build/bazel/icu:repository_rules.bzl",
     "fuchsia_icu_config_repository",
 )
 
@@ -166,7 +166,7 @@ rules_rust_dependencies()
 
 # buildifier: disable=load-on-top
 load(
-    "//:build/bazel/toolchains/rust/repository_rules.bzl",
+    "//build/bazel/toolchains/rust:repository_rules.bzl",
     "generate_prebuilt_rust_toolchain_repository",
 )
 
@@ -214,7 +214,7 @@ local_repository(
 # patch for now for Fuchsia support, which is handled by a repository rule.
 
 # buildifier: disable=load-on-top
-load("//:build/bazel/repository_rules/googletest_repository.bzl", "googletest_repository")
+load("//build/bazel/repository_rules:googletest_repository.bzl", "googletest_repository")
 
 googletest_repository(
     name = "com_google_googletest",
@@ -224,7 +224,7 @@ googletest_repository(
 )
 
 # buildifier: disable=load-on-top
-load("//:build/bazel/repository_rules/boringssl_repository.bzl", "boringssl_repository")
+load("//build/bazel/repository_rules:boringssl_repository.bzl", "boringssl_repository")
 
 boringssl_repository(
     name = "boringssl",
@@ -244,7 +244,7 @@ _clang_dir = paths.dirname(clang_prefix) if clang_prefix else "prebuilt/third_pa
 
 # buildifier: disable=load-on-top
 load(
-    "//:build/bazel/toolchains/clang/repository_rules.bzl",
+    "//build/bazel/toolchains/clang:repository_rules.bzl",
     "generate_prebuilt_clang_toolchain_repository",
     "generate_prebuilt_llvm_repository",
 )
@@ -305,7 +305,7 @@ local_repository(
 
 # buildifier: disable=load-on-top
 load(
-    "//:build/bazel/fuchsia_idk/repository_rules.bzl",
+    "//build/bazel/fuchsia_idk:repository_rules.bzl",
     "fuchsia_idk_repository",
 )
 

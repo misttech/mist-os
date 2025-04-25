@@ -5,7 +5,7 @@
 """BUILD.bazel file for @prebuilt_clang repository."""
 
 load(
-    "@//:build/bazel/toolchains/clang/toolchains.bzl",
+    "@//build/bazel/toolchains/clang:toolchains.bzl",
     "define_host_prebuilt_clang_cc_toolchains",
 )
 load("@fuchsia_build_config//:defs.bzl", "build_config")

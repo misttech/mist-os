@@ -9,7 +9,7 @@ See //build/bazel/README.md for details about this file.
 
 load("@fuchsia_build_config//:defs.bzl", "build_config")
 load(
-    "//:build/bazel/toolchains/linux_sysroot.bzl",
+    "//build/bazel/toolchains:linux_sysroot.bzl",
     "linux_sysroot_headers",
     "linux_sysroot_libs",
 )

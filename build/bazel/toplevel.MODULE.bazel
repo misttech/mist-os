@@ -27,7 +27,7 @@ module(
 # Use a module extension to generate the @clang_prebuilt// repository
 # used to implement Bazel C++ toolchains, see //build/bazel/toolchains/clang/...
 clang_toolchains = use_extension(
-    "//:build/bazel/module_extensions.bzl",
+    "//build/bazel:module_extensions.bzl",
     "clang_toolchains_extension",
 )
 clang_toolchains.prebuilt_toolchain(
@@ -96,7 +96,7 @@ local_path_override(
 )
 
 fuchsia_sdk_repositories = use_extension(
-    "//:build/bazel/module_extensions.bzl",
+    "//build/bazel:module_extensions.bzl",
     "fuchsia_sdk_repositories",
 )
 use_repo(

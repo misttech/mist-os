@@ -14,10 +14,10 @@ def _googletest_repository_impl(repo_ctx):
 
     # Locate the git bundle path, and record it as an input dependency for this rule.
     # This works even if content_hash_file is not used.
-    bundle_path = repo_ctx.path(Label("@//:build/bazel/patches/googletest/fuchsia-support.bundle"))
+    bundle_path = repo_ctx.path(Label("@//build/bazel:patches/googletest/fuchsia-support.bundle"))
 
     # Do the same for the script's path.
-    script_path = repo_ctx.path(Label("@//:build/bazel/scripts/git-clone-then-apply-bundle.py"))
+    script_path = repo_ctx.path(Label("@//build/bazel:scripts/git-clone-then-apply-bundle.py"))
 
     # This uses a git bundle to ensure that we can always work from a
     # Jiri-managed clone of //third_party/googletest/src/. This is more reliable
