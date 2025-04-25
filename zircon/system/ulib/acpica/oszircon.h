@@ -6,15 +6,25 @@
 #ifndef ZIRCON_SYSTEM_ULIB_ACPICA_OSZIRCON_H_
 #define ZIRCON_SYSTEM_ULIB_ACPICA_OSZIRCON_H_
 
-#include <stdio.h>
-#include <trace.h>
-
 #include <acpica/acpi.h>
 
 #define _COMPONENT ACPI_OS_SERVICES
 ACPI_MODULE_NAME("oszircon")
 
-#define LOCAL_TRACE 0
+#if 0
+#define LOCAL_TRACE 2
+
+#define TRACEF(str, x...)                               \
+  do {                                                  \
+    printf("%s:%d: " str, __FUNCTION__, __LINE__, ##x); \
+  } while (0)
+#define LTRACEF(x...)  \
+  do {                 \
+    if (LOCAL_TRACE) { \
+      TRACEF(x);       \
+    }                  \
+  } while (0)
+#endif
 
 // Start the task execution thread.
 ACPI_STATUS AcpiTaskThreadStart();

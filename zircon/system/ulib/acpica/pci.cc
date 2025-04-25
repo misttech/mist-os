@@ -10,6 +10,8 @@
 
 #include "zircon/system/ulib/acpica/oszircon.h"
 
+#define LOCAL_TRACE 0
+
 namespace {
 const size_t PCIE_MAX_DEVICES_PER_BUS = 32;
 const size_t PCIE_MAX_FUNCTIONS_PER_DEVICE = 8;
@@ -29,8 +31,10 @@ const size_t PCIE_MAX_FUNCTIONS_PER_DEVICE = 8;
  */
 static ACPI_STATUS AcpiOsReadWritePciConfiguration(ACPI_PCI_ID* PciId, UINT32 Register,
                                                    UINT64* Value, UINT32 Width, bool Write) {
-  LTRACEF("ACPIOS: %s PCI Config %x:%x:%x:%x register %#x width %u\n", Write ? "write" : "read",
-          PciId->Segment, PciId->Bus, PciId->Device, PciId->Function, Register, Width);
+  if (LOCAL_TRACE) {
+    printf("ACPIOS: %s PCI Config %x:%x:%x:%x register %#x width %u\n", Write ? "write" : "read",
+           PciId->Segment, PciId->Bus, PciId->Device, PciId->Function, Register, Width);
+  }
 
   // Only segment 0 is supported for now
   if (PciId->Segment != 0) {

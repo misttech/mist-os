@@ -3,6 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <trace.h>
+
 #include <acpica/acpi.h>
 #include <bitmap/raw-bitmap.h>
 #include <bitmap/storage.h>
@@ -11,10 +13,12 @@
 
 #include "zircon/system/ulib/acpica/oszircon.h"
 
+#define LOCAL_TRACE 0
+
 #ifdef __x86_64__
 
-#include <arch/x86/descriptor.h>
-#include <arch/x86/ioport.h>
+// #include <arch/x86/descriptor.h>
+// #include <arch/x86/ioport.h>
 
 // Essentially, we're using a bitmap here to represent each individual I/O port, so that we can
 // keep track of which I/O ports are allowed and which are not by the kernel.
@@ -30,8 +34,8 @@ static void initialize_port_bitmap() {
 }
 
 static bool check_port_permissions(uint16_t address, uint8_t width_bytes) {
-  // LTRACEF("Testing %#x until %#x, in bitmap of size %#zx\n", address, address + width_bytes,
-  //         port_bitmap.size());
+  LTRACEF("Testing %#x until %#x, in bitmap of size %#zx\n", address, address + width_bytes,
+          port_bitmap.size());
 
   return port_bitmap.Scan(address, address + width_bytes, true);
 }
@@ -49,7 +53,7 @@ static zx_status_t add_port_permissions(uint16_t address, uint8_t width_bytes) {
   zx_status_t result = port_bitmap.Set(address, address + width_bytes);
   ZX_ASSERT(result == ZX_OK);
 
-  // LTRACEF("Adding permissions to [%#x, %#x]\n", address, address + width_bytes);
+  LTRACEF("Adding permissions to [%#x, %#x]\n", address, address + width_bytes);
 
   // return zx_ioports_request(ioport_resource_handle, address, width_bytes);
   // IoBitmap::GetCurrent()->SetIoBitmap(address, width_bytes, /*enable=*/true);
@@ -171,10 +175,8 @@ ACPI_STATUS AcpiOsWritePort(ACPI_IO_ADDRESS Address, UINT32 Value, UINT32 Width)
   return AE_OK;
 }
 
-#ifdef __x86_64__
 inline constexpr uint16_t kPciConfigAddrPort = 0xCF8;
 inline constexpr uint16_t kPciConfigDataPort = 0xCFC;
-#endif
 
 ACPI_STATUS AcpiIoPortSetup() {
   initialize_port_bitmap();

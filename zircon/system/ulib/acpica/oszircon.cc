@@ -161,8 +161,7 @@ void AcpiOsSleep(UINT64 Milliseconds) {
     // If we're asked to sleep for a long time (>1.5 months), shorten it
     Milliseconds = UINT32_MAX;
   }
-  const zx_instant_mono_t now = current_mono_time();
-  Thread::Current::SleepEtc(Deadline::after_mono(ZX_MSEC(Milliseconds)), Interruptible::Yes, now);
+  Thread::Current::SleepRelative(ZX_MSEC(Milliseconds));
 }
 
 /**
@@ -172,10 +171,7 @@ void AcpiOsSleep(UINT64 Milliseconds) {
  *
  * @param Microseconds The amount of time to delay, in microseconds.
  */
-void AcpiOsStall(UINT32 Microseconds) {
-  const zx_instant_mono_t now = current_mono_time();
-  Thread::Current::SleepEtc(Deadline::after_mono(ZX_USEC(Microseconds)), Interruptible::Yes, now);
-}
+void AcpiOsStall(UINT32 Microseconds) { Thread::Current::SleepRelative(ZX_USEC(Microseconds)); }
 
 /**
  * @brief Read a value from a memory location.
