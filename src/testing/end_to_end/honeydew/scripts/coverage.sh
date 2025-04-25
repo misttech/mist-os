@@ -41,8 +41,14 @@ else
 fi
 
 echo "Configuring environment..."
+NEW_PATH=$($FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/conformance_paths.py --python-path-json "$FUCHSIA_DIR/$BUILD_DIR/fidl_python_dirs.json" --fuchsia-dir "$FUCHSIA_DIR" --build-dir "$FUCHSIA_DIR/$BUILD_DIR")
+if [[ $? -ne 0 ]]; then
+    echo "Failed to get PYTHONPATH"
+    echo "$NEW_PATH"
+    exit 1
+fi
 OLD_PYTHONPATH=$PYTHONPATH
-PYTHONPATH=$FUCHSIA_DIR/$BUILD_DIR/host_x64:$FUCHSIA_DIR/$BUILD_DIR/host_x64/gen/src/developer/ffx/lib/fuchsia-controller/cpp:$FUCHSIA_DIR/src/developer/ffx/lib/fuchsia-controller/python:$FUCHSIA_DIR/src/lib/diagnostics/python:$PYTHONPATH
+PYTHONPATH=$NEW_PATH:$PYTHONPATH
 
 echo "Running coverage tool..."
 HONEYDEW_FASTBOOT_OVERRIDE=$FASTBOOT_PATH coverage \
