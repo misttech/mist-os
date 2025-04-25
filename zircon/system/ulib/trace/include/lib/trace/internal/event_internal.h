@@ -220,6 +220,16 @@ __BEGIN_CDECLS
         args);                                                                               \
   } while (0)
 
+#define TRACE_INTERNAL_INSTAFLOW_BEGIN(category_literal, name_literal, flow_id, args...)     \
+  do {                                                                                       \
+    TRACE_INTERNAL_EVENT_RECORD(                                                             \
+        (category_literal),                                                                  \
+        trace_internal_write_instaflow_begin_event_record_and_release_context(               \
+            TRACE_INTERNAL_CONTEXT, &TRACE_INTERNAL_CATEGORY_REF, (name_literal), (flow_id), \
+            TRACE_INTERNAL_ARGS, TRACE_INTERNAL_NUM_INTERNAL_ARGS),                          \
+        args);                                                                               \
+  } while (0)
+
 #define TRACE_INTERNAL_FLOW_STEP(category_literal, name_literal, flow_id, args...)           \
   do {                                                                                       \
     TRACE_INTERNAL_EVENT_RECORD(                                                             \
@@ -230,11 +240,31 @@ __BEGIN_CDECLS
         args);                                                                               \
   } while (0)
 
+#define TRACE_INTERNAL_INSTAFLOW_STEP(category_literal, name_literal, flow_id, args...)      \
+  do {                                                                                       \
+    TRACE_INTERNAL_EVENT_RECORD(                                                             \
+        (category_literal),                                                                  \
+        trace_internal_write_instaflow_step_event_record_and_release_context(                \
+            TRACE_INTERNAL_CONTEXT, &TRACE_INTERNAL_CATEGORY_REF, (name_literal), (flow_id), \
+            TRACE_INTERNAL_ARGS, TRACE_INTERNAL_NUM_INTERNAL_ARGS),                          \
+        args);                                                                               \
+  } while (0)
+
 #define TRACE_INTERNAL_FLOW_END(category_literal, name_literal, flow_id, args...)            \
   do {                                                                                       \
     TRACE_INTERNAL_EVENT_RECORD(                                                             \
         (category_literal),                                                                  \
         trace_internal_write_flow_end_event_record_and_release_context(                      \
+            TRACE_INTERNAL_CONTEXT, &TRACE_INTERNAL_CATEGORY_REF, (name_literal), (flow_id), \
+            TRACE_INTERNAL_ARGS, TRACE_INTERNAL_NUM_INTERNAL_ARGS),                          \
+        args);                                                                               \
+  } while (0)
+
+#define TRACE_INTERNAL_INSTAFLOW_END(category_literal, name_literal, flow_id, args...)       \
+  do {                                                                                       \
+    TRACE_INTERNAL_EVENT_RECORD(                                                             \
+        (category_literal),                                                                  \
+        trace_internal_write_instaflow_end_event_record_and_release_context(                 \
             TRACE_INTERNAL_CONTEXT, &TRACE_INTERNAL_CATEGORY_REF, (name_literal), (flow_id), \
             TRACE_INTERNAL_ARGS, TRACE_INTERNAL_NUM_INTERNAL_ARGS),                          \
         args);                                                                               \
@@ -340,11 +370,23 @@ void trace_internal_write_flow_begin_event_record_and_release_context(
     trace_context_t* context, const trace_string_ref_t* category_ref, const char* name_literal,
     trace_flow_id_t flow_id, trace_arg_t* args, size_t num_args);
 
+void trace_internal_write_instaflow_begin_event_record_and_release_context(
+    trace_context_t* context, const trace_string_ref_t* category_ref, const char* name_literal,
+    trace_flow_id_t flow_id, trace_arg_t* args, size_t num_args);
+
 void trace_internal_write_flow_step_event_record_and_release_context(
     trace_context_t* context, const trace_string_ref_t* category_ref, const char* name_literal,
     trace_flow_id_t flow_id, trace_arg_t* args, size_t num_args);
 
+void trace_internal_write_instaflow_step_event_record_and_release_context(
+    trace_context_t* context, const trace_string_ref_t* category_ref, const char* name_literal,
+    trace_flow_id_t flow_id, trace_arg_t* args, size_t num_args);
+
 void trace_internal_write_flow_end_event_record_and_release_context(
+    trace_context_t* context, const trace_string_ref_t* category_ref, const char* name_literal,
+    trace_flow_id_t flow_id, trace_arg_t* args, size_t num_args);
+
+void trace_internal_write_instaflow_end_event_record_and_release_context(
     trace_context_t* context, const trace_string_ref_t* category_ref, const char* name_literal,
     trace_flow_id_t flow_id, trace_arg_t* args, size_t num_args);
 

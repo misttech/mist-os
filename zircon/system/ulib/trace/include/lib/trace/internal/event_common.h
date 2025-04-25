@@ -262,6 +262,16 @@
 #define TRACE_FLOW_BEGIN(category_literal, name_literal, flow_id, args...) \
   TRACE_INTERNAL_FLOW_BEGIN((category_literal), (name_literal), (flow_id), args)
 
+// Convenience macro to begin a flow attached to an instant event.
+// Otherwise, use as you would use TRACE_FLOW_BEGIN.
+//
+// Flows must be attached to a duration event. This can be awkward when there isn't an obvious
+// duration event to attach to, or the relevant duration is very small, which makes visualizing
+// difficult. This emits a flow event wrapped in a self contained instant event that is also easy
+// to see in the tracing UI.
+#define TRACE_INSTAFLOW_BEGIN(category_literal, name_literal, flow_id, args...) \
+  TRACE_INTERNAL_INSTAFLOW_BEGIN((category_literal), (name_literal), (flow_id), args)
+
 // Writes a flow step event with the specified id.
 //
 // Flow events describe control flow handoffs between threads or across processes.
@@ -292,6 +302,16 @@
 #define TRACE_FLOW_STEP(category_literal, name_literal, flow_id, args...) \
   TRACE_INTERNAL_FLOW_STEP((category_literal), (name_literal), (flow_id), args)
 
+// Convenience macro to emit a step in a flow attached to an instant event.
+// Otherwise, use as you would use TRACE_FLOW_STEP.
+//
+// Flows must be attached to a duration event. This can be awkward when there isn't an obvious
+// duration event to attach to, or the relevant duration is very small, which makes visualizing
+// difficult. This emits a flow event wrapped in a self contained instant event that is also easy
+// to see in the tracing UI.
+#define TRACE_INSTAFLOW_STEP(category_literal, name_literal, flow_id, args...) \
+  TRACE_INTERNAL_INSTAFLOW_STEP((category_literal), (name_literal), (flow_id), args)
+
 // Writes a flow end event with the specified id.
 //
 // Flow events describe control flow handoffs between threads or across processes.
@@ -321,6 +341,16 @@
 //
 #define TRACE_FLOW_END(category_literal, name_literal, flow_id, args...) \
   TRACE_INTERNAL_FLOW_END((category_literal), (name_literal), (flow_id), args)
+
+// Convenience macro to end a flow attached to an instant event.
+// Otherwise, use as you would use TRACE_FLOW_END.
+//
+// Flows must be attached to a duration event. This can be awkward when there isn't an obvious
+// duration event to attach to, or the relevant duration is very small, which makes visualizing
+// difficult. This emits a flow event wrapped in a self contained instant event that is also easy
+// to see in the tracing UI.
+#define TRACE_INSTAFLOW_END(category_literal, name_literal, flow_id, args...) \
+  TRACE_INTERNAL_INSTAFLOW_END((category_literal), (name_literal), (flow_id), args)
 
 // Writes a large blob record with the given blob data and metadata.
 // Here metadata includes timestamp, thread and process information, and arguments,
