@@ -4,6 +4,16 @@
 
 import("//build/bazel/bazel_build_action.gni")
 
+# Building this target will currently fail because without `host = true` it will
+# attempt to generate a Fuchsia C++ binary, which will fail because
+# `no_sdk = true` implies that there is no C library or fdio.so available to
+# link to.
+#
+# See //build/bazel/examples/hello_host for a similar example that builds for
+# the host successfully.
+#
+# TODO(ddorwin): Make the Bazel target something that can be built without the
+# SDK (i.e., not a C binary).
 bazel_build_action("hello_no_sdk") {
   no_sdk = true
   bazel_target = ":hello_no_sdk"

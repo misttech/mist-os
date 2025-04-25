@@ -24,7 +24,7 @@ declare_args() {
 #
 # May only be called on the default_toolchain so as to prevent generating Bazel
 # workspace multiple times. Host targets can be built by specifying
-# `no_sdk = true`.
+# `host = true`.
 #
 # The caller should pass a list of Bazel target patterns for the
 # `bazel build` command, as well as a list Bazel output files relative
@@ -204,8 +204,14 @@ declare_args() {
 #
 #   no_sdk: (optional)
 #     Set this to true to run a Bazel command to build artifacts that do not
-#     depend on the Fuchsia IDK or SDK. This currently implies targeting the
-#     host platform.
+#     depend on the Fuchsia IDK or SDK. This makes these targets available to
+#     the GN graph early during the build. Must be true if `host` is true.
+#     Type: boolean
+#     Default: false
+#
+#   host: (optional)
+#     Set this to true to run a Bazel command to build host artifacts.
+#     Requires `no_sdk = true`.
 #     Type: boolean
 #     Default: false
 #
@@ -271,6 +277,11 @@ template("bazel_action") {
   assert(defined(invoker.bazel_targets), "bazel_targets must be defined!")
   assert(invoker.bazel_targets != [], "bazel_targets cannot be empty!")
 
+  _no_sdk = defined(invoker.no_sdk) && invoker.no_sdk
+  _build_for_host = defined(invoker.host) && invoker.host
+  assert(!_build_for_host || _no_sdk,
+         "`no_sdk` must true when `host` is true. ")
+
   _copy_outputs = []
   if (defined(invoker.copy_outputs)) {
     _copy_outputs = invoker.copy_outputs
@@ -300,8 +311,6 @@ template("bazel_action") {
   _has_directory_outputs = false
   _has_package_outputs = false
   _has_final_symlink_outputs = false
-
-  _no_sdk = defined(invoker.no_sdk) && invoker.no_sdk
 
   _ninja_base_dir = target_out_dir
   if (defined(invoker.ninja_base_dir)) {
@@ -791,7 +800,7 @@ template("bazel_action") {
 
     args += [ "--" ]
 
-    if (_no_sdk) {
+    if (_build_for_host) {
       args += [ "--platforms=//build/bazel/platforms:host" ]
     } else {
       # Since this template can only be used on the default toolchain, the
