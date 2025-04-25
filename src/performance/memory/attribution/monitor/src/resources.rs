@@ -52,6 +52,7 @@ pub struct KernelResources {
 #[derive(Default)]
 struct KernelResourcesBuilder {
     kernel_resources: KernelResources,
+    cache: Cache,
 }
 
 struct Cache {
@@ -257,9 +258,9 @@ impl KernelResources {
                 hashmap
             });
         let mut kr_builder = KernelResourcesBuilder::default();
-        let mut cache = Cache::default();
+
         let root_job_koid = root.get_koid().unwrap();
-        kr_builder.explore_job(&mut cache, &root_job_koid, root, &process_collection_requests)?;
+        kr_builder.explore_job(&root_job_koid, root, &process_collection_requests)?;
         Ok(kr_builder.kernel_resources)
     }
 }
@@ -268,7 +269,6 @@ impl KernelResourcesBuilder {
     /// Recursively gather memory information from a job.
     fn explore_job(
         &mut self,
-        cache: &mut Cache,
         koid: &zx::Koid,
         job: &dyn Job,
         process_mapped: &HashMap<zx::Koid, CollectionRequest>,
@@ -290,7 +290,7 @@ impl KernelResourcesBuilder {
                 }
                 Ok(child) => child,
             };
-            self.explore_job(cache, child_job_koid, child_job.as_ref(), process_mapped)?;
+            self.explore_job(child_job_koid, child_job.as_ref(), process_mapped)?;
         }
 
         for process_koid in &processes {
@@ -305,7 +305,6 @@ impl KernelResourcesBuilder {
                 Ok(child) => child,
             };
             match self.explore_process(
-                cache,
                 process_koid,
                 child_process.as_ref(),
                 process_mapped.get(process_koid),
@@ -341,7 +340,6 @@ impl KernelResourcesBuilder {
     /// Gather the memory information of a process.
     fn explore_process(
         &mut self,
-        cache: &mut Cache,
         koid: &zx::Koid,
         process: &dyn Process,
         collection: Option<&CollectionRequest>,
@@ -352,12 +350,12 @@ impl KernelResourcesBuilder {
 
         let vmo_koids = if collection.is_none() || collection.is_some_and(|c| c.collect_vmos) {
             duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:vmos");
-            let (mut info_vmos, available) = process.info_vmos(cache.vmos_cache(0))?;
+            let (mut info_vmos, available) = process.info_vmos(self.cache.vmos_cache(0))?;
 
             if info_vmos.len() < available {
                 duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:vmos:grow",
                     "initial_length" => info_vmos.len(), "target_length" => available);
-                (info_vmos, _) = process.info_vmos(cache.vmos_cache(available))?;
+                (info_vmos, _) = process.info_vmos(self.cache.vmos_cache(available))?;
             }
 
             duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:vmos:insert");
@@ -403,11 +401,11 @@ impl KernelResourcesBuilder {
 
         let process_maps = if collection.is_some_and(|c| c.collect_maps) {
             duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:maps");
-            let (mut info_maps, available) = process.info_maps(cache.maps_cache(0))?;
+            let (mut info_maps, available) = process.info_maps(self.cache.maps_cache(0))?;
 
             if info_maps.len() < available {
                 duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:maps:grow", "initial_length" => info_maps.len(), "target_length" => available);
-                (info_maps, _) = process.info_maps(cache.maps_cache(available))?;
+                (info_maps, _) = process.info_maps(self.cache.maps_cache(available))?;
             }
 
             duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:maps:insert");
