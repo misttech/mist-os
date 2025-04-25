@@ -877,7 +877,7 @@ pub fn sys_sched_getparam(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
-    param: UserAddress,
+    param: UserRef<sched_param>,
 ) -> Result<(), Errno> {
     if pid < 0 || param.is_null() {
         return error!(EINVAL);
@@ -886,7 +886,7 @@ pub fn sys_sched_getparam(
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
     let param_value = target_task.read().scheduler_policy.raw_params();
-    current_task.write_object(param.into(), &param_value)?;
+    current_task.write_object(param, &param_value)?;
     Ok(())
 }
 
@@ -894,7 +894,7 @@ pub fn sys_sched_setparam(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
-    param: UserAddress,
+    param: UserRef<sched_param>,
 ) -> Result<(), Errno> {
     if pid < 0 || param.is_null() {
         return error!(EINVAL);
@@ -1987,7 +1987,9 @@ mod arch32 {
         sys_sched_get_priority_max as sys_arch32_sched_get_priority_max,
         sys_sched_get_priority_min as sys_arch32_sched_get_priority_min,
         sys_sched_getaffinity as sys_arch32_sched_getaffinity,
+        sys_sched_getparam as sys_arch32_sched_getparam,
         sys_sched_setaffinity as sys_arch32_sched_setaffinity,
+        sys_sched_setparam as sys_arch32_sched_setparam,
         sys_sched_setscheduler as sys_arch32_sched_setscheduler, sys_seccomp as sys_arch32_seccomp,
         sys_setfsuid as sys_arch32_setfsuid, sys_setfsuid as sys_arch32_setfsuid32,
         sys_setgid as sys_arch32_setgid32, sys_setgroups as sys_arch32_setgroups32,
@@ -2343,7 +2345,8 @@ mod tests {
 
         let mapped_address =
             map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
-        sys_sched_getparam(&mut locked, &current_task, 0, mapped_address).expect("sched_getparam");
+        sys_sched_getparam(&mut locked, &current_task, 0, mapped_address.into())
+            .expect("sched_getparam");
         let param_value: sched_param =
             current_task.read_object(mapped_address.into()).expect("read_object");
         assert_eq!(param_value.sched_priority, 15);
@@ -2354,7 +2357,8 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mapped_address =
             map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
-        sys_sched_getparam(&mut locked, &current_task, 0, mapped_address).expect("sched_getparam");
+        sys_sched_getparam(&mut locked, &current_task, 0, mapped_address.into())
+            .expect("sched_getparam");
         let param_value: sched_param =
             current_task.read_object(mapped_address.into()).expect("read_object");
         assert_eq!(param_value.sched_priority, 0);

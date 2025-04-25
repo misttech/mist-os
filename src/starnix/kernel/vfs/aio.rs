@@ -8,6 +8,7 @@ use crate::mm::{
 };
 use crate::task::{CurrentTask, KernelThreads, SimpleWaiter, WaitQueue};
 use crate::vfs::eventfd::EventFdFileObject;
+use crate::vfs::syscalls::IocbPtr;
 use crate::vfs::{
     checked_add_offset_and_length, FdNumber, FileHandle, InputBuffer, OutputBuffer,
     UserBuffersInputBuffer, UserBuffersOutputBuffer, VecInputBuffer, VecOutputBuffer,
@@ -19,7 +20,6 @@ use starnix_sync::{InterruptibleEvent, Locked, Mutex, Unlocked};
 use starnix_syscalls::SyscallResult;
 use starnix_types::user_buffer::{UserBuffer, UserBuffers};
 use starnix_uapi::errors::{Errno, EINTR, ETIMEDOUT};
-use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
     aio_context_t, errno, error, io_event, iocb, IOCB_CMD_PREAD, IOCB_CMD_PREADV, IOCB_CMD_PWRITE,
     IOCB_CMD_PWRITEV, IOCB_FLAG_RESFD,
@@ -69,7 +69,7 @@ impl AioContext {
         self: &Arc<Self>,
         current_task: &CurrentTask,
         control_block: iocb,
-        iocb_addr: UserAddress,
+        iocb_addr: IocbPtr,
     ) -> Result<(), Errno> {
         self.inner.submit(current_task, control_block, iocb_addr)
     }
@@ -151,7 +151,7 @@ impl AioContextInner {
         self: &Arc<Self>,
         current_task: &CurrentTask,
         control_block: iocb,
-        iocb_addr: UserAddress,
+        iocb_addr: IocbPtr,
     ) -> Result<(), Errno> {
         let op = IoOperation::new(current_task, control_block, iocb_addr)?;
         self.operations.enqueue(op)
@@ -238,7 +238,7 @@ struct IoOperation {
     buffers: UserBuffers,
     offset: usize,
     id: u64,
-    iocb_addr: UserAddress,
+    iocb_addr: IocbPtr,
     eventfd: Option<WeakFileHandle>,
 }
 
@@ -246,7 +246,7 @@ impl IoOperation {
     fn new(
         current_task: &CurrentTask,
         control_block: iocb,
-        iocb_addr: UserAddress,
+        iocb_addr: IocbPtr,
     ) -> Result<Self, Errno> {
         if control_block.aio_reserved2 != 0 {
             return error!(EINVAL);
@@ -338,7 +338,7 @@ impl IoOperation {
             Err(errno) => errno.return_value() as i64,
         };
 
-        io_event { data: self.id, obj: self.iocb_addr.into(), res, ..Default::default() }
+        io_event { data: self.id, obj: self.iocb_addr.addr().into(), res, ..Default::default() }
     }
 
     fn do_read(

@@ -320,3 +320,52 @@ impl TryFrom<crate::sigevent> for crate::arch32::sigevent {
         })
     }
 }
+
+impl From<crate::arch32::sysinfo> for crate::sysinfo {
+    fn from(sysinfo: crate::arch32::sysinfo) -> Self {
+        Self {
+            uptime: sysinfo.uptime.into(),
+            loads: sysinfo.loads.map(u64::from),
+            totalram: sysinfo.totalram.into(),
+            freeram: sysinfo.freeram.into(),
+            sharedram: sysinfo.sharedram.into(),
+            bufferram: sysinfo.bufferram.into(),
+            totalswap: sysinfo.totalswap.into(),
+            freeswap: sysinfo.freeswap.into(),
+            procs: sysinfo.procs.into(),
+            pad: sysinfo.pad.into(),
+            totalhigh: sysinfo.totalhigh.into(),
+            freehigh: sysinfo.freehigh.into(),
+            mem_unit: sysinfo.mem_unit.into(),
+            ..Default::default()
+        }
+    }
+}
+
+impl TryFrom<crate::sysinfo> for crate::arch32::sysinfo {
+    type Error = ();
+    fn try_from(sysinfo: crate::sysinfo) -> Result<Self, ()> {
+        let [v1, v2, v3] = sysinfo.loads;
+        let loads = [
+            u32::try_from(v1).map_err(|_| ())?,
+            u32::try_from(v2).map_err(|_| ())?,
+            u32::try_from(v3).map_err(|_| ())?,
+        ];
+        Ok(Self {
+            uptime: sysinfo.uptime.try_into().map_err(|_| ())?,
+            loads,
+            totalram: sysinfo.totalram.try_into().map_err(|_| ())?,
+            freeram: sysinfo.freeram.try_into().map_err(|_| ())?,
+            sharedram: sysinfo.sharedram.try_into().map_err(|_| ())?,
+            bufferram: sysinfo.bufferram.try_into().map_err(|_| ())?,
+            totalswap: sysinfo.totalswap.try_into().map_err(|_| ())?,
+            freeswap: sysinfo.freeswap.try_into().map_err(|_| ())?,
+            procs: sysinfo.procs.try_into().map_err(|_| ())?,
+            pad: sysinfo.pad.try_into().map_err(|_| ())?,
+            totalhigh: sysinfo.totalhigh.try_into().map_err(|_| ())?,
+            freehigh: sysinfo.freehigh.try_into().map_err(|_| ())?,
+            mem_unit: sysinfo.mem_unit.try_into().map_err(|_| ())?,
+            ..Default::default()
+        })
+    }
+}

@@ -20,7 +20,7 @@ use starnix_types::user_buffer::MAX_RW_COUNT;
 use starnix_uapi::auth::{CAP_SYS_ADMIN, CAP_SYS_MODULE};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::personality::PersonalityFlags;
-use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserCString, UserRef};
 use starnix_uapi::version::KERNEL_RELEASE;
 use starnix_uapi::{
     c_char, errno, error, from_status_like_fdio, uapi, utsname, EFAULT, GRND_NONBLOCK, GRND_RANDOM,
@@ -102,7 +102,7 @@ pub fn sys_uname(
 pub fn sys_sysinfo(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    info: UserRef<uapi::sysinfo>,
+    info: MultiArchUserRef<uapi::sysinfo, uapi::arch32::sysinfo>,
 ) -> Result<(), Errno> {
     let page_size = zx::system_get_page_size();
     let total_ram_pages = zx::system_get_physmem() / (page_size as u64);
@@ -124,7 +124,7 @@ pub fn sys_sysinfo(
         ..Default::default()
     };
 
-    current_task.write_object(info, &result)?;
+    current_task.write_multi_arch_object(info, result)?;
     Ok(())
 }
 
@@ -288,7 +288,7 @@ pub fn sys_delete_module(
 // Syscalls for arch32 usage
 #[cfg(feature = "arch32")]
 mod arch32 {
-    pub use super::sys_uname as sys_arch32_uname;
+    pub use super::{sys_sysinfo as sys_arch32_sysinfo, sys_uname as sys_arch32_uname};
 }
 
 #[cfg(feature = "arch32")]

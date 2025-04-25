@@ -88,6 +88,28 @@ uapi::check_arch_independent_layout! {
         events,
         revents,
     }
+
+    io_event {
+        data,
+        obj,
+        res,
+        res2,
+    }
+
+    iocb {
+        aio_data,
+        aio_key,
+        aio_rw_flags,
+        aio_lio_opcode,
+        aio_reqprio,
+        aio_fildes,
+        aio_buf,
+        aio_nbytes,
+        aio_offset,
+        aio_reserved2,
+        aio_flags,
+        aio_resfd,
+    }
 }
 
 // Constants from bionic/libc/include/sys/stat.h
@@ -95,6 +117,8 @@ const UTIME_NOW: i64 = 0x3fffffff;
 const UTIME_OMIT: i64 = 0x3ffffffe;
 
 pub type OffsetPtr = MultiArchUserRef<uapi::off_t, uapi::arch32::off_t>;
+pub type IocbPtr = MultiArchUserRef<iocb, iocb>;
+pub type IocbPtrPtr = MultiArchUserRef<IocbPtr, IocbPtr>;
 
 pub fn sys_read(
     locked: &mut Locked<'_, Unlocked>,
@@ -2973,7 +2997,7 @@ pub fn sys_io_setup(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     user_nr_events: UserValue<u32>,
-    user_ctx_idp: UserRef<aio_context_t>,
+    user_ctx_idp: MultiArchUserRef<uapi::aio_context_t, uapi::arch32::aio_context_t>,
 ) -> Result<(), Errno> {
     // From https://man7.org/linux/man-pages/man2/io_setup.2.html:
     //
@@ -2984,11 +3008,11 @@ pub fn sys_io_setup(
     // TODO: Determine what "internal limits" means.
     let max_operations =
         user_nr_events.validate(0..(i32::MAX as u32)).ok_or_else(|| errno!(EINVAL))? as usize;
-    if current_task.read_object(user_ctx_idp)? != 0 {
+    if current_task.read_multi_arch_object(user_ctx_idp)? != 0 {
         return error!(EINVAL);
     }
     let ctx_id = AioContext::create(current_task, max_operations)?;
-    current_task.write_object(user_ctx_idp, &ctx_id).map_err(|e| {
+    current_task.write_multi_arch_object(user_ctx_idp, ctx_id).map_err(|e| {
         let _ = current_task
             .mm()
             .expect("previous sys_io_setup code verified mm exists")
@@ -3003,7 +3027,7 @@ pub fn sys_io_submit(
     current_task: &CurrentTask,
     ctx_id: aio_context_t,
     user_nr: UserValue<i32>,
-    mut iocb_addrs: UserRef<UserAddress>,
+    mut iocb_addrs: IocbPtrPtr,
 ) -> Result<i32, Errno> {
     let nr = user_nr.validate(0..i32::MAX).ok_or_else(|| errno!(EINVAL))?;
     if nr == 0 {
@@ -3018,11 +3042,10 @@ pub fn sys_io_submit(
     // `iocbpp` is an array of addresses to iocb's.
     let mut num_submitted: i32 = 0;
     loop {
-        let iocb_addr = current_task.read_object(iocb_addrs)?;
-        let iocb_ref = UserRef::<iocb>::new(iocb_addr.clone());
-        let control_block = current_task.read_object(iocb_ref)?;
+        let iocb_ref = current_task.read_multi_arch_ptr(iocb_addrs)?;
+        let control_block = current_task.read_multi_arch_object(iocb_ref)?;
 
-        match (num_submitted, ctx.submit(current_task, control_block, iocb_addr)) {
+        match (num_submitted, ctx.submit(current_task, control_block, iocb_ref)) {
             (0, Err(e)) => return Err(e),
             (_, Err(_)) => break,
             (_, Ok(())) => {
@@ -3070,10 +3093,10 @@ pub fn sys_io_cancel(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     ctx_id: aio_context_t,
-    user_iocb: UserRef<iocb>,
+    user_iocb: IocbPtr,
     _result: UserRef<io_event>,
 ) -> Result<(), Errno> {
-    let _iocb = current_task.read_object(user_iocb)?;
+    let _iocb = current_task.read_multi_arch_object(user_iocb)?;
     let _ctx = current_task
         .mm()
         .ok_or_else(|| errno!(EINVAL))?
@@ -3563,22 +3586,25 @@ mod arch32 {
         sys_eventfd2 as sys_arch32_eventfd2, sys_fchmod as sys_arch32_fchmod,
         sys_fchmodat as sys_arch32_fchmodat, sys_fchown as sys_arch32_fchown32,
         sys_fchown as sys_arch32_fchown, sys_fchownat as sys_arch32_fchownat,
-        sys_fdatasync as sys_arch32_fdatasync, sys_fsetxattr as sys_arch32_fsetxattr,
-        sys_fstatat64 as sys_arch32_fstatat64, sys_fstatfs as sys_arch32_fstatfs,
-        sys_fsync as sys_arch32_fsync, sys_ftruncate as sys_arch32_ftruncate,
+        sys_fdatasync as sys_arch32_fdatasync, sys_flock as sys_arch32_flock,
+        sys_fsetxattr as sys_arch32_fsetxattr, sys_fstatat64 as sys_arch32_fstatat64,
+        sys_fstatfs as sys_arch32_fstatfs, sys_fsync as sys_arch32_fsync,
+        sys_ftruncate as sys_arch32_ftruncate,
         sys_inotify_add_watch as sys_arch32_inotify_add_watch,
         sys_inotify_init1 as sys_arch32_inotify_init1,
-        sys_inotify_rm_watch as sys_arch32_inotify_rm_watch, sys_lgetxattr as sys_arch32_lgetxattr,
-        sys_linkat as sys_arch32_linkat, sys_lsetxattr as sys_arch32_lsetxattr,
-        sys_mkdirat as sys_arch32_mkdirat, sys_mknodat as sys_arch32_mknodat,
-        sys_pidfd_getfd as sys_arch32_pidfd_getfd, sys_pidfd_open as sys_arch32_pidfd_open,
-        sys_ppoll as sys_arch32_ppoll, sys_preadv as sys_arch32_preadv,
-        sys_pselect6 as sys_arch32_pselect6, sys_readv as sys_arch32_readv,
-        sys_renameat2 as sys_arch32_renameat2, sys_select as sys_arch32__newselect,
-        sys_setxattr as sys_arch32_setxattr, sys_splice as sys_arch32_splice,
-        sys_statfs as sys_arch32_statfs, sys_symlinkat as sys_arch32_symlinkat,
-        sys_sync as sys_arch32_sync, sys_tee as sys_arch32_tee,
-        sys_timerfd_create as sys_arch32_timerfd_create,
+        sys_inotify_rm_watch as sys_arch32_inotify_rm_watch, sys_io_cancel as sys_arch32_io_cancel,
+        sys_io_destroy as sys_arch32_io_destroy, sys_io_getevents as sys_arch32_io_getevents,
+        sys_io_setup as sys_arch32_io_setup, sys_io_submit as sys_arch32_io_submit,
+        sys_lgetxattr as sys_arch32_lgetxattr, sys_linkat as sys_arch32_linkat,
+        sys_lsetxattr as sys_arch32_lsetxattr, sys_mkdirat as sys_arch32_mkdirat,
+        sys_mknodat as sys_arch32_mknodat, sys_pidfd_getfd as sys_arch32_pidfd_getfd,
+        sys_pidfd_open as sys_arch32_pidfd_open, sys_ppoll as sys_arch32_ppoll,
+        sys_preadv as sys_arch32_preadv, sys_pselect6 as sys_arch32_pselect6,
+        sys_readv as sys_arch32_readv, sys_renameat2 as sys_arch32_renameat2,
+        sys_select as sys_arch32__newselect, sys_setxattr as sys_arch32_setxattr,
+        sys_splice as sys_arch32_splice, sys_statfs as sys_arch32_statfs,
+        sys_symlinkat as sys_arch32_symlinkat, sys_sync as sys_arch32_sync,
+        sys_tee as sys_arch32_tee, sys_timerfd_create as sys_arch32_timerfd_create,
         sys_timerfd_settime as sys_arch32_timerfd_settime, sys_truncate as sys_arch32_truncate,
         sys_umask as sys_arch32_umask, sys_utimensat as sys_arch32_utimensat,
         sys_vmsplice as sys_arch32_vmsplice,
