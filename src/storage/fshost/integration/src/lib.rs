@@ -135,6 +135,7 @@ impl TestFixtureBuilder {
             .add_route(
                 Route::new()
                     .capability(Capability::protocol::<ffeedback::CrashReporterMarker>())
+                    .capability(Capability::directory("boot").rights(fio::R_STAR_DIR).path("/boot"))
                     .from(&mocks)
                     .to(&fshost),
             )

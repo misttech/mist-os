@@ -49,7 +49,7 @@
         },
         {
             directory: "boot",
-            rights: [ "rx*" ],
+            rights: [ "r*" ],
             path: "/boot",
         },
         {

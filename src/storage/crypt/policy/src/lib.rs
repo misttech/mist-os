@@ -31,13 +31,7 @@ impl TryFrom<String> for Policy {
 
 /// Reads the policy from well-known locations in `/boot`.
 pub async fn get_policy() -> Result<Policy, Error> {
-    let policy = fuchsia_fs::file::read_in_namespace_to_string("/boot/config/zxcrypt").await;
-    let policy = match policy {
-        Ok(policy) => policy,
-        // In tests, the configuration is found in the same package as fshost.
-        Err(_) => fuchsia_fs::file::read_in_namespace_to_string("/pkg/config/zxcrypt").await?,
-    };
-    policy.try_into()
+    fuchsia_fs::file::read_in_namespace_to_string("/boot/config/zxcrypt").await?.try_into()
 }
 
 #[derive(Debug)]

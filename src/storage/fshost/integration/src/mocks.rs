@@ -38,6 +38,12 @@ async fn run_mocks(
     crash_reports_sink: mpsc::Sender<ffeedback::CrashReport>,
 ) -> Result<(), Error> {
     let export = vfs::pseudo_directory! {
+        "boot" => vfs::pseudo_directory! {
+            "config" => vfs::pseudo_directory! {
+                // Tests are expected to use a null zxcrypt policy.
+                "zxcrypt" => vfs::file::read_only("null"),
+            },
+        },
         "svc" => vfs::pseudo_directory! {
             fboot::ArgumentsMarker::PROTOCOL_NAME => vfs::service::host(move |stream| {
                 run_boot_args(stream, netboot)
