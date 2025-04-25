@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::security;
-use fidl_fuchsia_buildinfo as buildinfo;
-use fuchsia_component::client::connect_to_protocol_sync;
-use starnix_sync::{Locked, Unlocked};
-use starnix_uapi::user_address::ArchSpecific;
-
-use crate::arch::{ARCH_NAME, ARCH_NAME_COMPAT};
+use crate::arch::ARCH_NAME;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
+use crate::security;
 use crate::task::CurrentTask;
 use crate::vfs::FsString;
+use fidl_fuchsia_buildinfo as buildinfo;
+use fuchsia_component::client::connect_to_protocol_sync;
 use starnix_logging::{log_error, track_stub};
+use starnix_sync::{Locked, Unlocked};
 #[cfg(feature = "arch32")]
 use starnix_syscalls::{for_each_arch32_syscall, syscall_arch32_number_to_name_literal_callback};
 use starnix_syscalls::{
@@ -27,6 +25,9 @@ use starnix_uapi::version::KERNEL_RELEASE;
 use starnix_uapi::{
     c_char, errno, error, from_status_like_fdio, uapi, utsname, EFAULT, GRND_NONBLOCK, GRND_RANDOM,
 };
+
+#[cfg(feature = "arch32")]
+use starnix_uapi::user_address::ArchSpecific;
 
 uapi::check_arch_independent_layout! {
     utsname {
@@ -68,12 +69,7 @@ pub fn do_uname(
     })?;
 
     init_array(&mut result.version, version.as_bytes());
-    // TODO(https://fxbug.dev/380431743) rename property or use personality?
-    if current_task.is_arch32() {
-        init_array(&mut result.machine, ARCH_NAME_COMPAT);
-    } else {
-        init_array(&mut result.machine, ARCH_NAME);
-    }
+    init_array(&mut result.machine, ARCH_NAME);
 
     {
         // Get the UTS namespace from the perspective of this task.
