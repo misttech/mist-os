@@ -50,6 +50,9 @@ source_set("top") {
 
       # LWIP
       "//vendor/misttech/third_party/lwip",
+
+      # Platform Drivers
+      "//vendor/misttech/src/devices/bus/drivers/platform",
     ]
   }
 }

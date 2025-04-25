@@ -35,6 +35,7 @@ PlatformBus* platform_bus;
 void platform_bus_scan(uint level) {
   ZX_ASSERT(PlatformBus::Create("platform-bus", &platform_bus) == ZX_OK);
 
+#if 0
   auto bus_drv = PcieBusDriver::GetDriver();
   if (bus_drv == nullptr) {
     dprintf(CRITICAL, "pci bus not found\n");
@@ -136,8 +137,9 @@ void platform_bus_scan(uint level) {
       }
     }
   }
+#endif
 }
 
 }  // namespace platform_bus
 
-LK_INIT_HOOK(platform_bus_scan, platform_bus::platform_bus_scan, LK_INIT_LEVEL_ARCH_LATE - 1)
+LK_INIT_HOOK(platform_bus_scan, platform_bus::platform_bus_scan, LK_INIT_LEVEL_PLATFORM - 1)
