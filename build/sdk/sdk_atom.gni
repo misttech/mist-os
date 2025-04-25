@@ -27,6 +27,16 @@ _types_not_requiring_compatibility = [
   "version_history",
 ]
 
+# Atoms of type "data" specify the real type in `value.type`. These are the
+# valid values for `value.type`.
+_valid_data_atom_types = [
+  # LINT.IfChange
+  "component_manifest",
+  "config",
+
+  # LINT.ThenChange(//build/sdk/generate_idk/__init__.py)
+]
+
 # Defines an IDK element.
 #
 # Outputs
@@ -174,7 +184,13 @@ template("sdk_atom") {
            "`type` must be specified in `value`.")
     if (type == "data") {
       assert(value.type != type,
-             "'data' atoms must specify the actual type in 'meta.value'.")
+             "'data' atoms must specify the actual type in `meta.value`.")
+
+      is_data_type_valid = _valid_data_atom_types + [ value.type ] -
+                           [ value.type ] != _valid_data_atom_types
+      assert(
+          is_data_type_valid,
+          "The `value.type` ('${value.type}') for 'data' atoms must be one of ${_valid_data_atom_types}.")
     } else {
       assert(value.type == type)
     }

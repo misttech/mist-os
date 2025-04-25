@@ -265,8 +265,10 @@ class MergedIDK:
             # Some atoms are given different "types" in the overall manifest...
             if meta_path == VERSION_HISTORY_PATH:
                 type = "version_history"
+            # LINT.IfChange
             elif atom["type"] in ["component_manifest", "config"]:
                 type = "data"
+            # LINT.ThenChange(//build/sdk/sdk_atom.gni)
             else:
                 type = atom["type"]
 
