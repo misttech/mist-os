@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    // TODO: https://fxbug.dev/409966399 - Remove this after soft-transitioning containers.
-    include: [ "//src/starnix/kernel/security/selinux_hooks/default_exceptions_config.shard.cml" ],
     use: [
         {
             config: "fuchsia.starnix.config.container.ExtraFeatures",
@@ -34,6 +32,20 @@
             type: "string",
             max_size: 100,
             default: "noop",
+
+            // See https://fxbug.dev/379782290 for context.
+            availability: "transitional",
+        },
+        {
+            config: "fuchsia.starnix.config.container.SelinuxExceptions",
+            key: "selinux_exceptions",
+            type: "vector",
+            element: {
+                type: "string",
+                max_size: 1024,
+            },
+            max_count: 1024,
+            default: [],
 
             // See https://fxbug.dev/379782290 for context.
             availability: "transitional",
