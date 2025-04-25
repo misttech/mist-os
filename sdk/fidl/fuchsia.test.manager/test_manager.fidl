@@ -86,7 +86,7 @@ alias TestCaseName = string:fuchsia.test.MAX_TEST_NAME;
 
 /// Runs test suites.
 @available(added=20)
-@discoverable
+@discoverable(server="platform")
 open protocol SuiteRunner {
     /// Run a test suite. A suite is a test component that implements `fuchsia.test.Suite`.
     flexible Run(resource struct {
@@ -532,7 +532,7 @@ type LogsIterator = flexible resource union {
 
 /// Protocol to manage Early boot profiles. This should be called by our clients
 /// after running all the tests.
-@discoverable
+@discoverable(server="platform")
 open protocol EarlyBootProfile {
     /// Register iterator for watching early boot profiles.
     strict RegisterWatcher(resource struct {
@@ -591,7 +591,7 @@ alias CaseName = string:fuchsia.test.MAX_TEST_NAME;
 /// This is the entry point of running test suites. A test "run" consists of
 /// multiple test "suites" which consists of running multiple "test cases".
 @available(deprecated=20)
-@discoverable
+@discoverable(server="platform")
 open protocol RunBuilder {
     /// Add a suite to this run. A suite is a component that implements
     /// `fuchsia.test.Suite`. Implementors of this API will talk to test suites
@@ -717,7 +717,7 @@ type SchedulingOptions = table {
 /// If the client disconnects, the tests will be terminated immediately and all
 /// results discarded.
 @available(deprecated=20)
-@discoverable
+@discoverable(server="platform")
 open protocol RunController {
     /// Stop the run gracefully. RunController will disconnect after all
     /// resources are released and all the events in this controller are drained.
