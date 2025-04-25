@@ -4,8 +4,6 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include <lib/stdcompat/source_location.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -16,6 +14,8 @@
 #include <limits>
 #include <memory>
 #include <new>
+#include <source_location>
+#include <span>
 
 #include <gtest/gtest.h>
 
@@ -26,7 +26,7 @@
 // expected.
 
 void DoAndVerifyCopy(size_t copy_size, size_t src_offset, size_t dst_offset,
-                     cpp20::source_location loc = cpp20::source_location::current()) {
+                     std::source_location loc = std::source_location::current()) {
   SCOPED_TRACE("Invocation At: " + std::string(loc.file_name()) + ":" + std::to_string(loc.line()));
   SCOPED_TRACE("Args: copy_size: " + std::to_string(copy_size) + " src_offset: " +
                std::to_string(src_offset) + " dst_offset: " + std::to_string(dst_offset));
@@ -45,8 +45,8 @@ void DoAndVerifyCopy(size_t copy_size, size_t src_offset, size_t dst_offset,
   auto dst_buffer = std::unique_ptr<uint8_t[], deleter>(
       new (std::align_val_t{16}) uint8_t[get_size(dst_offset)], del);
 
-  auto src = cpp20::span(src_buffer.get(), get_size(src_offset));
-  auto dst = cpp20::span(dst_buffer.get(), get_size(dst_offset));
+  auto src = std::span(src_buffer.get(), get_size(src_offset));
+  auto dst = std::span(dst_buffer.get(), get_size(dst_offset));
   // Randomize the contents of src and destination.
   unsigned int seed = ::testing::UnitTest::GetInstance()->random_seed();
   auto fill_random = [&](auto& buffer, size_t copy_size, size_t offset) {
