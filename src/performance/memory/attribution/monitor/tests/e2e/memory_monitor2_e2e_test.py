@@ -118,32 +118,6 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
             root["kmem_stats_compression"]["pages_decompressed_unit_ns"], 0
         )
 
-    def test_memory_monitor2_inspect_current(self) -> None:
-        inspect_col = self.dut.get_inspect_data(
-            monikers=["core/memory_monitor2"]
-        )
-        (only_entry,) = inspect_col.data
-
-        # Verify that a current memory capture is present, with 6 fields.
-        asserts.assert_equal(only_entry.moniker, "core/memory_monitor2")
-        if only_entry.payload is None:
-            raise AssertionError("Payload should not be none")
-        self.write_output(
-            json.dumps(only_entry.payload), "inspect_payload.json"
-        )
-        root = only_entry.payload["root"]
-        value_dict = root["current"]["core/memory_monitor2"]
-        for field in (
-            "committed_private",
-            "committed_scaled",
-            "committed_total",
-            "populated_private",
-            "populated_scaled",
-            "populated_total",
-        ):
-            asserts.assert_in(field, value_dict)
-            asserts.assert_greater(value_dict[field], 0)
-
     def test_profile_memory_with_monitor2_report(self) -> None:
         profile = self.dut.ffx.run(
             [

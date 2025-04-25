@@ -48,7 +48,6 @@ pub fn start_service(
             .ok_or_else(|| anyhow!("Failed to serve server handling `fuchsia.inspect.Tree`"))?;
 
     build_inspect_tree(
-        attribution_data_service.clone(),
         kernel_stats_proxy.clone(),
         stall_provider,
         inspector,
@@ -65,7 +64,6 @@ pub fn start_service(
 }
 
 fn build_inspect_tree(
-    attribution_data_service: Arc<impl AttributionDataProvider>,
     kernel_stats_proxy: fkernel::StatsProxy,
     stall_provider: Arc<impl StallProvider>,
     inspector: &Inspector,
@@ -174,32 +172,6 @@ fn build_inspect_tree(
                     array.set(6, v[6]);
                     array.set(7, v[7]);
                     inspector.root().record(array);
-                });
-                Ok(inspector)
-            }
-            .boxed()
-        });
-    }
-
-    {
-        inspector.root().record_lazy_child("current", move || {
-            let attribution_data_service = attribution_data_service.clone();
-            async move {
-                let inspector = Inspector::default();
-                let current_attribution_data =
-                    attribution_data_service.get_attribution_data().await?;
-                let summary =
-                    attribution_processing::attribute_vmos(current_attribution_data).summary();
-
-                summary.principals.into_iter().for_each(|p| {
-                    let node = inspector.root().create_child(p.name);
-                    node.record_uint("committed_private", p.committed_private);
-                    node.record_double("committed_scaled", p.committed_scaled);
-                    node.record_uint("committed_total", p.committed_total);
-                    node.record_uint("populated_private", p.populated_private);
-                    node.record_double("populated_scaled", p.populated_scaled);
-                    node.record_uint("populated_total", p.populated_total);
-                    inspector.root().record(node);
                 });
                 Ok(inspector)
             }
@@ -456,8 +428,6 @@ mod tests {
     fn test_build_inspect_tree() {
         let mut exec = fasync::TestExecutor::new();
 
-        let data_provider = Arc::new(FakeAttributionDataProvider {});
-
         let (stats_provider, stats_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fkernel::StatsMarker>();
 
@@ -484,7 +454,6 @@ mod tests {
         }
 
         build_inspect_tree(
-            data_provider,
             stats_provider,
             Arc::new(FakeStallProvider {}),
             &inspector,
@@ -495,16 +464,6 @@ mod tests {
             .expect("got hierarchy");
 
         assert_data_tree!(output, root: {
-            current: {
-                principal: {
-                    committed_private: 1024u64,
-                    committed_scaled: 1024.0,
-                    committed_total: 1024u64,
-                    populated_private: 2048u64,
-                    populated_scaled: 2048.0,
-                    populated_total: 2048u64
-                }
-            },
             kmem_stats: {
                 total_bytes: 1u64,
                 free_bytes: 2u64,
