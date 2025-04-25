@@ -6,7 +6,7 @@
 
 use zerocopy::{FromBytes, Immutable, IntoBytes};
 
-pub const MAGMA_API_VERSION: u32 = 7;
+pub const MAGMA_API_VERSION: u32 = 9;
 pub const MAGMA_VENDOR_ID_MALI: u32 = 5045;
 pub const MAGMA_VENDOR_ID_INTEL: u32 = 32902;
 pub type magma_query_t = u64;
@@ -161,6 +161,7 @@ pub struct magma_image_info {
     pub unused: u32,
 }
 pub type magma_image_info_t = magma_image_info;
+pub type magma_priority_t = u64;
 unsafe extern "C" {
     #[doc = "\n \\brief Imports and takes ownership of a channel to a device. Takes ownership of |device_channel|\n        on both success and failure.\n \\param device_channel A channel connecting to a gpu class device.\n \\param device_out Returned device.\n"]
     pub fn magma_device_import(
@@ -503,6 +504,14 @@ unsafe extern "C" {
         image_info_out: *mut magma_image_info_t,
     ) -> magma_status_t;
 }
+unsafe extern "C" {
+    #[doc = "\n \\brief Creates a context on the given connection.\n \\param connection An open connection.\n \\param priority The priority of the connection. Higher numbers are higher priorities.\n \\param context_id_out The returned context id.\n"]
+    pub fn magma_connection_create_context2(
+        connection: magma_connection_t,
+        priority: magma_priority_t,
+        context_id_out: *mut u32,
+    ) -> magma_status_t;
+}
 pub type __u32 = ::std::os::raw::c_uint;
 pub type __u64 = ::std::os::raw::c_ulonglong;
 #[repr(C)]
@@ -549,6 +558,25 @@ pub struct virtmagma_buffer_set_name_wrapper {
     pub name_address: __u64,
     pub name_size: __u64,
 }
+pub const MAGMA_STATUS_OK: magma_status_t = 0;
+pub const MAGMA_STATUS_INTERNAL_ERROR: magma_status_t = -1;
+pub const MAGMA_STATUS_INVALID_ARGS: magma_status_t = -2;
+pub const MAGMA_STATUS_MEMORY_ERROR: magma_status_t = -4;
+pub const MAGMA_STATUS_TIMED_OUT: magma_status_t = -7;
+pub const MAGMA_IMAGE_CREATE_FLAGS_PRESENTABLE: u32 = 1;
+pub const MAGMA_IMAGE_CREATE_FLAGS_VULKAN_USAGE: u32 = 2;
+pub const MAGMA_MAX_IMAGE_PLANES: u32 = 4;
+pub const MAGMA_COHERENCY_DOMAIN_CPU: magma_coherency_domain_t = 0;
+pub const MAGMA_COHERENCY_DOMAIN_RAM: magma_coherency_domain_t = 1;
+pub const MAGMA_COHERENCY_DOMAIN_INACCESSIBLE: magma_coherency_domain_t = 2;
+pub const MAGMA_POLL_TYPE_SEMAPHORE: u32 = 1;
+pub const MAGMA_POLL_TYPE_HANDLE: u32 = 2;
+pub const MAGMA_POLL_CONDITION_SIGNALED: u32 = 3;
+pub const MAGMA_CACHE_POLICY_CACHED: magma_cache_policy_t = 0;
+pub const MAGMA_CACHE_POLICY_WRITE_COMBINING: magma_cache_policy_t = 1;
+pub const MAGMA_CACHE_POLICY_UNCACHED: magma_cache_policy_t = 2;
+pub const MAGMA_QUERY_VENDOR_ID: magma_query_t = 0;
+pub const MAGMA_IMPORT_SEMAPHORE_ONE_SHOT: u64 = 1;
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, Immutable)]
 pub struct virtio_magma_config {
@@ -629,6 +657,8 @@ pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_VIRT_CONNECTION_CREATE_IMAGE:
     virtio_magma_ctrl_type = 4182;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_VIRT_CONNECTION_GET_IMAGE_INFO:
     virtio_magma_ctrl_type = 4168;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_CREATE_CONTEXT2:
+    virtio_magma_ctrl_type = 4188;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_INTERNAL_RELEASE_HANDLE: virtio_magma_ctrl_type =
     4172;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_INTERNAL_MAP: virtio_magma_ctrl_type = 4173;
@@ -710,6 +740,8 @@ pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE:
     virtio_magma_ctrl_type = 8278;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_VIRT_CONNECTION_GET_IMAGE_INFO:
     virtio_magma_ctrl_type = 8264;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_CREATE_CONTEXT2:
+    virtio_magma_ctrl_type = 8284;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_INTERNAL_RELEASE_HANDLE: virtio_magma_ctrl_type =
     8268;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_INTERNAL_MAP: virtio_magma_ctrl_type = 8269;
@@ -1516,6 +1548,24 @@ pub type virtio_magma_virt_connection_get_image_info_resp_t =
     virtio_magma_virt_connection_get_image_info_resp;
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, Immutable)]
+pub struct virtio_magma_connection_create_context2_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub connection: u64,
+    pub priority: u64,
+}
+pub type virtio_magma_connection_create_context2_ctrl_t =
+    virtio_magma_connection_create_context2_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, Immutable)]
+pub struct virtio_magma_connection_create_context2_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub context_id_out: u64,
+    pub result_return: u64,
+}
+pub type virtio_magma_connection_create_context2_resp_t =
+    virtio_magma_connection_create_context2_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, Immutable)]
 pub struct virtio_magma_internal_release_handle_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub handle: u32,
@@ -1559,22 +1609,3 @@ pub struct virtio_magma_internal_unmap_resp {
     pub result_return: u64,
 }
 pub type virtio_magma_internal_unmap_resp_t = virtio_magma_internal_unmap_resp;
-pub const MAGMA_STATUS_OK: magma_status_t = 0;
-pub const MAGMA_STATUS_INTERNAL_ERROR: magma_status_t = -1;
-pub const MAGMA_STATUS_INVALID_ARGS: magma_status_t = -2;
-pub const MAGMA_STATUS_MEMORY_ERROR: magma_status_t = -4;
-pub const MAGMA_STATUS_TIMED_OUT: magma_status_t = -7;
-pub const MAGMA_IMAGE_CREATE_FLAGS_PRESENTABLE: u32 = 1;
-pub const MAGMA_IMAGE_CREATE_FLAGS_VULKAN_USAGE: u32 = 2;
-pub const MAGMA_MAX_IMAGE_PLANES: u32 = 4;
-pub const MAGMA_COHERENCY_DOMAIN_CPU: magma_coherency_domain_t = 0;
-pub const MAGMA_COHERENCY_DOMAIN_RAM: magma_coherency_domain_t = 1;
-pub const MAGMA_COHERENCY_DOMAIN_INACCESSIBLE: magma_coherency_domain_t = 2;
-pub const MAGMA_POLL_TYPE_SEMAPHORE: u32 = 1;
-pub const MAGMA_POLL_TYPE_HANDLE: u32 = 2;
-pub const MAGMA_POLL_CONDITION_SIGNALED: u32 = 3;
-pub const MAGMA_CACHE_POLICY_CACHED: magma_cache_policy_t = 0;
-pub const MAGMA_CACHE_POLICY_WRITE_COMBINING: magma_cache_policy_t = 1;
-pub const MAGMA_CACHE_POLICY_UNCACHED: magma_cache_policy_t = 2;
-pub const MAGMA_QUERY_VENDOR_ID: magma_query_t = 0;
-pub const MAGMA_IMPORT_SEMAPHORE_ONE_SHOT: u64 = 1;

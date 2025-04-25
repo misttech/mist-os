@@ -138,6 +138,7 @@ class Connection {
   // collision with possible concurrent destruction.
   virtual void SetNotificationCallback(NotificationHandler* handler) {}
   virtual std::unique_ptr<Context> CreateContext() { return {}; }
+  virtual std::unique_ptr<Context> CreateContext2(uint64_t priority) { return CreateContext(); }
 
   virtual magma_status_t EnablePerformanceCounters(cpp20::span<const uint64_t> counters) {
     return MAGMA_STATUS_UNIMPLEMENTED;

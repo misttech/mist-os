@@ -16,7 +16,7 @@ use magma::{
     magma_buffer_clean_cache, magma_buffer_get_cache_policy, magma_buffer_get_info,
     magma_buffer_id_t, magma_buffer_info_t, magma_buffer_set_cache_policy, magma_buffer_set_name,
     magma_buffer_t, magma_cache_operation_t, magma_cache_policy_t, magma_connection_create_buffer,
-    magma_connection_create_context, magma_connection_get_error,
+    magma_connection_create_context, magma_connection_create_context2, magma_connection_get_error,
     magma_connection_get_notification_channel_handle, magma_connection_import_buffer,
     magma_connection_map_buffer, magma_connection_perform_buffer_op, magma_connection_release,
     magma_connection_release_buffer, magma_connection_release_context,
@@ -31,7 +31,8 @@ use magma::{
     virtio_magma_buffer_get_info_resp_t, virtio_magma_buffer_set_cache_policy_ctrl_t,
     virtio_magma_buffer_set_cache_policy_resp_t, virtio_magma_buffer_set_name_ctrl_t,
     virtio_magma_buffer_set_name_resp_t, virtio_magma_connection_create_buffer_ctrl_t,
-    virtio_magma_connection_create_buffer_resp_t, virtio_magma_connection_create_context_ctrl_t,
+    virtio_magma_connection_create_buffer_resp_t, virtio_magma_connection_create_context2_ctrl_t,
+    virtio_magma_connection_create_context2_resp_t, virtio_magma_connection_create_context_ctrl_t,
     virtio_magma_connection_create_context_resp_t, virtio_magma_connection_create_semaphore_ctrl_t,
     virtio_magma_connection_create_semaphore_resp_t,
     virtio_magma_connection_execute_command_ctrl_t, virtio_magma_connection_execute_command_resp_t,
@@ -65,6 +66,7 @@ use magma::{
     virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_BUFFER_SET_NAME,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_CREATE_BUFFER,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_CREATE_CONTEXT,
+    virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_CREATE_CONTEXT2,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_CREATE_SEMAPHORE,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_EXECUTE_COMMAND,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_EXECUTE_IMMEDIATE_COMMANDS,
@@ -97,6 +99,7 @@ use magma::{
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_SET_NAME,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_CREATE_BUFFER,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_CREATE_CONTEXT,
+    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_CREATE_CONTEXT2,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_CREATE_SEMAPHORE,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXECUTE_COMMAND,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXECUTE_IMMEDIATE_COMMANDS,
@@ -631,6 +634,27 @@ impl FileOps for MagmaFile {
 
                 response.hdr.type_ =
                     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_CREATE_CONTEXT as u32;
+                current_task.write_object(UserRef::new(response_address), &response)
+            }
+            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_CREATE_CONTEXT2 => {
+                let (control, mut response): (
+                    virtio_magma_connection_create_context2_ctrl_t,
+                    virtio_magma_connection_create_context2_resp_t,
+                ) = read_control_and_response(current_task, &command)?;
+                let connection = self.get_connection(control.connection)?;
+
+                let mut context_id_out = 0;
+                response.result_return = unsafe {
+                    magma_connection_create_context2(
+                        connection.handle,
+                        control.priority,
+                        &mut context_id_out,
+                    ) as u64
+                };
+                response.context_id_out = context_id_out as u64;
+
+                response.hdr.type_ =
+                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_CREATE_CONTEXT2 as u32;
                 current_task.write_object(UserRef::new(response_address), &response)
             }
             virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_RELEASE_CONTEXT => {

@@ -257,6 +257,18 @@ void PrimaryFidlServer::CreateContext(CreateContextRequestView request,
     SetError(&completer, status.get());
 }
 
+void PrimaryFidlServer::CreateContext2(CreateContext2RequestView request,
+                                       CreateContext2Completer::Sync& completer) {
+  TRACE_DURATION("magma", "PrimaryFidlServer::CreateContext2");
+  MAGMA_DLOG("PrimaryFidlServer: CreateContext2");
+  FlowControl();
+
+  magma::Status status =
+      delegate_->CreateContext2(request->context_id, static_cast<uint64_t>(request->priority));
+  if (!status.ok())
+    SetError(&completer, status.get());
+}
+
 void PrimaryFidlServer::DestroyContext(DestroyContextRequestView request,
                                        DestroyContextCompleter::Sync& completer) {
   TRACE_DURATION("magma", "PrimaryFidlServer::DestroyContext");

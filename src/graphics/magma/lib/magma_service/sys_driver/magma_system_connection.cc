@@ -48,11 +48,16 @@ MagmaSystemConnection::~MagmaSystemConnection() {
 uint32_t MagmaSystemConnection::GetDeviceId() { return owner_->GetDeviceId(); }
 
 magma::Status MagmaSystemConnection::CreateContext(uint32_t context_id) {
+  return CreateContext2(context_id,
+                        static_cast<uint64_t>(fuchsia_gpu_magma::wire::Priority::kMedium));
+}
+
+magma::Status MagmaSystemConnection::CreateContext2(uint32_t context_id, uint64_t priority) {
   auto iter = context_map_.find(context_id);
   if (iter != context_map_.end())
     return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Attempting to add context with duplicate id");
 
-  auto msd_ctx = msd_connection_->CreateContext();
+  auto msd_ctx = msd_connection_->CreateContext2(priority);
   if (!msd_ctx)
     return MAGMA_DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Failed to create msd context");
 

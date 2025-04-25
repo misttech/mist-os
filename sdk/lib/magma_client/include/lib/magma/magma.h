@@ -604,6 +604,17 @@ MAGMA_EXPORT magma_status_t magma_virt_connection_get_image_info(
     magma_buffer_t image,
     magma_image_info_t* image_info_out);
 
+///
+/// \brief Creates a context on the given connection.
+/// \param connection An open connection.
+/// \param priority The priority of the connection. Higher numbers are higher priorities.
+/// \param context_id_out The returned context id.
+///
+MAGMA_EXPORT magma_status_t magma_connection_create_context2(
+    magma_connection_t connection,
+    magma_priority_t priority,
+    uint32_t* context_id_out);
+
 #if defined(__cplusplus)
 }
 #endif

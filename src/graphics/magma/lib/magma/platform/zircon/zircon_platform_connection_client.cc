@@ -251,6 +251,21 @@ magma_status_t PrimaryWrapper::CreateContext(uint32_t context_id) {
   return magma::FromZxStatus(status).get();
 }
 
+magma_status_t PrimaryWrapper::CreateContext2(uint32_t context_id, uint64_t priority) {
+  std::lock_guard<std::mutex> lock(flow_control_mutex_);
+  FlowControl();
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  zx_status_t status =
+      client_->CreateContext2(context_id, fuchsia_gpu_magma::wire::Priority(priority)).status();
+#else
+  zx_status_t status = client_->CreateContext(context_id).status();
+#endif
+  if (status == ZX_OK) {
+    UpdateFlowControl();
+  }
+  return magma::FromZxStatus(status).get();
+}
+
 magma_status_t PrimaryWrapper::DestroyContext(uint32_t context_id) {
   std::lock_guard<std::mutex> lock(flow_control_mutex_);
   FlowControl();
@@ -568,6 +583,14 @@ class ZirconPlatformConnectionClient : public PlatformConnectionClient {
     auto context_id = next_context_id_++;
     *context_id_out = context_id;
     magma_status_t result = client_.CreateContext(context_id);
+    return result;
+  }
+
+  magma_status_t CreateContext2(uint32_t* context_id_out, uint64_t priority) override {
+    DLOG("ZirconPlatformConnectionClient: CreateContext");
+    auto context_id = next_context_id_++;
+    *context_id_out = context_id;
+    magma_status_t result = client_.CreateContext2(context_id, priority);
     return result;
   }
 

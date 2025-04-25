@@ -1,6 +1,6 @@
 {
     "magma-interface": {
-        "next-free-ordinal": 92,
+        "next-free-ordinal": 93,
         "exports": [
             {
                 "ordinal": 46,
@@ -1037,6 +1037,29 @@
                         "name": "image_info_out",
                         "type": "magma_image_info_t*",
                         "description": "Output parameters describing the image."
+                    }
+                ]
+            },
+            {
+                "ordinal": 92,
+                "name": "magma_connection_create_context2",
+                "type": "magma_status_t",
+                "description": "Creates a context on the given connection.",
+                "arguments": [
+                    {
+                        "name": "connection",
+                        "type": "magma_connection_t",
+                        "description": "An open connection."
+                    },
+                    {
+                        "name": "priority",
+                        "type": "magma_priority_t",
+                        "description": "The priority of the connection. Higher numbers are higher priorities."
+                    },
+                    {
+                        "name": "context_id_out",
+                        "type": "uint32_t*",
+                        "description": "The returned context id."
                     }
                 ]
             }

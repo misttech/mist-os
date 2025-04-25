@@ -267,6 +267,16 @@ class TestPlatformConnection {
     EXPECT_EQ(shared_data_->test_context_id, context_id);
   }
 
+  void TestCreateContext2() {
+    FlowControlInit();
+    uint32_t context_id;
+    constexpr uint64_t kMediumPriority = 256;
+    client_connection_->CreateContext2(&context_id, kMediumPriority);
+    EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
+    FlowControlCheckOneMessage();
+    EXPECT_EQ(shared_data_->test_context_id, context_id);
+  }
+
   void TestDestroyContext() {
     FlowControlInit();
     client_connection_->DestroyContext(shared_data_->test_context_id);
@@ -547,6 +557,14 @@ class TestDelegate : public msd::internal::PrimaryFidlServer::Delegate {
     shared_data_->test_complete = true;
     return MAGMA_STATUS_OK;
   }
+
+  magma::Status CreateContext2(uint32_t context_id, uint64_t priority) override {
+    std::unique_lock<std::mutex> lock(shared_data_->mutex);
+    shared_data_->test_context_id = context_id;
+    shared_data_->test_complete = true;
+    return MAGMA_STATUS_OK;
+  }
+
   magma::Status DestroyContext(uint32_t context_id) override {
     std::unique_lock<std::mutex> lock(shared_data_->mutex);
     EXPECT_EQ(context_id, shared_data_->test_context_id);
@@ -808,6 +826,12 @@ TEST(PlatformConnection, CreateContext) {
   auto Test = TestPlatformConnection::Create();
   ASSERT_NE(Test, nullptr);
   Test->TestCreateContext();
+}
+
+TEST(PlatformConnection, CreateContext2) {
+  auto Test = TestPlatformConnection::Create();
+  ASSERT_NE(Test, nullptr);
+  Test->TestCreateContext2();
 }
 
 TEST(PlatformConnection, DestroyContext) {

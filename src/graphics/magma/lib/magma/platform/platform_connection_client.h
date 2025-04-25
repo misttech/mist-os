@@ -46,6 +46,8 @@ class PlatformConnectionClient {
 
   // Creates a context and returns the context id
   virtual magma_status_t CreateContext(uint32_t* context_id_out) = 0;
+  virtual magma_status_t CreateContext2(uint32_t* context_id_out, uint64_t priority) = 0;
+
   // Destroys a context for the given id
   virtual magma_status_t DestroyContext(uint32_t context_id) = 0;
 

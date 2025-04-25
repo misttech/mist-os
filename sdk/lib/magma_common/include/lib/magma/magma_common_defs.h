@@ -26,7 +26,7 @@ extern "C" {
 
 // LINT.IfChange(version)
 // This version should be incremented whenever the Magma API changes.
-#define MAGMA_API_VERSION 8
+#define MAGMA_API_VERSION 9
 // LINT.ThenChange(magma_common_defs.h)
 
 // LINT.IfChange
@@ -347,6 +347,13 @@ typedef struct magma_image_info {
   uint32_t coherency_domain;
   uint32_t unused;
 } magma_image_info_t;
+
+#define MAGMA_PRIORITY_LOW ((uint64_t)(128))
+#define MAGMA_PRIORITY_MEDIUM ((uint64_t)(256))
+#define MAGMA_PRIORITY_HIGH ((uint64_t)(512))
+#define MAGMA_PRIORITY_REALTIME ((uint64_t)(1024))
+
+typedef uint64_t magma_priority_t;
 
 // LINT.ThenChange(:version)
 // NOLINTEND(modernize-use-using)

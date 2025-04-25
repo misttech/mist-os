@@ -61,6 +61,7 @@ class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
                                         fuchsia_gpu_magma::wire::ObjectType object_type) = 0;
 
     virtual magma::Status CreateContext(uint32_t context_id) = 0;
+    virtual magma::Status CreateContext2(uint32_t context_id, uint64_t priority) = 0;
     virtual magma::Status DestroyContext(uint32_t context_id) = 0;
 
     virtual magma::Status ExecuteCommandBuffers(
@@ -134,6 +135,8 @@ class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
                      ReleaseObjectCompleter::Sync& _completer) override;
   void CreateContext(CreateContextRequestView request,
                      CreateContextCompleter::Sync& _completer) override;
+  void CreateContext2(CreateContext2RequestView request,
+                      CreateContext2Completer::Sync& _completer) override;
   void DestroyContext(DestroyContextRequestView request,
                       DestroyContextCompleter::Sync& _completer) override;
   void ExecuteImmediateCommands(ExecuteImmediateCommandsRequestView request,
