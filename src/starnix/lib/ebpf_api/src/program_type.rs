@@ -530,6 +530,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                                 output: true,
                             },
                             Type::ScalarValueParameter,
+                            Type::ScalarValueParameter,
                         ],
                         return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: false,

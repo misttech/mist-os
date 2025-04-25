@@ -211,6 +211,11 @@ impl From<u64> for BpfValue {
         Self(v)
     }
 }
+impl From<i64> for BpfValue {
+    fn from(v: i64) -> Self {
+        Self(v as u64)
+    }
+}
 
 impl From<usize> for BpfValue {
     fn from(v: usize) -> Self {
