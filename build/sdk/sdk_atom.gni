@@ -217,29 +217,40 @@ template("sdk_atom") {
 
   target_label = get_label_info(":${target_name}", "label_no_toolchain")
 
-  if (category == "internal" &&
-      # `sdk_source_set()` enforces an allowlist.
-      type != "cc_source_library") {
-    # Handle individual exceptions for types with only one "internal" instance.
+  if (category == "internal") {
+    # TODO(https://fxbug.dev/343059325): Remove once devicetree is in
+    # "partner" or no longer using loadable modules.
+    is_devicetree_visitor_loadable_module =
+        type == "loadable_module" &&
+        target_label != string_replace(target_label, "devicetree", "", 1)
+
+    # TODO(https://fxbug.dev/343059325): Remove once devicetree is in "partner".
+    is_devicetree =
+        type == "cc_prebuilt_library" &&
+        target_label == "//zircon/kernel/lib/devicetree:devicetree_sdk_manifest"
+
+    # TODO(https://fxbug.dev/42070500): Remove once shard is in "partner".
+    is_realm_builder_shard =
+        type == "data" &&
+        target_label == "//sdk/lib/sys/component:realm_builder_shard"
+
+    # TODO(https://fxbug.dev/331991540): Remove once a different
+    # solution for the Firmware SDK is implemented.
+    is_firmware_docs =
+        type == "documentation" && target_label == "//sdk/docs:firmware"
+
     assert(
-        (type == "cc_prebuilt_library" &&
-             # TODO(https://fxbug.dev/343059325): Remove once devicetree is in "partner".
-             target_label ==
-                 "//zircon/kernel/lib/devicetree:devicetree_sdk_manifest") ||
-            # TODO(https://fxbug.dev/42070500): Remove once shard is in "partner".
-            (type == "data" &&
-                 target_label ==
-                     "//sdk/lib/sys/component:realm_builder_shard") ||
-            # TODO(https://fxbug.dev/331991540): Remove once a different
-            # solution for the Firmware SDK is implemented.
-            (type == "documentation" &&
-                 target_label == "//sdk/docs:firmware") ||
-            # TODO(https://fxbug.dev/343059325): Remove once devicetree is in
-            # "partner" or no longer using loadable modules.
-            (type == "loadable_module" &&
-                 target_label !=
-                     string_replace(target_label, "devicetree", "", 1)),
+        # `sdk_source_set()` enforces an allowlist.
+        type == "cc_source_library" ||
+            # Handle individual exceptions for types with only one "internal" instance.
+            is_devicetree_visitor_loadable_module || is_devicetree ||
+            is_realm_builder_shard || is_firmware_docs,
         "`${target_label}` of type `${type}` is not allowed to use the \"internal\" SDK category. No new uses are allowed.")
+    not_needed([
+                 "is_devicetree_visitor_loadable_module",
+                 "is_realm_builder_shard",
+                 "is_firmware_docs",
+               ])
   }
 
   # For support unstable atoms, ensure that `meta.stable`is always
@@ -250,7 +261,15 @@ template("sdk_atom") {
   is_type_supporting_unstable = _types_supporting_unstable_atoms + [ type ] -
                                 [ type ] != _types_supporting_unstable_atoms
   assert(
-      is_type_supporting_unstable == defined(meta.stable),
+      is_type_supporting_unstable == defined(meta.stable) ||
+          # loadable_module does not support unstable atoms, but there are some
+          # in the internal only IDK.
+          # TODO(https://fxbug.dev/343059325): Remove once devicetree is in
+          # "partner" or no longer using loadable modules.
+          (type == "loadable_module" &&
+               target_label !=
+                   string_replace(target_label, "devicetree", "", 1) &&
+               defined(meta.stable) && !meta.stable),
       "`meta.stable` must be set if and only if the type ('${type}') is one of ${_types_supporting_unstable_atoms}.")
   if (defined(meta.stable)) {
     if (meta.stable) {
@@ -281,6 +300,18 @@ template("sdk_atom") {
     add_stable_true_to_meta_json = false
   }
 
+  # Handle types that are not in _types_not_requiring_compatibility. Their
+  # templates do not support specifying `meta.stable`, so override it here.
+  if (category == "internal" &&
+      (is_devicetree || is_realm_builder_shard || is_firmware_docs)) {
+    assert(is_stable)
+    is_stable = false
+  }
+
+  # TODO(https://fxbug.dev/372986936): Remove when no more uses of "internal".
+  assert(category != "internal" || !is_stable,
+         "Internal atoms must be unstable.")
+
   is_type_not_requiring_compatibility =
       _types_not_requiring_compatibility + [ type ] - [ type ] !=
       _types_not_requiring_compatibility
@@ -297,9 +328,7 @@ template("sdk_atom") {
   }
 
   assert(
-      defined(invoker.api) || category == "internal" ||
-          (defined(meta.stable) && !meta.stable) ||
-          is_type_not_requiring_compatibility,
+      defined(invoker.api) || !is_stable || is_type_not_requiring_compatibility,
       "All atoms with types ('${type}') and categories ('${category}') requiring compatibility must specify an `api` file unless explicitly unstable.")
   not_needed([
                "is_type_not_requiring_compatibility",

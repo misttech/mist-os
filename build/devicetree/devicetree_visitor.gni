@@ -94,6 +94,7 @@ template("devicetree_visitor") {
     meta = {
       dest = "pkg/${_sdk_pkg_name}/meta.json"
       schema = "loadable_module"
+      stable = false
       value = {
         type = "loadable_module"
         name = "${_sdk_pkg_name}"
