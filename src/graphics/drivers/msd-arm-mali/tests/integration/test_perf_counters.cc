@@ -37,13 +37,22 @@ class TestConnection : public magma::TestDeviceBase {
   }
 
   bool AccessPerfCounters() {
-    for (auto& p : std::filesystem::directory_iterator("/dev/class/gpu-performance-counters")) {
-      zx::result client_end =
-          component::Connect<fuchsia_gpu_magma::PerformanceCounterAccess>(p.path().c_str());
+    for (auto& p :
+         std::filesystem::directory_iterator("/svc/fuchsia.gpu.magma.PerformanceCounterService")) {
+      zx::result client_end = component::Connect<fuchsia_gpu_magma::PerformanceCounterAccess>(
+          (static_cast<std::string>(p.path()) + "/access").c_str());
       EXPECT_TRUE(client_end.is_ok()) << client_end.status_string();
 
       magma_status_t status = magma_connection_enable_performance_counter_access(
           connection_, client_end.value().TakeChannel().release());
+
+      // MAGMA_STATUS_INTERNAL_ERROR occurs because, if the MSD was unbound and rebound prior to
+      // this test running, there may be a stale performance counters servic entry.
+      // TODO(b/397958414) - remove once services from unbound drivers are reliably removed.
+      if (status == MAGMA_STATUS_INTERNAL_ERROR) {
+        continue;
+      }
+
       EXPECT_TRUE(status == MAGMA_STATUS_OK || status == MAGMA_STATUS_ACCESS_DENIED);
       if (status == MAGMA_STATUS_OK) {
         return true;

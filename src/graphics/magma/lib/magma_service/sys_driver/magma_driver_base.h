@@ -18,6 +18,7 @@
 #include <zircon/threads.h>
 
 #include "dependency_injection_server.h"
+#include "fidl/fuchsia.gpu.magma/cpp/markers.h"
 #include "magma_system_device.h"
 #include "performance_counters_server.h"
 
@@ -297,19 +298,21 @@ class MagmaDriverBase : public fdf::DriverBase,
                                                      std::move(node_endpoints->server));
     gpu_node_controller_.Bind(std::move(controller_endpoints.client));
     gpu_node_.Bind(std::move(node_endpoints->client));
-    auto power_protocol =
-        [this](fidl::ServerEnd<fuchsia_gpu_magma::PowerElementProvider> server_end) mutable {
-          fidl::BindServer(dispatcher(), std::move(server_end), this);
-        };
-    auto device_protocol =
-        [this](fidl::ServerEnd<fuchsia_gpu_magma::CombinedDevice> server_end) mutable {
-          fidl::BindServer(dispatcher(), std::move(server_end), this);
-        };
 
-    fuchsia_gpu_magma::Service::InstanceHandler handler(
-        {.device = std::move(device_protocol),
-         .power_element_provider = std::move(power_protocol)});
     {
+      auto power_protocol =
+          [this](fidl::ServerEnd<fuchsia_gpu_magma::PowerElementProvider> server_end) mutable {
+            fidl::BindServer(dispatcher(), std::move(server_end), this);
+          };
+      auto device_protocol =
+          [this](fidl::ServerEnd<fuchsia_gpu_magma::CombinedDevice> server_end) mutable {
+            fidl::BindServer(dispatcher(), std::move(server_end), this);
+          };
+
+      fuchsia_gpu_magma::Service::InstanceHandler handler(
+          {.device = std::move(device_protocol),
+           .power_element_provider = std::move(power_protocol)});
+
       auto status = outgoing()->template AddService<fuchsia_gpu_magma::Service>(std::move(handler));
       if (status.is_error()) {
         FDF_LOG(ERROR, "%s(): Failed to add service to outgoing directory: %s\n", __func__,
@@ -317,6 +320,43 @@ class MagmaDriverBase : public fdf::DriverBase,
         return status.take_error();
       }
     }
+
+    {
+      auto performance_counter_access =
+          [this](fidl::ServerEnd<fuchsia_gpu_magma::PerformanceCounterAccess> server_end) mutable {
+            fidl::BindServer(dispatcher(), std::move(server_end), &perf_counter_);
+          };
+
+      fuchsia_gpu_magma::PerformanceCounterService::InstanceHandler handler(
+          {.access = std::move(performance_counter_access)});
+
+      auto status = outgoing()->template AddService<fuchsia_gpu_magma::PerformanceCounterService>(
+          std::move(handler));
+      if (status.is_error()) {
+        FDF_LOG(ERROR, "%s(): Failed to add service to outgoing directory: %s\n", __func__,
+                status.status_string());
+        return status.take_error();
+      }
+    }
+
+    {
+      auto injection_device =
+          [this](fidl::ServerEnd<fuchsia_gpu_magma::DependencyInjection> server_end) mutable {
+            fidl::BindServer(dispatcher(), std::move(server_end), &dependency_injection_);
+          };
+
+      fuchsia_gpu_magma::DependencyInjectionService::InstanceHandler handler(
+          {.device = std::move(injection_device)});
+
+      auto status = outgoing()->template AddService<fuchsia_gpu_magma::DependencyInjectionService>(
+          std::move(handler));
+      if (status.is_error()) {
+        FDF_LOG(ERROR, "%s(): Failed to add service to outgoing directory: %s\n", __func__,
+                status.status_string());
+        return status.take_error();
+      }
+    }
+
     return zx::ok();
   }
 
