@@ -1232,3 +1232,73 @@ function fx-zbi {
 function fx-zbi-default-compression {
   "${FUCHSIA_BUILD_DIR}/$(fx-command-run list-build-artifacts --name zbi --expect-one tools)" "$@"
 }
+
+# Failsafe check for global TUI functionality, defaults to 'text' in case of
+# errors. Call with e.g. $(fx-get-ui-mode "fx-use") to check for command
+# specific overrides. By convention use snake-case to identify commands in
+# overrides, e.g. "fx-use" or "ffx-target-list".
+# Echos "tui" or "text" for the two modes, returns 0 on error-free invocation
+# and returns 1 if any of the called commands have errors.
+function fx-get-ui-mode() {
+  local command="$1"
+  local override_mode
+  local mode
+
+  mode="text" # default to text
+  # We are NOT using fx-command-run to avoid having to build `ffx` -
+  # one instance of this call chooses which out dir to use with `fx use`
+  local ffx_binary="${FUCHSIA_BUILD_DIR}/host-tools/ffx"
+  if [[ ! -x "${ffx_binary}" ]]; then
+    fx-warn "ffx not found in build directory. It is needed to check \`ffx.ui.mode\`. Defaulting to 'text'"
+    echo "text"
+    return 1
+  fi
+  # check for the ffx.ui.mode
+  tui_setting_raw="$("${ffx_binary}" config get ffx.ui.mode 2>/dev/null)"
+  exit_status=$?
+  if [[ "$exit_status" -ne 0 ]]; then
+    fx-warn "error running ffx config get ffx.ui.mode, defaulting to 'text'"
+    echo "text"
+    return 1
+  elif [[ -n "$tui_setting_raw" ]]; then
+    tui_setting="${tui_setting_raw#\"}" # Remove leading " if it exists
+    tui_setting="${tui_setting%\"}" # Remove trailing " if it exists
+    mode="${tui_setting}"
+  fi
+  # there can be command specific overrides, check for those
+  if [[ -n $command ]]; then
+    overrides="$("${ffx_binary}" config get ffx.ui.overrides 2>/dev/null)"
+    exit_status=$?
+    if [[ "$exit_status" -ne 0 && "$exit_status" -ne 2 ]]; then # 2 is Value not found, which not an error
+        fx-warn "Error calling ffx config get ffx.ui.overrides, $mode"
+        echo "$mode"
+        return 1
+    else
+      override_mode="$(jq --arg cmd "$command" -r '.[$cmd] //empty' <<< "$overrides")"
+      exit_status=$?
+      if [[ "$exit_status" -ne 0 ]]; then
+        fx-warn "Error parsing overrides in fx-get-ui-mode, using $mode"
+        echo "$mode"
+        return 1
+      elif [[ -n "$override_mode" ]]; then
+          mode="$override_mode"
+      fi
+    fi
+  fi
+  # check the mode set is in the right format (or default to text)
+  case "$mode" in
+        text|tui)
+          echo "$mode"
+          ;;
+        *)
+          fx-warn "Warning: Invalid mode '$mode' detected for ffx.ui.mode, but 'tui' or 'text' expected: defaulting to 'text'\n\t (Change the setting with e.g. 'ffx config set ffx.ui.mode tui' )" >&2
+          echo "text"
+          ;;
+  esac
+  return 0
+}
+
+# Gum - wrapped functionality for choosing amongst options
+function fx-choose-tui {
+    fx-command-run gum choose "$@"
+}

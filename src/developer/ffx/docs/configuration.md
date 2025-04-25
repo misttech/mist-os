@@ -110,6 +110,14 @@ When updating, please add the value in alphabetical order.
     |                                         | `discovery.mdns.enabled`,          |
     |                                         | `discovery.mdns.autoconnect`       |
     |                                         | Defaults to `false`                |
+    | `ffx.ui.mode`                           | Sets the ui mode for ffx and fx    |
+    |                                         | options are "text" and "tui",      |
+    |                                         | defaults to `text` for plaintext   |
+    |                                         | output. 'tui' enables TUI mode     |
+    |                                         | where available.                   |
+    | `ffx.ui.overrides`                      | Allows per-command overrides of the|
+    |                                         | UI mode. Commands are identified by|
+    |                                         | tool-command, e.g. `fx-use`        |
     | `log.dir`                               | Location for ffx and daemon logs   |
     |                                         | Defaults to first available of:    |
     |                                         |   `$FFX_LOG_DIR`                   |

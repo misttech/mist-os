@@ -18,6 +18,11 @@
 ##
 ## fx use without arguments will list the available build directories, naming
 ## the current active build directory (if any).
+##
+## fx use with `ffx.ui.mode = tui` set will prompt you to choose a build director.
+## ffx.ui.mode can be set using `ffx config set ffx.ui.mode tui`
+## The UI mode for just fx use can be set with e.g.
+## `ffx config set ffx.ui.overrides.fx-use text`
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 
@@ -25,7 +30,7 @@ function main {
   local build_dir="$1"
 
   case "${build_dir}" in
-  -h|--help)
+  -h | --help)
     fx-command-help
     return 0
     ;;
@@ -36,24 +41,64 @@ function main {
   fi
 
   if [[ -z "${build_dir}" ]]; then
-    fx-info "listing build directories:"
+
     fx-build-dir-if-present
+    local possible_build_dirs=()
     local current="${FUCHSIA_BUILD_DIR##"${FUCHSIA_DIR}"/}"
     if [[ -n "${current}" ]]; then
-      echo "${current} (current)"
+      possible_build_dirs+=("${current} (current)")
     fi
-    for d in ${FUCHSIA_DIR}/out/*; do
-      local build_dir="${d##"${FUCHSIA_DIR}"/}"
-      if [[ "${build_dir}" != out/*.zircon && "${build_dir}" != out/*.device \
-        && "${build_dir}" != "${current}" && "${build_dir}" != out/*crash.log
-        && "${build_dir}" != out/*.json
-        && "${build_dir}" != out/\_* # Ignore dirs that start with `_` (e.g. _bazel_rbe_test)
-        && "${build_dir}" != out/rust-analyzer ]]; # This is a symbolink link to ${FUCHSIA_BUILD_DIR}/rust-analyzer
-      then
-        echo "${build_dir}"
+
+    shopt -s nullglob
+    for d in "${FUCHSIA_DIR}"/out/*; do
+      local item_rel_path="${d##"${FUCHSIA_DIR}"/}"
+      # Skip known invalid directories
+      if [[ "${item_rel_path}" == */*.zircon ||
+        "${item_rel_path}" == */*.device ||
+        "${item_rel_path}" == "${current}" ||
+        "${item_rel_path}" == */*crash.log ||
+        "${item_rel_path}" == */*.json ||
+        "${item_rel_path}" == out/_* ||
+        "${item_rel_path}" == out/repro_*.instructions ||
+        "${item_rel_path}" == out/.*build_lock ||
+        "${item_rel_path}" == out/rust-analyzer ]]; then
+        continue #skip
       fi
+      possible_build_dirs+=("${item_rel_path}")
     done
-    return 1
+    shopt -u nullglob
+
+    use_tui=$(fx-get-ui-mode "fx-use")
+    if [[ "$use_tui" == "tui" ]]; then
+      # TUI picker
+      # check if we have any possible build directories to choose from.
+      if [ "${#possible_build_dirs[@]}" -eq 0 ]; then
+        fx-error "There are no current build directories. Make sure you have run fx set."
+        exit 1
+      fi
+
+      chosen_dir="$(fx-choose-tui "${possible_build_dirs[@]}" --select-if-one --header="Select a build dir:")"
+      # strip off any trailing spaces and the '(current)' string
+      local suffix=" (current)"
+      if [[ "${chosen_dir}" == *"${suffix}" ]]; then
+        build_dir="${chosen_dir%${suffix}}"
+      else
+        build_dir="${chosen_dir}"
+      fi
+
+      if [[ -z "${build_dir}" ]]; then
+        # This can happen if users close out of the picker without selecting anything
+        fx-error "No build directory picked. If you still want to change directories,\nrun this command again and select a directory."
+        exit 1
+      fi
+    else
+      # Non-TUI default
+      fx-info "listing build directories:"
+      for d in "${possible_build_dirs[@]}"; do
+        echo "$d"
+      done
+      return 1
+    fi
   fi
 
   if [[ "$build_dir" == /* ]]; then
@@ -67,7 +112,7 @@ function main {
     fx-check-default-target
     exit $?
   else
-    echo "\"${build_dir}\" is not a valid build dir."
+    fx-error "\"${build_dir}\" is not a valid build dir."
     echo ""
     fx-command-help
     exit 1
