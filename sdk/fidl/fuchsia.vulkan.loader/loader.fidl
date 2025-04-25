@@ -32,7 +32,7 @@ type GetVmexResourceError = flexible enum {
 };
 
 /// Service to provide Vulkan libraries to the loader.
-@discoverable
+@discoverable(server="platform")
 closed protocol Loader {
     /// Requests a client driver library with the given name from the Vulkan loader
     /// service. Returns a VMO suitable for loading as a dynamic library on
