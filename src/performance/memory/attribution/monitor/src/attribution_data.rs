@@ -109,7 +109,7 @@ impl AttributionDataProvider for AttributionDataProviderImpl {
             Ok(AttributionData {
                 principals_vec: principals,
                 resources_vec: kernel_resources.resources.into_values().map(|r| r.into()).collect(),
-                resource_names: kernel_resources.resource_names.build(),
+                resource_names: kernel_resources.resource_names,
                 attributions,
             })
         }
