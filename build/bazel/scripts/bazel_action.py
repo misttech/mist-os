@@ -9,22 +9,25 @@ import argparse
 import dataclasses
 import errno
 import filecmp
-import hashlib
-import json
 import os
 import shlex
 import shutil
 import stat
 import subprocess
 import sys
-import time
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, TypeAlias
 
+_SCRIPT_DIR = os.path.dirname(__file__)
+sys.path.insert(0, _SCRIPT_DIR)
+import build_utils
+
+_BUILD_BAZEL_DIR = os.path.dirname(_SCRIPT_DIR)
+
 # Directory where to find Starlark input files.
-_STARLARK_DIR = os.path.join(os.path.dirname(__file__), "..", "starlark")
+_STARLARK_DIR = os.path.join(_BUILD_BAZEL_DIR, "starlark")
 
 # Directory where to find templated files.
-_TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "..", "templates")
+_TEMPLATE_DIR = os.path.join(_BUILD_BAZEL_DIR, "templates")
 
 # A type for the JSON-decoded content describing the @gn_targets repository.
 GnTargetsManifest: TypeAlias = List[Dict[str, Any]]
@@ -316,7 +319,7 @@ def copy_directory_if_changed(
     """
     assert os.path.isdir(
         src_dir
-    ), "{} is not a dir, but copy dir is called.".format(src_path)
+    ), "{} is not a dir, but copy dir is called.".format(src_dir)
 
     def all_tracked_files_unchanged(
         src_dir: str, dst_dir: str, tracked_files: List[str]
@@ -370,7 +373,7 @@ def copy_file_if_changed(
     if os.path.lexists(dst_path):
         os.remove(dst_path)
 
-    def is_under_bazel_root(p):
+    def is_under_bazel_root(p: str) -> bool:
         return os.path.realpath(p).startswith(
             os.path.abspath(bazel_output_base_dir)
         )
@@ -448,7 +451,7 @@ def depfile_quote(path: str) -> str:
     shlex.quote() does not work because paths with spaces
     are simply encased in single-quotes, while the Ninja
     depfile parser only supports escaping single chars
-    (e.g. ' ' -> '\ ').
+    (e.g. ' ' -> '\\ ').
 
     Args:
        path: input file path.
@@ -459,35 +462,6 @@ def depfile_quote(path: str) -> str:
     return path.replace("\\", "\\\\").replace(" ", "\\ ")
 
 
-_HEXADECIMAL_SET = set("0123456789ABCDEFabcdef")
-
-
-def is_hexadecimal_string(s: str) -> bool:
-    """Return True if input string only contains hexadecimal characters."""
-    return all([c in _HEXADECIMAL_SET for c in s])
-
-
-_BUILD_ID_PREFIX = ".build-id/"
-
-
-def is_likely_build_id_path(path: str) -> bool:
-    """Return True if path is a .build-id/xx/yyyy* file name."""
-    # Look for .build-id/XX/ where XX is an hexadecimal string.
-    pos = path.find(_BUILD_ID_PREFIX)
-    if pos < 0:
-        return False
-
-    path = path[pos + len(_BUILD_ID_PREFIX) :]
-    if len(path) < 3 or path[2] != "/":
-        return False
-
-    return is_hexadecimal_string(path[0:2])
-
-
-assert is_likely_build_id_path("/src/.build-id/ae/23094.so")
-assert not is_likely_build_id_path("/src/.build-id/log.txt")
-
-
 def copy_build_id_dir(build_id_dir: str, bazel_output_base_dir: str) -> None:
     """Copy debug symbols from a source .build-id directory, to the top-level one."""
     for path in os.listdir(build_id_dir):
@@ -495,31 +469,10 @@ def copy_build_id_dir(build_id_dir: str, bazel_output_base_dir: str) -> None:
         if len(path) == 2 and os.path.isdir(bid_path):
             for obj in os.listdir(bid_path):
                 src_path = os.path.join(bid_path, obj)
-                dst_path = os.path.join(_BUILD_ID_PREFIX, path, obj)
+                dst_path = os.path.join(".build-id", path, obj)
                 if _DEBUG_BUILD_ID_COPIES:
                     print(f"BUILD_ID {src_path} --> {dst_path}")
                 copy_file_if_changed(src_path, dst_path, bazel_output_base_dir)
-
-
-def is_likely_content_hash_path(path: str) -> bool:
-    """Return True if file path is likely based on a content hash.
-
-    Args:
-        path: File path
-    Returns:
-        True if the path is a likely content-based file path, False otherwise.
-    """
-    # Look for .build-id/XX/ where XX is an hexadecimal string.
-    if is_likely_build_id_path(path):
-        return True
-
-    # Look for a long hexadecimal sequence filename.
-    filename = os.path.basename(path)
-    return len(filename) >= 16 and is_hexadecimal_string(filename)
-
-
-assert is_likely_content_hash_path("/src/.build-id/ae/23094.so")
-assert not is_likely_content_hash_path("/src/.build-id/log.txt")
 
 
 def find_bazel_output_base(workspace_dir: str) -> str:
@@ -1169,141 +1122,31 @@ def main() -> int:
         )
         # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
 
-    def run_bazel_query(
-        query_type: str, query_args: List[str], ignore_errors: bool
-    ) -> "subprocess.CompletedProcess[str]":
-        """Run a Bazel query, and return stdout, stderr pair.
+    bazel_launcher = build_utils.BazelLauncher(
+        args.bazel_launcher,
+        log_err=lambda msg: print(f"BAZEL_ACTION_ERROR: {msg}", file=sys.stderr)
+        if _DEBUG
+        else None,
+    )
 
-        Args:
-           query_type: One of 'query', 'cquery' or 'aquery'.
-           query_args: Additional query arguments.
-           ignore_errors: If true, errors are ignored.
-
-        Returns:
-            On success, return an (stdout_lines, stderr_lines) pair, where
-            stdout_lines is a list of output lines, and stderr_lines is a list
-            of error lines, if any.
-
-            On failure, if ignore_errors is False, then return (None, None),
-            otherwise, return (stdout_lines, stderr_lines).
-        """
-        query_cmd = [args.bazel_launcher, query_type] + query_args
-        if ignore_errors:
-            query_cmd += ["--keep_going"]
-
-        query_cmd_str = " ".join(shlex.quote(c) for c in query_cmd)
-        debug("QUERY_CMD: " + query_cmd_str)
-        ret = subprocess.run(query_cmd, capture_output=True, text=True)
-        if ret.returncode != 0:
-            if not ignore_errors:
-                print(
-                    "BAZEL_ACTION_ERROR: Error when calling Bazel query: %s\n%s\n%s\n"
-                    % (query_cmd_str, ret.stderr, ret.stdout),
-                    file=sys.stderr,
-                )
-                return ret
-
-            if _DEBUG and False:
-                print(
-                    "BAZEL_ACTION_WARNING: Error when calling Bazel query: %s\nSTDOUT\n%s\nSTDERR\n%s\n"
-                    % (query_cmd_str, ret.stderr, ret.stdout),
-                    file=sys.stderr,
-                )
-
-        return ret
-
-    def get_bazel_query_output(
-        query_type: str, query_args: List[str]
-    ) -> Optional[List[str]]:
-        """Run a bazel query and return its output as a series of lines.
-
-        Args:
-            query_type: One of 'query', 'cquery' or 'aquery'
-            query_args: Extra query arguments.
-
-        Returns:
-            On success, a list of output lines. On failure return None.
-        """
-        # The result of queries does not change between incremental builds,
-        # as their outputs only depend on the shape of the Bazel graph, not
-        # the content of the artifacts. Due to this, it is possible to cache
-        # the outputs to save several seconds per bazel_action() invocation.
-        #
-        # The data is simply stored under $WORKSPACE/fuchsia_build_generated/bazel_query_cache/
-        # which will be removed by each `fx gen` call, since it may change the Bazel
-        # graph dependencies, and thus the query results.
-
-        cache_key_args = [query_type] + query_args
-        cache_key_inputs = cache_key_args[:]
-
-        # If a --starlark:file PATH is used, add the content of PATH
-        # to compute the cache key. This ensure stale cache entries
-        # are not reused when only this file changes during development.
-        starlark_file_option = "--starlark:file"
-        for n, arg in enumerate(query_args):
-            input_path = None
-            if arg == starlark_file_option and n + 1 < len(query_args):
-                input_path = query_args[n + 1]
-            elif arg.startswith(f"{starlark_file_option}="):
-                input_path = arg[len(starlark_file_option) + 1 :]
-            if input_path:
-                with open(input_path, "rt") as f:
-                    cache_key_inputs.append(f.read())
-
-        cache_key = hashlib.sha256(
-            repr(cache_key_inputs).encode("utf-8")
-        ).hexdigest()[:12]
-        cache_file = os.path.join(
-            args.workspace_dir,
-            f"fuchsia_build_generated/bazel_query_cache/{cache_key}.json",
+    query_cache = build_utils.BazelQueryCache(
+        os.path.join(
+            args.workspace_dir, "fuchsia_build_generated/bazel_query_cache"
         )
-        if os.path.exists(cache_file):
-            try:
-                with open(cache_file, "rt") as f:
-                    cache_value = json.load(f)
-                assert cache_value["key_args"] == cache_key_args
-                if _DEBUG_BAZEL_QUERIES:
-                    print(
-                        f"DEBUG: Found cached values for query {cache_key}: {cache_key_args}",
-                        file=sys.stderr,
-                    )
-                return cache_value["output_lines"]
-            except Exception as e:
-                print(
-                    f"WARNING: Error when reading cached values for query {cache_key}: {cache_key_args}:\n{e}",
-                    file=sys.stderr,
-                )
+    )
 
-        if _DEBUG_BAZEL_QUERIES:
-            query_start_time = time.time()
-
-        ret = run_bazel_query(query_type, query_args, False)
-        if ret.returncode != 0:
-            return None
-
-        result = ret.stdout.splitlines()
-
-        # Write the result to the cache.
-        new_cache_value = {
-            "key_args": cache_key_args,
-            "output_lines": result,
-        }
-        if _DEBUG_BAZEL_QUERIES:
-            print(
-                "DEBUG: Query took %.1f seconds for query %s"
-                % (time.time() - query_start_time, cache_key_args),
-                file=sys.stderr,
-            )
-            print(
-                f"DEBUG: Writing query values to cache for query {cache_key}\n",
-                file=sys.stderr,
-            )
-
-        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
-        with open(cache_file, "wt") as f:
-            json.dump(new_cache_value, f)
-
-        return result
+    def run_bazel_query(
+        query_cmd: str, query_args: list[str]
+    ) -> Optional[list[str]]:
+        """Run a Bazel query, return output as list of lines."""
+        return query_cache.get_query_output(
+            query_cmd,
+            query_args,
+            bazel_launcher,
+            log=lambda m: print(f"DEBUG: {m}", file=sys.stderr)
+            if _DEBUG_BAZEL_QUERIES
+            else None,
+        )
 
     # Update $WORKSPACE/fuchsia_generated_build/root_bazel_files symlink
     # if necessary.
@@ -1328,7 +1171,7 @@ def main() -> int:
     def run_starlark_cquery(
         query_targets: List[str], starlark_filename: str
     ) -> List[str]:
-        result = get_bazel_query_output(
+        result = run_bazel_query(
             "cquery",
             [
                 "--config=quiet",
@@ -1444,7 +1287,7 @@ def main() -> int:
         with open(build_files_query_output, "r") as f:
             build_files = f.read().splitlines()
 
-        bazel_source_files = get_bazel_query_output(
+        bazel_source_files = run_bazel_query(
             "cquery",
             [
                 "--config=quiet",
@@ -1615,7 +1458,7 @@ def main() -> int:
 
     # Drop tracked_files from dir_copies so it can be concatenated with
     # file_copies later.
-    dir_copies = [(src, dst) for src, dst, _ in dir_copies]
+    all_copies = file_copies + [(src, dst) for src, dst, _ in dir_copies]
 
     if args.path_mapping:
         # When determining source path of the copied output, follow links to get
@@ -1627,7 +1470,7 @@ def main() -> int:
                 dst_path
                 + ":"
                 + os.path.relpath(os.path.realpath(src_path), current_dir)
-                for src_path, dst_path in file_copies + dir_copies
+                for src_path, dst_path in all_copies
             ),
         )
 
@@ -1655,7 +1498,7 @@ def main() -> int:
         for label in all_inputs:
             path = mapper.source_label_to_path(label, relative_to=current_dir)
             if path:
-                if is_likely_content_hash_path(path):
+                if build_utils.is_likely_content_hash_path(path):
                     debug(f"{path} ::: IGNORED CONTENT HASH NAME")
                 else:
                     debug(f"{path} <-- {label}")
@@ -1686,7 +1529,7 @@ track all input files that the repository rule may access when it is run.
             return 1
 
         depfile_content = "%s: %s\n" % (
-            " ".join(depfile_quote(c) for _, c in file_copies + dir_copies),
+            " ".join(depfile_quote(c) for _, c in all_copies),
             " ".join(depfile_quote(c) for c in sorted(all_sources)),
         )
 
@@ -1695,8 +1538,8 @@ track all input files that the repository rule may access when it is run.
 
         write_file_if_changed(args.depfile, depfile_content)
 
-        for f in args.stamp_files:
-            with open(f, "w") as f:
+        for stamp_file in args.stamp_files:
+            with open(stamp_file, "w") as f:
                 f.write("")
 
     # Done!

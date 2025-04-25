@@ -661,7 +661,10 @@ template("bazel_action") {
     mnemonic = "BAZEL"
     script = "//build/bazel/scripts/bazel_action.py"
 
-    inputs = _bazel_build_files
+    inputs = [
+               # Imported by bazel_action.py
+               "//build/bazel/scripts/build_utils.py",
+             ] + _bazel_build_files
 
     if (defined(invoker.inputs)) {
       inputs += invoker.inputs

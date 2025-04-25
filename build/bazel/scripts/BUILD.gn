@@ -10,6 +10,11 @@ python_build_time_tests("get_git_head_commit_test") {
   inputs = [ "get_git_head_commit.py" ]
 }
 
+python_build_time_tests("build_utils_test") {
+  tests = [ "build_utils_test.py" ]
+  inputs = [ "build_utils.py" ]
+}
+
 python_build_time_tests("compute_content_hash_test") {
   tests = [ "compute_content_hash_test.py" ]
   inputs = [
@@ -26,6 +31,11 @@ python_build_time_tests("gn_targets_utils_test") {
 python_build_time_tests("remote_services_utils_test") {
   tests = [ "remote_services_utils_test.py" ]
   inputs = [ "remote_services_utils_test.py" ]
+}
+
+python_build_time_tests("starlark_utils_test") {
+  tests = [ "starlark_utils_test.py" ]
+  inputs = [ "starlark_utils.py" ]
 }
 
 python_build_time_tests("workspace_utils_test") {
@@ -63,11 +73,13 @@ if (is_host) {
 group("tests") {
   testonly = true
   deps = [
+    ":build_utils_test($host_toolchain)",
     ":export_host_tests_test($host_toolchain)",
     ":gn_targets_utils_test($host_toolchain)",
     ":minimal_workspace_test($host_toolchain)",
     ":remote_services_utils_test",
     ":runfiles_utils_test($host_toolchain)",
+    ":starlark_utils_test($host_toolchain)",
     ":workspace_utils_test($host_toolchain)",
   ]
 
