@@ -231,7 +231,7 @@ class FindGnBazelActioInfosForTest(unittest.TestCase):
         )
 
     def test_direct_mapping(self) -> None:
-        def command_runner(args: T.List[str]) -> T.Tuple[int, str, str]:
+        def command_runner(args: list[str]) -> tuple[int, str, str]:
             return 1, "", "An unexpected error\nAnd another one\n"
 
         result = find_gn_bazel_action_infos_for(
@@ -248,7 +248,7 @@ class FindGnBazelActioInfosForTest(unittest.TestCase):
         self.assertListEqual(self.errors, [])
 
     def test_single_dependency(self) -> None:
-        def command_runner(args: T.List[str]) -> T.Tuple[int, str, str]:
+        def command_runner(args: list[str]) -> tuple[int, str, str]:
             return (
                 1,
                 r"""//bazel/target/dependency:5
@@ -277,7 +277,7 @@ ERROR: Evaluation of query "allpaths(set(...), //bazel/target/dependency:5) fail
         )
 
     def test_multiple_dependencies_same_gn_action(self) -> None:
-        def command_runner(args: T.List[str]) -> T.Tuple[int, str, str]:
+        def command_runner(args: list[str]) -> tuple[int, str, str]:
             return (
                 1,
                 r"""//bazel/target/dependency:5
@@ -307,7 +307,7 @@ ERROR: Evaluation of query "allpaths(set(...), //bazel/target/dependency:5) fail
         )
 
     def test_multiple_dependencies(self) -> None:
-        def command_runner(args: T.List[str]) -> T.Tuple[int, str, str]:
+        def command_runner(args: list[str]) -> tuple[int, str, str]:
             return (
                 1,
                 r"""//bazel/target/dependency:5
@@ -342,7 +342,7 @@ ERROR: Evaluation of query "allpaths(set(...), //bazel/target/dependency:5) fail
         )
 
     def test_unknown_dependency(self) -> None:
-        def command_runner(args: T.List[str]) -> T.Tuple[int, str, str]:
+        def command_runner(args: list[str]) -> tuple[int, str, str]:
             return 0, "", ""
 
         result = find_gn_bazel_action_infos_for(
@@ -357,7 +357,7 @@ ERROR: Evaluation of query "allpaths(set(...), //bazel/target/dependency:5) fail
         self.assertListEqual(self.errors, [])
 
     def test_unexpected_query_errors(self) -> None:
-        def command_runner(args: T.List[str]) -> T.Tuple[int, str, str]:
+        def command_runner(args: list[str]) -> tuple[int, str, str]:
             return 1, "", "An unexpected error\nAnd another one\n"
 
         result = find_gn_bazel_action_infos_for(

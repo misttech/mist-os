@@ -20,7 +20,7 @@ RBE_TEMPLATE_FILE = "build/bazel/templates/template.remote_services.bazelrc"
 
 def generate_rbe_config(
     fuchsia_dir: Path, config_files: T.Sequence[str] = RBE_CONFIG_FILES
-) -> T.Tuple[T.Dict[str, str], T.Set[Path]]:
+) -> tuple[dict[str, str], set[Path]]:
     """Read RBE config files into a dictionary.
 
     Args:
@@ -32,8 +32,8 @@ def generate_rbe_config(
         mapping configuration keys to values, and input_files is a set of
         input file Paths read by the function.
     """
-    input_files: T.Set[Path] = set()
-    config: T.Dict[str, str] = {}
+    input_files: set[Path] = set()
+    config: dict[str, str] = {}
     for f in config_files:
         cfg_file = fuchsia_dir / f
         input_files.add(cfg_file)
@@ -50,8 +50,8 @@ def generate_rbe_config(
 
 
 def generate_rbe_template_substitutions(
-    config_dict: T.Dict[str, str], remote_download_outputs: str
-) -> T.Dict[str, str]:
+    config_dict: dict[str, str], remote_download_outputs: str
+) -> dict[str, str]:
     """Generate formatting arguments to expand the remote services template.
 
     Args:
@@ -83,7 +83,7 @@ def generate_remote_services_bazelrc(
     fuchsia_dir: Path,
     output_path: Path,
     download_outputs: str,
-) -> T.Set[Path]:
+) -> set[Path]:
     """Generate the remote_services.bazelrc file.
 
     Args:

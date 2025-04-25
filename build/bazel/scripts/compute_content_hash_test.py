@@ -28,7 +28,7 @@ def _git_cmd(git_dir: Path, args: T.Sequence[str | Path]) -> str:
     return ret.stdout.strip()
 
 
-def _setup_first_git_dir(git_dir: Path) -> T.Tuple[str, str]:
+def _setup_first_git_dir(git_dir: Path) -> tuple[str, str]:
     git_dir.mkdir(parents=True)
     _git_cmd(git_dir, ["init"])
     # required to avoid errors on CI build bots when running this test.

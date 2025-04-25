@@ -21,7 +21,7 @@ class BazelBuildActionInfo(object):
 
     # LINT.IfChange
     gn_target: str
-    bazel_targets: T.List[str]
+    bazel_targets: list[str]
     no_sdk: bool
     gn_targets_dir: str
     gn_targets_manifest: str
@@ -39,9 +39,9 @@ class BazelBuildActionsMap(object):
     for these, an actual Bazel query is needed, see BazelBuildActionQuery below.
     """
 
-    def __init__(self, json_content: T.List[T.Dict[str, T.Any]]) -> None:
-        self._targets: T.Dict[str, BazelBuildActionInfo] = {}
-        self._bazel_to_gn: T.Dict[str, str] = {}
+    def __init__(self, json_content: list[dict[str, T.Any]]) -> None:
+        self._targets: dict[str, BazelBuildActionInfo] = {}
+        self._bazel_to_gn: dict[str, str] = {}
         for entry in json_content:
             info = BazelBuildActionInfo(**entry)
             self._targets[info.gn_target] = info
@@ -64,11 +64,11 @@ class BazelBuildActionsMap(object):
         return BazelBuildActionsMap(content)
 
     @property
-    def bazel_targets(self) -> T.List[str]:
+    def bazel_targets(self) -> list[str]:
         return sorted(self._bazel_to_gn.keys())
 
     @property
-    def gn_targets(self) -> T.List[str]:
+    def gn_targets(self) -> list[str]:
         return sorted(set(self._bazel_to_gn.values()))
 
     def get_info(self, gn_label: str) -> T.Optional[BazelBuildActionInfo]:
@@ -101,9 +101,7 @@ class BazelBuildActionQuery(object):
         self._bazel_target = bazel_target
         self._actions_map = actions_map
 
-    def make_query_command(
-        self, bazel_pre_cmd_args: T.List[str]
-    ) -> T.List[str]:
+    def make_query_command(self, bazel_pre_cmd_args: list[str]) -> list[str]:
         """Return the query command to be performed.
 
         Note that this forces @gn_targets to be empty, which will generate errors
@@ -166,7 +164,7 @@ class BazelBuildActionQuery(object):
 
         return "\n".join(real_errors)
 
-    def process_query_output(self, query_result: str) -> T.List[str]:
+    def process_query_output(self, query_result: str) -> list[str]:
         """Parse the result of a Bazel query to get a list of GN  bazel_action() labels.
 
         Args:
@@ -198,12 +196,10 @@ def _stderr_log_sink(msg: str) -> None:
 
 # A CommandRunnerType is a callable that takes a list of command strings,
 # and returns a (returncode, stdout, stderr) tuple from its execution.
-CommandRunnerType: T.TypeAlias = T.Callable[
-    [T.List[str]], T.Tuple[int, str, str]
-]
+CommandRunnerType: T.TypeAlias = T.Callable[[list[str]], tuple[int, str, str]]
 
 
-def _subprocess_command_runner(args: T.List[str]) -> T.Tuple[int, str, str]:
+def _subprocess_command_runner(args: list[str]) -> tuple[int, str, str]:
     """A CommandRunnerType implementation that uses subprocess.run()."""
     ret = subprocess.run(
         args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
@@ -214,11 +210,11 @@ def _subprocess_command_runner(args: T.List[str]) -> T.Tuple[int, str, str]:
 def find_gn_bazel_action_infos_for(
     bazel_target: str,
     actions_map: BazelBuildActionsMap,
-    bazel_cmd_args: T.List[str],
+    bazel_cmd_args: list[str],
     log_step: T.Optional[LogSinkType] = None,
     log_err: LogSinkType = _stderr_log_sink,
     command_runner: CommandRunnerType = _subprocess_command_runner,
-) -> T.List[BazelBuildActionInfo]:
+) -> list[BazelBuildActionInfo]:
     """Find the BazelBuildActionInfo instances matching a given Bazel target.
 
     Find all GN bazel_action() target whose top-level bazel targets

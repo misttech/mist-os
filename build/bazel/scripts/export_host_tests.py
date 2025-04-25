@@ -133,7 +133,7 @@ class HostInfo(object):
         return self._cpu
 
     @property
-    def test_json_environments(self) -> T.List[T.Dict[str, T.Any]]:
+    def test_json_environments(self) -> list[dict[str, T.Any]]:
         """The value of a tests.json "environments" key for a given host test."""
         # See https://fuchsia.dev/fuchsia-src/reference/testing/tests-json-format?hl=en#environments_field
         # and //build/testing/environments.gni.
@@ -244,7 +244,7 @@ class HostTestInfo(object):
 
     def __init__(
         self,
-        test_input: T.Dict[str, T.Any],
+        test_input: dict[str, T.Any],
         host_info: HostInfo,
         export_subdir: str = "",
     ) -> None:
@@ -284,7 +284,7 @@ class HostTestInfo(object):
         self._runtime_deps_path = f"{self._entry_path}.runtime_deps.json"
         # LINT.ThenChange(../starlark/host_test_info.cquery)
 
-    def generate_tests_json_entry(self) -> T.Dict[str, T.Any]:
+    def generate_tests_json_entry(self) -> dict[str, T.Any]:
         """Generate a single tests.json entry describing the current host test.
 
         Returns:
@@ -419,7 +419,7 @@ class HostTestInfo(object):
         output_runfiles_dir.mkdir(parents=True)
 
         runtime_deps = []
-        output_manifest_entries: T.Dict[str, str] = {}
+        output_manifest_entries: dict[str, str] = {}
         for source_path, target_path in input_manifest.as_dict().items():
             dest_path = output_runfiles_dir / source_path
             runtime_path = os.path.relpath(dest_path, build_dir)
@@ -486,7 +486,7 @@ class CommandContext(object):
 
     args: argparse.Namespace
     build_dir: Path
-    tests_map: T.Dict[str, HostTestInfo]
+    tests_map: dict[str, HostTestInfo]
     bazel_cmd: BazelCommand
 
 

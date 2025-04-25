@@ -87,7 +87,7 @@ def find_fx_build_dir(fuchsia_dir: Path) -> T.Optional[Path]:
 
 def get_bazel_relative_topdir(
     fuchsia_dir: str | Path, workspace_name: str
-) -> T.Tuple[str, T.Set[Path]]:
+) -> tuple[str, set[Path]]:
     """Return Bazel topdir for a given workspace, relative to Ninja output dir.
 
     Args:
@@ -312,9 +312,9 @@ class GeneratedWorkspaceFiles(object):
     """
 
     def __init__(self) -> None:
-        self._files: T.Dict[str, T.Any] = {}
+        self._files: dict[str, T.Any] = {}
         self._file_hasher: T.Optional[FileHasherType] = None
-        self._input_files: T.Set[Path] = set()
+        self._input_files: set[Path] = set()
 
     def set_file_hasher(self, file_hasher: FileHasherType) -> None:
         self._file_hasher = file_hasher
@@ -325,7 +325,7 @@ class GeneratedWorkspaceFiles(object):
         )
 
     @property
-    def input_files(self) -> T.Set[Path]:
+    def input_files(self) -> set[Path]:
         """The set of input file Paths that were read through read_text_file()."""
         return self._input_files
 
@@ -935,7 +935,7 @@ def generate_fuchsia_workspace(
     build_dir: Path,
     log: T.Optional[T.Callable[[str], None]] = None,
     enable_bzlmod: bool = False,
-) -> T.Set[Path]:
+) -> set[Path]:
     """Generate the Fuchsia Bazel workspace and associated files.
 
     Args:
@@ -1020,7 +1020,7 @@ class GnBuildArgs(object):
     @staticmethod
     def find_and_read_all_build_args(
         fuchsia_dir: Path,
-    ) -> T.Tuple[T.Dict[str, str], T.Set[Path]]:
+    ) -> tuple[dict[str, str], set[Path]]:
         """Find and read all gn_build_args.txt files in Fuchsia checkout.
 
         Args:
@@ -1035,8 +1035,8 @@ class GnBuildArgs(object):
         Raises:
             ValueError if a required input file is missing.
         """
-        mapping: T.Dict[str, str] = {}
-        extra_ninja_inputs: T.Set[Path] = set()
+        mapping: dict[str, str] = {}
+        extra_ninja_inputs: set[Path] = set()
 
         def add_file(relative_path: str, required: bool = False) -> None:
             file_path = fuchsia_dir / relative_path
@@ -1188,7 +1188,7 @@ class GnBuildArgs(object):
         fuchsia_dir: Path,
         args_json: T.Mapping[str, T.Any],
         generated: GeneratedWorkspaceFiles,
-    ) -> T.Set[Path]:
+    ) -> set[Path]:
         """Record the content of @fuchsia_build_info in a GeneratedWorkspaceFiles instance.
 
         Args:
@@ -1224,7 +1224,7 @@ class GnBuildArgs(object):
     @staticmethod
     def generate_fuchsia_build_info(
         fuchsia_dir: Path, build_dir: Path, repository_dir: Path
-    ) -> T.Set[Path]:
+    ) -> set[Path]:
         # Read args.json
         with (build_dir / "args.json").open("rb") as f:
             args_json = json.load(f)
@@ -1313,7 +1313,7 @@ def record_gn_targets_dir(
     all_files = []
 
     # Build a { bazel_package -> { gn_target_name -> entry } } map.
-    package_map: T.Dict[str, T.Dict[str, str]] = {}
+    package_map: dict[str, dict[str, str]] = {}
     for entry in json.loads(generated.read_text_file(inputs_manifest_path)):
         bazel_package = entry["bazel_package"]
         bazel_name = entry["bazel_name"]
@@ -1430,7 +1430,7 @@ license(
 def check_regenerator_inputs_updates(
     build_dir: Path,
     inputs_file: str = "regenerator_outputs/regenerator_inputs.txt",
-) -> T.Set[str]:
+) -> set[str]:
     """Check whether any regenerator input has changed.
 
     Args:
@@ -1449,7 +1449,7 @@ def check_regenerator_inputs_updates(
         return {inputs_file}
 
     inputs_timestamp = inputs_path.stat().st_mtime
-    changed_inputs: T.Set[str] = set()
+    changed_inputs: set[str] = set()
     for dep in inputs_path.read_text().splitlines():
         dep_path = build_dir / dep
         if not dep_path.exists():
