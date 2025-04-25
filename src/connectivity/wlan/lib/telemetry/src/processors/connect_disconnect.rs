@@ -161,6 +161,7 @@ pub struct ConnectDisconnectLogger {
     time_series_stats: ConnectDisconnectTimeSeries,
     successive_connect_attempt_failures: AtomicUsize,
     last_connect_failure_at: Arc<Mutex<Option<fasync::BootInstant>>>,
+    last_disconnect_at: Arc<Mutex<Option<fasync::MonotonicInstant>>>,
 }
 
 impl ConnectDisconnectLogger {
@@ -194,6 +195,7 @@ impl ConnectDisconnectLogger {
             ),
             successive_connect_attempt_failures: AtomicUsize::new(0),
             last_connect_failure_at: Arc::new(Mutex::new(None)),
+            last_disconnect_at: Arc::new(Mutex::new(None)),
         };
         this.log_connection_state();
         this
@@ -219,12 +221,15 @@ impl ConnectDisconnectLogger {
         bss: &BssDescription,
     ) {
         let mut flushed_successive_failures = None;
+        let mut downtime_duration = None;
         if result == fidl_ieee80211::StatusCode::Success {
             self.update_connection_state(ConnectionState::Connected(ConnectedState {}));
             // TODO(https://fxbug.dev/412460463): Also flush and log
             // successive_connect_attempt_failures metric on suspend
             flushed_successive_failures =
                 Some(self.successive_connect_attempt_failures.swap(0, Ordering::SeqCst));
+            downtime_duration =
+                self.last_disconnect_at.lock().map(|t| fasync::MonotonicInstant::now() - t);
         } else {
             self.update_connection_state(ConnectionState::Idle(IdleState {}));
             let _prev = self.successive_connect_attempt_failures.fetch_add(1, Ordering::SeqCst);
@@ -232,7 +237,8 @@ impl ConnectDisconnectLogger {
         }
 
         self.log_connect_attempt_inspect(result, bss);
-        self.log_connect_attempt_cobalt(result, flushed_successive_failures).await;
+        self.log_connect_attempt_cobalt(result, flushed_successive_failures, downtime_duration)
+            .await;
     }
 
     pub fn log_connect_attempt_inspect(
@@ -259,6 +265,7 @@ impl ConnectDisconnectLogger {
         &self,
         result: fidl_ieee80211::StatusCode,
         flushed_successive_failures: Option<usize>,
+        downtime_duration: Option<zx::MonotonicDuration>,
     ) {
         let mut metric_events = vec![];
         metric_events.push(MetricEvent {
@@ -275,6 +282,14 @@ impl ConnectDisconnectLogger {
             });
         }
 
+        if let Some(duration) = downtime_duration {
+            metric_events.push(MetricEvent {
+                metric_id: metrics::DOWNTIME_POST_DISCONNECT_METRIC_ID,
+                event_codes: vec![],
+                payload: MetricEventPayload::IntegerValue(duration.into_millis()),
+            });
+        }
+
         log_cobalt_1dot1_batch!(
             self.cobalt_1dot1_proxy,
             &metric_events,
@@ -284,6 +299,7 @@ impl ConnectDisconnectLogger {
 
     pub async fn log_disconnect(&self, info: &DisconnectInfo) {
         self.update_connection_state(ConnectionState::Disconnected(DisconnectedState {}));
+        let _prev = self.last_disconnect_at.lock().replace(fasync::MonotonicInstant::now());
         self.log_disconnect_inspect(info);
         self.log_disconnect_cobalt(info).await;
     }
@@ -341,8 +357,7 @@ impl ConnectDisconnectLogger {
     pub async fn handle_periodic_telemetry(&self) {
         let mut metric_events = vec![];
         let now = fasync::BootInstant::now();
-        let last_connect_failure_at = *self.last_connect_failure_at.lock();
-        if let Some(failed_at) = last_connect_failure_at {
+        if let Some(failed_at) = *self.last_connect_failure_at.lock() {
             if now - failed_at >= SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_TIMEOUT {
                 let failures = self.successive_connect_attempt_failures.swap(0, Ordering::SeqCst);
                 if failures > 0 {
@@ -997,6 +1012,58 @@ mod tests {
         } else {
             assert!(metrics.is_empty());
         }
+    }
+
+    #[fuchsia::test]
+    fn test_log_downtime_post_disconnect_on_reconnect() {
+        let mut test_helper = setup_test();
+        let logger = ConnectDisconnectLogger::new(
+            test_helper.cobalt_1dot1_proxy.clone(),
+            &test_helper.inspect_node,
+            &test_helper.inspect_metadata_node,
+            &test_helper.inspect_metadata_path,
+            test_helper.persistence_sender.clone(),
+            &test_helper.mock_time_matrix_client,
+        );
+
+        // Connect at 15th second
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(15_000_000_000));
+        let bss_description = random_bss_description!(Wpa2);
+        let mut test_fut =
+            pin!(logger
+                .handle_connect_attempt(fidl_ieee80211::StatusCode::Success, &bss_description));
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        // Verify no downtime metric is logged on first successful connect
+        let metrics = test_helper.get_logged_metrics(metrics::DOWNTIME_POST_DISCONNECT_METRIC_ID);
+        assert!(metrics.is_empty());
+
+        // Disconnect at 25th second
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(25_000_000_000));
+        let disconnect_info = fake_disconnect_info();
+        let mut test_fut = pin!(logger.log_disconnect(&disconnect_info));
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        // Reconnect at 60th second
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(60_000_000_000));
+        let mut test_fut =
+            pin!(logger
+                .handle_connect_attempt(fidl_ieee80211::StatusCode::Success, &bss_description));
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        // Verify that downtime metric is logged
+        let metrics = test_helper.get_logged_metrics(metrics::DOWNTIME_POST_DISCONNECT_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(35_000));
     }
 
     fn fake_disconnect_info() -> DisconnectInfo {
