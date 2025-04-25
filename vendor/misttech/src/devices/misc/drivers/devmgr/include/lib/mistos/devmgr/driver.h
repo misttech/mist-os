@@ -25,23 +25,33 @@ using DriverHooks = const zx_driver_rec_t*;
 class Driver : public fbl::RefCounted<Driver>,
                public fbl::DoublyLinkedListable<fbl::RefPtr<Driver>> {
  public:
-  Driver();
+  Driver(std::string_view url, void* library, DriverHooks hooks);
   ~Driver();
 
-  // From Zircon
-  // void set_name(std::string_view name) { driver_name_ = name; }
-  // void set_driver_rec(const zx_driver_rec_t* driver_rec) { record_ = driver_rec; }
-  void set_binding(ktl::unique_ptr<const zx_bind_inst_t[]> binding) /*__TA_EXCLUDES(lock_)*/ {
-    binding_ = std::move(binding);
-  }
+  // Starts the driver.
+  void Start(fbl::RefPtr<Driver> self, /*fuchsia_driver_framework::DriverStartArgs start_args,
+             fdf::Dispatcher dispatcher,*/
+             fit::callback<void(zx::result<>)> cb) /*__TA_EXCLUDES(lock_)*/;
+
+  const std::string_view& url() const { return url_; }
+  void set_binding(ktl::unique_ptr<const zx_bind_inst_t[]> binding) /*__TA_EXCLUDES(lock_)*/;
+  const zx_bind_inst_t* binding() const /*__TA_EXCLUDES(lock_)*/ { return binding_->get(); }
+
   void set_binding_size(uint32_t binding_size) { binding_size_ = binding_size; }
-  void set_flags(uint32_t flags) { flags_ = flags; }
+  uint32_t binding_size() const { return binding_size_; }
 
  private:
   friend class Coordinator;
+  std::string_view url_;
+  void* library_;
 
-  // From Zircon
-  ktl::unique_ptr<const zx_bind_inst_t[]> binding_;
+  // fbl::Mutex lock_;
+
+  // The hooks to initialize and destroy the driver. Backed by the registration symbol.
+  DriverHooks hooks_ /*__TA_GUARDED(lock_)*/;
+
+  std::optional<ktl::unique_ptr<const zx_bind_inst_t[]>> binding_ /*__TA_GUARDED(lock_)*/;
+
   // Binding size in number of bytes, not number of entries
   // TODO: Change it to number of entries
   uint32_t binding_size_ = 0;

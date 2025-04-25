@@ -7,7 +7,7 @@
 
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/fidl/cpp/wire/message.h>
+// #include <lib/fidl/cpp/wire/message.h>
 #include <lib/zx/result.h>
 
 namespace ddk {
@@ -58,6 +58,7 @@ zx::result<std::vector<T>> GetMetadataArray(zx_device_t* dev, uint32_t type) {
   return zx::ok(std::vector<T>(mstart, mstart + (metadata->size() / sizeof(T))));
 }
 
+#if 0
 template <typename T>
 class DecodedMetadata {
  public:
@@ -96,6 +97,7 @@ zx::result<DecodedMetadata<T>> GetEncodedMetadata(zx_device_t* dev, uint32_t typ
   // byte contents stored within.
   return zx::ok(DecodedMetadata<T>{std::move(metadata_blob), decoded.value()});
 }
+#endif
 
 }  // namespace ddk
 

@@ -12,15 +12,14 @@
 
 #include <ktl/unique_ptr.h>
 
-#define LOCAL_TRACE 2
+#define LOCAL_TRACE 0
 
 // A linear array of statically defined drivers.
 extern const zircon_driver_note_t __start_mistos_driver_ldr[];
 extern const zircon_driver_note_t __stop_mistos_driver_ldr[];
 
 #ifndef ROOT_DRIVER_NAME
-// #define ROOT_DRIVER_NAME platform_bus
-#define ROOT_DRIVER_NAME acpi_bus
+#define ROOT_DRIVER_NAME platform_bus
 #endif
 
 /* macro-expanding concat */
@@ -34,6 +33,9 @@ extern const zircon_driver_note_t __stop_mistos_driver_ldr[];
 extern zircon_driver_note_t ROOT_DRIVER_LD;
 
 namespace {
+
+// System-wide coordinator.
+devmgr::Coordinator* global_coordinator;
 
 lazy_init::LazyInit<devmgr::Coordinator, lazy_init::CheckType::None,
                     lazy_init::Destructor::Disabled>
@@ -65,21 +67,27 @@ int cmd_driver(int argc, const cmd_args* argv, uint32_t flags) {
 
 }  // namespace
 
+devmgr::Coordinator& GlobalCoordinator() {
+  ASSERT_MSG(global_coordinator != nullptr, "mistos_devmgr_init() not called.");
+  return *global_coordinator;
+}
+
 void mistos_devmgr_init() {
   g_coordinator.Initialize();
+  global_coordinator = &g_coordinator.Get();
 
   devmgr::find_loadable_drivers(
       __start_mistos_driver_ldr, __stop_mistos_driver_ldr,
       fit::bind_member<&devmgr::Coordinator::DriverAddedInit>(&g_coordinator.Get()));
 
-  /*zircon_driver_note_t* root_driver = &ROOT_DRIVER_LD;
+  zircon_driver_note_t* root_driver = &ROOT_DRIVER_LD;
   dprintf(INFO, "Starting with root driver: [%s]\n", root_driver->payload.name);
 
   auto result = g_coordinator->StartRootDriver(root_driver->payload.name);
   if (result.is_error()) {
     dprintf(CRITICAL, "Failed to start root driver: [%s]\n", root_driver->payload.name);
     return;
-  }*/
+  }
 }
 
 STATIC_COMMAND_START

@@ -4,18 +4,29 @@
 
 #include "misc/drivers/mistos/driver.h"
 
+#include <lib/ddk/binding.h>
+#include <lib/ddk/driver.h>
 #include <lib/fit/function.h>
 #include <trace.h>
 
 #include <fbl/alloc_checker.h>
 #include <ktl/unique_ptr.h>
 
-#define LOCAL_TRACE 2
+#define LOCAL_TRACE 0
 // #define VERBOSE_DRIVER_LOAD 1
+
+extern const zircon_driver_note_t __start_mistos_driver_ldr[];
+extern const zircon_driver_note_t __stop_mistos_driver_ldr[];
 
 namespace mistos {
 
 namespace {
+
+typedef struct {
+  zircon_driver_note_t note;
+  zx_driver_rec_t rec;
+  zx_bind_inst_t binding[0];
+} mistos_driver_ldr_t;
 
 #if 0
 // CompatDriverServer::CreateDriver
@@ -48,19 +59,19 @@ Driver* CreateDriver(const zircon_driver_note_t* note, zx_driver_rec_t* rec,
 }
 #endif
 
-
 }  // namespace
 
-DriverBase::DriverBase(std::string_view name) : name_(name) {}
+DriverBase::DriverBase(std::string_view name, DriverStartArgs start_args)
+    : name_(name), start_args_(start_args) {}
 
 DriverBase::~DriverBase() {}
 
-Driver::Driver(device_t device, const zx_protocol_device_t* ops)
-    : DriverBase(device.name), device_(device, ops, this, std::nullopt) {
+Driver::Driver(DriverStartArgs start_args, device_t device, const zx_protocol_device_t* ops)
+    : Base("compat", start_args), device_(device, ops, this, std::nullopt) {
   // Give the parent device the correct node.
   // device_.Bind({std::move(node()), dispatcher()});
   // Call this so the parent device is in the post-init state.
-  // device_.InitReply(ZX_OK);
+  device_.InitReply(ZX_OK);
   // ZX_ASSERT(url().has_value());
 }
 
@@ -75,12 +86,19 @@ Driver::~Driver() {
   // }
 }
 
-zx::result<> Driver::Start() {
+void Driver::Start(fit::callback<void(zx::result<>)> cb) {
   if (zx::result result = LoadDriver(); result.is_error()) {
     LTRACEF("Failed to load driver: %d\n", result.error_value());
-    return result.take_error();
+    cb(result.take_error());
+    return;
   }
-  return StartDriver();
+
+  if (zx::result result = StartDriver(); result.is_error()) {
+    LTRACEF("Failed to start driver: %d\n", result.error_value());
+    cb(result.take_error());
+    return;
+  }
+  cb(zx::ok());
 }
 
 zx::result<> Driver::StartDriver() {
@@ -121,8 +139,13 @@ zx::result<> Driver::StartDriver() {
 }
 
 zx::result<> Driver::LoadDriver() {
-  LTRACEF("Loaded driver %.*s\n", static_cast<int>(driver_name_.size()), driver_name_.data());
-  ZX_ASSERT(record_ != nullptr);
+  // Find symbols
+  auto* note = base();
+
+  driver_name_ = note->payload.name;
+  LTRACEF("Loaded driver '%.*s'\n", static_cast<int>(driver_name_.size()), driver_name_.data());
+  record_ = reinterpret_cast<zx_driver_rec_t*>(reinterpret_cast<char*>(note) +
+                                               sizeof(zircon_driver_note_t));
 
   if (record_->ops == nullptr) {
     LTRACEF("Failed to load driver '%.*s', missing driver ops\n",
@@ -149,15 +172,15 @@ zx::result<> Driver::LoadDriver() {
 }
 
 zx_status_t Driver::AddDevice(Device* parent, device_add_args_t* args, zx_device_t** out) {
-  zx_device_t* child;
-  zx_status_t status = parent->Add(args, &child);
+  // zx_device_t* child;
+  zx_status_t status = parent->Add(args, out);
   if (status != ZX_OK) {
     LTRACEF("Failed to add device %s: %s\n", args->name, zx_status_get_string(status));
     return status;
   }
-  if (out) {
-    *out = child;
-  }
+  // if (out) {
+  //   *out = child;
+  // }
   return ZX_OK;
 }
 
@@ -167,6 +190,8 @@ zx_status_t Driver::GetFragmentProtocol(const char* fragment, uint32_t proto_id,
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-void Driver::CompleteStart(zx::result<> result) {}
+void Driver::CompleteStart(zx::result<> result) {
+  LTRACEF("CompleteStart '%.*s'\n", static_cast<int>(name().size()), name().data());
+}
 
 }  // namespace mistos

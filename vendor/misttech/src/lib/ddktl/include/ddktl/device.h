@@ -18,6 +18,7 @@
 #include <ddktl/composite-node-spec.h>
 #include <ddktl/device-internal.h>
 #include <ddktl/init-txn.h>
+#include <ddktl/metadata.h>
 #include <ddktl/resume-txn.h>
 #include <ddktl/suspend-txn.h>
 #include <ddktl/unbind-txn.h>
@@ -277,18 +278,22 @@ class MadeVisibleable : public base_mixin {
   static void MadeVisible(void* ctx) { static_cast<D*>(ctx)->DdkMadeVisible(); }
 };
 
-#ifndef __mist_os__
 class MetadataList {
  public:
   MetadataList() = default;
   MetadataList& operator=(const MetadataList& other) {
-    data_list_.clear();
-    metadata_list_.clear();
+    // data_list_.clear();
+    // metadata_list_.clear();
     ZX_ASSERT(other.metadata_list_.size() == other.data_list_.size());
     for (size_t i = 0; i < other.metadata_list_.size(); ++i) {
-      data_list_.push_back(other.data_list_[i]);
-      metadata_list_.push_back({other.metadata_list_[i].type, data_list_.back()->data(),
-                                other.metadata_list_[i].length});
+      fbl::AllocChecker ac;
+      data_list_.push_back(other.data_list_[i], &ac);
+      ZX_ASSERT(ac.check());
+      metadata_list_.push_back(
+          {other.metadata_list_[i].type, data_list_[data_list_.size() - 1]->data(),
+           other.metadata_list_[i].length},
+          &ac);
+      ZX_ASSERT(ac.check());
     }
     return *this;
   }
@@ -298,9 +303,20 @@ class MetadataList {
     if (!metadata_blob.is_ok()) {
       return metadata_blob.error_value();
     }
-    data_list_.emplace_back(
-        std::make_shared<std::vector<uint8_t>>(metadata_blob->begin(), metadata_blob->end()));
-    metadata_list_.push_back({type, data_list_.back()->data(), metadata_blob->size()});
+    fbl::AllocChecker ac;
+
+    fbl::Vector<uint8_t> vector;
+    for (const auto& byte : *metadata_blob) {
+      vector.push_back(byte, &ac);
+    }
+    ZX_ASSERT(ac.check());
+
+    data_list_.push_back(std::make_shared<fbl::Vector<uint8_t>>(std::move(vector)), &ac);
+    ZX_ASSERT(ac.check());
+
+    metadata_list_.push_back(
+        {type, data_list_[data_list_.size() - 1]->data(), metadata_blob->size()}, &ac);
+    ZX_ASSERT(ac.check());
     return ZX_OK;
   }
 
@@ -308,10 +324,9 @@ class MetadataList {
   size_t count() { return metadata_list_.size(); }
 
  private:
-  std::vector<std::shared_ptr<std::vector<uint8_t>>> data_list_;
-  std::vector<device_metadata_t> metadata_list_;
+  fbl::Vector<std::shared_ptr<fbl::Vector<uint8_t>>> data_list_;
+  fbl::Vector<device_metadata_t> metadata_list_;
 };
-#endif
 
 // Factory functions to create a zx_device_str_prop_t.
 inline zx_device_str_prop_t MakeStrProperty(const std::string_view& key, uint32_t val) {
@@ -355,14 +370,10 @@ class DeviceAddArgs {
   }
 
   DeviceAddArgs& operator=(const DeviceAddArgs& other) {
-#ifndef __mist_os__
     metadata_list_ = other.metadata_list_;
-#endif
     args_ = other.args_;
-#ifndef __mist_os__
     args_.metadata_list = metadata_list_.data();
     args_.metadata_count = metadata_list_.count();
-#endif
     return *this;
   }
 
@@ -398,6 +409,7 @@ class DeviceAddArgs {
     args_.inspect_vmo = inspect_vmo.release();
     return *this;
   }
+#endif
   DeviceAddArgs& forward_metadata(zx_device_t* dev, uint32_t type) {
     if (ZX_OK == metadata_list_.AddMetadata(dev, type)) {
       args_.metadata_list = metadata_list_.data();
@@ -405,6 +417,8 @@ class DeviceAddArgs {
     }
     return *this;
   }
+
+#ifndef __mist_os__
   DeviceAddArgs& set_outgoing_dir(zx::channel outgoing_dir) {
     args_.outgoing_dir_channel = outgoing_dir.release();
     return *this;
@@ -437,8 +451,8 @@ class DeviceAddArgs {
   const device_add_args_t& get() const { return args_; }
 
  private:
-#ifndef __mist_os__
   MetadataList metadata_list_;
+#ifndef __mist_os__
   std::unique_ptr<fuchsia_driver_framework::BusInfo> bus_info_;
 #endif
   device_add_args_t args_ = {};

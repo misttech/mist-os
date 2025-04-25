@@ -16,6 +16,7 @@ zx_library("devmgr") {
     "//sdk/lib/fit",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
+    "//vendor/misttech/src/devices/misc/drivers/mistos:driver.headers",
     "//vendor/misttech/src/lib/ddk",
     "//vendor/misttech/src/lib/ddktl",
     "//zircon/kernel/lib/console",

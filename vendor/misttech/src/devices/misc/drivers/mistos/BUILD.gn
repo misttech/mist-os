@@ -11,6 +11,8 @@ zx_library("driver") {
     "driver.cc",
   ]
 
+  deps = [ "//vendor/misttech/src/devices/misc/drivers/devmgr:headers" ]
+
   public_deps = [
     "//sdk/lib/fit",
     "//src/devices/bind/fuchsia:fuchsia_cpp",

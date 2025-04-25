@@ -48,6 +48,7 @@ config("suppress-warning.config") {
     "//src/connectivity/lib/network-device/buffer_descriptor/*",
     "//src/devices/block/drivers/virtio/*",
     "//src/devices/block/lib/common/*",
+    "//src/devices/bind/*",
     "//src/devices/board/lib/acpi/*",
     "//src/devices/bus/lib/virtio/*",
     "//src/lib/ddk/*",

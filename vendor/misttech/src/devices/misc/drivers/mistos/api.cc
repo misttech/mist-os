@@ -18,8 +18,7 @@ zx_status_t device_add_from_driver(zx_driver_t* drv, zx_device_t* parent, device
 }
 
 zx_status_t device_get_properties(zx_device_t* device, device_props_args_t* out_args) {
-  // return device->driver()->GetProperties(out_args);
-  return ZX_ERR_NOT_SUPPORTED;
+  return device->driver()->GetProperties(out_args);
 }
 
 void device_init_reply(zx_device_t* dev, zx_status_t status, const device_init_reply_args_t* args) {
@@ -126,24 +125,15 @@ zx_status_t load_firmware_from_driver(zx_driver_t* drv, zx_device_t* dev, const 
 
 zx_status_t device_get_metadata(zx_device_t* dev, uint32_t type, void* buf, size_t buflen,
                                 size_t* actual) {
-#if 0
   return dev->GetMetadata(type, buf, buflen, actual);
-#endif
-  return ZX_ERR_NOT_SUPPORTED;
 }
 
 zx_status_t device_get_metadata_size(zx_device_t* dev, uint32_t type, size_t* out_size) {
-#if 0
   return dev->GetMetadataSize(type, out_size);
-#endif
-  return ZX_ERR_NOT_SUPPORTED;
 }
 
 zx_status_t device_add_metadata(zx_device_t* dev, uint32_t type, const void* data, size_t size) {
-#if 0
   return dev->AddMetadata(type, data, size);
-#endif
-  return ZX_ERR_NOT_SUPPORTED;
 }
 
 zx_status_t device_add_composite_spec(zx_device_t* dev, const char* name,

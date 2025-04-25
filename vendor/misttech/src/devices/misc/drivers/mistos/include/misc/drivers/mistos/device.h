@@ -45,15 +45,24 @@ class Device {
 
   Driver* driver() { return driver_; }
 
+  fbl::Vector<zx_device_str_prop>& properties() { return properties_; }
+
  private:
   Device(Device&&) = delete;
   Device& operator=(Device&&) = delete;
 
+  zx_status_t ExportAfterInit();
+
   bool HasChildNamed(std::string_view name) const;
+
+  fbl::Vector<zx_device_str_prop> properties_;
 
   const std::string_view name_;
   // A unique id for the device.
   uint32_t device_id_ = 0;
+
+  uint32_t device_flags_ = 0;
+  fbl::Vector<std::string> fragments_;
 
   // This device's driver. The driver owns all of its Device objects, so it
   // is garaunteed to outlive the Device.

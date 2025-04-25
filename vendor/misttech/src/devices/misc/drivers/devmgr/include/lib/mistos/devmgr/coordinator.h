@@ -5,10 +5,13 @@
 #ifndef VENDOR_MISTTECH_SRC_DEVICES_MISC_DRIVERS_DEVMGR_INCLUDE_LIB_MISTOS_DEVMGR_COORDINATOR_H_
 #define VENDOR_MISTTECH_SRC_DEVICES_MISC_DRIVERS_DEVMGR_INCLUDE_LIB_MISTOS_DEVMGR_COORDINATOR_H_
 
+#include <lib/ddk/device.h>
+
 #include <fbl/intrusive_double_list.h>
 #include <fbl/mutex.h>
 #include <fbl/ref_counted.h>
-
+#include <misc/drivers/mistos/device.h>
+#include <misc/drivers/mistos/symbols.h>
 namespace devmgr {
 
 class Driver;
@@ -22,13 +25,20 @@ class Coordinator {
   void DumpDrivers();
   void DumpState();
 
-  //void StartDriver(fbl::RefPtr<Driver> driver);
-  // zx::result<> StartRootDriver(std::string_view name);
+  zx::result<> StartDriver(mistos::device_t device, const zx_protocol_device_t* ops,
+                           std::string_view name);
+  zx::result<> StartRootDriver(std::string_view name);
+
+  zx_status_t AttemptBind(const Driver* drv, mistos::Device* dev);
+  void HandleNewDevice(mistos::Device* dev);
 
  private:
   // All Drivers
-  fbl::Mutex mutex_;
-  fbl::DoublyLinkedList<fbl::RefPtr<Driver>> drivers_ __TA_GUARDED(mutex_);
+  //fbl::Mutex mutex_;
+  fbl::DoublyLinkedList<fbl::RefPtr<Driver>> drivers_ /*__TA_GUARDED(mutex_)*/;
+
+  // Root Device
+  mistos::device_t root_device_ = mistos::kDefaultDevice;
 };
 
 }  // namespace devmgr
