@@ -483,9 +483,9 @@ fn check_self_permission<P: ClassPermission + Into<KernelPermission> + Clone + '
 }
 
 /// Returns the security state structure for the kernel.
-pub(super) fn kernel_init_security(exceptions_config: String) -> KernelState {
+pub(super) fn kernel_init_security(options: String, exceptions: Vec<String>) -> KernelState {
     KernelState {
-        server: SecurityServer::new_with_exceptions(exceptions_config),
+        server: SecurityServer::new(options, exceptions),
         pending_file_systems: Mutex::default(),
         selinuxfs_null: OnceLock::default(),
         access_denial_count: AtomicU64::new(0u64),

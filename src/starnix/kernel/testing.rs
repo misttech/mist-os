@@ -100,7 +100,7 @@ where
         + Sync
         + 'static,
 {
-    let security_server = SecurityServer::new();
+    let security_server = SecurityServer::new_default();
     let security_server_for_callback = security_server.clone();
     spawn_kernel_and_run_internal(
         move |unlocked, current_task| {

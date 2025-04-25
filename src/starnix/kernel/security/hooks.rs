@@ -163,9 +163,13 @@ where
 
 /// Returns the security state structure for the kernel, based on the supplied "selinux" argument
 /// contents.
-pub fn kernel_init_security(enabled: bool, exceptions_config: String) -> KernelState {
+pub fn kernel_init_security(
+    enabled: bool,
+    options: String,
+    exceptions: Vec<String>,
+) -> KernelState {
     track_hook_duration!(c"security.hooks.kernel_init_security");
-    KernelState { state: enabled.then(|| selinux_hooks::kernel_init_security(exceptions_config)) }
+    KernelState { state: enabled.then(|| selinux_hooks::kernel_init_security(options, exceptions)) }
 }
 
 /// Consumes the mount options from the supplied `MountParams` and returns the security mount

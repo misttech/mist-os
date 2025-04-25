@@ -5,7 +5,7 @@
 use crate::{
     expose_root, get_serial_number, parse_features, parse_numbered_handles, run_container_features,
     serve_component_runner, serve_container_controller, serve_graphical_presenter, Features,
-    MountAction, SELinuxFeature,
+    MountAction,
 };
 use anyhow::{anyhow, bail, Context, Error};
 use bootreason::get_android_bootreason;
@@ -561,44 +561,11 @@ async fn create_container(
     kernel_node.record_int("created_at", zx::MonotonicInstant::get().into_nanos());
     features.record_inspect(&kernel_node);
 
-    // The SELinux `exceptions_path` may provide a path to an exceptions file to read, or the
-    // special "#strict" value, to run with no exceptions applied.
-    // If no `exceptions_path` is specified then a default set of exceptions are used.
-    let security_state = match &features.selinux {
-        SELinuxFeature::EnabledWithExceptionsFile(file_path) => {
-            let config = match file_path.as_str() {
-                "#strict" => String::new(),
-                file_path => {
-                    let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
-
-                    let flags = fio::Flags::PERM_READ | fio::Flags::PROTOCOL_FILE;
-
-                    pkg_dir_proxy
-                        .open(
-                            &file_path,
-                            flags,
-                            &fio::Options::default(),
-                            server_end.into_channel(),
-                        )
-                        .expect("open SELinux exceptions config file");
-
-                    let contents = match fuchsia_fs::file::read(&file).await {
-                        Ok(contents) => contents,
-                        Err(e) => {
-                            panic!("read SELinux exceptions from \"{}\" (error: {})", file_path, e);
-                        }
-                    };
-
-                    String::from_utf8(contents).expect("parsing security exception file")
-                }
-            };
-            security::kernel_init_security(true, config)
-        }
-        SELinuxFeature::EnabledWithExceptionsConfig(config) => {
-            security::kernel_init_security(true, config.join("\n"))
-        }
-        SELinuxFeature::Disabled => security::kernel_init_security(false, String::new()),
-    };
+    let security_state = security::kernel_init_security(
+        features.selinux.enabled,
+        features.selinux.options.clone(),
+        features.selinux.exceptions.clone(),
+    );
 
     // XXX(fmil): Should there also be a condition to allow this *only* for specific containers?
     //

@@ -1173,7 +1173,7 @@ mod tests {
 
     #[fuchsia::test]
     fn status_file_layout() {
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         let status_holder = StatusSeqLock::new_default().unwrap();
         let status_vmo = status_holder.get_readonly_vmo();
         security_server.set_status_publisher(Box::new(status_holder));
@@ -1197,7 +1197,7 @@ mod tests {
 
     #[fuchsia::test]
     fn status_accurate_directly_following_set_status_publisher() {
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         let status_holder = StatusSeqLock::new_default().unwrap();
         let status_vmo = status_holder.get_readonly_vmo();
 

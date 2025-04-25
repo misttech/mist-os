@@ -109,11 +109,15 @@ pub struct Features {
 }
 
 #[derive(Default, Debug, PartialEq)]
-pub enum SELinuxFeature {
-    #[default]
-    Disabled,
-    EnabledWithExceptionsFile(String),
-    EnabledWithExceptionsConfig(Vec<String>),
+pub struct SELinuxFeature {
+    /// True if SELinux should be enabled in the container.
+    pub enabled: bool,
+
+    /// Optional set of options to pass to the SELinux module.
+    pub options: String,
+
+    /// Optional set of access-check exceptions to pass to the SELinux module.
+    pub exceptions: Vec<String>,
 }
 
 impl Features {
@@ -157,7 +161,7 @@ impl Features {
                 thermal,
                 android_bootreason,
             } => {
-                inspect_node.record_bool("selinux", *selinux != SELinuxFeature::Disabled);
+                inspect_node.record_bool("selinux", selinux.enabled);
                 inspect_node.record_bool("ashmem", *ashmem);
                 inspect_node.record_bool("framebuffer", *framebuffer);
                 inspect_node.record_bool("gralloc", *gralloc);
@@ -314,11 +318,11 @@ pub fn parse_features(start_info: &ContainerStartInfo) -> Result<Features, Error
             ("rootfs_rw", _) => features.rootfs_rw = true,
             ("self_profile", _) => features.self_profile = true,
             ("selinux", arg) => {
-                features.selinux = if let Some(path) = arg {
-                    SELinuxFeature::EnabledWithExceptionsFile(path)
-                } else {
-                    SELinuxFeature::EnabledWithExceptionsConfig(selinux_exceptions.clone())
-                }
+                features.selinux = SELinuxFeature {
+                    enabled: true,
+                    options: arg.unwrap_or_default(),
+                    exceptions: selinux_exceptions.clone(),
+                };
             }
             ("selinux_test_suite", _) => features.kernel.selinux_test_suite = true,
             ("test_data", _) => features.test_data = true,

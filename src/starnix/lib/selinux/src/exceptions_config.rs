@@ -17,20 +17,19 @@ pub(super) struct ExceptionsConfig {
 }
 
 impl ExceptionsConfig {
-    /// Parses the supplied `exceptions_config` and returns an `ExceptionsConfig` with an entry for
+    /// Parses the supplied `exceptions` lines and returns an `ExceptionsConfig` with an entry for
     /// each parsed exception definition. If a definition's source or target type/domain are not
     /// defined by the supplied `policy` then the entry is ignored, so that removal/renaming of
     /// policy elements will not break the exceptions configuration.
     pub(super) fn new(
         policy: &Policy<ByValue<Vec<u8>>>,
-        exceptions_config: &str,
+        exceptions: &[&str],
     ) -> Result<Self, anyhow::Error> {
-        let lines = exceptions_config.lines();
         let mut result = Self {
-            todo_deny_entries: HashMap::with_capacity(lines.clone().count()),
+            todo_deny_entries: HashMap::with_capacity(exceptions.len()),
             permissive_entries: HashMap::new(),
         };
-        for line in lines {
+        for line in exceptions {
             result.parse_config_line(policy, line)?;
         }
         result.todo_deny_entries.shrink_to_fit();
@@ -111,7 +110,6 @@ impl ExceptionsConfig {
                         println!("Ignoring statement: {}", line);
                     }
                 }
-                "" | "//" => {}
                 _ => bail!("Unknown statement {}", statement),
             }
         }
@@ -158,6 +156,16 @@ mod tests {
     const _EXCEPTION_OTHER_TYPE: &str = "test_exception_other_t";
     const UNMATCHED_TYPE: &str = "test_exception_unmatched_t";
 
+    const TEST_CONFIG: &[&str] = &[
+        // These statement should all be resolved.
+        "todo_deny b/001 test_exception_source_t test_exception_target_t file",
+        "todo_deny b/002 test_exception_other_t test_exception_target_t chr_file",
+        "todo_deny b/003 test_exception_source_t test_exception_other_t anon_inode",
+        // These statements should not be resolved.
+        "todo_deny b/101 test_undefined_source_t test_exception_target_t file",
+        "todo_deny b/102 test_exception_source_t test_undefined_target_t file",
+    ];
+
     struct TestData {
         policy: Arc<Policy<ByValue<Vec<u8>>>>,
         defined_source: TypeId,
@@ -180,44 +188,20 @@ mod tests {
 
     #[test]
     fn empty_config_is_valid() {
-        let _ = ExceptionsConfig::new(&test_data().policy, "")
+        let _ = ExceptionsConfig::new(&test_data().policy, &[])
             .expect("Empty exceptions config is valid");
-    }
-
-    #[test]
-    fn comments_and_empty_lines_are_valid() {
-        let _ = ExceptionsConfig::new(
-            &test_data().policy,
-            "
-            // This is a comment.
-
-            // This is a second comment, with a blank line preceding it.
-            ",
-        )
-        .expect("Config with only comments is valid");
     }
 
     #[test]
     fn extra_separating_whitespace_is_valid() {
         let _ = ExceptionsConfig::new(
             &test_data().policy,
-            "
+            &["
             todo_deny b/001\ttest_exception_source_t     test_exception_target_t   file
-            ",
+    "],
         )
         .expect("Config with extra separating whitespace is valid");
     }
-
-    const TEST_CONFIG: &str = "
-            // These statement should all be resolved.
-            todo_deny b/001 test_exception_source_t test_exception_target_t file
-            todo_deny b/002 test_exception_other_t test_exception_target_t chr_file
-            todo_deny b/003 test_exception_source_t test_exception_other_t anon_inode
-
-            // These statements should not be resolved.
-            todo_deny b/101 test_undefined_source_t test_exception_target_t file
-            todo_deny b/102 test_exception_source_t test_undefined_target_t file
-        ";
 
     #[test]
     fn only_defined_types_resolve_to_lookup_entries() {

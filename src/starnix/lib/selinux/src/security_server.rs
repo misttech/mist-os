@@ -127,16 +127,21 @@ pub struct SecurityServer {
     /// The mutable state of the security server.
     state: Mutex<SecurityServerState>,
 
-    /// Optional configuration to apply to the `TodoDenyList`.
-    exceptions_config: String,
+    /// Optional set of exceptions to apply to access checks, via `ExceptionsConfig`.
+    exceptions: Vec<String>,
 }
 
 impl SecurityServer {
-    pub fn new() -> Arc<Self> {
-        Self::new_with_exceptions(String::new())
+    /// Returns an instance with default configuration and no exceptions.
+    pub fn new_default() -> Arc<Self> {
+        Self::new(String::new(), Vec::new())
     }
 
-    pub fn new_with_exceptions(exceptions_config: String) -> Arc<Self> {
+    /// Returns an instance with the specified options and exceptions configured.
+    pub fn new(options: String, exceptions: Vec<String>) -> Arc<Self> {
+        // No options are currently supported.
+        assert_eq!(options, String::new());
+
         let avc_manager = AvcManager::new();
         let state = Mutex::new(SecurityServerState {
             active_policy: None,
@@ -146,7 +151,7 @@ impl SecurityServer {
             policy_change_count: 0,
         });
 
-        let security_server = Arc::new(Self { avc_manager, state, exceptions_config });
+        let security_server = Arc::new(Self { avc_manager, state, exceptions: exceptions });
 
         // TODO(http://b/304776236): Consider constructing shared owner of `AvcManager` and
         // `SecurityServer` to eliminate weak reference.
@@ -198,7 +203,8 @@ impl SecurityServer {
         let (parsed, binary) = parse_policy_by_value(binary_policy)?;
         let parsed = Arc::new(parsed.validate()?);
 
-        let exceptions = ExceptionsConfig::new(&parsed, &self.exceptions_config)?;
+        let exceptions = self.exceptions.iter().map(String::as_str).collect::<Vec<&str>>();
+        let exceptions = ExceptionsConfig::new(&parsed, &exceptions)?;
 
         // Replace any existing policy and push update to `state.status_publisher`.
         self.with_state_and_update_status(|state| {
@@ -669,7 +675,7 @@ mod tests {
 
     fn security_server_with_tests_policy() -> Arc<SecurityServer> {
         let policy_bytes = TESTS_BINARY_POLICY.to_vec();
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         assert_eq!(
             Ok(()),
             security_server.load_policy(policy_bytes).map_err(|e| format!("{:?}", e))
@@ -679,7 +685,7 @@ mod tests {
 
     #[test]
     fn compute_access_vector_allows_all() {
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         let sid1 = SecurityId::initial(InitialSid::Kernel);
         let sid2 = SecurityId::initial(InitialSid::Unlabeled);
         assert_eq!(
@@ -697,13 +703,13 @@ mod tests {
     #[test]
     fn loaded_policy_is_validated() {
         let not_really_a_policy = "not a real policy".as_bytes().to_vec();
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         assert!(security_server.load_policy(not_really_a_policy.clone()).is_err());
     }
 
     #[test]
     fn enforcing_mode_is_reported() {
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         assert!(!security_server.is_enforcing());
 
         security_server.set_enforcing(true);
@@ -712,14 +718,14 @@ mod tests {
 
     #[test]
     fn without_policy_conditional_booleans_are_empty() {
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         assert!(security_server.conditional_booleans().is_empty());
     }
 
     #[test]
     fn conditional_booleans_can_be_queried() {
         let policy_bytes = TESTSUITE_BINARY_POLICY.to_vec();
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         assert_eq!(
             Ok(()),
             security_server.load_policy(policy_bytes).map_err(|e| format!("{:?}", e))
@@ -736,7 +742,7 @@ mod tests {
     #[test]
     fn conditional_booleans_can_be_changed() {
         let policy_bytes = TESTSUITE_BINARY_POLICY.to_vec();
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         assert_eq!(
             Ok(()),
             security_server.load_policy(policy_bytes).map_err(|e| format!("{:?}", e))
@@ -761,7 +767,7 @@ mod tests {
 
     #[test]
     fn parse_security_context_no_policy() {
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         let error = security_server
             .security_context_to_sid(b"unconfined_u:unconfined_r:unconfined_t:s0".into())
             .expect_err("expected error");
@@ -771,7 +777,7 @@ mod tests {
 
     #[test]
     fn compute_new_fs_node_sid_no_defaults() {
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_no_defaults_policy.pp").to_vec();
         security_server.load_policy(policy_bytes).expect("binary policy loads");
@@ -798,7 +804,7 @@ mod tests {
 
     #[test]
     fn compute_new_fs_node_sid_source_defaults() {
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_source_defaults_policy.pp").to_vec();
         security_server.load_policy(policy_bytes).expect("binary policy loads");
@@ -825,7 +831,7 @@ mod tests {
 
     #[test]
     fn compute_new_fs_node_sid_target_defaults() {
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_target_defaults_policy.pp").to_vec();
         security_server.load_policy(policy_bytes).expect("binary policy loads");
@@ -851,7 +857,7 @@ mod tests {
 
     #[test]
     fn compute_new_fs_node_sid_range_source_low_default() {
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_source_low_policy.pp").to_vec();
         security_server.load_policy(policy_bytes).expect("binary policy loads");
@@ -877,7 +883,7 @@ mod tests {
 
     #[test]
     fn compute_new_fs_node_sid_range_source_low_high_default() {
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_source_low_high_policy.pp")
                 .to_vec();
@@ -904,7 +910,7 @@ mod tests {
 
     #[test]
     fn compute_new_fs_node_sid_range_source_high_default() {
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_source_high_policy.pp").to_vec();
         security_server.load_policy(policy_bytes).expect("binary policy loads");
@@ -930,7 +936,7 @@ mod tests {
 
     #[test]
     fn compute_new_fs_node_sid_range_target_low_default() {
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_target_low_policy.pp").to_vec();
         security_server.load_policy(policy_bytes).expect("binary policy loads");
@@ -956,7 +962,7 @@ mod tests {
 
     #[test]
     fn compute_new_fs_node_sid_range_target_low_high_default() {
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_target_low_high_policy.pp")
                 .to_vec();
@@ -983,7 +989,7 @@ mod tests {
 
     #[test]
     fn compute_new_fs_node_sid_range_target_high_default() {
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_target_high_policy.pp").to_vec();
         security_server.load_policy(policy_bytes).expect("binary policy loads");
@@ -1009,7 +1015,7 @@ mod tests {
 
     #[test]
     fn compute_new_fs_node_sid_with_name() {
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         let policy_bytes =
             include_bytes!("../testdata/composite_policies/compiled/type_transition_policy.pp")
                 .to_vec();
@@ -1082,7 +1088,7 @@ mod tests {
             include_bytes!("../testdata/composite_policies/compiled/allow_fork.pp").to_vec();
         let context = b"source_u:object_r:source_t:s0:c0";
 
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         security_server.set_enforcing(true);
 
         let permission_check = security_server.as_permission_check();
@@ -1120,7 +1126,7 @@ mod tests {
         let allowed_type_context = b"source_u:object_r:allowed_t:s0:c0";
         let additional_type_context = b"source_u:object_r:additional_t:s0:c0";
 
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new_default();
         security_server.set_enforcing(true);
 
         // Load a policy, get a SID for a context that is valid for that policy, and verify
@@ -1416,20 +1422,20 @@ mod tests {
 
     #[test]
     fn access_checks_with_exceptions_config() {
-        const EXCEPTIONS_CONFIG: &str = "
+        const EXCEPTIONS_CONFIG: &[&str] = &[
             // These statement should all be resolved.
-            todo_deny b/001 test_exception_source_t test_exception_target_t file
-            todo_deny b/002 test_exception_other_t test_exception_target_t chr_file
-            todo_deny b/003 test_exception_source_t test_exception_other_t anon_inode
-            todo_deny b/004 test_exception_permissive_t test_exception_target_t file
-            todo_permissive b/005 test_exception_todo_permissive_t
-
+            "todo_deny b/001 test_exception_source_t test_exception_target_t file",
+            "todo_deny b/002 test_exception_other_t test_exception_target_t chr_file",
+            "todo_deny b/003 test_exception_source_t test_exception_other_t anon_inode",
+            "todo_deny b/004 test_exception_permissive_t test_exception_target_t file",
+            "todo_permissive b/005 test_exception_todo_permissive_t",
             // These statements should not be resolved.
-            todo_deny b/101 test_undefined_source_t test_exception_target_t file
-            todo_deny b/102 test_exception_source_t test_undefined_target_t file
-            todo_permissive b/103 test_undefined_source_t
-        ";
-        let security_server = SecurityServer::new_with_exceptions(EXCEPTIONS_CONFIG.into());
+            "todo_deny b/101 test_undefined_source_t test_exception_target_t file",
+            "todo_deny b/102 test_exception_source_t test_undefined_target_t file",
+            "todo_permissive b/103 test_undefined_source_t",
+        ];
+        let exceptions_config = EXCEPTIONS_CONFIG.iter().map(|x| String::from(*x)).collect();
+        let security_server = SecurityServer::new(String::new(), exceptions_config);
         security_server.set_enforcing(true);
 
         const EXCEPTIONS_POLICY: &[u8] =
