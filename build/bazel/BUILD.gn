@@ -39,12 +39,7 @@ group("generate_main_workspace") {
 # output directory directly.
 group("generate_fuchsia_sdk_repository") {
   # There should be no internal dependencies on this target.
-  visibility = [
-    "//:root_targets",
-
-    # TODO(https://fxbug.dev/406603905): Remove after updating dependencies.
-    "//vendor/*",
-  ]
+  visibility = [ "//:root_targets" ]
 
   deps = [ "//sdk:final_fuchsia_sdk_head_only" ]
 }
