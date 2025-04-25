@@ -15,9 +15,11 @@ mod sid_table;
 mod sync;
 
 use policy::arrays::FsUseType;
-use policy::ClassId;
 
 use std::num::NonZeroU32;
+
+/// Numeric class Ids are provided to the userspace AVC surfaces (e.g. "create", "access", etc).
+pub use policy::ClassId;
 
 /// The Security ID (SID) used internally to refer to a security context.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]

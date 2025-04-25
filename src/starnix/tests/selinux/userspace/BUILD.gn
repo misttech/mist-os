@@ -146,6 +146,7 @@ foreach(test_name, test_names) {
       "//src/lib/files",
       "//src/lib/fxl",
       "//third_party/googletest:gtest",
+      "//zircon/system/ulib/fbl",
     ]
     configs += [ ":rpath_config" ]
 

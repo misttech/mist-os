@@ -27,7 +27,7 @@ use starnix_uapi::auth::FsCred;
 
 use selinux::policy::SUPPORTED_POLICY_VERSION;
 use selinux::{
-    InitialSid, SeLinuxStatus, SeLinuxStatusPublisher, SecurityId, SecurityPermission,
+    ClassId, InitialSid, SeLinuxStatus, SeLinuxStatusPublisher, SecurityId, SecurityPermission,
     SecurityServer,
 };
 use starnix_logging::{impossible_error, log_error, log_info, track_stub};
@@ -39,7 +39,9 @@ use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error, off_t, statfs, SELINUX_MAGIC};
 use std::borrow::Cow;
-use std::sync::Arc;
+use std::num::NonZeroU32;
+use std::str::FromStr;
+use std::sync::{Arc, OnceLock};
 use zerocopy::{Immutable, IntoBytes};
 use zx::{self as zx, HandleBased as _};
 
@@ -195,7 +197,12 @@ impl SeLinuxFs {
             ContextApi::new_node(security_server.clone()),
             mode!(IFREG, 0o666),
         );
-        dir.entry(current_task, "create", CreateApi::new_node(), mode!(IFREG, 0o666));
+        dir.entry(
+            current_task,
+            "create",
+            CreateApi::new_node(security_server.clone()),
+            mode!(IFREG, 0o666),
+        );
         dir.entry(current_task, "member", MemberApi::new_node(), mode!(IFREG, 0o666));
         dir.entry(current_task, "relabel", RelabelApi::new_node(), mode!(IFREG, 0o666));
         dir.entry(current_task, "user", UserApi::new_node(), mode!(IFREG, 0o666));
@@ -374,11 +381,16 @@ impl BytesFileOps for RejectUnknownFile {
 
 /// "create" API used to determine the Security Context to associate with a new resource instance
 /// based on source, target, and target class.
-struct CreateApi;
+struct CreateApi {
+    security_server: Arc<SecurityServer>,
+    result: OnceLock<SecurityId>,
+}
 
 impl CreateApi {
-    fn new_node() -> impl FsNodeOps {
-        SeLinuxApi::new_node(|| Ok(Self {}))
+    fn new_node(security_server: Arc<SecurityServer>) -> impl FsNodeOps {
+        SeLinuxApi::new_node(move || {
+            Ok(Self { security_server: security_server.clone(), result: OnceLock::new() })
+        })
     }
 }
 
@@ -386,12 +398,66 @@ impl SeLinuxApiOps for CreateApi {
     fn api_write_permission() -> SecurityPermission {
         SecurityPermission::ComputeCreate
     }
-    fn api_write(&self, _data: Vec<u8>) -> Result<(), Errno> {
-        track_stub!(TODO("https://fxbug.dev/361552580"), "selinux create");
+
+    fn api_write(&self, data: Vec<u8>) -> Result<(), Errno> {
+        if self.result.get().is_some() {
+            // The "create" API can be written-to at most once.
+            return error!(EBUSY);
+        }
+
+        // Requests consist of three mandatory space-separated elements.
+        let mut parts = data.split(|x| *x == b' ');
+
+        // <scontext>: describes the subject that is creating the new object.
+        let scontext = parts.next().ok_or_else(|| errno!(EINVAL))?;
+        let scontext = self
+            .security_server
+            .security_context_to_sid(scontext.into())
+            .map_err(|_| errno!(EINVAL))?;
+
+        // <tcontext>: describes the target (e.g. parent directory) of the create operation.
+        let tcontext = parts.next().ok_or_else(|| errno!(EINVAL))?;
+        let tcontext = self
+            .security_server
+            .security_context_to_sid(tcontext.into())
+            .map_err(|_| errno!(EINVAL))?;
+
+        // <tclass>: the policy-specific Id of the created object's class, as a decimal integer.
+        // Class Ids are obtained via lookups in the SELinuxFS "class" directory.
+        let tclass = parts.next().ok_or_else(|| errno!(EINVAL))?;
+        let tclass = str::from_utf8(tclass).map_err(|_| errno!(EINVAL))?;
+        let tclass = u32::from_str(tclass).map_err(|_| errno!(EINVAL))?;
+        let tclass = ClassId::new(NonZeroU32::new(tclass).ok_or_else(|| errno!(EINVAL))?);
+
+        // Optional <name>: the final element of the path of the newly-created object. This allows
+        // filename-dependent transition rules to be applied to the computation.
+        let tname = parts.next();
+        if tname.is_some() {
+            track_stub!(TODO("https://fxbug.dev/361552580"), "selinux create with name");
+            return error!(ENOTSUP);
+        }
+
+        // There must be no further trailing arguments.
+        if parts.next().is_some() {
+            return error!(EINVAL);
+        }
+
+        let result = self
+            .security_server
+            .compute_new_sid(scontext, tcontext, tclass)
+            .map_err(|_| errno!(EINVAL))?;
+        self.result.set(result).map_err(|_| errno!(EINVAL))?;
+
         Ok(())
     }
+
     fn api_read(&self) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok([].as_ref().into())
+        let maybe_context = self
+            .result
+            .get()
+            .map(|sid| self.security_server.sid_to_security_context(*sid).unwrap());
+        let context = maybe_context.unwrap_or_else(|| Vec::new());
+        Ok(context.into())
     }
 }
 
@@ -588,6 +654,7 @@ impl SeLinuxApiOps for AccessApi {
         // Result format is: allowed decided auditallow auditdeny seqno flags
         // Everything but seqno must be in hexadecimal format and represents a bits field.
         track_stub!(TODO("https://fxbug.dev/361551536"), "selinux access");
+
         // `SEQ_NUMBER` should reflect the policy revision from which the result was calculated.
         const SEQ_NUMBER: u32 = 1;
         *result = format!("ffffffff ffffffff 0 ffffffff {} 0\n", SEQ_NUMBER).into_bytes();

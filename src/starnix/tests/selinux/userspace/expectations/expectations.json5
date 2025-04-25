@@ -9,5 +9,18 @@
                 "*",
             ],
         },
+        {
+            type: "expect_failure",
+            matchers: [
+                // TODO: https://fxbug.dev/361552580 - Fix "create" computation for non-process/socket types.
+                "SeLinuxFsCreate.DefaultComputeCreateForFile",
+
+                // TODO: https://fxbug.dev/361552580 - Fix SELinuxFS API handling of extra whitespace.
+                "SeLinuxFsCreate.ExtraWhitespace",
+
+                // TODO: https://fxbug.dev/361552580 - Fix "create" handling of unknown policy class Ids.
+                "SeLinuxFsCreate.InvalidComputeCreateClassId",
+            ],
+        },
     ],
 }
