@@ -564,6 +564,7 @@ rustc_library("starnix_kernel_runner") {
     "//src/starnix/modules/ashmem",
     "//src/starnix/modules/gpu",
     "//src/starnix/modules/gralloc",
+    "//src/starnix/modules/hvdcp_opti:hvdcp_opti_module",
     "//src/starnix/modules/input",
     "//src/starnix/modules/layeredfs",
     "//src/starnix/modules/magma",

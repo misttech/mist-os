@@ -16,6 +16,7 @@ use starnix_logging::log_error;
 use starnix_modules_ashmem::ashmem_device_init;
 use starnix_modules_gpu::gpu_device_init;
 use starnix_modules_gralloc::gralloc_device_init;
+use starnix_modules_hvdcp_opti::hvdcp_opti_init;
 use starnix_modules_input::uinput::register_uinput_device;
 use starnix_modules_input::{
     EventProxyMode, InputDevice, InputEventsRelay, DEFAULT_KEYBOARD_DEVICE_ID,
@@ -106,6 +107,8 @@ pub struct Features {
 
     /// Whether to add android bootreason to kernel cmdline.
     pub android_bootreason: bool,
+
+    pub hvdcp_opti: bool,
 }
 
 #[derive(Default, Debug, PartialEq)]
@@ -160,6 +163,7 @@ impl Features {
                 enable_utc_time_adjustment,
                 thermal,
                 android_bootreason,
+                hvdcp_opti,
             } => {
                 inspect_node.record_bool("selinux", selinux.enabled);
                 inspect_node.record_bool("ashmem", *ashmem);
@@ -211,6 +215,7 @@ impl Features {
                     },
                 );
                 inspect_node.record_bool("android_bootreason", *android_bootreason);
+                inspect_node.record_bool("hvdcp_opti", *hvdcp_opti);
 
                 inspect_node.record_child("kernel", |kernel_node| {
                     kernel_node.record_bool("bpf_v2", *bpf_v2);
@@ -329,6 +334,7 @@ pub fn parse_features(start_info: &ContainerStartInfo) -> Result<Features, Error
             ("thermal", Some(arg)) =>
                 features.thermal = Some(
                     arg.split(',').map(String::from).collect::<Vec<String>>()),
+            ("hvdcp_opti", _) => features.hvdcp_opti = true,
             (f, _) => {
                 return Err(anyhow!("Unsupported feature: {}", f));
             }
@@ -519,6 +525,9 @@ pub fn run_container_features(
     }
     if let Some(devices) = &features.thermal {
         thermal_device_init(locked, system_task, devices.clone());
+    }
+    if features.hvdcp_opti {
+        hvdcp_opti_init(locked, system_task);
     }
 
     Ok(())

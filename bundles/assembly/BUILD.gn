@@ -2585,6 +2585,29 @@ assembly_input_bundle("nanohub_support") {
   ]
 }
 
+# hvdcp_opti support. Does not include driver. Driver should be included separately.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: minimal
+# valid build-types: all
+#
+assembly_input_bundle("hvdcp_opti_support") {
+  base_packages = [ "//src/starnix/modules/hvdcp_opti:hvdcp_opti" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [
+            "//src/starnix/modules/hvdcp_opti/meta/hvdcp_opti.core_shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+}
+
 # This AIB enables minimal testing support for bootstrap environments, and is meant to be used with
 # the `bootstrap_eng` AIB.
 #

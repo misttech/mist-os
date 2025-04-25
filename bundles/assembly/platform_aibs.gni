@@ -345,6 +345,7 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
                          "core_realm_development_access",
                          "core_realm_development_access_rcs_usb",
                          "core_realm_development_access_userdebug",
+                         "hvdcp_opti_support",
                          "session_manager_enable_pkg_cache",
                          "standard_userdebug",
                          "standard_userdebug_and_eng",
@@ -482,6 +483,7 @@ experimental_aib_names = [
   # Bluetooth phone calling as the Hands Free role. Currently in development.
   "bluetooth_hfp_hf",
 
+  "hvdcp_opti_support",
   "nanohub_support",
   "paravirtualization_support_bootstrap",
   "power_framework_broker",
