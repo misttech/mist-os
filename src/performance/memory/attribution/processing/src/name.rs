@@ -35,7 +35,7 @@ pub enum Error {
 }
 
 impl ZXName {
-    fn as_bstr(&self) -> &BStr {
+    pub fn as_bstr(&self) -> &BStr {
         BStr::new(match self.0.iter().position(|&b| b == 0) {
             Some(index) => &self.0[..index],
             None => &self.0[..],
@@ -80,14 +80,6 @@ impl ZXName {
         }
 
         Self(inner)
-    }
-}
-
-impl std::ops::Deref for ZXName {
-    type Target = [u8];
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
 

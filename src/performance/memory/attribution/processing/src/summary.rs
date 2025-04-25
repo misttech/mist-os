@@ -325,7 +325,7 @@ pub fn vmo_name_to_digest_zxname(name: &ZXName) -> &ZXName {
                 })
                 .collect()
         });
-    RULES.iter().find(|(regex, _)| regex.is_match(name)).map_or(name, |rule| &rule.1)
+    RULES.iter().find(|(regex, _)| regex.is_match(name.as_bstr())).map_or(name, |rule| &rule.1)
 }
 
 #[cfg(test)]
@@ -337,6 +337,16 @@ mod tests {
         pretty_assertions::assert_eq!(
             vmo_name_to_digest_zxname(&ZXName::from_string_lossy("ld.so.1-internal-heap")),
             &ZXName::from_string_lossy("[process-bootstrap]"),
+        );
+    }
+
+    #[test]
+    fn rename_zx_test_small_name() {
+        // Verify that we can match regular expressions anchored at both ends even when the name is
+        // not taking the full size of a [ZXName].
+        pretty_assertions::assert_eq!(
+            vmo_name_to_digest_zxname(&ZXName::from_string_lossy("blob-1234")),
+            &ZXName::from_string_lossy("[blobs]"),
         );
     }
 

@@ -42,12 +42,12 @@ pub struct BucketDefinition {
 impl BucketDefinition {
     /// Tests whether a process matches this bucket's definition, based on its name.
     fn process_match(&self, process: &ZXName) -> bool {
-        self.process.as_ref().map_or(true, |p| p.is_match(process))
+        self.process.as_ref().map_or(true, |p| p.is_match(process.as_bstr()))
     }
 
     /// Tests whether a VMO matches this bucket's definition, based on its name.
     fn vmo_match(&self, vmo: &ZXName) -> bool {
-        self.vmo.as_ref().map_or(true, |v| v.is_match(vmo))
+        self.vmo.as_ref().map_or(true, |v| v.is_match(vmo.as_bstr()))
     }
 }
 
