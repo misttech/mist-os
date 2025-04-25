@@ -504,9 +504,19 @@ std::string Node::MakeComponentMoniker() const {
 
 void Node::OnBind() const {
   if (controller_ref_) {
-    fidl::Status result = fidl::WireSendEvent(*controller_ref_)->OnBind();
-    if (!result.ok()) {
-      LOGF(ERROR, "Failed to send OnBind event: %s", result.FormatDescription().data());
+    zx::event node_token;
+    zx_status_t status =
+        driver_component_->component_instance.duplicate(ZX_RIGHT_SAME_RIGHTS, &node_token);
+    if (status != ZX_OK) {
+      LOGF(ERROR, "Failed to send OnBind event: %s", zx_status_get_string(status));
+      return;
+    }
+
+    fit::result result =
+        fidl::SendEvent(*controller_ref_)->OnBind({{.node_token = std::move(node_token)}});
+    if (result.is_error()) {
+      LOGF(ERROR, "Failed to send OnBind event: %s",
+           result.error_value().FormatDescription().c_str());
     }
   }
 }
@@ -542,6 +552,7 @@ void Node::CompleteBind(zx::result<> result) {
     ZX_ASSERT_MSG(driver_component_->state == DriverState::kBinding,
                   "Node %s CompleteBind() invoked at invalid state", name().c_str());
     driver_component_->state = DriverState::kRunning;
+    OnBind();
   }
 
   auto completer = std::move(pending_bind_completer_);

@@ -393,8 +393,9 @@ DriverRunnerTestBase::StartDriverResult DriverRunnerTestBase::StartDriver(
   driver_host().SetStartHandler(
       [&started_driver, dispatcher = dispatcher(), start_handler = std::move(start_handler)](
           fdfw::DriverStartArgs start_args, fidl::ServerEnd<fdh::Driver> driver) mutable {
-        started_driver = std::make_unique<TestDriver>(
-            dispatcher, std::move(start_args.node().value()), std::move(driver));
+        started_driver =
+            std::make_unique<TestDriver>(dispatcher, std::move(start_args.node().value()),
+                                         std::move(start_args.node_token()), std::move(driver));
         start_args.node().reset();
         if (start_handler.has_value()) {
           start_handler.value()(started_driver.get(), std::move(start_args));
@@ -684,8 +685,7 @@ std::shared_ptr<CreatedChild> TestDriver::AddChild(std::string_view child_name, 
   return AddChild(fidl::ToNatural(args), owned, expect_error);
 }
 std::shared_ptr<CreatedChild> TestDriver::AddChild(fdfw::NodeAddArgs child_args, bool owned,
-                                                   bool expect_error,
-                                                   fit::function<void()> on_bind) {
+                                                   bool expect_error, OnBindCallback on_bind) {
   auto controller_endpoints = fidl::Endpoints<fdfw::NodeController>::Create();
 
   auto child_node_endpoints = fidl::CreateEndpoints<fdfw::Node>();
@@ -722,10 +722,11 @@ std::shared_ptr<CreatedChild> TestDriver::AddChild(fdfw::NodeAddArgs child_args,
 
   class ControllerEventHandler : public fidl::AsyncEventHandler<fdfw::NodeController> {
    public:
-    explicit ControllerEventHandler(std::shared_ptr<CreatedChild> child,
-                                    fit::function<void()> on_bind)
+    explicit ControllerEventHandler(std::shared_ptr<CreatedChild> child, OnBindCallback on_bind)
         : child_(std::move(child)), on_bind_(std::move(on_bind)) {}
-    void OnBind() override { on_bind_(); }
+    void OnBind(fdfw::NodeControllerOnBindRequest& request) override {
+      on_bind_(request.node_token());
+    }
     void on_fidl_error(::fidl::UnbindInfo error) override {
       child_->node_controller.reset();
       delete this;
@@ -734,7 +735,7 @@ std::shared_ptr<CreatedChild> TestDriver::AddChild(fdfw::NodeAddArgs child_args,
 
    private:
     std::shared_ptr<CreatedChild> child_;
-    fit::function<void()> on_bind_;
+    OnBindCallback on_bind_;
   };
 
   std::shared_ptr<CreatedChild> child = std::make_shared<CreatedChild>();

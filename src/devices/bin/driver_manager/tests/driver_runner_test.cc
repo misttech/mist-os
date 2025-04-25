@@ -374,13 +374,13 @@ TEST_P(DriverRunnerTest, StartSecondDriver_NewDriverHost) {
   });
 
   bool did_bind = false;
-  auto on_bind = [&did_bind]() { did_bind = true; };
+  auto on_bind = [&did_bind](std::optional<zx::event>&) { did_bind = true; };
   std::shared_ptr<CreatedChild> child =
       root_driver->driver->AddChild(std::move(args), false, false, std::move(on_bind));
   EXPECT_TRUE(RunLoopUntilIdle());
-  EXPECT_TRUE(did_bind);
 
   auto [driver, controller] = StartSecondDriver();
+  EXPECT_TRUE(did_bind);
 
   driver->CloseBinding();
   driver->DropNode();
@@ -422,11 +422,10 @@ TEST_P(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
   });
 
   bool did_bind = false;
-  auto on_bind = [&did_bind]() { did_bind = true; };
+  auto on_bind = [&did_bind](std::optional<zx::event>&) { did_bind = true; };
   std::shared_ptr<CreatedChild> child =
       root_driver->driver->AddChild(std::move(args), false, false, std::move(on_bind));
   EXPECT_TRUE(RunLoopUntilIdle());
-  EXPECT_TRUE(did_bind);
 
   auto second_driver_config = kDefaultSecondDriverPkgConfig;
   std::string binary = std::string(second_driver_config.main_module.open_path);
@@ -450,6 +449,7 @@ TEST_P(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
   driver->CloseBinding();
   driver->DropNode();
   StopDriverComponent(std::move(root_driver->controller));
+  EXPECT_TRUE(did_bind);
   realm().AssertDestroyedChildren(
       {CreateChildRef("dev", "boot-drivers"), CreateChildRef("dev.second", "boot-drivers")});
 }
@@ -495,6 +495,51 @@ TEST_P(DriverRunnerTest, StartSecondDriver_UseProperties) {
   EXPECT_TRUE(RunLoopUntilIdle());
 
   auto [driver, controller] = StartSecondDriver(true);
+
+  driver->CloseBinding();
+  driver->DropNode();
+  StopDriverComponent(std::move(root_driver->controller));
+  realm().AssertDestroyedChildren(
+      {CreateChildRef("dev", "boot-drivers"), CreateChildRef("dev.second", "boot-drivers")});
+}
+
+TEST_P(DriverRunnerTest, CheckOnBindNode) {
+  SetupDriverRunner();
+
+  auto root_driver = StartRootDriver();
+  ASSERT_EQ(ZX_OK, root_driver.status_value());
+
+  PrepareRealmForSecondDriverComponentStart();
+  fdfw::NodeAddArgs args({
+      .name = "second",
+      .properties =
+          {
+              {
+                  fdf::MakeProperty("second_node_prop", 0x2301u),
+              },
+          },
+  });
+
+  std::optional<zx::event> node_token;
+  std::shared_ptr<CreatedChild> child = root_driver->driver->AddChild(
+      std::move(args), false, false,
+      [&node_token](std::optional<zx::event>& token) { node_token = std::move(token); });
+  EXPECT_TRUE(RunLoopUntilIdle());
+
+  auto [driver, controller] = StartSecondDriver(true);
+
+  ASSERT_TRUE(node_token.has_value());
+  zx_info_handle_basic_t info;
+  ASSERT_EQ(node_token->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr),
+            ZX_OK);
+
+  ASSERT_TRUE(driver->node_token().has_value());
+  zx_info_handle_basic_t info2;
+  ASSERT_EQ(
+      driver->node_token()->get_info(ZX_INFO_HANDLE_BASIC, &info2, sizeof(info2), nullptr, nullptr),
+      ZX_OK);
+
+  ASSERT_EQ(info.koid, info2.koid);
 
   driver->CloseBinding();
   driver->DropNode();

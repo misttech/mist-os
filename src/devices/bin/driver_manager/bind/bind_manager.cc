@@ -253,7 +253,6 @@ BindResult BindManager::BindNodeToResult(
     return BindResult();
   }
 
-  node.OnBind();
   return BindResult(start_result.value());
 }
 

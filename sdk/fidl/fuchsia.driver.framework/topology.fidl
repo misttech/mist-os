@@ -259,7 +259,12 @@ open protocol NodeController {
 
 
     /// Event that is triggered when the associated `Node` is bound to a driver.
-    flexible -> OnBind();
+    flexible -> OnBind(resource table {
+        /// Provides a token representing this node which can be exchanged with the
+        /// driver framework to discern additional information about this node.
+        @available(added=NEXT)
+        1: node_token zx.Handle:EVENT;
+    });
 };
 
 /// Error codes for the Node protocol.

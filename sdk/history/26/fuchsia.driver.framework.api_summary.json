@@ -699,7 +699,8 @@
         "name": "fuchsia.driver.framework/NodeController.OnBind",
         "strictness": "flexible",
         "ordinal": "5905369594807853098",
-        "direction": "event"
+        "direction": "event",
+        "request": "fuchsia.driver.framework/NodeControllerOnBindRequest"
     },
     {
         "kind": "protocol/member",
@@ -723,6 +724,11 @@
         "name": "fuchsia.driver.framework/NodeController",
         "openness": "open",
         "transport": "channel"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.driver.framework/NodeControllerOnBindRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",
