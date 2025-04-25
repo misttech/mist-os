@@ -35,6 +35,7 @@ cc_test_executable("crash_register_unittest_exe") {
     "//sdk/lib/fit-promise",
     "//src/developer/forensics/crash_reports:crash_register",
     "//src/developer/forensics/crash_reports/info",
+    "//src/developer/forensics/testing:gpretty_printers",
     "//src/developer/forensics/testing:gtest_with_syslog_main",
     "//src/developer/forensics/testing:unit_test_fixture",
     "//src/developer/forensics/testing/stubs:channel_control",

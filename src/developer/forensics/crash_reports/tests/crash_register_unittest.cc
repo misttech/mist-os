@@ -18,6 +18,7 @@
 #include "src/developer/forensics/crash_reports/info/info_context.h"
 #include "src/developer/forensics/crash_reports/product.h"
 #include "src/developer/forensics/feedback/annotations/constants.h"
+#include "src/developer/forensics/testing/gpretty_printers.h"  // IWYU pragma: keep
 #include "src/developer/forensics/testing/unit_test_fixture.h"
 #include "src/lib/files/file.h"
 #include "src/lib/files/path.h"

@@ -66,6 +66,7 @@ source_set("gpretty_printers") {
     "//sdk/lib/syslog/cpp",
     "//src/developer/forensics/crash_reports:filing_result",
     "//src/developer/forensics/crash_reports:item_location",
+    "//src/developer/forensics/crash_reports:product",
     "//src/developer/forensics/feedback/attachments",
     "//src/developer/forensics/utils:errors",
     "//src/developer/forensics/utils/cobalt",
