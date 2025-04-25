@@ -123,7 +123,7 @@ template("sdk_python_mobly_test") {
     id = "sdk://python/${_sdk_name}"
 
     meta = {
-      schema = "experimental_python_e2e_test"
+      type = "experimental_python_e2e_test"
       dest = "python/${_sdk_name}/meta.json"
       source = _files.meta_json
       source_prebuild_info = {

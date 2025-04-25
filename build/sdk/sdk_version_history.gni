@@ -74,7 +74,7 @@ template("sdk_version_history") {
     meta = {
       dest = "version_history.json"
       source = _files.compiled
-      schema = "version_history"
+      type = "version_history"
       source_prebuild_info = {
         source = rebase_path(invoker.source, root_build_dir)
         daily_commit_timestamp_file = rebase_path(

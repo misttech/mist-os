@@ -280,7 +280,7 @@ template("sdk_fuchsia_package") {
         id = "sdk://packages/${_distribution_name}"
 
         meta = {
-          schema = "package"
+          type = "package"
           dest = "packages/${_distribution_name}/meta.json"
           source = "${_sdk_package_metadata}"
           source_prebuild_info = {

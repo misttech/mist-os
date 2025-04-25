@@ -104,7 +104,7 @@ template("_bind_library_sdk") {
       source = meta_file
       source_prebuild_info = _prebuild_info
       dest = "$file_base/meta.json"
-      schema = "bind_library"
+      type = "bind_library"
     }
 
     files = all_files

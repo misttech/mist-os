@@ -564,7 +564,7 @@ template("sdk_shared_library") {
       source = metadata_file
       source_prebuild_info = _prebuild_info
       dest = "${sdk_root_path}/meta.json"
-      schema = "cc_prebuilt_library"
+      type = "cc_prebuilt_library"
     }
 
     files = sdk_files

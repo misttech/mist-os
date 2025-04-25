@@ -61,7 +61,7 @@ template("sdk_component_manifests") {
     id = "sdk://component_manifest/${invoker.name}"
     files = file_records
     meta = {
-      schema = "data"
+      type = "data"
       dest = meta_dest
       value = {
         type = "component_manifest"

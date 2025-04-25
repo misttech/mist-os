@@ -166,7 +166,7 @@ sdk_atom("sysroot_sdk") {
 
   meta = {
     dest = "pkg/sysroot/meta.json"
-    schema = "sysroot"
+    type = "sysroot"
     value = _sysroot_meta
 
     # `source_prebuild_info` is unnecessary because `value` is provided.

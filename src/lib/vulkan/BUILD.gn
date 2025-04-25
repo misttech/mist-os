@@ -191,7 +191,7 @@ sdk_atom("vulkan_layers") {
 
   meta = {
     dest = "pkg/vulkan_layers/meta.json"
-    schema = "loadable_module"
+    type = "loadable_module"
     value = {
       type = "loadable_module"
       name = "vulkan_layers"

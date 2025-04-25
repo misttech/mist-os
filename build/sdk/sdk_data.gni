@@ -74,7 +74,7 @@ template("sdk_data") {
     ]
 
     meta = {
-      schema = "data"
+      type = "data"
       dest = meta_dest
       value = {
         type = "${invoker.type}"

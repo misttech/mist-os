@@ -93,7 +93,7 @@ template("emu_companion") {
 
     meta = {
       dest = "${invoker.sdk_dest_path}-meta.json"
-      schema = "companion_host_tool"
+      type = "companion_host_tool"
       source = _file_list_array[1]
       source_prebuild_info = {
         name = invoker.target_name

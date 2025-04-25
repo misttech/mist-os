@@ -133,7 +133,7 @@ pub fn write_fuchsia_sdk_metadata<W: io::Write>(
                         version = "{version}"
                     }}
                     dest = "${{_sdk_prefix}}third_party/rust_crates/{group_name}/meta.json"
-                    schema = "rust_3p_library"
+                    type = "{sdk_atom_type}"
                 }}
             }}
         }}

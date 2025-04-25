@@ -442,7 +442,7 @@ if (current_toolchain == dart_toolchain) {
             deps = sdk_deps
           }
           dest = "$file_base/meta.json"
-          schema = "dart_library"
+          type = "dart_library"
         }
 
         deps = sdk_deps

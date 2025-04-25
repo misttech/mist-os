@@ -47,7 +47,7 @@ template("sdk_documentation") {
     id = "sdk://docs/${invoker.name}"
 
     meta = {
-      schema = "documentation"
+      type = "documentation"
       dest = "docs/${invoker.name}.json"
       value = {
         type = "documentation"
