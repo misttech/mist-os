@@ -31,6 +31,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         input_bundles_dir,
         package_validation,
         custom_kernel_aib,
+        custom_boot_shim_aib,
         suppress_overrides_warning,
         developer_overrides,
     } = args;
@@ -184,6 +185,26 @@ Resulting product is not supported and may misbehave!
     builder
         .add_bundle(&kernel_aib_path)
         .with_context(|| format!("Adding kernel input bundle ({kernel_aib_path})"))?;
+
+    // The emulator support bundle is always added, even to an empty build.
+    // The emulator support bundle contains only a QEMU boot shim.
+    // Kernel tests can customize this bundle to provide an alternate boot shim.
+    //
+    // TODO(https://fxbug.dev/408223995): Determine whether we want to expose alternate boot shims via the platform
+    // and refactor this if we decide to.
+    let emulator_support_aib_path;
+    if let Some(custom_boot_shim_aib_path) = custom_boot_shim_aib {
+        if platform.feature_set_level != FeatureSetLevel::TestKernelOnly {
+            bail!("emulator test support can only be enabled at FeatureSetLevel::TestKernelOnly");
+        }
+        emulator_support_aib_path = custom_boot_shim_aib_path;
+    } else {
+        emulator_support_aib_path = make_bundle_path(&input_bundles_dir, "emulator_support");
+    }
+
+    builder
+        .add_bundle(&emulator_support_aib_path)
+        .with_context(|| format!("Adding emulator support bundle ({emulator_support_aib_path})"))?;
 
     // Set the info used for BoardDriver arguments.
     if platform.feature_set_level != FeatureSetLevel::TestKernelOnly {

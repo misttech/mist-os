@@ -271,6 +271,11 @@ pub struct ProductArgs {
     #[argh(option)]
     pub custom_kernel_aib: Option<Utf8PathBuf>,
 
+    /// path to an AIB containing a customized qemu_kernel boot shim to use
+    /// instead of the in the platform AIBs.
+    #[argh(option)]
+    pub custom_boot_shim_aib: Option<Utf8PathBuf>,
+
     /// whether to hide the warning that shows the overrides that are enabled.
     /// This can be helpful to disable for test assemblies.
     #[argh(switch)]

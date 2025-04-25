@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/assembly_input_bundle.gni")
 import("//build/assembly/developer_overrides.gni")
 import("//build/assembly/hermetic_inputs_for_image_assembly.gni")
 import("//build/assembly/kernel_aib.gni")
@@ -80,6 +81,9 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     [string] The image name of the 'kernel_zbi' as seen in images.json. This is used
 #     as an override, that in conjunction with 'kernel_zbi' allows selecting a custom zbi
 #     image as the kernel zbi.
+#
+#   qemu_kernel (optional; default: null)
+#     [label] Label of a custom boot shim for kernel tests
 #
 # Image Assembly parameters:
 #
@@ -305,6 +309,10 @@ template("assembled_system") {
     if (defined(invoker.kernel_zbi)) {
       custom_kernel_aib = "${_namespace}.custom_kernel_aib"
     }
+
+    if (defined(invoker.qemu_kernel)) {
+      custom_boot_shim_aib = "${_namespace}.custom_boot_shim_aib"
+    }
   }
 
   # Intermediate files produced for Image Assembly.
@@ -406,6 +414,12 @@ template("assembled_system") {
       custom_kernel_aib = "${outdir}/custom_kernel_aib"
       custom_kernel_aib_manifest = "${custom_kernel_aib}/assembly_config.json"
     }
+
+    if (defined(labels.custom_boot_shim_aib)) {
+      custom_boot_shim_aib = "${outdir}/custom_boot_shim_aib"
+      custom_boot_shim_aib_manifest =
+          "${custom_boot_shim_aib}/assembly_config.json"
+    }
   }
 
   #######
@@ -423,6 +437,19 @@ template("assembled_system") {
                              ])
       bundles_dir = files.outdir
       bundle_name = "custom_kernel_aib"
+    }
+  }
+
+  # Create the AIB for a custom boot shim, if one was provided.
+  if (defined(labels.custom_boot_shim_aib)) {
+    assembly_input_bundle(labels.custom_boot_shim_aib) {
+      forward_variables_from(invoker, [ "testonly" ])
+      deps = [ invoker.qemu_kernel ]
+      qemu_kernel = get_label_info("${deps[0]}", "root_out_dir") + "/" +
+                    get_label_info(deps[0], "name") + ".bin"
+
+      bundles_dir = files.outdir
+      bundle_name = "custom_boot_shim_aib"
     }
   }
 
@@ -490,6 +517,15 @@ template("assembled_system") {
       ]
       deps += [ ":${labels.custom_kernel_aib}" ]
       inputs += [ files.custom_kernel_aib_manifest ]
+    }
+
+    if (defined(labels.custom_boot_shim_aib)) {
+      args += [
+        "--custom-boot-shim-aib",
+        rebase_path(files.custom_boot_shim_aib_manifest, root_build_dir),
+      ]
+      deps += [ ":${labels.custom_boot_shim_aib}" ]
+      inputs += [ files.custom_boot_shim_aib_manifest ]
     }
 
     outputs = [ files.regenerated_image_assembly_config ]

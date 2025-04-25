@@ -84,9 +84,6 @@ pub fn define_configuration(
     let icu_config = &platform.icu;
     let mut builder = ConfigurationBuilderImpl::new(icu_config.clone());
 
-    // The emulator support bundle is always added, even to an empty build.
-    builder.platform_bundle("emulator_support");
-
     let feature_set_level = FeatureSetLevel::from_deserialized(&platform.feature_set_level);
 
     // Only perform configuration if the feature_set_level is not None (ie, Empty).
