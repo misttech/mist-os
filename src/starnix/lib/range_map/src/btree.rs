@@ -358,9 +358,9 @@ where
 
     /// Validates that the cached max_gap value matches what we would compute now.
     #[cfg(test)]
-    fn validate_max_gap(&self) -> bool {
+    fn validate_max_gap(&self) {
         let computed = self.compute_max_gap();
-        computed == self.max_gap
+        assert_eq!(computed, self.max_gap);
     }
 
     /// Update the maximum gap for this node.
@@ -748,30 +748,57 @@ where
     /// Validates that the cached max_gap value matches what we would compute now,
     /// and recursively validates all children.
     #[cfg(test)]
-    fn validate_max_gap(&self) -> bool {
+    fn validate_max_gap(&self) {
         let computed = self.compute_max_gap();
-        if computed != self.max_gap {
-            return false;
-        }
+        assert_eq!(computed, self.max_gap);
 
         // Recursively validate children
         match &self.children {
             ChildList::Leaf(children) => {
                 for child in children {
-                    if !child.validate_max_gap() {
-                        return false;
-                    }
+                    child.validate_max_gap();
                 }
             }
             ChildList::Internal(children) => {
                 for child in children {
-                    if !child.validate_max_gap() {
-                        return false;
+                    child.validate_max_gap();
+                }
+            }
+        }
+    }
+
+    /// Checks that the keys stored in this node are actually the leftmost edge of the
+    /// corresponding children. Specifically, key `i` should be the `start` of the range of the
+    /// zeroth entry in of child `i+1`.
+    ///
+    /// Panics if the node (or a descendant) does not validate.
+    #[cfg(test)]
+    fn validate_keys(&self) -> K {
+        let mut first_key = None;
+        match &self.children {
+            ChildList::Leaf(children) => {
+                for (i, child) in children.iter().enumerate() {
+                    let child_key = child.keys[0].start;
+                    if i == 0 {
+                        first_key = Some(child_key);
+                    } else {
+                        assert!(child_key == self.keys[i - 1]);
+                    }
+                }
+            }
+            ChildList::Internal(children) => {
+                for (i, child) in children.iter().enumerate() {
+                    let child_key = child.validate_keys();
+                    if i == 0 {
+                        first_key = Some(child_key);
+                    } else {
+                        assert!(child_key == self.keys[i - 1]);
                     }
                 }
             }
         }
-        true
+
+        first_key.expect("internal nodes must be non-empty")
     }
 
     /// Update the maximum gap for this node.
@@ -884,11 +911,15 @@ where
             return;
         }
         let (left, right) = self.select_children_to_rebalance(index);
-        let n = self.children.size_at(left) + self.children.size_at(right);
+        let left_size = self.children.size_at(left);
+        debug_assert!(left_size > 0);
+        let right_size = self.children.size_at(right);
+        debug_assert!(right_size > 0);
+        let n = left_size + right_size;
         match &mut self.children {
             ChildList::Leaf(children) => {
-                let (left_shard_node, right_shared_node) = get_two_mut(children, left, right);
-                let left_node = Arc::make_mut(left_shard_node);
+                let (left_shared_node, right_shared_node) = get_two_mut(children, left, right);
+                let left_node = Arc::make_mut(left_shared_node);
                 if n <= NODE_CAPACITY {
                     // Merge the right node into the left node.
                     left_node.keys.extend(right_shared_node.keys.iter().cloned());
@@ -1003,7 +1034,25 @@ where
                         maybe_split_key = None;
                     }
                 }
-                self.rebalance_child(index);
+                // If the child underflowed to zero we can simply remove the child rather than
+                // rebalancing existing nodes.
+                if self.children.size_at(index) == 0 {
+                    // If the child underflowed to zero elements, the child cannot have a split key
+                    // because the child has no keys.
+                    debug_assert!(maybe_split_key.is_none());
+                    self.children.remove(index);
+                    if index == 0 {
+                        // When we remove the first child, we need to return the split key for the
+                        // new first child to our parent.
+                        maybe_split_key = Some(self.keys.remove(0));
+                    } else {
+                        // Otherwise, we can just remove the split key associated with the removed
+                        // child.
+                        self.keys.remove(index - 1);
+                    }
+                } else {
+                    self.rebalance_child(index);
+                }
                 self.update_max_gap();
                 if self.children.len() < NODE_CAPACITY / 2 {
                     RemoveResult::Underflow(RemoveState { maybe_split_key, removed_value })
@@ -1172,10 +1221,20 @@ where
     }
 
     #[cfg(test)]
-    fn validate_max_gap(&self) -> bool {
+    fn validate_max_gap(&self) {
         match self {
             Node::Leaf(node) => node.validate_max_gap(),
             Node::Internal(node) => node.validate_max_gap(),
+        }
+    }
+
+    /// If this node is an internal node, validates that the keys held by this node are correct.
+    ///
+    /// Panics if the node (or a descendant) does not validate.
+    #[cfg(test)]
+    fn validate_keys(&self) {
+        if let Node::Internal(node) = self {
+            node.validate_keys();
         }
     }
 }
@@ -1447,7 +1506,10 @@ where
         }
 
         #[cfg(test)]
-        assert!(self.validate_max_gap());
+        self.node.validate_max_gap();
+
+        #[cfg(test)]
+        self.node.validate_keys();
 
         removed_values
     }
@@ -1536,7 +1598,10 @@ where
         self.insert_range_internal(range, value);
 
         #[cfg(test)]
-        assert!(self.validate_max_gap());
+        self.node.validate_max_gap();
+
+        #[cfg(test)]
+        self.node.validate_keys();
     }
 
     /// Remove the entry with the given cursor from the map.
@@ -1619,11 +1684,6 @@ where
     ) -> impl DoubleEndedIterator<Item = (&Range<K>, &V)> {
         let range = range.borrow();
         self.range(range.start..range.end)
-    }
-
-    #[cfg(test)]
-    fn validate_max_gap(&self) -> bool {
-        self.node.validate_max_gap()
     }
 }
 
@@ -2459,5 +2519,48 @@ mod test {
 
         // Now should find the first gap
         assert_eq!(map.find_gap_end(10, &100), 100);
+    }
+
+    #[::fuchsia::test]
+    fn test_remove_empty_node() {
+        let mut map = RangeMap2::<u32, i32>::default();
+
+        // Fill two leaf nodes to capacity.
+        for i in 0..(NODE_CAPACITY * 2) {
+            let start = i as u32 * 10;
+            let end = start + 1;
+            map.insert(start..end, i as i32 * 100);
+        }
+
+        // Insert at the right edge of the left leaf node, causing us to create a middle leaf node
+        // with a single element.
+        let i = NODE_CAPACITY - 1;
+        let start = i as u32 * 10 + 2;
+        let end = start + 1;
+        let critical_range = start..end;
+        map.insert(critical_range.clone(), i as i32 * 1000);
+
+        {
+            // Remove the lone entry from the middle leaf node, ensuring that we pass our internal
+            // validation checks in that scenario.
+            let mut map = map.clone();
+            map.remove(critical_range.clone());
+        }
+
+        {
+            let mut map = map.clone();
+
+            // Remove a bunch of nodes from the left side to encourage rebalancing from the right.
+            for i in 0..(NODE_CAPACITY / 2 - 1) {
+                let start = i as u32 * 10;
+                let end = start + 1;
+                map.remove(start..end);
+            }
+
+            // Again, we remove the lone entry from the middle leaf node. This check is similar to
+            // the previous check, but now the left leaf node has fewer elements, which would have
+            // caused us to rebalance to the right in a previous version of this data structure.
+            map.remove(critical_range);
+        }
     }
 }
