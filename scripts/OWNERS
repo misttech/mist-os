@@ -2,8 +2,8 @@
 # This file intentionally does not contain any (non-per-file) OWNERS. See
 # //scripts/README.md for more info.
 
-# shell- and fx-related utilities.
-per-file fuchsia-vendored-python*,fx,fx-*,hermetic-env = crjohns@google.com
+# shell-, fx-, and ctf-related utilities.
+per-file fuchsia-vendored-python*,fx,fx-*,hermetic-env,disable_ctf_tests = crjohns@google.com
 
 # FIDL-related scripts.
 per-file generate-fidl-* = file://tools/fidl/OWNERS

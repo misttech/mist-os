@@ -21,6 +21,7 @@ group("tests") {
   testonly = true
   deps = [
     ":build_id_conv_test($host_toolchain)",
+    "disable_ctf_tests:tests",
     "ffx_complete:tests",
     "fortunes:tests",
     "fxtest:tests",
