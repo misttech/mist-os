@@ -7,12 +7,12 @@
 #ifndef ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_ARRAY_H_
 #define ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_ARRAY_H_
 
-#include <lib/stdcompat/array.h>
+#include <array>
 
 namespace ktl {
 
-using cpp20::to_array;
 using std::array;
+using std::to_array;
 
 }  // namespace ktl
 

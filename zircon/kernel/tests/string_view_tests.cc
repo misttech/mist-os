@@ -296,7 +296,9 @@ bool CompareOverloadCheck() {
               kString1.compare(1, 2, kString2, 1, 2));
   }
 
-  { EXPECT_EQ(kString1.compare(ktl::string_view("123")), kString1.compare("123")); }
+  {
+    EXPECT_EQ(kString1.compare(ktl::string_view("123")), kString1.compare("123"));
+  }
 
   {
     EXPECT_EQ(kString1.substr(1, 2).compare(ktl::string_view("123")),
@@ -952,16 +954,16 @@ bool StartsWith() {
   constexpr ktl::string_view kString = "foobar";
 
   // string_view argument.
-  EXPECT_TRUE(ktl::starts_with(kString, "foo"sv));
-  EXPECT_FALSE(ktl::starts_with(kString, "bar"sv));
+  EXPECT_TRUE(kString.starts_with("foo"sv));
+  EXPECT_FALSE(kString.starts_with("bar"sv));
 
   // char argument.
-  EXPECT_TRUE(ktl::starts_with(kString, 'f'));
-  EXPECT_FALSE(ktl::starts_with(kString, 'b'));
+  EXPECT_TRUE(kString.starts_with('f'));
+  EXPECT_FALSE(kString.starts_with('b'));
 
   // C string (const char*) argument.
-  EXPECT_TRUE(ktl::starts_with(kString, "foo"));
-  EXPECT_FALSE(ktl::starts_with(kString, "bar"));
+  EXPECT_TRUE(kString.starts_with("foo"));
+  EXPECT_FALSE(kString.starts_with("bar"));
 
   END_TEST;
 }
@@ -971,16 +973,16 @@ bool EndsWith() {
   constexpr ktl::string_view kString = "foobar";
 
   // string_view argument.
-  EXPECT_TRUE(ktl::ends_with(kString, "bar"sv));
-  EXPECT_FALSE(ktl::ends_with(kString, "foo"sv));
+  EXPECT_TRUE(kString.ends_with("bar"sv));
+  EXPECT_FALSE(kString.ends_with("foo"sv));
 
   // char argument.
-  EXPECT_TRUE(ktl::ends_with(kString, 'r'));
-  EXPECT_FALSE(ktl::ends_with(kString, 'f'));
+  EXPECT_TRUE(kString.ends_with('r'));
+  EXPECT_FALSE(kString.ends_with('f'));
 
   // C string (const char*) argument.
-  EXPECT_TRUE(ktl::ends_with(kString, "bar"));
-  EXPECT_FALSE(ktl::ends_with(kString, "foo"));
+  EXPECT_TRUE(kString.ends_with("bar"));
+  EXPECT_FALSE(kString.ends_with("foo"));
 
   END_TEST;
 }

@@ -7,23 +7,23 @@
 #ifndef ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_BIT_H_
 #define ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_BIT_H_
 
-#include <lib/stdcompat/bit.h>
+#include <bit>
 
 namespace ktl {
 
-using cpp20::bit_cast;
-using cpp20::bit_ceil;
-using cpp20::bit_floor;
-using cpp20::bit_width;
-using cpp20::countl_one;
-using cpp20::countl_zero;
-using cpp20::countr_one;
-using cpp20::countr_zero;
-using cpp20::endian;
-using cpp20::has_single_bit;
-using cpp20::popcount;
-using cpp20::rotl;
-using cpp20::rotr;
+using std::bit_cast;
+using std::bit_ceil;
+using std::bit_floor;
+using std::bit_width;
+using std::countl_one;
+using std::countl_zero;
+using std::countr_one;
+using std::countr_zero;
+using std::endian;
+using std::has_single_bit;
+using std::popcount;
+using std::rotl;
+using std::rotr;
 
 }  // namespace ktl
 

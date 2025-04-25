@@ -98,7 +98,7 @@ void TurduckenTestBase::RemoveOption(ktl::string_view exact_word) {
 ktl::optional<ktl::string_view> TurduckenTestBase::OptionWithPrefix(ktl::string_view prefix) {
   ktl::optional<ktl::string_view> result;
   auto match_word = [prefix, &result](ktl::string_view word, ktl::span<char> mutable_word) -> bool {
-    if (ktl::starts_with(word, prefix)) {
+    if (word.starts_with(prefix)) {
       result = word.substr(prefix.size());
       return false;
     }
@@ -111,7 +111,7 @@ ktl::optional<ktl::string_view> TurduckenTestBase::OptionWithPrefix(ktl::string_
 ktl::span<char> TurduckenTestBase::ModifyOption(ktl::string_view prefix) {
   ktl::span<char> result;
   auto match_word = [prefix, &result](ktl::string_view word, ktl::span<char> mutable_word) -> bool {
-    if (ktl::starts_with(word, prefix)) {
+    if (word.starts_with(prefix)) {
       result = mutable_word;
       return false;
     }

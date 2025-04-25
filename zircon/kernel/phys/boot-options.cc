@@ -56,7 +56,7 @@ void SetBootOptionsWithoutEntropy(BootOptions& boot_opts, zbitl::ByteView zbi,
     // BootOptions already parsed and redacted, so put it back.
     for (auto word : WordView(legacy_cmdline)) {
       constexpr ktl::string_view kPrefix = "kernel.entropy-mixin=";
-      if (ktl::starts_with(word, kPrefix)) {
+      if (word.starts_with(kPrefix)) {
         word.remove_prefix(kPrefix.length());
         memcpy(const_cast<char*>(word.data()), boot_opts.entropy_mixin.hex.data(),
                ktl::min(boot_opts.entropy_mixin.len, word.size()));

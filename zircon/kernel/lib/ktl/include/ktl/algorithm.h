@@ -7,7 +7,7 @@
 #ifndef ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_ALGORITHM_H_
 #define ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_ALGORITHM_H_
 
-#include <lib/stdcompat/algorithm.h>
+#include <algorithm>
 
 namespace ktl {
 
@@ -39,9 +39,9 @@ using std::swap;
 using std::transform;
 
 // "Sorting operations" (subset)
-using cpp20::is_sorted;
-using cpp20::sort;
+using std::is_sorted;
 using std::is_sorted_until;
+using std::sort;
 using std::stable_sort;
 
 // "Binary search operations (on sorted ranges)"

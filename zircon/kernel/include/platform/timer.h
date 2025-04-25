@@ -8,6 +8,7 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_PLATFORM_TIMER_H_
 #define ZIRCON_KERNEL_INCLUDE_PLATFORM_TIMER_H_
 
+#include <assert.h>
 #include <lib/arch/ticks.h>
 #include <zircon/compiler.h>
 #include <zircon/time.h>
