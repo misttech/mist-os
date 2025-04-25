@@ -394,9 +394,16 @@ fn dispatch_signal_handler(
     }
     .ok_or_else(|| errno!(EINVAL))?;
 
-    let stack_pointer = align_stack_pointer(
-        stack_bottom.checked_sub(SIG_STACK_SIZE as u64).ok_or_else(|| errno!(EINVAL))?,
-    );
+    let stack_pointer =
+        align_stack_pointer(stack_bottom.checked_sub(SIG_STACK_SIZE as u64).ok_or_else(|| {
+            errno!(
+                EINVAL,
+                format!(
+                    "Subtracting SIG_STACK_SIZE ({}) from stack bottom ({}) overflowed",
+                    SIG_STACK_SIZE, stack_bottom
+                )
+            )
+        })?);
 
     // Check that if the stack pointer is inside altstack, the entire signal stack is inside
     // altstack.
