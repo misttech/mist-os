@@ -108,8 +108,13 @@ struct InternedStringStorage {
 //     const fxt::InternedString& string = "FooBar"_intern;
 //
 
+#pragma GCC diagnostic push
+#ifdef __clang__
+#pragma GCC diagnostic ignored "-Wgnu-string-literal-operator-template"
+#endif
 template <typename T, T... chars>
 constexpr const InternedString& operator""_intern() {
+#pragma GCC diagnostic pop
   static_assert(std::is_same_v<T, char>);
 #ifdef __clang__
   return internal::InternedStringStorage<chars...>::interned_string;
