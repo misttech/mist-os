@@ -23,10 +23,6 @@ library_headers("headers") {
 
 library_headers("crypto-entropy-src.headers") {
   headers = [ "lib/crypto/entropy_pool.h" ]
-  public_deps = [
-    # <lib/crypto/entropy_pool.h> #include <lib/stdcompat/span.h>
-    "//sdk/lib/stdcompat",
-  ]
 }
 
 source_set("crypto-entropy-src") {

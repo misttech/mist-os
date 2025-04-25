@@ -7,10 +7,10 @@
 #ifndef ZIRCON_KERNEL_LIB_CRYPTO_INCLUDE_LIB_CRYPTO_ENTROPY_POOL_H_
 #define ZIRCON_KERNEL_LIB_CRYPTO_INCLUDE_LIB_CRYPTO_ENTROPY_POOL_H_
 
-#include <lib/stdcompat/span.h>
-#include <stdint.h>
-
 #include <array>
+#include <cstdint>
+#include <cstring>
+#include <span>
 
 namespace crypto {
 
@@ -38,11 +38,11 @@ struct EntropyPool {
   ~EntropyPool();
 
   // Adds |entropy| into the |pool|, collecting |entropy.size()| bits of entropy.
-  void Add(cpp20::span<const uint8_t> entropy);
+  void Add(std::span<const uint8_t> entropy);
 
   // Adds the entropy of the digested |source| to the pool.
   // Returns the size in bytes of the digest of |source|.
-  size_t AddFromDigest(cpp20::span<const uint8_t> source);
+  size_t AddFromDigest(std::span<const uint8_t> source);
 
   // Creates a copy of the current state of |EntropyPool|.
   EntropyPool Clone() const {
@@ -52,7 +52,7 @@ struct EntropyPool {
   }
 
   // Returns a view into a buffer where entropy can be drawn from.
-  constexpr cpp20::span<const uint8_t, 32> contents() const { return contents_; }
+  constexpr std::span<const uint8_t, 32> contents() const { return contents_; }
 
  private:
   // Matches |SHA256_DIGEST_LENGTH|. This is verified through static assertion in entropy_pool.cc.
