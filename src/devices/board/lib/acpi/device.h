@@ -5,34 +5,37 @@
 #ifndef SRC_DEVICES_BOARD_LIB_ACPI_DEVICE_H_
 #define SRC_DEVICES_BOARD_LIB_ACPI_DEVICE_H_
 
-#include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
-#include <fidl/fuchsia.hardware.i2c.businfo/cpp/fidl.h>
-#include <lib/async/cpp/executor.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
+// #include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
+// #include <fidl/fuchsia.hardware.i2c.businfo/cpp/fidl.h>
+// #include <lib/async/cpp/executor.h>
+// #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/binding.h>
-#include <lib/fpromise/promise.h>
-#include <lib/svc/outgoing.h>
+// #include <lib/fpromise/promise.h>
+// #include <lib/svc/outgoing.h>
 #include <zircon/compiler.h>
 
 #include <cstdint>
-#include <mutex>
-#include <unordered_map>
-#include <unordered_set>
-#include <utility>
+
+#include <fbl/mutex.h>
+// #include <unordered_map>
+// #include <unordered_set>
+// #include <utility>
 
 #include <acpica/acpi.h>
 #include <ddktl/device.h>
-#include <ddktl/metadata_server.h>
+// #include <ddktl/metadata_server.h>
 #include <fbl/mutex.h>
 
 #include "lib/ddk/device.h"
 #include "src/devices/board/lib/acpi/device-args.h"
-#include "src/devices/board/lib/acpi/event.h"
+// #include "src/devices/board/lib/acpi/event.h"
+#include <object/interrupt_dispatcher.h>
+
 #include "src/devices/board/lib/acpi/manager.h"
 #include "src/devices/board/lib/acpi/power-resource.h"
 #include "src/devices/board/lib/acpi/resources.h"
 
-#ifndef __Fuchsia__
+#ifndef __mist_os__
 #error "Use device-for-host.h!"
 #endif
 
@@ -94,31 +97,34 @@ struct PowerStateTransitionResponse {
 };
 
 struct DevicePowerState {
-  DevicePowerState(uint8_t state, std::unordered_set<uint8_t> supported_s_states)
-      : state{state}, supported_s_states{std::move(supported_s_states)} {}
+  DevicePowerState(uint8_t state /*, std::unordered_set<uint8_t> supported_s_states*/)
+      : state{state} /*, supported_s_states{std::move(supported_s_states)}*/ {}
   uint8_t state;
-  std::unordered_set<uint8_t> supported_s_states;
+  // std::unordered_set<uint8_t> supported_s_states;
 };
 
 class Device;
-using DeviceType = ddk::Device<::acpi::Device, ddk::Initializable, ddk::Unbindable,
-                               ddk::Messageable<fuchsia_hardware_acpi::Device>::Mixin>;
-class Device : public DeviceType,
-               public fidl::WireAsyncEventHandler<fuchsia_hardware_acpi::NotifyHandler> {
+using DeviceType =
+    ddk::Device<::acpi::Device, ddk::Initializable,
+                ddk::Unbindable /*,ddk::Messageable<fuchsia_hardware_acpi::Device>::Mixin*/>;
+class Device
+    : public DeviceType /*,public
+                           fidl::WireAsyncEventHandler<fuchsia_hardware_acpi::NotifyHandler>*/
+{
  public:
   explicit Device(DeviceArgs&& args) : Device(args) {}
   explicit Device(DeviceArgs& args)
       : DeviceType{args.parent_},
         manager_{args.manager_},
-        dispatcher_{args.dispatcher_},
-        executor_{dispatcher_},
+        // dispatcher_{args.dispatcher_},
+        // executor_{dispatcher_},
         acpi_{manager_->acpi()},
         acpi_handle_{args.handle_},
         metadata_{std::move(args.metadata_)},
         bus_type_{args.bus_type_},
         bus_id_{args.bus_id_},
-        pci_bdfs_{std::move(args.bdfs_)},
-        outgoing_{component::OutgoingDirectory(dispatcher_)} {}
+        pci_bdfs_{std::move(args.bdfs_)} /*,outgoing_{component::OutgoingDirectory(dispatcher_)}*/ {
+  }
 
   // DDK mix-in impls.
   void DdkRelease() { delete this; }
@@ -132,9 +138,10 @@ class Device : public DeviceType,
   zx::result<> AddDevice(const char* name, cpp20::span<zx_device_str_prop_t> str_props,
                          uint32_t flags);
 
-  zx::result<zx::interrupt> GetInterrupt(size_t index) __TA_EXCLUDES(lock_);
+  zx::result<fbl::RefPtr<InterruptDispatcher>> GetInterrupt(size_t index) __TA_EXCLUDES(lock_);
 
-  // FIDL impls
+// FIDL impls
+#if 0
   void GetBusId(GetBusIdCompleter::Sync& completer) override;
   void EvaluateObject(EvaluateObjectRequestView request,
                       EvaluateObjectCompleter::Sync& completer) override;
@@ -151,13 +158,14 @@ class Device : public DeviceType,
                                   InstallAddressSpaceHandlerCompleter::Sync& completer) override;
   void SetWakeDevice(SetWakeDeviceRequestView request,
                      SetWakeDeviceCompleter::Sync& completer) override;
+#endif
 
-  std::vector<pci_bdf_t>& pci_bdfs() { return pci_bdfs_; }
+  fbl::Vector<pci_bdf_t>& pci_bdfs() { return pci_bdfs_; }
 
   ACPI_STATUS RemoveNotifyHandler();
 
   // Returns a map containing information on D states supported by this device.
-  std::unordered_map<uint8_t, DevicePowerState> GetSupportedPowerStates();
+  // std::unordered_map<uint8_t, DevicePowerState> GetSupportedPowerStates();
   // Attempts to transition a device to the given D state. Returns the resulting D state of the
   // device.
   PowerStateTransitionResponse TransitionToPowerState(uint8_t requested_state);
@@ -168,10 +176,10 @@ class Device : public DeviceType,
     uint32_t space_type;
   };
 
-  using BusMetadataServer =
-      std::variant<std::monostate,
-                   ddk::MetadataServer<fuchsia_hardware_i2c_businfo::I2CBusMetadata>,
-                   ddk::MetadataServer<fuchsia_hardware_spi_businfo::SpiBusMetadata>>;
+  // using BusMetadataServer =
+  //     std::variant<std::monostate,
+  //                  ddk::MetadataServer<fuchsia_hardware_i2c_businfo::I2CBusMetadata>,
+  //                  ddk::MetadataServer<fuchsia_hardware_spi_businfo::SpiBusMetadata>>;
 
   static ACPI_STATUS AddressSpaceHandler(uint32_t function, ACPI_PHYSICAL_ADDRESS physical_address,
                                          uint32_t bit_width, UINT64* value, void* handler_ctx,
@@ -180,14 +188,14 @@ class Device : public DeviceType,
   zx_status_t ReportCurrentResources() __TA_REQUIRES(lock_);
   ACPI_STATUS AddResource(ACPI_RESOURCE*) __TA_REQUIRES(lock_);
   // Set up FIDL outgoing directory and start serving fuchsia.hardware.acpi.Device.
-  zx::result<zx::channel> PrepareOutgoing();
+  //zx::result<zx::channel> PrepareOutgoing();
 
   struct PowerStateInfo {
     uint8_t d_state;
     // This should be sorted by ascending resource_order.
-    std::vector<ACPI_HANDLE> power_resources;
+    fbl::Vector<ACPI_HANDLE> power_resources;
     bool defines_psx_method = false;
-    std::unordered_set<uint8_t> supported_s_states;
+    // std::unordered_set<uint8_t> supported_s_states;
   };
 
   zx_status_t InitializePowerManagement();
@@ -198,33 +206,36 @@ class Device : public DeviceType,
   zx_status_t Suspend(const PowerStateInfo& requested_state_info);
 
   PowerStateInfo* GetPowerStateInfo(uint8_t d_state) {
+    /*
     auto power_state = supported_power_states_.find(d_state);
     if (power_state == supported_power_states_.end()) {
       return nullptr;
     }
     return &power_state->second;
+    */
+    return nullptr;
   }
 
   acpi::Manager* manager_;
-  async_dispatcher_t* dispatcher_;
-  async::Executor executor_;
+  // async_dispatcher_t* dispatcher_;
+  // async::Executor executor_;
   acpi::Acpi* acpi_;
   // Handle to the corresponding ACPI node
   ACPI_HANDLE acpi_handle_;
   // BTI ID for dummy IOMMU.
   uint32_t bti_id_ = manager_->GetNextBtiId();
 
-  mutable std::mutex lock_;
+  mutable fbl::Mutex lock_;
   bool got_resources_ = false;
 
   // Port, memory, and interrupt resources from _CRS respectively
-  std::vector<DevicePioResource> pio_resources_ __TA_GUARDED(lock_);
-  std::vector<DeviceMmioResource> mmio_resources_ __TA_GUARDED(lock_);
-  std::vector<DeviceIrqResource> irqs_ __TA_GUARDED(lock_);
+  fbl::Vector<DevicePioResource> pio_resources_ __TA_GUARDED(lock_);
+  fbl::Vector<DeviceMmioResource> mmio_resources_ __TA_GUARDED(lock_);
+  fbl::Vector<DeviceIrqResource> irqs_ __TA_GUARDED(lock_);
 
   bool can_use_global_lock_ = false;
 
-  std::unordered_map<uint8_t, PowerStateInfo> supported_power_states_;
+  // std::unordered_map<uint8_t, PowerStateInfo> supported_power_states_;
   uint8_t current_power_state_ = DEV_POWER_STATE_D3COLD;
 
   // Child metadata.
@@ -233,30 +244,31 @@ class Device : public DeviceType,
   uint32_t bus_id_ = UINT32_MAX;
 
   // TODO(https://fxbug.dev/42108122): remove once kernel PCI is no longer used.
-  std::vector<pci_bdf_t> pci_bdfs_;
+  fbl::Vector<pci_bdf_t> pci_bdfs_;
 
   // ACPI events.
-  std::optional<fidl::WireSharedClient<fuchsia_hardware_acpi::NotifyHandler>> notify_handler_;
+  // std::optional<fidl::WireSharedClient<fuchsia_hardware_acpi::NotifyHandler>> notify_handler_;
   std::atomic_size_t pending_notify_count_ = 0;
-  std::optional<fpromise::promise<void>> notify_teardown_finished_;
+  // std::optional<fpromise::promise<void>> notify_teardown_finished_;
   std::atomic_bool notify_handler_active_ = false;
   uint32_t notify_handler_type_;
   bool notify_count_warned_ = false;
 
   // ACPI address space handling.
-  std::mutex address_handler_lock_;
-  std::unordered_map<uint32_t, fidl::WireSharedClient<fuchsia_hardware_acpi::AddressSpaceHandler>>
-      address_handlers_ __TA_GUARDED(address_handler_lock_);
-  std::vector<fpromise::promise<void>> address_handler_teardown_finished_
-      __TA_GUARDED(address_handler_lock_);
+  fbl::Mutex address_handler_lock_;
+  // std::unordered_map<uint32_t,
+  // fidl::WireSharedClient<fuchsia_hardware_acpi::AddressSpaceHandler>>
+  //     address_handlers_ __TA_GUARDED(address_handler_lock_);
+  // std::vector<fpromise::promise<void>> address_handler_teardown_finished_
+  //     __TA_GUARDED(address_handler_lock_);
 
-  component::OutgoingDirectory outgoing_;
+  // component::OutgoingDirectory outgoing_;
 
   // Passthrough device -- the one that drivers actually bind to. This is a child of this |Device|
   // instance.
   zx_device_t* passthrough_dev_;
 
-  BusMetadataServer bus_metadata_server_;
+  // BusMetadataServer bus_metadata_server_;
 };
 
 }  // namespace acpi

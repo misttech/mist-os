@@ -5,16 +5,19 @@
 #ifndef SRC_DEVICES_BOARD_LIB_ACPI_PCI_INTERNAL_H_
 #define SRC_DEVICES_BOARD_LIB_ACPI_PCI_INTERNAL_H_
 
-#include <fuchsia/hardware/pciroot/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/pci/pciroot.h>
-#include <lib/zx/resource.h>
+// #include <lib/zx/resource.h>
+#include <lib/mistos/util/allocator.h>
+#include <mistos/hardware/pciroot/cpp/banjo.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
-#include <zircon/syscalls/pci.h>
+// #include <zircon/syscalls/pci.h>
 
-#include <unordered_map>
+#include <lib/mistos/util/allocator.h>
+
+#include <map>
 
 #include <acpica/acpi.h>
 #include <acpica/actypes.h>
@@ -26,7 +29,7 @@
 __BEGIN_CDECLS
 // It would be nice to use the hwreg library here, but these structs should be kept
 // simple so that it can be passed across process boundaries.
-#define MB(n) (1024UL * 1024UL * (n))
+#define _MB(n) (1024UL * 1024UL * (n))
 #define PCI_BUS_MAX 255
 
 // Base Address Allocation Structure, defined in PCI firmware spec v3.2 chapter 4.1.2
@@ -46,7 +49,7 @@ struct acpi_legacy_irq {
 };
 
 zx_status_t get_pci_init_arg(acpi::Acpi* acpi, zx_pci_init_arg_t** arg, uint32_t* size);
-zx_status_t pci_report_current_resources(acpi::Acpi* acpi, zx_handle_t mmio_resource_handle);
+zx_status_t pci_report_current_resources(acpi::Acpi* acpi, void* mmio_resource_handle);
 
 class AcpiPciroot;
 using AcpiPcirootType = ddk::Device<AcpiPciroot, ddk::GetProtocolable>;
@@ -57,19 +60,22 @@ class AcpiPciroot : ddk::PcirootProtocol<AcpiPciroot>, public AcpiPcirootType, p
     ACPI_HANDLE acpi_object;
     acpi::UniquePtr<ACPI_DEVICE_INFO> acpi_device_info;
     zx_device_t* platform_bus;
-    std::unordered_map<uint32_t, acpi_legacy_irq> irqs;
-    std::vector<zx::resource> irq_resources;
-    std::vector<pci_irq_routing_entry_t> routing;
+    std::map<uint32_t, acpi_legacy_irq, std::less<>,
+             util::Allocator<std::pair<const uint32_t, acpi_legacy_irq>>>
+        irqs;
+    fbl::Vector<fbl::RefPtr<ResourceDispatcher>> irq_resources;
+    fbl::Vector<pci_irq_routing_entry_t> routing;
     struct pci_platform_info info;
     iommu::IommuManagerInterface* iommu;
   };
 
   static zx_status_t Create(PciRootHost* root_host, AcpiPciroot::Context ctx, zx_device_t* parent,
-                            const char* name, std::vector<pci_bdf_t> acpi_bdfs);
+                            const char* name, fbl::Vector<pci_bdf_t> acpi_bdfs);
   using PcirootBase::PcirootAllocateMsi;
   using PcirootBase::PcirootDriverShouldProxyConfig;
   using PcirootBase::PcirootGetAddressSpace;
-  zx_status_t PcirootGetBti(uint32_t bdf, uint32_t index, zx::bti* bti);
+  zx_status_t PcirootGetBti(uint32_t bdf, uint32_t index, uint8_t* out_bti_list, size_t bti_count,
+                            size_t* out_bti_actual);
   zx_status_t PcirootGetPciPlatformInfo(pci_platform_info_t* info);
   zx_status_t PcirootReadConfig8(const pci_bdf_t* address, uint16_t offset, uint8_t* value) final;
   zx_status_t PcirootReadConfig16(const pci_bdf_t* address, uint16_t offset, uint16_t* value) final;
@@ -92,9 +98,9 @@ class AcpiPciroot : ddk::PcirootProtocol<AcpiPciroot>, public AcpiPcirootType, p
 
  private:
   Context context_;
-  std::vector<pci_bdf_t> acpi_bdfs_;
+  fbl::Vector<pci_bdf_t> acpi_bdfs_;
   AcpiPciroot(PciRootHost* root_host, AcpiPciroot::Context ctx, zx_device_t* parent,
-              const char* name, std::vector<pci_bdf_t> acpi_bdfs)
+              const char* name, fbl::Vector<pci_bdf_t> acpi_bdfs)
       : AcpiPcirootType(parent),
         PcirootBase(root_host),
         context_(std::move(ctx)),

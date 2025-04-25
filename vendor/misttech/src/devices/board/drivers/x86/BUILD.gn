@@ -3,10 +3,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bind/bind.gni")
 import("//build/zircon/zx_library.gni")
 
 group("x86") {
-  deps = [ ":platform-bus-x86" ]
+  deps = [ ":platform-bus-x86-driver" ]
 }
 
 config("config") {
@@ -21,25 +22,41 @@ config("config") {
   cflags_c = [ "-fno-strict-aliasing" ]
 }
 
-zx_library("platform-bus-x86") {
+driver_bind_rules("x64-bind") {
+  rules = "meta/x64.bind"
+  bind_output = "platform-bus-x64.bindbc"
+  tests = "meta/bind-tests.json"
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib",
+    "//src/devices/bind/fuchsia.intel.platform",
+  ]
+}
+
+zx_library("platform-bus-x86-driver") {
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
 
   sources = [
+    #"acpi-dev/dev-ec.cc",
     "acpi-nswalk.cc",
-    "driver_pci.cc",
     "init.cc",
-    "kpci.cc",
     "x86.cc",
   ]
 
   configs += [ ":config" ]
   deps = [
+    ":x64-bind",
+    "//sdk/banjo/mistos.hardware.pciroot:mistos.hardware.pciroot_banjo_cpp",
     "//src/devices/board/lib/acpi",
-    "//zircon/kernel/lib/init",
-    "//zircon/kernel/lib/kpci",
+    "//src/devices/pci/lib/pci",
+
+    #
+    "//vendor/misttech/src/lib/ddk",
+
+    #"//zircon/kernel/lib/init",
+    #"//zircon/kernel/lib/kpci",
     "//zircon/kernel/phys:handoff",
 
     #

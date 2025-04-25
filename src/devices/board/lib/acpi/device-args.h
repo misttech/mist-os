@@ -11,11 +11,15 @@
 
 #include "src/devices/board/lib/acpi/manager.h"
 
+#ifdef __mist_os__
+#include <mistos/hardware/pciroot/cpp/banjo.h>
+#else
 using pci_bdf_t = struct pci_bdf {
   uint8_t bus_id;
   uint8_t device_id;
   uint8_t function_id;
 };
+#endif
 
 namespace acpi {
 
@@ -33,6 +37,7 @@ inline const char* BusTypeToString(BusType t) {
 }
 
 struct DeviceArgs {
+  zx_device_t* parent_;
   acpi::Manager* manager_;
   ACPI_HANDLE handle_;
 
@@ -44,7 +49,8 @@ struct DeviceArgs {
   // PCI metadata
   fbl::Vector<pci_bdf_t> bdfs_;
 
-  DeviceArgs(acpi::Manager* manager, ACPI_HANDLE handle) : manager_(manager), handle_(handle) {}
+  DeviceArgs(zx_device_t* parent, acpi::Manager* manager, ACPI_HANDLE handle)
+      : parent_(parent), manager_(manager), handle_(handle) {}
   DeviceArgs(DeviceArgs&) = delete;
 
   DeviceArgs& SetBusMetadata(BusMetadata metadata, BusType bus_type, uint32_t bus_id) {

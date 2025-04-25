@@ -7,6 +7,15 @@
 #include <trace.h>
 #include <zircon/compiler.h>
 
+#include <bind/fuchsia/acpi/cpp/bind.h>
+#include <bind/fuchsia/pci/cpp/bind.h>
+
+#ifdef __mist_os__
+#include "src/devices/board/lib/acpi/device.h"
+#include "src/devices/board/lib/acpi/irq-fragment.h"
+#else
+#include "src/devices/board/lib/acpi/device-for-host.h"
+#endif
 #include "src/devices/board/lib/acpi/device-args.h"
 #include "src/devices/board/lib/acpi/manager.h"
 #include "src/devices/board/lib/acpi/resources.h"
@@ -35,10 +44,11 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, acpi::Manager* m
   // TODO(https://fxbug.dev/42158705): Handle other resources like serial buses.
   auto result = acpi->WalkResources(
       handle_, "_CRS", [this, acpi, manager, &callback](ACPI_RESOURCE* res) -> acpi::status<> {
+        fbl::AllocChecker ac;
         ACPI_HANDLE bus_parent = nullptr;
         BusType type = BusType::kUnknown;
         DeviceChildEntry entry;
-        // const char* bus_id_prop;
+        const char* bus_id_prop;
         if (resource_is_spi(res)) {
           type = BusType::kSpi;
           auto result = resource_parse_spi(acpi, handle_, res, &bus_parent);
@@ -46,11 +56,17 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, acpi::Manager* m
             LTRACEF("Failed to parse SPI resource: %d\n", result.error_value());
             return result.take_error();
           }
-          // entry = result.value();
-          // bus_id_prop = bind_fuchsia::SPI_BUS_ID.c_str();
-          // str_props_.emplace_back(
-          //     OwnedStringProp(bind_fuchsia::SPI_CHIP_SELECT.c_str(),
-          //     result.value().cs().value()));
+          bus_id_prop = bind_fuchsia::SPI_BUS_ID.data();
+#if 0
+          entry = result.value();
+          bus_id_prop = /*bind_fuchsia::SPI_BUS_ID.c_str()*/ "fuchsia.BIND_SPI_BUS_ID";
+          str_props_.push_back(
+              OwnedStringProp(
+                  /*bind_fuchsia::SPI_CHIP_SELECT.c_str()*/ "fuchsia.BIND_SPI_CHIP_SELECT",
+                  result.value().cs().value()),
+              &ac);
+          ZX_ASSERT(ac.check());
+#endif
         } else if (resource_is_i2c(res)) {
           type = BusType::kI2c;
           auto result = resource_parse_i2c(acpi, handle_, res, &bus_parent);
@@ -58,11 +74,16 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, acpi::Manager* m
             LTRACEF("Failed to parse I2C resource: %d\n", result.error_value());
             return result.take_error();
           }
-          // entry = result.value();
-          // bus_id_prop = bind_fuchsia::I2C_BUS_ID.c_str();
-          //;
-          // str_props_.emplace_back(
-          //  OwnedStringProp(bind_fuchsia::I2C_ADDRESS.c_str(), result.value().address().value()));
+          bus_id_prop = bind_fuchsia::I2C_BUS_ID.data();
+#if 0
+          entry = result.value();
+          bus_id_prop = /*bind_fuchsia::I2C_BUS_ID.c_str()*/ "fuchsia.BIND_I2C_BUS_ID";
+          str_props_.push_back(
+              OwnedStringProp(/*bind_fuchsia::I2C_ADDRESS.c_str()*/ "fuchsia.BIND_I2C_ADDRESS",
+                              result.value().address().value()),
+              &ac);
+          ZX_ASSERT(ac.check());
+#endif
         } else if (resource_is_irq(res)) {
           irq_count_++;
         }
@@ -70,10 +91,10 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, acpi::Manager* m
         if (bus_parent) {
           size_t bus_index = callback(bus_parent, type, entry);
           DeviceBuilder* b = manager->LookupDevice(bus_parent);
-          fbl::AllocChecker ac;
           buses_.push_back(ktl::move(std::pair<DeviceBuilder*, size_t>(b, bus_index)), &ac);
           ZX_ASSERT(ac.check());
-          // str_props_.emplace_back(OwnedStringProp(bus_id_prop, b->GetBusId()));
+          str_props_.push_back(OwnedStringProp(bus_id_prop, b->GetBusId()), &ac);
+          ZX_ASSERT(ac.check());
           has_address_ = true;
         }
         return acpi::ok();
@@ -93,14 +114,17 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, acpi::Manager* m
   // _ADR for PCI addressing info.
   if (parent_->bus_type_ == BusType::kPci) {
     if (info->Valid & ACPI_VALID_ADR) {
+      fbl::AllocChecker ac;
       callback(parent_->handle_, BusType::kPci, DeviceChildEntry(info->Address));
       // Set up some bind properties for ourselves. callback() should set HasBusId.
       ZX_ASSERT(parent_->HasBusId());
-      // uint32_t bus_id = parent_->GetBusId();
-      // uint32_t device = (info->Address & (0xffff0000)) >> 16;
-      // uint32_t func = info->Address & 0x0000ffff;
-      /*str_props_.emplace_back(OwnedStringProp(bind_fuchsia::PCI_TOPO.c_str(),
-                                              BIND_PCI_TOPO_PACK(bus_id, device, func)));*/
+      uint32_t bus_id = parent_->GetBusId();
+      uint32_t device = (info->Address & (0xffff0000)) >> 16;
+      uint32_t func = info->Address & 0x0000ffff;
+      str_props_.push_back(
+          OwnedStringProp(bind_fuchsia::PCI_TOPO.data(), BIND_PCI_TOPO_PACK(bus_id, device, func)),
+          &ac);
+      ZX_ASSERT(ac.check());
       // Should we buses_.emplace_back() here? The PCI bus driver currently publishes PCI
       // composites, so having a device on a PCI bus that uses other buses resources can't be
       // represented. Such devices don't seem to exist, but if we ever encounter one, it will need
@@ -115,8 +139,10 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, acpi::Manager* m
     if (!strcmp(info->HardwareId.String, kDeviceTreeLinkID)) {
       has_devicetree_cid = CheckForDeviceTreeCompatible(acpi);
     } else {
-      /*str_props_.emplace_back(
-          OwnedStringProp(bind_fuchsia_acpi::HID.c_str(), info->HardwareId.String));*/
+      fbl::AllocChecker ac;
+      str_props_.push_back(OwnedStringProp(bind_fuchsia_acpi::HID.data(), info->HardwareId.String),
+                           &ac);
+      ZX_ASSERT(ac.check());
     }
   }
 
@@ -126,16 +152,19 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, acpi::Manager* m
       has_devicetree_cid = CheckForDeviceTreeCompatible(acpi);
     } else {
       // We only expose the first CID.
-      // str_props_.emplace_back(OwnedStringProp(bind_fuchsia_acpi::FIRST_CID.c_str(),
-      // first.String));
+      fbl::AllocChecker ac;
+      str_props_.push_back(OwnedStringProp(bind_fuchsia_acpi::FIRST_CID.data(), first.String), &ac);
+      ZX_ASSERT(ac.check());
     }
   }
 
   // If our parent has a bus type, and we have an address on that bus, then we'll expose it in our
   // bind properties.
   if (parent_->GetBusType() != BusType::kUnknown && has_address_) {
-    // str_props_.emplace_back(
-    // OwnedStringProp(bind_fuchsia::ACPI_BUS_TYPE.c_str(), parent_->GetBusType()));
+    fbl::AllocChecker ac;
+    str_props_.push_back(OwnedStringProp(bind_fuchsia::ACPI_BUS_TYPE.data(), parent_->GetBusType()),
+                         &ac);
+    ZX_ASSERT(ac.check());
   }
   if (result.status_value() == AE_NOT_FOUND) {
     return acpi::ok();
@@ -143,8 +172,16 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, acpi::Manager* m
   return result;
 }
 
-zx::result<> DeviceBuilder::Build(acpi::Manager* manager) {
-  DeviceArgs device_args(manager, handle_);
+zx::result<zx_device_t*> DeviceBuilder::Build(acpi::Manager* manager) {
+  if (parent_->zx_device_ == nullptr) {
+    LTRACEF("Parent has not been added to the tree yet!\n");
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+  if (zx_device_ != nullptr) {
+    LTRACEF("This device (%s) has already been built!\n", name());
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+  DeviceArgs device_args(parent_->zx_device_, manager /*, device_dispatcher*/, handle_);
   if (HasBusId() && bus_type_ != BusType::kPci) {
     zx::result metadata = GetMetadata();
     if (metadata.is_error()) {
@@ -153,49 +190,52 @@ zx::result<> DeviceBuilder::Build(acpi::Manager* manager) {
     }
     device_args.SetBusMetadata(std::move(*metadata), bus_type_, GetBusId());
   }
-  // auto device = std::make_unique<Device>(std::move(device_args));
+  auto device = std::make_unique<Device>(std::move(device_args));
 
   // Narrow our custom type down to zx_device_str_prop_t.
   // Any strings in zx_device_str_prop_t will still point at their equivalents
   // in the original str_props_ array.
-  // std::vector<zx_device_str_prop_t> str_props_for_ddkadd;
-  // for (auto& str_prop : str_props_) {
-  //  str_props_for_ddkadd.emplace_back(str_prop);
-  //}
-
-  // uint32_t add_flags = DEVICE_ADD_MUST_ISOLATE;
-  // if ((state_ & (ACPI_STA_DEVICE_FUNCTIONING | ACPI_STA_DEVICE_PRESENT)) ==
-  //     ACPI_STA_DEVICE_FUNCTIONING) {
-  //   // Don't bind drivers to this device if it is functioning but not present.
-  //   // See ACPI 6.4 section 6.3.7.
-  //   add_flags |= DEVICE_ADD_NON_BINDABLE;
-  // }
-
-  // auto result = device->AddDevice(name(), cpp20::span(str_props_for_ddkadd), add_flags);
-  // if (result.is_error()) {
-  //   LTRACEF("failed to publish acpi device '%s' (parent=%s): %d\n", name(), parent_->name(),
-  //           result.status_value());
-  //   return result.take_error();
-  // }
-
-  // auto* acpi_dev = device.release();
-
-  for (uint32_t i = 0; i < irq_count_; i++) {
-    /*auto result = IrqFragment::Create(*acpi_dev, i, device_id_);
-    if (result.is_error()) {
-      LTRACEF("Failed to construct IRQ fragment: %d\n", result.status_value());
-      return result.take_error();
-    }*/
+  fbl::Vector<zx_device_str_prop_t> str_props_for_ddkadd;
+  for (auto& str_prop : str_props_) {
+    fbl::AllocChecker ac;
+    str_props_for_ddkadd.push_back(str_prop, &ac);
+    ZX_ASSERT(ac.check());
   }
 
-  /*auto status = BuildComposite(manager, str_props_for_ddkadd, device_dispatcher);
-  if (status.is_error()) {
-    zxlogf(WARNING, "failed to publish composite acpi device '%s-composite': %d", name(),
-           status.error_value());
-    return status.take_error();
-  }*/
+  uint32_t add_flags = DEVICE_ADD_MUST_ISOLATE;
+  if ((state_ & (ACPI_STA_DEVICE_FUNCTIONING | ACPI_STA_DEVICE_PRESENT)) ==
+      ACPI_STA_DEVICE_FUNCTIONING) {
+    // Don't bind drivers to this device if it is functioning but not present.
+    // See ACPI 6.4 section 6.3.7.
+    add_flags |= DEVICE_ADD_NON_BINDABLE;
+  }
 
-  return zx::ok();
+  auto result = device->AddDevice(name(), cpp20::span(str_props_for_ddkadd), add_flags);
+  if (result.is_error()) {
+    LTRACEF("failed to publish acpi device '%s' (parent=%s): %d\n", name(), parent_->name(),
+            result.status_value());
+    return result.take_error();
+  }
+
+  auto* acpi_dev = device.release();
+  zx_device_ = acpi_dev->zxdev();
+
+  for (uint32_t i = 0; i < irq_count_; i++) {
+    auto create_result = IrqFragment::Create(*acpi_dev, i, device_id_);
+    if (create_result.is_error()) {
+      LTRACEF("Failed to construct IRQ fragment: %d\n", create_result.status_value());
+      return create_result.take_error();
+    }
+  }
+
+  auto status = BuildComposite(manager, str_props_for_ddkadd);
+  if (status.is_error()) {
+    LTRACEF("failed to publish composite acpi device '%s-composite': %d\n", name(),
+            status.error_value());
+    return status.take_error();
+  }
+
+  return zx::ok(zx_device_);
 }
 
 size_t DeviceBuilder::AddBusChild(DeviceChildEntry d) {
@@ -220,15 +260,85 @@ size_t DeviceBuilder::AddBusChild(DeviceChildEntry d) {
 }
 
 zx::result<BusMetadata> DeviceBuilder::GetMetadata() {
-  /*return std::visit(
+#ifdef __mist_os__
+#if 0
+  return std::visit(
       [this](DeviceChildData&& arg) -> zx::result<BusMetadata> {
         if (std::holds_alternative<std::monostate>(arg)) {
           return zx::ok(std::monostate{});
         }
         return zx::error(ZX_ERR_NOT_SUPPORTED);
       },
-      bus_children_);*/
+      bus_children_);
+#endif
   return zx::error(ZX_ERR_NOT_SUPPORTED);
+#else
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
+#endif
+}
+
+zx::result<> DeviceBuilder::BuildComposite(acpi::Manager* manager,
+                                           fbl::Vector<zx_device_str_prop_t>& str_props) {
+  if (parent_->GetBusType() == BusType::kPci) {
+    // If a device is on a PCI bus, the PCI bus driver will publish a composite device, so we
+    // don't try to publish a composite.
+    return zx::ok();
+  }
+
+#if 0
+  auto [acpi_bind_rules, acpi_properties] = GetFragmentBindRulesAndPropertiesForSelf();
+  for (const auto& str_prop : str_props) {
+    fbl::AllocChecker ac;
+    acpi_properties.push_back(MakeProperty(str_prop), &ac);
+    ZX_ASSERT(ac.check());
+  }
+  auto composite_node_spec = ddk::CompositeNodeSpec(acpi_bind_rules, acpi_properties);
+
+  // Generate composite node spec parent for every device we use.
+  for (auto& pair : buses_) {
+    DeviceBuilder* parent = pair.first;
+    size_t child_index = pair.second;
+
+    auto [bind_rules, properties] = parent->GetFragmentBindRulesAndPropertiesForChild(child_index);
+    composite_node_spec.AddParentSpec(bind_rules, properties);
+  }
+
+  for (uint32_t i = 0; i < irq_count_; i++) {
+    auto bind_platform_dev_interrupt_id = i + 1;
+    composite_node_spec.AddParentSpec(
+        std::vector<ddk::BindRule>{
+            ddk::MakeAcceptBindRule(bind_fuchsia::ACPI_ID, device_id_),
+            ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_INTERRUPT_ID,
+                                    bind_platform_dev_interrupt_id),
+            ddk::MakeAcceptBindRule(bind_fuchsia_hardware_interrupt::SERVICE,
+                                    bind_fuchsia_hardware_interrupt::SERVICE_ZIRCONTRANSPORT)},
+        std::vector<device_bind_prop_t>{
+            ddk::MakeProperty(bind_fuchsia::ACPI_ID, device_id_),
+            ddk::MakeProperty(bind_fuchsia::PLATFORM_DEV_INTERRUPT_ID,
+                              bind_platform_dev_interrupt_id),
+            ddk::MakeProperty(bind_fuchsia_hardware_interrupt::SERVICE,
+                              bind_fuchsia_hardware_interrupt::SERVICE_ZIRCONTRANSPORT)});
+  }
+
+#if !defined(IS_TEST)
+  // TODO(https://fxbug.dev/42160209): re-enable this in tests once mock_ddk supports composites.
+  char composite_node_spec_name[128];
+  snprintf(composite_node_spec_name, sizeof(composite_node_spec_name), "%s-composite-spec", name());
+  DeviceArgs composite_node_spec_args(parent_->zx_device_, manager, handle_);
+  auto composite_node_spec_device = std::make_unique<Device>(composite_node_spec_args);
+  zx_status_t status = composite_node_spec_device->DdkAddCompositeNodeSpec(
+      composite_node_spec_name.data(), composite_node_spec);
+  if (status != ZX_OK) {
+    LTRACEF("Failed to add composite node spec: %d\n", status);
+    return zx::error(status);
+  }
+
+  // The DDK takes ownership of the device.
+  [[maybe_unused]] auto* unused = composite_node_spec_device.release();
+#endif
+#endif
+
+  return zx::ok();
 }
 
 bool DeviceBuilder::CheckForDeviceTreeCompatible(acpi::Acpi* acpi) {
@@ -289,7 +399,9 @@ bool DeviceBuilder::CheckForDeviceTreeCompatible(acpi::Acpi* acpi) {
     }
 
     if (!strcmp("compatible", key->String.Pointer) && v->Type == ACPI_TYPE_STRING) {
-      // str_props_.emplace_back(OwnedStringProp{"fuchsia.acpi.FIRST_CID", value->String.Pointer});
+      fbl::AllocChecker ac;
+      str_props_.push_back(OwnedStringProp("fuchsia.acpi.FIRST_CID", value->String.Pointer), &ac);
+      ZX_ASSERT(ac.check());
       return true;
     }
   }

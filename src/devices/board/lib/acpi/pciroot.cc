@@ -1,15 +1,15 @@
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-//
+
 #include <endian.h>
-#include <fuchsia/hardware/pciroot/c/banjo.h>
 #include <inttypes.h>
-#include <lib/ddk/debug.h>
+// #include <lib/ddk/debug.h>
 #include <lib/pci/pciroot.h>
 #include <lib/pci/pio.h>
+#include <mistos/hardware/pciroot/c/banjo.h>
 #include <zircon/compiler.h>
-#include <zircon/syscalls/resource.h>
+// #include <zircon/syscalls/resource.h>
 #include <zircon/types.h>
 
 #include <array>
@@ -23,13 +23,15 @@
 #include "src/devices/board/lib/acpi/pci-internal.h"
 #include "src/devices/lib/iommu/iommu.h"
 
-zx_status_t AcpiPciroot::PcirootGetBti(uint32_t bdf, uint32_t index, zx::bti* bti) {
+zx_status_t AcpiPciroot::PcirootGetBti(uint32_t bdf, uint32_t index, uint8_t* out_bti_list,
+                                       size_t bti_count, size_t* out_bti_actual) {
   // x86 uses PCI BDFs as hardware identifiers, and ARM uses PCI root complexes. There will be at
   // most one BTI per device.
   if (index != 0) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
+#if 0
   auto iommu = context_.iommu->IommuForPciDevice(bdf);
   const zx_status_t status = zx::bti::create(*iommu, 0, bdf, bti);
   if (status == ZX_OK) {
@@ -44,6 +46,8 @@ zx_status_t AcpiPciroot::PcirootGetBti(uint32_t bdf, uint32_t index, zx::bti* bt
   }
 
   return status;
+#endif
+  return ZX_ERR_NOT_SUPPORTED;
 }
 
 zx_status_t AcpiPciroot::PcirootGetPciPlatformInfo(pci_platform_info_t* info) {
@@ -88,9 +92,8 @@ zx_status_t AcpiPciroot::PcirootWriteConfig32(const pci_bdf_t* address, uint16_t
 
 zx_status_t AcpiPciroot::Create(PciRootHost* root_host, AcpiPciroot::Context ctx,
                                 zx_device_t* parent, const char* name,
-                                std::vector<pci_bdf_t> acpi_bdfs) {
+                                fbl::Vector<pci_bdf_t> acpi_bdfs) {
   auto pciroot = new AcpiPciroot(root_host, std::move(ctx), parent, name, std::move(acpi_bdfs));
-  return pciroot->DdkAdd(ddk::DeviceAddArgs(name)
-                             .set_proto_id(ZX_PROTOCOL_PCIROOT)
-                             .set_inspect_vmo(pciroot->inspect().DuplicateVmo()));
+  return pciroot->DdkAdd(ddk::DeviceAddArgs(name).set_proto_id(ZX_PROTOCOL_PCIROOT)
+                         /*.set_inspect_vmo(pciroot->inspect().DuplicateVmo())*/);
 }

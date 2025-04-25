@@ -4,15 +4,15 @@
 
 #include "src/devices/board/lib/acpi/device.h"
 
-#include <lib/async/cpp/executor.h>
-#include <lib/component/outgoing/cpp/handlers.h>
-#include <lib/ddk/debug.h>
+// #include <lib/async/cpp/executor.h>
+// #include <lib/component/outgoing/cpp/handlers.h>
+// #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/fit/defer.h>
-#include <lib/fpromise/promise.h>
+// #include <lib/fpromise/promise.h>
 #include <zircon/errors.h>
-#include <zircon/syscalls/resource.h>
+// #include <zircon/syscalls/resource.h>
 #include <zircon/types.h>
 
 #include <atomic>
@@ -25,13 +25,18 @@
 
 #include "lib/ddk/device.h"
 #include "lib/zx/result.h"
-#include "src/devices/board/lib/acpi/event.h"
-#include "src/devices/board/lib/acpi/fidl.h"
-#include "src/devices/board/lib/acpi/global-lock.h"
+// #include "src/devices/board/lib/acpi/event.h"
+//  #include "src/devices/board/lib/acpi/fidl.h"
+#include <trace.h>
+
+// #include "src/devices/board/lib/acpi/global-lock.h"
+
 #include "src/devices/board/lib/acpi/manager.h"
 #include "src/devices/board/lib/acpi/power-resource.h"
 #include "src/devices/lib/iommu/iommu.h"
 #include "third_party/acpica/source/include/actypes.h"
+
+#define LOCAL_TRACE 0
 
 namespace acpi {
 namespace {
@@ -40,6 +45,7 @@ constexpr size_t kMaxPendingNotifications = 1000;
 }  // namespace
 
 ACPI_STATUS Device::AddResource(ACPI_RESOURCE* res) {
+  fbl::AllocChecker ac;
   if (resource_is_memory(res)) {
     resource_memory_t mem;
     zx_status_t st = resource_parse_memory(res, &mem);
@@ -48,7 +54,8 @@ ACPI_STATUS Device::AddResource(ACPI_RESOURCE* res) {
     if ((st != ZX_OK) || (mem.minimum != mem.maximum)) {
       return AE_ERROR;
     }
-    mmio_resources_.emplace_back(mem);
+    mmio_resources_.push_back(DeviceMmioResource(mem), &ac);
+    ZX_ASSERT(ac.check());
 
   } else if (resource_is_address(res)) {
     resource_address_t addr;
@@ -58,8 +65,11 @@ ACPI_STATUS Device::AddResource(ACPI_RESOURCE* res) {
     }
     if ((addr.resource_type == RESOURCE_ADDRESS_MEMORY) && addr.min_address_fixed &&
         addr.max_address_fixed && (addr.maximum < addr.minimum)) {
-      mmio_resources_.emplace_back(/* writeable= */ true, addr.min_address_fixed,
-                                   /* alignment= */ 0, static_cast<uint32_t>(addr.address_length));
+      mmio_resources_.push_back(
+          DeviceMmioResource(/* writeable= */ true, addr.min_address_fixed,
+                             /* alignment= */ 0, static_cast<uint32_t>(addr.address_length)),
+          &ac);
+      ZX_ASSERT(ac.check());
     }
 
   } else if (resource_is_io(res)) {
@@ -69,7 +79,8 @@ ACPI_STATUS Device::AddResource(ACPI_RESOURCE* res) {
       return AE_ERROR;
     }
 
-    pio_resources_.emplace_back(io);
+    pio_resources_.push_back(DevicePioResource(io), &ac);
+    ZX_ASSERT(ac.check());
 
   } else if (resource_is_irq(res)) {
     resource_irq_t irq;
@@ -78,7 +89,8 @@ ACPI_STATUS Device::AddResource(ACPI_RESOURCE* res) {
       return AE_ERROR;
     }
     for (auto i = 0; i < irq.pin_count; i++) {
-      irqs_.emplace_back(irq, i);
+      irqs_.push_back(DeviceIrqResource(irq, i), &ac);
+      ZX_ASSERT(ac.check());
     }
   }
 
@@ -116,21 +128,21 @@ zx_status_t Device::ReportCurrentResources() {
     return acpi_to_zx_status(acpi_status);
   }
 
-  zxlogf(DEBUG, "acpi-bus: found %zd port resources %zd memory resources %zx irqs",
-         pio_resources_.size(), mmio_resources_.size(), irqs_.size());
-  if (zxlog_level_enabled(TRACE)) {
-    zxlogf(TRACE, "port resources:");
+  LTRACEF("acpi-bus: found %zd port resources %zd memory resources %zx irqs\n",
+          pio_resources_.size(), mmio_resources_.size(), irqs_.size());
+  if (LOCAL_TRACE > 2) {
+    LTRACEF("port resources:\n");
     for (size_t i = 0; i < pio_resources_.size(); i++) {
-      zxlogf(TRACE, "  %02zd: addr=0x%x length=0x%x align=0x%x", i, pio_resources_[i].base_address,
-             pio_resources_[i].address_length, pio_resources_[i].alignment);
+      LTRACEF("  %02zd: addr=0x%x length=0x%x align=0x%x\n", i, pio_resources_[i].base_address,
+              pio_resources_[i].address_length, pio_resources_[i].alignment);
     }
-    zxlogf(TRACE, "memory resources:");
+    LTRACEF("memory resources:\n");
     for (size_t i = 0; i < mmio_resources_.size(); i++) {
-      zxlogf(TRACE, "  %02zd: addr=0x%x length=0x%x align=0x%x writeable=%d", i,
-             mmio_resources_[i].base_address, mmio_resources_[i].address_length,
-             mmio_resources_[i].alignment, mmio_resources_[i].writeable);
+      LTRACEF("  %02zd: addr=0x%x length=0x%x align=0x%x writeable=%d\n", i,
+              mmio_resources_[i].base_address, mmio_resources_[i].address_length,
+              mmio_resources_[i].alignment, mmio_resources_[i].writeable);
     }
-    zxlogf(TRACE, "irqs:");
+    LTRACEF("irqs:\n");
     for (size_t i = 0; i < irqs_.size(); i++) {
       const char* trigger;
       switch (irqs_[i].trigger) {
@@ -159,9 +171,9 @@ zx_status_t Device::ReportCurrentResources() {
           polarity = "bad_polarity";
           break;
       }
-      zxlogf(TRACE, "  %02zd: pin=%u %s %s %s %s", i, irqs_[i].pin, trigger, polarity,
-             (irqs_[i].sharable == ACPI_IRQ_SHARED) ? "shared" : "exclusive",
-             irqs_[i].wake_capable ? "wake" : "nowake");
+      LTRACEF("  %02zd: pin=%u %s %s %s %s\n", i, irqs_[i].pin, trigger, polarity,
+              (irqs_[i].sharable == ACPI_IRQ_SHARED) ? "shared" : "exclusive",
+              irqs_[i].wake_capable ? "wake" : "nowake");
     }
   }
 
@@ -180,8 +192,7 @@ void Device::DdkInit(ddk::InitTxn txn) {
 
   zx_status_t result = InitializePowerManagement();
   if (result != ZX_OK) {
-    zxlogf(ERROR, "Error initializing power management for ACPI device: %s",
-           zx_status_get_string(result));
+    LTRACEF("Error initializing power management for ACPI device: %d\n", result);
     txn.Reply(result);
     return;
   }
@@ -196,11 +207,10 @@ void Device::DdkInit(ddk::InitTxn txn) {
   // Skip turning on Atlas camera unless enabled.
   if ((name_ != "CAM0" && name_ != "NVM0") || atlas_camera_enabled) {
     if (GetPowerStateInfo(DEV_POWER_STATE_D0)) {
-      PowerStateTransitionResponse result = TransitionToPowerState(DEV_POWER_STATE_D0);
-      if (result.status != ZX_OK) {
-        zxlogf(ERROR, "Error transitioning ACPI device to D0 in Init: %s",
-               zx_status_get_string(result.status));
-        txn.Reply(result.status);
+      PowerStateTransitionResponse ps_result = TransitionToPowerState(DEV_POWER_STATE_D0);
+      if (ps_result.status != ZX_OK) {
+        LTRACEF("Error transitioning ACPI device to D0 in Init: %d\n", ps_result.status);
+        txn.Reply(ps_result.status);
         return;
       }
     }
@@ -210,6 +220,7 @@ void Device::DdkInit(ddk::InitTxn txn) {
 }
 
 void Device::DdkUnbind(ddk::UnbindTxn txn) {
+#if 0
   if (notify_handler_.has_value()) {
     RemoveNotifyHandler();
   }
@@ -234,8 +245,10 @@ void Device::DdkUnbind(ddk::UnbindTxn txn) {
                      .discard_result()
                      .and_then([txn = std::move(txn)]() mutable { txn.Reply(); });
   executor_.schedule_task(std::move(promise));
+#endif
 }
 
+#if 0
 void Device::GetMmio(GetMmioRequestView request, GetMmioCompleter::Sync& completer) {
   std::scoped_lock guard{lock_};
   zx_status_t st = ReportCurrentResources();
@@ -334,8 +347,10 @@ zx_status_t Device::CallPsxMethod(const PowerStateInfo& state) {
   auto psx = acpi_->EvaluateObject(acpi_handle_, method_name.c_str(), std::nullopt);
   return psx.zx_status_value();
 }
+#endif
 
 zx::result<Device::PowerStateInfo> Device::GetInfoForState(uint8_t d_state) {
+#if 0
   PowerStateInfo power_state_info{.d_state = d_state};
   std::vector<const PowerResource*> power_resources;
 
@@ -352,7 +367,7 @@ zx::result<Device::PowerStateInfo> Device::GetInfoForState(uint8_t d_state) {
           manager_->AddPowerResource(power_resource_reference.Reference.Handle);
 
       if (power_resource == nullptr) {
-        zxlogf(ERROR, "Failed to add power resource");
+        LTRACEF("Failed to add power resource\n");
         return zx::error(ZX_ERR_INTERNAL);
       }
 
@@ -377,7 +392,7 @@ zx::result<Device::PowerStateInfo> Device::GetInfoForState(uint8_t d_state) {
   }
 
   for (uint8_t s_state = 0; s_state <= shallowest_system_level; ++s_state) {
-    power_state_info.supported_s_states.insert(s_state);
+    // power_state_info.supported_s_states.insert(s_state);
   }
 
   // Sort power resources by ascending resource_order.
@@ -387,7 +402,7 @@ zx::result<Device::PowerStateInfo> Device::GetInfoForState(uint8_t d_state) {
             });
 
   for (auto power_resource : power_resources) {
-    power_state_info.power_resources.push_back(power_resource->handle());
+    // power_state_info.power_resources.push_back(power_resource->handle());
   }
 
   // Check whether this D state has a _PSx method defined.
@@ -398,9 +413,12 @@ zx::result<Device::PowerStateInfo> Device::GetInfoForState(uint8_t d_state) {
   }
 
   return zx::ok(power_state_info);
+#endif
+  return zx::error(ZX_ERR_INTERNAL);
 }
 
 zx_status_t Device::ConfigureInitialPowerState() {
+#if 0
   if (supported_power_states_.empty()) {
     return ZX_OK;
   }
@@ -437,9 +455,12 @@ zx_status_t Device::ConfigureInitialPowerState() {
   }
 
   return ZX_OK;
+#endif
+  return ZX_ERR_INTERNAL;
 }
 
 zx_status_t Device::InitializePowerManagement() {
+#if 0
   for (uint8_t d_state = DEV_POWER_STATE_D0; d_state <= DEV_POWER_STATE_D3HOT; ++d_state) {
     zx::result<PowerStateInfo> power_state_info = GetInfoForState(d_state);
 
@@ -489,10 +510,11 @@ zx_status_t Device::InitializePowerManagement() {
   if (result != ZX_OK) {
     return result;
   }
-
+#endif
   return ZX_OK;
 }
 
+#if 0
 std::unordered_map<uint8_t, DevicePowerState> Device::GetSupportedPowerStates() {
   std::unordered_map<uint8_t, DevicePowerState> states;
 
@@ -503,7 +525,9 @@ std::unordered_map<uint8_t, DevicePowerState> Device::GetSupportedPowerStates() 
 
   return states;
 }
+#endif
 
+#if 0
 zx_status_t Device::Resume(const PowerStateInfo& requested_state_info) {
   PowerStateInfo* current_state_info = GetPowerStateInfo(current_power_state_);
 
@@ -620,15 +644,18 @@ PowerStateTransitionResponse Device::TransitionToPowerState(uint8_t requested_st
   current_power_state_ = requested_state;
   return PowerStateTransitionResponse(ZX_OK, current_power_state_);
 }
+#endif
 
 zx::result<> Device::AddDevice(const char* name, cpp20::span<zx_device_str_prop_t> str_props,
                                uint32_t flags) {
+#if 0
   auto outgoing = PrepareOutgoing();
   if (outgoing.is_error()) {
     zxlogf(ERROR, "failed to add acpi device '%s' - while setting up outgoing: %s", name,
            outgoing.status_string());
     return outgoing.take_error();
   }
+#endif
 
   // A node can either have children manually added to it, or have drivers bound to it. To make this
   // work and preserve the tree topology of ACPI we create a passthrough node called
@@ -638,12 +665,13 @@ zx::result<> Device::AddDevice(const char* name, cpp20::span<zx_device_str_prop_
     needs_passthrough = true;
   }
 
-  std::array offers = {
+  /*std::array offers = {
       ddk::MetadataServer<fuchsia_hardware_i2c_businfo::I2CBusMetadata>::kFidlServiceName,
       ddk::MetadataServer<fuchsia_hardware_spi_businfo::SpiBusMetadata>::kFidlServiceName,
-  };
-  zx_status_t status = DdkAdd(
-      ddk::DeviceAddArgs(name).set_flags(DEVICE_ADD_NON_BINDABLE).set_fidl_service_offers(offers));
+  };*/
+
+  zx_status_t status = DdkAdd(ddk::DeviceAddArgs(name).set_flags(
+      DEVICE_ADD_NON_BINDABLE) /*.set_fidl_service_offers(offers)*/);
   if (status != ZX_OK) {
     return zx::error(status);
   }
@@ -658,8 +686,8 @@ zx::result<> Device::AddDevice(const char* name, cpp20::span<zx_device_str_prop_
             Device* dev = static_cast<Device*>(ctx);
             zx_status_t result = ZX_OK;
             switch (dev->bus_type_) {
+#if 0
               case BusType::kSpi: {
-                const auto& metadata =
                     std::get<fuchsia_hardware_spi_businfo::SpiBusMetadata>(dev->metadata_);
 
                 auto& bus_metadata_server = dev->bus_metadata_server_.emplace<
@@ -702,6 +730,7 @@ zx::result<> Device::AddDevice(const char* name, cpp20::span<zx_device_str_prop_
                 }
                 break;
               }
+#endif
               default:
                 break;
             }
@@ -712,9 +741,9 @@ zx::result<> Device::AddDevice(const char* name, cpp20::span<zx_device_str_prop_
       .release = [](void* dev) {},
   };
 
-  std::array pt_offers = {
+  /*std::array pt_offers = {
       fuchsia_hardware_acpi::Service::Name,
-  };
+  };*/
 
   device_add_args_t passthrough_args{
       .version = DEVICE_ADD_ARGS_VERSION,
@@ -724,22 +753,22 @@ zx::result<> Device::AddDevice(const char* name, cpp20::span<zx_device_str_prop_
       .str_props = str_props.data(),
       .str_prop_count = static_cast<uint32_t>(str_props.size()),
       .proto_id = ZX_PROTOCOL_ACPI,
-      .fidl_service_offers = pt_offers.data(),
-      .fidl_service_offer_count = pt_offers.size(),
+      //.fidl_service_offers = pt_offers.data(),
+      //.fidl_service_offer_count = pt_offers.size(),
       .flags = flags | DEVICE_ADD_MUST_ISOLATE | DEVICE_ADD_ALLOW_MULTI_COMPOSITE,
-      .outgoing_dir_channel = outgoing->release(),
+      //.outgoing_dir_channel = outgoing->release(),
   };
 
   status = device_add(zxdev(), &passthrough_args, &passthrough_dev_);
   if (status != ZX_OK) {
-    zxlogf(WARNING, "Failed to add passthrough device for '%s': %s", name,
-           zx_status_get_string(status));
+    LTRACEF("Failed to add passthrough device for '%s': %d\n", name, status);
     // Do not fail here so that child devices can still get added.
   }
 
   return zx::ok();
 }
 
+#if 0
 void Device::GetBusId(GetBusIdCompleter::Sync& completer) {
   if (bus_id_ == UINT32_MAX) {
     completer.ReplyError(ZX_ERR_BAD_STATE);
@@ -760,12 +789,13 @@ void Device::EvaluateObject(EvaluateObjectRequestView request,
     completer.ReplySuccess(std::move(result.value().response().result));
   }
 }
+#endif
 
-zx::result<zx::interrupt> Device::GetInterrupt(size_t index) {
-  std::scoped_lock guard{lock_};
+zx::result<fbl::RefPtr<InterruptDispatcher>> Device::GetInterrupt(size_t index) {
+  fbl::AutoLock guard{&lock_};
   zx_status_t st = ReportCurrentResources();
   if (st != ZX_OK) {
-    zxlogf(ERROR, "Internal error evaluating resources: %s", zx_status_get_string(st));
+    LTRACEF("Internal error evaluating resources: %d\n", st);
     return zx::error(ZX_ERR_INTERNAL);
   }
 
@@ -814,6 +844,9 @@ zx::result<zx::interrupt> Device::GetInterrupt(size_t index) {
   if (st != ZX_OK) {
     return zx::error(st);
   }
+
+  fbl::RefPtr<InterruptDispatcher> out_irq;
+#if 0
   zx::interrupt out_irq;
   st = zx::interrupt::create(*zx::unowned_resource{get_irq_resource(parent())}, irq.pin,
                              ZX_INTERRUPT_REMAP_IRQ | mode, &out_irq);
@@ -821,10 +854,11 @@ zx::result<zx::interrupt> Device::GetInterrupt(size_t index) {
     zxlogf(ERROR, "Internal error creating interrupt: %s", zx_status_get_string(st));
     return zx::error(ZX_ERR_INTERNAL);
   }
-
+#endif
   return zx::ok(std::move(out_irq));
 }
 
+#if 0
 void Device::MapInterrupt(MapInterruptRequestView request, MapInterruptCompleter::Sync& completer) {
   auto result = GetInterrupt(request->index);
   if (result.is_error()) {
@@ -921,20 +955,21 @@ void Device::InstallNotifyHandler(InstallNotifyHandlerRequestView request,
           .box();
   executor_.schedule_task(std::move(promise));
 }
+#endif
 
 void Device::DeviceObjectNotificationHandler(ACPI_HANDLE object, uint32_t value, void* context) {
   Device* device = static_cast<Device*>(context);
   if (device->pending_notify_count_.load(std::memory_order_acquire) >= kMaxPendingNotifications) {
     if (!device->notify_count_warned_) {
-      zxlogf(ERROR, "%s: too many un-handled pending notifications. Will drop notifications.",
-             device->name());
+      LTRACEF("%s: too many un-handled pending notifications. Will drop notifications.\n",
+              device->name());
       device->notify_count_warned_ = true;
     }
     return;
   }
 
   device->pending_notify_count_.fetch_add(1, std::memory_order_acq_rel);
-  if (device->notify_handler_ && device->notify_handler_->is_valid()) {
+  /*if (device->notify_handler_ && device->notify_handler_->is_valid()) {
     device->notify_handler_.value()->Handle(value).ThenExactlyOnce(
         [device](fidl::WireUnownedResult<fuchsia_hardware_acpi::NotifyHandler::Handle>& result) {
           if (!result.ok()) {
@@ -942,9 +977,10 @@ void Device::DeviceObjectNotificationHandler(ACPI_HANDLE object, uint32_t value,
           }
           device->pending_notify_count_.fetch_sub(1, std::memory_order_acq_rel);
         });
-  }
+  }*/
 }
 
+#if 0
 void Device::RemoveNotifyHandler(RemoveNotifyHandlerCompleter::Sync& completer) {
   auto status = RemoveNotifyHandler();
   if (status != AE_OK) {
@@ -953,6 +989,7 @@ void Device::RemoveNotifyHandler(RemoveNotifyHandlerCompleter::Sync& completer) 
   }
   completer.ReplySuccess();
 }
+#endif
 
 ACPI_STATUS Device::RemoveNotifyHandler() {
   // Try and mark the notify handler as inactive. If this fails, then someone else marked it as
@@ -967,14 +1004,14 @@ ACPI_STATUS Device::RemoveNotifyHandler() {
   auto status = acpi_->RemoveNotifyHandler(acpi_handle_, notify_handler_type_,
                                            Device::DeviceObjectNotificationHandler);
   if (status.is_error()) {
-    zxlogf(ERROR, "Failed to remove notification handler from '%s': %d", name(),
-           status.error_value());
+    LTRACEF("Failed to remove notification handler from '%s': %d\n", name(), status.error_value());
     return status.error_value();
   }
-  notify_handler_->AsyncTeardown();
+  // notify_handler_->AsyncTeardown();
   return AE_OK;
 }
 
+#if 0
 void Device::AcquireGlobalLock(AcquireGlobalLockCompleter::Sync& completer) {
   if (!can_use_global_lock_) {
     completer.ReplyError(fuchsia_hardware_acpi::wire::Status::kAccess);
@@ -983,46 +1020,48 @@ void Device::AcquireGlobalLock(AcquireGlobalLockCompleter::Sync& completer) {
 
   GlobalLockHandle::Create(acpi_, dispatcher_, completer.ToAsync());
 }
+#endif
 
 ACPI_STATUS Device::AddressSpaceHandler(uint32_t function, ACPI_PHYSICAL_ADDRESS physical_address,
                                         uint32_t bit_width, UINT64* value, void* handler_ctx,
                                         void* region_ctx) {
-  HandlerCtx* ctx = static_cast<HandlerCtx*>(handler_ctx);
-  std::scoped_lock lock(ctx->device->address_handler_lock_);
-  auto client = ctx->device->address_handlers_.find(ctx->space_type);
-  if (client == ctx->device->address_handlers_.end()) {
-    zxlogf(ERROR, "No handler found for space %u", ctx->space_type);
-    return AE_NOT_FOUND;
-  }
+  // HandlerCtx* ctx = static_cast<HandlerCtx*>(handler_ctx);
+  //  std::scoped_lock lock(ctx->device->address_handler_lock_);
+  //  auto client = ctx->device->address_handlers_.find(ctx->space_type);
+  //  if (client == ctx->device->address_handlers_.end()) {
+  //    LTRACEF("No handler found for space %u\n", ctx->space_type);
+  //    return AE_NOT_FOUND;
+  //  }
 
   switch (function) {
     case ACPI_READ: {
-      auto result = client->second.sync()->Read(physical_address, bit_width);
-      if (!result.ok()) {
-        zxlogf(ERROR, "FIDL Read failed: %s", result.FormatDescription().data());
-        return AE_ERROR;
-      }
-      if (result->is_error()) {
-        return static_cast<ACPI_STATUS>(result->error_value());
-      }
-      *value = result->value()->value;
+      // auto result = client->second.sync()->Read(physical_address, bit_width);
+      // if (!result.ok()) {
+      //   LTRACEF("FIDL Read failed: %s\n", result.FormatDescription().data());
+      //   return AE_ERROR;
+      // }
+      // if (result->is_error()) {
+      //   return static_cast<ACPI_STATUS>(result->error_value());
+      // }
+      //*value = result->value()->value;
       break;
     }
     case ACPI_WRITE: {
-      auto result = client->second.sync()->Write(physical_address, bit_width, *value);
-      if (!result.ok()) {
-        zxlogf(ERROR, "FIDL Write failed: %s", result.FormatDescription().data());
-        return AE_ERROR;
-      }
-      if (result->is_error()) {
-        return static_cast<ACPI_STATUS>(result->error_value());
-      }
+      // auto result = client->second.sync()->Write(physical_address, bit_width, *value);
+      // if (!result.ok()) {
+      //   LTRACEF("FIDL Write failed: %s\n", result.FormatDescription().data());
+      //   return AE_ERROR;
+      // }
+      // if (result->is_error()) {
+      //   return static_cast<ACPI_STATUS>(result->error_value());
+      // }
       break;
     }
   }
   return AE_OK;
 }
 
+#if 0
 void Device::InstallAddressSpaceHandler(InstallAddressSpaceHandlerRequestView request,
                                         InstallAddressSpaceHandlerCompleter::Sync& completer) {
   if (request->space.IsUnknown()) {
@@ -1170,4 +1209,5 @@ void Device::SetWakeDevice(SetWakeDeviceRequestView request,
   }
   completer.ReplySuccess();
 }
+#endif
 }  // namespace acpi

@@ -1,3 +1,4 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -5,10 +6,14 @@
 #ifndef SRC_DEVICES_BOARD_LIB_ACPI_DEVICE_BUILDER_H_
 #define SRC_DEVICES_BOARD_LIB_ACPI_DEVICE_BUILDER_H_
 
+#include <lib/ddk/binding_driver.h>
+#include <lib/ddk/device.h>
+#include <lib/ddk/driver.h>
 #include <lib/zx/result.h>
 #include <stdint.h>
 
-#include <string>
+#include <bind/fuchsia/cpp/bind.h>
+#include <ddktl/composite-node-spec.h>
 
 #include "src/devices/board/lib/acpi/acpi.h"
 #include "src/devices/board/lib/acpi/bus-type.h"
@@ -17,7 +22,6 @@ namespace acpi {
 
 class Manager;
 
-#if 0
 // A helper class that takes ownership of the string value of a |zx_device_str_prop_t|.
 struct OwnedStringProp : zx_device_str_prop_t {
   OwnedStringProp(const char* key, const char* value) : value_(value) {
@@ -66,7 +70,6 @@ struct OwnedStringProp : zx_device_str_prop_t {
  private:
   std::string value_;
 };
-#endif
 
 // PCI topology in the ACPI format.
 // Lowest 16 bits is function.
@@ -91,16 +94,19 @@ class DeviceBuilder {
         parent_(parent),
         state_(state),
         device_id_(device_id) {
-    // str_props_.emplace_back(OwnedStringProp(bind_fuchsia::ACPI_ID.c_str(), device_id_));
+    fbl::AllocChecker ac;
+    str_props_.push_back(OwnedStringProp(bind_fuchsia::ACPI_ID.data(), device_id_), &ac);
+    ZX_ASSERT(ac.check());
   }
 
-  static DeviceBuilder MakeRootDevice(ACPI_HANDLE handle) {
+  static DeviceBuilder MakeRootDevice(ACPI_HANDLE handle, zx_device_t* acpi_root) {
     DeviceBuilder builder("root", handle, nullptr, false, 0);
+    builder.zx_device_ = acpi_root;
     return builder;
   }
 
   // Creates an actual device from this DeviceBuilder, returning a pointer to its zx_device_t.
-  zx::result<> Build(acpi::Manager* acpi);
+  zx::result<zx_device_t*> Build(acpi::Manager* acpi /*, async_dispatcher_t* device_dispatcher*/);
 
   // Set the bus type of this device. A device can only have a single bus type.
   void SetBusType(BusType t) {
@@ -123,9 +129,9 @@ class DeviceBuilder {
   // Returns true if this bus has any children.
   bool HasBusChildren() { return std::get_if<std::monostate>(&bus_children_) == nullptr; }
 
-  const char* name() { return name_.data(); }
+  const char* name() { return name_.c_str(); }
   ACPI_HANDLE handle() { return handle_; }
-  // bool built() { return zx_device_ != nullptr; }
+  bool built() { return zx_device_ != nullptr; }
   DeviceBuilder* parent() { return parent_; }
 
   // Walk this device's resources.
@@ -155,13 +161,13 @@ class DeviceBuilder {
   // Build a composite node spec for this device that binds to all of its parents. For instance, if
   // a device had an i2c and spi resource, this would generate a composite node spec that binds to
   // the i2c device, the spi device, and the acpi device.
-  zx::result<> BuildComposite(acpi::Manager* acpi);
+  zx::result<> BuildComposite(acpi::Manager* acpi, fbl::Vector<zx_device_str_prop_t>& str_props);
   // Get bind rules and node properties for the |child_index|th child of this bus.
-  // std::pair<std::vector<ddk::BindRule>, std::vector<device_bind_prop_t>>
-  // GetFragmentBindRulesAndPropertiesForChild(size_t child_index);
+  std::pair<fbl::Vector<ddk::BindRule>, fbl::Vector<device_bind_prop_t>>
+  GetFragmentBindRulesAndPropertiesForChild(size_t child_index);
   // Get bind rules and node properties for this device.
-  // td::pair<std::vector<ddk::BindRule>, std::vector<device_bind_prop_t>>
-  // GetFragmentBindRulesAndPropertiesForSelf();
+  std::pair<fbl::Vector<ddk::BindRule>, fbl::Vector<device_bind_prop_t>>
+  GetFragmentBindRulesAndPropertiesForSelf();
 
   // Check for "Device Properties for _DSD" containing a "compatible" key.
   // If found, the first value is added as the first_cid bind property.
@@ -170,7 +176,7 @@ class DeviceBuilder {
   bool CheckForDeviceTreeCompatible(acpi::Acpi* acpi);
 
   // Information about the device to be published.
-  ktl::string_view name_;
+  std::string name_;
   ACPI_HANDLE handle_;
   BusType bus_type_ = kUnknown;
   // For PCI, this is the result of evaluating _BBN.
@@ -178,10 +184,10 @@ class DeviceBuilder {
   // (e.g. first i2c bus in the ACPI tables will be bus 0, second bus 1, etc.)
   std::optional<uint32_t> bus_id_;
   DeviceBuilder* parent_;
-  // zx_device_t* zx_device_ = nullptr;
+  zx_device_t* zx_device_ = nullptr;
 
   DeviceChildData bus_children_;
-  // std::vector<OwnedStringProp> str_props_;
+  fbl::Vector<OwnedStringProp> str_props_;
 
   // Resources this device uses. "Buses" is a fairly loosely used term here and could
   // refer to things like GPIOs as well.

@@ -8,23 +8,25 @@
 
 #include "ddktl/device.h"
 #include "fbl/string_printf.h"
-#include "fidl/fuchsia.hardware.interrupt/cpp/wire_messaging.h"
-#include "lib/component/outgoing/cpp/handlers.h"
-#include "lib/component/outgoing/cpp/outgoing_directory.h"
+// #include "fidl/fuchsia.hardware.interrupt/cpp/wire_messaging.h"
+// #include "lib/component/outgoing/cpp/handlers.h"
+// #include "lib/component/outgoing/cpp/outgoing_directory.h"
 #include "src/devices/board/lib/acpi/device.h"
 
 namespace acpi {
 
-IrqFragment::IrqFragment(async_dispatcher_t* dispatcher, acpi::Device& parent, uint32_t irq_index)
+IrqFragment::IrqFragment(/*async_dispatcher_t* dispatcher,*/ acpi::Device& parent,
+                         uint32_t irq_index)
     : IrqFragmentDeviceType(parent.zxdev()),
       device_(parent),
-      irq_index_(irq_index),
-      dispatcher_(dispatcher),
-      outgoing_(dispatcher) {}
+      irq_index_(irq_index) /*,
+       dispatcher_(dispatcher),
+       outgoing_(dispatcher)*/
+{}
 
-zx::result<> IrqFragment::Create(async_dispatcher_t* dispatcher, acpi::Device& parent,
+zx::result<> IrqFragment::Create(/*async_dispatcher_t* dispatcher,*/ acpi::Device& parent,
                                  uint32_t irq_index, uint32_t acpi_device_id) {
-  auto device = std::unique_ptr<IrqFragment>(new IrqFragment(dispatcher, parent, irq_index));
+  auto device = std::unique_ptr<IrqFragment>(new IrqFragment(/*dispatcher,*/ parent, irq_index));
 
   auto result = device->Init(acpi_device_id);
   if (result.is_ok()) {
@@ -36,6 +38,7 @@ zx::result<> IrqFragment::Create(async_dispatcher_t* dispatcher, acpi::Device& p
 }
 
 zx::result<> IrqFragment::Init(uint32_t device_id) {
+#if 0
   fuchsia_hardware_interrupt::Service::InstanceHandler handler(
       {.provider = [this](fidl::ServerEnd<fuchsia_hardware_interrupt::Provider> request) {
         fidl::BindServer(dispatcher_, std::move(request), this);
@@ -58,26 +61,29 @@ zx::result<> IrqFragment::Init(uint32_t device_id) {
   std::array offers = {
       fuchsia_hardware_interrupt::Service::Name,
   };
+#endif
 
   // Make sure the properties here stay in sync with
   // the bind rules in device-builder.cc.
   // LINT.IfChange
   zx_device_str_prop_t properties[] = {
-      ddk::MakeStrProperty(bind_fuchsia::ACPI_ID, device_id),
-      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_INTERRUPT_ID, irq_index_ + 1),
+      ddk::MakeStrProperty(bind_fuchsia::ACPI_ID.data(), device_id),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_INTERRUPT_ID.data(), irq_index_ + 1),
   };
   // LINT.ThenChange(device-builder.cc)
 
-  auto name = fbl::StringPrintf("%s-irq%03u", device_.name(), irq_index_);
-  zx_status_t status = DdkAdd(ddk::DeviceAddArgs(name.data())
+  char name[ZX_MAX_NAME_LEN];
+  snprintf(name, sizeof(name), "%s-irq%03u", device_.name(), irq_index_);
+  zx_status_t status = DdkAdd(ddk::DeviceAddArgs(name)
                                   .set_flags(DEVICE_ADD_MUST_ISOLATE)
-                                  .set_outgoing_dir(endpoints->client.TakeChannel())
-                                  .set_fidl_service_offers(offers)
+                                  /*.set_outgoing_dir(endpoints->client.TakeChannel())
+                                  .set_fidl_service_offers(offers)*/
                                   .set_str_props(properties));
 
   return zx::make_result(status);
 }
 
+#if 0
 void IrqFragment::Get(GetCompleter::Sync& completer) {
   auto result = device_.GetInterrupt(irq_index_);
   if (result.is_error()) {
@@ -86,5 +92,6 @@ void IrqFragment::Get(GetCompleter::Sync& completer) {
     completer.ReplySuccess(std::move(*result));
   }
 }
+#endif
 
 }  // namespace acpi

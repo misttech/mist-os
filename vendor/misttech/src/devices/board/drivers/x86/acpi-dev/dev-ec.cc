@@ -2,13 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/board/drivers/x86/acpi-dev/dev-ec.h"
+#include "vendor/misttech/src/devices/board/drivers/x86/acpi-dev/dev-ec.h"
 
 #include <lib/ddk/debug.h>
 #include <lib/ddk/hw/inout.h>
+#include <trace.h>
 #include <zircon/errors.h>
 
 #include <ddktl/device.h>
+
+#define LOCAL_TRACE 2
 
 namespace acpi_ec {
 namespace {
@@ -19,7 +22,8 @@ class RealIoPort : public IoPortInterface {
   void outp(uint16_t port, uint8_t value) override { ::outp(port, value); }
 
   zx_status_t Map(uint16_t port) override {
-    return zx_ioports_request(get_ioport_resource(parent_), port, 1);
+    // return zx_ioports_request(get_ioport_resource(parent_), port, 1);
+    return ZX_OK;
   }
 
   explicit RealIoPort(zx_device_t* parent) : parent_(parent) {}
@@ -37,9 +41,9 @@ zx_status_t EcDevice::Create(zx_device_t* parent, acpi::Acpi* acpi, ACPI_HANDLE 
   if (status == ZX_OK) {
     // The DDK takes ownership of the device.
     [[maybe_unused]] auto unused = device.release();
-    zxlogf(INFO, "initialised acpi-ec");
+    LTRACEF("initialised acpi-ec\n");
   } else {
-    zxlogf(ERROR, "Failed to init acpi-ec: %s", zx_status_get_string(status));
+    LTRACEF("Failed to init acpi-ec: %d\n", status);
   }
   return status;
 }
@@ -51,13 +55,15 @@ zx_status_t EcDevice::Init() {
     return use_glk.error_value();
   }
   use_global_lock_ = *use_glk;
-  inspect_.GetRoot().CreateBool("use-global-lock", use_global_lock_, &inspect_);
+  // inspect_.GetRoot().CreateBool("use-global-lock", use_global_lock_, &inspect_);
 
   // Create event.
-  zx_status_t status = zx::event::create(0, &irq_);
-  if (status != ZX_OK) {
-    return status;
-  }
+  zx_status_t status = ZX_OK;
+  // zx_status_t status = zx::event::create(0, &irq_);
+  // if (status != ZX_OK) {
+  //  return status;
+  //}
+
   // Find GPE info.
   zx::result<std::pair<ACPI_HANDLE, uint32_t>> gpe_info = GetGpeInfo();
   if (gpe_info.is_error()) {
@@ -85,7 +91,7 @@ zx_status_t EcDevice::Init() {
 
   // Start transaction thread -- some boards seem to call into the address space handler
   // from AML bytecode when you call InstallAddressSpaceHandler(), so we need to do this first.
-  txn_thread_ = std::thread([this]() { TransactionThread(); });
+  // txn_thread_ = std::thread([this]() { TransactionThread(); });
 
   // Install address space handler.
   acpi::status<> addr_space_status = acpi_->InstallAddressSpaceHandler(
@@ -95,28 +101,27 @@ zx_status_t EcDevice::Init() {
   }
 
   // Start query thread now that we're fully ready to service queries.
-  query_thread_ = std::thread([this]() { QueryThread(); });
+  // query_thread_ = std::thread([this]() { QueryThread(); });
 
-  status = DdkAdd(ddk::DeviceAddArgs("ec")
-                      .set_proto_id(ZX_PROTOCOL_MISC)
-                      .set_inspect_vmo(inspect_.DuplicateVmo()));
+  status = DdkAdd(ddk::DeviceAddArgs("ec").set_proto_id(ZX_PROTOCOL_MISC)
+                  /*.set_inspect_vmo(inspect_.DuplicateVmo())*/);
   return status;
 }
 
 void EcDevice::DdkUnbind(ddk::UnbindTxn txn) {
-  irq_.signal(0, EcSignal::kEcShutdown);
+  // irq_.signal(0, EcSignal::kEcShutdown);
   acpi::status<> status = acpi_->DisableGpe(gpe_info_.first, gpe_info_.second);
   if (status.is_error()) {
-    zxlogf(WARNING, "Failed to disable GPE: %d", status.status_value());
+    LTRACEF("Failed to disable GPE: %d\n", status.status_value());
   }
   status = acpi_->RemoveGpeHandler(gpe_info_.first, gpe_info_.second, EcDevice::GpeHandlerThunk);
   if (status.is_error()) {
-    zxlogf(WARNING, "Failed to remove GPE handler: %d", status.status_value());
+    LTRACEF("Failed to remove GPE handler: %d\n", status.status_value());
   }
   status =
       acpi_->RemoveAddressSpaceHandler(handle_, ACPI_ADR_SPACE_EC, EcDevice::AddressSpaceThunk);
   if (status.is_error()) {
-    zxlogf(WARNING, "failed to remove address space handler: %d", status.status_value());
+    LTRACEF("failed to remove address space handler: %d\n", status.status_value());
   }
   txn.Reply();
 }
@@ -146,7 +151,7 @@ void EcDevice::HandleGpe() {
     clear |= EcSignal::kPendingEvent;
   }
 
-  irq_.signal(clear, pending);
+  // irq_.signal(clear, pending);
 }
 
 ACPI_STATUS EcDevice::SpaceRequest(uint32_t function, ACPI_PHYSICAL_ADDRESS paddr, uint32_t width,
@@ -510,12 +515,12 @@ zx::result<> EcDevice::SetupIo() {
 
   zx_status_t status = io_ports_->Map(data_port_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "acpi-ec: Failed to map ec data port: %s", zx_status_get_string(status));
+    LTRACEF("acpi-ec: Failed to map ec data port: %d\n", status);
     return zx::error(status);
   }
   status = io_ports_->Map(cmd_port_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "acpi-ec: Failed to map ec cmd port: %s", zx_status_get_string(status));
+    LTRACEF("acpi-ec: Failed to map ec cmd port: %d\n", status);
     return zx::error(status);
   }
 

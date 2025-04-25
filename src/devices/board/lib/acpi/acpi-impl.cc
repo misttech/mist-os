@@ -198,7 +198,7 @@ acpi::status<> AcpiImpl::InitializeAcpi() {
     return acpi::make_status(status);
   }
 
-  status = AcpiInitializeTables(NULL, kAcpiMaxInitTables, FALSE);
+  status = AcpiInitializeTables(nullptr, kAcpiMaxInitTables, FALSE);
   if (status == AE_NOT_FOUND) {
     LTRACEF("Could not find ACPI tables\n");
     return acpi::make_status(status);

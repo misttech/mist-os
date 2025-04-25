@@ -15,6 +15,7 @@
 #include "src/devices/board/lib/acpi/bus-type.h"
 #include "src/devices/board/lib/acpi/device-builder.h"
 #include "src/devices/board/lib/acpi/power-resource.h"
+#include "src/devices/lib/iommu/iommu.h"
 
 namespace async {
 class Executor;
@@ -36,7 +37,8 @@ class Manager {
   // must ensure it outlives the manager.
   // |acpi_root| is a pointer to the device that will be the parent of all other ACPI devices. It
   // should be owned by the DDK, and must outlive the manager.
-  explicit Manager(Acpi* acpi) : acpi_(acpi) {}
+  explicit Manager(Acpi* acpi, iommu::IommuManagerInterface* iommu, zx_device_t* acpi_root)
+      : acpi_(acpi), iommu_manager_(iommu), acpi_root_(acpi_root) {}
 
   virtual ~Manager() = default;
 
@@ -45,10 +47,10 @@ class Manager {
   // Infer information about devices based on their relationships.
   acpi::status<> ConfigureDiscoveredDevices();
   // Publish devices to driver manager.
-  acpi::status<> PublishDevices();
+  acpi::status<> PublishDevices(zx_device_t* platform_bus);
 
   // For devices: get the next unique BTI ID.
-  //uint32_t GetNextBtiId() { return next_bti_++; }
+  uint32_t GetNextBtiId() { return next_bti_++; }
 
   // Used by a device to inform the manager about the existence of a power resource.
   const PowerResource* AddPowerResource(ACPI_HANDLE power_resource_handle);
@@ -73,9 +75,11 @@ class Manager {
   acpi::status<bool> DiscoverDevice(ACPI_HANDLE handle);
 
   // Call pci_init for the given device.
-  acpi::status<> PublishPciBus(DeviceBuilder* device);
+  acpi::status<> PublishPciBus(zx_device_t* platform_bus, DeviceBuilder* device);
 
   Acpi* acpi_;
+  iommu::IommuManagerInterface* iommu_manager_;
+  zx_device_t* acpi_root_;
   util::BTreeMap<ACPI_HANDLE, DeviceBuilder> devices_;
 
   DECLARE_MUTEX(Manager) devices_lock_;

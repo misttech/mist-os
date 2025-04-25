@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 
 #include <assert.h>
-#include <fuchsia/hardware/pciroot/c/banjo.h>
-#include <lib/ddk/debug.h>
 #include <lib/pci/pciroot.h>
+#include <mistos/hardware/pciroot/c/banjo.h>
 #include <stdio.h>
+#include <trace.h>
 #include <zircon/hw/pci.h>
 
+#include <algorithm>
 #include <array>
-#include <cstring>
 #include <optional>
 
 #include <acpica/acpi.h>
@@ -18,6 +18,9 @@
 #include "src/devices/board/lib/acpi/pci-internal.h"
 #include "src/devices/board/lib/acpi/status.h"
 #include "src/devices/board/lib/acpi/util.h"
+#include "zircon/system/ulib/acpica/oszircon.h"
+
+#define LOCAL_TRACE 0
 
 // Legacy PCI device functions have a single interrupt that was traditionally
 // wired directly into the interrupt controller. There are only four interrupt
@@ -119,14 +122,14 @@ void AddIrqToAccounting(acpi_legacy_irq irq, AcpiPciroot::Context* context,
   auto vector_entry = context->irqs.find(irq.vector);
   if (vector_entry == context->irqs.end()) {
     context->irqs[irq.vector] = irq;
-    zxlogf(DEBUG, "added vector %#x { %s } from PRT", irq.vector, im_to_str(irq.options));
+    LTRACEF("added vector %#x { %s } from PRT\n", irq.vector, im_to_str(irq.options));
   } else if (vector_entry->second.options != irq.options) {
     // This may not be fatal, but it would represent a misconfiguration that
     // would likely result in some devices wired to this pin to have
     // malfunctioning IRQs. It would most likely reflect an error in an ACPI
     // table, but we cannot do much about it without knowing which configuration
     // is correct. In lieu of that, go with the first.
-    zxlogf(WARNING, "Multiple IRQ configurations found in PRT for vector %#x!", irq.vector);
+    LTRACEF("Multiple IRQ configurations found in PRT for vector %#x!\n", irq.vector);
   }
 
   auto& routing_vec = context->routing;
@@ -141,7 +144,7 @@ void AddIrqToAccounting(acpi_legacy_irq irq, AcpiPciroot::Context* context,
   // address then we can update that entry, otherwise a new entry needs to be made for that
   // combination of port and child device. This would be easier in a map, but a vector allows us to
   // directly point to the backing storage in the pciroot protocol implementation.
-  if (auto found_entry = std::find_if(routing_vec.begin(), routing_vec.end(), find_fn);
+  if (auto found_entry = std::ranges::find_if(routing_vec, find_fn);
       found_entry != std::end(routing_vec)) {
     found_entry->pins[entry->Pin] = static_cast<uint8_t>(irq.vector);
   } else {
@@ -153,7 +156,9 @@ void AddIrqToAccounting(acpi_legacy_irq irq, AcpiPciroot::Context* context,
         .pins = {0},
     };
     new_entry.pins[entry->Pin] = static_cast<uint8_t>(irq.vector);
-    routing_vec.push_back(new_entry);
+    fbl::AllocChecker ac;
+    routing_vec.push_back(new_entry, &ac);
+    ZX_ASSERT(ac.check());
   }
 }
 
@@ -167,15 +172,15 @@ ACPI_STATUS ReadPciRoutingTable(ACPI_HANDLE object, AcpiPciroot::Context* contex
 
   for (auto& entry : irt_buffer) {
     if (entry.Pin >= PCI_MAX_LEGACY_IRQ_PINS) {
-      zxlogf(ERROR, "PRT entry contains an invalid pin: %#x", entry.Pin);
+      LTRACEF("PRT entry contains an invalid pin: %#x\n", entry.Pin);
       return AE_ERROR;
     }
 
-    zxlogf(TRACE,
-           "_PRT Entry RootPort %02x.%1x: .Address = 0x%05llx, .Pin = %u, .SourceIndex = %u, "
-           ".Source = \"%s\"",
-           (port) ? port->dev_id : 0, (port) ? port->func_id : 0, entry.Address, entry.Pin,
-           entry.SourceIndex, entry.u.Source);
+    LTRACEF(
+        "_PRT Entry RootPort %02x.%1x: .Address = 0x%05llx, .Pin = %u, .SourceIndex = %u, "
+        ".Source = \"%s\"\n",
+        (port) ? port->dev_id : 0, (port) ? port->func_id : 0, entry.Address, entry.Pin,
+        entry.SourceIndex, entry.u.Source);
 
     // Per ACPI Spec 6.2.13, all _PRT entries must have a function address of
     // 0xFFFF representing all functions in the device. In effect, this means we
@@ -185,8 +190,8 @@ ACPI_STATUS ReadPciRoutingTable(ACPI_HANDLE object, AcpiPciroot::Context* contex
     // we're handling a root port, and if it's a root port, dev_id should
     // be 0. If not, the entry is strange and we'll warn / skip it.
     if (port && dev_id != 0) {
-      zxlogf(WARNING, "PRT entry for root %.*s unexpected contains device address: %#x",
-             static_cast<int>(sizeof(context->name)), context->name, dev_id);
+      LTRACEF("PRT entry for root %.*s unexpected contains device address: %#x\n",
+              static_cast<int>(sizeof(context->name)), context->name, dev_id);
       continue;
     }
 
@@ -206,8 +211,8 @@ ACPI_STATUS GetPciRootIrqRouting(acpi::Acpi* acpi, ACPI_HANDLE root_obj,
   // Start with the Root's _PRT. The spec requires that one exists.
   ACPI_STATUS status = ReadPciRoutingTable(root_obj, context, std::nullopt);
   if (status != AE_OK) {
-    zxlogf(DEBUG, "Couldn't find an IRQ routing table for root %.*s",
-           static_cast<int>(sizeof(context->name)), context->name);
+    LTRACEF("Couldn't find an IRQ routing table for root %.*s\n",
+            static_cast<int>(sizeof(context->name)), context->name);
     return status;
   }
 
@@ -224,8 +229,8 @@ ACPI_STATUS GetPciRootIrqRouting(acpi::Acpi* acpi, ACPI_HANDLE root_obj,
           .dev_id = static_cast<uint8_t>((res->Address >> 16) & (PCI_MAX_DEVICES_PER_BUS - 1)),
           .func_id = static_cast<uint8_t>(res->Address & (PCI_MAX_FUNCTIONS_PER_DEVICE - 1)),
       };
-      zxlogf(DEBUG, "Processing _PRT for %02x.%1x (%.*s)", port.dev_id, port.func_id, 4,
-             reinterpret_cast<char*>(&res->Name));
+      LTRACEF("Processing _PRT for %02x.%1x (%.*s)\n", port.dev_id, port.func_id, 4,
+              reinterpret_cast<char*>(&res->Name));
       // Ignore the return value of this, since if child is not a root port, it
       // will fail and we don't care.
       ReadPciRoutingTable(child, context, port);

@@ -4,7 +4,12 @@
 # found in the LICENSE file.
 
 shared_public_deps = [
+  "//src/devices/bind/fuchsia:fuchsia_cpp",
+  "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
+
+  #"//src/devices/lib/iommu",
   "//third_party/acpica",
+  "//vendor/misttech/src/lib/ddktl",
   "//vendor/misttech/zircon/kernel/lib/mistos/util",
 ]
 
@@ -23,13 +28,19 @@ shared_defines = [ "ACPI_FLEX_ARRAY(TYPE, NAME)=TYPE NAME[0]" ]
 shared_fuchsia_public_deps = []
 
 shared_deps = [
+  "//sdk/banjo/mistos.hardware.pciroot:mistos.hardware.pciroot_banjo_cpp",
+  "//src/devices/bind/fuchsia:fuchsia_cpp",
+  "//src/devices/bind/fuchsia.pci:fuchsia.pci_cpp",
   "//zircon/system/ulib/fbl",
   "//zircon/system/ulib/zx",
 ]
 
 shared_fuchsia_deps = [
+  #"//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp",
+  #"//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_cpp",
   #"//src/devices/lib/acpi",
-  #"//src/devices/pci/lib/pci",
+  "//src/devices/pci/lib/pci",
+  "//vendor/misttech/src/lib/ddk:ddk-deprecated-binding-headers",
   "//zircon/system/ulib/zircon-internal",
 ]
 
@@ -41,9 +52,8 @@ source_set("host-acpi") {
     "acpi.h",
     "device-builder.cc",
     "device-builder.h",
-
-    #"device-for-host.cc",
-    #"device-for-host.h",
+    "device-for-host.cc",
+    "device-for-host.h",
     "manager.cc",
     "manager.h",
     "resources.cc",
@@ -63,19 +73,16 @@ source_set("acpi") {
     "acpi.h",
     "device-builder.cc",
     "device-builder.h",
-
-    #"device.cc",
-    #"device.h",
-
-    #"irq-fragment.cc",
-    #"irq-fragment.h",
+    "device.cc",
+    "device.h",
+    "irq-fragment.cc",
+    "irq-fragment.h",
     "manager.cc",
     "manager.h",
-
-    #"pci.cc",
-    #"pci.h",
-    #"pci_irqs.cc",
-    #"pciroot.cc",
+    "pci.cc",
+    "pci.h",
+    "pci_irqs.cc",
+    "pciroot.cc",
     "power-resource.cc",
     "power-resource.h",
     "resources.cc",
@@ -85,7 +92,7 @@ source_set("acpi") {
   defines = []
 
   public_deps = shared_public_deps + shared_fuchsia_public_deps
-  deps = shared_deps + shared_fuchsia_deps
+  deps = shared_deps + shared_fuchsia_deps + [ "//vendor/misttech/src/lib/ddk" ]
   defines += shared_defines
 
   configs += [ "//build/config:default_include_dirs" ]

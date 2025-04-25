@@ -3,12 +3,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <mistos/hardware/pciroot/c/banjo.h>
 #include <trace.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 
 #include <acpica/acpi.h>
+#include <fbl/auto_lock.h>
 
+// #include "acpi-dev/dev-ec.h"
 #include "acpi-private.h"
 #include "acpi.h"
 #include "dev.h"
@@ -68,7 +71,8 @@ zx_status_t acpi_suspend(bool enable_wake, uint8_t suspend_reason) {
 }
 #endif
 
-zx_status_t publish_acpi_devices(acpi::Manager* manager) {
+zx_status_t publish_acpi_devices(acpi::Manager* manager, zx_device_t* platform_bus,
+                                 zx_device_t* acpi_root) {
   acpi::Acpi* acpi = manager->acpi();
 
   auto result = manager->DiscoverDevices();
@@ -79,7 +83,7 @@ zx_status_t publish_acpi_devices(acpi::Manager* manager) {
   if (result.is_error()) {
     LTRACEF("configure failed\n");
   }
-  result = manager->PublishDevices();
+  result = manager->PublishDevices(platform_bus);
 
   // Now walk the ACPI namespace looking for devices we understand, and publish
   // them.  For now, publish only the first PCI bus we encounter.

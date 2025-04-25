@@ -18,7 +18,7 @@
 #include "src/devices/board/lib/acpi/power-resource.h"
 #include "src/devices/board/lib/acpi/util.h"
 
-#define LOCAL_TRACE 0
+#define LOCAL_TRACE 2
 
 namespace acpi {
 
@@ -30,7 +30,7 @@ acpi::status<> Manager::DiscoverDevices() {
     return root.take_error();
   }
 
-  devices_.emplace(root.value(), DeviceBuilder::MakeRootDevice(root.value()));
+  devices_.emplace(root.value(), DeviceBuilder::MakeRootDevice(root.value(), acpi_root_));
   uint32_t ignored_depth = Acpi::kMaxNamespaceDepth + 1;
   return acpi_->WalkNamespace(ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT, Acpi::kMaxNamespaceDepth,
                               [this, &ignored_depth](ACPI_HANDLE handle, uint32_t depth,
@@ -114,7 +114,7 @@ acpi::status<> Manager::ConfigureDiscoveredDevices() {
   return acpi::ok();
 }
 
-acpi::status<> Manager::PublishDevices() {
+acpi::status<> Manager::PublishDevices(zx_device_t* platform_bus) {
   for (auto handle : device_publish_order_) {
     DeviceBuilder* d = LookupDevice(handle);
     if (d == nullptr) {
@@ -128,7 +128,7 @@ acpi::status<> Manager::PublishDevices() {
 
     uint32_t bus_type = d->GetBusType();
     if (bus_type == BusType::kPci) {
-      auto s = PublishPciBus(d);
+      auto s = PublishPciBus(platform_bus, d);
       if (s.is_error()) {
         return s.take_error();
       }
@@ -219,7 +219,8 @@ acpi::status<bool> Manager::DiscoverDevice(ACPI_HANDLE handle) {
     examine_children = true;
   } else if (state_result.is_ok()) {
     if (state_result->Type != ACPI_TYPE_INTEGER) {
-      LTRACEF("%s returned incorrect object type for _STA\n", name.data());
+      LTRACEF("%.*s returned incorrect object type for _STA\n", static_cast<int>(name.size()),
+              name.data());
       return acpi::error(AE_BAD_VALUE);
     }
     state = state_result->Integer.Value;
@@ -230,7 +231,8 @@ acpi::status<bool> Manager::DiscoverDevice(ACPI_HANDLE handle) {
 
   // See ACPI 6.4, Table 6.66.
   if (!examine_children) {
-    LTRACEF("device '%s' not present, so not enumerating.\n", name.data());
+    LTRACEF("device '%.*s' not present, so not enumerating.\n", static_cast<int>(name.size()),
+            name.data());
     return acpi::ok(true);
   }
 
@@ -239,7 +241,8 @@ acpi::status<bool> Manager::DiscoverDevice(ACPI_HANDLE handle) {
   do {
     parent = acpi_->GetParent(*parent);
     if (parent.is_error()) {
-      LTRACEF("Device '%s' failed to get parent: %d\n", name.data(), parent.status_value());
+      LTRACEF("Device '%.*s' failed to get parent: %d\n", static_cast<int>(name.size()),
+              name.data(), parent.status_value());
       return parent.take_error();
     }
 
@@ -257,7 +260,8 @@ acpi::status<bool> Manager::DiscoverDevice(ACPI_HANDLE handle) {
   if (parent_ptr == nullptr) {
     // Our parent should have been visited before us (since we're descending down the tree),
     // so this should never happen.
-    LTRACEF("Device %s has no discovered parent? (%p)\n", name.data(), parent.value());
+    LTRACEF("Device %.*s has no discovered parent? (%p)\n", static_cast<int>(name.size()),
+            name.data(), parent.value());
     return acpi::error(AE_NOT_FOUND);
   }
 
@@ -274,7 +278,7 @@ acpi::status<bool> Manager::DiscoverDevice(ACPI_HANDLE handle) {
   return acpi::ok(false);
 }
 
-acpi::status<> Manager::PublishPciBus(DeviceBuilder* device) {
+acpi::status<> Manager::PublishPciBus(zx_device_t* platform_bus, DeviceBuilder* device) {
   if (published_pci_bus_) {
     return acpi::ok();
   }
@@ -317,7 +321,8 @@ acpi::status<> Manager::PublishPciBus(DeviceBuilder* device) {
     }
   }
 
-  if (pci_init(device->handle(), std::move(info.value()), this, std::move(bdfs)) == ZX_OK) {
+  if (pci_init(platform_bus, device->handle(), std::move(info.value()), this, std::move(bdfs)) ==
+      ZX_OK) {
     published_pci_bus_ = true;
   }
   return acpi::ok();

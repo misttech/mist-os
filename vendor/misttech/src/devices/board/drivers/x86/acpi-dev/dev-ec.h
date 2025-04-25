@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/inspect/cpp/inspector.h>
+// #include <lib/inspect/cpp/inspector.h>
 #include <lib/zx/event.h>
 #include <zircon/types.h>
 
-#include <condition_variable>
+// #include <condition_variable>
 
 #include <ddktl/device.h>
 
@@ -55,7 +55,7 @@ struct Transaction {
   zx_status_t status = ZX_OK;
   // Signalled when this transaction is ready to be consumed by whatever initiated it.
   // Transactions are usually performed in synchronous contexts (i.e. AML code), so this is OK.
-  sync_completion_t done;
+  // sync_completion_t done;
 };
 
 class IoPortInterface {
@@ -80,8 +80,8 @@ class EcDevice : public DeviceType {
   static zx_status_t Create(zx_device_t* parent, acpi::Acpi* acpi, ACPI_HANDLE handle);
   zx_status_t Init();
   void DdkRelease() {
-    txn_thread_.join();
-    query_thread_.join();
+    //txn_thread_.join();
+    //query_thread_.join();
     delete this;
   }
 
@@ -137,10 +137,10 @@ class EcDevice : public DeviceType {
     return static_cast<EcDevice*>(handler_ctx)->SpaceRequest(func, addr, width, value);
   }
 
-  std::mutex transaction_lock_;
-  std::vector<Transaction*> transaction_queue_ __TA_GUARDED(transaction_lock_);
-  std::thread txn_thread_;
-  std::thread query_thread_;
+  fbl::Mutex transaction_lock_;
+  fbl::Vector<Transaction*> transaction_queue_ __TA_GUARDED(transaction_lock_);
+  // std::thread txn_thread_;
+  // std::thread query_thread_;
 
   acpi::Acpi* acpi_;
   ACPI_HANDLE handle_;
@@ -149,11 +149,11 @@ class EcDevice : public DeviceType {
   uint16_t cmd_port_ = 0;
   std::unique_ptr<IoPortInterface> io_ports_;
   bool use_global_lock_ = false;
-  zx::event irq_;
+  // zx::event irq_;
   std::pair<ACPI_HANDLE, uint32_t> gpe_info_;
-  inspect::Inspector inspect_;
-  inspect::UintProperty finished_txns_ = inspect_.GetRoot().CreateUint("finished-txns", 0);
-  inspect::StringProperty last_query_ = inspect_.GetRoot().CreateString("last-query", "N/A");
+  // inspect::Inspector inspect_;
+  // inspect::UintProperty finished_txns_ = inspect_.GetRoot().CreateUint("finished-txns", 0);
+  // inspect::StringProperty last_query_ = inspect_.GetRoot().CreateString("last-query", "N/A");
 };
 
 }  // namespace acpi_ec

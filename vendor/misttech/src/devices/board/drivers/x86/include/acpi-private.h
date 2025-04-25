@@ -3,11 +3,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef VENDOR_MISTTECH_DEVICES_BOARD_DRIVERS_X86_INCLUDE_ACPI_PRIVATE_H_
-#define VENDOR_MISTTECH_DEVICES_BOARD_DRIVERS_X86_INCLUDE_ACPI_PRIVATE_H_
+#ifndef VENDOR_MISTTECH_SRC_DEVICES_BOARD_DRIVERS_X86_INCLUDE_ACPI_PRIVATE_H_
+#define VENDOR_MISTTECH_SRC_DEVICES_BOARD_DRIVERS_X86_INCLUDE_ACPI_PRIVATE_H_
 
 #include <vector>
 
+#include <ddktl/device.h>
 
 #include "src/devices/board/lib/acpi/status.h"
 #include "src/devices/board/lib/acpi/util.h"
@@ -32,6 +33,6 @@ acpi::status<UniquePtr<ACPI_DEVICE_INFO>> GetObjectInfo(ACPI_HANDLE obj);
 
 }  // namespace acpi
 
-// const zx_protocol_device_t* get_acpi_root_device_proto(void);
+const zx_protocol_device_t* get_acpi_root_device_proto(void);
 
-#endif  // VENDOR_MISTTECH_DEVICES_BOARD_DRIVERS_X86_INCLUDE_ACPI_PRIVATE_H_
+#endif  // VENDOR_MISTTECH_SRC_DEVICES_BOARD_DRIVERS_X86_INCLUDE_ACPI_PRIVATE_H_
