@@ -10,8 +10,6 @@ import("//build/test.gni")
 library_headers("headers") {
   headers = [ "vm/phys/arena.h" ]
   public_deps = [
-    "//sdk/lib/stdcompat",
-
     # <vm/phys/arena.h> has #include <lib/fit/result.h>
     "//sdk/lib/fit",
 
@@ -24,7 +22,6 @@ test("arena-selection-tests") {
   sources = [ "arena-selection-tests.cc" ]
   deps = [
     ":headers",
-    "//sdk/lib/stdcompat",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
     "//zircon/kernel/phys/lib/memalloc",

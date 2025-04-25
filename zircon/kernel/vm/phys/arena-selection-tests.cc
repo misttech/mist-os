@@ -4,10 +4,11 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include <inttypes.h>
 #include <lib/memalloc/range.h>
 #include <lib/memalloc/testing/range.h>
-#include <lib/stdcompat/span.h>
+
+#include <cinttypes>
+#include <span>
 
 #include <gtest/gtest.h>
 #include <vm/phys/arena.h>
@@ -44,9 +45,9 @@ constexpr uint64_t kMaxNumWastedPagesUnderTestLimit =
 
 // Compares expected arena and bookkeeping selection for a given set of input
 // ranges with the actual.
-void ExpectArenas(cpp20::span<const memalloc::Range> ranges,
-                  cpp20::span<const PmmArenaSelection> expected,
-                  cpp20::span<const PmmArenaSelectionError> expected_errors = {},
+void ExpectArenas(std::span<const memalloc::Range> ranges,
+                  std::span<const PmmArenaSelection> expected,
+                  std::span<const PmmArenaSelectionError> expected_errors = {},
                   uint64_t max_wasted_bytes = kTestMaxWastedBytes) {
   std::vector<PmmArenaSelection> actual;
   auto record_arena = [&actual](const PmmArenaSelection& arena) { actual.push_back(arena); };
@@ -98,14 +99,14 @@ void ExpectArenas(cpp20::span<const memalloc::Range> ranges,
 // A thin wrapper around ExpectArenas() that provides the 'production' wastage
 // limit. This is used in the practical test cases below that provide memory
 // layouts that mirror specific supported boards.
-void ExpectArenasInPractice(cpp20::span<const memalloc::Range> ranges,
-                            cpp20::span<const PmmArenaSelection> expected,
-                            cpp20::span<const PmmArenaSelectionError> expected_errors = {}) {
+void ExpectArenasInPractice(std::span<const memalloc::Range> ranges,
+                            std::span<const PmmArenaSelection> expected,
+                            std::span<const PmmArenaSelectionError> expected_errors = {}) {
   ExpectArenas(ranges, expected, expected_errors, kMaxWastedArenaBytes);
 }
 
-void ExpectAlignedAllocationsOrHoles(cpp20::span<const memalloc::Range> input_ranges,
-                                     cpp20::span<const memalloc::Range> expected) {
+void ExpectAlignedAllocationsOrHoles(std::span<const memalloc::Range> input_ranges,
+                                     std::span<const memalloc::Range> expected) {
   std::vector<memalloc::Range> actual;
   ForEachAlignedAllocationOrHole<kPageSize>(input_ranges, [&actual](const memalloc::Range& range) {
     actual.push_back(range);
