@@ -22,6 +22,10 @@ declare_args() {
 # Wrap a Bazel command with a GN action.
 # Bazel is invoked in a workspace setup by `//build/bazel:bazel_workspace`.
 #
+# May only be called on the default_toolchain so as to prevent generating Bazel
+# workspace multiple times. Host targets can be built by specifying
+# `no_sdk = true`.
+#
 # The caller should pass a list of Bazel target patterns for the
 # `bazel build` command, as well as a list Bazel output files relative
 # to the workspace's root that will be copied into the
@@ -787,16 +791,11 @@ template("bazel_action") {
 
     args += [ "--" ]
 
-    # Ensure that the default platform is set correctly when this build action
-    # is invoked from a Fuchsia or host toolchain. Other toolchains
-    # will inherit the 'default' platforms which may be set to
-    # //build/bazel/platforms:common in the future, and does not target any
-    # specific system intentionally.
     if (_no_sdk) {
-      # Only host binaries can be built without the SDK because, among other
-      # things, the Zircon library is not available without the SDK.
       args += [ "--platforms=//build/bazel/platforms:host" ]
-    } else if (is_host || is_fuchsia) {
+    } else {
+      # Since this template can only be used on the default toolchain, the
+      # platform is always Fuchsia.
       args +=
           [ "--platforms=//build/bazel/platforms:${current_os}_${current_cpu}" ]
     }
@@ -947,6 +946,9 @@ template("bazel_action") {
     }
     deps += [
       ":${_gn_targets_repository_target}",
+
+      # In addition to checking whether the action is allowed, this dependency
+      # ensures that the template is being used on the default toolchain.
       "//build/bazel:bazel_action_allowlist",
     ]
 
