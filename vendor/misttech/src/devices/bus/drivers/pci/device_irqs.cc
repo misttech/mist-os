@@ -15,9 +15,9 @@
 #include <object/msi_dispatcher.h>
 #include <object/msi_interrupt_dispatcher.h>
 
-#include "src/devices/bus/drivers/pci/capabilities/msi.h"
-#include "src/devices/bus/drivers/pci/common.h"
-#include "src/devices/bus/drivers/pci/device.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/capabilities/msi.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/common.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/device.h"
 
 #define LOCAL_TRACE 0
 

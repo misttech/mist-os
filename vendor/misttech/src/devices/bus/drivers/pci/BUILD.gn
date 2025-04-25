@@ -3,14 +3,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-#import("//build/bind/bind.gni")
-#import("//build/drivers.gni")
+import("//build/bind/bind.gni")
+import("//build/zircon/zx_library.gni")
 
 group("pci") {
   deps = [ ":bus-pci" ]
 }
 
-# The userspace PCI bus driver uses this set, as well as the
+# The PCI bus driver uses this set, as well as the
 # automated tests.
 source_set("bus-pci") {
   visibility = [
@@ -43,28 +43,27 @@ source_set("bus-pci") {
 
   deps = [
     #"//sdk/lib/driver/metadata/cpp",
-    #"//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
+    "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
   ]
 
   public_deps = [
     "//sdk/banjo/mistos.hardware.pciroot:mistos.hardware.pciroot_banjo_cpp",
-
-    #"//sdk/fidl/mistos.hardware.pci:mistos.hardware.pci_bindlib_cpp",
     "//sdk/fidl/mistos.hardware.pci:mistos.hardware.pci_banjo_cpp",
+    "//sdk/fidl/mistos.hardware.pci:mistos.hardware.pci_bindlib_cpp",
     "//vendor/misttech/zircon/kernel/lib/mistos/util:headers",
     "//zircon/kernel/object:headers",
 
     #"//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     #"//sdk/lib/component/outgoing/cpp",
-    #"//src/devices/bind/fuchsia:fuchsia_cpp",
-    #"//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
+
     #"//src/devices/lib/driver",
     #"//src/devices/lib/driver:driver_runtime",
     #"//src/devices/pci/lib/device-protocol-pci",
     "//src/devices/pci/lib/pci",
-
-    #"//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//vendor/misttech/src/lib/ddk",
+    "//vendor/misttech/src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
 
@@ -83,6 +82,36 @@ source_set("bus-pci") {
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
+
+  configs += [ "//build/config:default_include_dirs" ]
+}
+
+driver_bind_rules("pci_bind") {
+  rules = "meta/pci.bind"
+  tests = "meta/pci_bind_tests.json"
+  deps = [
+    "//src/devices/bind/fuchsia.pci",
+    "//src/devices/bind/fuchsia.platform",
+  ]
+}
+
+# bus-pci is used on boards that enable user space PCI support.
+zx_library("bus-pci-driver") {
+  configs += [
+    "//build/config:all_source",
+    "//build/config/fuchsia:enable_zircon_asserts",
+  ]
+
+  sources = [
+    # The driver needs bind glue, unlike tests.
+    "bind.cc",
+  ]
+  deps = [
+    ":bus-pci",
+    ":pci_bind",
+
+    #"//src/devices/lib/driver",
+  ]
 
   configs += [ "//build/config:default_include_dirs" ]
 }

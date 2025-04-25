@@ -11,9 +11,9 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/macros.h>
 
-#include "src/devices/bus/drivers/pci/allocation.h"
-#include "src/devices/bus/drivers/pci/device.h"
-#include "src/devices/bus/drivers/pci/ref_counted.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/allocation.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/device.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/ref_counted.h"
 
 // UpstreamNode
 //

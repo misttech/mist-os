@@ -10,8 +10,8 @@
 
 #include <hwreg/bitfields.h>
 
-#include "src/devices/bus/drivers/pci/capabilities.h"
-#include "src/devices/bus/drivers/pci/config.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/capabilities.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/config.h"
 
 namespace pci {
 

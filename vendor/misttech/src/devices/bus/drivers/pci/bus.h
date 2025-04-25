@@ -23,24 +23,23 @@
 #include <map>
 #include <memory>
 
+#include <ddktl/device.h>
 #include <kernel/thread.h>
-
-// #include <ddktl/device.h>
 // #include <ddktl/fidl.h>
 // #include <ddktl/metadata_server.h>
-// #include <ddktl/protocol/empty-protocol.h>
 #include <mistos/hardware/pci/cpp/banjo.h>
 #include <mistos/hardware/pciroot/cpp/banjo.h>
 
+#include <ddktl/protocol/empty-protocol.h>
 #include <fbl/intrusive_double_list.h>
 #include <fbl/intrusive_wavl_tree.h>
 #include <fbl/vector.h>
 #include <object/port_dispatcher.h>
 
-#include "src/devices/bus/drivers/pci/bus_device_interface.h"
-#include "src/devices/bus/drivers/pci/config.h"
-#include "src/devices/bus/drivers/pci/device.h"
-#include "src/devices/bus/drivers/pci/root.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/bus_device_interface.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/config.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/device.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/root.h"
 
 namespace pci {
 // The length of time to count interrupts before rolling over.
@@ -94,16 +93,16 @@ using DeviceTree =
     fbl::WAVLTree<pci_bdf_t, fbl::RefPtr<pci::Device>, pci::Device::KeyTraitsSortByBdf>;
 
 class Bus;
-// using PciBusType = ddk::Device<Bus, ddk::Messageable<PciFidl::Bus>::Mixin>;
-class Bus : /*public PciBusType,*/
-            /*ublic ddk::EmptyProtocol<ZX_PROTOCOL_PCI>,*/
+using PciBusType = ddk::Device<Bus /*, ddk::Messageable<PciFidl::Bus>::Mixin*/>;
+class Bus : public PciBusType,
+            public ddk::EmptyProtocol<ZX_PROTOCOL_PCI>,
             public BusDeviceInterface,
             public BusInspect {
  public:
-  static zx_status_t Create(fbl::RefPtr<pci::Device> parent);
-  Bus(fbl::RefPtr<pci::Device> parent, const pciroot_protocol_t* pciroot, pci_platform_info_t info,
+  static zx_status_t Create(zx_device_t* parent);
+  Bus(zx_device_t* parent, const pciroot_protocol_t* pciroot, pci_platform_info_t info,
       std::optional<fdf::MmioBuffer> ecam)
-      : /*PciBusType(parent),  // fulfills the DDK mixins*/
+      : PciBusType(parent),  // fulfills the DDK mixins*/
         pciroot_(pciroot),
         info_(info),
         ecam_(std::move(ecam)) {}
@@ -203,7 +202,7 @@ class Bus : /*public PciBusType,*/
   friend int IrqWorkerWrapper(void* args);
 };
 
-// zx_status_t pci_bus_bind(void* ctx, zx_device_t* parent);
+zx_status_t pci_bus_bind(void* ctx, zx_device_t* parent);
 
 }  // namespace pci
 

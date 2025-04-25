@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bus/drivers/pci/bus.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/bus.h"
 
 // #include <fidl/mistos.hardware.pci/cpp/natural_types.h>
 #include <mistos/hardware/pciroot/c/banjo.h>
 // #include <lib/ddk/debug.h>
-// #include <lib/ddk/device.h>
+#include <lib/ddk/device.h>
 // #include <lib/ddk/metadata.h>
-// include <lib/ddk/platform-defs.h>
+// #include <lib/ddk/platform-defs.h>
 #include <lib/mmio/mmio.h>
 #include <lib/pci/hw.h>
 #include <lib/stdcompat/span.h>
@@ -30,54 +30,55 @@
 #include <fbl/auto_lock.h>
 #include <fbl/vector.h>
 
-#include "src/devices/bus/drivers/pci/bridge.h"
-#include "src/devices/bus/drivers/pci/config.h"
-#include "src/devices/bus/drivers/pci/device.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/bridge.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/config.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/device.h"
 
-#define LOCAL_TRACE 0
+#define LOCAL_TRACE 2
 
 namespace pci {
 
-#if 0
 zx_status_t pci_bus_bind(void* ctx, zx_device_t* parent) {
   pciroot_protocol_t pciroot = {};
   zx_status_t status = device_get_protocol(parent, ZX_PROTOCOL_PCIROOT, &pciroot);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to obtain pciroot protocol: %s", zx_status_get_string(status));
+    LTRACEF("failed to obtain pciroot protocol: %s\n", zx_status_get_string(status));
     return status;
   }
 
   pci_platform_info_t info = {};
   status = pciroot_get_pci_platform_info(&pciroot, &info);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to obtain platform information: %s!", zx_status_get_string(status));
+    LTRACEF("failed to obtain platform information: %s!\n", zx_status_get_string(status));
     return status;
   }
 
   // A PCI bus should have an ecam, but they are not mandatory per spec depending on the
   // platform tables offered to us.
   std::optional<fdf::MmioBuffer> ecam;
-  if (info.cam.vmo != ZX_HANDLE_INVALID) {
-    if (auto result = pci::Bus::MapConfigRegion(zx::vmo(info.cam.vmo)); result.is_ok()) {
+  if (info.cam.vmo_list != nullptr) {
+#if 0
+    if (auto result = pci::Bus::MapConfigRegion(zx::vmo(info.cam.vmo_list[0])); result.is_ok()) {
       ecam = std::move(result.value());
     } else {
       return result.status_value();
     }
+#endif
   }
 
   fbl::AllocChecker ac;
   auto bus = std::unique_ptr<pci::Bus>(new (&ac) pci::Bus(parent, &pciroot, info, std::move(ecam)));
   if (!ac.check()) {
-    zxlogf(ERROR, "failed to allocate bus object");
+    LTRACEF("failed to allocate bus object\n");
     return ZX_ERR_NO_MEMORY;
   }
 
-  if (zx_status_t status = bus->Initialize(); status != ZX_OK) {
-    zxlogf(ERROR, "failed to initialize driver: %s", zx_status_get_string(status));
+  if (status = bus->Initialize(); status != ZX_OK) {
+    LTRACEF("failed to initialize driver: %s\n", zx_status_get_string(status));
     if (bus->zxdev() != nullptr) {
       bus->DdkAsyncRemove();
     } else {
-      zxlogf(INFO, "initialization never assigned device, skipping removal");
+      LTRACEF("initialization never assigned device, skipping removal\n");
     }
     return status;
   }
@@ -86,19 +87,16 @@ zx_status_t pci_bus_bind(void* ctx, zx_device_t* parent) {
   [[maybe_unused]] void* released_ptr = bus.release();
   return ZX_OK;
 }
-#endif
 
 zx_status_t Bus::Initialize() {
-  zx_status_t status;
-#if 0
-  zx_status_t status = DdkAdd(ddk::DeviceAddArgs("bus")
-                                  .set_flags(DEVICE_ADD_NON_BINDABLE)
-                                  .set_inspect_vmo(GetInspectVmo()));
+  zx_status_t status = DdkAdd(ddk::DeviceAddArgs("bus").set_flags(DEVICE_ADD_NON_BINDABLE)
+                              /*.set_inspect_vmo(GetInspectVmo())*/);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to add bus driver: %s", zx_status_get_string(status));
+    LTRACEF("failed to add bus driver: %s\n", zx_status_get_string(status));
     return status;
   }
 
+#if 0
   if (zx::result<PciFidl::BoardConfiguration> result =
           ddk::GetMetadata<PciFidl::BoardConfiguration>(parent_);
       result.is_ok()) {

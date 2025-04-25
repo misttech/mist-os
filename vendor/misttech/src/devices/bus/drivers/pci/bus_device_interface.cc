@@ -7,7 +7,7 @@
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
-#include "src/devices/bus/drivers/pci/bus.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/bus.h"
 
 #define LOCAL_TRACE 0
 

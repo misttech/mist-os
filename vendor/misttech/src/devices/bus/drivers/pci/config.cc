@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bus/drivers/pci/config.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/config.h"
 
 #include <assert.h>
 #include <inttypes.h>
@@ -13,7 +13,7 @@
 
 #include <pretty/hexdump.h>
 
-#include "src/devices/bus/drivers/pci/common.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/common.h"
 
 namespace pci {
 

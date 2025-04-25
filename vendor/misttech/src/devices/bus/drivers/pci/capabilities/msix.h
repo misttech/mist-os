@@ -1,6 +1,7 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #ifndef SRC_DEVICES_BUS_DRIVERS_PCI_CAPABILITIES_MSIX_H_
 #define SRC_DEVICES_BUS_DRIVERS_PCI_CAPABILITIES_MSIX_H_
 
@@ -13,10 +14,10 @@
 
 #include <hwreg/bitfields.h>
 
-#include "src/devices/bus/drivers/pci/bar_info.h"
-#include "src/devices/bus/drivers/pci/capabilities.h"
-#include "src/devices/bus/drivers/pci/common.h"
-#include "src/devices/bus/drivers/pci/config.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/bar_info.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/capabilities.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/common.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/config.h"
 
 namespace pci {
 

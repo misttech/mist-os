@@ -2,8 +2,9 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#ifndef SRC_DEVICES_BUS_DRIVERS_PCI_DEVICE_H_
-#define SRC_DEVICES_BUS_DRIVERS_PCI_DEVICE_H_
+
+#ifndef VENDOR_MISTTECH_SRC_DEVICES_BUS_DRIVERS_PCI_DEVICE_H_
+#define VENDOR_MISTTECH_SRC_DEVICES_BUS_DRIVERS_PCI_DEVICE_H_
 
 #include <assert.h>
 #include <mistos/hardware/pci/c/banjo.h>
@@ -32,16 +33,16 @@
 #include <object/msi_allocation.h>
 #include <region-alloc/region-alloc.h>
 
-#include "src/devices/bus/drivers/pci/allocation.h"
-#include "src/devices/bus/drivers/pci/bar_info.h"
-#include "src/devices/bus/drivers/pci/bus_device_interface.h"
-#include "src/devices/bus/drivers/pci/capabilities.h"
-#include "src/devices/bus/drivers/pci/capabilities/msi.h"
-#include "src/devices/bus/drivers/pci/capabilities/msix.h"
-#include "src/devices/bus/drivers/pci/capabilities/pci_express.h"
-#include "src/devices/bus/drivers/pci/capabilities/power_management.h"
-#include "src/devices/bus/drivers/pci/config.h"
-#include "src/devices/bus/drivers/pci/ref_counted.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/allocation.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/bar_info.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/bus_device_interface.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/capabilities.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/capabilities/msi.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/capabilities/msix.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/capabilities/pci_express.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/capabilities/power_management.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/config.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/ref_counted.h"
 
 namespace pci {
 
@@ -461,4 +462,4 @@ class FidlDevice : public FidlDeviceType, public fidl::WireServer<fuchsia_hardwa
 
 }  // namespace pci
 
-#endif  // SRC_DEVICES_BUS_DRIVERS_PCI_DEVICE_H_
+#endif  // VENDOR_MISTTECH_SRC_DEVICES_BUS_DRIVERS_PCI_DEVICE_H_

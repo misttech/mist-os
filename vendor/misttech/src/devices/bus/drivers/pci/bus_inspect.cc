@@ -7,7 +7,7 @@
 
 #include <algorithm>
 
-#include "src/devices/bus/drivers/pci/bus.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/bus.h"
 
 namespace pci {
 

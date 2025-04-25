@@ -11,9 +11,9 @@
 #include <fbl/macros.h>
 #include <fbl/ref_ptr.h>
 
-#include "src/devices/bus/drivers/pci/allocation.h"
-#include "src/devices/bus/drivers/pci/ref_counted.h"
-#include "src/devices/bus/drivers/pci/upstream_node.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/allocation.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/ref_counted.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/upstream_node.h"
 
 namespace pci {
 // Forward declaration of Bus to avoid recursive header inclusion between

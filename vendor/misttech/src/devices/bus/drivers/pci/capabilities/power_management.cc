@@ -12,8 +12,9 @@ namespace pci {
 void PowerManagementCapability::WaitForTransitionRecovery(
     PowerManagementCapability::PowerState old_state,
     PowerManagementCapability::PowerState new_state) {
-  zx::duration wait_time = kStateRecoveryTime[old_state][new_state];
-  zx::nanosleep(zx::deadline_after(wait_time));
+  //zx::duration wait_time = kStateRecoveryTime[old_state][new_state];
+  //zx::nanosleep(zx::deadline_after(wait_time));
+  //Thread::Current::Sleep();
 }
 
 PowerManagementCapability::PowerState PowerManagementCapability::GetPowerState(

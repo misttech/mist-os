@@ -1,8 +1,9 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bus/drivers/pci/composite.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/composite.h"
 
 #include <lib/ddk/binding_driver.h>
 

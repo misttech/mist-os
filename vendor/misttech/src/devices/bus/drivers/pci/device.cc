@@ -1,8 +1,9 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bus/drivers/pci/device.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/device.h"
 
 #include <assert.h>
 // #include <err.h>
@@ -31,13 +32,13 @@
 #include <fbl/string_buffer.h>
 #include <object/virtual_interrupt_dispatcher.h>
 
-#include "src/devices/bus/drivers/pci/bus_device_interface.h"
-#include "src/devices/bus/drivers/pci/capabilities/msi.h"
-#include "src/devices/bus/drivers/pci/capabilities/msix.h"
-#include "src/devices/bus/drivers/pci/capabilities/power_management.h"
-#include "src/devices/bus/drivers/pci/common.h"
-#include "src/devices/bus/drivers/pci/ref_counted.h"
-#include "src/devices/bus/drivers/pci/upstream_node.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/bus_device_interface.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/capabilities/msi.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/capabilities/msix.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/capabilities/power_management.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/common.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/ref_counted.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/upstream_node.h"
 
 #define LOCAL_TRACE 0
 

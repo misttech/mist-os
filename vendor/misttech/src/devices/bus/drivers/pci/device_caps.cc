@@ -5,15 +5,14 @@
 #include <trace.h>
 #include <zircon/errors.h>
 
-#include <fbl/string_buffer.h>
 #include <hwreg/bitfields.h>
 
-#include "src/devices/bus/drivers/pci/capabilities/msi.h"
-#include "src/devices/bus/drivers/pci/capabilities/msix.h"
-#include "src/devices/bus/drivers/pci/capabilities/pci_express.h"
-#include "src/devices/bus/drivers/pci/capabilities/power_management.h"
-#include "src/devices/bus/drivers/pci/common.h"
-#include "src/devices/bus/drivers/pci/device.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/capabilities/msi.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/capabilities/msix.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/capabilities/pci_express.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/capabilities/power_management.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/common.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/device.h"
 
 #define LOCAL_TRACE 0
 
@@ -86,19 +85,22 @@ bool CapabilityCycleExists(const Config& cfg,
                            typename CapabilityBaseType::RegType offset) {
   auto found = list->find_if([&offset](const auto& c) { return c.base() == offset; });
   if (found != list->end()) {
-    fbl::StringBuffer<256> log;
-    log.AppendPrintf("%s found cycle in capabilities, disabling device: ", cfg.addr());
+    char log[256];
+    char hex[16];
+    snprintf(log, sizeof(log), "%s found cycle in capabilities, disabling device: ", cfg.addr());
     bool first = true;
     for (auto& cap = found; cap != list->end(); cap++) {
       if (!first) {
-        log.AppendPrintf(" -> ");
+        strcat(log, " -> ");
       } else {
         first = false;
       }
-      log.AppendPrintf("%#x", cap->base());
+      snprintf(hex, sizeof(hex), "%#x", cap->base());
+      strcat(log, hex);
     }
-    log.AppendPrintf(" -> %#x", offset);
-    TRACEF("%s\n", log.c_str());
+    snprintf(hex, sizeof(hex), " -> %#x", offset);
+    strcat(log, hex);
+    TRACEF("%s\n", log);
     return true;
   }
 
@@ -220,7 +222,8 @@ zx_status_t Device::ParseCapabilities() {
 
     cap_offset = hdr.ptr;
     if (cap_offset && (cap_offset < PCI_CAP_PTR_MIN_VALID || cap_offset > PCI_CAP_PTR_MAX_VALID)) {
-      TRACEF("%s capability pointer out of range: %#02x, disabling device\n", cfg_->addr(), cap_offset);
+      TRACEF("%s capability pointer out of range: %#02x, disabling device\n", cfg_->addr(),
+             cap_offset);
       return ZX_ERR_OUT_OF_RANGE;
     }
   }

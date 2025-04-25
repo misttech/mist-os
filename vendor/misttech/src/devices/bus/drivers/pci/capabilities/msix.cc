@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bus/drivers/pci/capabilities/msix.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/capabilities/msix.h"
 
 #include <lib/zx/result.h>
 #include <trace.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls.h>
 
-#include "src/devices/bus/drivers/pci/config.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/config.h"
 
 #define LOCAL_TRACE 0
 

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bus/drivers/pci/upstream_node.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/upstream_node.h"
 
 #include <assert.h>
 // #include <err.h>
@@ -11,7 +11,7 @@
 
 #include <fbl/algorithm.h>
 
-#include "src/devices/bus/drivers/pci/common.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/common.h"
 
 namespace pci {
 

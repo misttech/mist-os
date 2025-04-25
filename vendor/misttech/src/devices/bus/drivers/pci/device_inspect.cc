@@ -7,8 +7,8 @@
 #include <fbl/string_buffer.h>
 #include <pretty/sizes.h>
 
-#include "src/devices/bus/drivers/pci/config.h"
-#include "src/devices/bus/drivers/pci/device.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/config.h"
+#include "vendor/misttech/src/devices/bus/drivers/pci/device.h"
 
 namespace pci {
 
