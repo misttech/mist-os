@@ -59,6 +59,7 @@ source_set("src") {
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_hlcpp",
     "//sdk/lib/syslog/cpp",
     "//src/developer/forensics/feedback_data:constants",
+    "//src/developer/forensics/utils:purge_memory",
     "//src/lib/diagnostics/accessor2logger",
     "//src/lib/files",
     "//src/lib/fxl",
