@@ -7,8 +7,6 @@
 #include <lib/elfldltl/machine.h>
 #include <lib/fidl/txn_header.h>
 #include <lib/processargs/processargs.h>
-#include <lib/stdcompat/array.h>
-#include <lib/stdcompat/span.h>
 #include <lib/userabi/userboot.h>
 #include <lib/zircon-internal/default_stack_size.h>
 #include <lib/zx/channel.h>
@@ -34,6 +32,7 @@
 #include <cstdint>
 #include <cstring>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -126,7 +125,7 @@ struct ChildMessageLayout {
   zx_proc_args_t header{};
   std::array<char, kProcessArgsMaxBytes> args;
   std::array<uint32_t, kChildHandleCount> info;
-  std::array<char, 5> names = cpp20::to_array("/svc");
+  std::array<char, 5> names = std::to_array("/svc");
 };
 
 static_assert(alignof(std::array<uint32_t, kChildHandleCount>) ==
@@ -196,7 +195,7 @@ std::array<zx_handle_t, kChildHandleCount> ExtractHandles(zx::channel bootstrap)
   return handles;
 }
 
-// cpp20::source_location cannot be guaranteed not to generate initialized data
+// std::source_location cannot be guaranteed not to generate initialized data
 // declarations with dynamic relocations (RELRO).  So this must be done using
 // macros to expand __LINE__.
 #define DuplicateOrDie(log, handle) \
@@ -227,7 +226,7 @@ struct ChildContext {
 };
 
 ChildContext CreateChildContext(const zx::debuglog& log, std::string_view name,
-                                cpp20::span<const zx_handle_t> handles) {
+                                std::span<const zx_handle_t> handles) {
   ChildContext child;
   auto status =
       zx::process::create(*zx::unowned_job{handles[kRootJob]}, name.data(),
@@ -291,7 +290,7 @@ void SetChildHandles(const zx::debuglog& log, const zx::vmo& bootfs_vmo, ChildCo
 }
 
 void SetUserbootProtocolHandle(const zx::debuglog& log, zx::channel stash,
-                               cpp20::span<zx_handle_t, kChildHandleCount> handles) {
+                               std::span<zx_handle_t, kChildHandleCount> handles) {
   handles[kUserbootProtocol] = stash.release();
 
   // Check that the handle is valid/alive.
@@ -313,7 +312,7 @@ struct Resources {
 };
 
 Resources CreateResources(const zx::debuglog& log,
-                          cpp20::span<const zx_handle_t, kChildHandleCount> handles) {
+                          std::span<const zx_handle_t, kChildHandleCount> handles) {
   Resources resources = {};
   zx::unowned_resource system(handles[kSystemResource]);
   auto status = zx::resource::create(*system, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_POWER_BASE, 1,
