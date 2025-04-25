@@ -890,18 +890,18 @@ pub fn check_socket_create_access(
     })
 }
 
-/// Computes and updates the socket security class for the `FsNode` associated with a new socket.
+/// Computes and updates the socket security class associated with a new socket.
 /// Corresponds to the `socket_post_create()` LSM hook.
-pub fn socket_post_create(socket: &Socket, socket_node: &FsNode) {
+pub fn socket_post_create(socket: &Socket) {
     profile_duration!("security.hooks.socket_post_create");
-    selinux_hooks::socket::socket_post_create(socket, socket_node);
+    selinux_hooks::socket::socket_post_create(socket);
 }
 
-/// Checks if the `current_task` is allowed to perform a bind operation for this `socket_node`.
+/// Checks if the `current_task` is allowed to perform a bind operation for this `socket`.
 /// Corresponds to the `socket_bind()` LSM hook.
 pub fn check_socket_bind_access(
     current_task: &CurrentTask,
-    socket_node: &FsNode,
+    socket: &Socket,
     socket_address: &SocketAddress,
 ) -> Result<(), Errno> {
     track_hook_duration!(c"security.hooks.check_socket_bind_access");
@@ -909,17 +909,17 @@ pub fn check_socket_bind_access(
         selinux_hooks::socket::check_socket_bind_access(
             &security_server,
             current_task,
-            socket_node,
+            socket,
             socket_address,
         )
     })
 }
 
-/// Checks if the `current_task` is allowed to initiate a connection with `socket_node`.
+/// Checks if the `current_task` is allowed to initiate a connection with `socket`.
 /// Corresponds to the `socket_connect()` LSM hook.
 pub fn check_socket_connect_access(
     current_task: &CurrentTask,
-    socket_node: &FsNode,
+    socket: &Socket,
     socket_address: &SocketAddress,
 ) -> Result<(), Errno> {
     track_hook_duration!(c"security.hooks.check_socket_connect_access");
@@ -927,7 +927,7 @@ pub fn check_socket_connect_access(
         selinux_hooks::socket::check_socket_connect_access(
             &security_server,
             current_task,
-            socket_node,
+            socket,
             socket_address,
         )
     })

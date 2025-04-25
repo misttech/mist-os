@@ -172,7 +172,8 @@ pub(in crate::security) fn check_socket_create_access(
 }
 
 /// Computes and sets the security class for `socket_node`.
-pub(in crate::security) fn socket_post_create(socket: &Socket, socket_node: &FsNode) {
+pub(in crate::security) fn socket_post_create(socket: &Socket) {
+    let socket_node = socket.fs_node().expect("Socket should have FsNode");
     socket_node.security_state.lock().class =
         compute_socket_security_class(socket.domain, socket.socket_type, socket.protocol).into();
 }
@@ -182,9 +183,11 @@ pub(in crate::security) fn socket_post_create(socket: &Socket, socket_node: &FsN
 pub(in crate::security) fn check_socket_bind_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
-    socket_node: &FsNode,
+    socket: &Socket,
     _socket_address: &SocketAddress,
 ) -> Result<(), Errno> {
+    let socket_node = socket.fs_node().expect("Socket should have FsNode");
+
     let current_sid = current_task.security_state.lock().current_sid;
     let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
         panic!("check_socket_bind_access called for non-Socket class")
@@ -196,7 +199,7 @@ pub(in crate::security) fn check_socket_bind_access(
         &security_server.as_permission_check(),
         current_task.kernel(),
         current_sid,
-        socket_node,
+        &socket_node,
         &CommonSocketPermission::Bind.for_class(socket_class),
         current_task.into(),
     )
@@ -207,9 +210,11 @@ pub(in crate::security) fn check_socket_bind_access(
 pub(in crate::security) fn check_socket_connect_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
-    socket_node: &FsNode,
+    socket: &Socket,
     _socket_address: &SocketAddress,
 ) -> Result<(), Errno> {
+    let socket_node = socket.fs_node().expect("Socket should have FsNode");
+
     let current_sid = current_task.security_state.lock().current_sid;
     let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
         panic!("check_socket_connect_access called for non-Socket class")
@@ -221,7 +226,7 @@ pub(in crate::security) fn check_socket_connect_access(
         &security_server.as_permission_check(),
         current_task.kernel(),
         current_sid,
-        socket_node,
+        &socket_node,
         &CommonSocketPermission::Connect.for_class(socket_class),
         current_task.into(),
     )

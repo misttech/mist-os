@@ -15,7 +15,9 @@ use crate::vfs::buffers::{
     AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer, VecInputBuffer, VecOutputBuffer,
 };
 use crate::vfs::socket::SocketShutdownFlags;
-use crate::vfs::{default_ioctl, Anon, FileHandle, FileObject, FsNodeInfo};
+use crate::vfs::{
+    default_ioctl, Anon, FileHandle, FileObject, FsNodeHandle, FsNodeInfo, WeakFsNodeHandle,
+};
 use byteorder::{ByteOrder as _, NativeEndian};
 use starnix_uapi::user_address::ArchSpecific;
 use starnix_uapi::{arch_struct_with_union, AF_INET};
@@ -368,6 +370,11 @@ struct SocketState {
     // TODO(https://fxbug.dev/410631890): Remove this when the netstack handles
     // socket marks.
     mark: u32,
+
+    /// Reference to the [`crate::vfs::FsNode`] to which this `Socket` is attached.
+    /// `None` until the `Socket` is wrapped into a [`crate::vfs::FileObject`] (e.g. while it is
+    /// still held in a listen queue).
+    fs_node: Option<WeakFsNodeHandle>,
 }
 
 pub type SocketHandle = Arc<Socket>;
@@ -501,7 +508,12 @@ impl Socket {
             Anon::new_for_socket(kernel_private),
             FsNodeInfo::new_factory(mode, current_task.as_fscred()),
         );
-        security::socket_post_create(&socket, &node);
+        {
+            let mut locked_state = socket.state.lock();
+            assert!(locked_state.fs_node.is_none());
+            locked_state.fs_node = Some(Arc::downgrade(&node));
+        }
+        security::socket_post_create(&socket);
         Ok(FileObject::new_anonymous(current_task, SocketFile::new(socket), node, open_flags))
     }
 
@@ -1186,6 +1198,11 @@ impl Socket {
         current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
         self.ops.to_handle(self, current_task)
+    }
+
+    /// Returns the [`crate::vfs::FsNode`] unique to this `Socket`.
+    pub fn fs_node(&self) -> Option<FsNodeHandle> {
+        self.state.lock().fs_node.as_ref().and_then(|weak_node| weak_node.upgrade())
     }
 }
 
