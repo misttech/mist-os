@@ -99,7 +99,7 @@ pub trait IpPacket<I: FilterIpExt> {
     fn set_dst_addr(&mut self, addr: I::Addr);
 
     /// The IP protocol of the packet.
-    fn protocol(&self) -> I::Proto;
+    fn protocol(&self) -> Option<I::Proto>;
 
     /// Returns a type that provides access to the transport-layer packet contained
     /// in the body of the IP packet, if one exists.
@@ -144,13 +144,13 @@ pub trait IpPacket<I: FilterIpExt> {
     /// this would lead to multiple message types being mapped to the same tuple
     /// if they happen to have the same ID.
     fn conntrack_packet(&self) -> Option<conntrack::PacketMetadata<I>> {
-        self.maybe_transport_packet().transport_packet_data().map(|transport_data| {
-            conntrack::PacketMetadata::new(
+        self.maybe_transport_packet().transport_packet_data().and_then(|transport_data| {
+            Some(conntrack::PacketMetadata::new(
                 self.src_addr(),
                 self.dst_addr(),
-                I::map_ip(self.protocol(), |proto| proto.into(), |proto| proto.into()),
+                I::map_ip(self.protocol()?, |proto| proto.into(), |proto| proto.into()),
                 transport_data,
-            )
+            ))
         })
     }
 }
@@ -345,8 +345,8 @@ impl<B: SplitByteSliceMut> IpPacket<Ipv4> for Ipv4Packet<B> {
         self.set_dst_ip_and_update_checksum(addr);
     }
 
-    fn protocol(&self) -> Ipv4Proto {
-        self.proto()
+    fn protocol(&self) -> Option<Ipv4Proto> {
+        Some(self.proto())
     }
 
     fn maybe_transport_packet(&self) -> Self::TransportPacket<'_> {
@@ -408,8 +408,8 @@ impl<B: SplitByteSliceMut> IpPacket<Ipv6> for Ipv6Packet<B> {
         self.set_dst_ip(addr);
     }
 
-    fn protocol(&self) -> Ipv6Proto {
-        self.proto()
+    fn protocol(&self) -> Option<Ipv6Proto> {
+        Some(self.proto())
     }
 
     fn maybe_transport_packet(&self) -> Self::TransportPacket<'_> {
@@ -500,8 +500,8 @@ impl<I: FilterIpExt, S: TransportPacketSerializer<I>> IpPacket<I> for TxPacket<'
         }
     }
 
-    fn protocol(&self) -> I::Proto {
-        self.protocol
+    fn protocol(&self) -> Option<I::Proto> {
+        Some(self.protocol)
     }
 
     fn maybe_transport_packet(&self) -> Self::TransportPacket<'_> {
@@ -650,8 +650,8 @@ impl<I: FilterIpExt, B: BufferMut> IpPacket<I> for ForwardedPacket<I, B> {
         self.dst_addr = addr;
     }
 
-    fn protocol(&self) -> I::Proto {
-        self.protocol
+    fn protocol(&self) -> Option<I::Proto> {
+        Some(self.protocol)
     }
 
     fn maybe_transport_packet(&self) -> Self::TransportPacket<'_> {
@@ -717,8 +717,8 @@ impl<I: FilterIpExt, S: TransportPacketSerializer<I>, B: IpPacketBuilder<I>> IpP
         }
     }
 
-    fn protocol(&self) -> I::Proto {
-        self.outer().proto()
+    fn protocol(&self) -> Option<I::Proto> {
+        Some(self.outer().proto())
     }
 
     fn maybe_transport_packet(&self) -> Self::TransportPacket<'_> {
@@ -1520,7 +1520,7 @@ pub mod testutil {
         }
 
         pub trait TransportPacketExt<I: IpExt>: MaybeTransportPacket {
-            fn proto() -> I::Proto;
+            fn proto() -> Option<I::Proto>;
         }
 
         impl<I: FilterIpExt, T> IpPacket<I> for FakeIpPacket<I, T>
@@ -1553,7 +1553,7 @@ pub mod testutil {
                 self.dst_ip = addr;
             }
 
-            fn protocol(&self) -> I::Proto {
+            fn protocol(&self) -> Option<I::Proto> {
                 <&T>::proto()
             }
 
@@ -1575,12 +1575,12 @@ pub mod testutil {
         }
 
         impl<I: IpExt> TransportPacketExt<I> for &FakeTcpSegment {
-            fn proto() -> I::Proto {
-                I::map_ip_out(
+            fn proto() -> Option<I::Proto> {
+                Some(I::map_ip_out(
                     (),
                     |()| Ipv4Proto::Proto(IpProto::Tcp),
                     |()| Ipv6Proto::Proto(IpProto::Tcp),
-                )
+                ))
             }
         }
 
@@ -1630,12 +1630,12 @@ pub mod testutil {
         }
 
         impl<I: IpExt> TransportPacketExt<I> for &FakeUdpPacket {
-            fn proto() -> I::Proto {
-                I::map_ip_out(
+            fn proto() -> Option<I::Proto> {
+                Some(I::map_ip_out(
                     (),
                     |()| Ipv4Proto::Proto(IpProto::Udp),
                     |()| Ipv6Proto::Proto(IpProto::Udp),
-                )
+                ))
             }
         }
 
@@ -1670,13 +1670,36 @@ pub mod testutil {
             fn update_pseudo_header_dst_addr(&mut self, _: I::Addr, _: I::Addr) {}
         }
 
+        #[derive(Clone, Debug, PartialEq)]
+        pub struct FakeNullPacket;
+
+        impl<I: IpExt> TransportPacketExt<I> for &FakeNullPacket {
+            fn proto() -> Option<I::Proto> {
+                None
+            }
+        }
+
+        impl MaybeTransportPacket for &FakeNullPacket {
+            fn transport_packet_data(&self) -> Option<TransportPacketData> {
+                None
+            }
+        }
+
+        impl<I: IpExt> MaybeTransportPacketMut<I> for FakeNullPacket {
+            type TransportPacketMut<'a> = Never;
+
+            fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
+                None
+            }
+        }
+
         pub struct FakeIcmpEchoRequest {
             pub id: u16,
         }
 
         impl<I: IpExt> TransportPacketExt<I> for &FakeIcmpEchoRequest {
-            fn proto() -> I::Proto {
-                I::map_ip_out((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6)
+            fn proto() -> Option<I::Proto> {
+                Some(I::map_ip_out((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6))
             }
         }
 
@@ -1737,6 +1760,12 @@ pub mod testutil {
         impl ArbitraryValue for FakeUdpPacket {
             fn arbitrary_value() -> Self {
                 FakeUdpPacket { src_port: 33333, dst_port: 44444 }
+            }
+        }
+
+        impl ArbitraryValue for FakeNullPacket {
+            fn arbitrary_value() -> Self {
+                FakeNullPacket
             }
         }
 

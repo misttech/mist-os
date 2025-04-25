@@ -1345,7 +1345,7 @@ mod tests {
             Rule::new(
                 PacketMatcher {
                     transport_protocol: Some(TransportProtocolMatcher {
-                        proto: <&FakeTcpSegment as TransportPacketExt<I>>::proto(),
+                        proto: <&FakeTcpSegment as TransportPacketExt<I>>::proto().unwrap(),
                         src_port,
                         dst_port,
                     }),

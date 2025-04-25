@@ -139,10 +139,16 @@ impl<P: Debug> InspectableValue for TransportProtocolMatcher<P> {
     }
 }
 
-impl<P: PartialEq, T: MaybeTransportPacket> Matcher<(P, T)> for TransportProtocolMatcher<P> {
-    fn matches(&self, actual: &(P, T)) -> bool {
+impl<P: PartialEq, T: MaybeTransportPacket> Matcher<(Option<P>, T)>
+    for TransportProtocolMatcher<P>
+{
+    fn matches(&self, actual: &(Option<P>, T)) -> bool {
         let Self { proto, src_port, dst_port } = self;
         let (packet_proto, packet) = actual;
+
+        let Some(packet_proto) = packet_proto else {
+            return false;
+        };
 
         proto == packet_proto
             && src_port.required_matches(
@@ -319,8 +325,8 @@ mod tests {
     use super::*;
     use crate::context::testutil::FakeDeviceClass;
     use crate::packets::testutil::internal::{
-        ArbitraryValue, FakeIcmpEchoRequest, FakeIpPacket, FakeTcpSegment, FakeUdpPacket,
-        TestIpExt, TransportPacketExt,
+        ArbitraryValue, FakeIcmpEchoRequest, FakeIpPacket, FakeNullPacket, FakeTcpSegment,
+        FakeUdpPacket, TestIpExt, TransportPacketExt,
     };
 
     #[test_case(InterfaceMatcher::Id(wlan_interface().id))]
@@ -460,7 +466,7 @@ mod tests {
     }
 
     impl Protocol {
-        fn ip_proto<I: IpExt>(&self) -> I::Proto {
+        fn ip_proto<I: IpExt>(&self) -> Option<I::Proto> {
             match self {
                 Self::Tcp => <&FakeTcpSegment as TransportPacketExt<I>>::proto(),
                 Self::Udp => <&FakeUdpPacket as TransportPacketExt<I>>::proto(),
@@ -476,6 +482,7 @@ mod tests {
         FakeIpPacket::<Ipv4, FakeIcmpEchoRequest>::arbitrary_value()
         => false
     )]
+    #[test_case(Protocol::Tcp, FakeIpPacket::<Ipv4, FakeNullPacket>::arbitrary_value() => false)]
     #[test_case(Protocol::Udp, FakeIpPacket::<Ipv4, FakeUdpPacket>::arbitrary_value() => true)]
     #[test_case(Protocol::Udp, FakeIpPacket::<Ipv4, FakeTcpSegment>::arbitrary_value()=> false)]
     #[test_case(
@@ -488,6 +495,7 @@ mod tests {
         FakeIpPacket::<Ipv4, FakeIcmpEchoRequest>::arbitrary_value()
         => true
     )]
+    #[test_case(Protocol::Udp, FakeIpPacket::<Ipv4, FakeNullPacket>::arbitrary_value() => false)]
     #[test_case(
         Protocol::Icmp,
         FakeIpPacket::<Ipv6, FakeIcmpEchoRequest>::arbitrary_value()
@@ -495,13 +503,14 @@ mod tests {
     )]
     #[test_case(Protocol::Icmp, FakeIpPacket::<Ipv4, FakeTcpSegment>::arbitrary_value() => false)]
     #[test_case(Protocol::Icmp, FakeIpPacket::<Ipv4, FakeUdpPacket>::arbitrary_value() => false)]
+    #[test_case(Protocol::Icmp, FakeIpPacket::<Ipv4, FakeNullPacket>::arbitrary_value() => false)]
     fn match_on_transport_protocol<I: TestIpExt, P: IpPacket<I>>(
         protocol: Protocol,
         packet: P,
     ) -> bool {
         let matcher = PacketMatcher {
             transport_protocol: Some(TransportProtocolMatcher {
-                proto: protocol.ip_proto::<I>(),
+                proto: protocol.ip_proto::<I>().unwrap(),
                 src_port: None,
                 dst_port: None,
             }),

@@ -1123,7 +1123,9 @@ where
             let (new_dst_addr, new_dst_port) = (tuple.src_addr, tuple.src_port_or_id);
 
             packet.set_dst_addr(new_dst_addr);
-            let proto = packet.protocol();
+            let Some(proto) = packet.protocol() else {
+                return Verdict::Accept(());
+            };
             let mut transport = packet.transport_packet_mut();
             let Some(mut transport) = transport.transport_packet_mut() else {
                 return Verdict::Accept(());
@@ -1140,7 +1142,9 @@ where
             let (new_src_addr, new_src_port) = (tuple.dst_addr, tuple.dst_port_or_id);
 
             packet.set_src_addr(new_src_addr);
-            let proto = packet.protocol();
+            let Some(proto) = packet.protocol() else {
+                return Verdict::Accept(());
+            };
             let mut transport = packet.transport_packet_mut();
             let Some(mut transport) = transport.transport_packet_mut() else {
                 return Verdict::Accept(());
