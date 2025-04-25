@@ -138,7 +138,7 @@ _sysroot_meta = {
     variants = [
       {
         constraints = {
-          api_level = current_build_target_api_level
+          api_level = "$current_build_target_api_level"
           arch = target_cpu
         }
         values = {

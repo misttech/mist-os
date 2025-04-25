@@ -131,14 +131,9 @@
                     "description": "The architecture and API level information",
                     "properties": {
                         "api_level": {
-                            "description": "The API level this package is built against. Either a positive integer less than 2147483648 (0x80000000) or the string name of a special API level.",
-                            "type": [
-                                "integer",
-                                "string"
-                            ],
-                            "minimum": 1,
-                            "maximum": 2147483647,
-                            "minLength": 3
+                            "description": "The API level this package is built against. A string that is either a positive integer less than 2147483648 (0x80000000) or the name of a special API level.",
+                            "type": "string",
+                            "minLength": 2
                         },
                         "arch": {
                             "$ref": "common.json#/definitions/target_arch",
