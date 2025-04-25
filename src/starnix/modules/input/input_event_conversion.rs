@@ -71,6 +71,10 @@ pub struct LinuxTouchEventParser {
     processed_slots: HashSet<SlotId>,
     /// This store parsed contacts.
     contacts: Vec<fir::ContactInputReport>,
+
+    /// Allowing single pointer sequence without leading MT_SLOT, will set the
+    /// pointer to slot 0.
+    single_pointer_sequence: bool,
 }
 
 impl LinuxTouchEventParser {
@@ -83,6 +87,7 @@ impl LinuxTouchEventParser {
             current_contact: None,
             processed_slots: HashSet::new(),
             contacts: vec![],
+            single_pointer_sequence: false,
         }
     }
 
@@ -91,6 +96,7 @@ impl LinuxTouchEventParser {
         self.cached_events = vec![];
         self.slot_id_to_tracking_id = HashMap::new();
         self.reset_sequence_state();
+        self.single_pointer_sequence = false;
     }
 
     /// Clean state for parsing sequence, call for parsing sequence begin and end.
@@ -99,6 +105,7 @@ impl LinuxTouchEventParser {
         self.current_contact = None;
         self.processed_slots = HashSet::new();
         self.contacts = vec![];
+        self.single_pointer_sequence = false;
     }
 
     /// call when input_event for current_contact is end:
@@ -133,6 +140,12 @@ impl LinuxTouchEventParser {
     /// Add the slot id to processed_slots, current_slot_id and reset
     /// current_contact.
     fn mt_slot(&mut self, new_slot_id: SlotId) -> Result<(), Errno> {
+        if self.single_pointer_sequence {
+            log_warn!("sequence contains events in slot and out of slot");
+            self.reset_state();
+            return error!(EINVAL);
+        }
+
         if self.processed_slots.contains(&new_slot_id) {
             log_warn!("duplicated slot_id in one sequence, slot_id = {}", new_slot_id);
             self.reset_state();
@@ -159,14 +172,24 @@ impl LinuxTouchEventParser {
     }
 
     /// Type B requires ABS events leading by a MT_SLOT.
-    /// Returns SlotId if the requirement meet, or returns errno.
+    /// Returns SlotId if the requirement meet,
+    /// else fallback to single_pointer_sequence.
     fn get_current_slot_id_or_err(&mut self, curr_event: &str) -> Result<SlotId, Errno> {
         match self.current_slot_id {
             Some(slot_id) => Ok(slot_id),
             None => {
-                log_warn!("{:?} must be following ABS_MT_SLOT", curr_event);
-                self.reset_state();
-                error!(EINVAL)
+                log_warn!(
+                    "{:?} is not following ABS_MT_SLOT, fallback to single_pointer_sequence",
+                    curr_event
+                );
+                let res = self.mt_slot(0);
+                match res {
+                    Ok(_) => {
+                        self.single_pointer_sequence = true;
+                        Ok(0)
+                    }
+                    Err(e) => Err(e),
+                }
             }
         }
     }
@@ -341,6 +364,20 @@ impl LinuxTouchEventParser {
                 | uapi::ABS_MT_POSITION_X
                 | uapi::ABS_MT_POSITION_Y => {
                     self.cached_events.push(e);
+                    Ok(None)
+                }
+                uapi::ABS_MT_TOUCH_MAJOR
+                | uapi::ABS_MT_TOUCH_MINOR
+                | uapi::ABS_MT_WIDTH_MAJOR
+                | uapi::ABS_MT_WIDTH_MINOR
+                | uapi::ABS_MT_ORIENTATION
+                | uapi::ABS_MT_TOOL_TYPE
+                | uapi::ABS_MT_BLOB_ID
+                | uapi::ABS_MT_PRESSURE
+                | uapi::ABS_MT_DISTANCE
+                | uapi::ABS_MT_TOOL_X
+                | uapi::ABS_MT_TOOL_Y => {
+                    // We don't use these event. Just respsond Ok.
                     Ok(None)
                 }
                 _ => {
@@ -1639,20 +1676,68 @@ mod touchscreen_linux_fuchsia_tests {
         );
     }
 
-    #[test_case(input_event(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, 1); "ABS_MT_TRACKING_ID")]
-    #[test_case(input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 1); "ABS_MT_POSITION_X")]
-    #[test_case(input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 1); "ABS_MT_POSITION_Y")]
-    fn no_slot_leading_event(e: uapi::input_event) {
-        let syn = input_event(uapi::EV_SYN, uapi::SYN_REPORT, 0);
-
+    #[test_case(input_event(uapi::EV_ABS, uapi::ABS_MT_TOUCH_MAJOR, 1); "ignore ABS_MT_TOUCH_MAJOR event")]
+    #[test_case(input_event(uapi::EV_ABS, uapi::ABS_MT_TOUCH_MINOR, 1); "ignore ABS_MT_TOUCH_MINOR event")]
+    #[test_case(input_event(uapi::EV_ABS, uapi::ABS_MT_WIDTH_MAJOR, 1); "ignore ABS_MT_WIDTH_MAJOR event")]
+    #[test_case(input_event(uapi::EV_ABS, uapi::ABS_MT_WIDTH_MINOR, 1); "ignore ABS_MT_WIDTH_MINOR event")]
+    #[test_case(input_event(uapi::EV_ABS, uapi::ABS_MT_ORIENTATION, 1); "ignore ABS_MT_ORIENTATION event")]
+    #[test_case(input_event(uapi::EV_ABS, uapi::ABS_MT_TOOL_TYPE, 1); "ignore ABS_MT_TOOL_TYPE event")]
+    #[test_case(input_event(uapi::EV_ABS, uapi::ABS_MT_BLOB_ID, 1); "ignore ABS_MT_BLOB_ID event")]
+    #[test_case(input_event(uapi::EV_ABS, uapi::ABS_MT_PRESSURE, 1); "ignore ABS_MT_PRESSURE event")]
+    #[test_case(input_event(uapi::EV_ABS, uapi::ABS_MT_DISTANCE, 1); "ignore ABS_MT_DISTANCE event")]
+    #[test_case(input_event(uapi::EV_ABS, uapi::ABS_MT_TOOL_X, 1); "ignore ABS_MT_TOOL_X event")]
+    #[test_case(input_event(uapi::EV_ABS, uapi::ABS_MT_TOOL_Y , 1); "ignore ABS_MT_TOOL_Y event")]
+    fn handle_input_event_ignore(e: uapi::input_event) {
         let mut parser = LinuxTouchEventParser::create();
         pretty_assertions::assert_eq!(parser.handle(e), Ok(None));
-        pretty_assertions::assert_eq!(parser.handle(syn), error!(EINVAL));
         pretty_assertions::assert_eq!(
             parser,
             LinuxTouchEventParser {
                 cached_events: vec![],
                 slot_id_to_tracking_id: HashMap::new(),
+                ..LinuxTouchEventParser::default()
+            }
+        );
+    }
+
+    #[test]
+    fn no_slot_leading_event_fallback_to_single_pointer_mode() {
+        let syn = input_event(uapi::EV_SYN, uapi::SYN_REPORT, 0);
+
+        let mut parser = LinuxTouchEventParser::create();
+        pretty_assertions::assert_eq!(
+            parser.handle(input_event(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, 1)),
+            Ok(None)
+        );
+        pretty_assertions::assert_eq!(
+            parser.handle(input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 2)),
+            Ok(None)
+        );
+        pretty_assertions::assert_eq!(
+            parser.handle(input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 3)),
+            Ok(None)
+        );
+        assert_eq!(
+            parser.handle(syn),
+            Ok(Some(fir::InputReport {
+                event_time: Some(0),
+                touch: Some(fir::TouchInputReport {
+                    contacts: Some(vec![fir::ContactInputReport {
+                        contact_id: Some(1),
+                        position_x: Some(2),
+                        position_y: Some(3),
+                        ..fir::ContactInputReport::default()
+                    },]),
+                    ..fir::TouchInputReport::default()
+                }),
+                ..fir::InputReport::default()
+            }))
+        );
+        assert_eq!(
+            parser,
+            LinuxTouchEventParser {
+                cached_events: vec![],
+                slot_id_to_tracking_id: HashMap::from([(0, 1)]),
                 ..LinuxTouchEventParser::default()
             }
         );

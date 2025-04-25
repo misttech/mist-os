@@ -119,7 +119,8 @@ impl DeviceOps for UinputDevice {
 enum CreatedDevice {
     None,
     Keyboard(futinput::KeyboardSynchronousProxy, LinuxKeyboardEventParser),
-    Touchscreen(futinput::TouchScreenSynchronousProxy, LinuxTouchEventParser),
+    // LinuxTouchEventParser need to boxed to avoid warning: large-enum-variant.
+    Touchscreen(futinput::TouchScreenSynchronousProxy, Box<LinuxTouchEventParser>),
 }
 
 struct UinputDeviceMutableState {
@@ -297,7 +298,7 @@ impl UinputDeviceFile {
                             fidl::endpoints::create_sync_proxy::<futinput::TouchScreenMarker>();
                         inner.created_device = CreatedDevice::Touchscreen(
                             touch_client,
-                            LinuxTouchEventParser::create(),
+                            Box::new(LinuxTouchEventParser::create()),
                         );
 
                         // Register a touchscreen
@@ -429,7 +430,8 @@ impl FileOps for UinputDeviceFile {
             uapi::UI_SET_KEYBIT
             | uapi::UI_SET_ABSBIT
             | uapi::UI_SET_PHYS
-            | uapi::UI_SET_PROPBIT => Ok(SUCCESS),
+            | uapi::UI_SET_PROPBIT
+            | uapi::UI_ABS_SETUP => Ok(SUCCESS),
             uapi::UI_DEV_SETUP => self.ui_dev_setup(current_task, arg.into()),
             uapi::UI_DEV_CREATE => self.ui_dev_create(locked, current_task),
             uapi::UI_DEV_DESTROY => self.ui_dev_destroy(locked, current_task),
