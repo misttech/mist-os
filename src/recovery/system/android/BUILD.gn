@@ -10,8 +10,13 @@ rustc_binary("bin") {
   edition = "2021"
   with_unit_tests = true
   deps = [
+    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
+    "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_rust",
+    "//sdk/rust/zx",
     "//src/graphics/lib/compute/rive-rs",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
     "//src/lib/ui/carnelian",
     "//src/recovery/lib/recovery-ui",
     "//src/recovery/system:recovery_ui_config",
@@ -20,5 +25,9 @@ rustc_binary("bin") {
     "//third_party/rust_crates:log",
   ]
   test_deps = []
-  sources = [ "src/main.rs" ]
+  sources = [
+    "src/main.rs",
+    "src/menu.rs",
+    "src/power.rs",
+  ]
 }

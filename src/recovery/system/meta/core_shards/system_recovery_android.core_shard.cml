@@ -15,7 +15,10 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.paver.Paver" ],
+            protocol: [
+                "fuchsia.hardware.power.statecontrol.Admin",
+                "fuchsia.paver.Paver",
+            ],
             from: "parent",
             to: "#system_recovery",
         },
