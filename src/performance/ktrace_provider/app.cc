@@ -39,7 +39,8 @@ struct KTraceCategory {
 constexpr KTraceCategory kGroupCategories[] = {
     {"kernel", KTRACE_GRP_ALL, "All ktrace categories"},
     {"kernel:meta", KTRACE_GRP_META, "Thread and process names"},
-    {"kernel:lifecycle", KTRACE_GRP_LIFECYCLE, "<unused>"},
+    {"kernel:memory", KTRACE_GRP_MEMORY,
+     "Memory allocations performed by the kernel, such as heap growth."},
     {"kernel:sched", KTRACE_GRP_SCHEDULER, "Process and thread scheduling information"},
     {"kernel:tasks", KTRACE_GRP_TASKS, "<unused>"},
     {"kernel:ipc", KTRACE_GRP_IPC, "Emit an event for each FIDL call"},

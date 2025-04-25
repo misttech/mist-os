@@ -43,7 +43,7 @@ struct CategoryEntry {
 
 const CategoryEntry kCategories[] = {
     {KTRACE_GRP_META_BIT, "kernel:meta"_category},
-    {KTRACE_GRP_LIFECYCLE_BIT, "kernel:lifecycle"_category},
+    {KTRACE_GRP_MEMORY_BIT, "kernel:memory"_category},
     {KTRACE_GRP_SCHEDULER_BIT, "kernel:sched"_category},
     {KTRACE_GRP_TASKS_BIT, "kernel:tasks"_category},
     {KTRACE_GRP_IPC_BIT, "kernel:ipc"_category},

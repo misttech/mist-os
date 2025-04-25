@@ -133,7 +133,7 @@
 #include <trace.h>
 
 #define LOCAL_TRACE_DURATION(label, name, ...) \
-  ktrace::Scope name = KTRACE_BEGIN_SCOPE_ENABLE(false, "kernel:sched", label, ##__VA_ARGS__)
+  ktrace::Scope name = KTRACE_BEGIN_SCOPE_ENABLE(false, "kernel:memory", label, ##__VA_ARGS__)
 
 #define LOCAL_TRACE_DURATION_END(name) name.End()
 
@@ -936,21 +936,21 @@ NO_ASAN void* cmpct_alloc(size_t size) {
     ZX_DEBUG_ASSERT(growby >= rounded_up);
     // Try to add a new OS allocation to the heap, reducing the size until
     // we succeed or get too small.
-    KTRACE_DURATION_BEGIN("kernel:sched", "heap_grow_with_retries", ("allocation_size", size),
+    KTRACE_DURATION_BEGIN("kernel:memory", "heap_grow_with_retries", ("allocation_size", size),
                           ("starting_search_size", growby));
     [[maybe_unused]] int attempts = 1;
     while (!heap_grow(growby)) {
       if (growby <= rounded_up) {
         guard.Release();
         heap_report_alloc_failure(rounded_up);
-        KTRACE_DURATION_END("kernel:sched", "heap_grow_with_retries", ("num_attempts", attempts),
+        KTRACE_DURATION_END("kernel:memory", "heap_grow_with_retries", ("num_attempts", attempts),
                             ("status", "failed"));
         return NULL;
       }
       attempts++;
       growby = std::max(growby >> 1, rounded_up);
     }
-    KTRACE_DURATION_END("kernel:sched", "heap_grow_with_retries", ("num_attempts", attempts),
+    KTRACE_DURATION_END("kernel:memory", "heap_grow_with_retries", ("num_attempts", attempts),
                         ("status", "success"));
     bucket = find_nonempty_bucket(start_bucket);
     // It should be the case that, since we hold the heap lock, after growing the heap there should
