@@ -697,6 +697,11 @@ if (!is_host) {
       # :fuchsia_idk_atoms_at_platform_for_host_cpu_arch_only and/or
       # :fuchsia_idk_atoms_for_each_api_level as appropriate.
       ":host_tools_for_configured_host_cpus",
+
+      # Emulators that we include along with the SDK.
+      # TODO(https://fxbug.dev/42177692): Remove these once the emulators are
+      # available independently.
+      ":emulators($host_toolchain)",
     ]
 
     # TODO(https://fxbug.dev/310006516): Remove these once the Bazel SDK and all
@@ -747,6 +752,7 @@ if (!is_host) {
     host_tools = [
       ":build_host_tools($host_toolchain)",
       ":non_build_host_tools_required_by_bazel_sdk($host_toolchain)",
+      ":emulators_required_by_bazel_sdk($host_toolchain)",
     ]
 
     # TODO(https://fxbug.dev/385406226): Exclude these from the in-tree IDK
@@ -777,6 +783,7 @@ if (!is_host) {
 
     deps = [
       # Include all tools in the full IDK and only tools.
+      ":emulators($host_toolchain)",
       ":host_tools_for_single_toolchain($host_toolchain)",
     ]
   }
@@ -834,6 +841,7 @@ group("tests_no_e2e") {
     "//sdk/ctf/plasa:tests",
     "//sdk/fidl:tests",
     "//sdk/lib:tests",
+    "//sdk/pdk:tests",
     "//sdk/rust:tests",
     "//tools/fidl/abi-compat:check-compatibility",
   ]
@@ -953,7 +961,6 @@ if (is_host) {
     deps = [
       ":build_host_tools",
       ":non_build_host_tools",
-      ":non_build_host_tools_required_by_bazel_sdk",
     ]
   }
 
@@ -963,6 +970,7 @@ if (is_host) {
   sdk_molecule("non_build_host_tools") {
     category = "partner"
     deps = [
+      ":non_build_host_tools_required_by_bazel_sdk",
       "//src/developer/debug/zxdb:zxdb_sdk",
       "//src/developer/ffx/plugins/agis:sdk",
       "//src/developer/ffx/plugins/audio:sdk",
@@ -986,12 +994,6 @@ if (is_host) {
       "//src/sys/pkg/testing/fake-omaha-client:bin_sdk",
       "//tools/fidlcat:fidlcat_sdk",
       "//tools/net/device-finder:device-finder_sdk",
-
-      # TODO(https://fxbug.dev/42177692): Remove these once the emulators are available independently.
-      "//src/developer/ffx/plugins/emulator:crosvm_internal",
-      "//src/developer/ffx/plugins/emulator:qemu_internal",
-      "//src/developer/ffx/plugins/emulator:uefi_internal_arm64",
-      "//src/developer/ffx/plugins/emulator:uefi_internal_x64",
     ]
   }
 
@@ -1004,7 +1006,6 @@ if (is_host) {
       "//build/assembly/tools/generate_config:generate_config_sdk",
       "//src/developer/ffx:bin_sdk",
       "//src/developer/ffx/plugins/driver:sdk",
-      "//src/developer/ffx/plugins/emulator:aemu_internal",
       "//src/developer/ffx/plugins/product:sdk",
       "//src/developer/ffx/plugins/test:sdk",
       "//tools/bootserver_old:bootserver_sdk",
@@ -1039,12 +1040,32 @@ if (is_host) {
       "//zircon/tools/zbi:zbi_sdk",
     ]
   }
+
+  # TODO(https://fxbug.dev/42177692): Remove these once the emulators are available independently.
+  sdk_molecule("emulators") {
+    category = "partner"
+    deps = [
+      ":emulators_required_by_bazel_sdk",
+      "//src/developer/ffx/plugins/emulator:crosvm_internal",
+      "//src/developer/ffx/plugins/emulator:qemu_internal",
+      "//src/developer/ffx/plugins/emulator:uefi_internal_arm64",
+      "//src/developer/ffx/plugins/emulator:uefi_internal_x64",
+    ]
+  }
+
+  # TODO(https://fxbug.dev/42177692): Remove these once the emulators are available independently.
+  sdk_molecule("emulators_required_by_bazel_sdk") {
+    category = "partner"
+    deps = [ "//src/developer/ffx/plugins/emulator:aemu_internal" ]
+  }
 } else {
   # Contains :host_tools_for_single_toolchain for all host toolchains that this
   # build is configured to include. Always includes host tools for
   # `host_toolchain`, and includes host tools for other host toolchains when
   # `sdk_cross_compile_host_tools` is true.
   sdk_molecule("host_tools_for_configured_host_cpus") {
+    visibility += [ "//sdk/pdk:*" ]
+
     category = "partner"
 
     _toolchains = []
@@ -1488,7 +1509,10 @@ if (is_host) {
     # sdk_* templates.
     category = "internal"
 
-    deps = [ ":host_tools_for_single_toolchain" ]
+    deps = [
+      ":emulators($host_toolchain)",
+      ":host_tools_for_single_toolchain",
+    ]
   }
 
   # A collection that only contains host tools that are used by the Fuchsia
@@ -1543,6 +1567,7 @@ copy("idk_build_tools") {
   visibility += [
     "//build/*",
     "//sdk/firmware:*",
+    "//sdk/pdk:*",
     "//vendor/*",
   ]
 

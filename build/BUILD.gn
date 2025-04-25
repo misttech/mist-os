@@ -132,6 +132,7 @@ group("non_hermetic_deps") {
   visibility += [
     "//sdk:*",
     "//sdk/firmware:*",
+    "//sdk/pdk:*",
   ]
 
   # TODO(https://fxbug.dev/42174306): Remove entries when

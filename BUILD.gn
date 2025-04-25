@@ -373,7 +373,10 @@ build_api_module("args") {
 build_api_module("bazel_sdk_info") {
   testonly = true
   data_keys = [ "bazel_sdk_info" ]
-  deps = [ "//sdk:final_fuchsia_sdk" ]
+  deps = [
+    "//sdk:final_fuchsia_sdk",
+    "//sdk/pdk:sdk",
+  ]
 }
 
 # Describes the location where the Bazel rules are.
@@ -1034,7 +1037,10 @@ build_api_module("ninja_subbuilds") {
 build_api_module("sdk_archives") {
   testonly = true
   data_keys = [ "sdk_archives" ]
-  deps = [ "//sdk:final_fuchsia_idk" ] + sdk_archive_labels
+  deps = [
+           "//sdk:final_fuchsia_idk",
+           "//sdk/pdk:idk_archive",
+         ] + sdk_archive_labels
 }
 
 # Describes the `exported_package_archive`s labels specified by the gn arg
