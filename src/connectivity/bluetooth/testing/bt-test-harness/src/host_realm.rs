@@ -32,6 +32,53 @@ mod constants {
     }
 }
 
+pub async fn add_host_routes(
+    builder: &RealmBuilder,
+    to: impl Into<fuchsia_component_test::Ref> + Clone,
+) -> Result<(), Error> {
+    // Route config capabilities from root to bt-init
+    builder
+        .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+            name: "fuchsia.bluetooth.LegacyPairing".parse()?,
+            value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(false)),
+        }))
+        .await?;
+    builder
+        .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+            name: "fuchsia.bluetooth.ScoOffloadPathIndex".parse()?,
+            value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Uint8(6)),
+        }))
+        .await?;
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::configuration("fuchsia.bluetooth.LegacyPairing"))
+                .from(Ref::self_())
+                .to(to.clone()),
+        )
+        .await?;
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::configuration("fuchsia.bluetooth.ScoOffloadPathIndex"))
+                .from(Ref::self_())
+                .to(to.clone()),
+        )
+        .await?;
+
+    // Add directory routing between components within CoreRealm
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::directory("dev-class").subdir("bt-hci").as_("dev-bt-hci"))
+                .from(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
+                .to(to),
+        )
+        .await?;
+    Ok(())
+}
+
 pub struct HostRealm {
     realm: RealmInstance,
     receiver: Mutex<Option<Receiver<ClientEnd<HostMarker>>>>,
@@ -84,22 +131,7 @@ impl HostRealm {
         });
         builder.replace_realm_decl(realm_decl).await.unwrap();
 
-        // Route config capabilities from root to bt-host-collection
-        builder
-            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
-                name: "fuchsia.bluetooth.LegacyPairing".parse()?,
-                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(false)),
-            }))
-            .await?;
-
-        builder
-            .add_route(
-                Route::new()
-                    .capability(Capability::configuration("fuchsia.bluetooth.LegacyPairing"))
-                    .from(Ref::self_())
-                    .to(Ref::collection(BT_HOST_COLLECTION.to_string())),
-            )
-            .await?;
+        add_host_routes(&builder, Ref::collection(BT_HOST_COLLECTION.to_string())).await?;
 
         // Route capabilities between realm components and bt-host-collection
         builder
@@ -108,16 +140,6 @@ impl HostRealm {
                     .capability(Capability::protocol::<LogSinkMarker>())
                     .capability(Capability::dictionary("diagnostics"))
                     .from(Ref::parent())
-                    .to(Ref::collection(BT_HOST_COLLECTION.to_string())),
-            )
-            .await?;
-        builder
-            .add_route(
-                Route::new()
-                    .capability(
-                        Capability::directory("dev-class").subdir("bt-hci").as_("dev-bt-hci"),
-                    )
-                    .from(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
                     .to(Ref::collection(BT_HOST_COLLECTION.to_string())),
             )
             .await?;
