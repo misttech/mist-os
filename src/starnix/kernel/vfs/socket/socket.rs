@@ -15,9 +15,7 @@ use crate::vfs::buffers::{
     AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer, VecInputBuffer, VecOutputBuffer,
 };
 use crate::vfs::socket::SocketShutdownFlags;
-use crate::vfs::{
-    default_ioctl, Anon, FileHandle, FileObject, FsNodeHandle, FsNodeInfo, WeakFsNodeHandle,
-};
+use crate::vfs::{default_ioctl, Anon, FileHandle, FileObject, FsNodeHandle, FsNodeInfo};
 use byteorder::{ByteOrder as _, NativeEndian};
 use starnix_uapi::user_address::ArchSpecific;
 use starnix_uapi::{arch_struct_with_union, AF_INET};
@@ -374,7 +372,7 @@ struct SocketState {
     /// Reference to the [`crate::vfs::FsNode`] to which this `Socket` is attached.
     /// `None` until the `Socket` is wrapped into a [`crate::vfs::FileObject`] (e.g. while it is
     /// still held in a listen queue).
-    fs_node: Option<WeakFsNodeHandle>,
+    fs_node: Option<FsNodeHandle>,
 }
 
 pub type SocketHandle = Arc<Socket>;
@@ -511,7 +509,7 @@ impl Socket {
         {
             let mut locked_state = socket.state.lock();
             assert!(locked_state.fs_node.is_none());
-            locked_state.fs_node = Some(Arc::downgrade(&node));
+            locked_state.fs_node = Some(node.clone());
         }
         security::socket_post_create(&socket);
         Ok(FileObject::new_anonymous(current_task, SocketFile::new(socket), node, open_flags))
@@ -1202,8 +1200,9 @@ impl Socket {
     }
 
     /// Returns the [`crate::vfs::FsNode`] unique to this `Socket`.
-    pub fn fs_node(&self) -> Option<FsNodeHandle> {
-        self.state.lock().fs_node.as_ref().and_then(|weak_node| weak_node.upgrade())
+    /// Panics if the `Socket` has not yet been wrapped via `new_file()`.
+    pub fn fs_node(&self) -> FsNodeHandle {
+        self.state.lock().fs_node.clone().expect("Socket FsNode requested before being set")
     }
 }
 

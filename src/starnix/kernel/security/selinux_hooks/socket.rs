@@ -173,7 +173,7 @@ pub(in crate::security) fn check_socket_create_access(
 
 /// Computes and sets the security class for `socket_node`.
 pub(in crate::security) fn socket_post_create(socket: &Socket) {
-    let socket_node = socket.fs_node().expect("Socket should have FsNode");
+    let socket_node = socket.fs_node();
     socket_node.security_state.lock().class =
         compute_socket_security_class(socket.domain, socket.socket_type, socket.protocol).into();
 }
@@ -186,7 +186,7 @@ pub(in crate::security) fn check_socket_bind_access(
     socket: &Socket,
     _socket_address: &SocketAddress,
 ) -> Result<(), Errno> {
-    let socket_node = socket.fs_node().expect("Socket should have FsNode");
+    let socket_node = socket.fs_node();
 
     let current_sid = current_task.security_state.lock().current_sid;
     let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
@@ -213,7 +213,7 @@ pub(in crate::security) fn check_socket_connect_access(
     socket: &Socket,
     _socket_peer: &SocketPeer,
 ) -> Result<(), Errno> {
-    let socket_node = socket.fs_node().expect("Socket should have FsNode");
+    let socket_node = socket.fs_node();
 
     let current_sid = current_task.security_state.lock().current_sid;
     let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
