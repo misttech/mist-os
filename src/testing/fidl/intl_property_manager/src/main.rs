@@ -230,7 +230,7 @@ impl Debug for Service {
 struct Opts {
     #[structopt(long)]
     /// If set to `true`, the starting profile will be created based on the
-    /// flag settings like `--locale_ids=...`.
+    /// flag settings like `--locale-ids=...`.
     set_initial_profile: bool,
     #[structopt(long, use_delimiter = true)]
     /// A list of comma-separated BCP-47 locale ID strings to serve initially, in the order of

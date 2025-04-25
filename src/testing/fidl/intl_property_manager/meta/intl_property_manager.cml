@@ -8,8 +8,8 @@
         binary: "bin/intl_property_manager",
         args: [
             "--set-initial-profile",
-            "--locale_ids=en-US,nl-NL",
-            "--timezone_ids=und-u-tz-uslax",
+            "--locale-ids=en-US,nl-NL",
+            "--timezone-ids=und-u-tz-uslax",
         ],
     },
     capabilities: [
