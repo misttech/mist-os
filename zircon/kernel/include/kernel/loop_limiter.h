@@ -12,7 +12,7 @@
 
 #include <cstdint>
 
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <platform/timer.h>
 
 // LoopLimiter is used to detect when a thread is looping for "too long".

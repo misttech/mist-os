@@ -24,7 +24,7 @@
 #include <kernel/spinlock.h>
 #include <ktl/atomic.h>
 #include <ktl/forward.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 
 // Fwd decl of tests to allow friendship.
 namespace ktrace_internal_tests {

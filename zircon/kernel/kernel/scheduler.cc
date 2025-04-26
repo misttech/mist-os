@@ -41,10 +41,10 @@
 #include <ktl/algorithm.h>
 #include <ktl/forward.h>
 #include <ktl/limits.h>
-#include <ktl/move.h>
 #include <ktl/pair.h>
 #include <ktl/span.h>
 #include <ktl/tuple.h>
+#include <ktl/utility.h>
 #include <object/process_dispatcher.h>
 #include <object/thread_dispatcher.h>
 #include <vm/vm.h>

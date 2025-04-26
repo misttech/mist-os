@@ -14,9 +14,9 @@
 #include <lib/zbitl/item.h>
 
 #include <ktl/byte.h>
-#include <ktl/move.h>
 #include <ktl/optional.h>
 #include <ktl/string_view.h>
+#include <ktl/utility.h>
 #include <phys/main.h>
 #include <phys/stdio.h>
 #include <pretty/cpp/sizes.h>

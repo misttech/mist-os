@@ -23,7 +23,7 @@
 #include <kernel/semaphore.h>
 #include <ktl/algorithm.h>
 #include <ktl/iterator.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <vm/compression.h>
 #include <vm/fault.h>
 #include <vm/physmap.h>

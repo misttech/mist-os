@@ -19,10 +19,10 @@
 #include <ktl/byte.h>
 #include <ktl/concepts.h>
 #include <ktl/initializer_list.h>
-#include <ktl/move.h>
 #include <ktl/pair.h>
 #include <ktl/span.h>
 #include <ktl/tuple.h>
+#include <ktl/utility.h>
 #include <phys/handoff-ptr.h>
 #include <phys/handoff.h>
 #include <phys/kernel-package.h>

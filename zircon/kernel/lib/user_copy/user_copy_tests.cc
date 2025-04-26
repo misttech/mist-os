@@ -14,8 +14,8 @@
 
 #include <ktl/array.h>
 #include <ktl/limits.h>
-#include <ktl/move.h>
 #include <ktl/unique_ptr.h>
+#include <ktl/utility.h>
 #include <vm/fault.h>
 #include <vm/vm_aspace.h>
 #include <vm/vm_object_paged.h>

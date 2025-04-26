@@ -18,8 +18,8 @@
 #include <arch/code-patches/case-id.h>
 #include <arch/kernel_aspace.h>
 #include <ktl/initializer_list.h>
-#include <ktl/move.h>
 #include <ktl/string_view.h>
+#include <ktl/utility.h>
 #include <phys/allocation.h>
 #include <phys/boot-zbi.h>
 #include <phys/elf-image.h>

@@ -16,7 +16,7 @@
 #include <zircon/limits.h>
 
 #include <ktl/atomic.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <ktl/variant.h>
 #include <phys/address-space.h>
 #include <phys/allocation.h>

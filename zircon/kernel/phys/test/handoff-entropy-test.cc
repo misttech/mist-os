@@ -11,8 +11,8 @@
 #include <lib/zbitl/image.h>
 
 #include <ktl/array.h>
-#include <ktl/move.h>
 #include <ktl/span.h>
+#include <ktl/utility.h>
 
 #include "phys-unittest.h"
 #include "phys/symbolize.h"

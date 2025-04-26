@@ -12,7 +12,7 @@
 
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 
 #include <ktl/enforce.h>
 

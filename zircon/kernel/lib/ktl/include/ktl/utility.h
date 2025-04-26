@@ -4,8 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#ifndef ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_MOVE_H_
-#define ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_MOVE_H_
+#ifndef ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_UTILITY_H_
+#define ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_UTILITY_H_
 
 #include <utility>
 
@@ -16,4 +16,4 @@ using std::move;
 
 }  // namespace ktl
 
-#endif  // ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_MOVE_H_
+#endif  // ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_UTILITY_H_

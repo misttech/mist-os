@@ -14,10 +14,10 @@
 #include <fbl/alloc_checker.h>
 #include <ktl/algorithm.h>
 #include <ktl/byte.h>
-#include <ktl/move.h>
 #include <ktl/optional.h>
 #include <ktl/span.h>
 #include <ktl/string_view.h>
+#include <ktl/utility.h>
 
 // This object represents one memory allocation, and owns that allocation so
 // destroying this object frees the allocation.  It acts as a smart pointer

@@ -15,8 +15,8 @@
 
 #include <fbl/ref_ptr.h>
 #include <ktl/byte.h>
-#include <ktl/move.h>
 #include <ktl/span.h>
+#include <ktl/utility.h>
 #include <lk/init.h>
 #include <object/handle.h>
 #include <object/vm_object_dispatcher.h>

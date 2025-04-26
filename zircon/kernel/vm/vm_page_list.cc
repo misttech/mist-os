@@ -12,7 +12,7 @@
 #include <zircon/types.h>
 
 #include <fbl/alloc_checker.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <vm/compression.h>
 #include <vm/pmm.h>
 #include <vm/vm.h>

@@ -22,11 +22,11 @@
 #include <ktl/array.h>
 #include <ktl/byte.h>
 #include <ktl/initializer_list.h>
-#include <ktl/move.h>
 #include <ktl/optional.h>
 #include <ktl/span.h>
 #include <ktl/string_view.h>
 #include <ktl/type_traits.h>
+#include <ktl/utility.h>
 
 #include "address-space.h"
 #include "allocation.h"

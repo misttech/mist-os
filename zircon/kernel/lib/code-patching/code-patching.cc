@@ -9,8 +9,8 @@
 #include <lib/fit/result.h>
 #include <lib/zbitl/error-stdio.h>
 
-#include <ktl/move.h>
 #include <ktl/string_view.h>
+#include <ktl/utility.h>
 #include <phys/main.h>
 
 #include <ktl/enforce.h>

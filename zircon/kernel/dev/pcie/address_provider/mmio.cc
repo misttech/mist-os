@@ -9,7 +9,7 @@
 #include <dev/address_provider/address_provider.h>
 #include <dev/pci_common.h>
 #include <kernel/range_check.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 
 #include <ktl/enforce.h>
 

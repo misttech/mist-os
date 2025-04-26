@@ -17,8 +17,8 @@
 #include <kernel/lockdep.h>
 #include <kernel/mutex.h>
 #include <kernel/owned_wait_queue.h>
-#include <ktl/move.h>
 #include <ktl/unique_ptr.h>
+#include <ktl/utility.h>
 
 class ThreadDispatcher;
 

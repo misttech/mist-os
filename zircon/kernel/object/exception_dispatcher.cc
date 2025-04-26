@@ -10,7 +10,7 @@
 #include <lib/counters.h>
 
 #include <fbl/alloc_checker.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <object/process_dispatcher.h>
 
 #include <ktl/enforce.h>

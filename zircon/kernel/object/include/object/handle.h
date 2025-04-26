@@ -16,7 +16,7 @@
 #include <fbl/ref_ptr.h>
 #include <kernel/event_limiter.h>
 #include <ktl/atomic.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 
 class Dispatcher;
 class Handle;

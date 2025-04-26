@@ -12,8 +12,8 @@
 
 #if LK_DEBUGLEVEL != 0
 
-#include <ktl/move.h>
 #include <ktl/type_traits.h>
+#include <ktl/utility.h>
 #include <ktl/variant.h>
 
 #include <ktl/enforce.h>

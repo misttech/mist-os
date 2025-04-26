@@ -30,7 +30,7 @@
 #include <fbl/ref_ptr.h>
 #include <kernel/lockdep.h>
 #include <kernel/mutex.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <vm/attribution.h>
 #include <vm/content_size_manager.h>
 #include <vm/page.h>

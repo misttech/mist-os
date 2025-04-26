@@ -9,7 +9,7 @@
 #include <trace.h>
 
 #include <kernel/lockdep.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <vm/page_source.h>
 
 #include <ktl/enforce.h>

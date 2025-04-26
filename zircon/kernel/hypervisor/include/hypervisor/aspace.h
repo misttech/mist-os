@@ -9,8 +9,8 @@
 
 #include <lib/zx/result.h>
 
-#include <ktl/move.h>
 #include <ktl/unique_ptr.h>
+#include <ktl/utility.h>
 #include <vm/pinned_vm_object.h>
 #include <vm/vm_address_region.h>
 #include <vm/vm_aspace.h>

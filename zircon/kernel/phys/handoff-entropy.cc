@@ -16,9 +16,9 @@
 #include <explicit-memory/bytes.h>
 #include <ktl/algorithm.h>
 #include <ktl/array.h>
-#include <ktl/move.h>
 #include <ktl/optional.h>
 #include <ktl/string_view.h>
+#include <ktl/utility.h>
 
 #include <ktl/enforce.h>
 

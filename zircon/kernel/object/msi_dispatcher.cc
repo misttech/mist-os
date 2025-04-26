@@ -13,7 +13,7 @@
 
 #include <fbl/ref_counted.h>
 #include <ktl/bit.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <object/msi_dispatcher.h>
 
 #include <ktl/enforce.h>

@@ -14,9 +14,9 @@
 #include <zircon/assert.h>
 
 #include <ktl/byte.h>
-#include <ktl/move.h>
 #include <ktl/span.h>
 #include <ktl/string_view.h>
+#include <ktl/utility.h>
 #include <vm/vm_object_paged.h>
 
 #include "private.h"

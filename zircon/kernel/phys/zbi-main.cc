@@ -8,7 +8,7 @@
 #include <lib/uart/all.h>
 #include <lib/zbitl/view.h>
 
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <phys/boot-options.h>
 #include <phys/main.h>
 #include <phys/stdio.h>

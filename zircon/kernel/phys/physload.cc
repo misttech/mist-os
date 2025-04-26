@@ -17,9 +17,9 @@
 
 #include <ktl/array.h>
 #include <ktl/byte.h>
-#include <ktl/move.h>
 #include <ktl/span.h>
 #include <ktl/string_view.h>
+#include <ktl/utility.h>
 #include <phys/address-space.h>
 #include <phys/elf-image.h>
 #include <phys/handoff.h>

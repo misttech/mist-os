@@ -25,7 +25,7 @@
 #include <dev/pcie_root.h>
 #include <fbl/alloc_checker.h>
 #include <kernel/spinlock.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <vm/vm.h>
 
 #include <ktl/enforce.h>

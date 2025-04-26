@@ -26,8 +26,8 @@
 #include <kernel/mutex.h>
 #include <kernel/thread.h>
 #include <ktl/algorithm.h>
-#include <ktl/move.h>
 #include <ktl/span.h>
+#include <ktl/utility.h>
 #include <object/channel_dispatcher.h>
 #include <object/handle.h>
 #include <object/root_job_observer.h>

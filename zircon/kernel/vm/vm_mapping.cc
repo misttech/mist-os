@@ -16,7 +16,7 @@
 #include <fbl/alloc_checker.h>
 #include <ktl/algorithm.h>
 #include <ktl/iterator.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <vm/fault.h>
 #include <vm/physmap.h>
 #include <vm/vm.h>

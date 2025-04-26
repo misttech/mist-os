@@ -30,10 +30,10 @@
 #include <ktl/array.h>
 #include <ktl/bit.h>
 #include <ktl/forward.h>
-#include <ktl/move.h>
 #include <ktl/optional.h>
 #include <ktl/type_traits.h>
 #include <ktl/unique_ptr.h>
+#include <ktl/utility.h>
 #include <vm/page_state.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>

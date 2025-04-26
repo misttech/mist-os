@@ -12,7 +12,7 @@
 #include <hypervisor/cpu.h>
 #include <kernel/cpu.h>
 #include <kernel/mutex.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <vm/arch_vm_aspace.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>

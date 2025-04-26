@@ -13,8 +13,8 @@
 
 #include <fbl/vector.h>
 #include <kernel/cpu.h>
-#include <ktl/move.h>
 #include <ktl/unique_ptr.h>
+#include <ktl/utility.h>
 
 /*
  * Captures the physical layout of the core system (processors, caches, etc..).

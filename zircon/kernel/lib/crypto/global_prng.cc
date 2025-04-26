@@ -25,9 +25,9 @@
 #include <kernel/thread.h>
 #include <ktl/algorithm.h>
 #include <ktl/byte.h>
-#include <ktl/move.h>
 #include <ktl/span.h>
 #include <ktl/string_view.h>
+#include <ktl/utility.h>
 #include <lk/init.h>
 #include <openssl/sha.h>
 #include <phys/handoff.h>

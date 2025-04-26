@@ -36,8 +36,8 @@
 #include <kernel/mutex.h>
 #include <kernel/stats.h>
 #include <kernel/thread.h>
-#include <ktl/move.h>
 #include <ktl/unique_ptr.h>
+#include <ktl/utility.h>
 #include <lk/init.h>
 #include <vm/vm.h>
 #include <vm/vm_address_region.h>

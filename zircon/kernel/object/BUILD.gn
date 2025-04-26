@@ -94,7 +94,7 @@ zx_library("object") {
     deps += [ "//zircon/kernel/dev/iommu/intel" ]
   }
   public_deps = [
-    # <object/buffer_chain.h> has #include <ktl/move.h>.
+    # <object/buffer_chain.h> has #include <ktl/utility.h>.
     "//zircon/kernel/lib/ktl:headers",
 
     # <object/port_dispatcher.h> has <lib/object_cache.h>

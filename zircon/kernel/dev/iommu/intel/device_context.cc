@@ -14,8 +14,8 @@
 
 #include <kernel/range_check.h>
 #include <ktl/algorithm.h>
-#include <ktl/move.h>
 #include <ktl/unique_ptr.h>
+#include <ktl/utility.h>
 #include <vm/vm.h>
 #include <vm/vm_object_paged.h>
 

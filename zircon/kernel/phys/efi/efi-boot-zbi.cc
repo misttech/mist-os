@@ -13,7 +13,7 @@
 #include <lib/zbitl/view.h>
 #include <zircon/assert.h>
 
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <phys/allocation.h>
 #include <phys/efi/main.h>
 #include <phys/symbolize.h>

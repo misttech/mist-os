@@ -22,7 +22,7 @@
 #include <fbl/alloc_checker.h>
 #include <ktl/algorithm.h>
 #include <ktl/array.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <vm/discardable_vmo_tracker.h>
 #include <vm/fault.h>
 #include <vm/page_source.h>

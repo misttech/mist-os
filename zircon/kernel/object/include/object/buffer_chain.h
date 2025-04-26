@@ -20,7 +20,7 @@
 #include <fbl/canary.h>
 #include <fbl/intrusive_single_list.h>
 #include <ktl/algorithm.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <vm/page.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>

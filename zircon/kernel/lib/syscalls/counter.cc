@@ -11,7 +11,7 @@
 
 #include <cstdint>
 
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <object/counter_dispatcher.h>
 #include <object/handle.h>
 #include <object/process_dispatcher.h>
