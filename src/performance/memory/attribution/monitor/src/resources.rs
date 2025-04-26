@@ -121,23 +121,50 @@ impl Cache {
 }
 
 /// Represents whether we should collect information about VMOs or memory maps of a process.
+#[derive(PartialEq, Debug)]
 struct CollectionRequest {
     collect_vmos: bool,
-    collect_maps: bool,
+    collect_maps: Option<CollectionRequestRange>,
+}
+
+/// Represents an address space range we need to collect information about.
+#[derive(Clone, Copy, PartialEq, Debug)]
+struct CollectionRequestRange {
+    /// Start of the range
+    range_start: u64,
+    /// End of the range
+    range_end: u64,
+}
+
+impl CollectionRequestRange {
+    fn merge(a: &Self, b: &Self) -> Self {
+        Self {
+            range_start: a.range_start.min(b.range_start),
+            range_end: a.range_end.max(b.range_end),
+        }
+    }
 }
 
 impl CollectionRequest {
     fn collect_vmos() -> Self {
-        Self { collect_vmos: true, collect_maps: false }
+        Self { collect_vmos: true, collect_maps: None }
     }
 
-    fn collect_maps() -> Self {
-        Self { collect_vmos: false, collect_maps: true }
+    fn collect_maps(range_start: u64, range_end: u64) -> Self {
+        Self {
+            collect_vmos: false,
+            collect_maps: Some(CollectionRequestRange { range_start, range_end }),
+        }
     }
 
     fn merge(&mut self, other: &Self) {
         self.collect_vmos |= other.collect_vmos;
-        self.collect_maps |= other.collect_maps;
+        self.collect_maps = match (self.collect_maps, other.collect_maps) {
+            (None, None) => None,
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (Some(a), Some(b)) => Some(CollectionRequestRange::merge(&a, &b)),
+        };
     }
 }
 
@@ -261,7 +288,10 @@ impl KernelResources {
                     }
                     fattribution::Resource::ProcessMapped(pm) => {
                         // Here, we assume that we would have learned about the VMOs elsewhere.
-                        (zx::Koid::from_raw(pm.process), CollectionRequest::collect_maps())
+                        (
+                            zx::Koid::from_raw(pm.process),
+                            CollectionRequest::collect_maps(pm.base, pm.base + pm.len),
+                        )
                     }
                     fattribution::Resource::__SourceBreaking { unknown_ordinal: _ } => todo!(),
                 };
@@ -460,7 +490,9 @@ impl KernelResourcesExplorer {
             None
         };
 
-        let process_maps = if collection.is_some_and(|c| c.collect_maps) {
+        let process_maps = if let Some(CollectionRequestRange { range_start, range_end }) =
+            collection.map(|c| c.collect_maps).flatten()
+        {
             duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:maps");
             let (mut info_maps, available) = process.info_maps(self.cache.maps_cache(0))?;
 
@@ -475,14 +507,20 @@ impl KernelResourcesExplorer {
             let mut mappings = Vec::with_capacity(info_maps.len());
             for info_map in info_maps {
                 if let zx::MapDetails::Mapping(details) = info_map.details() {
-                    mappings.push(fplugin::Mapping {
-                        vmo: Some(details.vmo_koid.raw_koid()),
-                        address_base: Some(info_map.base.try_into().unwrap()),
-                        size: Some(info_map.size.try_into().unwrap()),
-                        ..Default::default()
-                    });
+                    let address_base = info_map.base.try_into().unwrap();
+                    let address_end: u64 = (info_map.base + info_map.size).try_into().unwrap();
+                    if address_base < range_end && address_end >= range_start {
+                        mappings.push(fplugin::Mapping {
+                            vmo: Some(details.vmo_koid.raw_koid()),
+                            address_base: Some(address_base),
+                            size: Some(info_map.size.try_into().unwrap()),
+                            ..Default::default()
+                        });
+                    }
                 }
             }
+            // As we overestimated the capacity, we now need to shrink it.
+            mappings.shrink_to_fit();
             Some(mappings)
         } else {
             None
@@ -767,5 +805,26 @@ pub mod tests {
         } else {
             unreachable!("Not a process");
         }
+    }
+
+    #[test]
+    fn test_collection_request_merges() {
+        let mut a1 = CollectionRequest::collect_maps(100, 200);
+        a1.merge(&CollectionRequest::collect_maps(300, 400));
+        assert_eq!(a1, CollectionRequest::collect_maps(100, 400));
+
+        let mut a2 = CollectionRequest::collect_maps(100, 200);
+        a2.merge(&CollectionRequest::collect_maps(50, 400));
+        assert_eq!(a2, CollectionRequest::collect_maps(50, 400));
+
+        let mut a3 = CollectionRequest::collect_maps(100, 200);
+        a3.merge(&CollectionRequest::collect_vmos());
+        assert_eq!(
+            a3,
+            CollectionRequest {
+                collect_vmos: true,
+                collect_maps: Some(CollectionRequestRange { range_start: 100, range_end: 200 })
+            }
+        );
     }
 }
