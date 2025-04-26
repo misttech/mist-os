@@ -292,6 +292,12 @@ def main():
         help="Use `fx build` to update images before running them (default).",
         default=True,
     )
+    parser.add_argument(
+        "--symbolize",
+        action=argparse.BooleanOptionalAction,
+        help="Pipe output through `ffx debug symbolize --no-prettify`.",
+        default=False,
+    )
     args = parser.parse_args()
 
     if args.arch is None:
@@ -388,7 +394,30 @@ def main():
         cmd += ["--", "-no-reboot"]
 
     test.print(command=cmd)
-    return subprocess.run(cmd, cwd=build_dir).returncode
+    if not args.symbolize:
+        # Just run the emulator synchronously.
+        return subprocess.run(cmd, cwd=build_dir).returncode
+
+    # Start the emulator running asynchronously.
+    emulator = subprocess.Popen(
+        cmd, cwd=build_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+    )
+    # Run the symbolizer synchronously.  When the emulator finishes,
+    # the symbolizer will see EOF on its stdin and exit too.
+    symbolizer_status = subprocess.run(
+        ["fx", "ffx", "debug", "symbolize", "--no-prettify"],
+        cwd=build_dir,
+        stdin=emulator.stdout,
+    ).returncode
+
+    # The emulator probably already exited or else the symbolizer wouldn't have
+    # exited.  But still wait for the emulator in case e.g. the symbolizer
+    # crashed.  And even when it's already finished, collect its exit status.
+    emulator_status = emulator.wait()
+
+    # The emulator's exit code is most important.  But also exit nonzero if the
+    # symbolizer did so even though the emulator exited with success.
+    return emulator_status if emulator_status != 0 else symbolizer_status
 
 
 if __name__ == "__main__":
