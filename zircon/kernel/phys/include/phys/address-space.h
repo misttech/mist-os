@@ -13,7 +13,6 @@
 #include <ktl/array.h>
 #include <ktl/byte.h>
 #include <ktl/functional.h>
-#include <ktl/integer_sequence.h>
 #include <ktl/optional.h>
 #include <ktl/type_traits.h>
 #include <ktl/utility.h>

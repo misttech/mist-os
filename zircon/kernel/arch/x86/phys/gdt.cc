@@ -14,7 +14,7 @@
 #include <zircon/tls.h>
 
 #include <ktl/array.h>
-#include <ktl/integer_sequence.h>
+#include <ktl/utility.h>
 #include <phys/exception.h>
 #include <phys/main.h>
 #include <phys/stack.h>

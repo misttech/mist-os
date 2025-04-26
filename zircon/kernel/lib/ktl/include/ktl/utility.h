@@ -21,6 +21,12 @@ using std::in_place_index;
 using std::in_place_index_t;
 using std::in_place_t;
 
+using std::index_sequence;
+using std::index_sequence_for;
+using std::integer_sequence;
+using std::make_index_sequence;
+using std::make_integer_sequence;
+
 }  // namespace ktl
 
 #endif  // ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_UTILITY_H_
