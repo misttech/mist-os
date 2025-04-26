@@ -50,14 +50,14 @@ use netstack3_base::socket::{
 use netstack3_base::socketmap::{IterShadows as _, SocketMap};
 use netstack3_base::sync::RwLock;
 use netstack3_base::{
-    AnyDevice, BidirectionalConverter as _, ContextPair, Control, CoreTimerContext, CtxPair,
-    DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId, ExistsError, HandleableTimer,
-    IcmpErrorCode, Inspector, InspectorDeviceExt, InspectorExt, InstantBindingsTypes, IpDeviceAddr,
-    IpExt, LocalAddressError, Mark, MarkDomain, Mss, OwnedOrRefsBidirectionalConverter,
-    PayloadLen as _, PortAllocImpl, ReferenceNotifiersExt as _, RemoveResourceResult,
-    ResourceCounterContext as _, RngContext, Segment, SeqNum, StrongDeviceIdentifier as _,
-    TimerBindingsTypes, TimerContext, TxMetadataBindingsTypes, WeakDeviceIdentifier,
-    ZonedAddressError,
+    AnyDevice, BidirectionalConverter as _, ContextPair, Control, CoreTimerContext,
+    CoreTxMetadataContext, CtxPair, DeferredResourceRemovalContext, DeviceIdContext,
+    EitherDeviceId, ExistsError, HandleableTimer, IcmpErrorCode, Inspector, InspectorDeviceExt,
+    InspectorExt, InstantBindingsTypes, IpDeviceAddr, IpExt, LocalAddressError, Mark, MarkDomain,
+    Mss, OwnedOrRefsBidirectionalConverter, PayloadLen as _, PortAllocImpl,
+    ReferenceNotifiersExt as _, RemoveResourceResult, ResourceCounterContext as _, RngContext,
+    Segment, SeqNum, StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext,
+    TxMetadataBindingsTypes, WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_filter::{FilterIpExt, Tuple};
 use netstack3_ip::socket::{
@@ -71,6 +71,7 @@ use thiserror::Error;
 
 use crate::internal::base::{
     BufferSizes, BuffersRefMut, ConnectionError, SocketOptions, TcpIpSockOptions,
+    TcpSocketTxMetadata,
 };
 use crate::internal::buffer::{Buffer, IntoBuffers, ReceiveBuffer, SendBuffer};
 use crate::internal::counters::{
@@ -532,6 +533,21 @@ impl<T> AsThisStack<T> for T {
     }
 }
 
+/// A marker traits for all traits used to access TCP socket.
+pub trait TcpSocketContext<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>:
+    TcpCounterContext<I, D, BT> + CoreTxMetadataContext<TcpSocketTxMetadata<I, D, BT>, BT>
+{
+}
+
+impl<CC, I, D, BC> TcpSocketContext<I, D, BC> for CC
+where
+    I: DualStackIpExt,
+    D: WeakDeviceIdentifier,
+    BC: TcpBindingsTypes,
+    CC: TcpCounterContext<I, D, BC> + CoreTxMetadataContext<TcpSocketTxMetadata<I, D, BC>, BC>,
+{
+}
+
 /// A shortcut for the `CoreTimerContext` required by TCP.
 pub trait TcpCoreTimerContext<I: DualStackIpExt, D: WeakDeviceIdentifier, BC: TcpBindingsTypes>:
     CoreTimerContext<WeakTcpSocketId<I, D, BC>, BC>
@@ -640,21 +656,21 @@ where
 pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
     TcpDemuxContext<I, Self::WeakDeviceId, BC>
     + IpSocketHandler<I, BC>
-    + TcpCounterContext<I, Self::WeakDeviceId, BC>
+    + TcpSocketContext<I, Self::WeakDeviceId, BC>
 {
     /// The core context for the current version of the IP protocol. This is
     /// used to be version agnostic when the operation is on the current stack.
     type ThisStackIpTransportAndDemuxCtx<'a>: TransportIpContext<I, BC, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + DeviceIpSocketHandler<I, BC>
         + TcpDemuxContext<I, Self::WeakDeviceId, BC>
-        + TcpCounterContext<I, Self::WeakDeviceId, BC>;
+        + TcpSocketContext<I, Self::WeakDeviceId, BC>;
 
     /// The core context that will give access to this version of the IP layer.
     type SingleStackIpTransportAndDemuxCtx<'a>: TransportIpContext<I, BC, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + DeviceIpSocketHandler<I, BC>
         + TcpDemuxContext<I, Self::WeakDeviceId, BC>
         + AsThisStack<Self::ThisStackIpTransportAndDemuxCtx<'a>>
-        + TcpCounterContext<I, Self::WeakDeviceId, BC>;
+        + TcpSocketContext<I, Self::WeakDeviceId, BC>;
 
     /// A collection of type assertions that must be true in the single stack
     /// version, associated types and concrete types must unify and we can
@@ -674,7 +690,7 @@ pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
         + TcpDemuxContext<I::OtherVersion, Self::WeakDeviceId, BC>
         + TcpDualStackContext<I, Self::WeakDeviceId, BC>
         + AsThisStack<Self::ThisStackIpTransportAndDemuxCtx<'a>>
-        + TcpCounterContext<I, Self::WeakDeviceId, BC>
+        + TcpSocketContext<I, Self::WeakDeviceId, BC>
         + TcpCounterContext<I::OtherVersion, Self::WeakDeviceId, BC>;
 
     /// A collection of type assertions that must be true in the dual stack
@@ -3019,7 +3035,7 @@ where
                             BC: TcpBindingsContext,
                             CC: TransportIpContext<WireI, BC>
                                 + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
-                                + TcpCounterContext<SockI, CC::WeakDeviceId, BC>,
+                                + TcpSocketContext<SockI, CC::WeakDeviceId, BC>,
                         {
                             // Ignore the result - errors are handled below after calling `close`.
                             let _: Result<(), CloseError> = conn.state.shutdown_recv();
@@ -3173,7 +3189,7 @@ where
                             BC: TcpBindingsContext,
                             CC: TransportIpContext<WireI, BC>
                                 + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
-                                + TcpCounterContext<SockI, CC::WeakDeviceId, BC>,
+                                + TcpSocketContext<SockI, CC::WeakDeviceId, BC>,
                         {
                             let (shutdown_send, shutdown_receive) = shutdown_type.to_send_receive();
                             if shutdown_receive {
@@ -3778,7 +3794,7 @@ where
                     BC: TcpBindingsContext,
                     CC: TransportIpContext<WireI, BC>
                         + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
-                        + TcpCounterContext<SockI, CC::WeakDeviceId, BC>,
+                        + TcpSocketContext<SockI, CC::WeakDeviceId, BC>,
                 {
                     let time_wait = matches!(conn.state, State::TimeWait(_));
                     let limit = None;
@@ -4762,7 +4778,7 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
     DC: TransportIpContext<WireI, BC>
         + DeviceIpSocketHandler<WireI, BC>
         + TcpDemuxContext<WireI, DC::WeakDeviceId, BC>
-        + TcpCounterContext<SockI, DC::WeakDeviceId, BC>,
+        + TcpSocketContext<SockI, DC::WeakDeviceId, BC>,
     BC: TcpBindingsContext,
 {
     debug!("aborting pending socket {sock_id:?}");
@@ -4798,7 +4814,7 @@ fn do_send_inner_and_then_handle_newly_closed<SockI, WireI, CC, BC>(
     WireI: DualStackIpExt,
     BC: TcpBindingsContext,
     CC: TransportIpContext<WireI, BC>
-        + TcpCounterContext<SockI, CC::WeakDeviceId, BC>
+        + TcpSocketContext<SockI, CC::WeakDeviceId, BC>
         + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
 {
     let newly_closed = do_send_inner(conn_id, conn, limit, addr, timer, core_ctx, bindings_ctx);
@@ -4840,7 +4856,7 @@ where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
     BC: TcpBindingsContext,
-    CC: TransportIpContext<WireI, BC> + TcpCounterContext<SockI, CC::WeakDeviceId, BC>,
+    CC: TransportIpContext<WireI, BC> + TcpSocketContext<SockI, CC::WeakDeviceId, BC>,
 {
     let newly_closed = loop {
         match conn.state.poll_send(
@@ -5279,7 +5295,7 @@ where
     BC: TcpBindingsContext,
     CC: TransportIpContext<WireI, BC>
         + DeviceIpSocketHandler<WireI, BC>
-        + TcpCounterContext<SockI, CC::WeakDeviceId, BC>,
+        + TcpSocketContext<SockI, CC::WeakDeviceId, BC>,
     Demux: DemuxStateAccessor<WireI, CC, BC>,
 {
     let (local_ip, bound_device, local_port) = match listener_addr {
@@ -5527,9 +5543,6 @@ where
 ///
 /// When `ip_sock` is some, it is used to send the segment, otherwise, one is
 /// constructed on demand to send a oneshot segment.
-///
-/// `socket_id` is used strictly for logging. `None` can be provided in cases
-/// where the segment is not associated with any particular socket.
 fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -5541,7 +5554,7 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
 ) where
     WireI: IpExt + FilterIpExt,
     SockI: IpExt + DualStackIpExt,
-    CC: TcpCounterContext<SockI, D, BC>
+    CC: TcpSocketContext<SockI, D, BC>
         + IpSocketHandler<WireI, BC, DeviceId = D::Strong, WeakDeviceId = D>,
     BC: TcpBindingsTypes,
     D: WeakDeviceIdentifier,
@@ -5550,7 +5563,13 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
     // application buffers only open send buffer space once the data is
     // acknowledged by the peer. That lives entirely in the TCP module and we
     // don't need to track segments sitting in device queues.
-    let tx_metadata: BC::TxMetadata = Default::default();
+    let tx_metadata: BC::TxMetadata = match socket_id {
+        Some(socket_id) => {
+            core_ctx.convert_tx_meta(TcpSocketTxMetadata::new(socket_id.downgrade()))
+        }
+        None => Default::default(),
+    };
+
     let (header, data) = segment.into_parts();
     let control = header.control;
     let result = match ip_sock {
@@ -6132,6 +6151,17 @@ mod tests {
     {
         fn convert_timer(dispatch_id: WeakTcpSocketId<I, D::Weak, BT>) -> BT::DispatchId {
             dispatch_id.into()
+        }
+    }
+
+    impl<I, D, BC> CoreTxMetadataContext<TcpSocketTxMetadata<I, D::Weak, BC>, BC> for TcpCoreCtx<D, BC>
+    where
+        I: TcpTestIpExt,
+        D: FakeStrongDeviceId,
+        BC: TcpTestBindingsTypes<D>,
+    {
+        fn convert_tx_meta(&self, _tx_meta: TcpSocketTxMetadata<I, D::Weak, BC>) -> BC::TxMetadata {
+            Default::default()
         }
     }
 

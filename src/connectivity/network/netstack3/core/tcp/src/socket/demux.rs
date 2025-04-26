@@ -42,12 +42,12 @@ use crate::internal::counters::{
 };
 use crate::internal::socket::isn::IsnGenerator;
 use crate::internal::socket::{
-    self, AsThisStack as _, BoundSocketState, Connection, DemuxState, DeviceIpSocketHandler,
-    DualStackDemuxIdConverter as _, DualStackIpExt, EitherStack, HandshakeStatus, Listener,
-    ListenerAddrState, ListenerSharingState, MaybeDualStack, MaybeListener, PrimaryRc, TcpApi,
-    TcpBindingsContext, TcpBindingsTypes, TcpContext, TcpDemuxContext, TcpDualStackContext,
-    TcpIpTransportContext, TcpPortSpec, TcpSocketId, TcpSocketSetEntry, TcpSocketState,
-    TcpSocketStateInner,
+    self, AsThisStack as _, BoundSocketState, Connection, CoreTxMetadataContext, DemuxState,
+    DeviceIpSocketHandler, DualStackDemuxIdConverter as _, DualStackIpExt, EitherStack,
+    HandshakeStatus, Listener, ListenerAddrState, ListenerSharingState, MaybeDualStack,
+    MaybeListener, PrimaryRc, TcpApi, TcpBindingsContext, TcpBindingsTypes, TcpContext,
+    TcpDemuxContext, TcpDualStackContext, TcpIpTransportContext, TcpPortSpec, TcpSocketId,
+    TcpSocketSetEntry, TcpSocketState, TcpSocketStateInner, TcpSocketTxMetadata,
 };
 use crate::internal::state::{
     BufferProvider, Closed, DataAcked, Initial, NewlyClosed, State, TimeWait,
@@ -629,7 +629,8 @@ where
     DC: TransportIpContext<WireI, BC, DeviceId = CC::DeviceId, WeakDeviceId = CC::WeakDeviceId>
         + DeviceIpSocketHandler<SockI, BC>
         + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
-        + TcpCounterContext<SockI, CC::WeakDeviceId, BC>,
+        + TcpCounterContext<SockI, CC::WeakDeviceId, BC>
+        + CoreTxMetadataContext<TcpSocketTxMetadata<SockI, CC::WeakDeviceId, BC>, BC>,
 {
     let Connection {
         accept_queue,
@@ -903,7 +904,8 @@ where
     DC: TransportIpContext<WireI, BC, DeviceId = CC::DeviceId, WeakDeviceId = CC::WeakDeviceId>
         + DeviceIpSocketHandler<WireI, BC>
         + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
-        + TcpCounterContext<SockI, CC::WeakDeviceId, BC>,
+        + TcpCounterContext<SockI, CC::WeakDeviceId, BC>
+        + CoreTxMetadataContext<TcpSocketTxMetadata<SockI, CC::WeakDeviceId, BC>, BC>,
 {
     let (maybe_listener, sharing, listener_addr) = assert_matches!(
         socket_state,
