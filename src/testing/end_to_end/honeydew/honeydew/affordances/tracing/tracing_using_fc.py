@@ -121,7 +121,7 @@ class TracingUsingFc(tracing.Tracing):
     # List all the public methods
     def initialize(
         self,
-        categories: list[str] | None = DEFAULT_CATEGORIES,
+        categories: list[str] | None = None,
         buffer_size: int | None = None,
         start_timeout_milliseconds: int | None = None,
     ) -> None:

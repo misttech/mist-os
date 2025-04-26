@@ -424,7 +424,7 @@ class FuchsiaDeviceImpl(
         Returns:
             rtc.Rtc object
         """
-        return rtc_using_fc.RtcUisngFc(
+        return rtc_using_fc.RtcUsingFc(
             fuchsia_controller=self.fuchsia_controller,
             reboot_affordance=self,
         )

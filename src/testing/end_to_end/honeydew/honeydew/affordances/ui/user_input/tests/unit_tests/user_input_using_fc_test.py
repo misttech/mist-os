@@ -99,7 +99,7 @@ class UserInputFCTests(unittest.TestCase):
         new_callable=mock.AsyncMock,
         return_value=None,
     )
-    def test_tap_only_required(self, register_touch_screen, simulate_tap) -> None:  # type: ignore[no-untyped-def]
+    def test_tap_only_required(self, unused_register_touch_screen, simulate_tap) -> None:  # type: ignore[no-untyped-def]
         """Test for UserInput.tap() method with only required params."""
 
         touch_device = self.user_input().create_touch_device()
@@ -117,7 +117,7 @@ class UserInputFCTests(unittest.TestCase):
         new_callable=mock.AsyncMock,
         return_value=None,
     )
-    def test_tap_all_params(self, register_touch_screen, simulate_tap) -> None:  # type: ignore[no-untyped-def]
+    def test_tap_all_params(self, unused_register_touch_screen, simulate_tap) -> None:  # type: ignore[no-untyped-def]
         """Test for UserInput.tap() method with all params."""
 
         touch_device = self.user_input().create_touch_device(
@@ -147,7 +147,7 @@ class UserInputFCTests(unittest.TestCase):
         new_callable=mock.AsyncMock,
         return_value=None,
     )
-    def test_swipe(self, register_touch_screen, simulate_swipe) -> None:  # type: ignore[no-untyped-def]
+    def test_swipe(self, unused_register_touch_screen, simulate_swipe) -> None:  # type: ignore[no-untyped-def]
         """Test for UserInput.swipe() method."""
 
         touch_device = self.user_input().create_touch_device(
@@ -180,7 +180,7 @@ class UserInputFCTests(unittest.TestCase):
         new_callable=mock.AsyncMock,
         return_value=None,
     )
-    def test_swipe_with_duration(self, register_touch_screen, simulate_swipe) -> None:  # type: ignore[no-untyped-def]
+    def test_swipe_with_duration(self, unused_register_touch_screen, simulate_swipe) -> None:  # type: ignore[no-untyped-def]
         """Test for UserInput.swipe() method with duration."""
 
         touch_device = self.user_input().create_touch_device(
@@ -233,7 +233,7 @@ class UserInputFCTests(unittest.TestCase):
         new_callable=mock.AsyncMock,
         return_value=None,
     )
-    def test_key_press(self, register_keyboard, simulate_key_press) -> None:  # type: ignore[no-untyped-def]
+    def test_key_press(self, unused_register_keyboard, simulate_key_press) -> None:  # type: ignore[no-untyped-def]
         """Test for UserInput.key_press() method."""
 
         keyboard_device = self.user_input().create_keyboard_device()

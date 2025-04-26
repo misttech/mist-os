@@ -5,7 +5,7 @@
 
 import asyncio
 import logging
-from typing import Sequence
+from collections.abc import Sequence
 
 import fidl_fuchsia_location_namedplace as f_location_namedplace
 import fidl_fuchsia_wlan_common as f_wlan_common
@@ -132,6 +132,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
         )
 
     @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
     async def connect(
         self,
         ssid: str,
@@ -235,6 +236,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
         return True
 
     @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
     async def create_iface(
         self, phy_id: int, role: WlanMacRole, sta_addr: str | None = None
     ) -> int:
@@ -268,7 +270,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             ).unwrap()
         except (ZxStatus, AssertionError) as e:
             raise wlan_errors.HoneydewWlanError(
-                f"DeviceMonitor.CreateIface() error"
+                "DeviceMonitor.CreateIface() error"
             ) from e
 
         assert (
@@ -277,6 +279,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
         return create_iface_response.iface_id
 
     @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
     async def destroy_iface(self, iface_id: int) -> None:
         """Destroy WLAN interface by ID.
 
@@ -299,6 +302,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             ) from status
 
     @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
     async def disconnect(self) -> None:
         """Disconnect all client WLAN connections.
 
@@ -321,6 +325,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
                     ) from status
 
     @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
     async def get_country(self, phy_id: int) -> CountryCode:
         """Queries the currently configured country code from phy `phy_id`.
 
@@ -339,7 +344,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             ).unwrap()
         except (ZxStatus, AssertionError) as e:
             raise wlan_errors.HoneydewWlanError(
-                f"DeviceMonitor.GetCountry() error"
+                "DeviceMonitor.GetCountry() error"
             ) from e
 
         return CountryCode(
@@ -347,6 +352,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
         )
 
     @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
     async def get_iface_id_list(self) -> Sequence[int]:
         """Get list of wlan iface IDs on device.
 
@@ -367,6 +373,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             ) from status
 
     @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
     async def get_phy_id_list(self) -> Sequence[int]:
         """Get list of phy ids on device.
 
@@ -384,6 +391,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             ) from status
 
     @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
     async def query_iface(self, iface_id: int) -> QueryIfaceResponse:
         """Retrieves interface info for given wlan iface id.
 
@@ -405,11 +413,12 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             ).unwrap()
         except (ZxStatus, AssertionError) as e:
             raise wlan_errors.HoneydewWlanError(
-                f"DeviceMonitor.QueryIface() error"
+                "DeviceMonitor.QueryIface() error"
             ) from e
         return QueryIfaceResponse.from_fidl(query_iface_response.resp)
 
     @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
     async def scan_for_bss_info(self) -> dict[str, list[BssDescription]]:
         """Scans and returns BSS info.
 
@@ -433,7 +442,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             ).unwrap()
         except (ZxStatus, AssertionError) as e:
             raise wlan_errors.HoneydewWlanError(
-                f"ClientSme.ScanForController() error"
+                "ClientSme.ScanForController() error"
             ) from e
 
         results: dict[str, list[BssDescription]] = {}
@@ -543,6 +552,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             ) from status
 
     @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
     async def status(self) -> ClientStatusResponse:
         """Request connection status
 

@@ -4,7 +4,7 @@
 """Abstract base class for wlan affordance."""
 
 import abc
-from typing import Sequence
+from collections.abc import Sequence
 
 from honeydew.affordances import affordance
 from honeydew.affordances.connectivity.wlan.utils.types import (

@@ -438,7 +438,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         mock_run_starnix_console_shell_cmd.assert_called_once()
 
     @mock.patch.object(
-        rtc_using_fc.RtcUisngFc,
+        rtc_using_fc.RtcUsingFc,
         "__init__",
         autospec=True,
         return_value=None,
@@ -448,7 +448,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         implemented using fuchsia-controller"""
         self.assertIsInstance(
             self.fd_fc_obj.rtc,
-            rtc_using_fc.RtcUisngFc,
+            rtc_using_fc.RtcUsingFc,
         )
         mock_rtc_fc_init.assert_called_once_with(
             self.fd_fc_obj.rtc,
@@ -1671,8 +1671,8 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
     )
     def test_send_snapshot_command(
         self,
-        mock_fc_create_context: mock.Mock,
-        mock_health_check: mock.Mock,
+        unused_mock_fc_create_context: mock.Mock,
+        unused_mock_health_check: mock.Mock,
         mock_fc_connect_device_proxy: mock.Mock,
         *unused_args: Any,
     ) -> None:
@@ -1707,8 +1707,8 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
     )
     def test_send_snapshot_command_get_snapshot_error(
         self,
-        mock_fc_create_context: mock.Mock,
-        mock_health_check: mock.Mock,
+        unused_mock_fc_create_context: mock.Mock,
+        unused_mock_health_check: mock.Mock,
         mock_fc_connect_device_proxy: mock.Mock,
         *unused_args: Any,
     ) -> None:
@@ -1750,8 +1750,8 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
     )
     def test_send_snapshot_command_get_attr_error(
         self,
-        mock_fc_create_context: mock.Mock,
-        mock_health_check: mock.Mock,
+        unused_mock_fc_create_context: mock.Mock,
+        unused_mock_health_check: mock.Mock,
         mock_fc_connect_device_proxy: mock.Mock,
         *unused_args: Any,
     ) -> None:
@@ -1792,8 +1792,8 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
     )
     def test_send_snapshot_command_get_attr_status_not_ok(
         self,
-        mock_fc_create_context: mock.Mock,
-        mock_health_check: mock.Mock,
+        unused_mock_fc_create_context: mock.Mock,
+        unused_mock_health_check: mock.Mock,
         mock_fc_connect_device_proxy: mock.Mock,
         *unused_args: Any,
     ) -> None:
@@ -1840,8 +1840,8 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
     )
     def test_send_snapshot_command_read_error(
         self,
-        mock_fc_create_context: mock.Mock,
-        mock_health_check: mock.Mock,
+        unused_mock_fc_create_context: mock.Mock,
+        unused_mock_health_check: mock.Mock,
         mock_fc_connect_device_proxy: mock.Mock,
         *unused_args: Any,
     ) -> None:
@@ -1893,8 +1893,8 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
     )
     def test_send_snapshot_command_size_mismatch(
         self,
-        mock_fc_create_context: mock.Mock,
-        mock_health_check: mock.Mock,
+        unused_mock_fc_create_context: mock.Mock,
+        unused_mock_health_check: mock.Mock,
         mock_fc_connect_device_proxy: mock.Mock,
         *unused_args: Any,
     ) -> None:
