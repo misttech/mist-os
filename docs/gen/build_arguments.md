@@ -5885,7 +5885,7 @@ From //src/starnix/kernel/args.gni:29
 
 Whether to use CowMap instead of BTreeMap to back RangeMap.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //src/starnix/lib/range_map/BUILD.gn:7
 
