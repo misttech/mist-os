@@ -393,6 +393,21 @@
             to: "#testing",
         },
         {
+            service: "fuchsia.hardware.serial.Service",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            service: "fuchsia.hardware.google.nanohub.Service",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            service: "fuchsia.hardware.sockettunnel.Service",
+            from: "parent",
+            to: "#testing",
+        },
+        {
             // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
             // been migrated to services. The service capability has been added below.
             directory: "dev-class",
