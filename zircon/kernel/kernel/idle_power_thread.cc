@@ -24,8 +24,8 @@
 #include <kernel/percpu.h>
 #include <kernel/scheduler.h>
 #include <kernel/thread.h>
-#include <ktl/algorithm.h>
 #include <ktl/atomic.h>
+#include <ktl/utility.h>
 #include <lk/init.h>
 #include <object/interrupt_dispatcher.h>
 #include <platform/timer.h>

@@ -21,8 +21,8 @@ InstrumentationDataVmo SancovGetCountsVmo() { return {}; }
 #include <stdint.h>
 #include <zircon/assert.h>
 
-#include <ktl/algorithm.h>
 #include <ktl/atomic.h>
+#include <ktl/utility.h>
 #include <lk/init.h>
 #include <vm/vm_object_paged.h>
 

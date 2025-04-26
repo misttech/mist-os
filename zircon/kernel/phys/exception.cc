@@ -6,7 +6,7 @@
 
 #include <stdio.h>
 
-#include <ktl/algorithm.h>
+#include <ktl/utility.h>
 #include <phys/exception.h>
 #include <phys/main.h>
 

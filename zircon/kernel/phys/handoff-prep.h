@@ -16,6 +16,7 @@
 
 #include <fbl/alloc_checker.h>
 #include <fbl/intrusive_single_list.h>
+#include <ktl/algorithm.h>
 #include <ktl/byte.h>
 #include <ktl/concepts.h>
 #include <ktl/initializer_list.h>

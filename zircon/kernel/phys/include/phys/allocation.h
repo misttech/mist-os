@@ -12,7 +12,6 @@
 #include <lib/memalloc/range.h>
 
 #include <fbl/alloc_checker.h>
-#include <ktl/algorithm.h>
 #include <ktl/byte.h>
 #include <ktl/optional.h>
 #include <ktl/span.h>

@@ -22,7 +22,7 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
-#include <ktl/algorithm.h>
+#include <ktl/utility.h>
 #include <lk/init.h>
 #include <object/channel_dispatcher.h>
 #include <object/handle.h>

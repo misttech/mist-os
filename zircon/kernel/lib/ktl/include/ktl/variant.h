@@ -15,10 +15,6 @@ namespace ktl {
 using std::get;
 using std::get_if;
 using std::holds_alternative;
-using std::in_place;
-using std::in_place_index;
-using std::in_place_index_t;
-using std::in_place_t;
 using std::in_place_type;
 using std::in_place_type_t;
 using std::monostate;

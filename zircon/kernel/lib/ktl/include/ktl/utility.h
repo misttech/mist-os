@@ -11,8 +11,15 @@
 
 namespace ktl {
 
+using std::exchange;
 using std::forward;
 using std::move;
+using std::swap;
+
+using std::in_place;
+using std::in_place_index;
+using std::in_place_index_t;
+using std::in_place_t;
 
 }  // namespace ktl
 

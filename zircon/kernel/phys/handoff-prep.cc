@@ -18,8 +18,8 @@
 #include <string-file.h>
 #include <zircon/assert.h>
 
-#include <ktl/algorithm.h>
 #include <ktl/tuple.h>
+#include <ktl/utility.h>
 #include <phys/allocation.h>
 #include <phys/arch/arch-handoff.h>
 #include <phys/elf-image.h>

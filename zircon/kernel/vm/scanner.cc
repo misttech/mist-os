@@ -13,7 +13,7 @@
 
 #include <kernel/event.h>
 #include <kernel/thread.h>
-#include <ktl/algorithm.h>
+#include <ktl/utility.h>
 #include <lk/init.h>
 #include <vm/compression.h>
 #include <vm/discardable_vmo_tracker.h>
