@@ -27,6 +27,12 @@ using std::integer_sequence;
 using std::make_index_sequence;
 using std::make_integer_sequence;
 
+using std::get;
+using std::pair;
+using std::piecewise_construct;
+using std::piecewise_construct_t;
+using std::make_pair;
+
 }  // namespace ktl
 
 #endif  // ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_UTILITY_H_

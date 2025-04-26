@@ -20,7 +20,6 @@
 #include <ktl/byte.h>
 #include <ktl/concepts.h>
 #include <ktl/initializer_list.h>
-#include <ktl/pair.h>
 #include <ktl/span.h>
 #include <ktl/tuple.h>
 #include <ktl/utility.h>

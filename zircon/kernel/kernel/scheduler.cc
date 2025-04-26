@@ -41,7 +41,6 @@
 #include <ktl/algorithm.h>
 #include <ktl/forward.h>
 #include <ktl/limits.h>
-#include <ktl/pair.h>
 #include <ktl/span.h>
 #include <ktl/tuple.h>
 #include <ktl/utility.h>
