@@ -85,7 +85,8 @@ pub fn main() {
         .add_fidl_service(Service::NdpWatcher)
         .add_fidl_service(Service::Neighbor)
         .add_fidl_service(Service::NeighborController)
-        .add_fidl_service(Service::HealthCheck);
+        .add_fidl_service(Service::HealthCheck)
+        .add_fidl_service(Service::SocketControl);
 
     let seed = NetstackSeed::new(GlobalConfig {
         suspend_enabled: *suspend_enabled,

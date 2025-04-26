@@ -766,7 +766,7 @@ impl<D: netstack3_base::StrongDeviceIdentifier> SocketOpsFilter<D> for NoOpSocke
         _device: &D,
         _marks: &Marks,
     ) -> SocketEgressFilterResult {
-        SocketEgressFilterResult::Send { congestion: false }
+        SocketEgressFilterResult::Pass { congestion: false }
     }
 }
 

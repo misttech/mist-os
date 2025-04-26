@@ -4,6 +4,7 @@
 
 mod controller;
 mod conversion;
+pub mod socket_filters;
 
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;

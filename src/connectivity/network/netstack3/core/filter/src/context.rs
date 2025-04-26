@@ -113,7 +113,7 @@ pub trait FilterContext<BT: FilterBindingsTypes>:
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum SocketEgressFilterResult {
     /// Send the packet normally.
-    Send {
+    Pass {
         /// Indicates that congestion should be signaled to the higher level protocol.
         congestion: bool,
     },

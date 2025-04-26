@@ -1238,6 +1238,7 @@ pub(crate) enum Service {
     RuleTableV4(fnet_routes_admin::RuleTableV4RequestStream),
     RuleTableV6(fnet_routes_admin::RuleTableV6RequestStream),
     Socket(fidl_fuchsia_posix_socket::ProviderRequestStream),
+    SocketControl(fidl_fuchsia_net_filter::SocketControlRequestStream),
     Stack(fidl_fuchsia_net_stack::StackRequestStream),
 }
 
@@ -1548,6 +1549,16 @@ impl NetstackSeed {
                                     filter::serve_root(
                                         rs,
                                         &filter_update_dispatcher,
+                                        &netstack.ctx,
+                                    )
+                                )
+                                .await
+                        }
+                        Service::SocketControl(root_filter) => {
+                            root_filter
+                                .serve_with(|rs|
+                                    filter::socket_filters::serve_socket_control(
+                                        rs,
                                         &netstack.ctx,
                                     )
                                 )

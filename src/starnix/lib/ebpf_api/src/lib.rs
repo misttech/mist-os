@@ -12,4 +12,5 @@ pub use helpers::*;
 pub use maps::*;
 pub use program_type::*;
 
-pub use linux_uapi::__sk_buff;
+pub use linux_uapi::{__sk_buff, uid_t};
+pub const BPF_MAP_TYPE_HASH: u32 = linux_uapi::bpf_map_type_BPF_MAP_TYPE_HASH;
