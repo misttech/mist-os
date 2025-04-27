@@ -1104,6 +1104,7 @@ impl Socket {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
+        security::check_socket_listen_access(current_task, self)?;
         let max_connections =
             current_task.kernel().system_limits.socket.max_connections.load(Ordering::Relaxed);
         let backlog = std::cmp::min(backlog, max_connections);

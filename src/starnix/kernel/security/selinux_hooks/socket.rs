@@ -9,14 +9,16 @@ use crate::vfs::socket::{
     NetlinkFamily, Socket, SocketAddress, SocketDomain, SocketPeer, SocketProtocol, SocketType,
 };
 use crate::vfs::{Anon, FileSystemHandle, FsNode};
+use crate::TODO_DENY;
 use selinux::permission_check::PermissionCheck;
 use selinux::{
     CommonFsNodePermission, CommonSocketPermission, FsNodeClass, InitialSid, KernelPermission,
     SecurityId, SecurityServer, SocketClass,
 };
+use starnix_logging::BugRef;
 use starnix_uapi::errors::Errno;
 
-use super::{check_permission, fs_node_effective_sid_and_class};
+use super::{check_permission, fs_node_effective_sid_and_class, todo_check_permission};
 
 /// Checks that `current_task` has the specified `permission` for the `socket_node`.
 fn has_socket_permission(
@@ -68,6 +70,40 @@ fn has_socket_permission_for_sid(
         socket_sid,
         permission.clone(),
         audit_context,
+    )
+}
+
+/// Checks that `current_task` has the specified `permission` for the `socket_node`, with
+/// "todo_deny" on denial.
+fn todo_has_socket_permission(
+    bug: BugRef,
+    permission_check: &PermissionCheck<'_>,
+    kernel: &Kernel,
+    subject_sid: SecurityId,
+    socket_node: &FsNode,
+    permission: KernelPermission,
+    audit_context: Auditable<'_>,
+) -> Result<(), Errno> {
+    // Permissions are allowed for kernel sockets.
+    let socket_sid = fs_node_effective_sid_and_class(socket_node).sid;
+    // TODO: https://fxbug.dev/364569010 - check if there are additional cases when the socket is
+    // for kernel-internal use.
+    if Anon::is_private(socket_node)
+        || subject_sid == SecurityId::initial(InitialSid::Kernel)
+        || socket_sid == SecurityId::initial(InitialSid::Kernel)
+    {
+        return Ok(());
+    }
+
+    let audit_context = [audit_context, socket_node.into()];
+    todo_check_permission(
+        bug,
+        kernel,
+        permission_check,
+        subject_sid,
+        socket_sid,
+        permission,
+        (&audit_context).into(),
     )
 }
 
@@ -228,6 +264,29 @@ pub(in crate::security) fn check_socket_connect_access(
         current_sid,
         &socket_node,
         &CommonSocketPermission::Connect.for_class(socket_class),
+        current_task.into(),
+    )
+}
+
+/// Checks that `current_task` has permission to listen on `socket_node`.
+pub(in crate::security) fn check_socket_listen_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    socket: &Socket,
+) -> Result<(), Errno> {
+    let socket_node = socket.fs_node();
+    let current_sid = current_task.security_state.lock().current_sid;
+    let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
+        panic!("check_socket_listen_access called for non-Socket class")
+    };
+
+    todo_has_socket_permission(
+        TODO_DENY!("https://fxbug.dev/411396154", "Enforce socket_listen checks."),
+        &security_server.as_permission_check(),
+        current_task.kernel(),
+        current_sid,
+        &socket_node,
+        CommonSocketPermission::Listen.for_class(socket_class),
         current_task.into(),
     )
 }

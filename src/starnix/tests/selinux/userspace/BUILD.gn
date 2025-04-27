@@ -107,6 +107,8 @@ test_names = [
   "procattr",
   "selinuxfs",
   "socket",
+  "socket_listen_allowed",
+  "socket_listen_denied",
   "timerslack",
   "unlabeled_fs",
 

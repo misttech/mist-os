@@ -4,13 +4,6 @@
 #include <netinet/ip.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <sys/xattr.h>
-#include <unistd.h>
-
-#include <cstring>
-#include <iostream>
-#include <sstream>
-#include <string>
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
@@ -138,4 +131,5 @@ TEST(SocketTest, SockFileLabelIsCorrect) {
   EXPECT_EQ(GetLabel(sockfd.get()), "test_u:test_r:unix_stream_socket_test_t:s0");
   EXPECT_EQ(GetLabel(kSockPath), "test_u:object_r:sock_file_test_t:s0");
 }
+
 }  // namespace

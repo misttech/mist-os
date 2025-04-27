@@ -769,6 +769,8 @@ common_permission_enum! {
         Bind("bind"),
         /// Permission to initiate a connection.
         Connect("connect"),
+        /// Permission to listen for connections.
+        Listen("listen"),
         // keep-sorted end
     }
 }

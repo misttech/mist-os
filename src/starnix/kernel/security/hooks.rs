@@ -939,6 +939,18 @@ pub fn check_socket_connect_access(
     })
 }
 
+/// Checks if the `current_task` is allowed to listen on `socket_node`.
+/// Corresponds to the `socket_listen()` LSM hook.
+pub fn check_socket_listen_access(
+    current_task: &CurrentTask,
+    socket: &Socket,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.check_socket_listen_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::check_socket_listen_access(&security_server, current_task, socket)
+    })
+}
+
 /// Updates the SELinux thread group state on exec.
 /// Corresponds to the `bprm_committing_creds()` and `bprm_committed_creds()` LSM hooks.
 pub fn update_state_on_exec(current_task: &CurrentTask, elf_security_state: &ResolvedElfState) {
