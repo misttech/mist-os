@@ -79,6 +79,33 @@ paddr_t root_lower_page_table_phys;
 
 namespace {
 
+// If lock is contended, limit harvesting to 32 entries per iteration with the
+// arch aspace lock held to avoid delays in accessed faults in the same aspace
+// running in parallel.
+//
+// This limit is derived from the following observations:
+// 1. Worst case runtime to harvest a terminal PTE on a low-end A53 is ~780ns.
+// 2. Real workloads can result in harvesting thousands of terminal PTEs in a
+//    single aspace.
+// 3. An access fault handler will spin up to 150us on the aspace adaptive
+//    mutex before blocking.
+// 4. Unnecessarily blocking is costly when the system is heavily loaded,
+//    especially during accessed faults, which tend to occur multiple times in
+//    quick succession within and across threads in the same process.
+//
+// To achieve optimal contention between access harvesting and access faults,
+// it is important to avoid exhausting the 150us mutex spin phase by holding
+// the aspace mutex for too long. The selected entry limit results in a worst
+// case harvest time of about 1/6 of the mutex spin phase.
+//
+//   Ti = worst case runtime per top-level harvest iteration.
+//   Te = worst case runtime per terminal entry harvest.
+//   L  = max entries per top-level harvest iteration.
+//
+//   Ti = Te * L = 780ns * 32 = 24.96us
+//
+constexpr size_t kHarvestEntriesBetweenUnlocks = 32;
+
 // Whether ASID use is enabled.
 bool feat_asid_enabled;
 
@@ -1295,8 +1322,18 @@ size_t ArmArchVmAspace::HarvestAccessedPageTable(
     // for too long. However, the remaining limit balance is updated at the end
     // of the loop to ensure that harvesting makes progress, even if the initial
     // limit is too small to reach a terminal PTE.
-    if (*entry_limit > 0) {
+    if (*entry_limit > 1) {
       *entry_limit -= 1;
+    } else if (!lock_.lock().IsContested() && pending_access_faults_.load() == 0) {
+      // The entry_limit is either about to be, or already is, 0, but since the lock is not
+      // contended and there are no access faults in progress, we can reset the counter and perform
+      // another block of work before checking again.
+      *entry_limit = kHarvestEntriesBetweenUnlocks;
+    } else {
+      // This either changes the entry_limit from 1->0, or is a no-op if it was already 0. As the
+      // lock is contested this ensures we'll break out back to the parent scope where the lock can
+      // be dropped.
+      *entry_limit = 0;
     }
   }
 
@@ -1676,7 +1713,6 @@ zx_status_t ArmArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
   // work performed with the lock held and preemption disabled is limited. Other
   // O(n) operations under this lock are opt-in by the user (e.g. Map, Protect)
   // and are performed with preemption enabled.
-  Guard<CriticalMutex> guard{&lock_};
 
   const vaddr_t vaddr_rel = vaddr - vaddr_base_;
   const vaddr_t vaddr_rel_max = 1UL << top_size_shift_;
@@ -1691,65 +1727,34 @@ zx_status_t ArmArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
 
   LOCAL_KTRACE("mmu harvest accessed", ("vaddr", vaddr), ("size", size));
 
-  // Limit harvesting to 32 entries per iteration with the arch aspace lock held
-  // to avoid delays in accessed faults in the same aspace running in parallel.
-  //
-  // This limit is derived from the following observations:
-  // 1. Worst case runtime to harvest a terminal PTE on a low-end A53 is ~780ns.
-  // 2. Real workloads can result in harvesting thousands of terminal PTEs in a
-  //    single aspace.
-  // 3. An access fault handler will spin up to 150us on the aspace adaptive
-  //    mutex before blocking.
-  // 4. Unnecessarily blocking is costly when the system is heavily loaded,
-  //    especially during accessed faults, which tend to occur multiple times in
-  //    quick succession within and across threads in the same process.
-  //
-  // To achieve optimal contention between access harvesting and access faults,
-  // it is important to avoid exhausting the 150us mutex spin phase by holding
-  // the aspace mutex for too long. The selected entry limit results in a worst
-  // case harvest time of about 1/6 of the mutex spin phase.
-  //
-  //   Ti = worst case runtime per top-level harvest iteration.
-  //   Te = worst case runtime per terminal entry harvest.
-  //   L  = max entries per top-level harvest iteration.
-  //
-  //   Ti = Te * L = 780ns * 32 = 24.96us
-  //
-  const size_t kMaxEntriesPerIteration = 32;
-
   size_t remaining_size = size;
   vaddr_t current_vaddr = vaddr;
   vaddr_t current_vaddr_rel = vaddr_rel;
 
   while (remaining_size) {
-    ktrace::Scope trace = KTRACE_BEGIN_SCOPE_ENABLE(
-        LOCAL_KTRACE_ENABLE, "kernel:vm", "harvest_loop", ("remaining_size", remaining_size));
-    size_t entry_limit = kMaxEntriesPerIteration;
-    // The consistency manager must be scoped narrowly here as it is incorrect keep it alive without
-    // the lock held, which we will drop later on.
-    {
-      ConsistencyManager cm(*this);
-      const size_t harvested_size = HarvestAccessedPageTable(
-          &entry_limit, current_vaddr, current_vaddr_rel, remaining_size, top_index_shift_,
-          non_terminal_action, terminal_action, tt_virt_, cm);
-      DEBUG_ASSERT(harvested_size > 0);
-      DEBUG_ASSERT(harvested_size <= remaining_size);
-
-      remaining_size -= harvested_size;
-      current_vaddr += harvested_size;
-      current_vaddr_rel += harvested_size;
-    }
-
     // Release and re-acquire the lock to let contending threads have a chance
     // to acquire the arch aspace lock between iterations. Use arch::Yield() to
     // give other CPUs spinning on the aspace mutex a slight edge in acquiring
     // the mutex. Reenable preemption to flush any pending preemptions that may
     // have pended during the critical section.
-    guard.CallUnlocked([this] {
-      while (pending_access_faults_.load() != 0) {
-        arch::Yield();
-      }
-    });
+    Guard<CriticalMutex> guard{&lock_};
+    if (pending_access_faults_.load() != 0) {
+      arch::Yield();
+      continue;
+    }
+    ktrace::Scope trace = KTRACE_BEGIN_SCOPE_ENABLE(
+        LOCAL_KTRACE_ENABLE, "kernel:vm", "harvest_loop", ("remaining_size", remaining_size));
+    size_t entry_limit = kHarvestEntriesBetweenUnlocks;
+    ConsistencyManager cm(*this);
+    const size_t harvested_size = HarvestAccessedPageTable(
+        &entry_limit, current_vaddr, current_vaddr_rel, remaining_size, top_index_shift_,
+        non_terminal_action, terminal_action, tt_virt_, cm);
+    DEBUG_ASSERT(harvested_size > 0);
+    DEBUG_ASSERT(harvested_size <= remaining_size);
+
+    remaining_size -= harvested_size;
+    current_vaddr += harvested_size;
+    current_vaddr_rel += harvested_size;
   }
 
   return ZX_OK;
