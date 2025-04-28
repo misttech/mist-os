@@ -255,7 +255,8 @@ void Device::FidlErrorHandler<T>::on_fidl_error(fidl::UnbindInfo info) {
     ADR_WARN_METHOD() << name_ << " disconnected: " << info;
     device_->OnError(info.status());
   } else {
-    ADR_LOG_METHOD(kLogCodecFidlResponses || kLogCompositeFidlResponses || kLogObjectLifetimes)
+    ADR_LOG_METHOD(kLogCodecFidlResponses || kLogCompositeFidlResponses || kLogObjectLifetimes ||
+                   kLogDeviceAddErrorRemove)
         << name_ << " disconnected: " << info;
   }
   device_->OnRemoval();
@@ -340,12 +341,22 @@ void Device::SetSignalProcessingSupported(bool is_supported) {
   auto first_set_of_signalprocessing_support = !supports_signalprocessing_.has_value();
   supports_signalprocessing_ = is_supported;
 
-  if (is_composite() && !is_supported) {
-    OnError(ZX_ERR_NOT_SUPPORTED);
-  }
   // Only poke the initialization state machine the FIRST time this is called.
   if (first_set_of_signalprocessing_support) {
+    // Composite drivers must support signalprocessing.
+    if (is_composite() && !is_supported) {
+      // If we have not already registered an error for this device, then do so now.
+      OnError(ZX_ERR_NOT_SUPPORTED);
+    }
     OnInitializationResponse();
+  }
+
+  if constexpr (kLogSignalProcessingState || kLogDeviceState) {
+    if (!first_set_of_signalprocessing_support && is_composite() && !is_supported) {
+      // If supports_signalprocessing_ changed AFTER we first checked, this is probably a device
+      // removal. Let OnRemoval() clean things up, instead of marking the device as error.
+      ADR_LOG_METHOD(kLogSignalProcessingState || kLogDeviceState) << "interpreting as a removal";
+    }
   }
 }
 
@@ -1296,12 +1307,12 @@ void Device::RetrieveSignalProcessingTopology() {
   (*sig_proc_client_)
       ->WatchTopology()
       .Then([this](fidl::Result<fhasp::SignalProcessing::WatchTopology>& result) {
-        TopologyId topology_id = result->topology_id();
-        std::string context("signalprocessing::WatchTopology response: topology_id ");
-        context.append(std::to_string(topology_id));
+        std::string context("signalprocessing::WatchTopology response");
         if (SetDeviceErrorOnFidlFrameworkError(result, context.c_str())) {
           return;
         }
+        TopologyId topology_id = result->topology_id();
+        context.append(": topology_id ").append(std::to_string(topology_id));
         ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
 
         // Either (a) sig_proc_topology_map_ is incorrect, or (b) the driver is poorly-behaved.
