@@ -1073,7 +1073,7 @@ group("test-case") {
 }
 
 group("textwrap") {
-  public_deps = [ ":textwrap-v0_11_0" ]
+  public_deps = [ ":textwrap-v0_16_2" ]
 }
 
 group("thiserror") {
@@ -16778,6 +16778,33 @@ rust_library("textwrap-v0_11_0") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":textwrap-v0_11_0.license" ]
+}
+
+license("textwrap-v0_16_2.license") {
+  public_package_name = "textwrap"
+  license_files = [ "//third_party/rust_crates/vendor/textwrap-0.16.2/LICENSE" ]
+}
+
+rust_library("textwrap-v0_16_2") {
+  crate_name = "textwrap"
+  crate_root = "//third_party/rust_crates/vendor/textwrap-0.16.2/src/lib.rs"
+  output_name = "textwrap-fec74b1a430768a0"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=fec74b1a430768a0",
+    "-Cextra-filename=-fec74b1a430768a0",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":textwrap-v0_16_2.license" ]
 }
 
 license("thiserror-v1_0_69.license") {

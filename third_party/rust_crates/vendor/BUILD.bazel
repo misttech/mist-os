@@ -2827,14 +2827,14 @@ alias(
 )
 
 alias(
-    name = "textwrap-0.11.0",
-    actual = "//third_party/rust_crates/vendor/textwrap-0.11.0:textwrap",
+    name = "textwrap-0.16.2",
+    actual = "//third_party/rust_crates/vendor/textwrap-0.16.2:textwrap",
     tags = ["manual"],
 )
 
 alias(
     name = "textwrap",
-    actual = "//third_party/rust_crates/vendor/textwrap-0.11.0:textwrap",
+    actual = "//third_party/rust_crates/vendor/textwrap-0.16.2:textwrap",
     tags = ["manual"],
 )
 
