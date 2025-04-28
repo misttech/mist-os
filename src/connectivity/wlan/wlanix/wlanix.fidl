@@ -142,6 +142,9 @@ open protocol SupplicantStaIface {
         1: network server_end:SupplicantStaNetwork;
     });
     flexible Disconnect() -> ();
+    flexible GetMacAddress() -> (table {
+        1: mac_addr fuchsia.wlan.ieee80211.MacAddr;
+    }) error zx.Status;
     flexible SetPowerSave(resource table {
         1: enable bool;
     }) -> ();

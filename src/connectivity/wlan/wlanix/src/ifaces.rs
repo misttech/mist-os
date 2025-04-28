@@ -252,6 +252,7 @@ impl std::fmt::Debug for PowerState {
 
 #[async_trait]
 pub(crate) trait ClientIface: Sync + Send {
+    async fn query(&self) -> Result<fidl_device_service::QueryIfaceResponse, Error>;
     async fn trigger_scan(&self) -> Result<ScanEnd, Error>;
     async fn abort_scan(&self) -> Result<(), Error>;
     fn get_last_scan_results(&self) -> Vec<fidl_sme::ScanResult>;
@@ -380,6 +381,14 @@ impl SmeClientIface {
 
 #[async_trait]
 impl ClientIface for SmeClientIface {
+    async fn query(&self) -> Result<fidl_device_service::QueryIfaceResponse, Error> {
+        self.monitor_svc
+            .query_iface(self.iface_id)
+            .await?
+            .map_err(zx::Status::from_raw)
+            .context("Could not query iface info")
+    }
+
     async fn trigger_scan(&self) -> Result<ScanEnd, Error> {
         let scan_request = fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest);
         let (abort_sender, mut abort_receiver) = oneshot::channel();
@@ -690,6 +699,7 @@ pub mod test_utils {
 
     #[derive(Debug, Clone)]
     pub enum ClientIfaceCall {
+        Query,
         TriggerScan,
         AbortScan,
         GetLastScanResults,
@@ -723,6 +733,17 @@ pub mod test_utils {
 
     #[async_trait]
     impl ClientIface for TestClientIface {
+        async fn query(&self) -> Result<fidl_device_service::QueryIfaceResponse, Error> {
+            self.calls.lock().push(ClientIfaceCall::Query);
+            Ok(fidl_device_service::QueryIfaceResponse {
+                role: fidl_common::WlanMacRole::Client,
+                id: 1,
+                phy_id: 42,
+                phy_assigned_id: 1337,
+                sta_addr: [13, 37, 13, 37, 13, 37],
+            })
+        }
+
         async fn trigger_scan(&self) -> Result<ScanEnd, Error> {
             self.calls.lock().push(ClientIfaceCall::TriggerScan);
             let scan_end_receiver = self.scan_end_receiver.lock().take();
@@ -1325,6 +1346,29 @@ mod tests {
         );
         responder.send(0).expect("Failed to send result");
         assert_variant!(exec.run_until_stalled(&mut set_country_fut), Poll::Ready(Ok(())));
+    }
+
+    #[test]
+    fn test_query_on_iface() {
+        let (mut exec, mut monitor_stream, _sme_stream, _telemetry_receiver, _manager, iface) =
+            setup_test_manager_with_iface();
+        let mut query_fut = iface.query();
+        assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Pending);
+        let (iface_id, responder) = assert_variant!(
+            exec.run_until_stalled(&mut monitor_stream.next()),
+            Poll::Ready(Some(Ok(fidl_device_service::DeviceMonitorRequest::QueryIface { iface_id, responder }))) => (iface_id, responder));
+        assert_eq!(iface_id, iface.iface_id);
+        const RESPONSE: fidl_device_service::QueryIfaceResponse =
+            fidl_device_service::QueryIfaceResponse {
+                role: fidl_common::WlanMacRole::Client,
+                id: 1,
+                phy_id: 2,
+                phy_assigned_id: 3,
+                sta_addr: [4, 5, 6, 7, 8, 9],
+            };
+        responder.send(Ok(&RESPONSE)).expect("Failed to send result");
+        let response = assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Ready(Ok(response)) => response);
+        assert_eq!(response, RESPONSE);
     }
 
     #[test]

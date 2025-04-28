@@ -836,6 +836,21 @@ async fn handle_supplicant_sta_iface_request<C: ClientIface>(
                 warn!("Failed to send disconnect response: {}", e);
             }
         }
+        fidl_wlanix::SupplicantStaIfaceRequest::GetMacAddress { responder } => {
+            info!("fidl_wlanix::WifiStaIfaceRequest::GetMacAddress");
+            let result = match iface.query().await {
+                Ok(response) => Ok(fidl_wlanix::SupplicantStaIfaceGetMacAddressResponse {
+                    mac_addr: Some(response.sta_addr),
+                    ..Default::default()
+                }),
+                Err(e) => {
+                    error!("Failed to query iface {}: {}", iface_id, e);
+                    Err(zx::sys::ZX_ERR_INTERNAL)
+                }
+            };
+            let result = result.as_ref().map_err(|status| *status);
+            responder.send(result).context("send GetMacAddress response")?;
+        }
         fidl_wlanix::SupplicantStaIfaceRequest::SetPowerSave { payload, responder } => {
             info!("fidl_wlanix::SupplicantStaIfaceRequest::SetPowerSave");
             match payload.enable {
@@ -2042,6 +2057,25 @@ mod tests {
             test_helper.exec.run_until_stalled(&mut disconnect_fut),
             Poll::Ready(Ok(()))
         );
+    }
+
+    #[test]
+    fn test_supplicant_sta_iface_get_mac_address() {
+        let (mut test_helper, mut test_fut) = setup_supplicant_test();
+
+        let mut get_mac_address_fut = test_helper.supplicant_sta_iface_proxy.get_mac_address();
+        assert_variant!(
+            test_helper.exec.run_until_stalled(&mut get_mac_address_fut),
+            Poll::Pending
+        );
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let iface_calls = test_helper.iface_manager.get_iface_call_history();
+        assert_variant!(&iface_calls.lock()[0], ClientIfaceCall::Query);
+        let response = assert_variant!(
+            test_helper.exec.run_until_stalled(&mut get_mac_address_fut),
+            Poll::Ready(Ok(Ok(response))) => response,
+        );
+        assert_eq!(response.mac_addr.unwrap(), [13u8, 37, 13, 37, 13, 37]);
     }
 
     #[test]
