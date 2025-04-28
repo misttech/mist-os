@@ -242,75 +242,12 @@ impl Digest {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing::FakeAttributionDataProvider;
     use crate::{
         Attribution, AttributionData, Principal, PrincipalDescription, PrincipalIdentifier,
         PrincipalType, Resource, ResourceReference,
     };
     use fidl_fuchsia_memory_attribution_plugin as fplugin;
-    use fplugin::ResourceType;
-    use futures::future::ready;
-
-    struct FakeAttributionDataProvider {
-        attribution_data: AttributionData,
-    }
-    impl AttributionDataProvider for FakeAttributionDataProvider {
-        fn get_attribution_data(
-            &self,
-        ) -> futures::future::BoxFuture<'_, Result<AttributionData, anyhow::Error>> {
-            Box::pin(ready(Ok(AttributionData {
-                principals_vec: self.attribution_data.principals_vec.clone(),
-                resources_vec: self.attribution_data.resources_vec.clone(),
-                resource_names: self.attribution_data.resource_names.clone(),
-                attributions: self.attribution_data.attributions.clone(),
-            })))
-        }
-
-        fn for_each_resource(
-            &self,
-            visitor: &mut impl ResourcesVisitor,
-        ) -> Result<(), anyhow::Error> {
-            for resource in &self.attribution_data.resources_vec {
-                if let Resource {
-                    koid, name_index, resource_type: ResourceType::Vmo(vmo), ..
-                } = resource
-                {
-                    visitor.on_vmo(
-                        *koid,
-                        &self.attribution_data.resource_names[*name_index],
-                        vmo.clone(),
-                    )?;
-                }
-            }
-            for resource in &self.attribution_data.resources_vec {
-                if let Resource {
-                    koid,
-                    name_index,
-                    resource_type: ResourceType::Process(process),
-                    ..
-                } = resource
-                {
-                    visitor.on_process(
-                        *koid,
-                        &self.attribution_data.resource_names[*name_index],
-                        process.clone(),
-                    )?;
-                }
-            }
-            for resource in &self.attribution_data.resources_vec {
-                if let Resource {
-                    koid, name_index, resource_type: ResourceType::Job(job), ..
-                } = resource
-                {
-                    visitor.on_job(
-                        *koid,
-                        &self.attribution_data.resource_names[*name_index],
-                        job.clone(),
-                    )?;
-                }
-            }
-            Ok(())
-        }
-    }
 
     fn get_attribution_data_provider() -> Arc<impl AttributionDataProvider + 'static> {
         let attribution_data = AttributionData {
