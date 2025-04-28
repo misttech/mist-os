@@ -94,9 +94,9 @@ var ipRouterExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNum
 	{3, 4}: Pass,
 	{3, 5}: Inconclusive,
 	{3, 6}: Inconclusive,
-	// TODO(https://fxbug.dev/400727923): Fix the cross-test contamination: this
-	// test case is Inconclusive if run on its own.
-	{3, 7}:  Pass,
+	// TODO(https://fxbug.dev/400727923): Fix the cross-test contamination. Case
+	// 3.7 is reassembling fragments from previous cases.
+	{3, 7}:  Inconclusive,
 	{3, 8}:  Inconclusive,
 	{4, 1}:  Pass,
 	{4, 2}:  Pass,
