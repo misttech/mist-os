@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::fuchsia::{RemoteCounter, RemoteFileObject};
-use crate::mm::{MemoryAccessorExt, ProtectionFlags};
+use crate::fs::fuchsia::RemoteCounter;
+use crate::mm::MemoryAccessorExt;
 use crate::task::{
     CurrentTask, EventHandler, ManyZxHandleSignalHandler, SignalHandler, SignalHandlerInner,
     WaitCanceler, Waiter,
@@ -14,7 +14,7 @@ use crate::vfs::{
 };
 
 use starnix_lifecycle::AtomicUsizeCounter;
-use starnix_logging::{impossible_error, log_warn, trace_duration};
+use starnix_logging::{impossible_error, log_warn, trace_duration, CATEGORY_STARNIX};
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
@@ -26,7 +26,7 @@ use starnix_uapi::{
 };
 use std::collections::HashSet;
 use std::sync::Arc;
-use zx::{AsHandleRef, HandleBased, HandleRef};
+use zx::{AsHandleRef, HandleBased};
 
 // Implementation of the sync framework described at:
 // https://source.android.com/docs/core/graphics/sync
@@ -57,66 +57,15 @@ pub enum Status {
     Signaled = 1,
 }
 
-pub enum Handle {
-    Vmo(zx::Vmo),
-    Counter(zx::Counter),
-}
-
-impl Handle {
-    fn read(&self) -> Result<u64, zx::Status> {
-        match self {
-            Handle::Vmo(vmo) => {
-                let mut vmo_bytes = vec![0; 8];
-                vmo.read(&mut vmo_bytes, /*offset=*/ 0)?;
-                Ok(u64::from_le_bytes(
-                    vmo_bytes[0..8].try_into().map_err(|_| zx::Status::BAD_STATE)?,
-                ))
-            }
-            Handle::Counter(counter) => Ok(counter.read()? as u64),
-        }
-    }
-}
-
-impl AsHandleRef for Handle {
-    fn as_handle_ref(&self) -> HandleRef<'_> {
-        match self {
-            Handle::Vmo(vmo) => vmo.as_handle_ref(),
-            Handle::Counter(counter) => counter.as_handle_ref(),
-        }
-    }
-}
-
-impl From<zx::Handle> for Handle {
-    fn from(handle: zx::Handle) -> Self {
-        let info = handle.basic_info().unwrap();
-        match info.object_type {
-            zx::ObjectType::VMO => Handle::Vmo(handle.into()),
-            zx::ObjectType::COUNTER => Handle::Counter(handle.into()),
-            _ => panic!("Unsupported"),
-        }
-    }
-}
-
-impl From<Handle> for zx::Handle {
-    fn from(handle: Handle) -> zx::Handle {
-        match handle {
-            Handle::Vmo(vmo) => vmo.into(),
-            Handle::Counter(counter) => counter.into(),
-        }
-    }
-}
-
-impl HandleBased for Handle {}
-
 #[derive(Clone)]
 pub struct SyncPoint {
     pub timeline: Timeline,
-    pub handle: Arc<Handle>,
+    pub counter: Arc<zx::Counter>,
 }
 
 impl SyncPoint {
-    pub fn new(timeline: Timeline, handle: zx::Handle) -> SyncPoint {
-        SyncPoint { timeline, handle: Arc::new(handle.into()) }
+    pub fn new(timeline: Timeline, counter: zx::Counter) -> SyncPoint {
+        SyncPoint { timeline, counter: Arc::new(counter) }
     }
 }
 
@@ -146,7 +95,7 @@ impl SyncFile {
 
         for sync_point in &self.fence.sync_points {
             if sync_point
-                .handle
+                .counter
                 .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::ZERO)
                 .to_result()
                 == Err(zx::Status::TIMED_OUT)
@@ -155,7 +104,7 @@ impl SyncFile {
             } else {
                 state.push(FenceState {
                     status: Status::Signaled,
-                    timestamp_ns: sync_point.handle.read().unwrap(),
+                    timestamp_ns: sync_point.counter.read().unwrap() as u64,
                 });
             }
         }
@@ -173,17 +122,17 @@ impl FileOps for SyncFile {
         _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
         assert!(self.fence.sync_points.len() == 1);
-        let vmo_dupe = self.fence.sync_points[0]
-            .handle
+        let dup = self.fence.sync_points[0]
+            .counter
             .duplicate_handle(zx::Rights::SAME_RIGHTS)
             .map_err(impossible_error)?;
-        Ok(Some(vmo_dupe.into()))
+        Ok(Some(dup.into()))
     }
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
-        file: &FileObject,
+        _locked: &mut Locked<'_, Unlocked>,
+        _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
@@ -199,7 +148,7 @@ impl FileOps for SyncFile {
 
         match ioctl_number {
             SYNC_IOC_MERGE => {
-                trace_duration!(c"starnix", c"SyncFileMerge");
+                trace_duration!(CATEGORY_STARNIX, c"SyncFileMerge");
                 let user_ref = UserRef::new(user_addr);
                 let mut merge_data: sync_merge_data = current_task.read_object(user_ref)?;
                 let file2 = current_task.files.get(FdNumber::from_raw(merge_data.fd2))?;
@@ -208,7 +157,7 @@ impl FileOps for SyncFile {
                 let mut set = HashSet::<zx::Koid>::new();
 
                 for sync_point in &self.fence.sync_points {
-                    let koid = sync_point.handle.get_koid().unwrap();
+                    let koid = sync_point.counter.get_koid().unwrap();
                     if set.insert(koid) {
                         fence.sync_points.push(sync_point.clone());
                     }
@@ -216,27 +165,10 @@ impl FileOps for SyncFile {
 
                 if let Some(file2) = file2.downcast_file::<SyncFile>() {
                     for sync_point in &file2.fence.sync_points {
-                        let koid = sync_point.handle.get_koid().unwrap();
+                        let koid = sync_point.counter.get_koid().unwrap();
                         if set.insert(koid) {
                             fence.sync_points.push(sync_point.clone());
                         }
-                    }
-                } else if let Some(file2) = file2.downcast_file::<RemoteFileObject>() {
-                    let memory = file2.get_memory(
-                        &mut locked.cast_locked::<FileOpsCore>(),
-                        file,
-                        current_task,
-                        None,
-                        ProtectionFlags::READ,
-                    )?;
-                    let koid = memory.get_koid();
-                    let vmo = memory
-                        .as_vmo()
-                        .ok_or_else(|| errno!(EINVAL))?
-                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                        .map_err(impossible_error)?;
-                    if set.insert(koid) {
-                        fence.sync_points.push(SyncPoint::new(Timeline::Hwc, vmo.into()));
                     }
                 } else if let Some(file2) = file2.downcast_file::<RemoteCounter>() {
                     let counter = file2.duplicate_handle()?;
@@ -254,13 +186,13 @@ impl FileOps for SyncFile {
                 let mut last_signaled_sync_point: Option<SyncPoint> = None;
                 while i < fence.sync_points.len() {
                     if fence.sync_points[i]
-                        .handle
+                        .counter
                         .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::ZERO)
                         .to_result()
                         != Err(zx::Status::TIMED_OUT)
                     {
                         let timestamp_ns =
-                            fence.sync_points[i].handle.read().map_err(|_| errno!(EIO))?;
+                            fence.sync_points[i].counter.read().map_err(|_| errno!(EIO))?;
                         let removed = fence.sync_points.remove(i);
                         if i == 0 && timestamp_ns >= last_signaled_timestamp_ns {
                             last_signaled_timestamp_ns = timestamp_ns;
@@ -290,7 +222,7 @@ impl FileOps for SyncFile {
                 Ok(SUCCESS)
             }
             SYNC_IOC_FILE_INFO => {
-                trace_duration!(c"starnix", c"SyncFileInfo");
+                trace_duration!(CATEGORY_STARNIX, c"SyncFileInfo");
                 let user_ref = UserRef::new(user_addr);
                 let mut info: sync_file_info = current_task.read_object(user_ref)?;
 
@@ -377,7 +309,7 @@ impl FileOps for SyncFile {
             };
 
             let canceler_result = waiter.wake_on_zircon_signals(
-                sync_point.handle.as_ref(),
+                sync_point.counter.as_ref(),
                 Self::SIGNAL,
                 signal_handler,
             );
@@ -394,18 +326,15 @@ impl FileOps for SyncFile {
             // query_events() after this query_async() returns; however that works only if all
             // handles are signaled.  Here we perform the counting, and cancel waits, for any
             // handles currently signaled.
-            if sync_point.handle.wait_handle(Self::SIGNAL, zx::MonotonicInstant::ZERO).to_result()
+            if sync_point.counter.wait_handle(Self::SIGNAL, zx::MonotonicInstant::ZERO).to_result()
                 == Err(zx::Status::TIMED_OUT)
             {
                 canceler = WaitCanceler::merge_unbounded(
                     canceler,
-                    WaitCanceler::new_sync_file(
-                        Arc::downgrade(&sync_point.handle),
-                        canceler_result,
-                    ),
+                    WaitCanceler::new_counter(Arc::downgrade(&sync_point.counter), canceler_result),
                 );
             } else {
-                canceler_result.cancel(sync_point.handle.as_handle_ref());
+                canceler_result.cancel(sync_point.counter.as_handle_ref());
 
                 count.next();
             }

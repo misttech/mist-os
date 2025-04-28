@@ -395,7 +395,8 @@ impl MagmaFile {
 
             if let Some(sync_file) = file.downcast_file::<SyncFile>() {
                 for sync_point in &sync_file.fence.sync_points {
-                    if let Ok(handle) = sync_point.handle.duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    if let Ok(counter) =
+                        sync_point.counter.duplicate_handle(zx::Rights::SAME_RIGHTS)
                     {
                         if control.flags & MAGMA_IMPORT_SEMAPHORE_ONE_SHOT == 0 {
                             // For most non-test cases, one shot should be specified.
@@ -406,7 +407,7 @@ impl MagmaFile {
                         let semaphore;
                         let semaphore_id;
                         (status, semaphore, semaphore_id) =
-                            import_semaphore2(&connection, handle.into(), control.flags);
+                            import_semaphore2(&connection, counter, control.flags);
                         if status != MAGMA_STATUS_OK {
                             break;
                         }
@@ -715,7 +716,7 @@ impl FileOps for MagmaFile {
                     let semaphore;
                     let semaphore_id;
                     (status, semaphore, semaphore_id) =
-                        import_semaphore2(&connection, counter.into(), flags);
+                        import_semaphore2(&connection, counter, flags);
                     if status == MAGMA_STATUS_OK {
                         result_semaphore_id = self.semaphore_id_generator.next();
 
@@ -794,10 +795,7 @@ impl FileOps for MagmaFile {
                             }
                             let handle = unsafe { zx::Handle::from_raw(raw_handle) };
 
-                            sync_points.push(SyncPoint {
-                                timeline: Timeline::Magma,
-                                handle: Arc::new(handle.into()),
-                            });
+                            sync_points.push(SyncPoint::new(Timeline::Magma, handle.into()));
                         }
                     }
                     Err(s) => status = s,

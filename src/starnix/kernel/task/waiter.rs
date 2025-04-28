@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::fuchsia::sync_file::Handle;
 use crate::signals::RunState;
 use crate::task::CurrentTask;
 use crate::vfs::FdNumber;
@@ -210,8 +209,8 @@ struct WaitCancelerVmo {
     inner: HandleWaitCanceler,
 }
 
-struct WaitCancelerSyncFile {
-    handle: Weak<Handle>,
+struct WaitCancelerCounter {
+    counter: Weak<zx::Counter>,
     inner: HandleWaitCanceler,
 }
 
@@ -223,7 +222,7 @@ enum WaitCancelerInner {
     BootTimer(WaitCancelerBootTimer),
     MonoTimer(WaitCancelerMonoTimer),
     Vmo(WaitCancelerVmo),
-    SyncFile(WaitCancelerSyncFile),
+    SyncFile(WaitCancelerCounter),
 }
 
 const WAIT_CANCELER_COMMON_SIZE: usize = 2;
@@ -271,8 +270,8 @@ impl WaitCanceler {
         Self::new_inner(WaitCancelerInner::Vmo(WaitCancelerVmo { vmo, inner }))
     }
 
-    pub fn new_sync_file(handle: Weak<Handle>, inner: HandleWaitCanceler) -> Self {
-        Self::new_inner(WaitCancelerInner::SyncFile(WaitCancelerSyncFile { handle, inner }))
+    pub fn new_counter(counter: Weak<zx::Counter>, inner: HandleWaitCanceler) -> Self {
+        Self::new_inner(WaitCancelerInner::SyncFile(WaitCancelerCounter { counter, inner }))
     }
 
     /// Equivalent to `merge_unbounded`, except that it enforces that the resulting vector of
@@ -357,9 +356,9 @@ impl WaitCanceler {
                     let Some(vmo) = vmo.upgrade() else { return };
                     inner.cancel(vmo.as_handle_ref());
                 }
-                WaitCancelerInner::SyncFile(WaitCancelerSyncFile { handle, inner }) => {
-                    let Some(handle) = handle.upgrade() else { return };
-                    inner.cancel(handle.as_handle_ref());
+                WaitCancelerInner::SyncFile(WaitCancelerCounter { counter, inner }) => {
+                    let Some(counter) = counter.upgrade() else { return };
+                    inner.cancel(counter.as_handle_ref());
                 }
             }
         }

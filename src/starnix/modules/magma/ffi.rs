@@ -691,7 +691,7 @@ pub fn release_connection(
 
 pub fn import_semaphore2(
     connection: &Arc<MagmaConnection>,
-    handle: zx::Handle,
+    counter: zx::Counter,
     flags: u64,
 ) -> (i32, u64, u64) {
     let mut semaphore = 0;
@@ -699,7 +699,7 @@ pub fn import_semaphore2(
     let status = unsafe {
         magma_connection_import_semaphore2(
             connection.handle,
-            handle.into_raw(),
+            counter.into_raw(),
             flags,
             &mut semaphore,
             &mut semaphore_id,

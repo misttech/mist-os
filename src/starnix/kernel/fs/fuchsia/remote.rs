@@ -1584,32 +1584,6 @@ impl FileOps for RemoteFileObject {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        // TODO(b/305781995): Change the SyncFence implementation to not rely on VMOs and
-        // remove this ioctl. This is temporary solution.
-        let ioctl_type = (request >> 8) as u8;
-        let ioctl_number = request as u8;
-        if ioctl_type == SYNC_IOC_MAGIC
-            && (ioctl_number == SYNC_IOC_FILE_INFO || ioctl_number == SYNC_IOC_MERGE)
-        {
-            let mut sync_points: Vec<SyncPoint> = vec![];
-            let memory = self.get_memory(
-                &mut locked.cast_locked::<FileOpsCore>(),
-                file,
-                current_task,
-                Some(8),
-                ProtectionFlags::READ,
-            )?;
-            let vmo = memory
-                .as_vmo()
-                .ok_or_else(|| errno!(ENOTSUP))?
-                .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                .map_err(impossible_error)?;
-            sync_points.push(SyncPoint::new(Timeline::Hwc, vmo.into()));
-            let sync_file_name: &[u8; 32] = b"hwc semaphore\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
-            let sync_file = SyncFile::new(*sync_file_name, SyncFence { sync_points });
-            return sync_file.ioctl(locked, file, current_task, request, arg);
-        }
-
         default_ioctl(file, locked, current_task, request, arg)
     }
 }
