@@ -9,6 +9,7 @@
 #include <trace.h>
 
 #include <algorithm>
+#include <ranges>
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <fbl/auto_lock.h>
@@ -210,47 +211,59 @@ void Coordinator::DriverAddedInit(fbl::RefPtr<Driver> drv, const char* version) 
   drivers_.push_back(drv);
 }
 
-zx::result<> Coordinator::StartRootDriver(std::string_view name) {
-  return StartDriver(root_device_, nullptr, name);
-}
-
-zx::result<> Coordinator::StartDriver(mistos::device_t device, const zx_protocol_device_t* ops,
-                                      std::string_view name) {
-  // fbl::AutoLock lock(&mutex_);
+std::unique_ptr<mistos::Driver> Coordinator::CreateDriver(std::string_view name,
+                                                          mistos::DriverStartArgs start_args) {
   for (auto& drv : drivers_) {
     if (drv.url() == name) {
+      auto compat_device = mistos::GetSymbol<const mistos::device_t*>(
+          start_args.symbols(), mistos::kDeviceSymbol, &mistos::kDefaultDevice);
+      const zx_protocol_device_t* ops =
+          mistos::GetSymbol<const zx_protocol_device_t*>(start_args.symbols(), mistos::kOps);
+
+      start_args.set_driver_base(reinterpret_cast<zx_vaddr_t>(drv.library_));
+
       fbl::AllocChecker ac;
-      mistos::DriverStartArgs start_args = {.driver_base = drv.library_};
-      auto driver = ktl::make_unique<mistos::Driver>(&ac, start_args, device, ops);
-      if (!ac.check()) {
-        return zx::error(ZX_ERR_NO_MEMORY);
-      }
+      auto driver =
+          ktl::make_unique<mistos::Driver>(&ac, std::move(start_args), *compat_device, ops);
+      ZX_ASSERT(ac.check());
 
-      driver->Start([](zx::result<> result) {
-        if (result.is_error()) {
-          LTRACEF("Failed to start driver: %d\n", result.error_value());
-        }
-      });
-
-      // TODO (Herrera) Fix leak
-      driver.release();
-
-      return zx::ok();
+      return driver;
     }
   }
-  return zx::error(ZX_ERR_NOT_FOUND);
-}  // namespace devmgr
+  return nullptr;
+}
 
-void Coordinator::HandleNewDevice(mistos::Device* dev) {
+zx::result<> Coordinator::StartDriver(mistos::DriverStartArgs start_args, std::string_view name) {
+  // fbl::AutoLock lock(&mutex_);
+  auto driver = CreateDriver(name, std::move(start_args));
+  if (driver == nullptr) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+  dprintf(INFO, "Starting driver: [%s]\n", name.data());
+  driver->Start([](zx::result<> result) {
+    if (result.is_error()) {
+      dprintf(CRITICAL, "Failed to start driver: %d\n", result.error_value());
+    }
+  });
+
+  fbl::AllocChecker ac;
+  driver_instances_.push_back(std::move(driver), &ac);
+  if (!ac.check()) {
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  return zx::ok();
+}
+
+void Coordinator::HandleNewDevice(mistos::DriverStartArgs start_args, mistos::Device* dev) {
   // fbl::AutoLock lock(&mutex_);
   for (auto& drv : drivers_) {
-    // uint32_t proto_id = dev->GetProtocol(ZX_PROTOCOL_MISC, nullptr);
     if (!dc_is_bindable(&drv, dev->properties(), true)) {
       continue;
     }
     LTRACEF("devcoord: drv='%.*s' bindable to dev='%s'\n", static_cast<int>(drv.url().size()),
             drv.url().data(), dev->Name());
-    zx_status_t status = AttemptBind(&drv, dev);
+    zx_status_t status = AttemptBind(std::move(start_args), &drv, dev);
     if (status != ZX_OK) {
       LTRACEF("failed to bind drv='%.*s' to dev='%s': %d\n", static_cast<int>(drv.url().size()),
               drv.url().data(), dev->Name(), status);
@@ -261,22 +274,43 @@ void Coordinator::HandleNewDevice(mistos::Device* dev) {
   }
 }
 
-zx_status_t Coordinator::AttemptBind(const Driver* drv, mistos::Device* dev) {
-  mistos::device_t device{
-      .name = dev->Name(),
-      .context = (void*)dev->ZxDevice(),
-  };
+zx_status_t Coordinator::AttemptBind(mistos::DriverStartArgs start_args, const Driver* drv,
+                                     mistos::Device* dev) {
+  // cannot bind driver to already bound device
+  // if ((dev->flags & DEV_CTX_BOUND) && (!(dev->flags & DEV_CTX_MULTI_BIND))) {
+  //  return ZX_ERR_BAD_STATE;
+  //}
 
-  if (auto result = StartDriver(device, nullptr, drv->url()); result.is_error()) {
+  if (auto result = StartDriver(std::move(start_args), drv->url()); result.is_error()) {
     LTRACEF("Failed to start driver: %d\n", result.error_value());
     return result.error_value();
   }
+
+  // if ((r == ZX_OK) && !(dev->flags & DEV_CTX_MULTI_BIND)) {
+  //      dev->flags |= DEV_CTX_BOUND;
+  // }
 
   return ZX_OK;
 }
 
 void Coordinator::DumpState() {
-  // fbl::AutoLock lock(&mutex_);
+  std::function<void(mistos::Device&, int)> print_device_tree = [&](mistos::Device& device,
+                                                                    int indent) {
+    // Print current device with proper indentation
+    printf("%*s[%s] %.*s\n", indent * 3, "", device.Name(),
+           static_cast<int>(device.driver()->driver_name().size()),
+           device.driver()->driver_name().data());
+
+    // Recursively print all children
+    for (auto& child : device.children()) {
+      print_device_tree(*child, indent + 1);
+    }
+  };
+
+  // Print all driver instances and their device trees
+  for (auto& driver_instance : std::ranges::reverse_view(driver_instances_)) {
+    print_device_tree(driver_instance->GetDevice(), 0);
+  }
 }
 
 namespace {
@@ -419,6 +453,7 @@ void di_dump_bind_inst(const zx_bind_inst_t* b, char* buf, size_t buf_len) {
 
 void Coordinator::DumpDrivers() {
   // fbl::AutoLock lock(&mutex_);
+
   bool first = true;
   for (auto& drv : drivers_) {
     // fbl::AutoLock drv_lock(&drv.lock_);

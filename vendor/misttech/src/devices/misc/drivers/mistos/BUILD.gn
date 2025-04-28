@@ -8,6 +8,7 @@ zx_library("driver") {
   sources = [
     "api.cc",
     "device.cc",
+    "device_server.cc",
     "driver.cc",
   ]
 
@@ -19,6 +20,7 @@ zx_library("driver") {
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//vendor/misttech/src/lib/ddk",
     "//vendor/misttech/src/lib/ddktl",
+    "//vendor/misttech/zircon/kernel/lib/mistos/util:headers",
     "//zircon/system/ulib/fbl",
   ]
 }

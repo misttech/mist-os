@@ -13,8 +13,9 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <ddktl/device.h>
-#include <misc/drivers/mistos/driver.h>
-#include <misc/drivers/mistos/symbols.h>
+
+#include "misc/drivers/mistos/driver.h"
+#include "misc/drivers/mistos/symbols.h"
 
 #define LOCAL_TRACE 0
 
@@ -110,7 +111,7 @@ Device::~Device() {
 
 zx_device_t* Device::ZxDevice() { return static_cast<zx_device_t*>(this); }
 
-const char* Device::Name() const { return name_.data(); }
+const char* Device::Name() const { return name_; }
 
 bool Device::HasChildren() const { return !children_.is_empty(); }
 
@@ -131,7 +132,7 @@ zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
   fbl::AllocChecker ac;
   auto device = ktl::make_unique<Device>(&ac, compat_device, zx_args->ops, driver_, this);
   // Update the compat symbol name pointer with a pointer the device owns.
-  device->compat_symbol_.name = device->name_.data();
+  device->compat_symbol_.name = device->name_;
 
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
@@ -141,18 +142,33 @@ zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
     device->device_id_ = driver()->GetNextDeviceId();
   }
 
-#if 0
-  if (HasOp(dev->ops_, &zx_protocol_device_t::get_protocol)) {
-    zx_status_t status = dev->ops_->get_protocol(dev->compat_symbol_.context, proto_id, &protocol);
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
+  DeviceServer::BanjoConfig banjo_config{.default_proto_id = zx_args->proto_id};
 
-    return zx::ok(protocol);
+  // Set the callback specifically for the base proto_id if there is one.
+  if (zx_args->proto_ops != nullptr && zx_args->proto_id != 0) {
+    banjo_config.callbacks[zx_args->proto_id] = [ops = zx_args->proto_ops, ctx = zx_args->ctx]() {
+      return DeviceServer::GenericProtocol{.ops = const_cast<void*>(ops), .ctx = ctx};
+    };
   }
 
-  return zx::error(ZX_ERR_PROTOCOL_NOT_SUPPORTED);
-#endif
+  // Set a generic callback for other proto_ids.
+  banjo_config.generic_callback =
+      [dev = device.get()](uint32_t proto_id) -> zx::result<DeviceServer::GenericProtocol> {
+    DeviceServer::GenericProtocol protocol;
+    if (HasOp(dev->ops_, &zx_protocol_device_t::get_protocol)) {
+      zx_status_t status =
+          dev->ops_->get_protocol(dev->compat_symbol_.context, proto_id, &protocol);
+      if (status != ZX_OK) {
+        return zx::error(status);
+      }
+
+      return zx::ok(protocol);
+    }
+
+    return zx::error(ZX_ERR_PROTOCOL_NOT_SUPPORTED);
+  };
+
+  device->device_server_.Initialize(std::move(banjo_config));
 
 #if 0
   // Add the metadata from add_args:
@@ -197,7 +213,20 @@ zx_status_t Device::ExportAfterInit() {
   if ((device_flags_ & DEVICE_ADD_NON_BINDABLE) != 0) {
     return ZX_OK;
   }
-  GlobalCoordinator().HandleNewDevice(this);
+
+  fbl::AllocChecker ac;
+  fbl::Vector<mistos::Symbol> symbols;
+  symbols.push_back(mistos::Symbol{kDeviceSymbol, reinterpret_cast<uint64_t>(&compat_symbol_)},
+                    &ac);
+  ZX_ASSERT(ac.check());
+  symbols.push_back(mistos::Symbol{kOps, reinterpret_cast<uint64_t>(ops_)}, &ac);
+  ZX_ASSERT(ac.check());
+
+  // Export parent as "default" symbol.
+  symbols.push_back(mistos::Symbol{"default", reinterpret_cast<uint64_t>(this)}, &ac);
+  ZX_ASSERT(ac.check());
+
+  GlobalCoordinator().HandleNewDevice(std::move(mistos::DriverStartArgs(std::move(symbols))), this);
   return ZX_OK;
 }
 
@@ -211,7 +240,34 @@ zx_status_t Device::GetProtocol(uint32_t proto_id, void* out) const {
     return ops_->get_protocol(compat_symbol_.context, proto_id, out);
   }
 
-  return driver_->GetProtocol(proto_id, out);
+  if (!device_server_.has_banjo_config()) {
+    if (driver_ == nullptr) {
+      LTRACEF("Driver is null\n");
+      return ZX_ERR_BAD_STATE;
+    }
+
+    return driver_->GetProtocol(proto_id, out);
+  }
+
+  DeviceServer::GenericProtocol device_server_out;
+  zx_status_t status = device_server_.GetProtocol(proto_id, &device_server_out);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  if (!out) {
+    return ZX_OK;
+  }
+
+  struct GenericProtocol {
+    const void* ops;
+    void* ctx;
+  };
+
+  auto proto = static_cast<GenericProtocol*>(out);
+  proto->ctx = device_server_out.ctx;
+  proto->ops = device_server_out.ops;
+  return ZX_OK;
 }
 
 zx_status_t Device::GetFragmentProtocol(const char* fragment, uint32_t proto_id, void* out) {

@@ -83,9 +83,11 @@ void mistos_devmgr_init() {
   zircon_driver_note_t* root_driver = &ROOT_DRIVER_LD;
   dprintf(INFO, "Starting with root driver: [%s]\n", root_driver->payload.name);
 
-  auto result = g_coordinator->StartRootDriver(root_driver->payload.name);
+  auto start_args = mistos::DriverStartArgs();
+  auto result = g_coordinator->StartDriver(std::move(start_args), root_driver->payload.name);
   if (result.is_error()) {
-    dprintf(CRITICAL, "Failed to start root driver: [%s]\n", root_driver->payload.name);
+    dprintf(CRITICAL, "Failed to start root driver: [%s], %d\n", root_driver->payload.name,
+            result.error_value());
     return;
   }
 }

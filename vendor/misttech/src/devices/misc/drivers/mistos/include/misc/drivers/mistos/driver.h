@@ -6,6 +6,7 @@
 #define VENDOR_MISTTECH_SRC_DEVICES_MISC_DRIVERS_MISTOS_INCLUDE_MISC_DRIVERS_MISTOS_DRIVER_H_
 
 #include <lib/ddk/binding_priv.h>
+#include <lib/mistos/util/allocator.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
@@ -21,15 +22,12 @@
 #include <misc/drivers/mistos/symbols.h>
 
 #include "misc/drivers/mistos/device.h"
+#include "misc/drivers/mistos/symbols.h"
 
 namespace mistos {
 
 /*Driver* CreateDriver(const zircon_driver_note_t* note, zx_driver_rec_t* rec,
                      ktl::unique_ptr<const zx_bind_inst_t[]> binding);*/
-
-struct DriverStartArgs {
-  void* driver_base;
-};
 
 class DriverBase {
  public:
@@ -70,8 +68,16 @@ class DriverBase {
   ktl::string_view name() const { return name_; }
 
   zircon_driver_note_t* base() const {
-    return static_cast<zircon_driver_note_t*>(start_args_.driver_base);
+    return reinterpret_cast<zircon_driver_note_t*>(start_args_.driver_base());
   }
+
+  // The url field in the start args.
+  // This is the URL of the package containing the driver. This is purely informational,
+  // used only to provide data for inspect.
+  // const std::optional<std::string>& url() const { return start_args_.url(); }
+
+  // The symbols field in the start args.
+  const fbl::Vector<Symbol>& symbols() const { return start_args_.symbols(); }
 
  private:
   ktl::string_view name_;
@@ -120,12 +126,16 @@ class Driver : public fbl::DoublyLinkedListable<Driver*>, public DriverBase {
 
   uint32_t GetNextDeviceId() { return next_device_id_++; }
 
+  const std::string_view& driver_name() const { return driver_name_; }
+
  private:
   // Loads the driver using the provided `vmos`.
   zx::result<> LoadDriver();
 
   // Starts the DFv1 driver.
   zx::result<> StartDriver();
+
+  zx_status_t ConnectToParentDevices();
 
   std::string_view driver_name_;
   Device device_;
@@ -136,6 +146,11 @@ class Driver : public fbl::DoublyLinkedListable<Driver*>, public DriverBase {
   // void* library_ = nullptr;
   const zx_driver_rec_t* record_ = nullptr;
   void* context_ = nullptr;
+
+  Device* parent_;
+  std::map<std::string, Device*, std::less<>,
+           util::Allocator<std::pair<const std::string, Device*>>>
+      parent_clients_;
 };
 
 }  // namespace mistos

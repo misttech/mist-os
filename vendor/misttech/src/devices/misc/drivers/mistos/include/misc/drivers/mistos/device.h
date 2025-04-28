@@ -1,4 +1,5 @@
 // Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
+// Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -10,8 +11,11 @@
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
 
+#include <string>
+
 #include <fbl/mutex.h>
 #include <fbl/vector.h>
+#include <misc/drivers/mistos/device_server.h>
 #include <misc/drivers/mistos/symbols.h>
 
 namespace mistos {
@@ -47,6 +51,8 @@ class Device {
 
   fbl::Vector<zx_device_str_prop>& properties() { return properties_; }
 
+  const fbl::Vector<ktl::unique_ptr<Device>>& children() const { return children_; }
+
  private:
   Device(Device&&) = delete;
   Device& operator=(Device&&) = delete;
@@ -57,7 +63,11 @@ class Device {
 
   fbl::Vector<zx_device_str_prop> properties_;
 
-  const std::string_view name_;
+  DeviceServer device_server_;
+
+  //const std::string name_;
+  const char* name_;
+  
   // A unique id for the device.
   uint32_t device_id_ = 0;
 

@@ -12,7 +12,7 @@
 #include <fbl/alloc_checker.h>
 #include <ktl/unique_ptr.h>
 
-#define LOCAL_TRACE 0
+#define LOCAL_TRACE 2
 // #define VERBOSE_DRIVER_LOAD 1
 
 extern const zircon_driver_note_t __start_mistos_driver_ldr[];
@@ -62,17 +62,18 @@ Driver* CreateDriver(const zircon_driver_note_t* note, zx_driver_rec_t* rec,
 }  // namespace
 
 DriverBase::DriverBase(std::string_view name, DriverStartArgs start_args)
-    : name_(name), start_args_(start_args) {}
+    : name_(name), start_args_(std::move(start_args)) {}
 
 DriverBase::~DriverBase() {}
 
 Driver::Driver(DriverStartArgs start_args, device_t device, const zx_protocol_device_t* ops)
-    : Base("compat", start_args), device_(device, ops, this, std::nullopt) {
+    : Base("compat", std::move(start_args)), device_(device, ops, this, std::nullopt) {
   // Give the parent device the correct node.
   // device_.Bind({std::move(node()), dispatcher()});
   // Call this so the parent device is in the post-init state.
   device_.InitReply(ZX_OK);
   // ZX_ASSERT(url().has_value());
+  ZX_ASSERT(base() != nullptr);
 }
 
 Driver::~Driver() {
@@ -90,6 +91,12 @@ void Driver::Start(fit::callback<void(zx::result<>)> cb) {
   if (zx::result result = LoadDriver(); result.is_error()) {
     LTRACEF("Failed to load driver: %d\n", result.error_value());
     cb(result.take_error());
+    return;
+  }
+
+  if (zx_status_t status = ConnectToParentDevices(); status != ZX_OK) {
+    LTRACEF("Failed to connect to parent devices: %d\n", status);
+    cb(zx::error(status));
     return;
   }
 
@@ -138,6 +145,27 @@ zx::result<> Driver::StartDriver() {
   return zx::ok();
 }
 
+zx_status_t Driver::ConnectToParentDevices() {
+  // Find the "default" parent device from symbols
+  if (!symbols().is_empty()) {
+    for (const auto& symbol : symbols()) {
+      if (symbol.name() == "default") {
+        // Found the default parent device
+        parent_ = reinterpret_cast<Device*>(symbol.address().value());
+        LTRACEF("Found default parent device at %p\n", parent_);
+        break;
+      }
+    }
+  }
+
+  if (!parent_) {
+    LTRACEF("Failed to find default parent device in symbols\n");
+    return ZX_ERR_NOT_FOUND;
+  }
+
+  return ZX_OK;
+}
+
 zx::result<> Driver::LoadDriver() {
   // Find symbols
   auto* note = base();
@@ -184,7 +212,26 @@ zx_status_t Driver::AddDevice(Device* parent, device_add_args_t* args, zx_device
   return ZX_OK;
 }
 
-zx_status_t Driver::GetProtocol(uint32_t proto_id, void* out) { return ZX_ERR_NOT_SUPPORTED; }
+zx_status_t Driver::GetProtocol(uint32_t proto_id, void* out) {
+  if (!parent_) {
+    LTRACEF("Invalid fuchsia.driver.compat.Device instance. Failed to retrieve Banjo protocol.");
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  struct GenericProtocol {
+    const void* ops;
+    void* ctx;
+  };
+
+  GenericProtocol result;
+  if (parent_->GetProtocol(proto_id, &result) != ZX_OK) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  auto proto = static_cast<GenericProtocol*>(out);
+  proto->ops = reinterpret_cast<const void*>(result.ops);
+  proto->ctx = reinterpret_cast<void*>(result.ctx);
+  return ZX_OK;
+}
 
 zx_status_t Driver::GetFragmentProtocol(const char* fragment, uint32_t proto_id, void* out) {
   return ZX_ERR_NOT_SUPPORTED;
