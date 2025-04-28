@@ -373,7 +373,7 @@ fit::result<BootZbi::Error> BootZbi::Load(uint32_t extra_data_capacity,
   // If we can reuse either the kernel image or the data ZBI items in place,
   // choose whichever makes for less copying.
   if (input_address + input_capacity - data_address < data_required_size ||
-      (KernelCanLoadInPlace() && KernelLoadSize() < data_load_size)) {
+      (KernelCanLoadInPlace() && KernelLoadSize() > data_load_size)) {
     data_.storage() = {};
   }
 
