@@ -28,7 +28,7 @@ type TunnelError = flexible enum {
 
 // Strict methods in this protocol are due to them predating the introduction of
 // API levels and being hard to migrate.
-@discoverable
+@discoverable(server="platform")
 open protocol RemoteControl {
     /// Returns the input.
     strict EchoString(struct {
