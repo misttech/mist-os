@@ -7,7 +7,6 @@
 #ifndef ZIRCON_KERNEL_LIB_POWER_MANAGEMENT_INCLUDE_LIB_POWER_MANAGEMENT_POWER_LEVEL_CONTROLLER_H_
 #define ZIRCON_KERNEL_LIB_POWER_MANAGEMENT_INCLUDE_LIB_POWER_MANAGEMENT_POWER_LEVEL_CONTROLLER_H_
 
-#include <lib/stdcompat/array.h>
 #include <lib/zx/result.h>
 #include <zircon/syscalls-next.h>
 

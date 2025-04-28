@@ -6,14 +6,14 @@
 
 #include "lib/power-management/energy-model.h"
 
-#include <lib/stdcompat/array.h>
-#include <lib/stdcompat/utility.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls-next.h>
 #include <zircon/time.h>
 #include <zircon/types.h>
 
+#include <array>
 #include <cstddef>
+#include <utility>
 
 #include <fbl/ref_ptr.h>
 #include <gtest/gtest.h>
@@ -90,7 +90,7 @@ TEST(PowerLevelTransitionTest, Ctor) {
 }
 
 TEST(PowerModelTest, Create) {
-  static constexpr auto kPowerLevels = cpp20::to_array<zx_processor_power_level_t>({
+  static constexpr auto kPowerLevels = std::to_array<zx_processor_power_level_t>({
       {
           .options = 0,
           .processing_rate = 0,
@@ -125,7 +125,7 @@ TEST(PowerModelTest, Create) {
       },
   });
 
-  static constexpr auto kTransitions = cpp20::to_array<zx_processor_power_level_transition_t>({
+  static constexpr auto kTransitions = std::to_array<zx_processor_power_level_transition_t>({
       {
           .latency = 1,
           .energy_nj = 2,
@@ -280,7 +280,7 @@ TEST(PowerModelTest, Create) {
 }
 
 TEST(PowerModelTest, CreateWithEmptyTransitionsIsOk) {
-  static constexpr auto kPowerLevels = cpp20::to_array<zx_processor_power_level_t>({
+  static constexpr auto kPowerLevels = std::to_array<zx_processor_power_level_t>({
       {
           .options = 0,
           .processing_rate = 0,
