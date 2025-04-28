@@ -29,9 +29,10 @@ rustc_library("ext4") {
   ]
 
   deps = [
+    "//sdk/fidl/fuchsia.starnix.runner:fuchsia.starnix.runner_rust",
     "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-runtime",
+    "//src/lib/fuchsia-component",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
     "//src/starnix/lib/starnix_sync",
@@ -39,10 +40,7 @@ rustc_library("ext4") {
     "//src/starnix/lib/starnix_uapi",
     "//src/storage/ext4/read-only:ext4-read-only",
     "//third_party/rust_crates:once_cell",
-    "//third_party/rust_crates:scopeguard",
   ]
-
-  test_deps = [ "//src/lib/fuchsia" ]
 }
 
 fuchsia_unittest_package("starnix-ext4-tests") {
