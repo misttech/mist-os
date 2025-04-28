@@ -180,10 +180,6 @@ magma_status_t PrimaryWrapper::ImportObject(zx::handle handle, uint64_t flags,
           wire_object =
               fuchsia_gpu_magma::wire::Object::WithSemaphore(zx::event(std::move(handle)));
           break;
-        case ZX_OBJ_TYPE_VMO:
-          wire_object =
-              fuchsia_gpu_magma::wire::Object::WithVmoSemaphore(zx::vmo(std::move(handle)));
-          break;
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
         case ZX_OBJ_TYPE_COUNTER:
           wire_object =

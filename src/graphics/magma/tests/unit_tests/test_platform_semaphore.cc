@@ -5,7 +5,6 @@
 #ifdef __Fuchsia__
 #include <lib/zx/counter.h>
 #include <lib/zx/event.h>
-#include <lib/zx/vmo.h>
 #endif
 
 #include <lib/magma/platform/platform_semaphore.h>
@@ -97,33 +96,6 @@ class TestPlatformSemaphore : public testing::Test {
     }
   }
 
-  void TestImportVmo(bool one_shot = false) {
-#if !defined(__Fuchsia__)
-    GTEST_SKIP();
-#endif
-    constexpr uint32_t kSize = 1;  // expect a page
-    zx::vmo vmo;
-    ASSERT_EQ(ZX_OK, zx::vmo::create(kSize, /*options=*/0, &vmo));
-
-    uint64_t flags = one_shot ? MAGMA_IMPORT_SEMAPHORE_ONE_SHOT : 0;
-
-    auto semaphore = magma::PlatformSemaphore::Import(vmo.release(), flags);
-    ASSERT_TRUE(semaphore);
-
-    EXPECT_FALSE(semaphore->Wait(0));
-
-    semaphore->Signal();
-    EXPECT_TRUE(semaphore->Wait(0));
-
-    semaphore->Reset();
-
-    if (one_shot) {
-      EXPECT_TRUE(semaphore->Wait(0));
-    } else {
-      EXPECT_FALSE(semaphore->Wait(0));
-    }
-  }
-
   void TestImportCounter(bool one_shot = false) {
 #if !defined(__Fuchsia__)
     GTEST_SKIP();
@@ -158,10 +130,6 @@ TEST_F(TestPlatformSemaphore, MultiThread) { TestMultiThread(); }
 TEST_F(TestPlatformSemaphore, ImportEvent) { TestImportEvent(); }
 
 TEST_F(TestPlatformSemaphore, ImportEventOneShot) { TestImportEvent(/*one_shot=*/true); }
-
-TEST_F(TestPlatformSemaphore, ImportVmo) { TestImportVmo(); }
-
-TEST_F(TestPlatformSemaphore, ImportVmoOneShot) { TestImportVmo(/*one_shot=*/true); }
 
 TEST_F(TestPlatformSemaphore, ImportCounter) { TestImportCounter(); }
 

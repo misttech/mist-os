@@ -142,6 +142,7 @@ closed protocol TestDevice {
 type Object = flexible resource union {
     1: semaphore zx.Handle:EVENT;
     2: buffer zx.Handle:VMO;
+    @available(removed=HEAD)
     3: vmo_semaphore zx.Handle:VMO;
     // A counter-based semaphore. This can store a timestamp, and uses less memory to do so than the
     // VMO equivalent.
@@ -154,7 +155,7 @@ type ObjectType = flexible enum : uint32 {
     EVENT = 10;
     /// A memory object backeed by a Zircon VMO.
     BUFFER = 11;
-    /// A sync object backed by a Zircon event, VMO, or counter.
+    /// A sync object backed by a Zircon event or counter.
     @available(added=13)
     SEMAPHORE = 12;
 };

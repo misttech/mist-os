@@ -23,7 +23,6 @@ namespace {
 
 enum class SemaphoreType : uint8_t {
   Default,
-  Vmo,
   Counter,
 };
 
@@ -48,18 +47,6 @@ class TestPlatformPort : public testing::Test {
       case SemaphoreType::Default:
         semaphore = std::shared_ptr<magma::PlatformSemaphore>(magma::PlatformSemaphore::Create());
         break;
-      case SemaphoreType::Vmo: {
-#if !defined(__Fuchsia__)
-        GTEST_SKIP();
-#else
-        constexpr uint32_t kSize = 1;  // expect a page
-        zx::vmo vmo;
-        ASSERT_EQ(ZX_OK, zx::vmo::create(kSize, /*options=*/0, &vmo));
-        semaphore = std::shared_ptr<magma::PlatformSemaphore>(
-            magma::PlatformSemaphore::Import(vmo.release(), /*flags=*/0));
-#endif
-        break;
-      }
       case SemaphoreType::Counter: {
 #if !defined(__Fuchsia__)
         GTEST_SKIP();
@@ -184,8 +171,6 @@ class TestPlatformPort : public testing::Test {
 }  // namespace
 
 TEST_F(TestPlatformPort, Semaphore) { TestSemaphore(SemaphoreType::Default); }
-
-TEST_F(TestPlatformPort, VmoSemaphore) { TestSemaphore(SemaphoreType::Vmo); }
 
 TEST_F(TestPlatformPort, CounterSemaphore) { TestSemaphore(SemaphoreType::Counter); }
 

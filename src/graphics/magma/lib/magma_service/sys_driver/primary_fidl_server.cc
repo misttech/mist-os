@@ -188,8 +188,6 @@ void PrimaryFidlServer::ImportObject(ImportObjectRequestView request,
     case fuchsia_gpu_magma::ObjectType::kSemaphore:
       if (request->object().is_semaphore()) {
         handle = std::move(request->object().semaphore());
-      } else if (request->object().is_vmo_semaphore()) {
-        handle = std::move(request->object().vmo_semaphore());
       }
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
       else if (request->object().is_counter_semaphore()) {

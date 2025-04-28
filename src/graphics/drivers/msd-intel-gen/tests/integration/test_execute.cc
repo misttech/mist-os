@@ -286,7 +286,7 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
 
   // Verifies independent presubmit queueing (pending wait semaphores) for multi engines.
   void MemoryWriteEngineInterleavedPresubmitQueueing(int submit_count, int semaphore_count,
-                                                     bool use_vmo_semaphore = false) {
+                                                     bool use_counter_semaphore = false) {
     ASSERT_EQ(submit_count % 2, 0);
 
     constexpr uint64_t kMapFlags =
@@ -342,11 +342,11 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
         magma_semaphore_id_t id;
 
 #if defined(__Fuchsia__)
-        if (use_vmo_semaphore) {
-          zx::vmo vmo;
-          ASSERT_EQ(ZX_OK, zx::vmo::create(1, /*options=*/0, &vmo));
+        if (use_counter_semaphore) {
+          zx::counter counter;
+          ASSERT_EQ(ZX_OK, zx::counter::create(/*options=*/0, &counter));
           ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_import_semaphore2(
-                                         connection_, vmo.release(),
+                                         connection_, counter.release(),
                                          MAGMA_IMPORT_SEMAPHORE_ONE_SHOT, &semaphore, &id));
         } else
 #endif
@@ -362,11 +362,11 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
         magma_semaphore_id_t id;
 
 #if defined(__Fuchsia__)
-        if (use_vmo_semaphore) {
-          zx::vmo vmo;
-          ASSERT_EQ(ZX_OK, zx::vmo::create(1, /*options=*/0, &vmo));
+        if (use_counter_semaphore) {
+          zx::counter counter;
+          ASSERT_EQ(ZX_OK, zx::counter::create(/*options=*/0, &counter));
           ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_import_semaphore2(
-                                         connection_, vmo.release(),
+                                         connection_, counter.release(),
                                          MAGMA_IMPORT_SEMAPHORE_ONE_SHOT, &semaphore, &id));
         } else
 #endif
@@ -658,16 +658,16 @@ TEST_P(TestMemoryWriteEngineInterleavedPresubmitQueueing, ManySemaphore) {
   MemoryWriteEngineInterleavedPresubmitQueueing(GetParam(), /* semaphore_count= */ 3);
 }
 
-TEST_P(TestMemoryWriteEngineInterleavedPresubmitQueueing, OneVmoSemaphore) {
-  constexpr bool kUseVmoSemaphore = true;
+TEST_P(TestMemoryWriteEngineInterleavedPresubmitQueueing, OneCounterSemaphore) {
+  constexpr bool kUseCounterSemaphore = true;
   MemoryWriteEngineInterleavedPresubmitQueueing(GetParam(), /* semaphore_count= */ 1,
-                                                kUseVmoSemaphore);
+                                                kUseCounterSemaphore);
 }
 
-TEST_P(TestMemoryWriteEngineInterleavedPresubmitQueueing, ManyVmoSemaphore) {
-  constexpr bool kUseVmoSemaphore = true;
+TEST_P(TestMemoryWriteEngineInterleavedPresubmitQueueing, ManyCounterSemaphore) {
+  constexpr bool kUseCounterSemaphore = true;
   MemoryWriteEngineInterleavedPresubmitQueueing(GetParam(), /* semaphore_count= */ 3,
-                                                kUseVmoSemaphore);
+                                                kUseCounterSemaphore);
 }
 
 INSTANTIATE_TEST_SUITE_P(MemoryWriteEngineInterleavedPresubmitQueueing,
