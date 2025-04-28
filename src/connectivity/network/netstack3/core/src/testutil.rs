@@ -759,11 +759,12 @@ impl FilterBindingsTypes for FakeBindingsCtx {
 
 struct NoOpSocketOpsFilter;
 
-impl<D: netstack3_base::StrongDeviceIdentifier> SocketOpsFilter<D> for NoOpSocketOpsFilter {
+impl<D: netstack3_base::StrongDeviceIdentifier, T> SocketOpsFilter<D, T> for NoOpSocketOpsFilter {
     fn on_egress<I: FilterIpExt, P: IpPacket<I>>(
         &self,
         _packet: &P,
         _device: &D,
+        _tx_metadata: &T,
         _marks: &Marks,
     ) -> SocketEgressFilterResult {
         SocketEgressFilterResult::Pass { congestion: false }
@@ -771,7 +772,9 @@ impl<D: netstack3_base::StrongDeviceIdentifier> SocketOpsFilter<D> for NoOpSocke
 }
 
 impl SocketOpsFilterBindingContext<DeviceId<FakeBindingsCtx>> for FakeBindingsCtx {
-    fn socket_ops_filter(&self) -> impl SocketOpsFilter<DeviceId<FakeBindingsCtx>> {
+    fn socket_ops_filter(
+        &self,
+    ) -> impl SocketOpsFilter<DeviceId<FakeBindingsCtx>, TxMetadata<FakeBindingsCtx>> {
         NoOpSocketOpsFilter
     }
 }

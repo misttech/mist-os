@@ -313,6 +313,16 @@ impl<I: IpExt, A, BT: FilterBindingsTypes + TxMetadataBindingsTypes>
             this.drop_check.okay_to_drop = true;
         }
     }
+
+    /// Returns the tx metadata associated with this packet.
+    pub(crate) fn tx_metadata(&self) -> &BT::TxMetadata {
+        &self.tx_metadata
+    }
+
+    /// Returns the marks attached to this packet.
+    pub(crate) fn marks(&self) -> &Marks {
+        &self.marks
+    }
 }
 
 #[cfg(debug_assertions)]

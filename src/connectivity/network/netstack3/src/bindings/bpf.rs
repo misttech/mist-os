@@ -20,6 +20,7 @@ use netstack3_core::device_socket::Frame;
 use netstack3_core::filter::{FilterIpExt, IpPacket, SocketEgressFilterResult, SocketOpsFilter};
 use netstack3_core::routes::Marks;
 use netstack3_core::sync::{Mutex, RwLock};
+use netstack3_core::TxMetadata;
 use std::collections::{hash_map, HashMap};
 use std::mem::offset_of;
 use std::sync::{Arc, LazyLock, Weak};
@@ -359,6 +360,7 @@ impl CgroupSkbProgram {
         &self,
         _packet: &P,
         _device: &DeviceId<BindingsCtx>,
+        _tx_metadata: &TxMetadata<BindingsCtx>,
         _marks: &Marks,
     ) -> u64 {
         // TODO(https://fxbug.dev/407809292): Actually run the programs.
@@ -521,11 +523,12 @@ impl EbpfManager {
     }
 }
 
-impl SocketOpsFilter<DeviceId<BindingsCtx>> for &EbpfManager {
+impl SocketOpsFilter<DeviceId<BindingsCtx>, TxMetadata<BindingsCtx>> for &EbpfManager {
     fn on_egress<I: FilterIpExt, P: IpPacket<I>>(
         &self,
         packet: &P,
         device: &DeviceId<BindingsCtx>,
+        tx_metadata: &TxMetadata<BindingsCtx>,
         marks: &Marks,
     ) -> SocketEgressFilterResult {
         let state = self.state.read();
@@ -533,7 +536,7 @@ impl SocketOpsFilter<DeviceId<BindingsCtx>> for &EbpfManager {
             return SocketEgressFilterResult::Pass { congestion: false };
         };
 
-        let result = prog.run(packet, device, marks);
+        let result = prog.run(packet, device, tx_metadata, marks);
         if result > CgroupSkbProgram::EGRESS_MAX_RESULT {
             // TODO(https://fxbug.dev/413490751): Change this to panic once
             // result validation is implemented in the verifier.

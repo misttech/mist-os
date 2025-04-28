@@ -427,7 +427,9 @@ impl FilterBindingsTypes for BindingsCtx {
 }
 
 impl SocketOpsFilterBindingContext<DeviceId<BindingsCtx>> for BindingsCtx {
-    fn socket_ops_filter(&self) -> impl SocketOpsFilter<DeviceId<BindingsCtx>> {
+    fn socket_ops_filter(
+        &self,
+    ) -> impl SocketOpsFilter<DeviceId<BindingsCtx>, TxMetadata<BindingsCtx>> {
         &self.ebpf_manager
     }
 }

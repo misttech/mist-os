@@ -8,7 +8,7 @@ use net_types::ip::{Ipv4, Ipv6};
 use net_types::SpecifiedAddr;
 use netstack3_base::{
     InstantBindingsTypes, IpDeviceAddr, IpDeviceAddressIdContext, Marks, RngContext,
-    StrongDeviceIdentifier, TimerBindingsTypes, TimerContext,
+    StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TxMetadataBindingsTypes,
 };
 
 use packet_formats::ip::IpExt;
@@ -126,20 +126,23 @@ pub enum SocketEgressFilterResult {
 }
 
 /// Trait for a socket operations filter.
-pub trait SocketOpsFilter<D: StrongDeviceIdentifier> {
+pub trait SocketOpsFilter<D: StrongDeviceIdentifier, T> {
     /// Called on every outgoing packet originated from a local socket.
     fn on_egress<I: FilterIpExt, P: IpPacket<I>>(
         &self,
         packet: &P,
         device: &D,
+        tx_metadata: &T,
         marks: &Marks,
     ) -> SocketEgressFilterResult;
 }
 
 /// Implemented by bindings to provide socket operations filtering.
-pub trait SocketOpsFilterBindingContext<D: StrongDeviceIdentifier> {
+pub trait SocketOpsFilterBindingContext<D: StrongDeviceIdentifier>:
+    TxMetadataBindingsTypes
+{
     /// Returns the filter that should be called for socket ops.
-    fn socket_ops_filter(&self) -> impl SocketOpsFilter<D>;
+    fn socket_ops_filter(&self) -> impl SocketOpsFilter<D, Self::TxMetadata>;
 }
 
 #[cfg(feature = "testutils")]

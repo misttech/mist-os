@@ -944,8 +944,12 @@ where
         InternalForwarding::NotUsed => {}
     }
 
-    let egress_filter_result =
-        bindings_ctx.socket_ops_filter().on_egress(&packet, &egress_device, options.marks());
+    let egress_filter_result = bindings_ctx.socket_ops_filter().on_egress(
+        &packet,
+        &egress_device,
+        packet_metadata.tx_metadata(),
+        packet_metadata.marks(),
+    );
     // TODO(https://fxbug.dev/412426836): Implement congestion signal handling.
     match egress_filter_result {
         SocketEgressFilterResult::Pass { congestion: _ } => (),

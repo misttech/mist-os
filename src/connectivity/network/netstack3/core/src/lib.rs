@@ -129,7 +129,7 @@ pub mod ip {
     }
 
     // Re-exported types.
-    pub use netstack3_base::{Mark, MarkDomain, SubnetMatcher, WrapBroadcastMarker};
+    pub use netstack3_base::{Mark, MarkDomain, Marks, SubnetMatcher, WrapBroadcastMarker};
     pub use netstack3_ip::device::{
         AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, AddressRemovedReason,
         CommonAddressConfig, CommonAddressProperties, IidGenerationConfiguration, IidSecret,
