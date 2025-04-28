@@ -3578,6 +3578,22 @@ mod arch32 {
         super::statfs(locked, current_task, user_path, user_buf)
     }
 
+    pub fn sys_arch32_arm_fadvise64_64(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+        advice: u32,
+        offset_low: u64,
+        offset_high: u64,
+        len_low: u64,
+        len_high: u64,
+    ) -> Result<(), Errno> {
+        let offset =
+            off_t::try_from(offset_low | (offset_high << 32)).map_err(|_| errno!(EINVAL))?;
+        let len = off_t::try_from(len_low | (len_high << 32)).map_err(|_| errno!(EINVAL))?;
+        super::sys_fadvise64(locked, current_task, fd, offset, len, advice)
+    }
+
     pub use super::{
         sys_chdir as sys_arch32_chdir, sys_chroot as sys_arch32_chroot,
         sys_copy_file_range as sys_arch32_copy_file_range, sys_dup3 as sys_arch32_dup3,
@@ -3600,11 +3616,12 @@ mod arch32 {
         sys_mknodat as sys_arch32_mknodat, sys_pidfd_getfd as sys_arch32_pidfd_getfd,
         sys_pidfd_open as sys_arch32_pidfd_open, sys_ppoll as sys_arch32_ppoll,
         sys_preadv as sys_arch32_preadv, sys_pselect6 as sys_arch32_pselect6,
-        sys_readv as sys_arch32_readv, sys_renameat2 as sys_arch32_renameat2,
-        sys_select as sys_arch32__newselect, sys_setxattr as sys_arch32_setxattr,
-        sys_splice as sys_arch32_splice, sys_statfs as sys_arch32_statfs,
-        sys_symlinkat as sys_arch32_symlinkat, sys_sync as sys_arch32_sync,
-        sys_tee as sys_arch32_tee, sys_timerfd_create as sys_arch32_timerfd_create,
+        sys_readv as sys_arch32_readv, sys_removexattr as sys_arch32_removexattr,
+        sys_renameat2 as sys_arch32_renameat2, sys_select as sys_arch32__newselect,
+        sys_setxattr as sys_arch32_setxattr, sys_splice as sys_arch32_splice,
+        sys_statfs as sys_arch32_statfs, sys_symlinkat as sys_arch32_symlinkat,
+        sys_sync as sys_arch32_sync, sys_tee as sys_arch32_tee,
+        sys_timerfd_create as sys_arch32_timerfd_create,
         sys_timerfd_settime as sys_arch32_timerfd_settime, sys_truncate as sys_arch32_truncate,
         sys_umask as sys_arch32_umask, sys_utimensat as sys_arch32_utimensat,
         sys_vmsplice as sys_arch32_vmsplice,

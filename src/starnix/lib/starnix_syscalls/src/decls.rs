@@ -133,6 +133,7 @@ macro_rules! for_each_arch_arch32_syscall {
             getegid32,
             geteuid32,
             getgid32,
+            getgroups32,
             getitimer,
             getresgid32,
             getresuid32,
