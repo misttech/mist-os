@@ -26,12 +26,12 @@ zx_library("mmio") {
   ]
   sources = [ "mmio-buffer.cc" ]
   public_deps = [
+    "//zircon/kernel/object:headers",
+
     # <lib/mmio/mmio.h> has #include <lib/mmio-ptr/mmio-ptr.h>.
     "//zircon/system/ulib/mmio-ptr",
 
     # <lib/mmio/mmio.h> has #include <lib/zx/bti.h>.
-    "//zircon/system/ulib/zx",
-
     # <lib/mmio/mmio-buffer.h> has #include <lib/zx/result.h>.
     "//zircon/system/ulib/zx",
   ]

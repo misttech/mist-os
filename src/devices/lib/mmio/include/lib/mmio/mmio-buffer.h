@@ -10,7 +10,6 @@
 #include <lib/mmio/mmio-ops.h>
 #include <lib/mmio/mmio-pinned-buffer.h>
 #include <zircon/assert.h>
-#include <zircon/process.h>
 
 __BEGIN_CDECLS
 
@@ -19,14 +18,14 @@ __BEGIN_CDECLS
 // specifies the size of the mmio region. |offset| + |size| must be less than
 // or equal to the size of |vmo|.
 // Always consumes |vmo|, including in error cases.
-zx_status_t mmio_buffer_init(mmio_buffer_t* buffer, zx_off_t offset, size_t size, zx_handle_t vmo,
+zx_status_t mmio_buffer_init(mmio_buffer_t* buffer, zx_off_t offset, size_t size, void* vmo,
                              uint32_t cache_policy);
 
 // Takes a physical region, and maps it into address space. |base| and |size|
 // must be page aligned.
 // Callee retains ownership of |resource|.
 zx_status_t mmio_buffer_init_physical(mmio_buffer_t* buffer, zx_paddr_t base, size_t size,
-                                      zx_handle_t resource, uint32_t cache_policy);
+                                      void* resource, uint32_t cache_policy);
 
 // Unmaps the mmio region.
 void mmio_buffer_release(mmio_buffer_t* buffer);
@@ -35,13 +34,14 @@ __END_CDECLS
 
 #ifdef __cplusplus
 
-#include <lib/zx/bti.h>
-#include <lib/zx/resource.h>
 #include <lib/zx/result.h>
-#include <lib/zx/vmo.h>
 
 #include <optional>
 #include <utility>
+
+#include <fbl/ref_ptr.h>
+#include <object/bus_transaction_initiator_dispatcher.h>
+#include <object/vm_object_dispatcher.h>
 
 namespace fdf {
 
@@ -76,10 +76,11 @@ class MmioBuffer {
     return result;
   }
 
-  static zx::result<MmioBuffer> Create(zx_off_t offset, size_t size, zx::vmo vmo,
-                                       uint32_t cache_policy) {
+  static zx::result<MmioBuffer> Create(zx_off_t offset, size_t size,
+                                       fbl::RefPtr<VmObjectDispatcher> vmo, uint32_t cache_policy) {
     mmio_buffer_t mmio;
-    zx_status_t status = mmio_buffer_init(&mmio, offset, size, vmo.release(), cache_policy);
+    zx_status_t status =
+        mmio_buffer_init(&mmio, offset, size, fbl::ExportToRawPtr(&vmo), cache_policy);
     if (status != ZX_OK) {
       return zx::error(status);
     }
@@ -94,9 +95,12 @@ class MmioBuffer {
   MMIO_PTR void* get() const { return mmio_.vaddr; }
   zx_off_t get_offset() const { return mmio_.offset; }
   size_t get_size() const { return mmio_.size; }
-  zx::unowned_vmo get_vmo() const { return zx::unowned_vmo(mmio_.vmo); }
+  fbl::RefPtr<VmObjectDispatcher> get_vmo() const {
+    return fbl::ImportFromRawPtr(static_cast<VmObjectDispatcher*>(mmio_.vmo));
+  }
 
-  zx_status_t Pin(const zx::bti& bti, std::optional<MmioPinnedBuffer>* pinned_buffer) {
+  zx_status_t Pin(const fbl::RefPtr<BusTransactionInitiatorDispatcher>& bti,
+                  std::optional<MmioPinnedBuffer>* pinned_buffer) {
     mmio_pinned_buffer_t pinned;
     zx_status_t status = mmio_buffer_pin(&mmio_, bti.get(), &pinned);
     if (status == ZX_OK) {
@@ -105,7 +109,7 @@ class MmioBuffer {
     return status;
   }
 
-  zx::result<MmioPinnedBuffer> Pin(const zx::bti& bti) {
+  zx::result<MmioPinnedBuffer> Pin(const fbl::RefPtr<BusTransactionInitiatorDispatcher>& bti) {
     mmio_pinned_buffer_t pinned;
     zx_status_t status = mmio_buffer_pin(&mmio_, bti.get(), &pinned);
     if (status != ZX_OK) {

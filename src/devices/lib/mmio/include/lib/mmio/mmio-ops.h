@@ -16,7 +16,8 @@ typedef struct {
   MMIO_PTR void* vaddr;
   zx_off_t offset;
   size_t size;
-  zx_handle_t vmo;
+  void* vmo;
+  void* mapping;
 } mmio_buffer_t;
 
 __END_CDECLS

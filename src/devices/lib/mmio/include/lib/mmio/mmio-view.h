@@ -46,7 +46,7 @@ class MmioView : public MmioBuffer {
 
   virtual ~MmioView() override {
     // Prevent unmap operation from occurring.
-    mmio_.vmo = ZX_HANDLE_INVALID;
+    mmio_.vmo = nullptr;
   }
 };
 
