@@ -6630,7 +6630,7 @@ zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(VmCowRange range, Deferr
                                                                           uint64_t off) {
         found_page_or_gap = true;
         // We only expect committed pages in the specified range.
-        if (p->IsMarker() || p->IsReference() || p->IsInterval()) {
+        if (!p->IsPage()) {
           return ZX_ERR_BAD_STATE;
         }
         vm_page_t* page = p->Page();
