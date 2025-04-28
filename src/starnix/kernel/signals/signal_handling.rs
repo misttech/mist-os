@@ -446,6 +446,7 @@ fn dispatch_signal_handler(
         );
     }
     registers.set_instruction_pointer_register(action.sa_handler.addr);
+    registers.reset_flags(); // TODO(https://fxbug.dev/413070731): Verify and update the logic in resetting the flags.
 
     Ok(())
 }

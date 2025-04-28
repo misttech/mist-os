@@ -22,6 +22,9 @@
 
                 // TODO(b/307595538): Fail with netstack3.
                 "SndRcvBufSockOpt/SndRcvBufSockOpt.DoubledOnGet/*",
+
+                // RISC-V has no flags register
+                "SignalHandling.FlagsRestoredAfterSigsegv",
             ],
         },
         {

@@ -633,7 +633,6 @@ fn process_completed_exception(
         ExceptionResult::Signal(signal) => {
             // TODO: Verify that the rip is actually in restricted code.
             let mut registers = current_task.thread_state.registers;
-            registers.reset_flags();
             {
                 let mut task_state = current_task.task.write();
                 if task_state.ptrace_on_signal_consume() {

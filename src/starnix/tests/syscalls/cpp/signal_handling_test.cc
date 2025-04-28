@@ -1244,4 +1244,70 @@ TEST(SignalHandling, RaceBetweenTaskReleaseAndThreadRelease) {
   }
 }
 
+TEST(SignalHandling, FlagsRestoredAfterSigsegv) {
+  test_helper::ForkHelper helper;
+
+  helper.RunInForkedProcess([]() {
+    static const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+    static void *noaccess_page =
+        mmap(NULL, page_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    ASSERT_NE(MAP_FAILED, noaccess_page);
+    struct sigaction sigsegv_action = {};
+    sigsegv_action.sa_flags = SA_SIGINFO;
+    sigsegv_action.sa_sigaction = [](int sig, siginfo_t *info, void *) {
+#ifdef __x86_64__
+      __asm__ volatile("std" ::: "cc");  // unset carry flag
+#elif defined(__aarch64__)
+      __asm__ volatile("mrs x0, nzcv; bic x0, x0, #0x20000000; msr nzcv, x0\n"  // unset carry flag
+                       ::
+                           : "x0", "x1", "cc");
+#elif defined(__arm__)
+      __asm__ volatile("mrs r0, apsr; bic r0, r0, #0x20000000; msr apsr, r0\n"  // unset carry flag
+                       ::
+                           : "r0", "r1", "cc");
+#endif
+      ASSERT_EQ(noaccess_page, info->si_addr);
+      SAFE_SYSCALL(mprotect(noaccess_page, page_size, PROT_READ | PROT_WRITE));
+    };
+    SAFE_SYSCALL(sigaction(SIGSEGV, &sigsegv_action, nullptr));
+    uint64_t value_before_signal = 0, value_after_signal = 0;
+#ifdef __x86_64__
+    __asm__ volatile(
+        "stc; pushfq; popq %0\n"  // set carry flag; read all flags
+        "movq %2, (%2)\n"         // access memory, triggering sigsegv
+        "pushfq; popq %1\n"       // read all flags again
+        : "=&r"(value_before_signal), "=r"(value_after_signal)
+        : "r"(noaccess_page)
+        : "cc", "memory");
+#elif defined(__aarch64__)
+    register uintptr_t x1 asm("x1") = reinterpret_cast<uintptr_t>(noaccess_page);
+    __asm__ volatile(
+        "mrs x0, nzcv; orr x0, x0, #0x20000000; msr nzcv, x0\n"  // set carry flag
+        "mrs %0, nzcv\n"                                         // read all flags
+        "str x1, [x1]\n"  // access memory, triggering sigsegv
+        "mrs %1, nzcv\n"  // read all flags again
+        : "=&r"(value_before_signal), "=r"(value_after_signal)
+        : "r"(x1)
+        : "x0", "cc", "memory");
+#elif defined(__arm__)
+    register uintptr_t r1 asm("r1") = reinterpret_cast<uintptr_t>(noaccess_page);
+    __asm__ volatile(
+        "mrs r0, apsr; orr r0, r0, #0x20000000; msr apsr, r0\n"  // set carry flag
+        "mrs %0, apsr\n"                                         // read all flags
+        "str r1, [r1]\n"  // access memory, triggering sigsegv
+        "mrs %1, apsr\n"  // read all flags again
+        : "=&r"(value_before_signal), "=r"(value_after_signal)
+        : "r"(r1)
+        : "r0", "cc", "memory");
+    // Only compare the part containing the condition flags.
+    value_before_signal &= 0xf0000000;
+    value_after_signal &= 0xf0000000;
+#endif
+    // Check that the write above succeeded
+    ASSERT_EQ(*reinterpret_cast<void **>(noaccess_page), noaccess_page);
+    EXPECT_EQ(value_before_signal, value_after_signal);
+    munmap(noaccess_page, page_size);
+  });
+}
+
 }  // namespace
