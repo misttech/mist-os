@@ -8,7 +8,6 @@
 #define ZIRCON_KERNEL_LIB_DEVICETREE_INCLUDE_LIB_DEVICETREE_DEVICETREE_H_
 
 #include <lib/fit/result.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 #include <zircon/types.h>
 
@@ -16,6 +15,7 @@
 #include <iterator>
 #include <numeric>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -35,7 +35,7 @@
 
 namespace devicetree {
 
-using ByteView = cpp20::span<const uint8_t>;
+using ByteView = std::span<const uint8_t>;
 
 // See
 // https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#address-cells-and-size-cells
@@ -932,7 +932,7 @@ class Devicetree {
   // be dereferenced.
   explicit Devicetree(ByteView fdt);
   Devicetree(const Devicetree& other) = default;
-  explicit Devicetree(cpp20::span<const std::byte> fdt)
+  explicit Devicetree(std::span<const std::byte> fdt)
       : Devicetree(ByteView{reinterpret_cast<const uint8_t*>(fdt.data()), fdt.size()}) {}
 
   Devicetree& operator=(const Devicetree& rhs) = default;

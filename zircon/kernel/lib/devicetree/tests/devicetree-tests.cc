@@ -7,18 +7,15 @@
 #include <lib/devicetree/devicetree.h>
 #include <lib/devicetree/testing/loaded-dtb.h>
 #include <lib/fit/result.h>
-#include <lib/stdcompat/array.h>
-#include <lib/stdcompat/source_location.h>
-#include <lib/stdcompat/span.h>
-#include <limits.h>
-#include <stdio.h>
-#include <string.h>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
-#include <filesystem>
-#include <memory>
-#include <type_traits>
+#include <cstdio>
+#include <cstring>
+#include <optional>
+#include <source_location>
+#include <span>
 
 #include <zxtest/zxtest.h>
 
@@ -77,8 +74,8 @@ struct Node {
 
 // List of nodes are in pre order.
 // post order does a translation for node[i](preorder) -> node[post_order[i]](postorder)
-void DoAndVerifyWalk(devicetree::Devicetree& tree, cpp20::span<const Node> nodes,
-                     cpp20::span<const size_t> post_order) {
+void DoAndVerifyWalk(devicetree::Devicetree& tree, std::span<const Node> nodes,
+                     std::span<const size_t> post_order) {
   // PreWalk Only check.
   size_t seen = 0;
   auto pre_walker = [&](const devicetree::NodePath& path,
@@ -140,7 +137,7 @@ TEST(DevicetreeTest, NodesAreVisitedDepthFirst) {
   ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
   devicetree::Devicetree dt = loaded_dtb->fdt();
 
-  constexpr auto nodes = cpp20::to_array<Node>({
+  constexpr auto nodes = std::to_array<Node>({
       {.name = "", .size = 1},
       {.name = "A", .size = 2},
       {.name = "B", .size = 3},
@@ -153,7 +150,7 @@ TEST(DevicetreeTest, NodesAreVisitedDepthFirst) {
       {.name = "I", .size = 4},
   });
 
-  constexpr auto post_order = cpp20::to_array<size_t>({2, 4, 3, 1, 8, 7, 9, 6, 5, 0});
+  constexpr auto post_order = std::to_array<size_t>({2, 4, 3, 1, 8, 7, 9, 6, 5, 0});
 
   DoAndVerifyWalk(dt, nodes, post_order);
 }
@@ -176,7 +173,7 @@ TEST(DevicetreeTest, SubtreesArePruned) {
   ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
   devicetree::Devicetree dt = loaded_dtb->fdt();
 
-  constexpr auto nodes = cpp20::to_array<Node>({
+  constexpr auto nodes = std::to_array<Node>({
       {.name = "", .size = 1},
       {.name = "A", .size = 2},
       {.name = "B", .size = 3},
@@ -185,7 +182,7 @@ TEST(DevicetreeTest, SubtreesArePruned) {
       {.name = "F", .size = 3, .prune = true},
   });
 
-  constexpr auto post_order = cpp20::to_array<size_t>({2, 3, 1, 5, 4, 0});
+  constexpr auto post_order = std::to_array<size_t>({2, 3, 1, 5, 4, 0});
 
   DoAndVerifyWalk(dt, nodes, post_order);
 }
@@ -209,11 +206,11 @@ TEST(DevicetreeTest, WholeTreeIsPruned) {
   ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
   devicetree::Devicetree dt = loaded_dtb->fdt();
 
-  constexpr auto nodes = cpp20::to_array<Node>({
+  constexpr auto nodes = std::to_array<Node>({
       {.name = "", .size = 1, .prune = true},
   });
 
-  constexpr auto post_order = cpp20::to_array<size_t>({0});
+  constexpr auto post_order = std::to_array<size_t>({0});
 
   DoAndVerifyWalk(dt, nodes, post_order);
 }
@@ -458,13 +455,13 @@ TEST(DevicetreeTest, StringList) {
 auto as_bytes = [](auto& val) {
   using byte_type = std::conditional_t<std::is_const_v<std::remove_reference_t<decltype(val)>>,
                                        const uint8_t, uint8_t>;
-  return cpp20::span<byte_type>(reinterpret_cast<byte_type*>(&val), sizeof(val));
+  return std::span<byte_type>(reinterpret_cast<byte_type*>(&val), sizeof(val));
 };
 
 auto append = [](auto& vec, auto&& other) { vec.insert(vec.end(), other.begin(), other.end()); };
 
 uint32_t byte_swap(uint32_t val) {
-  if constexpr (cpp20::endian::native == cpp20::endian::big) {
+  if constexpr (std::endian::native == std::endian::big) {
     return val;
   } else {
     auto bytes = as_bytes(val);
@@ -533,9 +530,9 @@ struct PropertyBuilder {
 
     // Add the null terminator.
     uint32_t len = static_cast<uint32_t>(absolute_path.size()) + 1;
-    cpp20::span<const uint8_t> padding;
+    std::span<const uint8_t> padding;
     if (auto remainder = len % sizeof(uint32_t); remainder != 0) {
-      padding = cpp20::span(kPadding).subspan(0, sizeof(uint32_t) - remainder);
+      padding = std::span(kPadding).subspan(0, sizeof(uint32_t) - remainder);
     }
     len = byte_swap(len);
 
@@ -550,7 +547,7 @@ struct PropertyBuilder {
     append(property_block, padding);
   }
 
-  void Add(std::string_view name, cpp20::span<const uint8_t> byte_array) {
+  void Add(std::string_view name, std::span<const uint8_t> byte_array) {
     uint32_t name_off = byte_swap(static_cast<uint32_t>(string_block.size()));
     // String must be null terminated.
     append(string_block, name);
@@ -573,7 +570,7 @@ struct PropertyBuilder {
 };
 
 auto check_prop = [](auto& prop, uint32_t val,
-                     cpp20::source_location loc = cpp20::source_location::current()) {
+                     std::source_location loc = std::source_location::current()) {
   ASSERT_TRUE(prop, "at %s:%u", loc.file_name(), loc.line());
   auto pv = prop->AsUint32();
   ASSERT_TRUE(pv, "at %s:%u", loc.file_name(), loc.line());

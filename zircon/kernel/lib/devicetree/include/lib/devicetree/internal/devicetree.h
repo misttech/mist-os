@@ -8,13 +8,14 @@
 #define ZIRCON_KERNEL_LIB_DEVICETREE_INCLUDE_LIB_DEVICETREE_INTERNAL_DEVICETREE_H_
 
 #include <inttypes.h>
-#include <lib/stdcompat/span.h>
-#include <stdint.h>
 #include <zircon/assert.h>
+
+#include <cstdint>
+#include <span>
 
 namespace devicetree::internal {
 
-using ByteView = cpp20::span<const uint8_t>;
+using ByteView = std::span<const uint8_t>;
 
 struct ReadBigEndianUint32Result {
   uint32_t value;

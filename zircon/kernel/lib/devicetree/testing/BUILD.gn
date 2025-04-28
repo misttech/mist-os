@@ -16,9 +16,6 @@ source_set("testing") {
     ":includes",
   ]
   public = [ "include/lib/devicetree/testing/loaded-dtb.h" ]
-  public_deps = [
-    "//sdk/lib/stdcompat",
-    "//zircon/kernel/lib/devicetree",
-  ]
+  public_deps = [ "//zircon/kernel/lib/devicetree" ]
   deps = [ "data" ]
 }
