@@ -55,6 +55,7 @@ class BlobWriter final : public fidl::WireServer<fuchsia_fxfs::BlobWriter> {
     if (!blob_) {
       completer.ReplyError(ZX_ERR_BAD_STATE);
       completer.Close(ZX_ERR_BAD_STATE);
+      return;
     }
     auto result = GetVmoImpl(request->size);
     if (result.is_error()) {
@@ -69,8 +70,7 @@ class BlobWriter final : public fidl::WireServer<fuchsia_fxfs::BlobWriter> {
     if (!blob_) {
       completer.ReplyError(ZX_ERR_BAD_STATE);
       completer.Close(ZX_ERR_BAD_STATE);
-    }
-    if (auto result = BytesReadyImpl(request->bytes_written); result.is_error()) {
+    } else if (auto result = BytesReadyImpl(request->bytes_written); result.is_error()) {
       completer.ReplyError(result.status_value());
       completer.Close(result.status_value());
     } else {
