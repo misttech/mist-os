@@ -14,103 +14,6 @@
 
 __BEGIN_CDECLS
 
-// LINT.IfChange
-// global binding variables at 0x00XX
-// BIND_FLAGS was 0x0000, the value of the flags register
-// #define BIND_PROTOCOL 0x0001  // primary protocol of the device
-// BIND_AUTOBIND was 0x0002, if this is an automated bind/load
-// BIND_COMPOSITE was 0x003, whether this is a composite device
-
-// pci binding variables at 0x01XX
-// BIND_PCI_VID was 0x0100
-// BIND_PCI_DID was 0x0101
-// BIND_PCI_CLASS was 0x0102
-// BIND_PCI_SUBCLASS was 0x0103
-// BIND_PCI_INTERFACE was 0x0104
-// BIND_PCI_REVISION was 0x0105
-// BIND_PCI_TOPO was 0x0107
-
-#define BIND_PCI_TOPO_PACK(bus, dev, func) (((bus) << 8) | (dev << 3) | (func))
-
-// usb binding variables at 0x02XX
-// these are used for both ZX_PROTOCOL_USB_INTERFACE and ZX_PROTOCOL_USB_FUNCTION
-// BIND_USB_VID as 0x0200
-// BIND_USB_PID as 0x0201
-// BIND_USB_CLASS as 0x0202
-// BIND_USB_SUBCLASS as 0x0203
-// BIND_USB_PROTOCOL as 0x0204
-// BIND_USB_INTERFACE_NUMBER as 0x0205
-
-// Platform bus binding variables at 0x03XX
-// BIND_PLATFORM_DEV_VID was 0x0300
-// BIND_PLATFORM_DEV_PID was 0x0301
-// BIND_PLATFORM_DEV_DID was 0x0302
-// BIND_PLATFORM_DEV_INSTANCE_ID was 0x0304
-// BIND_PLATFORM_DEV_INTERRUPT_ID was 0x0305
-
-// ACPI binding variables at 0x04XX
-// BIND_ACPI_BUS_TYPE was 0x0400
-// Internal use only.
-// BIND_ACPI_ID was 0x0401
-
-// Intel HDA Codec binding variables at 0x05XX
-// BIND_IHDA_CODEC_VID as 0x0500
-// BIND_IHDA_CODEC_DID as 0x0501
-// BIND_IHDA_CODEC_MAJOR_REV as 0x0502
-// BIND_IHDA_CODEC_MINOR_REV as 0x0503
-// BIND_IHDA_CODEC_VENDOR_REV as 0x0504
-// BIND_IHDA_CODEC_VENDOR_STEP as 0x0505
-
-// Serial binding variables at 0x06XX
-// BIND_SERIAL_CLASS was 0x0600
-// BIND_SERIAL_VID was 0x0601
-// BIND_SERIAL_PID was 0x0602
-
-// NAND binding variables at 0x07XX
-// BIND_NAND_CLASS was 0x0700
-
-// SDIO binding variables at 0x09XX
-// BIND_SDIO_VID was 0x0900
-// BIND_SDIO_PID was 0x0901
-// BIND_SDIO_FUNCTION was 0x0902
-
-// I2C binding variables at 0x0A0X
-// BIND_I2C_CLASS was 0x0A00
-// BIND_I2C_BUS_ID was 0x0A01
-// BIND_I2C_ADDRESS was 0x0A02
-// BIND_I2C_VID was 0x0A03
-// BIND_I2C_DID was 0x0A04
-
-// GPIO binding variables at 0x0A1X
-// BIND_GPIO_PIN was 0x0A10
-// BIND_GPIO_CONTROLLER was 0x0A11
-
-// POWER binding variables at 0x0A2X
-// BIND_POWER_DOMAIN was 0x0A20
-// BIND_POWER_DOMAIN_COMPOSITE was 0x0A21
-
-// POWER binding variables at 0x0A3X
-// BIND_CLOCK_ID was 0x0A30
-
-// SPI binding variables at 0x0A4X
-// BIND_SPI_BUS_ID was 0x0A41
-// BIND_SPI_CHIP_SELECT was 0x0A42
-
-// PWM binding variables at 0x0A5X
-// BIND_PWM_ID was 0x0A50
-
-// Init Step binding variables at 0x0A6X
-// BIND_INIT_STEP was 0x0A60
-
-// Codec binding variables at 0x0A7X
-// BIND_CODEC_INSTANCE was 0x0A70
-
-// 0x0A80 was BIND_REGISTER_ID which is now deprecated.
-
-// Power sensor binding variables at 0x0A9X
-// BIND_POWER_SENSOR_DOMAIN was 0x0A90
-// LINT.ThenChange(/sdk/lib/driver/legacy-bind-constants/legacy-bind-constants.h)
-
 // COAABBBB VVVVVVVV  Condition Opcode paramA paramB Value
 
 #define OP_ABORT 0x0  // if (cond) return no-match
@@ -153,10 +56,13 @@ __BEGIN_CDECLS
 // for drivers that only want to be bound on user request
 #define BI_ABORT_IF_AUTOBIND BI_ABORT_IF(NE, BIND_AUTOBIND, 0)
 
+// LINT.IfChange
 // global binding variables at 0x00XX
 #define BIND_FLAGS 0x0000     // value of the flags register
 #define BIND_PROTOCOL 0x0001  // primary protocol of the device
 #define BIND_AUTOBIND 0x0002  // if this is an automated bind/load
+#define BIND_COMPOSITE 0x003  // Whether this is a composite device
+// #define BIND_FIDL_PROTOCOL 0x0004  // primary FIDL protocol of the device
 
 // pci binding variables at 0x01XX
 #define BIND_PCI_VID 0x0100
@@ -165,40 +71,30 @@ __BEGIN_CDECLS
 #define BIND_PCI_SUBCLASS 0x0103
 #define BIND_PCI_INTERFACE 0x0104
 #define BIND_PCI_REVISION 0x0105
-#define BIND_PCI_BDF_ADDR 0x0106
+#define BIND_PCI_TOPO 0x0107
 
-// pci binding variable utils
-#define BIND_PCI_BDF_PACK(bus, dev, func) \
-  ((((uint32_t)(bus) & 0xFF) << 8) | (((uint32_t)(dev) & 0x1F) << 3) | ((uint32_t)(func) & 0x07))
-
-#define BIND_PCI_BDF_UNPACK_BUS(bdf) (((uint32_t)(bdf) >> 8) & 0xFF)
-#define BIND_PCI_BDF_UNPACK_DEV(bdf) (((uint32_t)(bdf) >> 3) & 0x1F)
-#define BIND_PCI_BDF_UNPACK_FUNC(bdf) ((uint32_t)(bdf) & 0x07)
+#define BIND_PCI_TOPO_PACK(bus, dev, func) (((bus) << 8) | (dev << 3) | (func))
 
 // usb binding variables at 0x02XX
-// these are used for both ZX_PROTOCOL_USB and ZX_PROTOCOL_USB_FUNCTION
+// these are used for both ZX_PROTOCOL_USB_INTERFACE and ZX_PROTOCOL_USB_FUNCTION
 #define BIND_USB_VID 0x0200
 #define BIND_USB_PID 0x0201
 #define BIND_USB_CLASS 0x0202
 #define BIND_USB_SUBCLASS 0x0203
 #define BIND_USB_PROTOCOL 0x0204
+#define BIND_USB_INTERFACE_NUMBER 0x0205
 
 // Platform bus binding variables at 0x03XX
 #define BIND_PLATFORM_DEV_VID 0x0300
 #define BIND_PLATFORM_DEV_PID 0x0301
 #define BIND_PLATFORM_DEV_DID 0x0302
-#define BIND_PLATFORM_PROTO 0x0303
+#define BIND_PLATFORM_DEV_INSTANCE_ID 0x0304
+#define BIND_PLATFORM_DEV_INTERRUPT_ID 0x0305
 
 // ACPI binding variables at 0x04XX
-// The _HID is a 7- or 8-byte string. Because a bind property is 32-bit, use 2
-// properties to bind using the _HID. They are encoded in big endian order for
-// human readability. In the case of 7-byte _HID's, the 8th-byte shall be 0.
-#define BIND_ACPI_HID_0_3 0x0400  // char 0-3
-#define BIND_ACPI_HID_4_7 0x0401  // char 4-7
-// The _CID may be a valid HID value or a bus-specific string. The ACPI bus
-// driver only publishes those that are valid HID values.
-#define BIND_ACPI_CID_0_3 0x0402  // char 0-3
-#define BIND_ACPI_CID_4_7 0x0403  // char 4-7
+#define BIND_ACPI_BUS_TYPE 0x0400
+// Internal use only.
+#define BIND_ACPI_ID 0x0401
 
 // Intel HDA Codec binding variables at 0x05XX
 #define BIND_IHDA_CODEC_VID 0x0500
@@ -216,30 +112,62 @@ __BEGIN_CDECLS
 // NAND binding variables at 0x07XX
 #define BIND_NAND_CLASS 0x0700
 
-// Bluetooth binding variables at 0x08XX
-#define BIND_BT_GATT_SVC_UUID16 0x0800
-// 128-bit UUID is split across 4 32-bit unsigned ints
-#define BIND_BT_GATT_SVC_UUID128_1 0x0801
-#define BIND_BT_GATT_SVC_UUID128_2 0x0802
-#define BIND_BT_GATT_SVC_UUID128_3 0x0803
-#define BIND_BT_GATT_SVC_UUID128_4 0x0804
-
 // SDIO binding variables at 0x09XX
 #define BIND_SDIO_VID 0x0900
 #define BIND_SDIO_PID 0x0901
+#define BIND_SDIO_FUNCTION 0x0902
 
-// I2C binding variables at 0x0AXX
+// I2C binding variables at 0x0A0X
 #define BIND_I2C_CLASS 0x0A00
+#define BIND_I2C_BUS_ID 0x0A01
+#define BIND_I2C_ADDRESS 0x0A02
+#define BIND_I2C_VID 0x0A03
+#define BIND_I2C_DID 0x0A04
 
-// TEMPORARY binding variables at 0xfXX
-// I2C_ADDR is a temporary way to bind the i2c touchscreen on the Acer12. This
-// binding will eventually be made via some sort of ACPI device enumeration.
-#define BIND_I2C_ADDR 0x0f00
+// GPIO binding variables at 0x0A1X
+#define BIND_GPIO_PIN 0x0A10
+
+// POWER binding variables at 0x0A2X
+#define BIND_POWER_DOMAIN 0x0A20
+#define BIND_POWER_DOMAIN_COMPOSITE 0x0A21
+
+// POWER binding variables at 0x0A3X
+#define BIND_CLOCK_ID 0x0A30
+
+// SPI binding variables at 0x0A4X
+#define BIND_SPI_BUS_ID 0x0A41
+#define BIND_SPI_CHIP_SELECT 0x0A42
+
+// PWM binding variables at 0x0A5X
+#define BIND_PWM_ID 0x0A50
+
+// Init Step binding variables at 0x0A6X
+#define BIND_INIT_STEP 0x0A60
+
+// Codec binding variables at 0x0A7X
+#define BIND_CODEC_INSTANCE 0x0A70
+
+// Regsiters binding variables at 0x0A8X
+#define BIND_REGISTER_ID 0x0A80
+
+// Power sensor binding variables at 0x0A9X
+#define BIND_POWER_SENSOR_DOMAIN 0x0A90
+// LINT.ThenChange(/sdk/lib/driver/legacy-bind-constants/legacy-bind-constants.h)
+
+// Mailbox binding variables at 0x0AAX
+#define BIND_MAILBOX_ID 0x0AA0
 
 typedef struct zx_bind_inst {
   uint32_t op;
   uint32_t arg;
+  // uint32_t debug;
 } zx_bind_inst_t;
+
+typedef struct zx_device_prop {
+  uint16_t id;
+  uint16_t reserved;
+  uint32_t value;
+} zx_device_prop_t;
 
 #define ZIRCON_NOTE_NAME "Zircon"
 #define ZIRCON_NOTE_DRIVER 0x31565244  // DRV1

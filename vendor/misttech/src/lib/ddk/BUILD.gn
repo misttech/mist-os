@@ -145,6 +145,7 @@ library_headers("ddk-deprecated-binding-headers") {
   visibility = [
     "//src/devices/board/lib/acpi/*",
     "//vendor/misttech/src/devices/board/drivers/x86/*",
+    "//vendor/misttech/src/devices/bus/drivers/pci:*",
   ]
 }
 
