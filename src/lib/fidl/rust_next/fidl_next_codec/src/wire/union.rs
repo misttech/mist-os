@@ -40,7 +40,7 @@ impl RawWireUnion {
     /// Encodes a `'static` value and ordinal in a slot.
     #[inline]
     pub fn encode_as_static<E: InternalHandleEncoder + ?Sized, T: Encode<E>>(
-        value: &mut T,
+        value: T,
         ord: u64,
         encoder: &mut E,
         out: &mut MaybeUninit<Self>,
@@ -54,7 +54,7 @@ impl RawWireUnion {
     /// Encodes a value and ordinal in a slot.
     #[inline]
     pub fn encode_as<E: Encoder + ?Sized, T: Encode<E>>(
-        value: &mut T,
+        value: T,
         ord: u64,
         encoder: &mut E,
         out: &mut MaybeUninit<Self>,

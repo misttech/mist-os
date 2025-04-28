@@ -11,9 +11,9 @@ use crate::{
     Client, ClientHandler, ClientSender, Responder, Server, ServerHandler, ServerSender, Transport,
 };
 
-pub fn assert_encoded<T: Encode<Vec<Chunk>>>(mut value: T, chunks: &[Chunk]) {
+pub fn assert_encoded<T: Encode<Vec<Chunk>>>(value: T, chunks: &[Chunk]) {
     let mut encoded_chunks = Vec::new();
-    encoded_chunks.encode_next(&mut value).unwrap();
+    encoded_chunks.encode_next(value).unwrap();
     assert_eq!(encoded_chunks, chunks, "encoded chunks did not match");
 }
 
@@ -49,7 +49,7 @@ pub async fn test_close_on_drop<T: Transport + 'static>(client_end: T, server_en
             let server = server.clone();
             self.scope.spawn(async move {
                 server
-                    .send_response(responder, 42, &mut "Pong".to_string())
+                    .send_response(responder, 42, "Pong")
                     .expect("failed to encode response")
                     .await
                     .expect("failed to send response");
@@ -65,7 +65,7 @@ pub async fn test_close_on_drop<T: Transport + 'static>(client_end: T, server_en
         Task::spawn(async move { server.run(TestServer { scope: Scope::new() }).await });
 
     let message = client_sender
-        .send_two_way(42, &mut "Ping".to_string())
+        .send_two_way(42, "Ping")
         .expect("client failed to encode request")
         .await
         .expect("client failed to send request and receive response")
@@ -101,7 +101,7 @@ pub async fn test_one_way<T: Transport + 'static>(client_end: T, server_end: T) 
     let server_task = Task::spawn(async move { server.run(TestServer).await });
 
     client_sender
-        .send_one_way(42, &mut "Hello world".to_string())
+        .send_one_way(42, "Hello world")
         .expect("client failed to encode request")
         .await
         .expect("client failed to send request");
@@ -137,7 +137,7 @@ pub async fn test_two_way<T: Transport + 'static>(client_end: T, server_end: T) 
             let server = server.clone();
             self.scope.spawn(async move {
                 server
-                    .send_response(responder, 42, &mut "Pong".to_string())
+                    .send_response(responder, 42, "Pong")
                     .expect("failed to encode response")
                     .await
                     .expect("failed to send response");
@@ -153,7 +153,7 @@ pub async fn test_two_way<T: Transport + 'static>(client_end: T, server_end: T) 
         Task::spawn(async move { server.run(TestServer { scope: Scope::new() }).await });
 
     let message = client_sender
-        .send_two_way(42, &mut "Ping".to_string())
+        .send_two_way(42, "Ping")
         .expect("client failed to encode request")
         .await
         .expect("client failed to send request and receive response")
@@ -200,7 +200,7 @@ pub async fn test_multiple_two_way<T: Transport + 'static>(client_end: T, server
             let server = server.clone();
             self.scope.spawn(async move {
                 server
-                    .send_response(responder, ordinal, &mut response.to_string())
+                    .send_response(responder, ordinal, response)
                     .expect("server failed to encode response")
                     .await
                     .expect("server failed to send response");
@@ -215,15 +215,10 @@ pub async fn test_multiple_two_way<T: Transport + 'static>(client_end: T, server
     let server_task =
         Task::spawn(async move { server.run(TestServer { scope: Scope::new() }).await });
 
-    let send_one = client_sender
-        .send_two_way(1, &mut "One".to_string())
-        .expect("client failed to encode request");
-    let send_two = client_sender
-        .send_two_way(2, &mut "Two".to_string())
-        .expect("client failed to encode request");
-    let send_three = client_sender
-        .send_two_way(3, &mut "Three".to_string())
-        .expect("client failed to encode request");
+    let send_one = client_sender.send_two_way(1, "One").expect("client failed to encode request");
+    let send_two = client_sender.send_two_way(2, "Two").expect("client failed to encode request");
+    let send_three =
+        client_sender.send_two_way(3, "Three").expect("client failed to encode request");
     let (response_one, response_two, response_three) =
         futures::join!(send_one, send_two, send_three);
 
@@ -280,7 +275,7 @@ pub async fn test_event<T: Transport + 'static>(client_end: T, server_end: T) {
     let server_task = Task::spawn(async move { server.run(TestServer).await });
 
     server_sender
-        .send_event(10, &mut "Surprise!".to_string())
+        .send_event(10, "Surprise!")
         .expect("server failed to encode response")
         .await
         .expect("server failed to send response");

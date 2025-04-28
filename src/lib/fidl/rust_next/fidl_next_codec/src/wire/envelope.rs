@@ -49,7 +49,7 @@ impl WireEnvelope {
     /// Encodes a `'static` value into an envelope with an encoder.
     #[inline]
     pub fn encode_value_static<E: InternalHandleEncoder + ?Sized, T: Encode<E>>(
-        value: &mut T,
+        value: T,
         encoder: &mut E,
         out: &mut MaybeUninit<Self>,
     ) -> Result<(), EncodeError> {
@@ -95,7 +95,7 @@ impl WireEnvelope {
     /// Encodes a value into an envelope with an encoder.
     #[inline]
     pub fn encode_value<E: Encoder + ?Sized, T: Encode<E>>(
-        value: &mut T,
+        value: T,
         encoder: &mut E,
         out: &mut MaybeUninit<Self>,
     ) -> Result<(), EncodeError> {

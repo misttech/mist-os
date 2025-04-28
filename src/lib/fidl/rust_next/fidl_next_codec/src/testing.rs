@@ -4,9 +4,9 @@
 
 use crate::{Chunk, Decode, Decoded, DecoderExt as _, Encode, EncoderExt as _};
 
-pub fn assert_encoded<T: Encode<Vec<Chunk>>>(mut value: T, chunks: &[Chunk]) {
+pub fn assert_encoded<T: Encode<Vec<Chunk>>>(value: T, chunks: &[Chunk]) {
     let mut encoded_chunks = Vec::new();
-    encoded_chunks.encode_next(&mut value).unwrap();
+    encoded_chunks.encode_next(value).unwrap();
     assert_eq!(encoded_chunks, chunks, "encoded chunks did not match");
 }
 

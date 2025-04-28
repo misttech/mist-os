@@ -36,11 +36,11 @@ impl<T: Transport + 'static> CalculatorServerHandler<T> for MyCalculatorServer {
         responder: Responder<calculator::Add>,
     ) {
         println!("{} + {} = {}", request.a, request.b, request.a + request.b);
-        let mut response = Flexible::Ok(CalculatorAddResponse { sum: request.a + request.b });
+        let response = Flexible::Ok(CalculatorAddResponse { sum: request.a + request.b });
 
         let sender = sender.clone();
         self.scope.spawn(async move {
-            if responder.respond(&sender, &mut response).unwrap().await.is_err() {
+            if responder.respond(&sender, response).unwrap().await.is_err() {
                 sender.close();
             }
         });
@@ -52,7 +52,7 @@ impl<T: Transport + 'static> CalculatorServerHandler<T> for MyCalculatorServer {
         request: Request<T, calculator::Divide>,
         responder: Responder<calculator::Divide>,
     ) {
-        let mut response = if request.divisor != 0 {
+        let response = if request.divisor != 0 {
             println!(
                 "{} / {} = {} rem {}",
                 request.dividend,
@@ -71,7 +71,7 @@ impl<T: Transport + 'static> CalculatorServerHandler<T> for MyCalculatorServer {
 
         let sender = sender.clone();
         self.scope.spawn(async move {
-            if responder.respond(&sender, &mut response).unwrap().await.is_err() {
+            if responder.respond(&sender, response).unwrap().await.is_err() {
                 return sender.close();
             }
         });
@@ -82,11 +82,7 @@ impl<T: Transport + 'static> CalculatorServerHandler<T> for MyCalculatorServer {
 
         let sender = sender.clone();
         self.scope.spawn(async move {
-            sender
-                .on_error(&mut CalculatorOnErrorRequest { status_code: 100 })
-                .unwrap()
-                .await
-                .unwrap();
+            sender.on_error(CalculatorOnErrorRequest { status_code: 100 }).unwrap().await.unwrap();
         });
     }
 }
@@ -135,7 +131,7 @@ async fn create_endpoints(
 
 async fn add(client_sender: &ClientSender<Endpoint, Calculator>) {
     let result = client_sender
-        .add(&mut CalculatorAddRequest { a: 16, b: 26 })
+        .add(CalculatorAddRequest { a: 16, b: 26 })
         .expect("failed to encode add request")
         .await
         .expect("failed to send, receive, or decode response to add request");
@@ -147,7 +143,7 @@ async fn add(client_sender: &ClientSender<Endpoint, Calculator>) {
 async fn divide(client_sender: &ClientSender<Endpoint, Calculator>) {
     // Normal division
     let result = client_sender
-        .divide(&mut CalculatorDivideRequest { dividend: 100, divisor: 3 })
+        .divide(CalculatorDivideRequest { dividend: 100, divisor: 3 })
         .expect("failed to encode divide request")
         .await
         .expect("failed to send, receive, or decode response to divide request");
@@ -158,7 +154,7 @@ async fn divide(client_sender: &ClientSender<Endpoint, Calculator>) {
 
     // Cause an error
     let result = client_sender
-        .divide(&mut CalculatorDivideRequest { dividend: 42, divisor: 0 })
+        .divide(CalculatorDivideRequest { dividend: 42, divisor: 0 })
         .expect("failed to encode divide request")
         .await
         .expect("failed to send, receive, or decode response to divide request");

@@ -10,7 +10,7 @@ use munge::munge;
 
 use crate::{
     Decode, DecodeError, Decoder, DecoderExt as _, Encodable, EncodableOption, Encode, EncodeError,
-    EncodeOption, Slot, TakeFrom, WirePointer, ZeroPadding,
+    EncodeOption, EncodeOptionRef, EncodeRef, Slot, TakeFrom, WirePointer, ZeroPadding,
 };
 
 /// A boxed (optional) FIDL value.
@@ -98,11 +98,21 @@ impl<T: EncodableOption> Encodable for Option<T> {
 
 unsafe impl<E: ?Sized, T: EncodeOption<E>> Encode<E> for Option<T> {
     fn encode(
-        &mut self,
+        self,
         encoder: &mut E,
         out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {
-        T::encode_option(self.as_mut(), encoder, out)
+        T::encode_option(self, encoder, out)
+    }
+}
+
+unsafe impl<E: ?Sized, T: EncodeOptionRef<E>> EncodeRef<E> for Option<T> {
+    fn encode_ref(
+        &self,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError> {
+        T::encode_option_ref(self.as_ref(), encoder, out)
     }
 }
 

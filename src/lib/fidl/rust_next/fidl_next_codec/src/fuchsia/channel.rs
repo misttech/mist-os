@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::mem::{replace, MaybeUninit};
+use core::mem::MaybeUninit;
 
 use crate::fuchsia::{HandleDecoder, HandleEncoder, WireHandle, WireOptionalHandle};
 use crate::{
@@ -121,14 +121,12 @@ impl Encodable for Channel {
 
 unsafe impl<E: HandleEncoder + ?Sized> Encode<E> for Channel {
     fn encode(
-        &mut self,
+        self,
         encoder: &mut E,
         out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {
-        let channel = replace(self, Channel::from(Handle::invalid()));
-
         munge!(let WireChannel { handle } = out);
-        Handle::from(channel).encode(encoder, handle)
+        Handle::from(self).encode(encoder, handle)
     }
 }
 
@@ -138,14 +136,12 @@ impl EncodableOption for Channel {
 
 unsafe impl<E: HandleEncoder + ?Sized> EncodeOption<E> for Channel {
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut E,
         out: &mut MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), EncodeError> {
-        let channel = this.map(|channel| replace(channel, Channel::from(Handle::invalid())));
-
         munge!(let WireOptionalChannel { handle } = out);
-        Handle::encode_option(channel.map(Handle::from).as_mut(), encoder, handle)
+        Handle::encode_option(this.map(Handle::from), encoder, handle)
     }
 }
 

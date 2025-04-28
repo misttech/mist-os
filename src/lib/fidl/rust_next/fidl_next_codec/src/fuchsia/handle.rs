@@ -4,7 +4,7 @@
 
 use core::cell::Cell;
 use core::fmt;
-use core::mem::{replace, ManuallyDrop, MaybeUninit};
+use core::mem::{ManuallyDrop, MaybeUninit};
 
 use zx::sys::{zx_handle_t, ZX_HANDLE_INVALID};
 use zx::Handle;
@@ -148,15 +148,14 @@ impl Encodable for Handle {
 
 unsafe impl<E: HandleEncoder + ?Sized> Encode<E> for Handle {
     fn encode(
-        &mut self,
+        self,
         encoder: &mut E,
         out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {
         if self.is_invalid() {
             Err(EncodeError::InvalidRequiredHandle)
         } else {
-            let handle = replace(self, Handle::invalid());
-            encoder.push_handle(handle)?;
+            encoder.push_handle(self)?;
             WireHandle::set_encoded_present(out);
             Ok(())
         }
@@ -169,12 +168,11 @@ impl EncodableOption for Handle {
 
 unsafe impl<E: HandleEncoder + ?Sized> EncodeOption<E> for Handle {
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut E,
         out: &mut MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), EncodeError> {
         if let Some(handle) = this {
-            let handle = replace(handle, Handle::invalid());
             encoder.push_handle(handle)?;
             WireOptionalHandle::set_encoded_present(out);
         } else {

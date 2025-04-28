@@ -10,8 +10,8 @@ use core::str::{from_utf8, from_utf8_unchecked};
 use munge::munge;
 
 use crate::{
-    Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, Encoder, Slot, TakeFrom,
-    WireVector, ZeroPadding,
+    Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, EncodeRef, Encoder, Slot,
+    TakeFrom, WireVector, ZeroPadding,
 };
 
 /// A FIDL string
@@ -99,7 +99,33 @@ impl Encodable for String {
 unsafe impl<E: Encoder + ?Sized> Encode<E> for String {
     #[inline]
     fn encode(
-        &mut self,
+        self,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError> {
+        self.as_str().encode(encoder, out)
+    }
+}
+
+unsafe impl<E: Encoder + ?Sized> EncodeRef<E> for String {
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError> {
+        self.as_str().encode(encoder, out)
+    }
+}
+
+impl Encodable for &str {
+    type Encoded = WireString;
+}
+
+unsafe impl<E: Encoder + ?Sized> Encode<E> for &str {
+    #[inline]
+    fn encode(
+        self,
         encoder: &mut E,
         out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {

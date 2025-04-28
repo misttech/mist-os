@@ -42,7 +42,7 @@ impl<T: Transport> ClientSender<T> {
     pub fn send_one_way<M>(
         &self,
         ordinal: u64,
-        request: &mut M,
+        request: M,
     ) -> Result<SendFuture<'_, T>, EncodeError>
     where
         M: Encode<T::SendBuffer>,
@@ -54,7 +54,7 @@ impl<T: Transport> ClientSender<T> {
     pub fn send_two_way<M>(
         &self,
         ordinal: u64,
-        request: &mut M,
+        request: M,
     ) -> Result<ResponseFuture<'_, T>, EncodeError>
     where
         M: Encode<T::SendBuffer>,
@@ -79,7 +79,7 @@ impl<T: Transport> ClientSender<T> {
         &self,
         txid: u32,
         ordinal: u64,
-        message: &mut M,
+        message: M,
     ) -> Result<SendFuture<'_, T>, EncodeError>
     where
         M: Encode<T::SendBuffer>,

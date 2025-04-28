@@ -53,7 +53,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(2618685789258237543, &mut ())
+            .send_two_way(2618685789258237543, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 }

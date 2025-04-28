@@ -14,7 +14,7 @@ pub fn encode_header<T: Transport>(
     txid: u32,
     ordinal: u64,
 ) -> Result<(), EncodeError> {
-    buffer.encode_next(&mut WireMessageHeader {
+    buffer.encode_next(WireMessageHeader {
         txid: WireU32(txid),
         flags: [FLAG_0_WIRE_FORMAT_V2_BIT, 0, 0],
         magic_number: MAGIC_NUMBER,

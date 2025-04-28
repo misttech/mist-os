@@ -120,7 +120,7 @@ pub trait {{ client_sender_name }} {
                 {% if let Some(request) = method.maybe_request_payload %}
                     fn {{ method_name }}<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                     where
                         ___R: ::fidl_next::Encode<
@@ -137,7 +137,7 @@ pub trait {{ client_sender_name }} {
                 {% if let Some(request) = method.maybe_request_payload %}
                     fn {{ method_name }}<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<
                         ::fidl_next::ResponseFuture<
                             '_,
@@ -184,7 +184,7 @@ where
                 {% if let Some(request) = method.maybe_request_payload %}
                     fn {{ method_name }}<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                     where
                         ___R: ::fidl_next::Encode<
@@ -198,7 +198,7 @@ where
                     fn {{ method_name }}(
                         &self,
                     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-                        self.as_untyped().send_one_way({{ method.ordinal }}, &mut ())
+                        self.as_untyped().send_one_way({{ method.ordinal }}, ())
                     }
                 {% endif %}
             {% when ProtocolMethodKind::TwoWay %}
@@ -206,7 +206,7 @@ where
                 {% if let Some(request) = method.maybe_request_payload %}
                     fn {{ method_name }}<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<
                         ::fidl_next::ResponseFuture<'_, Self::Transport, {{ module_name }}::{{ method_type_name }}>,
                         ::fidl_next::EncodeError,
@@ -227,7 +227,7 @@ where
                         ::fidl_next::ResponseFuture<'_, Self::Transport, {{ module_name }}::{{ method_type_name }}>,
                         ::fidl_next::EncodeError,
                     > {
-                        self.as_untyped().send_two_way({{ method.ordinal }}, &mut ())
+                        self.as_untyped().send_two_way({{ method.ordinal }}, ())
                             .map(::fidl_next::ResponseFuture::from_untyped)
                     }
                 {% endif %}
@@ -330,7 +330,7 @@ pub trait {{ server_sender_name }} {
                 {% let method_type_name = filters::ident(method.name.camel())? %}
                 fn {{ method_name }}<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
@@ -361,11 +361,11 @@ where
                 {% let method_type_name = filters::ident(method.name.camel())? %}
                 fn {{ method_name }}<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+                        <Self::Transport as ::fidl_next::Transport>::SendBuffer,
                         Encoded = <{{ module_name }}::{{ method_type_name }} as ::fidl_next::Method>::Response,
                     >,
                 {
@@ -375,7 +375,7 @@ where
                 fn {{ method_name }}(
                     &self,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-                    self.as_untyped().send_event({{ method.ordinal }}, &mut ())
+                    self.as_untyped().send_event({{ method.ordinal }}, ())
                 }
             {% endif %}
         {% endif %}

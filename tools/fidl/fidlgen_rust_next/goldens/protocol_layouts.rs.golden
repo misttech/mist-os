@@ -27,7 +27,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -44,7 +44,50 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(a) = &mut self.a {
+                    if let Some(a) = self.a.take() {
+                        ::fidl_next::WireEnvelope::encode_value(a, preallocated.encoder, &mut out)?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for LocalTablePayload
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireLocalTablePayload { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(a) = &self.a {
                         ::fidl_next::WireEnvelope::encode_value(a, preallocated.encoder, &mut out)?;
                     } else {
                         ::fidl_next::WireEnvelope::encode_zero(&mut out)
@@ -143,7 +186,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -152,6 +195,32 @@ where
         match self {
             Self::B(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, bool>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for LocalUnionPayload
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireLocalUnionPayload { raw } = out);
+
+        match self {
+            Self::B(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &bool>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -174,7 +243,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -182,7 +251,31 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<LocalUnionPayload>
+where
+    ___E: ?Sized,
+    LocalUnionPayload: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalLocalUnionPayload { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -383,7 +476,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -400,7 +493,50 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(a) = &mut self.a {
+                    if let Some(a) = self.a.take() {
+                        ::fidl_next::WireEnvelope::encode_value(a, preallocated.encoder, &mut out)?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for MainProtocolOneWayAnonRequest
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireMainProtocolOneWayAnonRequest { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(a) = &self.a {
                         ::fidl_next::WireEnvelope::encode_value(a, preallocated.encoder, &mut out)?;
                     } else {
                         ::fidl_next::WireEnvelope::encode_zero(&mut out)
@@ -499,7 +635,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -508,6 +644,32 @@ where
         match self {
             Self::B(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, bool>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for MainProtocolTwoWayAnonRequest
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireMainProtocolTwoWayAnonRequest { raw } = out);
+
+        match self {
+            Self::B(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &bool>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -530,7 +692,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -538,7 +700,31 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<MainProtocolTwoWayAnonRequest>
+where
+    ___E: ?Sized,
+    MainProtocolTwoWayAnonRequest: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalMainProtocolTwoWayAnonRequest { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -743,7 +929,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -760,7 +946,50 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(a) = &mut self.a {
+                    if let Some(a) = self.a.take() {
+                        ::fidl_next::WireEnvelope::encode_value(a, preallocated.encoder, &mut out)?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for MainProtocolTwoWayAnonResponse
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireMainProtocolTwoWayAnonResponse { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(a) = &self.a {
                         ::fidl_next::WireEnvelope::encode_value(a, preallocated.encoder, &mut out)?;
                     } else {
                         ::fidl_next::WireEnvelope::encode_zero(&mut out)
@@ -867,7 +1096,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -884,7 +1113,50 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(a) = &mut self.a {
+                    if let Some(a) = self.a.take() {
+                        ::fidl_next::WireEnvelope::encode_value(a, preallocated.encoder, &mut out)?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for MainProtocolTwoWayAnonWithErrorRequest
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireMainProtocolTwoWayAnonWithErrorRequest { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(a) = &self.a {
                         ::fidl_next::WireEnvelope::encode_value(a, preallocated.encoder, &mut out)?;
                     } else {
                         ::fidl_next::WireEnvelope::encode_zero(&mut out)
@@ -985,7 +1257,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -994,6 +1266,32 @@ where
         match self {
             Self::B(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, bool>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for MainProtocolTwoWayAnonWithErrorResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireMainProtocolTwoWayAnonWithErrorResponse { raw } = out);
+
+        match self {
+            Self::B(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &bool>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -1016,7 +1314,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -1024,7 +1322,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<MainProtocolTwoWayAnonWithErrorResponse>
+where
+    ___E: ?Sized,
+    MainProtocolTwoWayAnonWithErrorResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalMainProtocolTwoWayAnonWithErrorResponse { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -1225,7 +1548,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -1234,6 +1557,32 @@ where
         match self {
             Self::B(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, bool>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for MainProtocolOnAnonRequest
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireMainProtocolOnAnonRequest { raw } = out);
+
+        match self {
+            Self::B(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &bool>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -1256,7 +1605,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -1264,7 +1613,31 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<MainProtocolOnAnonRequest>
+where
+    ___E: ?Sized,
+    MainProtocolOnAnonRequest: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalMainProtocolOnAnonRequest { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -1769,7 +2142,7 @@ pub trait MainProtocolClientSender {
 
     fn one_way_anon_composed<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                     where
                         ___R: ::fidl_next::Encode<
@@ -1779,7 +2152,7 @@ pub trait MainProtocolClientSender {
 
     fn two_way_anon_composed<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<
                         ::fidl_next::ResponseFuture<
                             '_,
@@ -1796,7 +2169,7 @@ pub trait MainProtocolClientSender {
 
     fn two_way_anon_composed_with_error<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<
                         ::fidl_next::ResponseFuture<
                             '_,
@@ -1813,7 +2186,7 @@ pub trait MainProtocolClientSender {
 
     fn one_way_named_composed<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -1823,7 +2196,7 @@ pub trait MainProtocolClientSender {
 
     fn two_way_named_composed<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayNamedComposed>,
         ::fidl_next::EncodeError,
@@ -1836,7 +2209,7 @@ pub trait MainProtocolClientSender {
 
     fn two_way_named_composed_with_error<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<
             '_,
@@ -1853,7 +2226,7 @@ pub trait MainProtocolClientSender {
 
     fn one_way_import<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -1863,7 +2236,7 @@ pub trait MainProtocolClientSender {
 
     fn two_way_import<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayImport>,
         ::fidl_next::EncodeError,
@@ -1876,7 +2249,7 @@ pub trait MainProtocolClientSender {
 
     fn two_way_import_with_error<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayImportWithError>,
         ::fidl_next::EncodeError,
@@ -1889,7 +2262,7 @@ pub trait MainProtocolClientSender {
 
     fn one_way_local<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -1899,7 +2272,7 @@ pub trait MainProtocolClientSender {
 
     fn two_way_local<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayLocal>,
         ::fidl_next::EncodeError,
@@ -1912,7 +2285,7 @@ pub trait MainProtocolClientSender {
 
     fn two_way_local_with_error<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayLocalWithError>,
         ::fidl_next::EncodeError,
@@ -1925,7 +2298,7 @@ pub trait MainProtocolClientSender {
 
     fn one_way_anon<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -1935,7 +2308,7 @@ pub trait MainProtocolClientSender {
 
     fn two_way_anon<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayAnon>,
         ::fidl_next::EncodeError,
@@ -1948,7 +2321,7 @@ pub trait MainProtocolClientSender {
 
     fn two_way_anon_with_error<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayAnonWithError>,
         ::fidl_next::EncodeError,
@@ -1974,7 +2347,7 @@ where
 
                     fn one_way_anon_composed<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                     where
                         ___R: ::fidl_next::Encode<
@@ -1994,7 +2367,7 @@ where
 
                     fn two_way_anon_composed<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<
                         ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayAnonComposed>,
                         ::fidl_next::EncodeError,
@@ -2019,7 +2392,7 @@ where
 
                     fn two_way_anon_composed_with_error<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<
                         ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayAnonComposedWithError>,
                         ::fidl_next::EncodeError,
@@ -2037,7 +2410,7 @@ where
 
     fn one_way_named_composed<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -2050,7 +2423,7 @@ where
 
     fn two_way_named_composed<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayNamedComposed>,
         ::fidl_next::EncodeError,
@@ -2068,7 +2441,7 @@ where
 
     fn two_way_named_composed_with_error<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<
             '_,
@@ -2090,7 +2463,7 @@ where
 
     fn one_way_import<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -2103,7 +2476,7 @@ where
 
     fn two_way_import<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayImport>,
         ::fidl_next::EncodeError,
@@ -2121,7 +2494,7 @@ where
 
     fn two_way_import_with_error<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayImportWithError>,
         ::fidl_next::EncodeError,
@@ -2139,7 +2512,7 @@ where
 
     fn one_way_local<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -2152,7 +2525,7 @@ where
 
     fn two_way_local<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayLocal>,
         ::fidl_next::EncodeError,
@@ -2170,7 +2543,7 @@ where
 
     fn two_way_local_with_error<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayLocalWithError>,
         ::fidl_next::EncodeError,
@@ -2188,7 +2561,7 @@ where
 
     fn one_way_anon<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -2201,7 +2574,7 @@ where
 
     fn two_way_anon<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayAnon>,
         ::fidl_next::EncodeError,
@@ -2219,7 +2592,7 @@ where
 
     fn two_way_anon_with_error<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayAnonWithError>,
         ::fidl_next::EncodeError,
@@ -2381,7 +2754,7 @@ pub trait MainProtocolServerSender {
 
     fn on_anon_composed<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -2391,7 +2764,7 @@ pub trait MainProtocolServerSender {
 
     fn on_named_composed<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -2401,7 +2774,7 @@ pub trait MainProtocolServerSender {
 
     fn on_import<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -2411,7 +2784,7 @@ pub trait MainProtocolServerSender {
 
     fn on_local<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -2421,7 +2794,7 @@ pub trait MainProtocolServerSender {
 
     fn on_anon<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -2438,7 +2811,7 @@ where
 
     fn on_anon_composed<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -2451,7 +2824,7 @@ where
 
     fn on_named_composed<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -2464,7 +2837,7 @@ where
 
     fn on_import<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -2477,7 +2850,7 @@ where
 
     fn on_local<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -2490,7 +2863,7 @@ where
 
     fn on_anon<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3285,7 +3658,7 @@ pub trait OpenProtocolClientSender {
 
     fn flexible_one_way<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                     where
                         ___R: ::fidl_next::Encode<
@@ -3295,7 +3668,7 @@ pub trait OpenProtocolClientSender {
 
     fn flexible_two_way_no_error<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<
                         ::fidl_next::ResponseFuture<
                             '_,
@@ -3312,7 +3685,7 @@ pub trait OpenProtocolClientSender {
 
     fn flexible_two_way_with_error<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<
                         ::fidl_next::ResponseFuture<
                             '_,
@@ -3329,7 +3702,7 @@ pub trait OpenProtocolClientSender {
 
     fn strict_one_way<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                     where
                         ___R: ::fidl_next::Encode<
@@ -3339,7 +3712,7 @@ pub trait OpenProtocolClientSender {
 
     fn strict_two_way_no_error<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<
                         ::fidl_next::ResponseFuture<
                             '_,
@@ -3356,7 +3729,7 @@ pub trait OpenProtocolClientSender {
 
     fn strict_two_way_with_error<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<
                         ::fidl_next::ResponseFuture<
                             '_,
@@ -3373,7 +3746,7 @@ pub trait OpenProtocolClientSender {
 
     fn flexible_one_way_named_payload<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3396,7 +3769,7 @@ where
 
                     fn flexible_one_way<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                     where
                         ___R: ::fidl_next::Encode<
@@ -3416,7 +3789,7 @@ where
 
                     fn flexible_two_way_no_error<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<
                         ::fidl_next::ResponseFuture<'_, Self::Transport, open_protocol::FlexibleTwoWayNoError>,
                         ::fidl_next::EncodeError,
@@ -3441,7 +3814,7 @@ where
 
                     fn flexible_two_way_with_error<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<
                         ::fidl_next::ResponseFuture<'_, Self::Transport, open_protocol::FlexibleTwoWayWithError>,
                         ::fidl_next::EncodeError,
@@ -3472,7 +3845,7 @@ where
 
                     fn strict_one_way<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                     where
                         ___R: ::fidl_next::Encode<
@@ -3492,7 +3865,7 @@ where
 
                     fn strict_two_way_no_error<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<
                         ::fidl_next::ResponseFuture<'_, Self::Transport, open_protocol::StrictTwoWayNoError>,
                         ::fidl_next::EncodeError,
@@ -3517,7 +3890,7 @@ where
 
                     fn strict_two_way_with_error<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<
                         ::fidl_next::ResponseFuture<'_, Self::Transport, open_protocol::StrictTwoWayWithError>,
                         ::fidl_next::EncodeError,
@@ -3535,7 +3908,7 @@ where
 
     fn flexible_one_way_named_payload<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3629,7 +4002,7 @@ pub trait OpenProtocolServerSender {
 
     fn flexible_event<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3639,7 +4012,7 @@ pub trait OpenProtocolServerSender {
 
     fn strict_event<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3656,7 +4029,7 @@ where
 
     fn flexible_event<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3669,7 +4042,7 @@ where
 
     fn strict_event<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<

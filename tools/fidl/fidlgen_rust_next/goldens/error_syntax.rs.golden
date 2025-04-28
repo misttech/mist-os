@@ -19,7 +19,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -30,7 +30,32 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.s, encoder, s)?;
+        ::fidl_next::Encode::encode(self.s, encoder, s)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for ExampleUseOfErrorSyntaxCallWhichMayFailRequest
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                s,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.s, encoder, s)?;
 
         Ok(())
     }
@@ -48,7 +73,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<ExampleUseOfErrorSyntaxCallWhichMayFailRequest>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    ExampleUseOfErrorSyntaxCallWhichMayFailRequest: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -129,7 +177,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -140,7 +188,30 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.value, encoder, value)?;
+        ::fidl_next::Encode::encode(self.value, encoder, value)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for ExampleUseOfErrorSyntaxCallWhichMayFailResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                value,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.value, encoder, value)?;
 
         Ok(())
     }
@@ -158,7 +229,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<ExampleUseOfErrorSyntaxCallWhichMayFailResponse>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    ExampleUseOfErrorSyntaxCallWhichMayFailResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -292,7 +386,7 @@ pub trait ExampleUseOfErrorSyntaxClientSender {
 
     fn composed_call_which_may_fail<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<
                         ::fidl_next::ResponseFuture<
                             '_,
@@ -309,7 +403,7 @@ pub trait ExampleUseOfErrorSyntaxClientSender {
 
     fn call_which_may_fail<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<
             '_,
@@ -340,7 +434,7 @@ where
 
                     fn composed_call_which_may_fail<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<
                         ::fidl_next::ResponseFuture<'_, Self::Transport, example_use_of_error_syntax::ComposedCallWhichMayFail>,
                         ::fidl_next::EncodeError,
@@ -358,7 +452,7 @@ where
 
     fn call_which_may_fail<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<
             '_,

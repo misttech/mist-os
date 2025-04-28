@@ -7,7 +7,7 @@ use core::hint::unreachable_unchecked;
 use core::mem::MaybeUninit;
 
 use fidl_next_codec::{
-    munge, Decode, DecodeError, Encodable, Encode, EncodeError, Slot, TakeFrom, WireI32,
+    munge, Decode, DecodeError, Encodable, Encode, EncodeError, EncodeRef, Slot, TakeFrom, WireI32,
     ZeroPadding,
 };
 
@@ -62,7 +62,17 @@ impl Encodable for FrameworkError {
 
 unsafe impl<E: ?Sized> Encode<E> for FrameworkError {
     fn encode(
-        &mut self,
+        self,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError> {
+        self.encode_ref(encoder, out)
+    }
+}
+
+unsafe impl<E: ?Sized> EncodeRef<E> for FrameworkError {
+    fn encode_ref(
+        &self,
         _: &mut E,
         out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {

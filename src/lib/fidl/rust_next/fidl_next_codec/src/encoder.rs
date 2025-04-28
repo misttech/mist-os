@@ -6,7 +6,7 @@
 
 use core::marker::PhantomData;
 use core::mem::MaybeUninit;
-use core::slice::{from_mut, from_raw_parts};
+use core::slice::from_raw_parts;
 
 use crate::{Chunk, Encode, EncodeError, WireU64, ZeroPadding, CHUNK_SIZE};
 
@@ -107,15 +107,18 @@ pub trait EncoderExt {
     /// Pre-allocates space for a slice of elements.
     fn preallocate<T>(&mut self, len: usize) -> Preallocated<'_, Self, T>;
 
-    /// Encodes a slice of elements.
+    /// Encodes an iterator of elements.
     ///
     /// Returns `Err` if encoding failed.
-    fn encode_next_slice<T: Encode<Self>>(&mut self, values: &mut [T]) -> Result<(), EncodeError>;
+    fn encode_next_iter<T: Encode<Self>>(
+        &mut self,
+        values: impl ExactSizeIterator<Item = T>,
+    ) -> Result<(), EncodeError>;
 
     /// Encodes a value.
     ///
     /// Returns `Err` if encoding failed.
-    fn encode_next<T: Encode<Self>>(&mut self, value: &mut T) -> Result<(), EncodeError>;
+    fn encode_next<T: Encode<Self>>(&mut self, value: T) -> Result<(), EncodeError>;
 }
 
 impl<E: Encoder + ?Sized> EncoderExt for E {
@@ -134,7 +137,10 @@ impl<E: Encoder + ?Sized> EncoderExt for E {
         }
     }
 
-    fn encode_next_slice<T: Encode<Self>>(&mut self, values: &mut [T]) -> Result<(), EncodeError> {
+    fn encode_next_iter<T: Encode<Self>>(
+        &mut self,
+        values: impl ExactSizeIterator<Item = T>,
+    ) -> Result<(), EncodeError> {
         let mut outputs = self.preallocate::<T::Encoded>(values.len());
 
         let mut out = MaybeUninit::<T::Encoded>::uninit();
@@ -149,8 +155,8 @@ impl<E: Encoder + ?Sized> EncoderExt for E {
         Ok(())
     }
 
-    fn encode_next<T: Encode<Self>>(&mut self, value: &mut T) -> Result<(), EncodeError> {
-        self.encode_next_slice(from_mut(value))
+    fn encode_next<T: Encode<Self>>(&mut self, value: T) -> Result<(), EncodeError> {
+        self.encode_next_iter(core::iter::once(value))
     }
 }
 

@@ -4,10 +4,11 @@
 
 use core::marker::PhantomData;
 use core::mem::MaybeUninit;
+use core::{concat, stringify};
 
 use fidl_next_codec::{
     munge, Decode, DecodeError, Encodable, EncodableOption, Encode, EncodeError, EncodeOption,
-    Slot, TakeFrom, ZeroPadding,
+    EncodeRef, Slot, TakeFrom, ZeroPadding,
 };
 
 macro_rules! endpoint {
@@ -23,6 +24,9 @@ macro_rules! endpoint {
             _protocol: PhantomData<P>,
         }
 
+        // SAFETY: `$name` is `#[repr(transparent)]` over the transport `T`, and `zero_padding`
+        // calls `T::zero_padding` on `transport`. `_protocol` is a ZST which does not have any
+        // padding bytes to zero-initialize.
         unsafe impl<T: ZeroPadding, P> ZeroPadding for $name<T, P> {
             #[inline]
             fn zero_padding(out: &mut MaybeUninit<Self>) {
@@ -32,6 +36,17 @@ macro_rules! endpoint {
         }
 
         impl<T, P> $name<T, P> {
+            #[doc = concat!(
+                "Converts from `&",
+                stringify!($name),
+                "<T, P>` to `",
+                stringify!($name),
+                "<&T, P>`.",
+            )]
+            pub fn as_ref(&self) -> $name<&T, P> {
+                $name { transport: &self.transport, _protocol: PhantomData }
+            }
+
             /// Returns a new endpoint over the given transport.
             pub fn from_untyped(transport: T) -> Self {
                 Self { transport, _protocol: PhantomData }
@@ -43,6 +58,8 @@ macro_rules! endpoint {
             }
         }
 
+        // SAFETY: `$name` is `#[repr(transparent)]` over the transport `T`, and `decode` calls
+        // `T::decode` on `transport`. `_protocol` is a ZST which does not have any data to decode.
         unsafe impl<D, T, P> Decode<D> for $name<T, P>
         where
             D: ?Sized,
@@ -68,13 +85,15 @@ macro_rules! endpoint {
             type EncodedOption = $name<T::EncodedOption, P>;
         }
 
+        // SAFETY: `$name` is `#[repr(transparent)]` over the transport `T`, and `encode` calls
+        // `T::encode` on `transport`. `_protocol` is a ZST which does not have any data to encode.
         unsafe impl<E, T, P> Encode<E> for $name<T, P>
         where
             E: ?Sized,
             T: Encode<E>,
         {
             fn encode(
-                &mut self,
+                self,
                 encoder: &mut E,
                 out: &mut MaybeUninit<Self::Encoded>,
             ) -> Result<(), EncodeError> {
@@ -83,18 +102,38 @@ macro_rules! endpoint {
             }
         }
 
+        // SAFETY: `$name` is `#[repr(transparent)]` over the transport `T`, and `encode_ref` calls
+        // `T::encode_ref` on `transport`. `_protocol` is a ZST which does not have any data to
+        // encode.
+        unsafe impl<E, T, P> EncodeRef<E> for $name<T, P>
+        where
+            E: ?Sized,
+            T: EncodeRef<E>,
+        {
+            fn encode_ref(
+                &self,
+                encoder: &mut E,
+                out: &mut MaybeUninit<Self::Encoded>,
+            ) -> Result<(), EncodeError> {
+                self.as_ref().encode(encoder, out)
+            }
+        }
+
+        // SAFETY: `$name` is `#[repr(transparent)]` over the transport `T`, and `encode_option`
+        // calls `T::encode_option` on `transport`. `_protocol` is a ZST which does not have any
+        // data to encode.
         unsafe impl<E, T, P> EncodeOption<E> for $name<T, P>
         where
             E: ?Sized,
             T: EncodeOption<E>,
         {
             fn encode_option(
-                this: Option<&mut Self>,
+                this: Option<Self>,
                 encoder: &mut E,
                 out: &mut MaybeUninit<Self::EncodedOption>,
             ) -> Result<(), EncodeError> {
                 munge!(let Self::EncodedOption { transport, _protocol: _ } = out);
-                T::encode_option(this.map(|this| &mut this.transport), encoder, transport)
+                T::encode_option(this.map(|this| this.transport), encoder, transport)
             }
         }
 

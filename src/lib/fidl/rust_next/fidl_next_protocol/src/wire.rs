@@ -5,7 +5,8 @@
 use core::mem::MaybeUninit;
 
 use fidl_next_codec::{
-    Decode, DecodeError, Encodable, Encode, EncodeError, Slot, WireU32, WireU64, ZeroPadding,
+    Decode, DecodeError, Encodable, Encode, EncodeError, EncodeRef, Slot, WireU32, WireU64,
+    ZeroPadding,
 };
 
 use zerocopy::IntoBytes;
@@ -44,7 +45,18 @@ impl Encodable for WireMessageHeader {
 unsafe impl<E: ?Sized> Encode<E> for WireMessageHeader {
     #[inline]
     fn encode(
-        &mut self,
+        self,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError> {
+        self.encode_ref(encoder, out)
+    }
+}
+
+unsafe impl<E: ?Sized> EncodeRef<E> for WireMessageHeader {
+    #[inline]
+    fn encode_ref(
+        &self,
         _: &mut E,
         out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {

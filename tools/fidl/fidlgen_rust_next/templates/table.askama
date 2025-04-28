@@ -40,7 +40,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -57,7 +57,7 @@ where
             match i {
                 {% for member in table.members.iter().rev() %}
                     {% let member_name = filters::ident(member.name.snake())? %}
-                    {{ member.ordinal }} => if let Some({{ member_name }}) = &mut self.{{ member_name }} {
+                    {{ member.ordinal }} => if let Some({{ member_name }}) = self.{{ member_name }}.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             {{ member_name }},
                             preallocated.encoder,
@@ -79,6 +79,54 @@ where
         Ok(())
     }
 }
+
+{% if !table.is_resource %}
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for {{ name }}
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let {{ wire_name }} { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated = ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                {% for member in table.members.iter().rev() %}
+                    {% let member_name = filters::ident(member.name.snake())? %}
+                    {{ member.ordinal }} => if let Some({{ member_name }}) = &self.{{ member_name }} {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            {{ member_name }},
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                {% endfor %}
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+{% endif %}
 
 impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
     #[inline]

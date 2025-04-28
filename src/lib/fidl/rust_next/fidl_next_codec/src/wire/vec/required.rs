@@ -11,8 +11,8 @@ use munge::munge;
 
 use super::raw::RawWireVector;
 use crate::{
-    Decode, DecodeError, Decoder, DecoderExt as _, Encodable, Encode, EncodeError, Encoder,
-    EncoderExt as _, Slot, TakeFrom, WirePointer, ZeroPadding,
+    Decode, DecodeError, Decoder, DecoderExt as _, Encodable, Encode, EncodeError, EncodeRef,
+    Encoder, EncoderExt as _, Slot, TakeFrom, WirePointer, ZeroPadding,
 };
 
 /// A FIDL vector
@@ -125,25 +125,69 @@ unsafe impl<D: Decoder + ?Sized, T: Decode<D>> Decode<D> for WireVector<T> {
     }
 }
 
+#[inline]
+fn encode_to_vector<V, E, T>(
+    value: V,
+    encoder: &mut E,
+    out: &mut MaybeUninit<WireVector<T::Encoded>>,
+) -> Result<(), EncodeError>
+where
+    V: AsRef<[T]> + IntoIterator,
+    V::IntoIter: ExactSizeIterator,
+    V::Item: Encode<E, Encoded = T::Encoded>,
+    E: Encoder + ?Sized,
+    T: Encode<E>,
+{
+    let len = value.as_ref().len();
+    if T::COPY_OPTIMIZATION.is_enabled() {
+        let slice = value.as_ref();
+        // SAFETY: `T` has copy optimization enabled, which guarantees that it has no uninit bytes
+        // and can be copied directly to the output instead of calling `encode`. This means that we
+        // may cast `&[T]` to `&[u8]` and write those bytes.
+        let bytes = unsafe { slice::from_raw_parts(slice.as_ptr().cast(), size_of_val(slice)) };
+        encoder.write(bytes);
+    } else {
+        encoder.encode_next_iter(value.into_iter())?;
+    }
+    WireVector::encode_present(out, len as u64);
+    Ok(())
+}
+
 impl<T: Encodable> Encodable for Vec<T> {
     type Encoded = WireVector<T::Encoded>;
 }
 
 unsafe impl<E: Encoder + ?Sized, T: Encode<E>> Encode<E> for Vec<T> {
     fn encode(
-        &mut self,
+        self,
         encoder: &mut E,
         out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {
-        if T::COPY_OPTIMIZATION.is_enabled() {
-            let bytes =
-                unsafe { slice::from_raw_parts(self.as_ptr().cast(), self.len() * size_of::<T>()) };
-            encoder.write(bytes);
-        } else {
-            encoder.encode_next_slice(self.as_mut_slice())?;
-        }
-        WireVector::encode_present(out, self.len() as u64);
-        Ok(())
+        encode_to_vector(self, encoder, out)
+    }
+}
+
+unsafe impl<E: Encoder + ?Sized, T: EncodeRef<E>> EncodeRef<E> for Vec<T> {
+    fn encode_ref(
+        &self,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError> {
+        encode_to_vector(self, encoder, out)
+    }
+}
+
+impl<T: Encodable> Encodable for &[T] {
+    type Encoded = WireVector<T::Encoded>;
+}
+
+unsafe impl<E: Encoder + ?Sized, T: EncodeRef<E>> Encode<E> for &[T] {
+    fn encode(
+        self,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError> {
+        encode_to_vector(self, encoder, out)
     }
 }
 

@@ -66,7 +66,7 @@ where
     fn method_on_first(
         &self,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(6352548393671797041, &mut ())
+        self.as_untyped().send_one_way(6352548393671797041, ())
     }
 }
 
@@ -329,7 +329,7 @@ where
     fn method_on_second(
         &self,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(8121179205110225988, &mut ())
+        self.as_untyped().send_one_way(8121179205110225988, ())
     }
 }
 

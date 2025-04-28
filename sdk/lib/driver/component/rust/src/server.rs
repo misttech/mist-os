@@ -259,7 +259,7 @@ mod tests {
             let channel_handle = server_chan.into_driver_handle().into_raw().get();
             let driver_server = unsafe { initialize_func(channel_handle) } as usize;
             assert_ne!(driver_server, 0);
-            let mut start_request = DriverStartRequest {
+            let start_request = DriverStartRequest {
                 start_args: fidl_next_fuchsia_driver_framework::DriverStartArgs {
                     node: None,
                     symbols: None,
@@ -276,7 +276,7 @@ mod tests {
                 },
             };
 
-            client_sender.start(&mut start_request).unwrap().await.unwrap().unwrap();
+            client_sender.start(start_request).unwrap().await.unwrap().unwrap();
 
             client_sender.stop().unwrap().await.unwrap();
             client_exit_rx.await.unwrap();

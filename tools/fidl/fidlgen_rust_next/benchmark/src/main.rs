@@ -128,19 +128,19 @@ where
     );
 }
 
-fn bench_rust_next<T, W>(c: &mut Criterion, name: &str, mut input: T, input_size: usize)
+fn bench_rust_next<T, W>(c: &mut Criterion, name: &str, input: T, input_size: usize)
 where
-    T: 'static + fidl_next::Encode<Vec<fidl_next::Chunk>> + fidl_next::TakeFrom<W>,
+    T: 'static + fidl_next::EncodeRef<Vec<fidl_next::Chunk>> + fidl_next::TakeFrom<W>,
     W: for<'a> fidl_next::Decode<&'a mut [fidl_next::Chunk]>,
 {
     let mut decode_chunks = Vec::new();
-    decode_chunks.encode_next(&mut input).unwrap();
+    decode_chunks.encode_next(&input).unwrap();
 
     c.bench_function(&format!("rust_next/{name}/encode/{input_size}x"), move |b| {
         let mut chunks = Vec::new();
         b.iter(|| {
             chunks.clear();
-            black_box(chunks.encode_next(black_box(&mut input))).unwrap();
+            black_box(chunks.encode_next(black_box(&input))).unwrap();
         });
     });
 

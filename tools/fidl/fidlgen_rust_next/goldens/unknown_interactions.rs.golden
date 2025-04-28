@@ -25,7 +25,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -36,7 +36,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -57,7 +81,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -143,7 +190,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -152,6 +199,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -177,7 +251,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -185,7 +259,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse>
+where
+    ___E: ?Sized,
+    UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -419,7 +518,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -436,7 +535,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -559,7 +706,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -570,7 +717,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -592,7 +763,31 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse:
+        ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -678,7 +873,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -687,6 +882,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -713,7 +935,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -721,7 +943,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse>
+where
+    ___E: ?Sized,
+    UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -955,7 +1202,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -972,7 +1219,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -1340,13 +1635,13 @@ where
     fn strict_one_way(
         &self,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(200845620698173917, &mut ())
+        self.as_untyped().send_one_way(200845620698173917, ())
     }
 
     fn flexible_one_way(
         &self,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(3790953144423004126, &mut ())
+        self.as_untyped().send_one_way(3790953144423004126, ())
     }
 
     fn strict_two_way(
@@ -1360,7 +1655,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(523076268125513549, &mut ())
+            .send_two_way(523076268125513549, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -1375,7 +1670,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(902155904889801604, &mut ())
+            .send_two_way(902155904889801604, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -1390,7 +1685,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(8952307689721713673, &mut ())
+            .send_two_way(8952307689721713673, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -1405,7 +1700,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(3114064683372134045, &mut ())
+            .send_two_way(3114064683372134045, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -1420,7 +1715,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(7057260423103547829, &mut ())
+            .send_two_way(7057260423103547829, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -1435,7 +1730,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(6490530264582540031, &mut ())
+            .send_two_way(6490530264582540031, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -1450,7 +1745,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(2319476129312263555, &mut ())
+            .send_two_way(2319476129312263555, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -1465,7 +1760,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(6883106306697493305, &mut ())
+            .send_two_way(6883106306697493305, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 }
@@ -1796,7 +2091,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -1807,7 +2102,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -1828,7 +2147,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -1912,7 +2254,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -1921,6 +2263,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -1946,7 +2315,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -1954,7 +2323,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>
+where
+    ___E: ?Sized,
+    UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -2179,7 +2573,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -2196,7 +2590,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsAjarProtocolStrictTwoWayTableResponse
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -2317,7 +2759,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -2328,7 +2770,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -2349,7 +2815,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -2433,7 +2922,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -2442,6 +2931,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -2467,7 +2983,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -2475,7 +2991,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse>
+where
+    ___E: ?Sized,
+    UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -2704,7 +3245,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -2721,7 +3262,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -2837,7 +3426,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -2848,7 +3437,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsAjarProtocolStrictEventFieldsRequest
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -2867,7 +3480,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsAjarProtocolStrictEventFieldsRequest>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsAjarProtocolStrictEventFieldsRequest: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -2951,7 +3587,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -2960,6 +3596,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsAjarProtocolStrictEventUnionRequest
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsAjarProtocolStrictEventUnionRequest { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -2983,7 +3646,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -2991,7 +3654,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsAjarProtocolStrictEventUnionRequest>
+where
+    ___E: ?Sized,
+    UnknownInteractionsAjarProtocolStrictEventUnionRequest: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsAjarProtocolStrictEventUnionRequest { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -3216,7 +3904,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -3233,7 +3921,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsAjarProtocolStrictEventTableRequest
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsAjarProtocolStrictEventTableRequest { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -3349,7 +4085,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -3360,7 +4096,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -3381,7 +4141,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -3465,7 +4248,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -3474,6 +4257,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsAjarProtocolFlexibleEventUnionRequest
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -3499,7 +4309,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -3507,7 +4317,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsAjarProtocolFlexibleEventUnionRequest>
+where
+    ___E: ?Sized,
+    UnknownInteractionsAjarProtocolFlexibleEventUnionRequest: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsAjarProtocolFlexibleEventUnionRequest { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -3732,7 +4567,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -3749,7 +4584,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsAjarProtocolFlexibleEventTableRequest
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -4223,13 +5106,13 @@ where
     fn strict_one_way(
         &self,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(956561744635167883, &mut ())
+        self.as_untyped().send_one_way(956561744635167883, ())
     }
 
     fn flexible_one_way(
         &self,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(2483093178939638607, &mut ())
+        self.as_untyped().send_one_way(2483093178939638607, ())
     }
 
     fn strict_two_way(
@@ -4243,7 +5126,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(364341676962177080, &mut ())
+            .send_two_way(364341676962177080, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -4258,7 +5141,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(1821674633227946298, &mut ())
+            .send_two_way(1821674633227946298, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -4273,7 +5156,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(5870221221557233361, &mut ())
+            .send_two_way(5870221221557233361, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -4288,7 +5171,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(8038805778859962068, &mut ())
+            .send_two_way(8038805778859962068, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -4303,7 +5186,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(6577335136969723910, &mut ())
+            .send_two_way(6577335136969723910, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -4318,7 +5201,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(595881957484758745, &mut ())
+            .send_two_way(595881957484758745, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -4333,7 +5216,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(3224530777258896533, &mut ())
+            .send_two_way(3224530777258896533, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -4348,7 +5231,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(3515589146717969463, &mut ())
+            .send_two_way(3515589146717969463, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 }
@@ -4534,7 +5417,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender {
 
     fn strict_event_fields<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
@@ -4544,7 +5427,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender {
 
     fn strict_event_union<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
@@ -4554,7 +5437,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender {
 
     fn strict_event_table<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
@@ -4568,7 +5451,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender {
 
     fn flexible_event_fields<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
@@ -4578,7 +5461,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender {
 
     fn flexible_event_union<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
@@ -4588,7 +5471,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender {
 
     fn flexible_event_table<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
@@ -4607,7 +5490,7 @@ where
     fn strict_event(
         &self,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(6927291151663612592, &mut ())
+        self.as_untyped().send_event(6927291151663612592, ())
     }
 
 
@@ -4619,11 +5502,11 @@ where
 
                 fn strict_event_fields<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+                        <Self::Transport as ::fidl_next::Transport>::SendBuffer,
                         Encoded = <unknown_interactions_ajar_protocol::StrictEventFields as ::fidl_next::Method>::Response,
                     >,
                 {
@@ -4639,11 +5522,11 @@ where
 
                 fn strict_event_union<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+                        <Self::Transport as ::fidl_next::Transport>::SendBuffer,
                         Encoded = <unknown_interactions_ajar_protocol::StrictEventUnion as ::fidl_next::Method>::Response,
                     >,
                 {
@@ -4659,11 +5542,11 @@ where
 
                 fn strict_event_table<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+                        <Self::Transport as ::fidl_next::Transport>::SendBuffer,
                         Encoded = <unknown_interactions_ajar_protocol::StrictEventTable as ::fidl_next::Method>::Response,
                     >,
                 {
@@ -4673,7 +5556,7 @@ where
     fn flexible_event(
         &self,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(1281760452005010931, &mut ())
+        self.as_untyped().send_event(1281760452005010931, ())
     }
 
 
@@ -4685,11 +5568,11 @@ where
 
                 fn flexible_event_fields<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+                        <Self::Transport as ::fidl_next::Transport>::SendBuffer,
                         Encoded = <unknown_interactions_ajar_protocol::FlexibleEventFields as ::fidl_next::Method>::Response,
                     >,
                 {
@@ -4705,11 +5588,11 @@ where
 
                 fn flexible_event_union<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+                        <Self::Transport as ::fidl_next::Transport>::SendBuffer,
                         Encoded = <unknown_interactions_ajar_protocol::FlexibleEventUnion as ::fidl_next::Method>::Response,
                     >,
                 {
@@ -4725,11 +5608,11 @@ where
 
                 fn flexible_event_table<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+                        <Self::Transport as ::fidl_next::Transport>::SendBuffer,
                         Encoded = <unknown_interactions_ajar_protocol::FlexibleEventTable as ::fidl_next::Method>::Response,
                     >,
                 {
@@ -4926,7 +5809,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -4937,7 +5820,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -4958,7 +5865,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -5044,7 +5974,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -5053,6 +5983,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -5079,7 +6036,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -5087,7 +6044,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse>
+where
+    ___E: ?Sized,
+    UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -5321,7 +6303,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -5338,7 +6320,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -5463,7 +6493,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -5474,7 +6504,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -5496,7 +6550,31 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse:
+        ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -5584,7 +6662,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -5593,6 +6671,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -5619,7 +6724,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -5627,7 +6732,33 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse>
+where
+    ___E: ?Sized,
+    UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse:
+        ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -5865,7 +6996,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -5882,7 +7013,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -6237,7 +7416,7 @@ where
     fn strict_one_way(
         &self,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(9111839835597799810, &mut ())
+        self.as_untyped().send_one_way(9111839835597799810, ())
     }
 
     fn strict_two_way(
@@ -6251,7 +7430,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(2815690661228737027, &mut ())
+            .send_two_way(2815690661228737027, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -6266,7 +7445,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(5761316743698652038, &mut ())
+            .send_two_way(5761316743698652038, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -6281,7 +7460,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(7235351480214368636, &mut ())
+            .send_two_way(7235351480214368636, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -6296,7 +7475,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(1839495150551777151, &mut ())
+            .send_two_way(1839495150551777151, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -6311,7 +7490,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(4350840352076287137, &mut ())
+            .send_two_way(4350840352076287137, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -6326,7 +7505,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(3933117456632607830, &mut ())
+            .send_two_way(3933117456632607830, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -6341,7 +7520,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(4598950031783776653, &mut ())
+            .send_two_way(4598950031783776653, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -6356,7 +7535,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(1456858375973362525, &mut ())
+            .send_two_way(1456858375973362525, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 }
@@ -6666,7 +7845,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -6677,7 +7856,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -6698,7 +7901,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -6782,7 +8008,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -6791,6 +8017,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -6816,7 +8069,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -6824,7 +8077,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>
+where
+    ___E: ?Sized,
+    UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -7051,7 +8329,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -7068,7 +8346,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsClosedProtocolStrictTwoWayTableResponse
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -7189,7 +8515,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -7200,7 +8526,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -7221,7 +8571,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -7307,7 +8680,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -7316,6 +8689,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -7341,7 +8741,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -7349,7 +8749,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse>
+where
+    ___E: ?Sized,
+    UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -7580,7 +9005,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -7597,7 +9022,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -7713,7 +9186,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -7724,7 +9197,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsClosedProtocolStrictEventFieldsRequest
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -7745,7 +9242,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsClosedProtocolStrictEventFieldsRequest>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsClosedProtocolStrictEventFieldsRequest: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -7829,7 +9349,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -7838,6 +9358,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsClosedProtocolStrictEventUnionRequest
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsClosedProtocolStrictEventUnionRequest { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -7863,7 +9410,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -7871,7 +9418,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsClosedProtocolStrictEventUnionRequest>
+where
+    ___E: ?Sized,
+    UnknownInteractionsClosedProtocolStrictEventUnionRequest: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsClosedProtocolStrictEventUnionRequest { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -8096,7 +9668,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -8113,7 +9685,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsClosedProtocolStrictEventTableRequest
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsClosedProtocolStrictEventTableRequest { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -8517,7 +10137,7 @@ where
     fn strict_one_way(
         &self,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(401526495318825508, &mut ())
+        self.as_untyped().send_one_way(401526495318825508, ())
     }
 
     fn strict_two_way(
@@ -8531,7 +10151,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(6834828562275693047, &mut ())
+            .send_two_way(6834828562275693047, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -8546,7 +10166,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(1379139029283639891, &mut ())
+            .send_two_way(1379139029283639891, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -8561,7 +10181,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(7544414847426850727, &mut ())
+            .send_two_way(7544414847426850727, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -8576,7 +10196,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(7947328131967870853, &mut ())
+            .send_two_way(7947328131967870853, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -8591,7 +10211,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(5738532966428790074, &mut ())
+            .send_two_way(5738532966428790074, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -8606,7 +10226,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(802395819586836733, &mut ())
+            .send_two_way(802395819586836733, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -8621,7 +10241,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(925029359463709824, &mut ())
+            .send_two_way(925029359463709824, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -8636,7 +10256,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(1260407702860823440, &mut ())
+            .send_two_way(1260407702860823440, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 }
@@ -8756,7 +10376,7 @@ pub trait UnknownInteractionsClosedProtocolServerSender {
 
     fn strict_event_fields<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
@@ -8766,7 +10386,7 @@ pub trait UnknownInteractionsClosedProtocolServerSender {
 
     fn strict_event_union<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
@@ -8776,7 +10396,7 @@ pub trait UnknownInteractionsClosedProtocolServerSender {
 
     fn strict_event_table<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
@@ -8795,7 +10415,7 @@ where
     fn strict_event(
         &self,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(760799297757210939, &mut ())
+        self.as_untyped().send_event(760799297757210939, ())
     }
 
 
@@ -8807,11 +10427,11 @@ where
 
                 fn strict_event_fields<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+                        <Self::Transport as ::fidl_next::Transport>::SendBuffer,
                         Encoded = <unknown_interactions_closed_protocol::StrictEventFields as ::fidl_next::Method>::Response,
                     >,
                 {
@@ -8827,11 +10447,11 @@ where
 
                 fn strict_event_union<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+                        <Self::Transport as ::fidl_next::Transport>::SendBuffer,
                         Encoded = <unknown_interactions_closed_protocol::StrictEventUnion as ::fidl_next::Method>::Response,
                     >,
                 {
@@ -8847,11 +10467,11 @@ where
 
                 fn strict_event_table<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+                        <Self::Transport as ::fidl_next::Transport>::SendBuffer,
                         Encoded = <unknown_interactions_closed_protocol::StrictEventTable as ::fidl_next::Method>::Response,
                     >,
                 {
@@ -9039,7 +10659,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -9050,7 +10670,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -9071,7 +10715,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -9155,7 +10822,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -9164,6 +10831,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -9189,7 +10883,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -9197,7 +10891,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse>
+where
+    ___E: ?Sized,
+    UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -9424,7 +11143,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -9441,7 +11160,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsDriverProtocolStrictTwoWayTableResponse
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -9562,7 +11329,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -9573,7 +11340,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -9594,7 +11385,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -9680,7 +11494,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -9689,6 +11503,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -9714,7 +11555,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -9722,7 +11563,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse>
+where
+    ___E: ?Sized,
+    UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -9953,7 +11819,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -9970,7 +11836,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -10091,7 +12005,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -10102,7 +12016,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -10123,7 +12061,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -10207,7 +12168,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -10216,6 +12177,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -10241,7 +12229,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -10249,7 +12237,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse>
+where
+    ___E: ?Sized,
+    UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -10478,7 +12491,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -10495,7 +12508,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -10616,7 +12677,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -10627,7 +12688,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -10648,7 +12733,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -10734,7 +12842,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -10743,6 +12851,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -10769,7 +12904,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -10777,7 +12912,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse>
+where
+    ___E: ?Sized,
+    UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -11011,7 +13171,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -11028,7 +13188,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -11616,13 +13824,13 @@ where
     fn strict_one_way(
         &self,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(6982839851953080288, &mut ())
+        self.as_untyped().send_one_way(6982839851953080288, ())
     }
 
     fn flexible_one_way(
         &self,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(1083620022582160398, &mut ())
+        self.as_untyped().send_one_way(1083620022582160398, ())
     }
 
     fn strict_two_way(
@@ -11636,7 +13844,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(1481114722667499972, &mut ())
+            .send_two_way(1481114722667499972, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -11651,7 +13859,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(6841797014773573215, &mut ())
+            .send_two_way(6841797014773573215, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -11666,7 +13874,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(1451514501977162287, &mut ())
+            .send_two_way(1451514501977162287, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -11681,7 +13889,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(3330693085881435529, &mut ())
+            .send_two_way(3330693085881435529, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -11696,7 +13904,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(8222960355260037542, &mut ())
+            .send_two_way(8222960355260037542, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -11711,7 +13919,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(225387363174180470, &mut ())
+            .send_two_way(225387363174180470, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -11726,7 +13934,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(3066880266580913088, &mut ())
+            .send_two_way(3066880266580913088, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -11741,7 +13949,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(708169949929096689, &mut ())
+            .send_two_way(708169949929096689, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -11756,7 +13964,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(2929398860738426482, &mut ())
+            .send_two_way(2929398860738426482, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -11771,7 +13979,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(8423663794424433896, &mut ())
+            .send_two_way(8423663794424433896, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -11786,7 +13994,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(8216450897182897849, &mut ())
+            .send_two_way(8216450897182897849, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -11801,7 +14009,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(1049265954148894210, &mut ())
+            .send_two_way(1049265954148894210, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -11816,7 +14024,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(5583489590753947170, &mut ())
+            .send_two_way(5583489590753947170, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -11831,7 +14039,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(6033174601748665003, &mut ())
+            .send_two_way(6033174601748665003, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -11846,7 +14054,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(6235121653537390575, &mut ())
+            .send_two_way(6235121653537390575, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -11861,7 +14069,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(940887795361350656, &mut ())
+            .send_two_way(940887795361350656, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 }
@@ -12372,7 +14580,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -12383,7 +14591,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsProtocolStrictTwoWayFieldsResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -12402,7 +14634,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsProtocolStrictTwoWayFieldsResponse>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsProtocolStrictTwoWayFieldsResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -12483,7 +14738,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -12492,6 +14747,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsProtocolStrictTwoWayUnionResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsProtocolStrictTwoWayUnionResponse { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -12515,7 +14797,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -12523,7 +14805,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsProtocolStrictTwoWayUnionResponse>
+where
+    ___E: ?Sized,
+    UnknownInteractionsProtocolStrictTwoWayUnionResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionResponse { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -12743,7 +15050,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -12760,7 +15067,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsProtocolStrictTwoWayTableResponse
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsProtocolStrictTwoWayTableResponse { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -12879,7 +15234,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -12890,7 +15245,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -12911,7 +15290,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -12995,7 +15397,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -13004,6 +15406,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsProtocolStrictTwoWayUnionErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -13027,7 +15456,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -13035,7 +15464,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsProtocolStrictTwoWayUnionErrResponse>
+where
+    ___E: ?Sized,
+    UnknownInteractionsProtocolStrictTwoWayUnionErrResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrResponse { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -13260,7 +15714,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -13277,7 +15731,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsProtocolStrictTwoWayTableErrResponse
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -13398,7 +15900,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -13409,7 +15911,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -13428,7 +15954,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -13512,7 +16061,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -13521,6 +16070,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsProtocolFlexibleTwoWayUnionResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -13544,7 +16120,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -13552,7 +16128,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsProtocolFlexibleTwoWayUnionResponse>
+where
+    ___E: ?Sized,
+    UnknownInteractionsProtocolFlexibleTwoWayUnionResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionResponse { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -13777,7 +16378,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -13794,7 +16395,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsProtocolFlexibleTwoWayTableResponse
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -13915,7 +16564,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -13926,7 +16575,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -13947,7 +16620,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -14031,7 +16727,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -14040,6 +16736,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -14065,7 +16788,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -14073,7 +16796,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse>
+where
+    ___E: ?Sized,
+    UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -14298,7 +17046,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -14315,7 +17063,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -14430,7 +17226,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -14441,7 +17237,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsProtocolStrictEventFieldsRequest
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -14460,7 +17280,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsProtocolStrictEventFieldsRequest>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsProtocolStrictEventFieldsRequest: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -14541,7 +17384,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -14550,6 +17393,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsProtocolStrictEventUnionRequest
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsProtocolStrictEventUnionRequest { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -14573,7 +17443,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -14581,7 +17451,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsProtocolStrictEventUnionRequest>
+where
+    ___E: ?Sized,
+    UnknownInteractionsProtocolStrictEventUnionRequest: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsProtocolStrictEventUnionRequest { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -14801,7 +17696,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -14818,7 +17713,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsProtocolStrictEventTableRequest
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsProtocolStrictEventTableRequest { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -14932,7 +17875,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -14943,7 +17886,31 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.some_field, encoder, some_field)?;
+        ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsProtocolFlexibleEventFieldsRequest
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                some_field,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.some_field, encoder, some_field)?;
 
         Ok(())
     }
@@ -14962,7 +17929,30 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsProtocolFlexibleEventFieldsRequest>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    UnknownInteractionsProtocolFlexibleEventFieldsRequest: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -15043,7 +18033,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -15052,6 +18042,33 @@ where
         match self {
             Self::SomeField(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, i32>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsProtocolFlexibleEventUnionRequest
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsProtocolFlexibleEventUnionRequest { raw } = out);
+
+        match self {
+            Self::SomeField(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &i32>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -15075,7 +18092,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -15083,7 +18100,32 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E>
+    for Box<UnknownInteractionsProtocolFlexibleEventUnionRequest>
+where
+    ___E: ?Sized,
+    UnknownInteractionsProtocolFlexibleEventUnionRequest: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnknownInteractionsProtocolFlexibleEventUnionRequest { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -15303,7 +18345,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -15320,7 +18362,55 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(some_field) = &mut self.some_field {
+                    if let Some(some_field) = self.some_field.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            some_field,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E>
+    for UnknownInteractionsProtocolFlexibleEventTableRequest
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnknownInteractionsProtocolFlexibleEventTableRequest { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(some_field) = &self.some_field {
                         ::fidl_next::WireEnvelope::encode_value(
                             some_field,
                             preallocated.encoder,
@@ -16009,13 +19099,13 @@ where
     fn strict_one_way(
         &self,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(5652707722400962470, &mut ())
+        self.as_untyped().send_one_way(5652707722400962470, ())
     }
 
     fn flexible_one_way(
         &self,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(583422011583300678, &mut ())
+        self.as_untyped().send_one_way(583422011583300678, ())
     }
 
     fn strict_two_way(
@@ -16029,7 +19119,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(8308184097687583042, &mut ())
+            .send_two_way(8308184097687583042, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -16044,7 +19134,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(3697260130745060067, &mut ())
+            .send_two_way(3697260130745060067, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -16059,7 +19149,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(2455165891480464557, &mut ())
+            .send_two_way(2455165891480464557, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -16074,7 +19164,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(8389853739594228663, &mut ())
+            .send_two_way(8389853739594228663, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -16089,7 +19179,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(7862264614495172967, &mut ())
+            .send_two_way(7862264614495172967, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -16104,7 +19194,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(2414673307948662059, &mut ())
+            .send_two_way(2414673307948662059, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -16119,7 +19209,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(4988571416540160202, &mut ())
+            .send_two_way(4988571416540160202, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -16134,7 +19224,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(5487292735562672344, &mut ())
+            .send_two_way(5487292735562672344, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -16149,7 +19239,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(334879577560091516, &mut ())
+            .send_two_way(334879577560091516, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -16164,7 +19254,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(4257018954691721778, &mut ())
+            .send_two_way(4257018954691721778, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -16179,7 +19269,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(4913460516188409782, &mut ())
+            .send_two_way(4913460516188409782, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -16194,7 +19284,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(9171907422498283911, &mut ())
+            .send_two_way(9171907422498283911, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -16209,7 +19299,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(6999736795697216519, &mut ())
+            .send_two_way(6999736795697216519, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -16224,7 +19314,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(1093132337162001157, &mut ())
+            .send_two_way(1093132337162001157, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -16239,7 +19329,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(2410151523245950935, &mut ())
+            .send_two_way(2410151523245950935, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
@@ -16254,7 +19344,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(7893309626427980786, &mut ())
+            .send_two_way(7893309626427980786, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 }
@@ -16464,7 +19554,7 @@ pub trait UnknownInteractionsProtocolServerSender {
 
     fn strict_event_fields<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
@@ -16474,7 +19564,7 @@ pub trait UnknownInteractionsProtocolServerSender {
 
     fn strict_event_union<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
@@ -16484,7 +19574,7 @@ pub trait UnknownInteractionsProtocolServerSender {
 
     fn strict_event_table<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
@@ -16498,7 +19588,7 @@ pub trait UnknownInteractionsProtocolServerSender {
 
     fn flexible_event_fields<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
@@ -16508,7 +19598,7 @@ pub trait UnknownInteractionsProtocolServerSender {
 
     fn flexible_event_union<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
@@ -16518,7 +19608,7 @@ pub trait UnknownInteractionsProtocolServerSender {
 
     fn flexible_event_table<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
@@ -16537,7 +19627,7 @@ where
     fn strict_event(
         &self,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(685715276307386305, &mut ())
+        self.as_untyped().send_event(685715276307386305, ())
     }
 
 
@@ -16549,11 +19639,11 @@ where
 
                 fn strict_event_fields<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+                        <Self::Transport as ::fidl_next::Transport>::SendBuffer,
                         Encoded = <unknown_interactions_protocol::StrictEventFields as ::fidl_next::Method>::Response,
                     >,
                 {
@@ -16569,11 +19659,11 @@ where
 
                 fn strict_event_union<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+                        <Self::Transport as ::fidl_next::Transport>::SendBuffer,
                         Encoded = <unknown_interactions_protocol::StrictEventUnion as ::fidl_next::Method>::Response,
                     >,
                 {
@@ -16589,11 +19679,11 @@ where
 
                 fn strict_event_table<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+                        <Self::Transport as ::fidl_next::Transport>::SendBuffer,
                         Encoded = <unknown_interactions_protocol::StrictEventTable as ::fidl_next::Method>::Response,
                     >,
                 {
@@ -16603,7 +19693,7 @@ where
     fn flexible_event(
         &self,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(7042257263728687206, &mut ())
+        self.as_untyped().send_event(7042257263728687206, ())
     }
 
 
@@ -16615,11 +19705,11 @@ where
 
                 fn flexible_event_fields<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+                        <Self::Transport as ::fidl_next::Transport>::SendBuffer,
                         Encoded = <unknown_interactions_protocol::FlexibleEventFields as ::fidl_next::Method>::Response,
                     >,
                 {
@@ -16635,11 +19725,11 @@ where
 
                 fn flexible_event_union<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+                        <Self::Transport as ::fidl_next::Transport>::SendBuffer,
                         Encoded = <unknown_interactions_protocol::FlexibleEventUnion as ::fidl_next::Method>::Response,
                     >,
                 {
@@ -16655,11 +19745,11 @@ where
 
                 fn flexible_event_table<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+                        <Self::Transport as ::fidl_next::Transport>::SendBuffer,
                         Encoded = <unknown_interactions_protocol::FlexibleEventTable as ::fidl_next::Method>::Response,
                     >,
                 {

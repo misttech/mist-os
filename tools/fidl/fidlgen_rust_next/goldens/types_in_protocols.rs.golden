@@ -41,7 +41,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -63,29 +63,87 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.array_uint8, encoder, array_uint8)?;
+        ::fidl_next::Encode::encode(self.array_uint8, encoder, array_uint8)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_uint16, encoder, array_uint16)?;
+        ::fidl_next::Encode::encode(self.array_uint16, encoder, array_uint16)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_uint32, encoder, array_uint32)?;
+        ::fidl_next::Encode::encode(self.array_uint32, encoder, array_uint32)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_uint64, encoder, array_uint64)?;
+        ::fidl_next::Encode::encode(self.array_uint64, encoder, array_uint64)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_int8, encoder, array_int8)?;
+        ::fidl_next::Encode::encode(self.array_int8, encoder, array_int8)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_int16, encoder, array_int16)?;
+        ::fidl_next::Encode::encode(self.array_int16, encoder, array_int16)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_int32, encoder, array_int32)?;
+        ::fidl_next::Encode::encode(self.array_int32, encoder, array_int32)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_int64, encoder, array_int64)?;
+        ::fidl_next::Encode::encode(self.array_int64, encoder, array_int64)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_float32, encoder, array_float32)?;
+        ::fidl_next::Encode::encode(self.array_float32, encoder, array_float32)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_float64, encoder, array_float64)?;
+        ::fidl_next::Encode::encode(self.array_float64, encoder, array_float64)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_string, encoder, array_string)?;
+        ::fidl_next::Encode::encode(self.array_string, encoder, array_string)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_opt_string, encoder, array_opt_string)?;
+        ::fidl_next::Encode::encode(self.array_opt_string, encoder, array_opt_string)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for ArrayBasic
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                array_uint8,
+                array_uint16,
+                array_uint32,
+                array_uint64,
+                array_int8,
+                array_int16,
+                array_int32,
+                array_int64,
+                array_float32,
+                array_float64,
+                array_string,
+                array_opt_string,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_uint8, encoder, array_uint8)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_uint16, encoder, array_uint16)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_uint32, encoder, array_uint32)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_uint64, encoder, array_uint64)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_int8, encoder, array_int8)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_int16, encoder, array_int16)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_int32, encoder, array_int32)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_int64, encoder, array_int64)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_float32, encoder, array_float32)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_float64, encoder, array_float64)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_string, encoder, array_string)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_opt_string, encoder, array_opt_string)?;
 
         Ok(())
     }
@@ -102,7 +160,29 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<ArrayBasic>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    ArrayBasic: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -283,7 +363,21 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::EncodeRef::encode_ref(&self, encoder, out)
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for Bits
+where
+    ___E: ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
         _: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -364,8 +458,22 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
-        _: &mut ___E,
+        self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::EncodeRef::encode_ref(&self, encoder, out)
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for Enum
+where
+    ___E: ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireEnum { value } = out);
@@ -453,7 +561,27 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+
+            } = out;
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for Struct
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -478,7 +606,29 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<Struct>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Struct: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -550,7 +700,42 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireTable { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for Table
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -645,7 +830,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -654,6 +839,32 @@ where
         match self {
             Self::B(value) => {
                 ::fidl_next::RawWireUnion::encode_as_static::<___E, bool>(value, 1, encoder, raw)?
+            }
+
+            Self::UnknownOrdinal_(ordinal) => {
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
+            }
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for Union
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireUnion { raw } = out);
+
+        match self {
+            Self::B(value) => {
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, &bool>(value, 1, encoder, raw)?
             }
 
             Self::UnknownOrdinal_(ordinal) => {
@@ -676,7 +887,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -684,7 +895,31 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<Union>
+where
+    ___E: ?Sized,
+    Union: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptionalUnion { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -887,7 +1122,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -904,19 +1139,62 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.array_bits, encoder, array_bits)?;
+        ::fidl_next::Encode::encode(self.array_bits, encoder, array_bits)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_enum, encoder, array_enum)?;
+        ::fidl_next::Encode::encode(self.array_enum, encoder, array_enum)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_struct, encoder, array_struct)?;
+        ::fidl_next::Encode::encode(self.array_struct, encoder, array_struct)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_table, encoder, array_table)?;
+        ::fidl_next::Encode::encode(self.array_table, encoder, array_table)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_union, encoder, array_union)?;
+        ::fidl_next::Encode::encode(self.array_union, encoder, array_union)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_opt_struct, encoder, array_opt_struct)?;
+        ::fidl_next::Encode::encode(self.array_opt_struct, encoder, array_opt_struct)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_opt_union, encoder, array_opt_union)?;
+        ::fidl_next::Encode::encode(self.array_opt_union, encoder, array_opt_union)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for ArrayCompound
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                array_bits,
+                array_enum,
+                array_struct,
+                array_table,
+                array_union,
+                array_opt_struct,
+                array_opt_union,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_bits, encoder, array_bits)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_enum, encoder, array_enum)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_struct, encoder, array_struct)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_table, encoder, array_table)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_union, encoder, array_union)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_opt_struct, encoder, array_opt_struct)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_opt_union, encoder, array_opt_union)?;
 
         Ok(())
     }
@@ -933,7 +1211,29 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<ArrayCompound>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    ArrayCompound: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -1061,7 +1361,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -1075,13 +1375,51 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.array_array_uint8, encoder, array_array_uint8)?;
+        ::fidl_next::Encode::encode(self.array_array_uint8, encoder, array_array_uint8)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_vector_uint8, encoder, array_vector_uint8)?;
+        ::fidl_next::Encode::encode(self.array_vector_uint8, encoder, array_vector_uint8)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_array_uint8, encoder, vector_array_uint8)?;
+        ::fidl_next::Encode::encode(self.vector_array_uint8, encoder, vector_array_uint8)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_vector_uint8, encoder, vector_vector_uint8)?;
+        ::fidl_next::Encode::encode(self.vector_vector_uint8, encoder, vector_vector_uint8)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for ArrayVectorNested
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                array_array_uint8,
+                array_vector_uint8,
+                vector_array_uint8,
+                vector_vector_uint8,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_array_uint8, encoder, array_array_uint8)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.array_vector_uint8, encoder, array_vector_uint8)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_array_uint8, encoder, vector_array_uint8)?;
+
+        ::fidl_next::EncodeRef::encode_ref(
+            &self.vector_vector_uint8,
+            encoder,
+            vector_vector_uint8,
+        )?;
 
         Ok(())
     }
@@ -1098,7 +1436,29 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<ArrayVectorNested>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    ArrayVectorNested: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -1221,7 +1581,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -1243,29 +1603,87 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.uint8, encoder, uint8)?;
+        ::fidl_next::Encode::encode(self.uint8, encoder, uint8)?;
 
-        ::fidl_next::Encode::encode(&mut self.uint16, encoder, uint16)?;
+        ::fidl_next::Encode::encode(self.uint16, encoder, uint16)?;
 
-        ::fidl_next::Encode::encode(&mut self.uint32, encoder, uint32)?;
+        ::fidl_next::Encode::encode(self.uint32, encoder, uint32)?;
 
-        ::fidl_next::Encode::encode(&mut self.uint64, encoder, uint64)?;
+        ::fidl_next::Encode::encode(self.uint64, encoder, uint64)?;
 
-        ::fidl_next::Encode::encode(&mut self.int8, encoder, int8)?;
+        ::fidl_next::Encode::encode(self.int8, encoder, int8)?;
 
-        ::fidl_next::Encode::encode(&mut self.int16, encoder, int16)?;
+        ::fidl_next::Encode::encode(self.int16, encoder, int16)?;
 
-        ::fidl_next::Encode::encode(&mut self.int32, encoder, int32)?;
+        ::fidl_next::Encode::encode(self.int32, encoder, int32)?;
 
-        ::fidl_next::Encode::encode(&mut self.int64, encoder, int64)?;
+        ::fidl_next::Encode::encode(self.int64, encoder, int64)?;
 
-        ::fidl_next::Encode::encode(&mut self.float32, encoder, float32)?;
+        ::fidl_next::Encode::encode(self.float32, encoder, float32)?;
 
-        ::fidl_next::Encode::encode(&mut self.float64, encoder, float64)?;
+        ::fidl_next::Encode::encode(self.float64, encoder, float64)?;
 
-        ::fidl_next::Encode::encode(&mut self.string, encoder, string)?;
+        ::fidl_next::Encode::encode(self.string, encoder, string)?;
 
-        ::fidl_next::Encode::encode(&mut self.opt_string, encoder, opt_string)?;
+        ::fidl_next::Encode::encode(self.opt_string, encoder, opt_string)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for Basic
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                uint8,
+                uint16,
+                uint32,
+                uint64,
+                int8,
+                int16,
+                int32,
+                int64,
+                float32,
+                float64,
+                string,
+                opt_string,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.uint8, encoder, uint8)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.uint16, encoder, uint16)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.uint32, encoder, uint32)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.uint64, encoder, uint64)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.int8, encoder, int8)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.int16, encoder, int16)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.int32, encoder, int32)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.int64, encoder, int64)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.float32, encoder, float32)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.float64, encoder, float64)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.string, encoder, string)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.opt_string, encoder, opt_string)?;
 
         Ok(())
     }
@@ -1282,7 +1700,29 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<Basic>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Basic: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -1459,7 +1899,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -1476,19 +1916,62 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.bits, encoder, bits)?;
+        ::fidl_next::Encode::encode(self.bits, encoder, bits)?;
 
-        ::fidl_next::Encode::encode(&mut self.enum_, encoder, enum_)?;
+        ::fidl_next::Encode::encode(self.enum_, encoder, enum_)?;
 
-        ::fidl_next::Encode::encode(&mut self.struct_, encoder, struct_)?;
+        ::fidl_next::Encode::encode(self.struct_, encoder, struct_)?;
 
-        ::fidl_next::Encode::encode(&mut self.table, encoder, table)?;
+        ::fidl_next::Encode::encode(self.table, encoder, table)?;
 
-        ::fidl_next::Encode::encode(&mut self.union, encoder, union)?;
+        ::fidl_next::Encode::encode(self.union, encoder, union)?;
 
-        ::fidl_next::Encode::encode(&mut self.opt_struct, encoder, opt_struct)?;
+        ::fidl_next::Encode::encode(self.opt_struct, encoder, opt_struct)?;
 
-        ::fidl_next::Encode::encode(&mut self.opt_union, encoder, opt_union)?;
+        ::fidl_next::Encode::encode(self.opt_union, encoder, opt_union)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for Compound
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                bits,
+                enum_,
+                struct_,
+                table,
+                union,
+                opt_struct,
+                opt_union,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.bits, encoder, bits)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.enum_, encoder, enum_)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.struct_, encoder, struct_)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.table, encoder, table)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.union, encoder, union)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.opt_struct, encoder, opt_struct)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.opt_union, encoder, opt_union)?;
 
         Ok(())
     }
@@ -1505,7 +1988,29 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<Compound>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Compound: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -1649,7 +2154,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -1671,29 +2176,87 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.vector_uint8, encoder, vector_uint8)?;
+        ::fidl_next::Encode::encode(self.vector_uint8, encoder, vector_uint8)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_uint16, encoder, vector_uint16)?;
+        ::fidl_next::Encode::encode(self.vector_uint16, encoder, vector_uint16)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_uint32, encoder, vector_uint32)?;
+        ::fidl_next::Encode::encode(self.vector_uint32, encoder, vector_uint32)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_uint64, encoder, vector_uint64)?;
+        ::fidl_next::Encode::encode(self.vector_uint64, encoder, vector_uint64)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_int8, encoder, vector_int8)?;
+        ::fidl_next::Encode::encode(self.vector_int8, encoder, vector_int8)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_int16, encoder, vector_int16)?;
+        ::fidl_next::Encode::encode(self.vector_int16, encoder, vector_int16)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_int32, encoder, vector_int32)?;
+        ::fidl_next::Encode::encode(self.vector_int32, encoder, vector_int32)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_int64, encoder, vector_int64)?;
+        ::fidl_next::Encode::encode(self.vector_int64, encoder, vector_int64)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_float32, encoder, vector_float32)?;
+        ::fidl_next::Encode::encode(self.vector_float32, encoder, vector_float32)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_float64, encoder, vector_float64)?;
+        ::fidl_next::Encode::encode(self.vector_float64, encoder, vector_float64)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_string, encoder, vector_string)?;
+        ::fidl_next::Encode::encode(self.vector_string, encoder, vector_string)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_opt_string, encoder, vector_opt_string)?;
+        ::fidl_next::Encode::encode(self.vector_opt_string, encoder, vector_opt_string)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for VectorBasic
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                vector_uint8,
+                vector_uint16,
+                vector_uint32,
+                vector_uint64,
+                vector_int8,
+                vector_int16,
+                vector_int32,
+                vector_int64,
+                vector_float32,
+                vector_float64,
+                vector_string,
+                vector_opt_string,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_uint8, encoder, vector_uint8)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_uint16, encoder, vector_uint16)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_uint32, encoder, vector_uint32)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_uint64, encoder, vector_uint64)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_int8, encoder, vector_int8)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_int16, encoder, vector_int16)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_int32, encoder, vector_int32)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_int64, encoder, vector_int64)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_float32, encoder, vector_float32)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_float64, encoder, vector_float64)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_string, encoder, vector_string)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_opt_string, encoder, vector_opt_string)?;
 
         Ok(())
     }
@@ -1710,7 +2273,29 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<VectorBasic>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    VectorBasic: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -1875,7 +2460,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -1892,19 +2477,62 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.vector_bits, encoder, vector_bits)?;
+        ::fidl_next::Encode::encode(self.vector_bits, encoder, vector_bits)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_enum, encoder, vector_enum)?;
+        ::fidl_next::Encode::encode(self.vector_enum, encoder, vector_enum)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_struct, encoder, vector_struct)?;
+        ::fidl_next::Encode::encode(self.vector_struct, encoder, vector_struct)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_table, encoder, vector_table)?;
+        ::fidl_next::Encode::encode(self.vector_table, encoder, vector_table)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_union, encoder, vector_union)?;
+        ::fidl_next::Encode::encode(self.vector_union, encoder, vector_union)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_opt_struct, encoder, vector_opt_struct)?;
+        ::fidl_next::Encode::encode(self.vector_opt_struct, encoder, vector_opt_struct)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_opt_union, encoder, vector_opt_union)?;
+        ::fidl_next::Encode::encode(self.vector_opt_union, encoder, vector_opt_union)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for VectorCompound
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                vector_bits,
+                vector_enum,
+                vector_struct,
+                vector_table,
+                vector_union,
+                vector_opt_struct,
+                vector_opt_union,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_bits, encoder, vector_bits)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_enum, encoder, vector_enum)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_struct, encoder, vector_struct)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_table, encoder, vector_table)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_union, encoder, vector_union)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_opt_struct, encoder, vector_opt_struct)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_opt_union, encoder, vector_opt_union)?;
 
         Ok(())
     }
@@ -1921,7 +2549,29 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<VectorCompound>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    VectorCompound: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -2045,7 +2695,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -2059,14 +2709,48 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.opt_vector_uint8, encoder, opt_vector_uint8)?;
+        ::fidl_next::Encode::encode(self.opt_vector_uint8, encoder, opt_vector_uint8)?;
 
-        ::fidl_next::Encode::encode(&mut self.opt_vector_string, encoder, opt_vector_string)?;
+        ::fidl_next::Encode::encode(self.opt_vector_string, encoder, opt_vector_string)?;
 
-        ::fidl_next::Encode::encode(&mut self.opt_vector_struct, encoder, opt_vector_struct)?;
+        ::fidl_next::Encode::encode(self.opt_vector_struct, encoder, opt_vector_struct)?;
 
-        ::fidl_next::Encode::encode(
-            &mut self.opt_vector_opt_struct,
+        ::fidl_next::Encode::encode(self.opt_vector_opt_struct, encoder, opt_vector_opt_struct)?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for VectorOptional
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                opt_vector_uint8,
+                opt_vector_string,
+                opt_vector_struct,
+                opt_vector_opt_struct,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.opt_vector_uint8, encoder, opt_vector_uint8)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.opt_vector_string, encoder, opt_vector_string)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.opt_vector_struct, encoder, opt_vector_struct)?;
+
+        ::fidl_next::EncodeRef::encode_ref(
+            &self.opt_vector_opt_struct,
             encoder,
             opt_vector_opt_struct,
         )?;
@@ -2086,7 +2770,29 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<VectorOptional>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    VectorOptional: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -2186,7 +2892,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -2211,12 +2917,12 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
             ::fidl_next::WireBox::encode_present(out);
         } else {
             ::fidl_next::WireBox::encode_absent(out);
@@ -2287,7 +2993,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -2386,7 +3092,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -2398,7 +3104,7 @@ where
             }
 
             Self::UnknownOrdinal_(ordinal) => {
-                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
+                return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize))
             }
         }
 
@@ -2417,7 +3123,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -2425,7 +3131,7 @@ where
 
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
+            ::fidl_next::Encode::encode(inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -2656,7 +3362,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -2693,59 +3399,59 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.handle, encoder, handle)?;
+        ::fidl_next::Encode::encode(self.handle, encoder, handle)?;
 
-        ::fidl_next::Encode::encode(&mut self.vmo, encoder, vmo)?;
+        ::fidl_next::Encode::encode(self.vmo, encoder, vmo)?;
 
-        ::fidl_next::Encode::encode(&mut self.client_end, encoder, client_end)?;
+        ::fidl_next::Encode::encode(self.client_end, encoder, client_end)?;
 
-        ::fidl_next::Encode::encode(&mut self.server_end, encoder, server_end)?;
+        ::fidl_next::Encode::encode(self.server_end, encoder, server_end)?;
 
-        ::fidl_next::Encode::encode(&mut self.struct_, encoder, struct_)?;
+        ::fidl_next::Encode::encode(self.struct_, encoder, struct_)?;
 
-        ::fidl_next::Encode::encode(&mut self.table, encoder, table)?;
+        ::fidl_next::Encode::encode(self.table, encoder, table)?;
 
-        ::fidl_next::Encode::encode(&mut self.union, encoder, union)?;
+        ::fidl_next::Encode::encode(self.union, encoder, union)?;
 
-        ::fidl_next::Encode::encode(&mut self.opt_handle, encoder, opt_handle)?;
+        ::fidl_next::Encode::encode(self.opt_handle, encoder, opt_handle)?;
 
-        ::fidl_next::Encode::encode(&mut self.opt_vmo, encoder, opt_vmo)?;
+        ::fidl_next::Encode::encode(self.opt_vmo, encoder, opt_vmo)?;
 
-        ::fidl_next::Encode::encode(&mut self.opt_client_end, encoder, opt_client_end)?;
+        ::fidl_next::Encode::encode(self.opt_client_end, encoder, opt_client_end)?;
 
-        ::fidl_next::Encode::encode(&mut self.opt_server_end, encoder, opt_server_end)?;
+        ::fidl_next::Encode::encode(self.opt_server_end, encoder, opt_server_end)?;
 
-        ::fidl_next::Encode::encode(&mut self.opt_struct, encoder, opt_struct)?;
+        ::fidl_next::Encode::encode(self.opt_struct, encoder, opt_struct)?;
 
-        ::fidl_next::Encode::encode(&mut self.opt_union, encoder, opt_union)?;
+        ::fidl_next::Encode::encode(self.opt_union, encoder, opt_union)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_handle, encoder, array_handle)?;
+        ::fidl_next::Encode::encode(self.array_handle, encoder, array_handle)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_vmo, encoder, array_vmo)?;
+        ::fidl_next::Encode::encode(self.array_vmo, encoder, array_vmo)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_client_end, encoder, array_client_end)?;
+        ::fidl_next::Encode::encode(self.array_client_end, encoder, array_client_end)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_server_end, encoder, array_server_end)?;
+        ::fidl_next::Encode::encode(self.array_server_end, encoder, array_server_end)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_struct, encoder, array_struct)?;
+        ::fidl_next::Encode::encode(self.array_struct, encoder, array_struct)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_table, encoder, array_table)?;
+        ::fidl_next::Encode::encode(self.array_table, encoder, array_table)?;
 
-        ::fidl_next::Encode::encode(&mut self.array_union, encoder, array_union)?;
+        ::fidl_next::Encode::encode(self.array_union, encoder, array_union)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_handle, encoder, vector_handle)?;
+        ::fidl_next::Encode::encode(self.vector_handle, encoder, vector_handle)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_vmo, encoder, vector_vmo)?;
+        ::fidl_next::Encode::encode(self.vector_vmo, encoder, vector_vmo)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_client_end, encoder, vector_client_end)?;
+        ::fidl_next::Encode::encode(self.vector_client_end, encoder, vector_client_end)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_server_end, encoder, vector_server_end)?;
+        ::fidl_next::Encode::encode(self.vector_server_end, encoder, vector_server_end)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_struct, encoder, vector_struct)?;
+        ::fidl_next::Encode::encode(self.vector_struct, encoder, vector_struct)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_table, encoder, vector_table)?;
+        ::fidl_next::Encode::encode(self.vector_table, encoder, vector_table)?;
 
-        ::fidl_next::Encode::encode(&mut self.vector_union, encoder, vector_union)?;
+        ::fidl_next::Encode::encode(self.vector_union, encoder, vector_union)?;
 
         Ok(())
     }
@@ -2762,12 +3468,12 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
             ::fidl_next::WireBox::encode_present(out);
         } else {
             ::fidl_next::WireBox::encode_absent(out);
@@ -3490,7 +4196,7 @@ pub trait ProtocolClientSender {
 
     fn one_way_basic<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3500,7 +4206,7 @@ pub trait ProtocolClientSender {
 
     fn two_way_basic<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::TwoWayBasic>,
         ::fidl_next::EncodeError,
@@ -3520,7 +4226,7 @@ pub trait ProtocolClientSender {
 
     fn one_way_compound<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3530,7 +4236,7 @@ pub trait ProtocolClientSender {
 
     fn two_way_compound<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::TwoWayCompound>,
         ::fidl_next::EncodeError,
@@ -3550,7 +4256,7 @@ pub trait ProtocolClientSender {
 
     fn one_way_array_basic<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3560,7 +4266,7 @@ pub trait ProtocolClientSender {
 
     fn two_way_array_basic<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::TwoWayArrayBasic>,
         ::fidl_next::EncodeError,
@@ -3580,7 +4286,7 @@ pub trait ProtocolClientSender {
 
     fn one_way_array_compound<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3590,7 +4296,7 @@ pub trait ProtocolClientSender {
 
     fn two_way_array_compound<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::TwoWayArrayCompound>,
         ::fidl_next::EncodeError,
@@ -3610,7 +4316,7 @@ pub trait ProtocolClientSender {
 
     fn one_way_vector_basic<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3620,7 +4326,7 @@ pub trait ProtocolClientSender {
 
     fn two_way_vector_basic<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::TwoWayVectorBasic>,
         ::fidl_next::EncodeError,
@@ -3640,7 +4346,7 @@ pub trait ProtocolClientSender {
 
     fn one_way_vector_compound<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3650,7 +4356,7 @@ pub trait ProtocolClientSender {
 
     fn two_way_vector_compound<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::TwoWayVectorCompound>,
         ::fidl_next::EncodeError,
@@ -3670,7 +4376,7 @@ pub trait ProtocolClientSender {
 
     fn one_way_vector_optional<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3680,7 +4386,7 @@ pub trait ProtocolClientSender {
 
     fn two_way_vector_optional<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::TwoWayVectorOptional>,
         ::fidl_next::EncodeError,
@@ -3700,7 +4406,7 @@ pub trait ProtocolClientSender {
 
     fn one_way_array_vector_nested<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3710,7 +4416,7 @@ pub trait ProtocolClientSender {
 
     fn two_way_array_vector_nested<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::TwoWayArrayVectorNested>,
         ::fidl_next::EncodeError,
@@ -3730,7 +4436,7 @@ pub trait ProtocolClientSender {
 
     fn one_way_resource<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3740,7 +4446,7 @@ pub trait ProtocolClientSender {
 
     fn two_way_resource<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::TwoWayResource>,
         ::fidl_next::EncodeError,
@@ -3767,7 +4473,7 @@ where
 
     fn one_way_basic<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3780,7 +4486,7 @@ where
 
     fn two_way_basic<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::TwoWayBasic>,
         ::fidl_next::EncodeError,
@@ -3803,13 +4509,13 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(5016634351643393939, &mut ())
+            .send_two_way(5016634351643393939, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
     fn one_way_compound<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3822,7 +4528,7 @@ where
 
     fn two_way_compound<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::TwoWayCompound>,
         ::fidl_next::EncodeError,
@@ -3845,13 +4551,13 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(2990809657626249085, &mut ())
+            .send_two_way(2990809657626249085, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
     fn one_way_array_basic<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3864,7 +4570,7 @@ where
 
     fn two_way_array_basic<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::TwoWayArrayBasic>,
         ::fidl_next::EncodeError,
@@ -3887,13 +4593,13 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(1084731895342694265, &mut ())
+            .send_two_way(1084731895342694265, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
     fn one_way_array_compound<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3906,7 +4612,7 @@ where
 
     fn two_way_array_compound<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::TwoWayArrayCompound>,
         ::fidl_next::EncodeError,
@@ -3929,13 +4635,13 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(5919277476782807556, &mut ())
+            .send_two_way(5919277476782807556, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
     fn one_way_vector_basic<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3948,7 +4654,7 @@ where
 
     fn two_way_vector_basic<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::TwoWayVectorBasic>,
         ::fidl_next::EncodeError,
@@ -3971,13 +4677,13 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(875941614196965234, &mut ())
+            .send_two_way(875941614196965234, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
     fn one_way_vector_compound<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -3990,7 +4696,7 @@ where
 
     fn two_way_vector_compound<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::TwoWayVectorCompound>,
         ::fidl_next::EncodeError,
@@ -4013,13 +4719,13 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(8506780203315865989, &mut ())
+            .send_two_way(8506780203315865989, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
     fn one_way_vector_optional<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -4032,7 +4738,7 @@ where
 
     fn two_way_vector_optional<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::TwoWayVectorOptional>,
         ::fidl_next::EncodeError,
@@ -4055,13 +4761,13 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(6406191217027936606, &mut ())
+            .send_two_way(6406191217027936606, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
     fn one_way_array_vector_nested<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -4074,7 +4780,7 @@ where
 
     fn two_way_array_vector_nested<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::TwoWayArrayVectorNested>,
         ::fidl_next::EncodeError,
@@ -4097,13 +4803,13 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(9085604921605802151, &mut ())
+            .send_two_way(9085604921605802151, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
     fn one_way_resource<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -4116,7 +4822,7 @@ where
 
     fn two_way_resource<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::TwoWayResource>,
         ::fidl_next::EncodeError,
@@ -4139,7 +4845,7 @@ where
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
-            .send_two_way(6568609240497354166, &mut ())
+            .send_two_way(6568609240497354166, ())
             .map(::fidl_next::ResponseFuture::from_untyped)
     }
 }
@@ -4381,7 +5087,7 @@ pub trait ProtocolServerSender {
 
     fn event_basic<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -4391,7 +5097,7 @@ pub trait ProtocolServerSender {
 
     fn event_compound<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -4401,7 +5107,7 @@ pub trait ProtocolServerSender {
 
     fn event_array_basic<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -4411,7 +5117,7 @@ pub trait ProtocolServerSender {
 
     fn event_array_compound<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -4421,7 +5127,7 @@ pub trait ProtocolServerSender {
 
     fn event_vector_basic<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -4431,7 +5137,7 @@ pub trait ProtocolServerSender {
 
     fn event_vector_compound<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -4441,7 +5147,7 @@ pub trait ProtocolServerSender {
 
     fn event_vector_optional<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -4451,7 +5157,7 @@ pub trait ProtocolServerSender {
 
     fn event_array_vector_nested<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -4461,7 +5167,7 @@ pub trait ProtocolServerSender {
 
     fn event_resource<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -4478,7 +5184,7 @@ where
 
     fn event_basic<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -4491,7 +5197,7 @@ where
 
     fn event_compound<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -4504,7 +5210,7 @@ where
 
     fn event_array_basic<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -4517,7 +5223,7 @@ where
 
     fn event_array_compound<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -4530,7 +5236,7 @@ where
 
     fn event_vector_basic<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -4543,7 +5249,7 @@ where
 
     fn event_vector_compound<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -4556,7 +5262,7 @@ where
 
     fn event_vector_optional<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -4569,7 +5275,7 @@ where
 
     fn event_array_vector_nested<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
@@ -4582,7 +5288,7 @@ where
 
     fn event_resource<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<

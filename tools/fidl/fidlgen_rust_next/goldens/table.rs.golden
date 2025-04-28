@@ -21,7 +21,42 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireEmptyTable { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for EmptyTable
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -118,7 +153,42 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireExtensionTable { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for ExtensionTable
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -233,7 +303,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -250,7 +320,7 @@ where
         for i in 1..=max_ord {
             match i {
                 6 => {
-                    if let Some(z) = &mut self.z {
+                    if let Some(z) = self.z.take() {
                         ::fidl_next::WireEnvelope::encode_value(z, preallocated.encoder, &mut out)?;
                     } else {
                         ::fidl_next::WireEnvelope::encode_zero(&mut out)
@@ -258,7 +328,7 @@ where
                 }
 
                 5 => {
-                    if let Some(y) = &mut self.y {
+                    if let Some(y) = self.y.take() {
                         ::fidl_next::WireEnvelope::encode_value(y, preallocated.encoder, &mut out)?;
                     } else {
                         ::fidl_next::WireEnvelope::encode_zero(&mut out)
@@ -266,7 +336,66 @@ where
                 }
 
                 1 => {
-                    if let Some(x) = &mut self.x {
+                    if let Some(x) = self.x.take() {
+                        ::fidl_next::WireEnvelope::encode_value(x, preallocated.encoder, &mut out)?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for NewerSimpleTable
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireNewerSimpleTable { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                6 => {
+                    if let Some(z) = &self.z {
+                        ::fidl_next::WireEnvelope::encode_value(z, preallocated.encoder, &mut out)?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                5 => {
+                    if let Some(y) = &self.y {
+                        ::fidl_next::WireEnvelope::encode_value(y, preallocated.encoder, &mut out)?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                1 => {
+                    if let Some(x) = &self.x {
                         ::fidl_next::WireEnvelope::encode_value(x, preallocated.encoder, &mut out)?;
                     } else {
                         ::fidl_next::WireEnvelope::encode_zero(&mut out)
@@ -409,7 +538,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -426,7 +555,50 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(x) = &mut self.x {
+                    if let Some(x) = self.x.take() {
+                        ::fidl_next::WireEnvelope::encode_value(x, preallocated.encoder, &mut out)?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for OlderSimpleTable
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOlderSimpleTable { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(x) = &self.x {
                         ::fidl_next::WireEnvelope::encode_value(x, preallocated.encoder, &mut out)?;
                     } else {
                         ::fidl_next::WireEnvelope::encode_zero(&mut out)
@@ -545,7 +717,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -562,7 +734,7 @@ where
         for i in 1..=max_ord {
             match i {
                 3 => {
-                    if let Some(x) = &mut self.x {
+                    if let Some(x) = self.x.take() {
                         ::fidl_next::WireEnvelope::encode_value(x, preallocated.encoder, &mut out)?;
                     } else {
                         ::fidl_next::WireEnvelope::encode_zero(&mut out)
@@ -570,7 +742,7 @@ where
                 }
 
                 2 => {
-                    if let Some(y) = &mut self.y {
+                    if let Some(y) = self.y.take() {
                         ::fidl_next::WireEnvelope::encode_value(y, preallocated.encoder, &mut out)?;
                     } else {
                         ::fidl_next::WireEnvelope::encode_zero(&mut out)
@@ -578,7 +750,66 @@ where
                 }
 
                 1 => {
-                    if let Some(z) = &mut self.z {
+                    if let Some(z) = self.z.take() {
+                        ::fidl_next::WireEnvelope::encode_value(z, preallocated.encoder, &mut out)?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for ReverseOrdinalTable
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireReverseOrdinalTable { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                3 => {
+                    if let Some(x) = &self.x {
+                        ::fidl_next::WireEnvelope::encode_value(x, preallocated.encoder, &mut out)?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                2 => {
+                    if let Some(y) = &self.y {
+                        ::fidl_next::WireEnvelope::encode_value(y, preallocated.encoder, &mut out)?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                1 => {
+                    if let Some(z) = &self.z {
                         ::fidl_next::WireEnvelope::encode_value(z, preallocated.encoder, &mut out)?;
                     } else {
                         ::fidl_next::WireEnvelope::encode_zero(&mut out)
@@ -727,7 +958,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -744,7 +975,7 @@ where
         for i in 1..=max_ord {
             match i {
                 5 => {
-                    if let Some(y) = &mut self.y {
+                    if let Some(y) = self.y.take() {
                         ::fidl_next::WireEnvelope::encode_value(y, preallocated.encoder, &mut out)?;
                     } else {
                         ::fidl_next::WireEnvelope::encode_zero(&mut out)
@@ -752,7 +983,58 @@ where
                 }
 
                 1 => {
-                    if let Some(x) = &mut self.x {
+                    if let Some(x) = self.x.take() {
+                        ::fidl_next::WireEnvelope::encode_value(x, preallocated.encoder, &mut out)?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for SimpleTable
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireSimpleTable { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                5 => {
+                    if let Some(y) = &self.y {
+                        ::fidl_next::WireEnvelope::encode_value(y, preallocated.encoder, &mut out)?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                1 => {
+                    if let Some(x) = &self.x {
                         ::fidl_next::WireEnvelope::encode_value(x, preallocated.encoder, &mut out)?;
                     } else {
                         ::fidl_next::WireEnvelope::encode_zero(&mut out)
@@ -1254,7 +1536,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -1271,7 +1553,7 @@ where
         for i in 1..=max_ord {
             match i {
                 64 => {
-                    if let Some(v64) = &mut self.v64 {
+                    if let Some(v64) = self.v64.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v64,
                             preallocated.encoder,
@@ -1283,7 +1565,7 @@ where
                 }
 
                 63 => {
-                    if let Some(v63) = &mut self.v63 {
+                    if let Some(v63) = self.v63.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v63,
                             preallocated.encoder,
@@ -1295,7 +1577,7 @@ where
                 }
 
                 62 => {
-                    if let Some(v62) = &mut self.v62 {
+                    if let Some(v62) = self.v62.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v62,
                             preallocated.encoder,
@@ -1307,7 +1589,7 @@ where
                 }
 
                 61 => {
-                    if let Some(v61) = &mut self.v61 {
+                    if let Some(v61) = self.v61.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v61,
                             preallocated.encoder,
@@ -1319,7 +1601,7 @@ where
                 }
 
                 60 => {
-                    if let Some(v60) = &mut self.v60 {
+                    if let Some(v60) = self.v60.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v60,
                             preallocated.encoder,
@@ -1331,7 +1613,7 @@ where
                 }
 
                 59 => {
-                    if let Some(v59) = &mut self.v59 {
+                    if let Some(v59) = self.v59.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v59,
                             preallocated.encoder,
@@ -1343,7 +1625,7 @@ where
                 }
 
                 58 => {
-                    if let Some(v58) = &mut self.v58 {
+                    if let Some(v58) = self.v58.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v58,
                             preallocated.encoder,
@@ -1355,7 +1637,7 @@ where
                 }
 
                 57 => {
-                    if let Some(v57) = &mut self.v57 {
+                    if let Some(v57) = self.v57.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v57,
                             preallocated.encoder,
@@ -1367,7 +1649,7 @@ where
                 }
 
                 56 => {
-                    if let Some(v56) = &mut self.v56 {
+                    if let Some(v56) = self.v56.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v56,
                             preallocated.encoder,
@@ -1379,7 +1661,7 @@ where
                 }
 
                 55 => {
-                    if let Some(v55) = &mut self.v55 {
+                    if let Some(v55) = self.v55.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v55,
                             preallocated.encoder,
@@ -1391,7 +1673,7 @@ where
                 }
 
                 54 => {
-                    if let Some(v54) = &mut self.v54 {
+                    if let Some(v54) = self.v54.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v54,
                             preallocated.encoder,
@@ -1403,7 +1685,7 @@ where
                 }
 
                 53 => {
-                    if let Some(v53) = &mut self.v53 {
+                    if let Some(v53) = self.v53.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v53,
                             preallocated.encoder,
@@ -1415,7 +1697,7 @@ where
                 }
 
                 52 => {
-                    if let Some(v52) = &mut self.v52 {
+                    if let Some(v52) = self.v52.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v52,
                             preallocated.encoder,
@@ -1427,7 +1709,7 @@ where
                 }
 
                 51 => {
-                    if let Some(v51) = &mut self.v51 {
+                    if let Some(v51) = self.v51.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v51,
                             preallocated.encoder,
@@ -1439,7 +1721,7 @@ where
                 }
 
                 50 => {
-                    if let Some(v50) = &mut self.v50 {
+                    if let Some(v50) = self.v50.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v50,
                             preallocated.encoder,
@@ -1451,7 +1733,7 @@ where
                 }
 
                 49 => {
-                    if let Some(v49) = &mut self.v49 {
+                    if let Some(v49) = self.v49.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v49,
                             preallocated.encoder,
@@ -1463,7 +1745,7 @@ where
                 }
 
                 48 => {
-                    if let Some(v48) = &mut self.v48 {
+                    if let Some(v48) = self.v48.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v48,
                             preallocated.encoder,
@@ -1475,7 +1757,7 @@ where
                 }
 
                 47 => {
-                    if let Some(v47) = &mut self.v47 {
+                    if let Some(v47) = self.v47.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v47,
                             preallocated.encoder,
@@ -1487,7 +1769,7 @@ where
                 }
 
                 46 => {
-                    if let Some(v46) = &mut self.v46 {
+                    if let Some(v46) = self.v46.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v46,
                             preallocated.encoder,
@@ -1499,7 +1781,7 @@ where
                 }
 
                 45 => {
-                    if let Some(v45) = &mut self.v45 {
+                    if let Some(v45) = self.v45.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v45,
                             preallocated.encoder,
@@ -1511,7 +1793,7 @@ where
                 }
 
                 44 => {
-                    if let Some(v44) = &mut self.v44 {
+                    if let Some(v44) = self.v44.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v44,
                             preallocated.encoder,
@@ -1523,7 +1805,7 @@ where
                 }
 
                 43 => {
-                    if let Some(v43) = &mut self.v43 {
+                    if let Some(v43) = self.v43.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v43,
                             preallocated.encoder,
@@ -1535,7 +1817,7 @@ where
                 }
 
                 42 => {
-                    if let Some(v42) = &mut self.v42 {
+                    if let Some(v42) = self.v42.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v42,
                             preallocated.encoder,
@@ -1547,7 +1829,7 @@ where
                 }
 
                 41 => {
-                    if let Some(v41) = &mut self.v41 {
+                    if let Some(v41) = self.v41.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v41,
                             preallocated.encoder,
@@ -1559,7 +1841,7 @@ where
                 }
 
                 40 => {
-                    if let Some(v40) = &mut self.v40 {
+                    if let Some(v40) = self.v40.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v40,
                             preallocated.encoder,
@@ -1571,7 +1853,7 @@ where
                 }
 
                 39 => {
-                    if let Some(v39) = &mut self.v39 {
+                    if let Some(v39) = self.v39.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v39,
                             preallocated.encoder,
@@ -1583,7 +1865,7 @@ where
                 }
 
                 38 => {
-                    if let Some(v38) = &mut self.v38 {
+                    if let Some(v38) = self.v38.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v38,
                             preallocated.encoder,
@@ -1595,7 +1877,7 @@ where
                 }
 
                 37 => {
-                    if let Some(v37) = &mut self.v37 {
+                    if let Some(v37) = self.v37.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v37,
                             preallocated.encoder,
@@ -1607,7 +1889,7 @@ where
                 }
 
                 36 => {
-                    if let Some(v36) = &mut self.v36 {
+                    if let Some(v36) = self.v36.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v36,
                             preallocated.encoder,
@@ -1619,7 +1901,7 @@ where
                 }
 
                 35 => {
-                    if let Some(v35) = &mut self.v35 {
+                    if let Some(v35) = self.v35.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v35,
                             preallocated.encoder,
@@ -1631,7 +1913,7 @@ where
                 }
 
                 34 => {
-                    if let Some(v34) = &mut self.v34 {
+                    if let Some(v34) = self.v34.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v34,
                             preallocated.encoder,
@@ -1643,7 +1925,7 @@ where
                 }
 
                 33 => {
-                    if let Some(v33) = &mut self.v33 {
+                    if let Some(v33) = self.v33.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v33,
                             preallocated.encoder,
@@ -1655,7 +1937,7 @@ where
                 }
 
                 32 => {
-                    if let Some(v32) = &mut self.v32 {
+                    if let Some(v32) = self.v32.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v32,
                             preallocated.encoder,
@@ -1667,7 +1949,7 @@ where
                 }
 
                 31 => {
-                    if let Some(v31) = &mut self.v31 {
+                    if let Some(v31) = self.v31.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v31,
                             preallocated.encoder,
@@ -1679,7 +1961,7 @@ where
                 }
 
                 30 => {
-                    if let Some(v30) = &mut self.v30 {
+                    if let Some(v30) = self.v30.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v30,
                             preallocated.encoder,
@@ -1691,7 +1973,7 @@ where
                 }
 
                 29 => {
-                    if let Some(v29) = &mut self.v29 {
+                    if let Some(v29) = self.v29.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v29,
                             preallocated.encoder,
@@ -1703,7 +1985,7 @@ where
                 }
 
                 28 => {
-                    if let Some(v28) = &mut self.v28 {
+                    if let Some(v28) = self.v28.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v28,
                             preallocated.encoder,
@@ -1715,7 +1997,7 @@ where
                 }
 
                 27 => {
-                    if let Some(v27) = &mut self.v27 {
+                    if let Some(v27) = self.v27.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v27,
                             preallocated.encoder,
@@ -1727,7 +2009,7 @@ where
                 }
 
                 26 => {
-                    if let Some(v26) = &mut self.v26 {
+                    if let Some(v26) = self.v26.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v26,
                             preallocated.encoder,
@@ -1739,7 +2021,7 @@ where
                 }
 
                 25 => {
-                    if let Some(v25) = &mut self.v25 {
+                    if let Some(v25) = self.v25.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v25,
                             preallocated.encoder,
@@ -1751,7 +2033,7 @@ where
                 }
 
                 24 => {
-                    if let Some(v24) = &mut self.v24 {
+                    if let Some(v24) = self.v24.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v24,
                             preallocated.encoder,
@@ -1763,7 +2045,7 @@ where
                 }
 
                 23 => {
-                    if let Some(v23) = &mut self.v23 {
+                    if let Some(v23) = self.v23.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v23,
                             preallocated.encoder,
@@ -1775,7 +2057,7 @@ where
                 }
 
                 22 => {
-                    if let Some(v22) = &mut self.v22 {
+                    if let Some(v22) = self.v22.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v22,
                             preallocated.encoder,
@@ -1787,7 +2069,7 @@ where
                 }
 
                 21 => {
-                    if let Some(v21) = &mut self.v21 {
+                    if let Some(v21) = self.v21.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v21,
                             preallocated.encoder,
@@ -1799,7 +2081,7 @@ where
                 }
 
                 20 => {
-                    if let Some(v20) = &mut self.v20 {
+                    if let Some(v20) = self.v20.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v20,
                             preallocated.encoder,
@@ -1811,7 +2093,7 @@ where
                 }
 
                 19 => {
-                    if let Some(v19) = &mut self.v19 {
+                    if let Some(v19) = self.v19.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v19,
                             preallocated.encoder,
@@ -1823,7 +2105,7 @@ where
                 }
 
                 18 => {
-                    if let Some(v18) = &mut self.v18 {
+                    if let Some(v18) = self.v18.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v18,
                             preallocated.encoder,
@@ -1835,7 +2117,7 @@ where
                 }
 
                 17 => {
-                    if let Some(v17) = &mut self.v17 {
+                    if let Some(v17) = self.v17.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v17,
                             preallocated.encoder,
@@ -1847,7 +2129,7 @@ where
                 }
 
                 16 => {
-                    if let Some(v16) = &mut self.v16 {
+                    if let Some(v16) = self.v16.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v16,
                             preallocated.encoder,
@@ -1859,7 +2141,7 @@ where
                 }
 
                 15 => {
-                    if let Some(v15) = &mut self.v15 {
+                    if let Some(v15) = self.v15.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v15,
                             preallocated.encoder,
@@ -1871,7 +2153,7 @@ where
                 }
 
                 14 => {
-                    if let Some(v14) = &mut self.v14 {
+                    if let Some(v14) = self.v14.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v14,
                             preallocated.encoder,
@@ -1883,7 +2165,7 @@ where
                 }
 
                 13 => {
-                    if let Some(v13) = &mut self.v13 {
+                    if let Some(v13) = self.v13.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v13,
                             preallocated.encoder,
@@ -1895,7 +2177,7 @@ where
                 }
 
                 12 => {
-                    if let Some(v12) = &mut self.v12 {
+                    if let Some(v12) = self.v12.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v12,
                             preallocated.encoder,
@@ -1907,7 +2189,7 @@ where
                 }
 
                 11 => {
-                    if let Some(v11) = &mut self.v11 {
+                    if let Some(v11) = self.v11.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v11,
                             preallocated.encoder,
@@ -1919,7 +2201,7 @@ where
                 }
 
                 10 => {
-                    if let Some(v10) = &mut self.v10 {
+                    if let Some(v10) = self.v10.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v10,
                             preallocated.encoder,
@@ -1931,7 +2213,7 @@ where
                 }
 
                 9 => {
-                    if let Some(v9) = &mut self.v9 {
+                    if let Some(v9) = self.v9.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v9,
                             preallocated.encoder,
@@ -1943,7 +2225,7 @@ where
                 }
 
                 8 => {
-                    if let Some(v8) = &mut self.v8 {
+                    if let Some(v8) = self.v8.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v8,
                             preallocated.encoder,
@@ -1955,7 +2237,7 @@ where
                 }
 
                 7 => {
-                    if let Some(v7) = &mut self.v7 {
+                    if let Some(v7) = self.v7.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v7,
                             preallocated.encoder,
@@ -1967,7 +2249,7 @@ where
                 }
 
                 6 => {
-                    if let Some(v6) = &mut self.v6 {
+                    if let Some(v6) = self.v6.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v6,
                             preallocated.encoder,
@@ -1979,7 +2261,7 @@ where
                 }
 
                 5 => {
-                    if let Some(v5) = &mut self.v5 {
+                    if let Some(v5) = self.v5.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v5,
                             preallocated.encoder,
@@ -1991,7 +2273,7 @@ where
                 }
 
                 4 => {
-                    if let Some(v4) = &mut self.v4 {
+                    if let Some(v4) = self.v4.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v4,
                             preallocated.encoder,
@@ -2003,7 +2285,7 @@ where
                 }
 
                 3 => {
-                    if let Some(v3) = &mut self.v3 {
+                    if let Some(v3) = self.v3.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v3,
                             preallocated.encoder,
@@ -2015,7 +2297,7 @@ where
                 }
 
                 2 => {
-                    if let Some(v2) = &mut self.v2 {
+                    if let Some(v2) = self.v2.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             v2,
                             preallocated.encoder,
@@ -2027,7 +2309,810 @@ where
                 }
 
                 1 => {
-                    if let Some(v1) = &mut self.v1 {
+                    if let Some(v1) = self.v1.take() {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v1,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for SixtyFourOrdinalTable
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireSixtyFourOrdinalTable { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                64 => {
+                    if let Some(v64) = &self.v64 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v64,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                63 => {
+                    if let Some(v63) = &self.v63 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v63,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                62 => {
+                    if let Some(v62) = &self.v62 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v62,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                61 => {
+                    if let Some(v61) = &self.v61 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v61,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                60 => {
+                    if let Some(v60) = &self.v60 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v60,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                59 => {
+                    if let Some(v59) = &self.v59 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v59,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                58 => {
+                    if let Some(v58) = &self.v58 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v58,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                57 => {
+                    if let Some(v57) = &self.v57 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v57,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                56 => {
+                    if let Some(v56) = &self.v56 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v56,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                55 => {
+                    if let Some(v55) = &self.v55 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v55,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                54 => {
+                    if let Some(v54) = &self.v54 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v54,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                53 => {
+                    if let Some(v53) = &self.v53 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v53,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                52 => {
+                    if let Some(v52) = &self.v52 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v52,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                51 => {
+                    if let Some(v51) = &self.v51 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v51,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                50 => {
+                    if let Some(v50) = &self.v50 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v50,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                49 => {
+                    if let Some(v49) = &self.v49 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v49,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                48 => {
+                    if let Some(v48) = &self.v48 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v48,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                47 => {
+                    if let Some(v47) = &self.v47 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v47,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                46 => {
+                    if let Some(v46) = &self.v46 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v46,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                45 => {
+                    if let Some(v45) = &self.v45 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v45,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                44 => {
+                    if let Some(v44) = &self.v44 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v44,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                43 => {
+                    if let Some(v43) = &self.v43 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v43,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                42 => {
+                    if let Some(v42) = &self.v42 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v42,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                41 => {
+                    if let Some(v41) = &self.v41 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v41,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                40 => {
+                    if let Some(v40) = &self.v40 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v40,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                39 => {
+                    if let Some(v39) = &self.v39 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v39,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                38 => {
+                    if let Some(v38) = &self.v38 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v38,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                37 => {
+                    if let Some(v37) = &self.v37 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v37,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                36 => {
+                    if let Some(v36) = &self.v36 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v36,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                35 => {
+                    if let Some(v35) = &self.v35 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v35,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                34 => {
+                    if let Some(v34) = &self.v34 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v34,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                33 => {
+                    if let Some(v33) = &self.v33 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v33,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                32 => {
+                    if let Some(v32) = &self.v32 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v32,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                31 => {
+                    if let Some(v31) = &self.v31 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v31,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                30 => {
+                    if let Some(v30) = &self.v30 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v30,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                29 => {
+                    if let Some(v29) = &self.v29 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v29,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                28 => {
+                    if let Some(v28) = &self.v28 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v28,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                27 => {
+                    if let Some(v27) = &self.v27 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v27,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                26 => {
+                    if let Some(v26) = &self.v26 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v26,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                25 => {
+                    if let Some(v25) = &self.v25 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v25,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                24 => {
+                    if let Some(v24) = &self.v24 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v24,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                23 => {
+                    if let Some(v23) = &self.v23 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v23,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                22 => {
+                    if let Some(v22) = &self.v22 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v22,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                21 => {
+                    if let Some(v21) = &self.v21 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v21,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                20 => {
+                    if let Some(v20) = &self.v20 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v20,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                19 => {
+                    if let Some(v19) = &self.v19 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v19,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                18 => {
+                    if let Some(v18) = &self.v18 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v18,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                17 => {
+                    if let Some(v17) = &self.v17 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v17,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                16 => {
+                    if let Some(v16) = &self.v16 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v16,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                15 => {
+                    if let Some(v15) = &self.v15 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v15,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                14 => {
+                    if let Some(v14) = &self.v14 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v14,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                13 => {
+                    if let Some(v13) = &self.v13 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v13,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                12 => {
+                    if let Some(v12) = &self.v12 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v12,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                11 => {
+                    if let Some(v11) = &self.v11 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v11,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                10 => {
+                    if let Some(v10) = &self.v10 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v10,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                9 => {
+                    if let Some(v9) = &self.v9 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v9,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                8 => {
+                    if let Some(v8) = &self.v8 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v8,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                7 => {
+                    if let Some(v7) = &self.v7 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v7,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                6 => {
+                    if let Some(v6) = &self.v6 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v6,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                5 => {
+                    if let Some(v5) = &self.v5 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v5,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                4 => {
+                    if let Some(v4) = &self.v4 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v4,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                3 => {
+                    if let Some(v3) = &self.v3 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v3,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                2 => {
+                    if let Some(v2) = &self.v2 {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            v2,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                1 => {
+                    if let Some(v1) = &self.v1 {
                         ::fidl_next::WireEnvelope::encode_value(
                             v1,
                             preallocated.encoder,
@@ -3150,7 +4235,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -3167,7 +4252,50 @@ where
         for i in 1..=max_ord {
             match i {
                 1 => {
-                    if let Some(x) = &mut self.x {
+                    if let Some(x) = self.x.take() {
+                        ::fidl_next::WireEnvelope::encode_value(x, preallocated.encoder, &mut out)?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for TableWithAttributes
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireTableWithAttributes { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                1 => {
+                    if let Some(x) = &self.x {
                         ::fidl_next::WireEnvelope::encode_value(x, preallocated.encoder, &mut out)?;
                     } else {
                         ::fidl_next::WireEnvelope::encode_zero(&mut out)

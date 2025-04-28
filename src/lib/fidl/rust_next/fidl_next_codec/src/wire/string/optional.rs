@@ -9,8 +9,8 @@ use core::str::from_utf8;
 use munge::munge;
 
 use crate::{
-    Decode, DecodeError, Decoder, EncodableOption, EncodeError, EncodeOption, Encoder, Slot,
-    TakeFrom, WireOptionalVector, WireString, WireVector, ZeroPadding,
+    Decode, DecodeError, Decoder, EncodableOption, EncodeError, EncodeOption, EncodeOptionRef,
+    Encoder, Slot, TakeFrom, WireOptionalVector, WireString, WireVector, ZeroPadding,
 };
 
 /// An optional FIDL string
@@ -97,7 +97,33 @@ impl EncodableOption for String {
 unsafe impl<E: Encoder + ?Sized> EncodeOption<E> for String {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), EncodeError> {
+        <&str>::encode_option(this.as_deref(), encoder, out)
+    }
+}
+
+unsafe impl<E: Encoder + ?Sized> EncodeOptionRef<E> for String {
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), EncodeError> {
+        <&str>::encode_option(this.map(String::as_str), encoder, out)
+    }
+}
+
+impl EncodableOption for &str {
+    type EncodedOption = WireOptionalString;
+}
+
+unsafe impl<E: Encoder + ?Sized> EncodeOption<E> for &str {
+    #[inline]
+    fn encode_option(
+        this: Option<Self>,
         encoder: &mut E,
         out: &mut MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), EncodeError> {
@@ -107,7 +133,6 @@ unsafe impl<E: Encoder + ?Sized> EncodeOption<E> for String {
         } else {
             WireOptionalString::encode_absent(out);
         }
-
         Ok(())
     }
 }

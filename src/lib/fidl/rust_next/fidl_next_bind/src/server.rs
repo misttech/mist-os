@@ -166,7 +166,7 @@ impl<M> Responder<M> {
     pub fn respond<'s, T, P, R>(
         self,
         server: &'s ServerSender<T, P>,
-        response: &mut R,
+        response: R,
     ) -> Result<SendFuture<'s, T>, EncodeError>
     where
         T: Transport,

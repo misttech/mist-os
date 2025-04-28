@@ -428,13 +428,13 @@ mod tests {
 
     unsafe impl<E: HandleEncoder + ?Sized> Encode<E> for HandleAndBoolean {
         fn encode(
-            &mut self,
+            self,
             encoder: &mut E,
             out: &mut MaybeUninit<Self::Encoded>,
         ) -> Result<(), EncodeError> {
             munge!(let Self::Encoded { handle, boolean } = out);
-            Encode::encode(&mut self.handle, encoder, handle)?;
-            Encode::encode(&mut self.boolean, encoder, boolean)?;
+            self.handle.encode(encoder, handle)?;
+            self.boolean.encode(encoder, boolean)?;
             Ok(())
         }
     }
@@ -454,7 +454,7 @@ mod tests {
 
         let mut buffer = Buffer::new();
         buffer
-            .encode_next(&mut HandleAndBoolean { handle: encode_end.into_handle(), boolean: false })
+            .encode_next(HandleAndBoolean { handle: encode_end.into_handle(), boolean: false })
             .expect("encoding should succeed");
         // Modify the buffer so that the boolean value is invalid
         *buffer.chunks[0] |= 0x00000002_00000000;
@@ -485,7 +485,7 @@ mod tests {
 
         let mut buffer = Buffer::new();
         buffer
-            .encode_next(&mut HandleAndBoolean { handle: encode_end.into_handle(), boolean: false })
+            .encode_next(HandleAndBoolean { handle: encode_end.into_handle(), boolean: false })
             .expect("encoding should succeed");
 
         let recv_buffer = RecvBuffer { buffer, chunks_taken: 0, handles_taken: 0 };
@@ -533,7 +533,7 @@ mod tests {
         let server_task = fasync::Task::spawn(async move { server.run(TestServer).await });
 
         client_sender
-            .send_one_way(42, &mut "Hello world".to_string())
+            .send_one_way(42, "Hello world")
             .expect("client failed to encode request")
             .send_immediately()
             .expect("client failed to send request");

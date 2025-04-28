@@ -7,8 +7,8 @@ use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
 use fidl_next_codec::{
-    munge, Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, Encoder, RawWireUnion,
-    Slot, TakeFrom, WireResult, ZeroPadding,
+    munge, Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, EncodeRef, Encoder,
+    RawWireUnion, Slot, TakeFrom, WireResult, ZeroPadding,
 };
 
 use crate::{FrameworkError, WireFrameworkError};
@@ -22,6 +22,17 @@ pub enum FlexibleResult<T, E> {
     Err(E),
     /// The error indicating that the flexible call failed.
     FrameworkErr(FrameworkError),
+}
+
+impl<T, E> FlexibleResult<T, E> {
+    /// Converts from `FlexibleResult<T, E>` to `FlexibleResult<&T, &E>`.
+    pub fn as_ref(&self) -> FlexibleResult<&T, &E> {
+        match self {
+            Self::Ok(value) => FlexibleResult::Ok(value),
+            Self::Err(error) => FlexibleResult::Err(error),
+            Self::FrameworkErr(framework_error) => FlexibleResult::FrameworkErr(*framework_error),
+        }
+    }
 }
 
 /// A flexible FIDL result.
@@ -179,7 +190,7 @@ where
     E: Encode<Enc>,
 {
     fn encode(
-        &mut self,
+        self,
         encoder: &mut Enc,
         out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {
@@ -197,6 +208,21 @@ where
         }
 
         Ok(())
+    }
+}
+
+unsafe impl<Enc, T, E> EncodeRef<Enc> for FlexibleResult<T, E>
+where
+    Enc: Encoder + ?Sized,
+    T: EncodeRef<Enc>,
+    E: EncodeRef<Enc>,
+{
+    fn encode_ref(
+        &self,
+        encoder: &mut Enc,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError> {
+        self.as_ref().encode(encoder, out)
     }
 }
 

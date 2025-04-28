@@ -4,7 +4,7 @@
 
 use thiserror::Error;
 
-use fidl_next_codec::{EncodeError, DecodeError};
+use fidl_next_codec::{DecodeError, EncodeError};
 
 /// Error returned by TryFrom on a strict enum if none of the members match the supplied value.
 #[derive(Debug)]

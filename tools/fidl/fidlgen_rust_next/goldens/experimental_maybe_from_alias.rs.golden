@@ -218,7 +218,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -256,61 +256,61 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.u1, encoder, u1)?;
+        ::fidl_next::Encode::encode(self.u1, encoder, u1)?;
 
-        ::fidl_next::Encode::encode(&mut self.u2, encoder, u2)?;
+        ::fidl_next::Encode::encode(self.u2, encoder, u2)?;
 
-        ::fidl_next::Encode::encode(&mut self.u3, encoder, u3)?;
+        ::fidl_next::Encode::encode(self.u3, encoder, u3)?;
 
-        ::fidl_next::Encode::encode(&mut self.u4, encoder, u4)?;
+        ::fidl_next::Encode::encode(self.u4, encoder, u4)?;
 
-        ::fidl_next::Encode::encode(&mut self.u5, encoder, u5)?;
+        ::fidl_next::Encode::encode(self.u5, encoder, u5)?;
 
-        ::fidl_next::Encode::encode(&mut self.u6, encoder, u6)?;
+        ::fidl_next::Encode::encode(self.u6, encoder, u6)?;
 
-        ::fidl_next::Encode::encode(&mut self.u7, encoder, u7)?;
+        ::fidl_next::Encode::encode(self.u7, encoder, u7)?;
 
-        ::fidl_next::Encode::encode(&mut self.v1, encoder, v1)?;
+        ::fidl_next::Encode::encode(self.v1, encoder, v1)?;
 
-        ::fidl_next::Encode::encode(&mut self.v2, encoder, v2)?;
+        ::fidl_next::Encode::encode(self.v2, encoder, v2)?;
 
-        ::fidl_next::Encode::encode(&mut self.v3, encoder, v3)?;
+        ::fidl_next::Encode::encode(self.v3, encoder, v3)?;
 
-        ::fidl_next::Encode::encode(&mut self.a1, encoder, a1)?;
+        ::fidl_next::Encode::encode(self.a1, encoder, a1)?;
 
-        ::fidl_next::Encode::encode(&mut self.a2, encoder, a2)?;
+        ::fidl_next::Encode::encode(self.a2, encoder, a2)?;
 
-        ::fidl_next::Encode::encode(&mut self.a3, encoder, a3)?;
+        ::fidl_next::Encode::encode(self.a3, encoder, a3)?;
 
-        ::fidl_next::Encode::encode(&mut self.r1, encoder, r1)?;
+        ::fidl_next::Encode::encode(self.r1, encoder, r1)?;
 
-        ::fidl_next::Encode::encode(&mut self.r2, encoder, r2)?;
+        ::fidl_next::Encode::encode(self.r2, encoder, r2)?;
 
-        ::fidl_next::Encode::encode(&mut self.r3, encoder, r3)?;
+        ::fidl_next::Encode::encode(self.r3, encoder, r3)?;
 
-        ::fidl_next::Encode::encode(&mut self.b1, encoder, b1)?;
+        ::fidl_next::Encode::encode(self.b1, encoder, b1)?;
 
-        ::fidl_next::Encode::encode(&mut self.b2, encoder, b2)?;
+        ::fidl_next::Encode::encode(self.b2, encoder, b2)?;
 
-        ::fidl_next::Encode::encode(&mut self.b3, encoder, b3)?;
+        ::fidl_next::Encode::encode(self.b3, encoder, b3)?;
 
-        ::fidl_next::Encode::encode(&mut self.s1, encoder, s1)?;
+        ::fidl_next::Encode::encode(self.s1, encoder, s1)?;
 
-        ::fidl_next::Encode::encode(&mut self.s2, encoder, s2)?;
+        ::fidl_next::Encode::encode(self.s2, encoder, s2)?;
 
-        ::fidl_next::Encode::encode(&mut self.s3, encoder, s3)?;
+        ::fidl_next::Encode::encode(self.s3, encoder, s3)?;
 
-        ::fidl_next::Encode::encode(&mut self.vv1, encoder, vv1)?;
+        ::fidl_next::Encode::encode(self.vv1, encoder, vv1)?;
 
-        ::fidl_next::Encode::encode(&mut self.vv2, encoder, vv2)?;
+        ::fidl_next::Encode::encode(self.vv2, encoder, vv2)?;
 
-        ::fidl_next::Encode::encode(&mut self.vv3, encoder, vv3)?;
+        ::fidl_next::Encode::encode(self.vv3, encoder, vv3)?;
 
-        ::fidl_next::Encode::encode(&mut self.aa1, encoder, aa1)?;
+        ::fidl_next::Encode::encode(self.aa1, encoder, aa1)?;
 
-        ::fidl_next::Encode::encode(&mut self.aa2, encoder, aa2)?;
+        ::fidl_next::Encode::encode(self.aa2, encoder, aa2)?;
 
-        ::fidl_next::Encode::encode(&mut self.aa3, encoder, aa3)?;
+        ::fidl_next::Encode::encode(self.aa3, encoder, aa3)?;
 
         Ok(())
     }
@@ -327,12 +327,12 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
             ::fidl_next::WireBox::encode_present(out);
         } else {
             ::fidl_next::WireBox::encode_absent(out);

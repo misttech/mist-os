@@ -114,10 +114,24 @@ pub trait Encodable {
 /// # Safety
 ///
 /// `encode` must initialize all non-padding bytes of `out`.
-pub unsafe trait Encode<E: ?Sized>: Encodable {
+pub unsafe trait Encode<E: ?Sized>: Encodable + Sized {
     /// Encodes this value into an encoder and output.
     fn encode(
-        &mut self,
+        self,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError>;
+}
+
+/// Encodes a reference.
+///
+/// # Safety
+///
+/// `encode` must initialize all non-padding bytes of `out`.
+pub unsafe trait EncodeRef<E: ?Sized>: Encode<E> {
+    /// Encodes this reference into an encoder and output.
+    fn encode_ref(
+        &self,
         encoder: &mut E,
         out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError>;
@@ -134,13 +148,55 @@ pub trait EncodableOption {
 /// # Safety
 ///
 /// `encode_option` must initialize all non-padding bytes of `out`.
-pub unsafe trait EncodeOption<E: ?Sized>: EncodableOption {
+pub unsafe trait EncodeOption<E: ?Sized>: EncodableOption + Sized {
     /// Encodes this optional value into an encoder and output.
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut E,
         out: &mut MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), EncodeError>;
+}
+
+/// Encodes an optional reference.
+///
+/// # Safety
+///
+/// `encode_option_ref` must initialize all non-padding bytes of `out`.
+pub unsafe trait EncodeOptionRef<E: ?Sized>: EncodeOption<E> {
+    /// Encodes this optional reference into an encoder and output.
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), EncodeError>;
+}
+
+impl<T: Encodable> Encodable for &T {
+    type Encoded = T::Encoded;
+}
+
+unsafe impl<E: ?Sized, T: EncodeRef<E>> Encode<E> for &T {
+    fn encode(
+        self,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError> {
+        T::encode_ref(self, encoder, out)
+    }
+}
+
+impl<T: EncodableOption> EncodableOption for &T {
+    type EncodedOption = T::EncodedOption;
+}
+
+unsafe impl<E: ?Sized, T: EncodeOptionRef<E>> EncodeOption<E> for &T {
+    fn encode_option(
+        this: Option<Self>,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), EncodeError> {
+        T::encode_option_ref(this, encoder, out)
+    }
 }
 
 macro_rules! impl_encode_for_primitive {
@@ -160,7 +216,18 @@ macro_rules! impl_encode_for_primitive {
         unsafe impl<E: ?Sized> Encode<E> for $ty {
             #[inline]
             fn encode(
-                &mut self,
+                self,
+                encoder: &mut E,
+                out: &mut MaybeUninit<Self::Encoded>,
+            ) -> Result<(), EncodeError> {
+                self.encode_ref(encoder, out)
+            }
+        }
+
+        unsafe impl<E: ?Sized> EncodeRef<E> for $ty {
+            #[inline]
+            fn encode_ref(
+                &self,
                 _: &mut E,
                 out: &mut MaybeUninit<Self::Encoded>,
             ) -> Result<(), EncodeError> {
@@ -176,7 +243,18 @@ macro_rules! impl_encode_for_primitive {
         unsafe impl<E: Encoder + ?Sized> EncodeOption<E> for $ty {
             #[inline]
             fn encode_option(
-                this: Option<&mut Self>,
+                this: Option<Self>,
+                encoder: &mut E,
+                out: &mut MaybeUninit<Self::EncodedOption>,
+            ) -> Result<(), EncodeError> {
+                Self::encode_option_ref(this.as_ref(), encoder, out)
+            }
+        }
+
+        unsafe impl<E: Encoder + ?Sized> EncodeOptionRef<E> for $ty {
+            #[inline]
+            fn encode_option_ref(
+                this: Option<&Self>,
                 encoder: &mut E,
                 out: &mut MaybeUninit<Self::EncodedOption>,
             ) -> Result<(), EncodeError> {
@@ -220,25 +298,57 @@ impl<T: Encodable, const N: usize> Encodable for [T; N] {
     type Encoded = [T::Encoded; N];
 }
 
+fn encode_to_array<A, E, T, const N: usize>(
+    value: A,
+    encoder: &mut E,
+    out: &mut MaybeUninit<[T::Encoded; N]>,
+) -> Result<(), EncodeError>
+where
+    A: AsRef<[T]> + IntoIterator,
+    A::Item: Encode<E, Encoded = T::Encoded>,
+    E: ?Sized,
+    T: Encode<E>,
+{
+    if T::COPY_OPTIMIZATION.is_enabled() {
+        // SAFETY: `T` has copy optimization enabled and so is safe to copy to the output.
+        unsafe {
+            copy_nonoverlapping(value.as_ref().as_ptr().cast(), out.as_mut_ptr(), 1);
+        }
+    } else {
+        for (i, item) in value.into_iter().enumerate() {
+            // SAFETY: `out` is a `MaybeUninit<[T::Encoded; N]>` and so consists of `N` copies of
+            // `T::Encoded` in order with no additional padding. We can make a `&mut MaybeUninit` to
+            // the `i`th element by:
+            // 1. Getting a pointer to the contents of the `MaybeUninit<[T::Encoded; N]>` (the
+            //    pointer is of type `*mut [T::Encoded; N]`).
+            // 2. Casting it to `*mut MaybeUninit<T::Encoded>`. Note that `MaybeUninit<T>` always
+            //    has the same layout as `T`.
+            // 3. Adding `i` to reach the `i`th element.
+            // 4. Dereferencing as `&mut`.
+            let out_i = unsafe { &mut *out.as_mut_ptr().cast::<MaybeUninit<T::Encoded>>().add(i) };
+            item.encode(encoder, out_i)?;
+        }
+    }
+    Ok(())
+}
+
 unsafe impl<E: ?Sized, T: Encode<E>, const N: usize> Encode<E> for [T; N] {
     fn encode(
-        &mut self,
+        self,
         encoder: &mut E,
         out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {
-        if T::COPY_OPTIMIZATION.is_enabled() {
-            // SAFETY: `T` has copy optimization enabled and so is safe to copy to the output.
-            unsafe {
-                copy_nonoverlapping(self.as_ptr().cast(), out.as_mut_ptr(), 1);
-            }
-        } else {
-            for (i, item) in self.iter_mut().enumerate() {
-                let out_i =
-                    unsafe { &mut *out.as_mut_ptr().cast::<MaybeUninit<T::Encoded>>().add(i) };
-                item.encode(encoder, out_i)?;
-            }
-        }
-        Ok(())
+        encode_to_array(self, encoder, out)
+    }
+}
+
+unsafe impl<E: ?Sized, T: EncodeRef<E>, const N: usize> EncodeRef<E> for [T; N] {
+    fn encode_ref(
+        &self,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError> {
+        encode_to_array(self, encoder, out)
     }
 }
 
@@ -248,11 +358,21 @@ impl<T: Encodable> Encodable for Box<T> {
 
 unsafe impl<E: ?Sized, T: Encode<E>> Encode<E> for Box<T> {
     fn encode(
-        &mut self,
+        self,
         encoder: &mut E,
         out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {
-        T::encode(self, encoder, out)
+        T::encode(*self, encoder, out)
+    }
+}
+
+unsafe impl<E: ?Sized, T: EncodeRef<E>> EncodeRef<E> for Box<T> {
+    fn encode_ref(
+        &self,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError> {
+        T::encode_ref(self, encoder, out)
     }
 }
 

@@ -46,7 +46,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -61,6 +61,40 @@ where
             {% endfor %}
             {% if !union.is_strict %}
                 Self::UnknownOrdinal_(ordinal) => return Err(
+                    ::fidl_next::EncodeError::UnknownUnionOrdinal(ordinal as usize)
+                )
+            {% endif %}
+        }
+
+        Ok(())
+    }
+}
+
+{% if !union.is_resource %}
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for {{ name }}
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+    {% if !is_static %}
+        ___E: ::fidl_next::Encoder,
+    {% endif %}
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let {{ wire_name }} { raw } = out);
+
+        match self {
+            {% for member in union.members %}
+                Self::{{ member.name.camel()|ident }}(value) => ::fidl_next::RawWireUnion::{{ encode_as }}::<
+                    ___E,
+                    &{{ context.natural_type(member.ty) }},
+                >(value, {{ member.ordinal }}, encoder, raw)?,
+            {% endfor %}
+            {% if !union.is_strict %}
+                Self::UnknownOrdinal_(ordinal) => return Err(
                     ::fidl_next::EncodeError::UnknownUnionOrdinal(
                         *ordinal as usize
                     )
@@ -71,6 +105,7 @@ where
         Ok(())
     }
 }
+{% endif %}
 
 impl ::fidl_next::EncodableOption for Box<{{ name }}> {
     type EncodedOption = WireOptional{{ name }};
@@ -83,7 +118,7 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -92,7 +127,7 @@ where
         if let Some(inner) = this {
             let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
             ::fidl_next::Encode::encode(
-                &mut **inner,
+                inner,
                 encoder,
                 value_out,
             )?;
@@ -103,6 +138,36 @@ where
         Ok(())
     }
 }
+
+{% if !union.is_resource %}
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<{{ name }}>
+where
+    ___E: ?Sized,
+    {{ name }}: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireOptional{{ name }} { raw } = &mut *out);
+
+        if let Some(inner) = this {
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::EncodeRef::encode_ref(
+                inner,
+                encoder,
+                value_out,
+            )?;
+        } else {
+            ::fidl_next::RawWireUnion::encode_absent(raw);
+        }
+
+        Ok(())
+    }
+}
+{% endif %}
 
 impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
     #[inline]

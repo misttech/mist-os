@@ -10,7 +10,8 @@ use munge::munge;
 use super::raw::RawWireVector;
 use crate::{
     Decode, DecodeError, Decoder, DecoderExt as _, Encodable, EncodableOption, Encode, EncodeError,
-    EncodeOption, Encoder, EncoderExt as _, Slot, TakeFrom, WirePointer, WireVector, ZeroPadding,
+    EncodeOption, EncodeOptionRef, EncodeRef, Encoder, EncoderExt as _, Slot, TakeFrom,
+    WirePointer, WireVector, ZeroPadding,
 };
 
 /// An optional FIDL vector
@@ -120,31 +121,73 @@ unsafe impl<D: Decoder + ?Sized, T: Decode<D>> Decode<D> for WireOptionalVector<
     }
 }
 
+#[inline]
+fn encode_to_optional_vector<V, E, T>(
+    value: Option<V>,
+    encoder: &mut E,
+    out: &mut MaybeUninit<WireOptionalVector<T::Encoded>>,
+) -> Result<(), EncodeError>
+where
+    V: AsRef<[T]> + IntoIterator,
+    V::IntoIter: ExactSizeIterator,
+    V::Item: Encode<E, Encoded = T::Encoded>,
+    E: Encoder + ?Sized,
+    T: Encode<E>,
+{
+    if let Some(value) = value {
+        let len = value.as_ref().len();
+        if T::COPY_OPTIMIZATION.is_enabled() {
+            let slice = value.as_ref();
+            // SAFETY: `T` has copy optimization enabled, which guarantees that it has no uninit
+            // bytes and can be copied directly to the output instead of calling `encode`. This
+            // means that we may cast `&[T]` to `&[u8]` and write those bytes.
+            let bytes = unsafe { slice::from_raw_parts(slice.as_ptr().cast(), size_of_val(slice)) };
+            encoder.write(bytes);
+        } else {
+            encoder.encode_next_iter(value.into_iter())?;
+        }
+        WireOptionalVector::encode_present(out, len as u64);
+    } else {
+        WireOptionalVector::encode_absent(out);
+    }
+    Ok(())
+}
+
 impl<T: Encodable> EncodableOption for Vec<T> {
     type EncodedOption = WireOptionalVector<T::Encoded>;
 }
 
 unsafe impl<E: Encoder + ?Sized, T: Encode<E>> EncodeOption<E> for Vec<T> {
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut E,
         out: &mut MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), EncodeError> {
-        if let Some(vec) = this {
-            if T::COPY_OPTIMIZATION.is_enabled() {
-                let bytes = unsafe {
-                    slice::from_raw_parts(vec.as_ptr().cast(), vec.len() * size_of::<T>())
-                };
-                encoder.write(bytes);
-            } else {
-                encoder.encode_next_slice(vec.as_mut_slice())?;
-            }
-            WireOptionalVector::encode_present(out, vec.len() as u64);
-        } else {
-            WireOptionalVector::encode_absent(out);
-        }
+        encode_to_optional_vector(this, encoder, out)
+    }
+}
 
-        Ok(())
+unsafe impl<E: Encoder + ?Sized, T: EncodeRef<E>> EncodeOptionRef<E> for Vec<T> {
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), EncodeError> {
+        encode_to_optional_vector(this, encoder, out)
+    }
+}
+
+impl<T: Encodable> EncodableOption for &[T] {
+    type EncodedOption = WireOptionalVector<T::Encoded>;
+}
+
+unsafe impl<E: Encoder + ?Sized, T: EncodeRef<E>> EncodeOption<E> for &[T] {
+    fn encode_option(
+        this: Option<Self>,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), EncodeError> {
+        encode_to_optional_vector(this, encoder, out)
     }
 }
 

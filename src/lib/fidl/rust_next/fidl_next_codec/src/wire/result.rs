@@ -7,8 +7,8 @@ use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
 use crate::{
-    munge, Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, Encoder, RawWireUnion,
-    Slot, TakeFrom, ZeroPadding,
+    munge, Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, EncodeRef, Encoder,
+    RawWireUnion, Slot, TakeFrom, ZeroPadding,
 };
 
 /// A FIDL result union.
@@ -118,7 +118,7 @@ where
     E: Encode<Enc>,
 {
     fn encode(
-        &mut self,
+        self,
         encoder: &mut Enc,
         out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {
@@ -130,6 +130,21 @@ where
         }
 
         Ok(())
+    }
+}
+
+unsafe impl<Enc, T, E> EncodeRef<Enc> for Result<T, E>
+where
+    Enc: Encoder + ?Sized,
+    T: EncodeRef<Enc>,
+    E: EncodeRef<Enc>,
+{
+    fn encode_ref(
+        &self,
+        encoder: &mut Enc,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError> {
+        self.as_ref().encode(encoder, out)
     }
 }
 

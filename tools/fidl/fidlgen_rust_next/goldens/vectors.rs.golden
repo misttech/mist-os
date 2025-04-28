@@ -21,7 +21,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -33,10 +33,42 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.vector_of_uint8, encoder, vector_of_uint8)?;
+        ::fidl_next::Encode::encode(self.vector_of_uint8, encoder, vector_of_uint8)?;
 
         ::fidl_next::Encode::encode(
-            &mut self.vector_of_vector_of_bool,
+            self.vector_of_vector_of_bool,
+            encoder,
+            vector_of_vector_of_bool,
+        )?;
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for ExampleUseOfVectors
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                vector_of_uint8,
+                vector_of_vector_of_bool,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.vector_of_uint8, encoder, vector_of_uint8)?;
+
+        ::fidl_next::EncodeRef::encode_ref(
+            &self.vector_of_vector_of_bool,
             encoder,
             vector_of_vector_of_bool,
         )?;
@@ -56,7 +88,29 @@ where
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, *inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Box<ExampleUseOfVectors>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    ExampleUseOfVectors: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
