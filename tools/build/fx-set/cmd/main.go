@@ -139,6 +139,13 @@ func mainImpl(ctx context.Context) error {
 		}
 	}
 
+	if args.checkoutDir == "" {
+		return fmt.Errorf("got unexpected empty checkoutDir")
+	}
+	if args.buildDir == "" {
+		return fmt.Errorf("got unexpected empty buildDir")
+	}
+
 	contextSpec := &fintpb.Context{
 		CheckoutDir: args.checkoutDir,
 		BuildDir:    filepath.Join(args.checkoutDir, args.buildDir),
@@ -293,34 +300,30 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	}
 
 	if cmd.buildDir != "" {
-		userSpecifiedPath := cmd.checkoutDir + "/" + cmd.buildDir
-		fmt.Printf(userSpecifiedPath + "\n")
-		// if the user explicitly wants to use out/default for their buildDir
-		if cmd.buildDir == "out/default" {
-			// if we had been using out/default as a symlink, unlink it
-			symlink, err := isSymlink(userSpecifiedPath)
-			if err != nil {
-				return nil, fmt.Errorf(err.Error())
-			}
-			if symlink {
-				fmt.Printf(("It's a symlink, removing"))
-				if _, err := os.Lstat(userSpecifiedPath); err == nil {
-					if err := os.Remove(userSpecifiedPath); err != nil {
-						fmt.Errorf("failed to unlink: %+v", err)
-					}
-				} else {
-					fmt.Errorf("failed to check symlink: %+v", err)
-				}
-			}
-		}
 		providedBuildDir = true
 		autoDir = false
+	}
+
+	if cmd.buildDir == defaultBuildDir {
+		// If we had been using `defaultBuildDir` as a symlink, unlink it.
+		userSpecifiedPath := filepath.Join(cmd.checkoutDir, cmd.buildDir)
+		symlink, err := isSymlink(userSpecifiedPath)
+		if err != nil {
+			return nil, err
+		}
+		if symlink {
+			if err := os.Remove(userSpecifiedPath); err != nil {
+				return nil, fmt.Errorf("failed to unlink: %+v", err)
+			}
+		}
 	}
 
 	// If a fint params file was specified then no other arguments are required,
 	// so no need to validate them.
 	if cmd.fintParamsPath != "" {
-		autoDir = false
+		if cmd.buildDir == "" {
+			return nil, fmt.Errorf("build directory must be set (e.g. through --dir) when --fint-params-path is set")
+		}
 		return cmd, nil
 	}
 
@@ -619,14 +622,12 @@ func canAccessRbe(checkoutDir string) (bool, error) {
 // it returns false if the path doesn't exist.
 func isSymlink(path string) (bool, error) {
 	fileInfo, err := os.Lstat(path)
-
 	if err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
 		}
 		return false, fmt.Errorf("error checking path %s: %w", path, err)
 	}
-
 	isLink := fileInfo.Mode()&os.ModeSymlink != 0
 	return isLink, nil
 }

@@ -134,10 +134,17 @@ func TestParseArgsAndEnv(t *testing.T) {
 		},
 		{
 			name: "fint params path",
-			args: []string{"--fint-params-path", "foo.fint.textproto"},
+			env: map[string]string{
+				// fx sets this env var if the top-level --dir flag is set.
+				buildDirEnvVar: "out/repro42",
+			},
+			args: []string{
+				"--fint-params-path", "foo.fint.textproto",
+			},
 			expected: setArgs{
 				fintParamsPath: "foo.fint.textproto",
 				includeClippy:  true,
+				buildDir:       "out/repro42",
 			},
 		},
 		{
