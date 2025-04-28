@@ -157,18 +157,22 @@ impl FxFile {
     /// Creates a new regular FxFile.
     pub fn new(handle: DataObjectHandle<FxVolume>) -> Arc<Self> {
         let size = handle.get_size();
-        let (vmo, pager_packet_receiver_registration) = handle
-            .owner()
-            .pager()
-            .create_vmo(size, zx::VmoOptions::UNBOUNDED | zx::VmoOptions::TRAP_DIRTY)
-            .unwrap();
-        let file = Arc::new(Self {
-            handle: PagedObjectHandle::new(handle, vmo),
-            state: State::default(),
-            pager_packet_receiver_registration,
-        });
-        file.handle.owner().pager().register_file(&file);
-        file
+        Arc::new_cyclic(|weak| {
+            let (vmo, pager_packet_receiver_registration) = handle
+                .owner()
+                .pager()
+                .create_vmo(
+                    weak.clone(),
+                    size,
+                    zx::VmoOptions::UNBOUNDED | zx::VmoOptions::TRAP_DIRTY,
+                )
+                .unwrap();
+            Self {
+                handle: PagedObjectHandle::new(handle, vmo),
+                state: State::default(),
+                pager_packet_receiver_registration,
+            }
+        })
     }
 
     /// Creates a new connection on the given `scope`. May take a read lock on the object.

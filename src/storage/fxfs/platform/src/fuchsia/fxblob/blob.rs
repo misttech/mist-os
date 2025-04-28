@@ -57,9 +57,6 @@ impl FxBlob {
         compressed_offsets: Vec<u64>,
         uncompressed_size: u64,
     ) -> Result<Arc<Self>, Error> {
-        let (vmo, pager_packet_receiver_registration) =
-            handle.owner().pager().create_vmo(uncompressed_size, zx::VmoOptions::empty()).unwrap();
-
         // Only the merkle root and leaves are needed, the rest of the tree can be dropped.
         let merkle_root = merkle_tree.root();
         // The merkle leaves are intentionally copied to remove all of the spare capacity from the
@@ -73,22 +70,24 @@ impl FxBlob {
             Some(CompressionInfo::new(compressed_chunk_size, compressed_offsets, read_size)?)
         };
 
-        let trimmed_merkle = &merkle_root.to_string()[0..8];
-        let name = format!("blob-{}", trimmed_merkle);
-        let name = zx::Name::new(&name).unwrap();
-        vmo.set_name(&name).unwrap();
-        let file = Arc::new(Self {
-            handle,
-            vmo,
-            open_count: AtomicUsize::new(0),
-            merkle_root,
-            merkle_leaves,
-            compression_info,
-            uncompressed_size,
-            pager_packet_receiver_registration,
-        });
-        file.handle.owner().pager().register_file(&file);
-        Ok(file)
+        Ok(Arc::new_cyclic(|weak| {
+            let (vmo, pager_packet_receiver_registration) = handle
+                .owner()
+                .pager()
+                .create_vmo(weak.clone(), uncompressed_size, zx::VmoOptions::empty())
+                .unwrap();
+            set_vmo_name(&vmo, &merkle_root);
+            Self {
+                handle,
+                vmo,
+                open_count: AtomicUsize::new(0),
+                merkle_root,
+                merkle_leaves,
+                compression_info,
+                uncompressed_size,
+                pager_packet_receiver_registration,
+            }
+        }))
     }
 
     /// Marks the blob as being purged.  Returns true if there are no open references.
@@ -429,6 +428,13 @@ impl CompressionInfo {
         };
         Ok((start_offset, end_offset))
     }
+}
+
+fn set_vmo_name(vmo: &zx::Vmo, merkle_root: &Hash) {
+    let trimmed_merkle = &merkle_root.to_string()[0..8];
+    let name = format!("blob-{}", trimmed_merkle);
+    let name = zx::Name::new(&name).unwrap();
+    vmo.set_name(&name).unwrap();
 }
 
 #[cfg(test)]

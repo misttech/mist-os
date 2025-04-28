@@ -41,9 +41,6 @@ pub type PagerPacketReceiverRegistration<T> = fasync::ReceiverRegistration<Pager
 
 /// A `fuchsia_async::PacketReceiver` that handles pager packets and the `VMO_ZERO_CHILDREN` signal.
 pub struct PagerPacketReceiver<T> {
-    // The file should only ever be `None` for the brief period of time between `Pager::create_vmo`
-    // and `Pager::register_file`. Nothing should be reading or writing to the vmo during that time
-    // and `Pager::watch_for_zero_children` shouldn't be called either.
     file: Mutex<FileHolder<T>>,
 }
 
@@ -79,7 +76,6 @@ impl<T: PagerBacked> PagerPacketReceiver<T> {
                     return;
                 }
             }
-            FileHolder::None => panic!("Pager::register_file was not called"),
         };
 
         let Some(_guard) = file.pager().scope.try_active_guard() else {
@@ -172,7 +168,6 @@ pub struct Pager {
 enum FileHolder<T> {
     Strong(Arc<T>),
     Weak(Weak<T>),
-    None,
 }
 
 /// Pager handles page requests. It is a per-volume object.
@@ -215,15 +210,15 @@ impl Pager {
         }
     }
 
-    /// Creates a new VMO to be used with the pager. `Pager::register_file` must be called before
-    /// reading from, writing to, or creating children of the vmo.
+    /// Creates a new VMO to be used with the pager.
     pub fn create_vmo<T: PagerBacked>(
         &self,
+        file: Weak<T>,
         initial_size: u64,
         vmo_options: zx::VmoOptions,
     ) -> Result<(zx::Vmo, PagerPacketReceiverRegistration<T>), Error> {
         let registration = self.executor.register_receiver(Arc::new(PagerPacketReceiver {
-            file: Mutex::new(FileHolder::None),
+            file: Mutex::new(FileHolder::Weak(file)),
         }));
         Ok((
             self.pager.create_vmo(
@@ -234,12 +229,6 @@ impl Pager {
             )?,
             registration,
         ))
-    }
-
-    /// Registers a file with the pager.
-    pub fn register_file(&self, file: &Arc<impl PagerBacked>) {
-        *file.pager_packet_receiver_registration().file.lock() =
-            FileHolder::Weak(Arc::downgrade(file));
     }
 
     /// Starts watching for the `VMO_ZERO_CHILDREN` signal on `file`'s vmo. Returns false if the
@@ -260,7 +249,6 @@ impl Pager {
                 Ok(true)
             }
             FileHolder::Strong(_) => Ok(false),
-            FileHolder::None => panic!("Pager::register_file was not called"),
         }
     }
 
@@ -847,26 +835,26 @@ mod tests {
     }
 
     impl MockFile {
-        fn new(pager: Arc<Pager>) -> Self {
-            let (vmo, pager_packet_receiver_registration) = pager
-                .create_vmo(page_size(), zx::VmoOptions::UNBOUNDED | zx::VmoOptions::TRAP_DIRTY)
-                .unwrap();
-            Self {
-                pager,
-                vmo,
-                pager_packet_receiver_registration,
-                pager_requests: Default::default(),
-            }
+        fn new(pager: Arc<Pager>) -> Arc<Self> {
+            Self::new_with_size_and_type(pager, page_size(), zx::VmoOptions::UNBOUNDED)
         }
-        fn new_with_size_and_type(pager: Arc<Pager>, size: u64, vmo_type: zx::VmoOptions) -> Self {
-            let (vmo, pager_packet_receiver_registration) =
-                pager.create_vmo(size, vmo_type | zx::VmoOptions::TRAP_DIRTY).unwrap();
-            Self {
-                pager,
-                vmo,
-                pager_packet_receiver_registration,
-                pager_requests: Default::default(),
-            }
+
+        fn new_with_size_and_type(
+            pager: Arc<Pager>,
+            size: u64,
+            vmo_type: zx::VmoOptions,
+        ) -> Arc<Self> {
+            Arc::new_cyclic(|weak| {
+                let (vmo, pager_packet_receiver_registration) = pager
+                    .create_vmo(weak.clone(), size, vmo_type | zx::VmoOptions::TRAP_DIRTY)
+                    .unwrap();
+                Self {
+                    pager,
+                    vmo,
+                    pager_packet_receiver_registration,
+                    pager_requests: Default::default(),
+                }
+            })
         }
 
         // Returns the page_in requests received for this file.
@@ -954,10 +942,12 @@ mod tests {
     }
 
     impl OnZeroChildrenFile {
-        fn new(pager: Arc<Pager>, sender: mpsc::UnboundedSender<()>) -> Self {
-            let (vmo, pager_packet_receiver_registration) =
-                pager.create_vmo(page_size(), zx::VmoOptions::empty()).unwrap();
-            Self { pager, vmo, pager_packet_receiver_registration, sender: Mutex::new(sender) }
+        fn new(pager: Arc<Pager>, sender: mpsc::UnboundedSender<()>) -> Arc<Self> {
+            Arc::new_cyclic(|weak| {
+                let (vmo, pager_packet_receiver_registration) =
+                    pager.create_vmo(weak.clone(), page_size(), zx::VmoOptions::empty()).unwrap();
+                Self { pager, vmo, pager_packet_receiver_registration, sender: Mutex::new(sender) }
+            })
         }
     }
 
@@ -1030,8 +1020,7 @@ mod tests {
         let (sender, mut receiver) = mpsc::unbounded();
         let scope = ExecutionScope::new();
         let pager = Arc::new(Pager::new(scope.clone()).unwrap());
-        let file = Arc::new(OnZeroChildrenFile::new(pager.clone(), sender));
-        pager.register_file(&file);
+        let file = OnZeroChildrenFile::new(pager.clone(), sender);
         {
             let _child_vmo = file
                 .vmo()
@@ -1054,8 +1043,7 @@ mod tests {
         let (sender, mut receiver) = mpsc::unbounded();
         let scope = ExecutionScope::new();
         let pager = Arc::new(Pager::new(scope.clone()).unwrap());
-        let file = Arc::new(OnZeroChildrenFile::new(pager.clone(), sender));
-        pager.register_file(&file);
+        let file = OnZeroChildrenFile::new(pager.clone(), sender);
         {
             let _child_vmo = file
                 .vmo()
@@ -1158,15 +1146,16 @@ mod tests {
 
         let scope = ExecutionScope::new();
         let pager = Arc::new(Pager::new(scope.clone()).unwrap());
-        let (vmo, pager_packet_receiver_registration) =
-            pager.create_vmo(page_size(), zx::VmoOptions::empty()).unwrap();
-        let file = Arc::new(StatusCodeFile {
-            vmo,
-            pager: pager.clone(),
-            status_code: Mutex::new(zx::Status::INTERNAL),
-            pager_packet_receiver_registration,
+        let file = Arc::new_cyclic(|weak| {
+            let (vmo, pager_packet_receiver_registration) =
+                pager.create_vmo(weak.clone(), page_size(), zx::VmoOptions::empty()).unwrap();
+            StatusCodeFile {
+                vmo,
+                pager: pager.clone(),
+                status_code: Mutex::new(zx::Status::INTERNAL),
+                pager_packet_receiver_registration,
+            }
         });
-        pager.register_file(&file);
 
         fn check_mapping(
             file: &StatusCodeFile,
@@ -1194,8 +1183,7 @@ mod tests {
     async fn test_query_vmo_stats() {
         let scope = ExecutionScope::new();
         let pager = Arc::new(Pager::new(scope.clone()).unwrap());
-        let file = Arc::new(MockFile::new(pager.clone()));
-        pager.register_file(&file);
+        let file = MockFile::new(pager.clone());
 
         let stats = pager.query_vmo_stats(file.vmo(), PagerVmoStatsOptions::empty()).unwrap();
         // The VMO hasn't been modified yet.
@@ -1229,13 +1217,12 @@ mod tests {
         //    is correctly zeroed.
         let scope = ExecutionScope::new();
         let pager = Arc::new(Pager::new(scope.clone()).unwrap());
-        let file = Arc::new(MockFile::new_with_size_and_type(
+        let file = MockFile::new_with_size_and_type(
             pager.clone(),
             page_size() + page_size() / 2,
             zx::VmoOptions::UNBOUNDED,
-        ));
+        );
         let mut buffer = vec![VmoDirtyRange::default(); 2];
-        pager.register_file(&file);
 
         let page_size = page_size();
         assert_eq!(file.vmo().get_content_size().unwrap(), page_size + page_size / 2);
@@ -1322,8 +1309,7 @@ mod tests {
         // When a VMO's content size is explicitly grown, check that new content is zeroed.
         let scope = ExecutionScope::new();
         let pager = Arc::new(Pager::new(scope.clone()).unwrap());
-        let file = Arc::new(MockFile::new(pager.clone()));
-        pager.register_file(&file);
+        let file = MockFile::new(pager.clone());
 
         let write_buf = vec![0xff; page_size() as usize * 2];
         file.vmo().set_stream_size(page_size() * 2).expect("grow");
@@ -1351,7 +1337,7 @@ mod tests {
     async fn test_pager_range_chunks_iter_chunks() {
         let scope = ExecutionScope::new();
         let pager = Arc::new(Pager::new(scope).unwrap());
-        let file = Arc::new(MockFile::new(pager));
+        let file = MockFile::new(pager);
 
         let pager_range = PageInRange::new(0..page_size() * 5, file);
         let ranges: Vec<Range<u64>> = pager_range
@@ -1376,7 +1362,7 @@ mod tests {
     async fn test_pager_range_split() {
         let scope = ExecutionScope::new();
         let pager = Arc::new(Pager::new(scope).unwrap());
-        let file = Arc::new(MockFile::new(pager));
+        let file = MockFile::new(pager);
 
         let pager_range = PageInRange::new(0..page_size() * 10, file);
         let (left, right) = pager_range.split(page_size() * 5);
@@ -1393,7 +1379,7 @@ mod tests {
     async fn test_pager_range_bad_expand_panics() {
         let scope = ExecutionScope::new();
         let pager = Arc::new(Pager::new(scope).unwrap());
-        let file = Arc::new(MockFile::new(pager));
+        let file = MockFile::new(pager);
 
         let pager_range = PageInRange::new(0..page_size() * 2, file);
         pager_range.expand(0..page_size()).consume();
@@ -1416,18 +1402,19 @@ mod tests {
             page_in_fn: F1,
             mark_dirty_fn: F2,
         ) -> Arc<Self> {
-            let pager = Pager::new(ExecutionScope::new()).unwrap();
-            let (vmo, pager_packet_receiver_registration) =
-                pager.create_vmo(page_size() * 2, zx::VmoOptions::TRAP_DIRTY).unwrap();
-            let this = Arc::new(Self {
-                vmo,
-                pager_packet_receiver_registration,
-                pager,
-                page_in_fn: Box::new(page_in_fn),
-                mark_dirty_fn: Box::new(mark_dirty_fn),
-            });
-            this.pager.register_file(&this);
-            this
+            Arc::new_cyclic(|weak| {
+                let pager = Pager::new(ExecutionScope::new()).unwrap();
+                let (vmo, pager_packet_receiver_registration) = pager
+                    .create_vmo(weak.clone(), page_size() * 2, zx::VmoOptions::TRAP_DIRTY)
+                    .unwrap();
+                Self {
+                    vmo,
+                    pager_packet_receiver_registration,
+                    pager,
+                    page_in_fn: Box::new(page_in_fn),
+                    mark_dirty_fn: Box::new(mark_dirty_fn),
+                }
+            })
         }
     }
 
@@ -1644,19 +1631,11 @@ mod tests {
         let pager = Arc::new(Pager::new(scope.clone()).unwrap());
         let page_size = page_size();
         let vmo_size: u64 = page_size * 2;
-        let file_a = Arc::new(MockFile::new_with_size_and_type(
-            pager.clone(),
-            vmo_size,
-            zx::VmoOptions::RESIZABLE,
-        ));
-        let file_b = Arc::new(MockFile::new_with_size_and_type(
-            pager.clone(),
-            vmo_size,
-            zx::VmoOptions::UNBOUNDED,
-        ));
+        let file_a =
+            MockFile::new_with_size_and_type(pager.clone(), vmo_size, zx::VmoOptions::RESIZABLE);
+        let file_b =
+            MockFile::new_with_size_and_type(pager.clone(), vmo_size, zx::VmoOptions::UNBOUNDED);
         let mut buffer = vec![VmoDirtyRange::default(); 3];
-        pager.register_file(&file_a);
-        pager.register_file(&file_b);
 
         assert_eq!(file_a.vmo().get_stream_size().unwrap(), page_size * 2);
         assert_eq!(file_b.vmo().get_stream_size().unwrap(), page_size * 2);
@@ -1767,13 +1746,9 @@ mod tests {
         let pager = Arc::new(Pager::new(scope.clone()).unwrap());
         let page_size = page_size();
         let vmo_size: u64 = page_size * 25600; // 100MiB
-        let file = Arc::new(MockFile::new_with_size_and_type(
-            pager.clone(),
-            vmo_size,
-            zx::VmoOptions::UNBOUNDED,
-        ));
+        let file =
+            MockFile::new_with_size_and_type(pager.clone(), vmo_size, zx::VmoOptions::UNBOUNDED);
         let mut buffer = vec![VmoDirtyRange::default(); 10];
-        pager.register_file(&file);
 
         assert_eq!(file.vmo().get_stream_size().unwrap(), vmo_size);
 
@@ -1799,13 +1774,9 @@ mod tests {
         let pager = Arc::new(Pager::new(scope.clone()).unwrap());
         let page_size = page_size();
         let vmo_size: u64 = page_size * 25600; // 100MiB
-        let file = Arc::new(MockFile::new_with_size_and_type(
-            pager.clone(),
-            vmo_size,
-            zx::VmoOptions::UNBOUNDED,
-        ));
+        let file =
+            MockFile::new_with_size_and_type(pager.clone(), vmo_size, zx::VmoOptions::UNBOUNDED);
         let mut buffer = vec![VmoDirtyRange::default(); 10];
-        pager.register_file(&file);
 
         assert_eq!(file.vmo().get_stream_size().unwrap(), vmo_size);
 
@@ -1853,12 +1824,7 @@ mod tests {
     async fn test_grow_unbounded_vmo() {
         let scope = ExecutionScope::new();
         let pager = Arc::new(Pager::new(scope.clone()).unwrap());
-        let file = Arc::new(MockFile::new_with_size_and_type(
-            pager.clone(),
-            128,
-            zx::VmoOptions::UNBOUNDED,
-        ));
-        pager.register_file(&file);
+        let file = MockFile::new_with_size_and_type(pager.clone(), 128, zx::VmoOptions::UNBOUNDED);
 
         let data = vec![1; 128];
         // Overwrite the 128 after the content size;

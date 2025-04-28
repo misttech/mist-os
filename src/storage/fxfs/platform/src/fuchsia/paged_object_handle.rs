@@ -2359,23 +2359,24 @@ mod tests {
                 transaction.commit().await.unwrap();
                 let (notifications, mut receiver) = unbounded();
 
-                let (vmo, pager_packet_receiver_registration) = file
-                    .owner()
-                    .pager()
-                    .create_vmo(
-                        file.get_size(),
-                        zx::VmoOptions::RESIZABLE | zx::VmoOptions::TRAP_DIRTY,
-                    )
-                    .unwrap();
-                let file = Arc::new(File {
-                    notifications,
-                    handle: PagedObjectHandle::new(file, vmo),
-                    unblocked_requests: Mutex::new(HashSet::new()),
-                    cvar: Condvar::new(),
-                    pager_packet_receiver_registration,
+                let file = Arc::new_cyclic(|weak| {
+                    let (vmo, pager_packet_receiver_registration) = file
+                        .owner()
+                        .pager()
+                        .create_vmo(
+                            weak.clone(),
+                            file.get_size(),
+                            zx::VmoOptions::RESIZABLE | zx::VmoOptions::TRAP_DIRTY,
+                        )
+                        .unwrap();
+                    File {
+                        notifications,
+                        handle: PagedObjectHandle::new(file, vmo),
+                        unblocked_requests: Mutex::new(HashSet::new()),
+                        cvar: Condvar::new(),
+                        pager_packet_receiver_registration,
+                    }
                 });
-
-                file.handle.owner().pager().register_file(&file);
 
                 // Trigger a pager request.
                 let cloned_file = file.clone();
