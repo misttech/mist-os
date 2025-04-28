@@ -25,6 +25,8 @@ use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::signals::{SIGKILL, SIGSYS};
+#[cfg(target_arch = "aarch64")]
+use starnix_uapi::user_address::ArchSpecific;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
@@ -46,7 +48,7 @@ use starnix_uapi::__NR_clock_gettime;
 #[cfg(target_arch = "aarch64")]
 use starnix_uapi::__NR_gettimeofday;
 #[cfg(target_arch = "aarch64")]
-use starnix_uapi::AUDIT_ARCH_AARCH64;
+use starnix_uapi::{AUDIT_ARCH_AARCH64, AUDIT_ARCH_ARM};
 
 #[cfg(target_arch = "x86_64")]
 use starnix_uapi::__NR_clock_gettime;
@@ -188,11 +190,15 @@ impl Drop for SeccompFilterContainer {
     }
 }
 
-fn make_seccomp_data(syscall: &Syscall, ip: u64) -> seccomp_data {
+fn make_seccomp_data(
+    #[allow(unused_variables)] current_task: &CurrentTask,
+    syscall: &Syscall,
+    ip: u64,
+) -> seccomp_data {
     #[cfg(target_arch = "x86_64")]
     let arch_val = AUDIT_ARCH_X86_64;
     #[cfg(target_arch = "aarch64")]
-    let arch_val = AUDIT_ARCH_AARCH64;
+    let arch_val = if current_task.is_arch32() { AUDIT_ARCH_ARM } else { AUDIT_ARCH_AARCH64 };
     #[cfg(target_arch = "riscv64")]
     let arch_val = AUDIT_ARCH_RISCV64;
     seccomp_data {
@@ -267,6 +273,7 @@ impl SeccompFilterContainer {
         }
 
         let data = make_seccomp_data(
+            current_task,
             syscall,
             current_task.thread_state.registers.instruction_pointer_register(),
         );
@@ -499,6 +506,7 @@ impl SeccompState {
                         pid: current_task.id as u32,
                         flags: 0,
                         data: make_seccomp_data(
+                            current_task,
                             syscall,
                             current_task.thread_state.registers.instruction_pointer_register(),
                         ),
