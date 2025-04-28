@@ -13,7 +13,7 @@ use crate::object_store::journal::{self, Journal, JournalCheckpoint, JournalOpti
 use crate::object_store::object_manager::ObjectManager;
 use crate::object_store::transaction::{
     self, lock_keys, AssocObj, LockKey, LockKeys, LockManager, MetadataReservation, Mutation,
-    ReadGuard, Transaction, TRANSACTION_METADATA_MAX_AMOUNT,
+    ReadGuard, Transaction, WriteGuard, TRANSACTION_METADATA_MAX_AMOUNT,
 };
 use crate::object_store::volume::{root_volume, VOLUMES_DIRECTORY};
 use crate::object_store::{ObjectStore, NO_OWNER};
@@ -871,6 +871,11 @@ impl FxFilesystem {
             self.transaction_limit_event.notify(usize::MAX);
         }
     }
+
+    pub async fn truncate_guard(&self, store_id: u64, object_id: u64) -> TruncateGuard<'_> {
+        let keys = lock_keys![LockKey::truncate(store_id, object_id,)];
+        TruncateGuard(self.lock_manager().write_lock(keys).await)
+    }
 }
 
 pub enum TxnGuard<'a> {
@@ -886,6 +891,10 @@ impl TxnGuard<'_> {
         }
     }
 }
+
+/// A wrapper around a guard that needs to be taken when truncating an object.
+#[allow(dead_code)]
+pub struct TruncateGuard<'a>(WriteGuard<'a>);
 
 /// Helper method for making a new filesystem.
 pub async fn mkfs(device: DeviceHolder) -> Result<(), Error> {

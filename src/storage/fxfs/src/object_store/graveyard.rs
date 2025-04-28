@@ -127,11 +127,26 @@ impl Graveyard {
                         self.tombstone_object(store_id, object_id).await
                     };
                     if let Err(e) = res {
-                        error!(error:? = e, store_id, oid = object_id, attribute_id; "Tombstone error");
+                        debug_assert!(
+                            false,
+                            "Tombstone error: {e:?}, store_id: {store_id}, oid: {object_id}, \
+                             attribute_id: {attribute_id:?}"
+                        );
+                        error!(
+                            error:? = e,
+                            store_id,
+                            oid = object_id,
+                            attribute_id;
+                            "Tombstone error"
+                        );
                     }
                 }
                 Message::Trim(store_id, object_id) => {
                     if let Err(e) = self.trim(store_id, object_id).await {
+                        debug_assert!(
+                            false,
+                            "Tombstone error: {e:?}, store_id: {store_id}, oid: {object_id}"
+                        );
                         error!(error:? = e, store_id, oid = object_id; "Tombstone error");
                     }
                 }
@@ -272,7 +287,9 @@ impl Graveyard {
             .object_manager
             .store(store_id)
             .with_context(|| format!("Failed to get store {}", store_id))?;
-        store.trim(object_id).await.context("Failed to trim object")
+        let fs = store.filesystem();
+        let truncate_guard = fs.truncate_guard(store_id, object_id).await;
+        store.trim(object_id, &truncate_guard).await.context("Failed to trim object")
     }
 
     /// Returns an iterator that will return graveyard entries skipping deleted ones.  Example

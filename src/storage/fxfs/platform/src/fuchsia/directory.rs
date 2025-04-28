@@ -98,8 +98,12 @@ impl FxDirectory {
         mut path: Path,
         request: &ObjectRequest,
     ) -> Result<OpenedNode<dyn FxNode>, Error> {
-        if path.is_empty() && !protocols.create_unnamed_temporary_in_directory_path() {
-            return Ok(OpenedNode::new(self.clone()));
+        if path.is_empty() {
+            return if protocols.create_unnamed_temporary_in_directory_path() {
+                self.create_unnamed_temporary_file(request.create_attributes()).await
+            } else {
+                Ok(OpenedNode::new(self.clone()))
+            };
         }
         let store = self.store();
         let fs = store.filesystem();
@@ -108,12 +112,7 @@ impl FxDirectory {
             let last_segment = path.is_single_component();
             let current_dir =
                 current_node.into_any().downcast::<FxDirectory>().map_err(|_| FxfsError::NotDir)?;
-            let name = path.next().unwrap_or_default();
-            // The only situation where we expect the name to be empty is when we are creating a
-            // temporary unnamed file.
-            if name.is_empty() && !protocols.create_unnamed_temporary_in_directory_path() {
-                bail!(FxfsError::InvalidArgs);
-            }
+            let name = path.next().unwrap();
 
             // Create the transaction here if we might need to create the object so that we have a
             // lock in place.
@@ -121,12 +120,11 @@ impl FxDirectory {
                 store.store_object_id(),
                 current_dir.directory.object_id()
             )];
-            let create_object = match protocols.creation_mode() {
-                vfs::CreationMode::AllowExisting | vfs::CreationMode::Always => last_segment,
-                vfs::CreationMode::UnnamedTemporary
-                | vfs::CreationMode::UnlinkableUnnamedTemporary => name.is_empty(),
-                vfs::CreationMode::Never => false,
-            };
+            let create_object = last_segment
+                && matches!(
+                    protocols.creation_mode(),
+                    vfs::CreationMode::AllowExisting | vfs::CreationMode::Always
+                );
             let transaction_or_guard = if create_object {
                 Left(fs.clone().new_transaction(keys, Options::default()).await?)
             } else {
@@ -136,11 +134,7 @@ impl FxDirectory {
                 Right(fs.lock_manager().read_lock(keys).await)
             };
 
-            let create_unnamed_temporary_file_in_this_segment =
-                create_object && protocols.create_unnamed_temporary_in_directory_path();
-            let child_descriptor = if create_unnamed_temporary_file_in_this_segment {
-                None
-            } else {
+            let child_descriptor = {
                 match self.directory.owner().dirent_cache().lookup(&(current_dir.object_id(), name))
                 {
                     Some(node) => {
@@ -185,6 +179,19 @@ impl FxDirectory {
                         bail!(FxfsError::AlreadyExists);
                     }
                     if last_segment {
+                        if protocols.create_unnamed_temporary_in_directory_path() {
+                            if !matches!(object_descriptor, ObjectDescriptor::Directory) {
+                                bail!(FxfsError::WrongType);
+                            }
+                            let dir = child_node
+                                .into_any()
+                                .downcast::<FxDirectory>()
+                                .map_err(|_| FxfsError::Inconsistent)?;
+                            return dir
+                                .create_unnamed_temporary_file(request.create_attributes())
+                                .await;
+                        }
+
                         match object_descriptor {
                             ObjectDescriptor::Directory => {
                                 if !protocols.is_node() && !protocols.is_dir_allowed() {
@@ -221,23 +228,14 @@ impl FxDirectory {
                 }
                 None => {
                     if let Left(mut transaction) = transaction_or_guard {
-                        let new_node = if create_unnamed_temporary_file_in_this_segment {
-                            current_dir
-                                .create_unnamed_temporary_file(
-                                    &mut transaction,
-                                    request.create_attributes(),
-                                )
-                                .await?
-                        } else {
-                            current_dir
-                                .create_child(
-                                    &mut transaction,
-                                    name,
-                                    protocols.create_directory(),
-                                    request.create_attributes(),
-                                )
-                                .await?
-                        };
+                        let new_node = current_dir
+                            .create_child(
+                                &mut transaction,
+                                name,
+                                protocols.create_directory(),
+                                request.create_attributes(),
+                            )
+                            .await?;
                         if let GetResult::Placeholder(p) =
                             self.volume().cache().get_or_reserve(new_node.object_id()).await
                         {
@@ -294,20 +292,33 @@ impl FxDirectory {
 
     async fn create_unnamed_temporary_file(
         self: &Arc<Self>,
-        transaction: &mut Transaction<'_>,
         create_attributes: Option<&fio::MutableNodeAttributes>,
-    ) -> Result<Arc<dyn FxNode>, Error> {
-        let file = FxFile::new_unnamed_temporary(
-            self.directory.create_child_unnamed_temporary_file(transaction).await?,
+    ) -> Result<OpenedNode<dyn FxNode>, Error> {
+        let store = self.store();
+        let fs = store.filesystem();
+        let keys = lock_keys![LockKey::object(store.store_object_id(), self.directory.object_id())];
+        let mut transaction = fs.clone().new_transaction(keys, Options::default()).await?;
+        let file = FxFile::new(
+            self.directory.create_child_unnamed_temporary_file(&mut transaction).await?,
         );
         if let Some(attrs) = create_attributes {
             file.handle()
                 .uncached_handle()
-                .update_attributes(transaction, Some(&attrs), None)
+                .update_attributes(&mut transaction, Some(&attrs), None)
                 .await?;
         }
-
-        Ok(file as Arc<dyn FxNode>)
+        let GetResult::Placeholder(p) =
+            self.volume().cache().get_or_reserve(file.object_id()).await
+        else {
+            bail!(FxfsError::Inconsistent);
+        };
+        transaction
+            .commit_with_callback(|_| {
+                let file = file.open_as_temporary();
+                p.commit(&file);
+                file
+            })
+            .await
     }
 
     /// Called to indicate a file or directory was removed from this directory.

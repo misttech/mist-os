@@ -81,15 +81,11 @@ struct Flags {
 }
 
 /// Open count and state of the file. See the consts defined above.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 #[repr(transparent)]
 struct State(AtomicUsize);
 
 impl State {
-    fn new(state: usize) -> Self {
-        State(AtomicUsize::new(state))
-    }
-
     fn get_flags(&self) -> Flags {
         let state = self.0.load(Ordering::Relaxed);
         Flags {
@@ -103,13 +99,7 @@ impl State {
     fn increment_open_count(&self) -> Option<usize> {
         let mut old = self.0.load(Ordering::Relaxed);
         loop {
-            if !is_unnamed_temporary(old) && will_be_tombstoned(old) {
-                // For regular files, we cannot increment open count if the file has already been
-                // marked to be purged and the open count was zero (this file will be tombstoned).
-                // However, we treat unnamed temporary files as a special case. There is a moment
-                // during its creation where it will have the `TO_BE_PURGED` bit (and
-                // `IS_TEMPORARILY_IN_GRAVEYARD` bit) set, and its open count is zero. This
-                // operation is called to increment to open count to one when creating the file.
+            if will_be_tombstoned(old) {
                 return None;
             }
 
@@ -164,10 +154,8 @@ pub struct FxFile {
 
 #[fxfs_trace::trace]
 impl FxFile {
-    fn create_new_file(
-        handle: DataObjectHandle<FxVolume>,
-        is_unnamed_temporary: bool,
-    ) -> Arc<Self> {
+    /// Creates a new regular FxFile.
+    pub fn new(handle: DataObjectHandle<FxVolume>) -> Arc<Self> {
         let size = handle.get_size();
         let (vmo, pager_packet_receiver_registration) = handle
             .owner()
@@ -176,25 +164,11 @@ impl FxFile {
             .unwrap();
         let file = Arc::new(Self {
             handle: PagedObjectHandle::new(handle, vmo),
-            state: if is_unnamed_temporary {
-                State::new(IS_UNNAMED_TEMPORARY)
-            } else {
-                State::new(0)
-            },
+            state: State::default(),
             pager_packet_receiver_registration,
         });
         file.handle.owner().pager().register_file(&file);
         file
-    }
-
-    /// Creates a new regular FxFile.
-    pub fn new(handle: DataObjectHandle<FxVolume>) -> Arc<Self> {
-        Self::create_new_file(handle, /*is_unnamed_temporary*/ false)
-    }
-
-    /// Creates an unnamed temporary FxFile.
-    pub fn new_unnamed_temporary(handle: DataObjectHandle<FxVolume>) -> Arc<Self> {
-        Self::create_new_file(handle, /*is_unnamed_temporary*/ true)
     }
 
     /// Creates a new connection on the given `scope`. May take a read lock on the object.
@@ -233,7 +207,14 @@ impl FxFile {
         self.state.mark_to_be_purged()
     }
 
-    // Indicate the file is permanent (to be used when the file is currently marked as temporary).
+    /// Open the file as a temporary.  The file must have just been created with no other open
+    /// counts.
+    pub fn open_as_temporary(self: Arc<Self>) -> OpenedNode<dyn FxNode> {
+        assert_eq!(self.state.0.swap(1 | IS_UNNAMED_TEMPORARY, Ordering::Relaxed), 0);
+        OpenedNode(self)
+    }
+
+    /// Indicate the file is permanent (to be used when the file is currently marked as temporary).
     pub fn mark_as_permanent(&self) {
         self.state.mark_as_permanent()
     }
@@ -315,15 +296,6 @@ impl FxFile {
                 // anyway, there is no point.
                 self.handle.owner().clone().spawn(async move {
                     let store = self.handle.store();
-                    let fs = store.filesystem();
-                    // Take a truncate lock on the object, because flush also takes this lock, so
-                    // this will make sure any previously triggered flushes will complete before we
-                    // purge.
-                    let keys = lock_keys![LockKey::truncate(
-                        store.store_object_id(),
-                        self.handle.object_id()
-                    )];
-                    let _flush_guard = fs.lock_manager().write_lock(keys).await;
                     store
                         .filesystem()
                         .graveyard()

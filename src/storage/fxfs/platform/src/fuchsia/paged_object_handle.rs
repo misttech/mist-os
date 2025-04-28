@@ -10,12 +10,12 @@ use anyhow::{anyhow, ensure, Context, Error};
 use fidl_fuchsia_io as fio;
 use fuchsia_sync::Mutex;
 use fxfs::errors::FxfsError;
-use fxfs::filesystem::MAX_FILE_SIZE;
+use fxfs::filesystem::{TruncateGuard, MAX_FILE_SIZE};
 use fxfs::log::*;
 use fxfs::object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle};
 use fxfs::object_store::allocator::{Allocator, Reservation, ReservationOwner};
 use fxfs::object_store::transaction::{
-    lock_keys, LockKey, Options, Transaction, WriteGuard, TRANSACTION_METADATA_MAX_AMOUNT,
+    lock_keys, LockKey, Options, Transaction, TRANSACTION_METADATA_MAX_AMOUNT,
 };
 use fxfs::object_store::{DataObjectHandle, ObjectStore, RangeType, StoreObjectHandle, Timestamp};
 use fxfs::range::RangeExt;
@@ -592,7 +592,7 @@ impl PagedObjectHandle {
         Ok(())
     }
 
-    async fn flush_locked<'a>(&self, _truncate_guard: &WriteGuard<'a>) -> Result<(), Error> {
+    async fn flush_locked<'a>(&self, truncate_guard: &TruncateGuard<'a>) -> Result<(), Error> {
         self.handle.owner().pager().page_in_barrier().await;
 
         let pending_shrink = self.inner.lock().pending_shrink;
@@ -607,7 +607,10 @@ impl PagedObjectHandle {
 
         let pending_shrink = self.inner.lock().pending_shrink;
         if let PendingShrink::NeedsTrim = pending_shrink {
-            self.store().trim(self.object_id()).await.context("Failed to trim file")?;
+            self.store()
+                .trim(self.object_id(), truncate_guard)
+                .await
+                .context("Failed to trim file")?;
             self.inner.lock().pending_shrink = PendingShrink::None;
         }
 
@@ -696,14 +699,10 @@ impl PagedObjectHandle {
         let store = self.handle.store();
         let fs = store.filesystem();
         // If the VMO is shrunk between getting the VMO's size and calling query_dirty_ranges or
-        // reading the cached data then the flush could fail. This lock is held to prevent the file
-        // from shrinking while it's being flushed.
-        // NB: FxFile.open_count_sub_one_and_maybe_flush relies on this lock being taken to make
-        // sure any flushes are done before it adds a file tombstone if the file is going to be
-        // purged. If this lock key changes, it should change there as well.
-        let keys = lock_keys![LockKey::truncate(store.store_object_id(), self.handle.object_id())];
-        let truncate_guard = fs.lock_manager().write_lock(keys).await;
-
+        // reading the cached data then the flush could fail. The truncate guard lock is held to
+        // prevent the file from shrinking while it's being flushed.
+        let truncate_guard =
+            fs.truncate_guard(store.store_object_id(), self.handle.object_id()).await;
         self.flush_locked(&truncate_guard).await
     }
 
@@ -933,15 +932,14 @@ impl PagedObjectHandle {
         // so they all grab the same truncate lock.
         let store = self.store();
         let fs = store.filesystem();
-        let keys = lock_keys![LockKey::truncate(store.store_object_id(), self.handle.object_id())];
-        let flush_guard = fs.lock_manager().write_lock(keys).await;
+        let truncate_guard = fs.truncate_guard(store.store_object_id(), self.object_id()).await;
 
         // There are potentially pending shrink operations. We don't particularly care about the
         // performance of allocate, just correctness, so we flush while holding the truncate lock
         // the whole time to make sure the ordering of those operations is correct. Clearing most
         // of the pending write reservations that might overlap with allocated range is a nice side
         // effect, but it's not really required.
-        self.flush_locked(&flush_guard)
+        self.flush_locked(&truncate_guard)
             .await
             .inspect_err(|error| error!(error:?; "Failed to flush in allocate"))?;
 

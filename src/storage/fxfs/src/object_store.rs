@@ -33,7 +33,8 @@ pub use store_object_handle::{
 
 use crate::errors::FxfsError;
 use crate::filesystem::{
-    ApplyContext, ApplyMode, FxFilesystem, JournalingObject, SyncOptions, TxnGuard, MAX_FILE_SIZE,
+    ApplyContext, ApplyMode, FxFilesystem, JournalingObject, SyncOptions, TruncateGuard, TxnGuard,
+    MAX_FILE_SIZE,
 };
 use crate::log::*;
 use crate::lsm_tree::cache::{NullCache, ObjectCache};
@@ -1149,12 +1150,18 @@ impl ObjectStore {
         txn_options: Options<'_>,
     ) -> Result<(), Error> {
         self.key_manager.remove(object_id).await;
-        self.trim_or_tombstone(object_id, true, txn_options).await
+        let fs = self.filesystem();
+        let truncate_guard = fs.truncate_guard(self.store_object_id, object_id).await;
+        self.trim_or_tombstone(object_id, true, txn_options, &truncate_guard).await
     }
 
     /// Trim extents beyond the end of a file for all attributes.  This will remove the entry from
     /// the graveyard when done.
-    pub async fn trim(&self, object_id: u64) -> Result<(), Error> {
+    pub async fn trim(
+        &self,
+        object_id: u64,
+        truncate_guard: &TruncateGuard<'_>,
+    ) -> Result<(), Error> {
         // For the root and root parent store, we would need to use the metadata reservation which
         // we don't currently support, so assert that we're not those stores.
         assert!(self.parent_store.as_ref().unwrap().parent_store.is_some());
@@ -1163,15 +1170,18 @@ impl ObjectStore {
             object_id,
             false,
             Options { borrow_metadata_space: true, ..Default::default() },
+            truncate_guard,
         )
         .await
     }
 
+    /// Trims or tombstones an object.
     async fn trim_or_tombstone(
         &self,
         object_id: u64,
         for_tombstone: bool,
         txn_options: Options<'_>,
+        _truncate_guard: &TruncateGuard<'_>,
     ) -> Result<(), Error> {
         let fs = self.filesystem();
         let mut next_attribute = Some(0);
