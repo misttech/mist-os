@@ -190,7 +190,7 @@ struct Fine {
 // hierarchy lock is used.
 #if VMO_FINE_LOCK
 #define VMO_USE_LOCAL_LOCK true
-#define VMO_USE_SHARED_LOCK true
+#define VMO_USE_SHARED_LOCK false
 #else
 #define VMO_USE_LOCAL_LOCK (LOCK_DEP_ENABLED_FEATURE_LEVEL > 0)
 #define VMO_USE_SHARED_LOCK true
