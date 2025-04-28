@@ -97,6 +97,7 @@ template("sherlock_driver") {
       "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp",
       "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_bindlib_cpp",
+      "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
       "//sdk/lib/driver/component/cpp:cpp",
       "//sdk/lib/driver/outgoing/cpp",
       "//src/connectivity/openthread/lib/ot-radio",

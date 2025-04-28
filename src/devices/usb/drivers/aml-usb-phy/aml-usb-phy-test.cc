@@ -130,12 +130,23 @@ class AmlUsbPhyTest : public testing::Test {
  public:
   void SetUp() override {
     static constexpr uint32_t kMagicNumbers[8] = {};
-    static constexpr uint8_t kPhyType = kG12A;
-    static const std::vector<UsbPhyMode> kPhyModes = {
-        {UsbProtocol::Usb2_0, UsbMode::Host, false},
-        {UsbProtocol::Usb2_0, UsbMode::Otg, true},
-        {UsbProtocol::Usb3_0, UsbMode::Host, false},
+    static constexpr fuchsia_hardware_usb_phy::AmlogicPhyType kPhyType =
+        fuchsia_hardware_usb_phy::AmlogicPhyType::kG12A;
+    static const std::vector<fuchsia_hardware_usb_phy::UsbPhyMode> kPhyModes = {
+        {{.protocol = fuchsia_hardware_usb_phy::ProtocolVersion::kUsb20,
+          .dr_mode = fuchsia_hardware_usb_phy::Mode::kHost,
+          .is_otg_capable = false}},
+        {{.protocol = fuchsia_hardware_usb_phy::ProtocolVersion::kUsb20,
+          .dr_mode = fuchsia_hardware_usb_phy::Mode::kOtg,
+          .is_otg_capable = true}},
+        {{.protocol = fuchsia_hardware_usb_phy::ProtocolVersion::kUsb30,
+          .dr_mode = fuchsia_hardware_usb_phy::Mode::kHost,
+          .is_otg_capable = false}},
     };
+    static const fuchsia_hardware_usb_phy::Metadata kMetadata{{
+        .usb_phy_modes = kPhyModes,
+        .phy_type = kPhyType,
+    }};
 
     fuchsia_driver_framework::DriverStartArgs start_args;
     incoming_.SyncCall([&](IncomingNamespace* incoming) {
@@ -154,11 +165,11 @@ class AmlUsbPhyTest : public testing::Test {
       auto status = incoming->device_server_.AddMetadata(DEVICE_METADATA_PRIVATE, &kMagicNumbers,
                                                          sizeof(kMagicNumbers));
       EXPECT_EQ(ZX_OK, status);
+
+      fit::result persisted_metadata = fidl::Persist(kMetadata);
+      ASSERT_TRUE(persisted_metadata.is_ok());
       status = incoming->device_server_.AddMetadata(
-          DEVICE_METADATA_PRIVATE_PHY_TYPE | DEVICE_METADATA_PRIVATE, &kPhyType, sizeof(kPhyType));
-      EXPECT_EQ(ZX_OK, status);
-      status = incoming->device_server_.AddMetadata(DEVICE_METADATA_USB_MODE, kPhyModes.data(),
-                                                    kPhyModes.size() * sizeof(kPhyModes[0]));
+          DEVICE_METADATA_USB_MODE, persisted_metadata->data(), persisted_metadata->size());
       EXPECT_EQ(ZX_OK, status);
       status = incoming->device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                               &incoming->env_.incoming_directory());
@@ -206,9 +217,10 @@ class AmlUsbPhyTest : public testing::Test {
   }
 
   // This method fires the irq and then waits for the side effects of SetMode to have taken place.
-  void TriggerInterruptAndCheckMode(UsbMode mode) {
+  void TriggerInterruptAndCheckMode(fuchsia_hardware_usb_phy::Mode mode) {
     // Switch to appropriate mode. This will be read by the irq thread.
-    dut_->usbctrl_mmio().reg_values_[USB_R5_OFFSET >> 2] = (mode == UsbMode::Peripheral) << 6;
+    dut_->usbctrl_mmio().reg_values_[USB_R5_OFFSET >> 2] =
+        (mode == fuchsia_hardware_usb_phy::Mode::kPeripheral) << 6;
     // Wake up the irq thread.
     incoming_.SyncCall([](IncomingNamespace* incoming) {
       incoming->pdev_server.irq().trigger(0, zx::clock::get_boot());
@@ -217,9 +229,11 @@ class AmlUsbPhyTest : public testing::Test {
 
     // Check that mode is as expected.
     auto& phy = dut_->device();
-    EXPECT_EQ(phy->usbphy(UsbProtocol::Usb2_0, 0)->phy_mode(), UsbMode::Host);
-    EXPECT_EQ(phy->usbphy(UsbProtocol::Usb2_0, 1)->phy_mode(), mode);
-    EXPECT_EQ(phy->usbphy(UsbProtocol::Usb3_0, 0)->phy_mode(), UsbMode::Host);
+    EXPECT_EQ(phy->usbphy(fuchsia_hardware_usb_phy::ProtocolVersion::kUsb20, 0)->phy_mode(),
+              fuchsia_hardware_usb_phy::Mode::kHost);
+    EXPECT_EQ(phy->usbphy(fuchsia_hardware_usb_phy::ProtocolVersion::kUsb20, 1)->phy_mode(), mode);
+    EXPECT_EQ(phy->usbphy(fuchsia_hardware_usb_phy::ProtocolVersion::kUsb30, 0)->phy_mode(),
+              fuchsia_hardware_usb_phy::Mode::kHost);
   }
 
   void CheckDevices(fdf_testing::TestNode* test_node, std::vector<std::string> devices) {
@@ -266,16 +280,16 @@ TEST_F(AmlUsbPhyTest, SetMode) {
   CheckDevices(phy, {"xhci"});
 
   // Trigger interrupt configuring initial Host mode.
-  TriggerInterruptAndCheckMode(UsbMode::Host);
+  TriggerInterruptAndCheckMode(fuchsia_hardware_usb_phy::Mode::kHost);
   // Nothing should've changed.
   CheckDevices(phy, {"xhci"});
 
   // Trigger interrupt, and switch to Peripheral mode.
-  TriggerInterruptAndCheckMode(UsbMode::Peripheral);
+  TriggerInterruptAndCheckMode(fuchsia_hardware_usb_phy::Mode::kPeripheral);
   CheckDevices(phy, {"xhci", "dwc2"});
 
   // Trigger interrupt, and switch (back) to Host mode.
-  TriggerInterruptAndCheckMode(UsbMode::Host);
+  TriggerInterruptAndCheckMode(fuchsia_hardware_usb_phy::Mode::kHost);
   // The dwc2 device should be removed.
   CheckDevices(phy, {"xhci"});
 }

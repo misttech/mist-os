@@ -54,7 +54,6 @@ cc_library(
         "include/soc/aml-common/aml-sdmmc.h",
         "include/soc/aml-common/aml-spi.h",
         "include/soc/aml-common/aml-tdm-audio.h",
-        "include/soc/aml-common/aml-usb-phy.h",
         "include/soc/aml-meson/a1-clk.h",
         "include/soc/aml-meson/a5-clk.h",
         "include/soc/aml-meson/aml-clk-common.h",

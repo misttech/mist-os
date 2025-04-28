@@ -4,6 +4,7 @@
 
 #include "../aml-usb-phy-visitor.h"
 
+#include <fidl/fuchsia.hardware.usb.phy/cpp/fidl.h>
 #include <lib/driver/devicetree/testing/visitor-test-helper.h>
 #include <lib/driver/devicetree/visitors/default/bind-property/bind-property.h>
 #include <lib/driver/devicetree/visitors/registry.h>
@@ -11,7 +12,6 @@
 #include <cstdint>
 
 #include <gtest/gtest.h>
-#include <soc/aml-common/aml-usb-phy.h>
 #include <usb/usb.h>
 
 namespace aml_usb_phy_visitor_dt {
@@ -51,28 +51,25 @@ TEST(AmlUsbPhyVisitorTest, TestMetadataAndBindProperty) {
 
       // Test metadata properties.
       ASSERT_TRUE(metadata);
-      ASSERT_EQ(2lu, metadata->size());
-
-      // PhyType metadata
-      std::vector<uint8_t> metadata_blob_1 = std::move(*(*metadata)[0].data());
-      auto phy_type = reinterpret_cast<PhyType*>(metadata_blob_1.data());
-      EXPECT_EQ(*phy_type, kG12B);
+      ASSERT_EQ(1lu, metadata->size());
 
       // Drive mode metadata
-      std::vector<uint8_t> metadata_blob_2 = std::move(*(*metadata)[1].data());
-      auto metadata_start_2 = reinterpret_cast<UsbPhyMode*>(metadata_blob_2.data());
-      std::vector<UsbPhyMode> phy_modes(
-          metadata_start_2, metadata_start_2 + (metadata_blob_2.size() / sizeof(UsbPhyMode)));
+      std::vector<uint8_t> metadata_blob_1 = std::move(*(*metadata)[0].data());
+      fit::result usb_phy_metadata =
+          fidl::Unpersist<fuchsia_hardware_usb_phy::Metadata>(metadata_blob_1);
+      ASSERT_TRUE(usb_phy_metadata.is_ok());
+      EXPECT_EQ(usb_phy_metadata->phy_type(), fuchsia_hardware_usb_phy::AmlogicPhyType::kG12B);
+      const auto& phy_modes = usb_phy_metadata->usb_phy_modes().value();
       ASSERT_EQ(phy_modes.size(), 3lu);
-      EXPECT_EQ(phy_modes[0].protocol, UsbProtocol::Usb2_0);
-      EXPECT_EQ(phy_modes[0].dr_mode, USB_MODE_HOST);
-      EXPECT_EQ(phy_modes[0].is_otg_capable, false);
-      EXPECT_EQ(phy_modes[1].protocol, UsbProtocol::Usb2_0);
-      EXPECT_EQ(phy_modes[1].dr_mode, USB_MODE_PERIPHERAL);
-      EXPECT_EQ(phy_modes[1].is_otg_capable, true);
-      EXPECT_EQ(phy_modes[2].protocol, UsbProtocol::Usb3_0);
-      EXPECT_EQ(phy_modes[2].dr_mode, USB_MODE_HOST);
-      EXPECT_EQ(phy_modes[2].is_otg_capable, false);
+      EXPECT_EQ(phy_modes[0].protocol(), fuchsia_hardware_usb_phy::ProtocolVersion::kUsb20);
+      EXPECT_EQ(phy_modes[0].dr_mode(), fuchsia_hardware_usb_phy::Mode::kHost);
+      EXPECT_EQ(phy_modes[0].is_otg_capable(), false);
+      EXPECT_EQ(phy_modes[1].protocol(), fuchsia_hardware_usb_phy::ProtocolVersion::kUsb20);
+      EXPECT_EQ(phy_modes[1].dr_mode(), fuchsia_hardware_usb_phy::Mode::kPeripheral);
+      EXPECT_EQ(phy_modes[1].is_otg_capable(), true);
+      EXPECT_EQ(phy_modes[2].protocol(), fuchsia_hardware_usb_phy::ProtocolVersion::kUsb30);
+      EXPECT_EQ(phy_modes[2].dr_mode(), fuchsia_hardware_usb_phy::Mode::kHost);
+      EXPECT_EQ(phy_modes[2].is_otg_capable(), false);
     }
   }
 

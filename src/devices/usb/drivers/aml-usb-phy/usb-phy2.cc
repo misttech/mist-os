@@ -42,7 +42,7 @@ void UsbPhy2::dump_regs() const {
 }
 
 // Based on set_usb_pll() in phy-aml-new-usb2-v2.c
-void UsbPhy2::InitPll(PhyType type, bool needs_hack) {
+void UsbPhy2::InitPll(fuchsia_hardware_usb_phy::AmlogicPhyType type, bool needs_hack) {
   PHY2_R16::Get()
       .FromValue(0)
       .set_usb2_mppll_m(0x14)
@@ -100,7 +100,7 @@ void UsbPhy2::InitPll(PhyType type, bool needs_hack) {
       .set_usb2_edgedrv_trim(3)
       .WriteTo(&mmio());
 
-  if (type == PhyType::kG12A) {
+  if (type == fuchsia_hardware_usb_phy::AmlogicPhyType::kG12A) {
     PHY2_R4::Get()
         .FromValue(0)
         .set_Calibration_code_Value(0xfff)
@@ -114,7 +114,7 @@ void UsbPhy2::InitPll(PhyType type, bool needs_hack) {
         .set_Update_PMA_signals(1)
         .set_minimum_count_for_sync_detection(7)
         .WriteTo(&mmio());
-  } else if (type == PhyType::kG12B) {
+  } else if (type == fuchsia_hardware_usb_phy::AmlogicPhyType::kG12B) {
     PHY2_R21::Get()
         .FromValue(0)
         .set_usb2_cal_ack_en(1)
@@ -128,26 +128,30 @@ void UsbPhy2::InitPll(PhyType type, bool needs_hack) {
   PHY2_R3::Get()
       .FromValue(0)
       .set_disc_ref(3)
-      .set_hsdic_ref(type == PhyType::kG12A ? 3 : 2)
+      .set_hsdic_ref(type == fuchsia_hardware_usb_phy::AmlogicPhyType::kG12A ? 3 : 2)
       .WriteTo(&mmio());
 }
 
-void UsbPhy2::SetModeInternal(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio) {
-  ZX_DEBUG_ASSERT(mode == UsbMode::Host || mode == UsbMode::Peripheral);
-  if ((dr_mode() == UsbMode::Host && mode != UsbMode::Host) ||
-      (dr_mode() == UsbMode::Peripheral && mode != UsbMode::Peripheral)) {
+void UsbPhy2::SetModeInternal(fuchsia_hardware_usb_phy::Mode mode, fdf::MmioBuffer& usbctrl_mmio) {
+  ZX_DEBUG_ASSERT(mode == fuchsia_hardware_usb_phy::Mode::kHost ||
+                  mode == fuchsia_hardware_usb_phy::Mode::kPeripheral);
+  if ((dr_mode() == fuchsia_hardware_usb_phy::Mode::kHost &&
+       mode != fuchsia_hardware_usb_phy::Mode::kHost) ||
+      (dr_mode() == fuchsia_hardware_usb_phy::Mode::kPeripheral &&
+       mode != fuchsia_hardware_usb_phy::Mode::kPeripheral)) {
     FDF_LOG(ERROR, "If dr_mode_ is not USB_MODE_OTG, dr_mode_ must match requested mode.");
     return;
   }
 
-  FDF_LOG(INFO, "Entering USB %s Mode", mode == UsbMode::Host ? "Host" : "Peripheral");
+  FDF_LOG(INFO, "Entering USB %s Mode",
+          mode == fuchsia_hardware_usb_phy::Mode::kHost ? "Host" : "Peripheral");
 
   if (mode == phy_mode())
     return;
 
   if (is_otg_capable()) {
     auto r0 = USB_R0_V2::Get().ReadFrom(&usbctrl_mmio);
-    if (mode == UsbMode::Host) {
+    if (mode == fuchsia_hardware_usb_phy::Mode::kHost) {
       r0.set_u2d_act(0);
     } else {
       r0.set_u2d_act(1);
@@ -157,13 +161,13 @@ void UsbPhy2::SetModeInternal(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio) {
 
     USB_R4_V2::Get()
         .ReadFrom(&usbctrl_mmio)
-        .set_p21_sleepm0(mode == UsbMode::Peripheral)
+        .set_p21_sleepm0(mode == fuchsia_hardware_usb_phy::Mode::kPeripheral)
         .WriteTo(&usbctrl_mmio);
   }
 
   U2P_R0_V2::Get(idx_)
       .ReadFrom(&usbctrl_mmio)
-      .set_host_device(mode == UsbMode::Host)
+      .set_host_device(mode == fuchsia_hardware_usb_phy::Mode::kHost)
       .set_por(0)
       .WriteTo(&usbctrl_mmio);
 }

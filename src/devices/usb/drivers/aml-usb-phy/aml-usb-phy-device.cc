@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
@@ -27,76 +28,12 @@ namespace {
   DUMP_REG(A0_RTI_GEN_PWR_ISO0, mmio)
 }
 
-[[maybe_unused]] void dump_hhi_mem_pd_regs(const fdf::MmioBuffer& mmio) {
-  DUMP_REG(HHI_MEM_PD_REG0, mmio)
-}
+[[maybe_unused]] void dump_hhi_mem_pd_regs(const fdf::MmioBuffer& mmio){
+    DUMP_REG(HHI_MEM_PD_REG0, mmio)}
 
-struct PhyMetadata {
-  PhyType type;
-  std::vector<UsbPhyMode> phy_modes;
-};
-
-zx::result<PhyMetadata> ParseMetadata(
-    const fidl::VectorView<fuchsia_driver_compat::wire::Metadata>& metadata) {
-  PhyMetadata parsed_metadata;
-  bool found_phy_type = false;
-  for (const auto& m : metadata) {
-    if (m.type == (DEVICE_METADATA_PRIVATE_PHY_TYPE | DEVICE_METADATA_PRIVATE)) {
-      size_t size;
-      auto status = m.data.get_prop_content_size(&size);
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to get_prop_content_size %s", zx_status_get_string(status));
-        continue;
-      }
-
-      if (size != sizeof(PhyType)) {
-        FDF_LOG(ERROR, "Unexpected metadata size: got %zu, expected %zu", size, sizeof(PhyType));
-        continue;
-      }
-
-      status = m.data.read(&parsed_metadata.type, 0, size);
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to read %s", zx_status_get_string(status));
-        continue;
-      }
-
-      found_phy_type = true;
-    }
-
-    if (m.type == DEVICE_METADATA_USB_MODE) {
-      size_t size;
-      auto status = m.data.get_prop_content_size(&size);
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to get_prop_content_size %s", zx_status_get_string(status));
-        continue;
-      }
-
-      if (size % sizeof(UsbPhyMode)) {
-        FDF_LOG(ERROR, "Unexpected metadata size: got %zu, expected divisible by %zu", size,
-                sizeof(UsbPhyMode));
-        continue;
-      }
-
-      parsed_metadata.phy_modes.resize(size / sizeof(UsbPhyMode));
-      status = m.data.read(parsed_metadata.phy_modes.data(), 0, size);
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to read %s", zx_status_get_string(status));
-        continue;
-      }
-    }
-  }
-
-  if (found_phy_type) {
-    return zx::ok(parsed_metadata);
-  }
-
-  FDF_LOG(ERROR, "Failed to parse metadata. Metadata needs to have phy_type.");
-  return zx::error(ZX_ERR_NOT_FOUND);
-}
-
-zx_status_t PowerOn(fidl::ClientEnd<fuchsia_hardware_registers::Device>& reset_register,
-                    fdf::MmioBuffer& power_mmio, fdf::MmioBuffer& sleep_mmio,
-                    bool dump_regs = false) {
+zx_status_t
+    PowerOn(fidl::ClientEnd<fuchsia_hardware_registers::Device>& reset_register,
+            fdf::MmioBuffer& power_mmio, fdf::MmioBuffer& sleep_mmio, bool dump_regs = false) {
   A0_RTI_GEN_PWR_SLEEP0::Get().ReadFrom(&sleep_mmio).set_usb_comb_power_off(0).WriteTo(&sleep_mmio);
   HHI_MEM_PD_REG0::Get().ReadFrom(&power_mmio).set_usb_comb_pd(0).WriteTo(&power_mmio);
   zx::nanosleep(zx::deadline_after(zx::usec(100)));
@@ -174,35 +111,11 @@ zx::result<> AmlUsbPhyDevice::Start() {
   }
 
   // Get metadata.
-  PhyMetadata parsed_metadata;
-  {
-    zx::result result = incoming()->Connect<fuchsia_driver_compat::Service::Device>("pdev");
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to open compat service: %s", result.status_string());
-      return result.take_error();
-    }
-    auto compat = fidl::WireSyncClient(std::move(result.value()));
-    if (!compat.is_valid()) {
-      FDF_LOG(ERROR, "Failed to get compat");
-      return zx::error(ZX_ERR_NO_RESOURCES);
-    }
-
-    auto metadata = compat->GetMetadata();
-    if (!metadata.ok()) {
-      FDF_LOG(ERROR, "Failed to GetMetadata %s", metadata.error().FormatDescription().c_str());
-      return zx::error(metadata.error().status());
-    }
-    if (metadata->is_error()) {
-      FDF_LOG(ERROR, "Failed to GetMetadata %s", zx_status_get_string(metadata->error_value()));
-      return metadata->take_error();
-    }
-
-    auto vals = ParseMetadata(metadata.value()->metadata);
-    if (vals.is_error()) {
-      FDF_LOG(ERROR, "Failed to ParseMetadata %s", zx_status_get_string(vals.error_value()));
-      return vals.take_error();
-    }
-    parsed_metadata = vals.value();
+  zx::result usb_phy_metadata = compat::GetMetadata<fuchsia_hardware_usb_phy::Metadata>(
+      incoming(), DEVICE_METADATA_USB_MODE, "pdev");
+  if (usb_phy_metadata.is_error()) {
+    FDF_LOG(ERROR, "Failed to get metadata: %s", usb_phy_metadata.status_string());
+    return usb_phy_metadata.take_error();
   }
 
   // Get mmio.
@@ -239,22 +152,44 @@ zx::result<> AmlUsbPhyDevice::Start() {
     }
 
     uint32_t idx = 1;
-    for (auto& phy_mode : parsed_metadata.phy_modes) {
-      if (auto mmio = MapMmio(pdev, idx); mmio.is_error()) {
+    const auto& usb_phy_modes = usb_phy_metadata.value().usb_phy_modes();
+    if (!usb_phy_modes.has_value()) {
+      FDF_LOG(ERROR, "Metadata missing usb_phy_modes field");
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    for (size_t i = 0; i < usb_phy_modes.value().size(); ++i) {
+      zx::result mmio = MapMmio(pdev, idx);
+      if (mmio.is_error()) {
         return mmio.take_error();
-      } else {
-        switch (phy_mode.protocol) {
-          case Usb2_0: {
-            usbphy2.emplace_back(usbphy2.size(), std::move(*mmio), phy_mode.is_otg_capable,
-                                 phy_mode.dr_mode);
-          } break;
-          case Usb3_0: {
-            usbphy3.emplace_back(std::move(*mmio), phy_mode.is_otg_capable, phy_mode.dr_mode);
-          } break;
-          default:
-            FDF_LOG(ERROR, "Unsupported protocol type %d", phy_mode.protocol);
-            break;
-        }
+      }
+      const auto& phy_mode = usb_phy_modes.value()[i];
+      const auto& protocol = phy_mode.protocol();
+      if (!protocol.has_value()) {
+        FDF_LOG(ERROR, "Phy-mode %lu missing protocol field", i);
+        return zx::error(ZX_ERR_INTERNAL);
+      }
+      const auto& is_otg_capable = phy_mode.is_otg_capable();
+      if (!is_otg_capable.has_value()) {
+        FDF_LOG(ERROR, "Phy-mode %lu missing is_otg_capable field", i);
+        return zx::error(ZX_ERR_INTERNAL);
+      }
+      const auto& dr_mode = phy_mode.dr_mode();
+      if (!is_otg_capable.has_value()) {
+        FDF_LOG(ERROR, "Phy-mode %lu missing dr_mode field", i);
+        return zx::error(ZX_ERR_INTERNAL);
+      }
+
+      switch (protocol.value()) {
+        case fuchsia_hardware_usb_phy::ProtocolVersion::kUsb20: {
+          usbphy2.emplace_back(usbphy2.size(), std::move(*mmio), is_otg_capable.value(),
+                               dr_mode.value());
+        } break;
+        case fuchsia_hardware_usb_phy::ProtocolVersion::kUsb30: {
+          usbphy3.emplace_back(std::move(*mmio), is_otg_capable.value(), dr_mode.value());
+        } break;
+        default:
+          FDF_LOG(ERROR, "Unsupported protocol type %u", static_cast<uint32_t>(protocol.value()));
+          break;
       }
       idx++;
     }
@@ -285,7 +220,12 @@ zx::result<> AmlUsbPhyDevice::Start() {
   }
 
   // Create and initialize device
-  device_ = std::make_unique<AmlUsbPhy>(this, parsed_metadata.type, std::move(reset_register),
+  const auto& phy_type = usb_phy_metadata.value().phy_type();
+  if (!phy_type.has_value()) {
+    FDF_LOG(ERROR, "Metadata missing phy_type field");
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  device_ = std::make_unique<AmlUsbPhy>(this, phy_type.value(), std::move(reset_register),
                                         std::move(*usbctrl_mmio), std::move(irq),
                                         std::move(usbphy2), std::move(usbphy3), needs_hack);
 

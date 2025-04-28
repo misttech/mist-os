@@ -74,7 +74,7 @@ zx_status_t AmlUsbPhy::InitPhy2() {
       u2p_ro_v2.set_idpullup0(1).set_drvvbus0(1);
     }
     u2p_ro_v2.set_por(1)
-        .set_host_device(phy.dr_mode() != UsbMode::Peripheral)
+        .set_host_device(phy.dr_mode() != fuchsia_hardware_usb_phy::Mode::kPeripheral)
         .WriteTo(usbctrl_mmio);
     u2p_ro_v2.set_por(0).WriteTo(usbctrl_mmio);
   }
@@ -149,22 +149,22 @@ zx_status_t AmlUsbPhy::InitPhy3() {
   return ZX_OK;
 }
 
-void AmlUsbPhy::ChangeMode(UsbPhyBase& phy, UsbMode new_mode) {
+void AmlUsbPhy::ChangeMode(UsbPhyBase& phy, fuchsia_hardware_usb_phy::Mode new_mode) {
   auto old_mode = phy.phy_mode();
   if (new_mode == old_mode) {
-    FDF_LOG(ERROR, "Already in %d mode", static_cast<uint8_t>(new_mode));
+    FDF_LOG(ERROR, "Already in %d mode", static_cast<uint32_t>(new_mode));
     return;
   }
   phy.SetMode(new_mode, usbctrl_mmio_);
 
-  if (new_mode == UsbMode::Host) {
+  if (new_mode == fuchsia_hardware_usb_phy::Mode::kHost) {
     ++controller_->xhci_;
-    if (old_mode != UsbMode::Unknown) {
+    if (old_mode != fuchsia_hardware_usb_phy::Mode::kUnknown) {
       --controller_->dwc2_;
     }
   } else {
     ++controller_->dwc2_;
-    if (old_mode != UsbMode::Unknown) {
+    if (old_mode != fuchsia_hardware_usb_phy::Mode::kUnknown) {
       --controller_->xhci_;
     }
   }
@@ -187,11 +187,12 @@ void AmlUsbPhy::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, z
 
     // Read current host/device role.
     for (auto& phy : usbphy2_) {
-      if (phy.dr_mode() != UsbMode::Otg) {
+      if (phy.dr_mode() != fuchsia_hardware_usb_phy::Mode::kOtg) {
         continue;
       }
 
-      ChangeMode(phy, r5.iddig_curr() == 0 ? UsbMode::Host : UsbMode::Peripheral);
+      ChangeMode(phy, r5.iddig_curr() == 0 ? fuchsia_hardware_usb_phy::Mode::kHost
+                                           : fuchsia_hardware_usb_phy::Mode::kPeripheral);
     }
   }
 
@@ -217,26 +218,29 @@ zx_status_t AmlUsbPhy::Init() {
   }
 
   for (auto& phy : usbphy2_) {
-    UsbMode mode;
-    if (phy.dr_mode() != UsbMode::Otg) {
-      mode = phy.dr_mode() == UsbMode::Host ? UsbMode::Host : UsbMode::Peripheral;
+    fuchsia_hardware_usb_phy::Mode mode;
+    if (phy.dr_mode() != fuchsia_hardware_usb_phy::Mode::kOtg) {
+      mode = phy.dr_mode() == fuchsia_hardware_usb_phy::Mode::kHost
+                 ? fuchsia_hardware_usb_phy::Mode::kHost
+                 : fuchsia_hardware_usb_phy::Mode::kPeripheral;
     } else {
       has_otg = true;
       // Wait for PHY to stabilize before reading initial mode.
       zx::nanosleep(zx::deadline_after(zx::sec(1)));
-      mode = USB_R5_V2::Get().ReadFrom(&usbctrl_mmio_).iddig_curr() == 0 ? UsbMode::Host
-                                                                         : UsbMode::Peripheral;
+      mode = USB_R5_V2::Get().ReadFrom(&usbctrl_mmio_).iddig_curr() == 0
+                 ? fuchsia_hardware_usb_phy::Mode::kHost
+                 : fuchsia_hardware_usb_phy::Mode::kPeripheral;
     }
 
     ChangeMode(phy, mode);
   }
 
   for (auto& phy : usbphy3_) {
-    if (phy.dr_mode() != UsbMode::Host) {
+    if (phy.dr_mode() != fuchsia_hardware_usb_phy::Mode::kHost) {
       FDF_LOG(ERROR, "Not support USB3 in non-host mode yet");
     }
 
-    ChangeMode(phy, UsbMode::Host);
+    ChangeMode(phy, fuchsia_hardware_usb_phy::Mode::kHost);
   }
 
   if (has_otg) {

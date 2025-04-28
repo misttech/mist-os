@@ -20,7 +20,7 @@ namespace aml_usb_phy {
 
 class AmlUsbPhy : public fdf::Server<fuchsia_hardware_usb_phy::UsbPhy> {
  public:
-  AmlUsbPhy(AmlUsbPhyDevice* controller, PhyType type,
+  AmlUsbPhy(AmlUsbPhyDevice* controller, fuchsia_hardware_usb_phy::AmlogicPhyType type,
             fidl::ClientEnd<fuchsia_hardware_registers::Device> reset_register,
             fdf::MmioBuffer usbctrl_mmio, zx::interrupt irq, std::vector<UsbPhy2> usbphy2,
             std::vector<UsbPhy3> usbphy3, bool needs_hack)
@@ -49,9 +49,10 @@ class AmlUsbPhy : public fdf::Server<fuchsia_hardware_usb_phy::UsbPhy> {
 
   // For testing.
   bool dwc2_connected() const { return dwc2_connected_; }
-  UsbPhyBase* usbphy(UsbProtocol proto, uint32_t idx) {
-    return proto == UsbProtocol::Usb2_0 ? static_cast<UsbPhyBase*>(&usbphy2_.at(idx))
-                                        : static_cast<UsbPhyBase*>(&usbphy3_.at(idx));
+  UsbPhyBase* usbphy(fuchsia_hardware_usb_phy::ProtocolVersion proto, uint32_t idx) {
+    return proto == fuchsia_hardware_usb_phy::ProtocolVersion::kUsb20
+               ? static_cast<UsbPhyBase*>(&usbphy2_.at(idx))
+               : static_cast<UsbPhyBase*>(&usbphy3_.at(idx));
   }
 
  private:
@@ -61,7 +62,7 @@ class AmlUsbPhy : public fdf::Server<fuchsia_hardware_usb_phy::UsbPhy> {
   zx_status_t InitPhy3();
   zx_status_t InitOtg();
 
-  void ChangeMode(UsbPhyBase& phy, UsbMode new_mode);
+  void ChangeMode(UsbPhyBase& phy, fuchsia_hardware_usb_phy::Mode new_mode);
 
   void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
                  const zx_packet_interrupt_t* interrupt);
@@ -69,7 +70,7 @@ class AmlUsbPhy : public fdf::Server<fuchsia_hardware_usb_phy::UsbPhy> {
   // Used for debugging.
   void dump_regs();
 
-  const PhyType type_;
+  const fuchsia_hardware_usb_phy::AmlogicPhyType type_;
   AmlUsbPhyDevice* controller_;
 
   fidl::WireSyncClient<fuchsia_hardware_registers::Device> reset_register_;

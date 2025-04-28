@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.usb.phy/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
@@ -21,7 +22,6 @@
 #include <bind/fuchsia/register/cpp/bind.h>
 #include <bind/fuchsia/usb/phy/cpp/bind.h>
 #include <soc/aml-common/aml-registers.h>
-#include <soc/aml-common/aml-usb-phy.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 #include <usb/cdc.h>
 #include <usb/dwc2/metadata.h>
@@ -149,42 +149,45 @@ static const std::vector<fpbus::Irq> usb_phy_irqs{
     }},
 };
 
-static const PhyType type = kG12A;
-
-static const std::vector<UsbPhyMode> phy_modes = {
-    {UsbProtocol::Usb2_0, UsbMode::Host, false},
-    {UsbProtocol::Usb2_0, UsbMode::Peripheral, true},
-};
-
-static const std::vector<fpbus::Metadata> usb_phy_metadata{
-    {{
-        .id = std::to_string(DEVICE_METADATA_PRIVATE_PHY_TYPE | DEVICE_METADATA_PRIVATE),
-        .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&type),
-                                     reinterpret_cast<const uint8_t*>(&type) + sizeof(type)),
-    }},
-    {{
-        .id = std::to_string(DEVICE_METADATA_USB_MODE),
-        .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(phy_modes.data()),
-                                     reinterpret_cast<const uint8_t*>(phy_modes.data()) +
-                                         phy_modes.size() * sizeof(UsbPhyMode)),
-    }},
-};
-
-static const fpbus::Node usb_phy_dev = []() {
-  fpbus::Node dev = {};
-  dev.name() = "aml-usb-phy";
-  dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
-  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
-  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_USB_PHY_V2;
-  dev.mmio() = usb_phy_mmios;
-  dev.irq() = usb_phy_irqs;
-  dev.bti() = usb_btis;
-  dev.metadata() = usb_phy_metadata;
-  return dev;
-}();
-
 zx_status_t AddUsbPhyComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
                                fidl::AnyArena& fidl_arena, fdf::Arena& arena) {
+  const std::vector<fuchsia_hardware_usb_phy::UsbPhyMode> kUsbPhyModes = {
+      {{.protocol = fuchsia_hardware_usb_phy::ProtocolVersion::kUsb20,
+        .dr_mode = fuchsia_hardware_usb_phy::Mode::kHost,
+        .is_otg_capable = false}},
+      {{.protocol = fuchsia_hardware_usb_phy::ProtocolVersion::kUsb20,
+        .dr_mode = fuchsia_hardware_usb_phy::Mode::kPeripheral,
+        .is_otg_capable = true}},
+  };
+
+  const fuchsia_hardware_usb_phy::Metadata kMetadata{
+      {.usb_phy_modes = kUsbPhyModes, .phy_type = fuchsia_hardware_usb_phy::AmlogicPhyType::kG12A}};
+
+  fit::result persisted_metadata = fidl::Persist(kMetadata);
+  if (!persisted_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to persist metadata: %s",
+           persisted_metadata.error_value().FormatDescription().c_str());
+    return persisted_metadata.error_value().status();
+  }
+
+  std::vector<fpbus::Metadata> usb_phy_metadata{
+      {{
+          .id = std::to_string(DEVICE_METADATA_USB_MODE),
+          .data = std::move(persisted_metadata.value()),
+      }},
+  };
+
+  fpbus::Node usb_phy_dev{{
+      .name = "aml-usb-phy",
+      .vid = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC,
+      .pid = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2,
+      .did = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_USB_PHY_V2,
+      .mmio = usb_phy_mmios,
+      .irq = usb_phy_irqs,
+      .bti = usb_btis,
+      .metadata = usb_phy_metadata,
+  }};
+
   const std::vector<fdf::BindRule2> kResetRegisterRules = std::vector{
       fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_registers::SERVICE,
                                bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),

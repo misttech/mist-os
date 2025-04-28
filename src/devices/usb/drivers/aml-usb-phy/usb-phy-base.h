@@ -5,9 +5,8 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_AML_USB_PHY_USB_PHY_BASE_H_
 #define SRC_DEVICES_USB_DRIVERS_AML_USB_PHY_USB_PHY_BASE_H_
 
+#include <fidl/fuchsia.hardware.usb.phy/cpp/fidl.h>
 #include <lib/mmio/mmio.h>
-
-#include <soc/aml-common/aml-usb-phy.h>
 
 namespace aml_usb_phy {
 
@@ -15,10 +14,10 @@ class UsbPhyBase {
  public:
   const fdf::MmioBuffer& mmio() const { return mmio_; }
   bool is_otg_capable() const { return is_otg_capable_; }
-  UsbMode dr_mode() const { return dr_mode_; }
+  fuchsia_hardware_usb_phy::Mode dr_mode() const { return dr_mode_; }
 
-  UsbMode phy_mode() { return phy_mode_; }
-  void SetMode(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio) {
+  fuchsia_hardware_usb_phy::Mode phy_mode() { return phy_mode_; }
+  void SetMode(fuchsia_hardware_usb_phy::Mode mode, fdf::MmioBuffer& usbctrl_mmio) {
     SetModeInternal(mode, usbctrl_mmio);
     phy_mode_ = mode;
   }
@@ -27,18 +26,20 @@ class UsbPhyBase {
   virtual void dump_regs() const = 0;
 
  protected:
-  UsbPhyBase(fdf::MmioBuffer mmio, bool is_otg_capable, UsbMode dr_mode)
+  UsbPhyBase(fdf::MmioBuffer mmio, bool is_otg_capable, fuchsia_hardware_usb_phy::Mode dr_mode)
       : mmio_(std::move(mmio)), is_otg_capable_(is_otg_capable), dr_mode_(dr_mode) {}
 
  private:
-  virtual void SetModeInternal(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio) = 0;
+  virtual void SetModeInternal(fuchsia_hardware_usb_phy::Mode mode,
+                               fdf::MmioBuffer& usbctrl_mmio) = 0;
 
   fdf::MmioBuffer mmio_;
   const bool is_otg_capable_;
-  const UsbMode dr_mode_;  // USB Controller Mode. Internal to Driver.
+  const fuchsia_hardware_usb_phy::Mode dr_mode_;  // USB Controller Mode. Internal to Driver.
 
-  UsbMode phy_mode_ =
-      UsbMode::Unknown;  // Physical USB mode. Must hold parent's lock_ while accessing.
+  fuchsia_hardware_usb_phy::Mode phy_mode_ =
+      fuchsia_hardware_usb_phy::Mode::kUnknown;  // Physical USB mode. Must hold parent's lock_
+                                                 // while accessing.
 };
 
 }  // namespace aml_usb_phy
