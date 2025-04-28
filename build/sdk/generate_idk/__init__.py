@@ -24,7 +24,7 @@ from typing import (
 )
 
 # version_history.json doesn't follow the same schema as other IDK metadata
-# files, so we treat it specially in a few places.
+# files, so we treat it specially.
 VERSION_HISTORY_PATH = pathlib.Path("version_history.json")
 
 
@@ -190,8 +190,16 @@ class PartialIDK:
                     "Atom metadata file specified multiple times: %s"
                     % meta_dest
                 )
+
+                atom_meta = json.load(f)
+                if meta_dest == VERSION_HISTORY_PATH:
+                    # version_history.json doesn't have a 'type' field, so set
+                    # it. See https://fxbug.dev/409622622.
+                    assert "type" not in atom_meta.keys()
+                    atom_meta["type"] = "version_history"
+
                 result.atoms[meta_dest] = PartialAtom(
-                    meta=json.load(f),
+                    meta=atom_meta,
                     meta_src=meta_src,
                     dest_to_src=dest_to_src,
                 )
@@ -266,12 +274,8 @@ class MergedIDK:
         index = []
         for meta_path, atom in self.atoms.items():
             # Some atoms are given different "types" in the overall manifest...
-            if meta_path == VERSION_HISTORY_PATH:
-                # version_history.json doesn't have a 'type' field.
-                assert "type" not in atom.keys()
-                type = "version_history"
             # LINT.IfChange
-            elif atom["type"] in ["component_manifest", "config"]:
+            if atom["type"] in ["component_manifest", "config"]:
                 type = "data"
             # LINT.ThenChange(//build/sdk/sdk_atom.gni)
             else:
@@ -317,19 +321,11 @@ def _merge_atoms(
         atom_b = b.get(atom_path)
 
         if atom_a and atom_b:
-            if atom_path == VERSION_HISTORY_PATH:
-                # Treat version_history.json specially, since it doesn't have a
-                # 'type' field.
-                assert (
-                    atom_a == atom_b.meta
-                ), "A and B had different 'version_history' values. Huh?"
-                result[atom_path] = atom_a
-            else:
-                # Merge atoms found in both IDKs.
-                try:
-                    result[atom_path] = _merge_atom_meta(atom_a, atom_b.meta)
-                except Exception as e:
-                    raise AtomMergeError(atom_path) from e
+            # Merge atoms found in both IDKs.
+            try:
+                result[atom_path] = _merge_atom_meta(atom_a, atom_b.meta)
+            except Exception as e:
+                raise AtomMergeError(atom_path) from e
         elif atom_a:
             result[atom_path] = atom_a
         else:

@@ -110,10 +110,21 @@ def main() -> int:
 
     # Write metadata for each atom.
     for path, meta in merged.atoms.items():
+        type = meta["type"]
+        atom_meta = meta
+        if type == "version_history":
+            # Remove "type" from version_history.json before writing the file.
+            # See https://fxbug.dev/409622622.
+            # We must ignore the type checking error about deleting the key from
+            # AtomMeta types.
+            atom_meta = meta.copy()
+            found = atom_meta.pop("type")  # type: ignore
+            assert found
+
         dest_path = output_dir / path
         dest_path.parent.mkdir(exist_ok=True, parents=True)
         with dest_path.open("w") as f:
-            json.dump(meta, f, indent=2, sort_keys=True)
+            json.dump(atom_meta, f, indent=2, sort_keys=True)
 
     # Symlink all the other files.
     for dest, src in merged.dest_to_src.items():
