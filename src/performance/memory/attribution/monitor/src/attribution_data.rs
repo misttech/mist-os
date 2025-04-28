@@ -7,7 +7,7 @@ use crate::common::PrincipalIdMap;
 use crate::resources::{Job, KernelResources};
 use attribution_processing::{
     Attribution, AttributionData, AttributionDataProvider, Principal, PrincipalDescription,
-    PrincipalType, ResourceReference,
+    PrincipalType, ResourceReference, ResourcesVisitor,
 };
 use fuchsia_sync::Mutex;
 use fuchsia_trace::duration;
@@ -114,6 +114,16 @@ impl AttributionDataProvider for AttributionDataProviderImpl {
             })
         }
         .boxed()
+    }
+
+    fn for_each_resource(&self, visitor: &mut impl ResourcesVisitor) -> Result<(), anyhow::Error> {
+        let attribution_state = self.attribution_client.get_attributions();
+        crate::resources::KernelResourcesExplorer::default().explore_root_job(
+            visitor,
+            self.root_job.lock().as_ref(),
+            &attribution_state,
+        )?;
+        Ok(())
     }
 }
 

@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fplugin::{ResourceType, Vmo};
-use crate::{AttributionData, ZXName};
-use fidl_fuchsia_kernel as fkernel;
+use crate::fplugin::Vmo;
+use crate::{AttributionDataProvider, ResourcesVisitor, ZXName};
 use regex::bytes::Regex;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
 use std::collections::hash_map::Entry::Occupied;
 use std::collections::HashMap;
+use std::sync::Arc;
+use {fidl_fuchsia_kernel as fkernel, fidl_fuchsia_memory_attribution_plugin as fplugin};
 
 const UNDIGESTED: &str = "Undigested";
 const ORPHANED: &str = "Orphaned";
@@ -80,7 +81,6 @@ pub struct Bucket {
     pub name: String,
     pub size: u64,
 }
-
 /// Contains a view of the system's memory usage, aggregated in groups called buckets, which are
 /// configurable.
 #[derive(Debug, PartialEq, Eq)]
@@ -88,66 +88,87 @@ pub struct Digest {
     pub buckets: Vec<Bucket>,
 }
 
+/// Compute a bucket digest as the Jobs->Processes->VMOs tree is traversed.
+struct DigestComputer<'a> {
+    // Ordered pair with a bucket specification, and the current bucket result.
+    buckets: Vec<(&'a BucketDefinition, Bucket)>,
+    // Set of VMOs what didn't fell in any bucket.
+    undigested_vmos: HashMap<zx_types::zx_koid_t, (Vmo, ZXName)>,
+}
+
+impl<'a> DigestComputer<'a> {
+    fn new(bucket_definitions: &'a Vec<BucketDefinition>) -> DigestComputer<'a> {
+        DigestComputer {
+            buckets: bucket_definitions
+                .iter()
+                .map(|def| (def, Bucket { name: def.name.clone(), size: 0 }))
+                .collect(),
+            undigested_vmos: Default::default(),
+        }
+    }
+}
+
+impl ResourcesVisitor for DigestComputer<'_> {
+    fn on_job(
+        &mut self,
+        _job_koid: zx_types::zx_koid_t,
+        _job_name: &ZXName,
+        _job: fplugin::Job,
+    ) -> Result<(), zx_status::Status> {
+        Ok(())
+    }
+
+    fn on_process(
+        &mut self,
+        _process_koid: zx_types::zx_koid_t,
+        process_name: &ZXName,
+        process: fplugin::Process,
+    ) -> Result<(), zx_status::Status> {
+        for (bucket_definition, bucket) in self.buckets.iter_mut() {
+            if bucket_definition.process_match(process_name) {
+                for koid in process.vmos.iter().flatten() {
+                    bucket.size += match self.undigested_vmos.entry(*koid) {
+                        Occupied(e) => {
+                            let (_vmo, name) = e.get();
+                            if bucket_definition.vmo_match(&name) {
+                                let (_, (vmo, _name)) = e.remove_entry();
+                                vmo.total_committed_bytes.unwrap_or_default()
+                            } else {
+                                0
+                            }
+                        }
+                        _ => 0,
+                    };
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn on_vmo(
+        &mut self,
+        vmo_koid: zx_types::zx_koid_t,
+        vmo_name: &ZXName,
+        vmo: fplugin::Vmo,
+    ) -> Result<(), zx_status::Status> {
+        self.undigested_vmos.insert(vmo_koid, (vmo, vmo_name.clone()));
+        Ok(())
+    }
+}
+
 impl Digest {
     /// Given means to query the system for memory usage, and a specification, this function
     /// aggregates the current memory usage into human displayable units we call buckets.
-    pub fn new(
-        attribution_data: &AttributionData,
+    pub fn compute(
+        attribution_data_service: Arc<impl AttributionDataProvider + 'static>,
         kmem_stats: fkernel::MemoryStats,
         kmem_stats_compression: fkernel::MemoryStatsCompression,
         bucket_definitions: &Vec<BucketDefinition>,
-    ) -> Self {
-        // Contains all VMOs that have not yet been aggregated.
-        let mut undigested_vmos: HashMap<u64, (&Vmo, &ZXName)> = attribution_data
-            .resources_vec
-            .iter()
-            .filter_map(|r| match &r.resource_type {
-                ResourceType::Vmo(vmo) => {
-                    Some((r.koid, (vmo, &attribution_data.resource_names[r.name_index])))
-                }
-                _ => None,
-            })
-            .collect();
-
-        // Collection of processes currently live in the system.
-        let processes =
-            attribution_data.resources_vec.iter().filter_map(|r| match &r.resource_type {
-                ResourceType::Process(process) => {
-                    Some((process, &attribution_data.resource_names[r.name_index]))
-                }
-                _ => None,
-            });
-        // For each bucket, filter matching processes, and among their VMOs, account for those that
-        // have not been previously grouped in another buckets.  This means that the order of bucket
-        // definitions defines a priority in this aggregation.
-        let mut buckets: Vec<Bucket> = bucket_definitions
-            .iter()
-            .map(|bucket_def| Bucket {
-                name: bucket_def.name.clone(),
-                size: processes
-                    .clone()
-                    .filter(|&(_, process_name)| bucket_def.process_match(process_name))
-                    .fold(0, |size, (process, _)| {
-                        size + process
-                            .vmos
-                            .iter()
-                            .flatten()
-                            .map(|vmo| match undigested_vmos.entry(*vmo) {
-                                Occupied(e) => {
-                                    let &(vmo, name) = e.get();
-                                    if bucket_def.vmo_match(name) {
-                                        e.remove_entry();
-                                        vmo.total_committed_bytes.unwrap_or(0)
-                                    } else {
-                                        0
-                                    }
-                                }
-                                _ => 0,
-                            })
-                            .sum::<u64>()
-                    }),
-            })
-            .collect();
+    ) -> Result<Digest, anyhow::Error> {
+        let mut digest_visitor = DigestComputer::new(bucket_definitions);
+        attribution_data_service.for_each_resource(&mut digest_visitor)?;
+        let mut buckets: Vec<Bucket> =
+            digest_visitor.buckets.drain(..).map(|(_, bucket)| bucket).collect();
 
         let vmo_size: u64 = buckets.iter().map(|Bucket { size, .. }| size).sum();
         // Extend the configured aggregation with a number of additional, occasionally useful meta
@@ -157,9 +178,10 @@ impl Digest {
             // other bucket.
             Bucket {
                 name: UNDIGESTED.to_string(),
-                size: undigested_vmos
-                    .iter()
-                    .filter_map(|(_, (vmo, _))| vmo.total_committed_bytes)
+                size: digest_visitor
+                    .undigested_vmos
+                    .values()
+                    .filter_map(|(vmo, _)| vmo.total_committed_bytes)
                     .sum(),
             },
             // This bucket accounts for VMO bytes that have been allocated by the kernel, but not
@@ -213,7 +235,7 @@ impl Digest {
                 size: kmem_stats_compression.compressed_storage_bytes.unwrap_or(0),
             },
         ]);
-        Digest { buckets }
+        Ok(Digest { buckets })
     }
 }
 
@@ -221,14 +243,77 @@ impl Digest {
 mod tests {
     use super::*;
     use crate::{
-        Attribution, Principal, PrincipalDescription, PrincipalIdentifier, PrincipalType, Resource,
-        ResourceReference,
+        Attribution, AttributionData, Principal, PrincipalDescription, PrincipalIdentifier,
+        PrincipalType, Resource, ResourceReference,
     };
-
     use fidl_fuchsia_memory_attribution_plugin as fplugin;
+    use fplugin::ResourceType;
+    use futures::future::ready;
 
-    fn get_attribution_data() -> AttributionData {
-        AttributionData {
+    struct FakeAttributionDataProvider {
+        attribution_data: AttributionData,
+    }
+    impl AttributionDataProvider for FakeAttributionDataProvider {
+        fn get_attribution_data(
+            &self,
+        ) -> futures::future::BoxFuture<'_, Result<AttributionData, anyhow::Error>> {
+            Box::pin(ready(Ok(AttributionData {
+                principals_vec: self.attribution_data.principals_vec.clone(),
+                resources_vec: self.attribution_data.resources_vec.clone(),
+                resource_names: self.attribution_data.resource_names.clone(),
+                attributions: self.attribution_data.attributions.clone(),
+            })))
+        }
+
+        fn for_each_resource(
+            &self,
+            visitor: &mut impl ResourcesVisitor,
+        ) -> Result<(), anyhow::Error> {
+            for resource in &self.attribution_data.resources_vec {
+                if let Resource {
+                    koid, name_index, resource_type: ResourceType::Vmo(vmo), ..
+                } = resource
+                {
+                    visitor.on_vmo(
+                        *koid,
+                        &self.attribution_data.resource_names[*name_index],
+                        vmo.clone(),
+                    )?;
+                }
+            }
+            for resource in &self.attribution_data.resources_vec {
+                if let Resource {
+                    koid,
+                    name_index,
+                    resource_type: ResourceType::Process(process),
+                    ..
+                } = resource
+                {
+                    visitor.on_process(
+                        *koid,
+                        &self.attribution_data.resource_names[*name_index],
+                        process.clone(),
+                    )?;
+                }
+            }
+            for resource in &self.attribution_data.resources_vec {
+                if let Resource {
+                    koid, name_index, resource_type: ResourceType::Job(job), ..
+                } = resource
+                {
+                    visitor.on_job(
+                        *koid,
+                        &self.attribution_data.resource_names[*name_index],
+                        job.clone(),
+                    )?;
+                }
+            }
+            Ok(())
+        }
+    }
+
+    fn get_attribution_data_provider() -> Arc<impl AttributionDataProvider + 'static> {
+        let attribution_data = AttributionData {
             principals_vec: vec![Principal {
                 identifier: PrincipalIdentifier(1),
                 description: PrincipalDescription::Component("principal".to_owned()),
@@ -282,7 +367,8 @@ mod tests {
                 subject: PrincipalIdentifier(1),
                 resources: vec![ResourceReference::KernelObject(10)],
             }],
-        }
+        };
+        Arc::new(FakeAttributionDataProvider { attribution_data })
     }
 
     fn get_kernel_stats() -> (fkernel::MemoryStats, fkernel::MemoryStatsCompression) {
@@ -332,8 +418,13 @@ mod tests {
     #[test]
     fn test_digest_no_definitions() {
         let (kernel_stats, kernel_stats_compression) = get_kernel_stats();
-        let digest =
-            Digest::new(&get_attribution_data(), kernel_stats, kernel_stats_compression, &vec![]);
+        let digest = Digest::compute(
+            get_attribution_data_provider(),
+            kernel_stats,
+            kernel_stats_compression,
+            &vec![],
+        )
+        .unwrap();
         let expected_buckets = vec![
             Bucket { name: UNDIGESTED.to_string(), size: 2048 }, // The two VMOs are unmatched, 1024 + 1024
             Bucket { name: ORPHANED.to_string(), size: 10000 }, // No matched VMOs => kernel's VMO bytes
@@ -353,8 +444,8 @@ mod tests {
     #[test]
     fn test_digest_with_matching_vmo() -> Result<(), anyhow::Error> {
         let (kernel_stats, kernel_stats_compression) = get_kernel_stats();
-        let digest = Digest::new(
-            &get_attribution_data(),
+        let digest = Digest::compute(
+            get_attribution_data_provider(),
             kernel_stats,
             kernel_stats_compression,
             &vec![BucketDefinition {
@@ -363,7 +454,8 @@ mod tests {
                 vmo: Some(Regex::new("matched")?),
                 event_code: Default::default(),
             }],
-        );
+        )
+        .unwrap();
         let expected_buckets = vec![
             Bucket { name: "matched".to_string(), size: 1024 }, // One VMO is matched, the other is not
             Bucket { name: UNDIGESTED.to_string(), size: 1024 }, // One unmatched VMO
@@ -385,8 +477,8 @@ mod tests {
     #[test]
     fn test_digest_with_matching_process() -> Result<(), anyhow::Error> {
         let (kernel_stats, kernel_stats_compression) = get_kernel_stats();
-        let digest = Digest::new(
-            &get_attribution_data(),
+        let digest = Digest::compute(
+            get_attribution_data_provider(),
             kernel_stats,
             kernel_stats_compression,
             &vec![BucketDefinition {
@@ -395,7 +487,8 @@ mod tests {
                 vmo: None,
                 event_code: Default::default(),
             }],
-        );
+        )
+        .unwrap();
         let expected_buckets = vec![
             Bucket { name: "matched".to_string(), size: 2048 }, // Both VMOs are matched => 1024 + 1024 = 2048
             Bucket { name: UNDIGESTED.to_string(), size: 0 },   // No unmatched VMO
@@ -417,8 +510,8 @@ mod tests {
     #[test]
     fn test_digest_with_matching_process_and_vmo() -> Result<(), anyhow::Error> {
         let (kernel_stats, kernel_stats_compression) = get_kernel_stats();
-        let digest = Digest::new(
-            &get_attribution_data(),
+        let digest = Digest::compute(
+            get_attribution_data_provider(),
             kernel_stats,
             kernel_stats_compression,
             &vec![BucketDefinition {
@@ -427,7 +520,8 @@ mod tests {
                 vmo: Some(Regex::new("matched")?),
                 event_code: Default::default(),
             }],
-        );
+        )
+        .unwrap();
         let expected_buckets = vec![
             Bucket { name: "matched".to_string(), size: 1024 }, // One VMO is matched, the other is not
             Bucket { name: UNDIGESTED.to_string(), size: 1024 }, // One unmatched VMO

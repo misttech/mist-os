@@ -47,11 +47,7 @@ pub fn start_service(
         inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default())
             .ok_or_else(|| anyhow!("Failed to serve server handling `fuchsia.inspect.Tree`"))?;
 
-    build_inspect_tree(
-        kernel_stats_proxy.clone(),
-        stall_provider,
-        inspector,
-    );
+    build_inspect_tree(kernel_stats_proxy.clone(), stall_provider, inspector);
     let digest_service = digest_service(
         memory_monitor2_config,
         attribution_data_service,
@@ -264,19 +260,18 @@ fn digest_service(
             };
 
             // Retrieve (concurrently) the data necessary to perform the aggregation.
-            let (attribution_data, kmem_stats, kmem_stats_compression) = try_join!(
-                attribution_data_service.get_attribution_data(),
+            let (kmem_stats, kmem_stats_compression) = try_join!(
                 kernel_stats_proxy.get_memory_stats().map_err(anyhow::Error::from),
                 kernel_stats_proxy.get_memory_stats_compression().map_err(anyhow::Error::from)
             )?;
 
             // Compute the aggregation.
-            let Digest { buckets } = Digest::new(
-                &attribution_data,
+            let Digest { buckets } = Digest::compute(
+                attribution_data_service.clone(),
                 kmem_stats,
                 kmem_stats_compression,
                 &bucket_definitions,
-            );
+            )?;
 
             // Initialize the inspect property containing the buckets names, if necessary.
             let _ = buckets_names.get_or_init(|| {
@@ -305,59 +300,116 @@ fn digest_service(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use attribution_processing::{
         Attribution, AttributionData, Principal, PrincipalDescription, PrincipalIdentifier,
-        PrincipalType, Resource, ResourceReference, ZXName,
+        PrincipalType, Resource, ResourceReference, ResourcesVisitor, ZXName,
     };
     use diagnostics_assertions::{assert_data_tree, NonZeroIntProperty};
+    use fidl_fuchsia_memory_attribution_plugin::ResourceType;
     use fuchsia_async::TestExecutor;
-    use futures::future::BoxFuture;
+    use futures::future::ready;
     use futures::task::Poll;
     use futures::TryStreamExt;
+    use std::time::Duration;
     use {
         fidl_fuchsia_memory_attribution_plugin as fplugin,
         fidl_fuchsia_memorypressure as fpressure, fuchsia_async as fasync,
     };
 
-    use super::*;
-    use std::time::Duration;
-
-    struct FakeAttributionDataProvider {}
-
+    pub struct FakeAttributionDataProvider {
+        attribution_data: AttributionData,
+    }
     impl AttributionDataProvider for FakeAttributionDataProvider {
-        fn get_attribution_data(&self) -> BoxFuture<'_, Result<AttributionData, anyhow::Error>> {
-            async {
-                Ok(AttributionData {
-                    principals_vec: vec![Principal {
-                        identifier: PrincipalIdentifier(1),
-                        description: PrincipalDescription::Component("principal".to_owned()),
-                        principal_type: PrincipalType::Runnable,
-                        parent: None,
-                    }],
-                    resources_vec: vec![Resource {
-                        koid: 10,
-                        name_index: 0,
-                        resource_type: fplugin::ResourceType::Vmo(fplugin::Vmo {
-                            parent: None,
-                            private_committed_bytes: Some(1024),
-                            private_populated_bytes: Some(2048),
-                            scaled_committed_bytes: Some(1024),
-                            scaled_populated_bytes: Some(2048),
-                            total_committed_bytes: Some(1024),
-                            total_populated_bytes: Some(2048),
-                            ..Default::default()
-                        }),
-                    }],
-                    resource_names: vec![ZXName::from_string_lossy("resource")],
-                    attributions: vec![Attribution {
-                        source: PrincipalIdentifier(1),
-                        subject: PrincipalIdentifier(1),
-                        resources: vec![ResourceReference::KernelObject(10)],
-                    }],
-                })
-            }
+        fn get_attribution_data(
+            &self,
+        ) -> futures::future::BoxFuture<'_, Result<AttributionData, anyhow::Error>> {
+            ready(Ok(AttributionData {
+                principals_vec: self.attribution_data.principals_vec.clone(),
+                resources_vec: self.attribution_data.resources_vec.clone(),
+                resource_names: self.attribution_data.resource_names.clone(),
+                attributions: self.attribution_data.attributions.clone(),
+            }))
             .boxed()
         }
+
+        fn for_each_resource(
+            &self,
+            visitor: &mut impl ResourcesVisitor,
+        ) -> Result<(), anyhow::Error> {
+            for resource in &self.attribution_data.resources_vec {
+                if let Resource {
+                    koid, name_index, resource_type: ResourceType::Vmo(vmo), ..
+                } = resource
+                {
+                    visitor.on_vmo(
+                        *koid,
+                        &self.attribution_data.resource_names[*name_index],
+                        vmo.clone(),
+                    )?;
+                }
+            }
+            for resource in &self.attribution_data.resources_vec {
+                if let Resource {
+                    koid,
+                    name_index,
+                    resource_type: ResourceType::Process(process),
+                    ..
+                } = resource
+                {
+                    visitor.on_process(
+                        *koid,
+                        &self.attribution_data.resource_names[*name_index],
+                        process.clone(),
+                    )?;
+                }
+            }
+            for resource in &self.attribution_data.resources_vec {
+                if let Resource {
+                    koid, name_index, resource_type: ResourceType::Job(job), ..
+                } = resource
+                {
+                    visitor.on_job(
+                        *koid,
+                        &self.attribution_data.resource_names[*name_index],
+                        job.clone(),
+                    )?;
+                }
+            }
+            Ok(())
+        }
+    }
+
+    fn get_attribution_data_provider() -> Arc<impl AttributionDataProvider + 'static> {
+        let attribution_data = AttributionData {
+            principals_vec: vec![Principal {
+                identifier: PrincipalIdentifier(1),
+                description: PrincipalDescription::Component("principal".to_owned()),
+                principal_type: PrincipalType::Runnable,
+                parent: None,
+            }],
+            resources_vec: vec![Resource {
+                koid: 10,
+                name_index: 0,
+                resource_type: fplugin::ResourceType::Vmo(fplugin::Vmo {
+                    parent: None,
+                    private_committed_bytes: Some(1024),
+                    private_populated_bytes: Some(2048),
+                    scaled_committed_bytes: Some(1024),
+                    scaled_populated_bytes: Some(2048),
+                    total_committed_bytes: Some(1024),
+                    total_populated_bytes: Some(2048),
+                    ..Default::default()
+                }),
+            }],
+            resource_names: vec![ZXName::from_string_lossy("resource")],
+            attributions: vec![Attribution {
+                source: PrincipalIdentifier(1),
+                subject: PrincipalIdentifier(1),
+                resources: vec![ResourceReference::KernelObject(10)],
+            }],
+        };
+        Arc::new(FakeAttributionDataProvider { attribution_data })
     }
 
     async fn serve_kernel_stats(
@@ -427,7 +479,6 @@ mod tests {
     #[test]
     fn test_build_inspect_tree() {
         let mut exec = fasync::TestExecutor::new();
-
         let (stats_provider, stats_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fkernel::StatsMarker>();
 
@@ -453,11 +504,7 @@ mod tests {
             }
         }
 
-        build_inspect_tree(
-            stats_provider,
-            Arc::new(FakeStallProvider {}),
-            &inspector,
-        );
+        build_inspect_tree(stats_provider, Arc::new(FakeStallProvider {}), &inspector);
 
         let output = exec
             .run_singlethreaded(fuchsia_inspect::reader::read(&inspector))
@@ -516,7 +563,6 @@ mod tests {
     #[test]
     fn test_digest_service_capture_on_pressure_change_and_wait() -> anyhow::Result<()> {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        let data_provider = Arc::new(FakeAttributionDataProvider {});
         let (stats_provider, stats_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fkernel::StatsMarker>();
 
@@ -536,7 +582,7 @@ mod tests {
                 warning_capture_delay_s: 10,
                 normal_capture_delay_s: 10,
             },
-            data_provider,
+            get_attribution_data_provider(),
             stats_provider,
             pressure_provider,
             vec![],
@@ -647,7 +693,6 @@ mod tests {
     #[test]
     fn test_digest_service_wait() -> anyhow::Result<()> {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        let data_provider = Arc::new(FakeAttributionDataProvider {});
         let (stats_provider, stats_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fkernel::StatsMarker>();
 
@@ -666,7 +711,7 @@ mod tests {
                 warning_capture_delay_s: 10,
                 normal_capture_delay_s: 10,
             },
-            data_provider,
+            get_attribution_data_provider(),
             stats_provider,
             pressure_provider,
             vec![],
@@ -756,7 +801,6 @@ mod tests {
     #[test]
     fn test_digest_service_no_capture_on_pressure_change() -> anyhow::Result<()> {
         let mut exec = fasync::TestExecutor::new();
-        let data_provider = Arc::new(FakeAttributionDataProvider {});
         let (stats_provider, stats_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fkernel::StatsMarker>();
 
@@ -785,7 +829,7 @@ mod tests {
                 warning_capture_delay_s: 10,
                 normal_capture_delay_s: 10,
             },
-            data_provider,
+            get_attribution_data_provider(),
             stats_provider,
             pressure_provider,
             vec![],
@@ -810,7 +854,6 @@ mod tests {
     #[test]
     fn test_digest_service_capture_on_pressure_change() -> anyhow::Result<()> {
         let mut exec = fasync::TestExecutor::new();
-        let data_provider = Arc::new(FakeAttributionDataProvider {});
         let (stats_provider, stats_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fkernel::StatsMarker>();
 
@@ -839,7 +882,7 @@ mod tests {
                 warning_capture_delay_s: 10,
                 normal_capture_delay_s: 10,
             },
-            data_provider,
+            get_attribution_data_provider(),
             stats_provider,
             pressure_provider,
             vec![],

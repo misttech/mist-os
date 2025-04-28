@@ -82,7 +82,7 @@ impl Into<fplugin::PrincipalType> for PrincipalType {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Hash)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 /// A Principal, that can use and claim memory.
 pub struct Principal {
     // These fields are initialized from [fplugin::Principal].
@@ -189,7 +189,7 @@ pub struct Claim {
     claim_type: ClaimType,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Resource {
     pub koid: u64,
     pub name_index: usize,
@@ -421,8 +421,35 @@ pub struct AttributionData {
     pub attributions: Vec<Attribution>,
 }
 
+// TODO(b/411121120): Use zx::Koid when available on host code.
+/// The post-order traversal of the Jobs->Process->VMOs tree guarantees that when
+/// a visitor processes a Process, it has already seen its associated VMOs.
+pub trait ResourcesVisitor {
+    fn on_job(
+        &mut self,
+        job_koid: zx_types::zx_koid_t,
+        job_name: &ZXName,
+        job: fplugin::Job,
+    ) -> Result<(), zx_status::Status>;
+    fn on_process(
+        &mut self,
+        process_koid: zx_types::zx_koid_t,
+        process_name: &ZXName,
+        process: fplugin::Process,
+    ) -> Result<(), zx_status::Status>;
+    fn on_vmo(
+        &mut self,
+        vmo_koid: zx_types::zx_koid_t,
+        vmo_name: &ZXName,
+        vmo: fplugin::Vmo,
+    ) -> Result<(), zx_status::Status>;
+}
+
 pub trait AttributionDataProvider: Send + Sync + 'static {
+    /// Collects and returns a structure with all memory resources and attribution specifications.
     fn get_attribution_data(&self) -> BoxFuture<'_, Result<AttributionData, anyhow::Error>>;
+    /// Enumerates Jobs, Processes and VMOs and call back the visitor.
+    fn for_each_resource(&self, visitor: &mut impl ResourcesVisitor) -> Result<(), anyhow::Error>;
 }
 
 /// Processed snapshot of the memory usage of a device, with attribution of memory resources to
