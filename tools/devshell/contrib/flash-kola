@@ -25,9 +25,13 @@ ARTIFACTS="${PRODUCT_BUNDLE}/product_bundle.json"
 DTBO_PATH="${PRODUCT_BUNDLE}/$(fx-command-run jq --raw-output '.system_a[] | select(.name=="dtbo-a") | .path' "${ARTIFACTS}")"
 FVM_PATH="${PRODUCT_BUNDLE}/$(fx-command-run jq --raw-output '.system_a[] | select(.name=="fxfs.fastboot") | .path' "${ARTIFACTS}")"
 ZBI_PATH="${PRODUCT_BUNDLE}/$(fx-command-run jq --raw-output '.system_a[] | select(.name=="zircon-a") | .path' "${ARTIFACTS}")"
-RECOVERY_PATH="${PRODUCT_BUNDLE}/$(fx-command-run jq --raw-output '.system_r[] | select(.name=="zircon-a") | .path' "${ARTIFACTS}")"
 
-readonly FVM_PATH ZBI_PATH DTBO_PATH
+RECOVERY_PATH=""
+if [[ -d "${PRODUCT_BUNDLE}/system_r" ]]; then
+  RECOVERY_PATH="${PRODUCT_BUNDLE}/$(fx-command-run jq --raw-output '.system_r[] | select(.name=="zircon-a") | .path' "${ARTIFACTS}")"
+fi
+
+readonly FVM_PATH ZBI_PATH DTBO_PATH RECOVERY_PATH
 
 if [[ -z $ANDROID_SERIAL ]]; then
   readonly DEVICE_COUNT=$(${FASTBOOT} devices | awk NF | wc -l)
@@ -62,8 +66,10 @@ ${FASTBOOT} flash boot_a "$ZBI_PATH"
 ${FASTBOOT} flash boot_b "$ZBI_PATH"
 ${FASTBOOT} flash dtbo_a "$DTBO_PATH"
 ${FASTBOOT} flash dtbo_b "$DTBO_PATH"
-${FASTBOOT} flash vendor_boot_a "$RECOVERY_PATH"
-${FASTBOOT} flash vendor_boot_b "$RECOVERY_PATH"
+if [[ -n "$RECOVERY_PATH" ]]; then
+  ${FASTBOOT} flash vendor_boot_a "$RECOVERY_PATH"
+  ${FASTBOOT} flash vendor_boot_b "$RECOVERY_PATH"
+fi
 
 # Reboot back into the bootloader.
 # Some builds put firmware in the boot image, in which case we reboot here to
