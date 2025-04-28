@@ -187,11 +187,11 @@ impl Display for Auditable<'_> {
             Auditable::FileObject(file) => {
                 write!(f, " path=\"{}\"", file.name.path_escaping_chroot())
             }
-            Auditable::FsNode(node) => {
-                write!(f, " ino={}", node.node_id)
-            }
             Auditable::FileSystem(fs) => {
                 write!(f, " dev=\"{}\"", fs.options.source)
+            }
+            Auditable::FsNode(node) => {
+                write!(f, " ino={}", node.node_id)
             }
             Auditable::IoctlCommand(ioctl) => {
                 write!(f, " ioctlcmd={:#x}", ioctl)

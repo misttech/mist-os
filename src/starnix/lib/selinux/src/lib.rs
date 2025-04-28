@@ -771,6 +771,8 @@ common_permission_enum! {
         Connect("connect"),
         /// Permission to listen for connections.
         Listen("listen"),
+        /// Permission to send datagrams to the socket.
+        SendTo("sendto"),
         // keep-sorted end
     }
 }

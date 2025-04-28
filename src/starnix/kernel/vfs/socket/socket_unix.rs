@@ -4,6 +4,7 @@
 
 use crate::bpf::fs::get_bpf_object;
 use crate::mm::MemoryAccessorExt;
+use crate::security;
 use crate::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::buffers::{
     AncillaryData, InputBuffer, MessageQueue, MessageReadInfo, OutputBuffer, UnixControlData,
@@ -560,6 +561,10 @@ impl SocketOps for UnixSocket {
             (_, Some(_), _) => return error!(EINVAL),
             (None, None, _) => return error!(ENOTCONN),
         };
+
+        if socket.socket_type == SocketType::Datagram {
+            security::unix_may_send(current_task, socket, &peer)?;
+        }
 
         let unix_socket = downcast_socket_to_unix(&peer);
         let mut peer = unix_socket.lock();

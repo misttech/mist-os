@@ -4,6 +4,7 @@
 
 use super::audit::Auditable;
 use super::fs_node::compute_new_fs_node_sid;
+use super::{check_permission, fs_node_effective_sid_and_class, todo_check_permission};
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::socket::{
     NetlinkFamily, Socket, SocketAddress, SocketDomain, SocketPeer, SocketProtocol, SocketType,
@@ -18,15 +19,13 @@ use selinux::{
 use starnix_logging::BugRef;
 use starnix_uapi::errors::Errno;
 
-use super::{check_permission, fs_node_effective_sid_and_class, todo_check_permission};
-
 /// Checks that `current_task` has the specified `permission` for the `socket_node`.
 fn has_socket_permission(
     permission_check: &PermissionCheck<'_>,
     kernel: &Kernel,
     subject_sid: SecurityId,
     socket_node: &FsNode,
-    permission: &KernelPermission,
+    permission: KernelPermission,
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
     // Permissions are allowed for kernel sockets.
@@ -52,7 +51,7 @@ fn has_socket_permission_for_sid(
     kernel: &Kernel,
     subject_sid: SecurityId,
     socket_sid: SecurityId,
-    permission: &KernelPermission,
+    permission: KernelPermission,
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
     // If the socket is for kernel-internal use we can return success immediately.
@@ -63,14 +62,7 @@ fn has_socket_permission_for_sid(
     {
         return Ok(());
     }
-    check_permission(
-        permission_check,
-        kernel,
-        subject_sid,
-        socket_sid,
-        permission.clone(),
-        audit_context,
-    )
+    check_permission(permission_check, kernel, subject_sid, socket_sid, permission, audit_context)
 }
 
 /// Checks that `current_task` has the specified `permission` for the `socket_node`, with
@@ -86,6 +78,7 @@ fn todo_has_socket_permission(
 ) -> Result<(), Errno> {
     // Permissions are allowed for kernel sockets.
     let socket_sid = fs_node_effective_sid_and_class(socket_node).sid;
+
     // TODO: https://fxbug.dev/364569010 - check if there are additional cases when the socket is
     // for kernel-internal use.
     if Anon::is_private(socket_node)
@@ -202,7 +195,7 @@ pub(in crate::security) fn check_socket_create_access(
         current_task.kernel(),
         current_sid,
         new_socket_sid,
-        &CommonFsNodePermission::Create.for_class(new_socket_class),
+        CommonFsNodePermission::Create.for_class(new_socket_class),
         current_task.into(),
     )
 }
@@ -236,7 +229,7 @@ pub(in crate::security) fn check_socket_bind_access(
         current_task.kernel(),
         current_sid,
         &socket_node,
-        &CommonSocketPermission::Bind.for_class(socket_class),
+        CommonSocketPermission::Bind.for_class(socket_class),
         current_task.into(),
     )
 }
@@ -263,7 +256,7 @@ pub(in crate::security) fn check_socket_connect_access(
         current_task.kernel(),
         current_sid,
         &socket_node,
-        &CommonSocketPermission::Connect.for_class(socket_class),
+        CommonSocketPermission::Connect.for_class(socket_class),
         current_task.into(),
     )
 }
@@ -287,6 +280,34 @@ pub(in crate::security) fn check_socket_listen_access(
         current_sid,
         &socket_node,
         CommonSocketPermission::Listen.for_class(socket_class),
+        current_task.into(),
+    )
+}
+
+/// Checks if the Unix domain `sending_socket` is allowed to send a message to the
+/// `receiving_socket`.
+pub(in crate::security) fn unix_may_send(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    sending_socket: &Socket,
+    receiving_socket: &Socket,
+) -> Result<(), Errno> {
+    let sending_node = sending_socket.fs_node();
+    let receiving_node = receiving_socket.fs_node();
+
+    let sending_sid = fs_node_effective_sid_and_class(&sending_node).sid;
+    let receiving_class = fs_node_effective_sid_and_class(&receiving_node).class;
+    let FsNodeClass::Socket(receiving_class) = receiving_class else {
+        panic!("unix_may_send called for non-Socket class")
+    };
+
+    todo_has_socket_permission(
+        TODO_DENY!("https://fxbug.dev/364569339", "Enforce unix_may_send permission"),
+        &security_server.as_permission_check(),
+        current_task.kernel(),
+        sending_sid,
+        &receiving_node,
+        CommonSocketPermission::SendTo.for_class(receiving_class),
         current_task.into(),
     )
 }

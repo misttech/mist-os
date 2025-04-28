@@ -951,6 +951,25 @@ pub fn check_socket_listen_access(
     })
 }
 
+/// Checks if the Unix domain `sending_socket` is allowed to send a message to the
+/// `receiving_socket`.
+/// Corresponds to the `unix_may_send()` LSM hook.
+pub fn unix_may_send(
+    current_task: &CurrentTask,
+    sending_socket: &Socket,
+    receiving_socket: &Socket,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.unix_may_send");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::unix_may_send(
+            &security_server,
+            current_task,
+            sending_socket,
+            receiving_socket,
+        )
+    })
+}
+
 /// Updates the SELinux thread group state on exec.
 /// Corresponds to the `bprm_committing_creds()` and `bprm_committed_creds()` LSM hooks.
 pub fn update_state_on_exec(current_task: &CurrentTask, elf_security_state: &ResolvedElfState) {
