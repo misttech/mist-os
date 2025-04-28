@@ -39,6 +39,7 @@ use zerocopy::{FromBytes, Immutable, IntoBytes};
 // Rust will let us do this cast in a const assignment but not in a const generic constraint.
 const SI_MAX_SIZE_AS_USIZE: usize = SI_MAX_SIZE as usize;
 
+pub type RUsagePtr = MultiArchUserRef<uapi::rusage, uapi::arch32::rusage>;
 type SigAction64Ptr = MultiArchUserRef<uapi::sigaction_t, uapi::arch32::sigaction64_t>;
 type SigActionPtr = MultiArchUserRef<uapi::sigaction_t, uapi::arch32::sigaction_t>;
 
@@ -774,7 +775,7 @@ pub fn sys_waitid(
     id: i32,
     user_info: MultiArchUserRef<uapi::siginfo_t, uapi::arch32::siginfo_t>,
     options: u32,
-    user_rusage: MultiArchUserRef<uapi::rusage, uapi::arch32::rusage>,
+    user_rusage: RUsagePtr,
 ) -> Result<(), Errno> {
     let mut waiting_options = WaitingOptions::new_for_waitid(options)?;
 
@@ -838,7 +839,7 @@ pub fn sys_wait4(
     raw_selector: pid_t,
     user_wstatus: UserRef<i32>,
     options: u32,
-    user_rusage: UserRef<rusage>,
+    user_rusage: RUsagePtr,
 ) -> Result<pid_t, Errno> {
     let waiting_options = WaitingOptions::new_for_wait4(options, current_task.get_pid())?;
 
@@ -869,7 +870,7 @@ pub fn sys_wait4(
                 ru_stime: timeval_from_duration(waitable_process.time_stats.system_time),
                 ..Default::default()
             };
-            current_task.write_object(user_rusage, &usage)?;
+            current_task.write_multi_arch_object(user_rusage, usage)?;
         }
 
         if !user_wstatus.is_null() {
@@ -1771,7 +1772,7 @@ mod tests {
                 id,
                 UserRef::default(),
                 WEXITED,
-                UserRef::default()
+                RUsagePtr::null(&current_task)
             ),
             error!(EINVAL)
         );
@@ -1782,7 +1783,7 @@ mod tests {
                 id,
                 UserRef::default(),
                 WNOWAIT,
-                UserRef::default()
+                RUsagePtr::null(&current_task)
             ),
             error!(EINVAL)
         );
@@ -1793,7 +1794,7 @@ mod tests {
                 id,
                 UserRef::default(),
                 0xffff,
-                UserRef::default()
+                RUsagePtr::null(&current_task)
             ),
             error!(EINVAL)
         );
@@ -1942,7 +1943,7 @@ mod tests {
             std::mem::size_of::<i32>() as u64,
         );
         let address_ref = UserRef::<i32>::new(address);
-        sys_wait4(&mut locked, &current_task, -1, address_ref, 0, UserRef::default())
+        sys_wait4(&mut locked, &current_task, -1, address_ref, 0, RUsagePtr::null(&current_task))
             .expect("wait4");
         let wstatus = current_task.read_object(address_ref).expect("read memory");
         assert_eq!(wstatus, SIGKILL.number() as i32);
@@ -1965,7 +1966,7 @@ mod tests {
             std::mem::size_of::<i32>() as u64,
         );
         let address_ref = UserRef::<i32>::new(address);
-        sys_wait4(&mut locked, &current_task, -1, address_ref, 0, UserRef::default())
+        sys_wait4(&mut locked, &current_task, -1, address_ref, 0, RUsagePtr::null(&current_task))
             .expect("wait4");
         let wstatus = current_task.read_object(address_ref).expect("read memory");
         assert_eq!(wstatus, wait_status);
@@ -1999,12 +2000,19 @@ mod tests {
                 -child2_pid,
                 UserRef::default(),
                 0,
-                UserRef::default()
+                RUsagePtr::null(&current_task)
             ),
             Ok(child2_pid)
         );
         assert_eq!(
-            sys_wait4(&mut locked, &current_task, 0, UserRef::default(), 0, UserRef::default()),
+            sys_wait4(
+                &mut locked,
+                &current_task,
+                0,
+                UserRef::default(),
+                0,
+                RUsagePtr::null(&current_task)
+            ),
             Ok(child1_pid)
         );
     }

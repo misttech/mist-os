@@ -5,6 +5,7 @@
 use crate::execution::execute_task;
 use crate::mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::security;
+use crate::signals::syscalls::RUsagePtr;
 use crate::task::{
     max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach, ptrace_dispatch,
     ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers, PtraceAttachType,
@@ -1239,7 +1240,7 @@ pub fn sys_getrusage(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     who: i32,
-    user_usage: MultiArchUserRef<uapi::rusage, uapi::arch32::rusage>,
+    user_usage: RUsagePtr,
 ) -> Result<(), Errno> {
     const RUSAGE_SELF: i32 = starnix_uapi::uapi::RUSAGE_SELF as i32;
     const RUSAGE_THREAD: i32 = starnix_uapi::uapi::RUSAGE_THREAD as i32;
