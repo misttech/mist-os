@@ -509,7 +509,7 @@ fn may_create(
     .map(|(sid, _)| sid)
     .unwrap_or_else(|| SecurityId::initial(InitialSid::File));
 
-    let audit_context = [current_task.into(), fs.as_ref().into()];
+    let audit_context = [current_task.into(), fs.as_ref().into(), Auditable::Name(name)];
     check_permission(
         &permission_check,
         current_task.kernel(),
