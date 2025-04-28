@@ -262,13 +262,6 @@ function fx-build-config-load {
     return 1
   fi
 
-  # The source of `fx.config` will re-set the build dir to relative, so we need
-  # to abspath it again.
-  if [[ "${FUCHSIA_BUILD_DIR:0:1}" != "/" ]]; then
-    FUCHSIA_BUILD_DIR="${FUCHSIA_DIR}/${FUCHSIA_BUILD_DIR}"
-  fi
-
-
   export FUCHSIA_BUILD_DIR FUCHSIA_ARCH
 
   if [[ "${HOST_OUT_DIR:0:1}" != "/" ]]; then
