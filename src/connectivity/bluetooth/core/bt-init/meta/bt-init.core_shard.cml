@@ -11,6 +11,12 @@
     ],
     offer: [
         {
+            protocol: "fuchsia.power.system.ActivityGovernor",
+            from: "parent",
+            to: "#bluetooth-core",
+            availability: "optional",
+        },
+        {
             protocol: [ "fuchsia.device.NameProvider" ],
             from: "parent",
             to: [ "#bluetooth-core" ],
@@ -25,6 +31,11 @@
             from: "#bt-snoop",
             to: [ "#bluetooth-core" ],
             source_availability: "unknown",
+        },
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            from: "parent",
+            to: "#bluetooth-core",
         },
         {
             config: "fuchsia.bluetooth.LegacyPairing",

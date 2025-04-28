@@ -49,6 +49,12 @@ pub async fn add_host_routes(
             value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Uint8(6)),
         }))
         .await?;
+    builder
+        .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+            name: "fuchsia.power.SuspendEnabled".parse()?,
+            value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(false)),
+        }))
+        .await?;
 
     builder
         .add_route(
@@ -62,6 +68,15 @@ pub async fn add_host_routes(
         .add_route(
             Route::new()
                 .capability(Capability::configuration("fuchsia.bluetooth.ScoOffloadPathIndex"))
+                .from(Ref::self_())
+                .to(to.clone()),
+        )
+        .await?;
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::configuration("fuchsia.power.SuspendEnabled"))
                 .from(Ref::self_())
                 .to(to.clone()),
         )

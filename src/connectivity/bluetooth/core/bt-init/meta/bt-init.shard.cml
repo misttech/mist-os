@@ -70,6 +70,17 @@
     ],
     offer: [
         {
+            protocol: "fuchsia.power.system.ActivityGovernor",
+            from: "parent",
+            to: "#bt-host-collection",
+            availability: "optional",
+        },
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            from: "parent",
+            to: [ "#bt-host-collection" ],
+        },
+        {
             config: "fuchsia.bluetooth.LegacyPairing",
             from: "parent",
             to: [ "#bt-host-collection" ],
