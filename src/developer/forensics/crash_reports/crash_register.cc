@@ -10,6 +10,7 @@
 #include "src/lib/files/file.h"
 #include "src/lib/files/path.h"
 #include "src/lib/fostr/fidl/fuchsia/feedback/formatting.h"
+#include "src/lib/fxl/strings/string_printf.h"
 #include "third_party/rapidjson/include/rapidjson/error/en.h"
 #include "third_party/rapidjson/include/rapidjson/prettywriter.h"
 #include "third_party/rapidjson/include/rapidjson/stringbuffer.h"
@@ -65,8 +66,17 @@ Product CrashRegister::GetProduct(const std::string& program_name) const {
 }
 
 void CrashRegister::AddVersionAndChannel(Product& product, const AnnotationMap& annotations) {
-  if (annotations.Contains(feedback::kBuildVersionKey)) {
-    product.version = ErrorOrString(annotations.Get(feedback::kBuildVersionKey));
+  if (annotations.Contains(feedback::kBuildProductVersionKey) &&
+      annotations.Contains(feedback::kBuildPlatformVersionKey)) {
+    const std::string& product_version = annotations.Get(feedback::kBuildProductVersionKey);
+    const std::string& platform_version = annotations.Get(feedback::kBuildPlatformVersionKey);
+
+    if (product_version != platform_version) {
+      product.version = ErrorOrString(
+          fxl::StringPrintf("%s--%s", product_version.c_str(), platform_version.c_str()));
+    } else {
+      product.version = ErrorOrString(product_version);
+    }
   }
 
   if (annotations.Contains(feedback::kSystemUpdateChannelCurrentKey)) {

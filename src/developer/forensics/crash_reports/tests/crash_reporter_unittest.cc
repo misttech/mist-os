@@ -45,6 +45,7 @@
 #include "src/lib/files/path.h"
 #include "src/lib/files/scoped_temp_dir.h"
 #include "src/lib/fsl/vmo/strings.h"
+#include "src/lib/fxl/strings/substitute.h"
 #include "src/lib/timekeeper/test_clock.h"
 
 namespace forensics {
@@ -86,6 +87,9 @@ constexpr char kProgramName[] = "crashing_program";
 
 constexpr char kBuildVersion[] = "some-version";
 constexpr char kBuildPlatformVersion[] = "some-platform-version";
+constexpr char kBuildProductVersion[] = "some-product-version";
+const std::string kProductVersion =
+    fxl::Substitute("$0--$1", kBuildProductVersion, kBuildPlatformVersion);
 constexpr char kBuildBoard[] = "some-board";
 constexpr char kBuildProduct[] = "some-product";
 constexpr char kBuildLatestCommitDate[] = "some-date";
@@ -105,6 +109,7 @@ const std::map<std::string, std::string> kFeedbackAnnotations = {
     {feedback::kBuildVersionKey, kBuildVersion},
     {feedback::kBuildBoardKey, kBuildBoard},
     {feedback::kBuildPlatformVersionKey, kBuildPlatformVersion},
+    {feedback::kBuildProductVersionKey, kBuildProductVersion},
     {feedback::kBuildProductKey, kBuildProduct},
     {feedback::kBuildLatestCommitDateKey, kBuildLatestCommitDate},
     {feedback::kDeviceFeedbackIdKey, kDefaultDeviceId},
@@ -174,6 +179,7 @@ class CrashReporterTest : public UnitTestFixture {
             feedback::kBuildVersionKey,
             feedback::kBuildBoardKey,
             feedback::kBuildPlatformVersionKey,
+            feedback::kBuildProductVersionKey,
             feedback::kBuildProductKey,
             feedback::kBuildLatestCommitDateKey,
             feedback::kDeviceFeedbackIdKey,
@@ -183,6 +189,7 @@ class CrashReporterTest : public UnitTestFixture {
             {feedback::kBuildVersionKey, ErrorOrString(kBuildVersion)},
             {feedback::kBuildBoardKey, ErrorOrString(kBuildBoard)},
             {feedback::kBuildPlatformVersionKey, ErrorOrString(kBuildPlatformVersion)},
+            {feedback::kBuildProductVersionKey, ErrorOrString(kBuildProductVersion)},
             {feedback::kBuildProductKey, ErrorOrString(kBuildProduct)},
             {feedback::kBuildLatestCommitDateKey, ErrorOrString(kBuildLatestCommitDate)},
             {feedback::kDeviceFeedbackIdKey, ErrorOrString(kDefaultDeviceId)},
@@ -252,7 +259,7 @@ class CrashReporterTest : public UnitTestFixture {
 
     std::map<std::string, testing::Matcher<std::string>> expected_annotations = {
         {"product", "Fuchsia"},
-        {"version", kBuildVersion},
+        {"version", kProductVersion},
         {"program", testing::StartsWith("crashing_program")},
         {"ptype", testing::StartsWith("crashing_program")},
         {feedback::kOSNameKey, "Fuchsia"},
@@ -261,6 +268,7 @@ class CrashReporterTest : public UnitTestFixture {
         {feedback::kBuildVersionKey, kBuildVersion},
         {feedback::kBuildBoardKey, kBuildBoard},
         {feedback::kBuildPlatformVersionKey, kBuildPlatformVersion},
+        {feedback::kBuildProductVersionKey, kBuildProductVersion},
         {feedback::kBuildProductKey, kBuildProduct},
         {feedback::kBuildLatestCommitDateKey, kBuildLatestCommitDate},
         {feedback::kDeviceFeedbackIdKey, kDefaultDeviceId},
