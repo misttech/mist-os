@@ -4,25 +4,30 @@
 #ifndef SRC_DEVICES_PCI_LIB_PCI_INCLUDE_LIB_PCI_ROOT_HOST_H_
 #define SRC_DEVICES_PCI_LIB_PCI_INCLUDE_LIB_PCI_ROOT_HOST_H_
 
-#include <fuchsia/hardware/pciroot/cpp/banjo.h>
-#include <lib/zx/bti.h>
-#include <lib/zx/eventpair.h>
-#include <lib/zx/msi.h>
-#include <lib/zx/port.h>
+// #include <lib/zx/bti.h>
+// #include <lib/zx/eventpair.h>
+// #include <lib/zx/msi.h>
+// #include <lib/zx/port.h>
 #include <lib/zx/result.h>
-#include <lib/zx/thread.h>
+// #include <lib/zx/thread.h>
+#include <mistos/hardware/pciroot/cpp/banjo.h>
 #include <stdint.h>
 #include <string.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
-#include <zircon/syscalls/port.h>
+// #include <zircon/syscalls/port.h>
 
 #include <memory>
-#include <unordered_map>
+// #include <unordered_map>
 #include <utility>
-#include <vector>
 
 #include <fbl/mutex.h>
+#include <fbl/vector.h>
+#include <object/event_dispatcher.h>
+#include <object/event_pair_dispatcher.h>
+#include <object/msi_dispatcher.h>
+#include <object/port_dispatcher.h>
+#include <object/resource_dispatcher.h>
 #include <region-alloc/region-alloc.h>
 
 using PciAllocator = RegionAllocator;
@@ -52,30 +57,33 @@ class PciRootHost {
   RegionAllocator& Mmio32() { return mmio32_alloc_; }
   RegionAllocator& Mmio64() { return mmio64_alloc_; }
   RegionAllocator& Io() { return io_alloc_; }
-  std::vector<McfgAllocation>& mcfgs() { return mcfgs_; }
+  fbl::Vector<McfgAllocation>& mcfgs() { return mcfgs_; }
 
-  PciRootHost(zx::unowned_resource unowned_msi, zx::unowned_resource unowned_mmio,
-              zx::unowned_resource unowned_ioport, pci_address_space_t io_type)
+  PciRootHost(fbl::RefPtr<ResourceDispatcher> unowned_msi,
+              fbl::RefPtr<ResourceDispatcher> unowned_mmio,
+              fbl::RefPtr<ResourceDispatcher> unowned_ioport, pci_address_space_t io_type)
       : msi_resource_(std::move(unowned_msi)),
         mmio_resource_(std::move(unowned_mmio)),
         ioport_resource_(std::move(unowned_ioport)),
         io_type_(io_type) {
-    ZX_ASSERT(zx::port::create(0, &eventpair_port_) == ZX_OK);
+    // ZX_ASSERT(zx::port::create(0, &eventpair_port_) == ZX_OK);
   }
 
-  zx_status_t AllocateMsi(uint32_t count, zx::msi* msi) {
-    return zx::msi::allocate(*msi_resource_, count, msi);
+  zx_status_t AllocateMsi(uint32_t count, fbl::RefPtr<MsiDispatcher>* msi) {
+    printf("AllocateMsi: count: %u\n", count);
+    // return zx::msi::allocate(*msi_resource_, count, msi);
+    return ZX_OK;
   }
 
   zx::result<zx_paddr_t> AllocateMmio32Window(zx_paddr_t base, size_t size,
-                                              zx::resource* out_resource,
-                                              zx::eventpair* out_endpoint) {
+                                              fbl::RefPtr<ResourceDispatcher>* out_resource,
+                                              fbl::RefPtr<EventPairDispatcher>* out_endpoint) {
     return Allocate(kMmio32, PCI_ADDRESS_SPACE_MEMORY, base, size, out_resource, out_endpoint);
   }
 
   zx::result<zx_paddr_t> AllocateMmio64Window(zx_paddr_t base, size_t size,
-                                              zx::resource* out_resource,
-                                              zx::eventpair* out_endpoint) {
+                                              fbl::RefPtr<ResourceDispatcher>* out_resource,
+                                              fbl::RefPtr<EventPairDispatcher>* out_endpoint) {
     auto status =
         Allocate(kMmio64, PCI_ADDRESS_SPACE_MEMORY, base, size, out_resource, out_endpoint);
     // If an allocation request is made for Mmio64 but has no specified base we can
@@ -90,8 +98,9 @@ class PciRootHost {
     return status;
   }
 
-  zx::result<zx_paddr_t> AllocateIoWindow(zx_paddr_t base, size_t size, zx::resource* out_resource,
-                                          zx::eventpair* out_endpoint) {
+  zx::result<zx_paddr_t> AllocateIoWindow(zx_paddr_t base, size_t size,
+                                          fbl::RefPtr<ResourceDispatcher>* out_resource,
+                                          fbl::RefPtr<EventPairDispatcher>* out_endpoint) {
     return Allocate(kIo, io_type_, base, size, out_resource, out_endpoint);
   }
   // Search the MCFG allocations found earlier for an entry matching a given
@@ -138,40 +147,42 @@ class PciRootHost {
   }
   void ProcessQueue() __TA_REQUIRES(lock_);
   zx::result<zx_paddr_t> Allocate(AllocationType type, uint32_t kind, zx_paddr_t base, size_t size,
-                                  zx::resource* out_resource, zx::eventpair* out_endpoint)
+                                  fbl::RefPtr<ResourceDispatcher>* out_resource,
+                                  fbl::RefPtr<EventPairDispatcher>* out_endpoint)
       __TA_EXCLUDES(lock_);
   // Creates a backing pair of eventpair endpoints used to store and track if a
   // process dies while holding a window allocation, allowing the worker thread
   // to add the resources back to the allocation pool.
 
-  zx_status_t RecordAllocation(PciAddressWindow region, zx::eventpair* out_endpoint)
-      __TA_REQUIRES(lock_);
+  zx_status_t RecordAllocation(PciAddressWindow region,
+                               fbl::RefPtr<EventPairDispatcher>* out_endpoint) __TA_REQUIRES(lock_);
   PciAllocator mmio32_alloc_;
   PciAllocator mmio64_alloc_;
   PciAllocator io_alloc_;
-  std::vector<McfgAllocation> mcfgs_;
+  fbl::Vector<McfgAllocation> mcfgs_;
 
   // For each allocation of address space handed out to a PCI Bus Driver we store an
   // eventpair peer as well as the Region uptr itself. This allows us to tell if a downstream
   // process dies or frees their window allocation.
   struct WindowAllocation {
-    WindowAllocation(zx::eventpair host_peer, PciAddressWindow allocated_region)
+    WindowAllocation(fbl::RefPtr<EventPairDispatcher> host_peer, PciAddressWindow allocated_region)
         : host_peer_(std::move(host_peer)), allocated_region_(std::move(allocated_region)) {}
     ~WindowAllocation() {}
-    zx::eventpair host_peer_;
+    fbl::RefPtr<EventPairDispatcher> host_peer_;
     PciAddressWindow allocated_region_;
   };
   // The handle key is the handle value of the contained |host_peer| eventpair to keep from
   // needing to track our own unique IDs. Handle values are already unique.
-  uint64_t alloc_key_cnt_ __TA_GUARDED(lock_) = 0;
-  std::unordered_map<uint64_t, std::unique_ptr<WindowAllocation>> allocations_ __TA_GUARDED(lock_);
+  //uint64_t alloc_key_cnt_ __TA_GUARDED(lock_) = 0;
+  // std::unordered_map<uint64_t, std::unique_ptr<WindowAllocation>> allocations_
+  // __TA_GUARDED(lock_);
 
   fbl::Mutex lock_;
-  zx::port eventpair_port_ __TA_GUARDED(lock_);
-  const zx::unowned_resource msi_resource_;
-  const zx::unowned_resource mmio_resource_;
-  const zx::unowned_resource ioport_resource_;
-  // Depending on platform 'IO' in PCI can be either memory mapped, or something more akin to PIO.
+  fbl::RefPtr<PortDispatcher> eventpair_port_ __TA_GUARDED(lock_);
+  fbl::RefPtr<ResourceDispatcher> msi_resource_;
+  fbl::RefPtr<ResourceDispatcher> mmio_resource_;
+  fbl::RefPtr<ResourceDispatcher> ioport_resource_;
+  //  Depending on platform 'IO' in PCI can be either memory mapped, or something more akin to PIO.
   const pci_address_space_t io_type_;
 };
 

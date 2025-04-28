@@ -11,7 +11,7 @@
 // #include <lib/ddk/metadata.h>
 // #include <lib/ddk/platform-defs.h>
 #include <lib/mmio/mmio.h>
-#include <lib/pci/hw.h>
+// #include <lib/pci/hw.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/time.h>
 #include <trace.h>
@@ -39,6 +39,7 @@
 namespace pci {
 
 zx_status_t pci_bus_bind(void* ctx, zx_device_t* parent) {
+  printf("parent: %p\n", parent);
   pciroot_protocol_t pciroot = {};
   zx_status_t status = device_get_protocol(parent, ZX_PROTOCOL_PCIROOT, &pciroot);
   if (status != ZX_OK) {
@@ -57,13 +58,14 @@ zx_status_t pci_bus_bind(void* ctx, zx_device_t* parent) {
   // platform tables offered to us.
   std::optional<fdf::MmioBuffer> ecam;
   if (info.cam.vmo_list != nullptr) {
-#if 0
-    if (auto result = pci::Bus::MapConfigRegion(zx::vmo(info.cam.vmo_list[0])); result.is_ok()) {
+    ZX_ASSERT(info.cam.vmo_count == 1);
+    fbl::RefPtr<VmObjectDispatcher> vmo =
+        fbl::ImportFromRawPtr((VmObjectDispatcher*)info.cam.vmo_list);
+    if (auto result = pci::Bus::MapConfigRegion(vmo); result.is_ok()) {
       ecam = std::move(result.value());
     } else {
       return result.status_value();
     }
-#endif
   }
 
   fbl::AllocChecker ac;
@@ -150,7 +152,7 @@ zx::result<fdf::MmioBuffer> Bus::MapConfigRegion(fbl::RefPtr<VmObjectDispatcher>
   zx::result<fdf::MmioBuffer> result =
       fdf::MmioBuffer::Create(0, size, std::move(cam_vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE);
   if (result.is_error()) {
-    LTRACEF("couldn't map ecam vmo: %s!\n", result.status_string());
+    LTRACEF("couldn't map ecam vmo: %s!\n", zx_status_get_string(result.status_value()));
     return result.take_error();
   }
 
@@ -176,7 +178,7 @@ zx::result<std::unique_ptr<Config>> Bus::MakeConfig(pci_bdf_t bdf) {
 // unconfigured. In the end the Bus should have a list of all devides, and all bridges
 // should have a list of pointers to their own downstream devices.
 zx_status_t Bus::ScanDownstream() {
-  std::list<BusScanEntry> scan_list;
+  std::list<BusScanEntry, util::Allocator<BusScanEntry>> scan_list;
   // First scan the bus id associated with our root.
   BusScanEntry entry = {.bdf = {static_cast<uint8_t>(root_->managed_bus_id()), 0, 0},
                         .upstream = root_.get()};
@@ -203,7 +205,8 @@ zx_status_t Bus::ScanDownstream() {
   return ZX_OK;
 }
 
-void Bus::ScanBus(BusScanEntry entry, std::list<BusScanEntry>* scan_list) {
+void Bus::ScanBus(BusScanEntry entry,
+                  std::list<BusScanEntry, util::Allocator<BusScanEntry>>* scan_list) {
   uint32_t bus_id = entry.bdf.bus_id;  // 32bit so bus_id won't overflow 8bit in the loop
   uint8_t _dev_id = entry.bdf.device_id;
   uint8_t _func_id = entry.bdf.function_id;
@@ -230,8 +233,8 @@ void Bus::ScanBus(BusScanEntry entry, std::list<BusScanEntry>* scan_list) {
         continue;
       }
 
-      bool is_bridge = ((config->Read(Config::kHeaderType) & PCI_HEADER_TYPE_MASK) ==
-                        PCI_HEADER_TYPE_PCI_BRIDGE);
+      bool is_bridge =
+          ((config->Read(Config::kHeaderType) & PCI_HEADER_TYPE_MASK) == PCI_HEADER_TYPE_BRIDGE);
       LTRACEF("\tfound %s at %02x:%02x.%1x\n", (is_bridge) ? "bridge" : "device", bus_id, dev_id,
               func_id);
 
@@ -241,7 +244,7 @@ void Bus::ScanBus(BusScanEntry entry, std::list<BusScanEntry>* scan_list) {
       if (is_bridge) {
         fbl::RefPtr<Bridge> bridge;
         uint8_t mbus_id = config->Read(Config::kSecondaryBusId);
-        zx_status_t status = Bridge::Create(nullptr, std::move(config.value()), upstream,
+        zx_status_t status = Bridge::Create(zxdev(), std::move(config.value()), upstream,
                                             this /*,std::move(node)*/, mbus_id, &bridge);
         if (status != ZX_OK) {
           LTRACEF("failed to create Bridge at %s: %s\n", config->addr(),
@@ -276,7 +279,7 @@ void Bus::ScanBus(BusScanEntry entry, std::list<BusScanEntry>* scan_list) {
       char addr[ZX_MAX_NAME_LEN];
       strncpy(addr, config->addr(), sizeof(addr));
       zx_status_t status =
-          pci::Device::Create(nullptr, std::move(config.value()), upstream,
+          pci::Device::Create(zxdev(), std::move(config.value()), upstream,
                               this /*,std::move(node)*/, /*has_acpi=*/DeviceHasAcpi(config->bdf()));
       if (status != ZX_OK) {
         LTRACEF("failed to create device at %s: %s\n", addr, zx_status_get_string(status));
@@ -294,8 +297,7 @@ bool Bus::DeviceHasAcpi(pci_bdf_t bdf) {
     return bdf.bus_id == entry.bus_id && bdf.device_id == entry.device_id &&
            bdf.function_id == entry.function_id;
   };
-  return std::find_if(acpi_devices_.begin(), acpi_devices_.end(), find_fn) !=
-         std::end(acpi_devices_);
+  return std::ranges::find_if(acpi_devices_, find_fn) != std::end(acpi_devices_);
 }
 
 zx_status_t Bus::SetUpLegacyIrqHandlers() {
@@ -506,7 +508,7 @@ void Bus::LegacyIrqWorker(
           // no way to re-enable it without changing IRQ modes.
           auto& irqs = device.irqs();
           bool disable_irq = true;
-          if (irqs.mode == INTERRUPT_MODE_LEGACY_NOACK) {
+          if (irqs.mode == PCI_INTERRUPT_MODE_LEGACY_NOACK) {
             irqs.irqs_in_period++;
             if (packet.interrupt.timestamp - irqs.legacy_irq_period_start >= kLegacyNoAckPeriod) {
               irqs.legacy_irq_period_start = packet.interrupt.timestamp;

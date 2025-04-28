@@ -24,7 +24,7 @@ namespace pci {
 
 class Bridge : public pci::Device, public UpstreamNode {
  public:
-  static zx_status_t Create(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&& config,
+  static zx_status_t Create(zx_device_t* parent, std::unique_ptr<Config>&& config,
                             UpstreamNode* upstream,
                             BusDeviceInterface* bdi /*, inspect::Node node*/, uint8_t mbus_id,
                             fbl::RefPtr<pci::Bridge>* out_bridge);
@@ -61,7 +61,7 @@ class Bridge : public pci::Device, public UpstreamNode {
   void Disable() final __TA_EXCLUDES(dev_lock_);
 
  private:
-  Bridge(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&&, UpstreamNode* upstream,
+  Bridge(zx_device_t* parent, std::unique_ptr<Config>&&, UpstreamNode* upstream,
          BusDeviceInterface* bdi /*, inspect::Node node*/, uint8_t managed_bus_id);
   zx_status_t Init() __TA_EXCLUDES(dev_lock_);
 

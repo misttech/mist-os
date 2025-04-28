@@ -28,7 +28,7 @@
 namespace pci {
 
 // Bridges rely on most of the protected Device members when they can
-Bridge::Bridge(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&& config,
+Bridge::Bridge(zx_device_t* parent, std::unique_ptr<Config>&& config,
                UpstreamNode* upstream, BusDeviceInterface* bdi /*, inspect::Node node*/,
                uint8_t mbus_id)
     : pci::Device(parent, std::move(config), upstream, bdi /*, std::move(node)*/,
@@ -36,7 +36,7 @@ Bridge::Bridge(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&& config
                   /*has_acpi=*/false),
       UpstreamNode(UpstreamNode::Type::BRIDGE, mbus_id) {}
 
-zx_status_t Bridge::Create(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&& config,
+zx_status_t Bridge::Create(zx_device_t* parent, std::unique_ptr<Config>&& config,
                            UpstreamNode* upstream, BusDeviceInterface* bdi /*, inspect::Node node*/,
                            uint8_t managed_bus_id, fbl::RefPtr<pci::Bridge>* out_bridge) {
   fbl::AllocChecker ac;

@@ -36,7 +36,7 @@ struct pci_io_bar {
 
 union pci_bar_result {
   pci_io_bar_t io;
-  zx_handle_t vmo;
+  void* vmo;
 };
 
 struct pci_bar {
@@ -82,7 +82,7 @@ __END_CDECLS
 
 #ifdef __cplusplus
 
-#include <fidl/fuchsia.hardware.pci/cpp/wire.h>
+// #include <fidl/fuchsia.hardware.pci/cpp/wire.h>
 
 #include <optional>
 

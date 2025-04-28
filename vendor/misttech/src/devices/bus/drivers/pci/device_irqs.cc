@@ -23,35 +23,35 @@
 
 namespace pci {
 
-zx::result<uint32_t> Device::QueryIrqMode(interrupt_mode_t mode) {
+zx::result<uint32_t> Device::QueryIrqMode(pci_interrupt_mode_t mode) {
   const fbl::AutoLock dev_lock(&dev_lock_);
   switch (mode) {
-    case INTERRUPT_MODE_LEGACY:
-    case INTERRUPT_MODE_LEGACY_NOACK:
+    case PCI_INTERRUPT_MODE_LEGACY:
+    case PCI_INTERRUPT_MODE_LEGACY_NOACK:
       if (cfg_->Read(Config::kInterruptLine) != 0) {
         return zx::ok(PCI_LEGACY_INT_COUNT);
       }
       break;
-    case INTERRUPT_MODE_MSI:
+    case PCI_INTERRUPT_MODE_MSI:
       if (caps_.msi) {
         return zx::ok(caps_.msi->vectors_avail());
       }
       break;
-    case INTERRUPT_MODE_MSI_X:
+    case PCI_INTERRUPT_MODE_MSI_X:
       if (caps_.msix) {
         return zx::ok(caps_.msix->table_size());
       }
       break;
-    case INTERRUPT_MODE_DISABLED:
+    case PCI_INTERRUPT_MODE_DISABLED:
     default:
       return zx::error(ZX_ERR_INVALID_ARGS);
   }
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-interrupt_modes_t Device::GetInterruptModes() {
+pci_interrupt_modes_t Device::GetInterruptModes() {
   const fbl::AutoLock dev_lock(&dev_lock_);
-  interrupt_modes_t modes{};
+  pci_interrupt_modes_t modes{};
 
   if (cfg_->Read(Config::kInterruptLine) != 0) {
     modes.has_legacy = true;
@@ -65,8 +65,8 @@ interrupt_modes_t Device::GetInterruptModes() {
   return modes;
 }
 
-zx_status_t Device::SetIrqMode(interrupt_mode_t mode, uint32_t irq_cnt) {
-  if (mode != INTERRUPT_MODE_DISABLED && irq_cnt == 0) {
+zx_status_t Device::SetIrqMode(pci_interrupt_mode_t mode, uint32_t irq_cnt) {
+  if (mode != PCI_INTERRUPT_MODE_DISABLED && irq_cnt == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -82,21 +82,21 @@ zx_status_t Device::SetIrqMode(interrupt_mode_t mode, uint32_t irq_cnt) {
 
   status = ZX_ERR_NOT_SUPPORTED;
   switch (mode) {
-    case INTERRUPT_MODE_DISABLED:
+    case PCI_INTERRUPT_MODE_DISABLED:
       status = ZX_OK;
       break;
-    case INTERRUPT_MODE_LEGACY:
+    case PCI_INTERRUPT_MODE_LEGACY:
       status = EnableLegacy(/*needs_ack=*/true);
       break;
-    case INTERRUPT_MODE_LEGACY_NOACK:
+    case PCI_INTERRUPT_MODE_LEGACY_NOACK:
       status = EnableLegacy(/*needs_ack=*/false);
       break;
-    case INTERRUPT_MODE_MSI:
+    case PCI_INTERRUPT_MODE_MSI:
       if (caps_.msi) {
         status = EnableMsi(irq_cnt);
       }
       break;
-    case INTERRUPT_MODE_MSI_X:
+    case PCI_INTERRUPT_MODE_MSI_X:
       if (caps_.msix) {
         status = EnableMsix(irq_cnt);
       }
@@ -114,16 +114,16 @@ zx_status_t Device::SetIrqMode(interrupt_mode_t mode, uint32_t irq_cnt) {
 zx_status_t Device::DisableInterrupts() {
   zx_status_t st = ZX_OK;
   switch (irqs_.mode) {
-    case INTERRUPT_MODE_DISABLED:
+    case PCI_INTERRUPT_MODE_DISABLED:
       return ZX_OK;
-    case INTERRUPT_MODE_LEGACY:
-    case INTERRUPT_MODE_LEGACY_NOACK:
+    case PCI_INTERRUPT_MODE_LEGACY:
+    case PCI_INTERRUPT_MODE_LEGACY_NOACK:
       st = DisableLegacy();
       break;
-    case INTERRUPT_MODE_MSI:
+    case PCI_INTERRUPT_MODE_MSI:
       st = DisableMsi();
       break;
-    case INTERRUPT_MODE_MSI_X:
+    case PCI_INTERRUPT_MODE_MSI_X:
       st = DisableMsix();
       break;
     default:
@@ -132,7 +132,7 @@ zx_status_t Device::DisableInterrupts() {
 
   if (st == ZX_OK) {
     LTRACEF("[%s] disabled IRQ mode %u", cfg_->addr(), irqs_.mode);
-    irqs_.mode = INTERRUPT_MODE_DISABLED;
+    irqs_.mode = PCI_INTERRUPT_MODE_DISABLED;
   }
   return st;
 }
@@ -143,15 +143,15 @@ zx::result<fbl::RefPtr<InterruptDispatcher>> Device::MapInterrupt(uint32_t which
   // so the dispatcher needs access to the given device's config vmo. MSI-X needs access to the
   // table structure which is held in one of the device BARs, but a view is built ahead of time for
   // it when the MSI-X capability is initialized.
-  if (irqs_.mode == INTERRUPT_MODE_DISABLED) {
+  if (irqs_.mode == PCI_INTERRUPT_MODE_DISABLED) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
   fbl::RefPtr<InterruptDispatcher> interrupt = {};
   zx_status_t status = ZX_OK;
   switch (irqs_.mode) {
-    case INTERRUPT_MODE_LEGACY:
-    case INTERRUPT_MODE_LEGACY_NOACK: {
+    case PCI_INTERRUPT_MODE_LEGACY:
+    case PCI_INTERRUPT_MODE_LEGACY_NOACK: {
       if (which_irq != 0) {
         return zx::error(ZX_ERR_INVALID_ARGS);
       }
@@ -159,7 +159,7 @@ zx::result<fbl::RefPtr<InterruptDispatcher>> Device::MapInterrupt(uint32_t which
       interrupt = irqs_.legacy;
       break;
     }
-    case INTERRUPT_MODE_MSI: {
+    case PCI_INTERRUPT_MODE_MSI: {
       zx::result<fdf::MmioView> view_res = cfg_->get_view();
       if (!view_res.is_ok()) {
         return view_res.take_error();
@@ -177,7 +177,7 @@ zx::result<fbl::RefPtr<InterruptDispatcher>> Device::MapInterrupt(uint32_t which
       interrupt = msi_handle.release();
       break;
     }
-    case INTERRUPT_MODE_MSI_X: {
+    case PCI_INTERRUPT_MODE_MSI_X: {
       auto& msix = caps_.msix;
 
       zx_rights_t rights;
@@ -212,7 +212,7 @@ zx_status_t Device::SignalLegacyIrq(zx_instant_boot_t timestamp) {
 }
 
 zx_status_t Device::AckLegacyIrq() {
-  if (irqs_.mode != INTERRUPT_MODE_LEGACY) {
+  if (irqs_.mode != PCI_INTERRUPT_MODE_LEGACY) {
     return ZX_ERR_BAD_STATE;
   }
 
@@ -262,13 +262,13 @@ zx_status_t Device::EnableLegacy(bool needs_ack) {
   }
 
   ModifyCmdLocked(/*clr_bits=*/PCIE_CFG_COMMAND_INT_DISABLE, /*set_bits=*/0);
-  irqs_.mode = (needs_ack) ? INTERRUPT_MODE_LEGACY_NOACK : INTERRUPT_MODE_LEGACY;
+  irqs_.mode = (needs_ack) ? PCI_INTERRUPT_MODE_LEGACY_NOACK : PCI_INTERRUPT_MODE_LEGACY;
   irqs_.legacy_pin = cfg_->Read(Config::kInterruptPin);
   return ZX_OK;
 }
 
 zx_status_t Device::EnableMsi(uint32_t irq_cnt) {
-  ZX_DEBUG_ASSERT(irqs_.mode == INTERRUPT_MODE_DISABLED);
+  ZX_DEBUG_ASSERT(irqs_.mode == PCI_INTERRUPT_MODE_DISABLED);
   ZX_DEBUG_ASSERT(!irqs_.msi_allocation);
   ZX_DEBUG_ASSERT(caps_.msi);
 
@@ -298,13 +298,13 @@ zx_status_t Device::EnableMsi(uint32_t irq_cnt) {
     cfg_->Write(caps_.msi->ctrl(), ctrl.value);
 
     irqs_.msi_allocation = std::move(alloc);
-    irqs_.mode = INTERRUPT_MODE_MSI;
+    irqs_.mode = PCI_INTERRUPT_MODE_MSI;
   }
   return result.status_value();
 }
 
 zx_status_t Device::EnableMsix(uint32_t irq_cnt) {
-  ZX_DEBUG_ASSERT(irqs_.mode == INTERRUPT_MODE_DISABLED);
+  ZX_DEBUG_ASSERT(irqs_.mode == PCI_INTERRUPT_MODE_DISABLED);
   ZX_DEBUG_ASSERT(!irqs_.msi_allocation);
   ZX_DEBUG_ASSERT(caps_.msix);
 
@@ -328,7 +328,7 @@ zx_status_t Device::EnableMsix(uint32_t irq_cnt) {
     cfg_->Write(caps_.msix->ctrl(), ctrl.value);
 
     irqs_.msi_allocation = std::move(alloc);
-    irqs_.mode = INTERRUPT_MODE_MSI_X;
+    irqs_.mode = PCI_INTERRUPT_MODE_MSI_X;
   }
   return result.status_value();
 }

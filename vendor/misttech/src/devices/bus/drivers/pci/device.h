@@ -8,6 +8,7 @@
 
 #include <assert.h>
 #include <mistos/hardware/pci/c/banjo.h>
+#include <mistos/hardware/pci/cpp/banjo.h>
 //  #include <lib/component/outgoing/cpp/outgoing_directory.h>
 // #include <lib/device-protocol/pci.h>
 //  #include <lib/fdf/cpp/dispatcher.h>
@@ -20,8 +21,8 @@
 
 #include <limits>
 
-// #include <ddktl/device.h>
-// #include <ddktl/unbind-txn.h>
+#include <ddktl/device.h>
+#include <ddktl/unbind-txn.h>
 #include <fbl/algorithm.h>
 #include <fbl/intrusive_container_utils.h>
 #include <fbl/intrusive_double_list.h>
@@ -69,7 +70,7 @@ class Device : public fbl::WAVLTreeContainable<fbl::RefPtr<pci::Device>>,
   // This structure contains all bookkeeping and state for a device's
   // configured IRQ mode. It is initialized to fpci::InterruptMode::kDisabled.
   struct Irqs {
-    interrupt_mode_t mode;                    // The mode currently configured.
+    pci_interrupt_mode_t mode;                // The mode currently configured.
     fbl::RefPtr<InterruptDispatcher> legacy;  // Virtual interrupt for legacy signaling.
     uint32_t legacy_vector;             // Vector for the legacy interrupt, mirrors kInterruptLine
                                         // in Config.
@@ -174,7 +175,7 @@ class Device : public fbl::WAVLTreeContainable<fbl::RefPtr<pci::Device>>,
   }
 
   // Create, but do not initialize, a device.
-  static zx_status_t Create(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&& config,
+  static zx_status_t Create(zx_device_t* parent, std::unique_ptr<Config>&& config,
                             UpstreamNode* upstream,
                             BusDeviceInterface* bdi /*, inspect::Node node*/, bool has_acpi);
   virtual ~Device();
@@ -264,9 +265,9 @@ class Device : public fbl::WAVLTreeContainable<fbl::RefPtr<pci::Device>>,
   // These methods handle IRQ configuration and are generally called by the
   // PciProtocol methods, though they may be used to disable IRQs on
   // initialization as well.
-  zx::result<uint32_t> QueryIrqMode(interrupt_mode_t mode) __TA_EXCLUDES(dev_lock_);
-  interrupt_modes_t GetInterruptModes() __TA_EXCLUDES(dev_lock_);
-  zx_status_t SetIrqMode(interrupt_mode_t mode, uint32_t irq_cnt) __TA_EXCLUDES(dev_lock_);
+  zx::result<uint32_t> QueryIrqMode(pci_interrupt_mode_t mode) __TA_EXCLUDES(dev_lock_);
+  pci_interrupt_modes_t GetInterruptModes() __TA_EXCLUDES(dev_lock_);
+  zx_status_t SetIrqMode(pci_interrupt_mode_t mode, uint32_t irq_cnt) __TA_EXCLUDES(dev_lock_);
   zx::result<fbl::RefPtr<InterruptDispatcher>> MapInterrupt(uint32_t which_irq)
       __TA_EXCLUDES(dev_lock_);
   zx_status_t DisableInterrupts() __TA_REQUIRES(dev_lock_);
@@ -299,7 +300,7 @@ class Device : public fbl::WAVLTreeContainable<fbl::RefPtr<pci::Device>>,
   // as in a list for roots/bridges to track their downstream children. These
   // traits facilitate that for us.
  protected:
-  Device(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&& config, UpstreamNode* upstream,
+  Device(zx_device_t* parent, std::unique_ptr<Config>&& config, UpstreamNode* upstream,
          BusDeviceInterface* bdi /*, inspect::Node node*/, bool is_bridge, bool has_acpi);
 
   zx_status_t Init() __TA_EXCLUDES(dev_lock_);
@@ -400,10 +401,53 @@ class Device : public fbl::WAVLTreeContainable<fbl::RefPtr<pci::Device>>,
   bool is_pcie_ = false;
 
   Capabilities caps_ __TA_GUARDED(dev_lock_){};
-  Irqs irqs_ __TA_GUARDED(dev_lock_){.mode = INTERRUPT_MODE_DISABLED};
+  Irqs irqs_ __TA_GUARDED(dev_lock_){.mode = PCI_INTERRUPT_MODE_DISABLED};
 
-  fbl::RefPtr<Device> parent_;
+  // fbl::RefPtr<Device> parent_;
+  zx_device_t* parent_;
   // Inspect inspect_;
+};
+
+class BanjoDevice;
+using BanjoDeviceType = ddk::Device<pci::BanjoDevice, ddk::GetProtocolable, ddk::Unbindable>;
+class BanjoDevice : public BanjoDeviceType, public ddk::PciProtocol<pci::BanjoDevice> {
+ public:
+  BanjoDevice(zx_device_t* parent, pci::Device* device)
+      : BanjoDeviceType(parent), device_(device) {}
+
+  // ddk::PciProtocol implementations.
+  zx_status_t PciGetBar(uint32_t bar_id, pci_bar_t* out_bar);
+  zx_status_t PciSetBusMastering(bool enable);
+  zx_status_t PciResetDevice();
+  zx_status_t PciAckInterrupt();
+  zx_status_t PciMapInterrupt(uint32_t which_irq, uintptr_t* out_handle);
+  void PciGetInterruptModes(pci_interrupt_modes_t* out_modes);
+  zx_status_t PciSetInterruptMode(pci_interrupt_mode_t mode, uint32_t requested_irq_count);
+  zx_status_t PciGetDeviceInfo(pci_device_info_t* out_info);
+  zx_status_t PciReadConfig8(uint16_t offset, uint8_t* out_value);
+  zx_status_t PciReadConfig16(uint16_t offset, uint16_t* out_value);
+  zx_status_t PciReadConfig32(uint16_t offset, uint32_t* out_value);
+  zx_status_t PciWriteConfig8(uint16_t offset, uint8_t value);
+  zx_status_t PciWriteConfig16(uint16_t offset, uint16_t value);
+  zx_status_t PciWriteConfig32(uint16_t offset, uint32_t value);
+  zx_status_t PciGetFirstCapability(uint8_t cap_id, uint8_t* out_offset);
+  zx_status_t PciGetNextCapability(uint8_t cap_id, uint8_t offset, uint8_t* out_offset);
+  zx_status_t PciGetFirstExtendedCapability(uint16_t cap_id, uint16_t* out_offset);
+  zx_status_t PciGetNextExtendedCapability(uint16_t cap_id, uint16_t offset, uint16_t* out_offset);
+  zx_status_t PciGetBti(uint32_t index, uintptr_t* out_bti);
+
+  // Does the work necessary to create a ddk Composite device representing the
+  // pci::Device.
+  static zx::result<> Create(zx_device_t* parent, pci::Device* device);
+
+  // DDK mix-in impls
+  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
+  void DdkRelease() { delete this; }
+  void DdkUnbind(ddk::UnbindTxn txn) { txn.Reply(); }
+  pci::Device* device() { return device_; }
+
+ private:
+  pci::Device* device_;
 };
 
 #if 0

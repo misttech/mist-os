@@ -150,7 +150,8 @@ class Bus : public PciBusType,
   zx_status_t ScanDownstream();
   ddk::PcirootProtocolClient& pciroot() { return pciroot_; }
   // Scan a specific bus
-  void ScanBus(BusScanEntry entry, std::list<BusScanEntry>* scan_list);
+  void ScanBus(BusScanEntry entry,
+               std::list<BusScanEntry, util::Allocator<BusScanEntry>>* scan_list);
   // Returns true if a given BDF is present in the list of devices provided by
   // the platform to us that use the ACPI fragment.
   bool DeviceHasAcpi(pci_bdf_t bdf);

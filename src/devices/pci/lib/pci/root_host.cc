@@ -1,7 +1,7 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#include <fuchsia/hardware/pciroot/cpp/banjo.h>
+
 #include <lib/pci/pciroot.h>
 #include <lib/pci/root_host.h>
 #include <lib/zx/object.h>
@@ -9,6 +9,7 @@
 #include <lib/zx/process.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
+#include <mistos/hardware/pciroot/cpp/banjo.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls.h>
@@ -36,8 +37,10 @@
 // have devhost isolation between the root host and root implemtnations and will
 // be able to use channel endpoints closing for similar notifications.
 zx::result<zx_paddr_t> PciRootHost::Allocate(AllocationType type, uint32_t kind, zx_paddr_t base,
-                                             size_t size, zx::resource* out_resource,
-                                             zx::eventpair* out_endpoint) {
+                                             size_t size,
+                                             fbl::RefPtr<ResourceDispatcher>* out_resource,
+                                             fbl::RefPtr<EventPairDispatcher>* out_endpoint) {
+#if 0
   fbl::AutoLock lock(&lock_);
   RegionAllocator* allocator = nullptr;
   const char* allocator_name = nullptr;
@@ -111,6 +114,8 @@ zx::result<zx_paddr_t> PciRootHost::Allocate(AllocationType type, uint32_t kind,
   // Discard the lifecycle aspect of the returned pointer, we'll be tracking it on the bus
   // side of things.
   return zx::ok(new_base);
+#endif
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
 constexpr uint64_t kU32Max = std::numeric_limits<uint32_t>::max();
@@ -129,7 +134,7 @@ zx::result<> PciRootHost::AddMmioRange(zx_paddr_t base, size_t size) {
 }
 
 void PciRootHost::ProcessQueue() {
-  zx_port_packet packet;
+  /*zx_port_packet packet;
   while (eventpair_port_.wait(zx::deadline_after(zx::msec(20)), &packet) == ZX_OK) {
     if (packet.type == ZX_PKT_TYPE_SIGNAL_ONE) {
       // An eventpair downstream has died meaning that some resources need
@@ -137,11 +142,12 @@ void PciRootHost::ProcessQueue() {
       ZX_ASSERT(packet.signal.observed == ZX_EVENTPAIR_PEER_CLOSED);
       allocations_.erase(packet.key);
     }
-  }
+  }*/
 }
 
 zx_status_t PciRootHost::RecordAllocation(RegionAllocator::Region::UPtr region,
-                                          zx::eventpair* out_endpoint) {
+                                          fbl::RefPtr<EventPairDispatcher>* out_endpoint) {
+#if 0
   zx::eventpair root_host_endpoint;
   zx_status_t st = zx::eventpair::create(0, &root_host_endpoint, out_endpoint);
   if (st != ZX_OK) {
@@ -160,4 +166,6 @@ zx_status_t PciRootHost::RecordAllocation(RegionAllocator::Region::UPtr region,
   allocations_[key] =
       std::make_unique<WindowAllocation>(std::move(root_host_endpoint), std::move(region));
   return ZX_OK;
+#endif
+  return ZX_ERR_NOT_SUPPORTED;
 }

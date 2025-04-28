@@ -112,14 +112,18 @@ template <class CapabilityType>
 zx_status_t AllocateCapability(
     uint16_t offset, const Config& cfg, CapabilityType** out,
     fbl::DoublyLinkedList<std::unique_ptr<typename CapabilityType::BaseClass>>* list) {
+  fbl::AllocChecker ac;
   // If we find a duplicate of a singleton capability then either we've parsed incorrectly,
   // or the device configuration space is suspect.
   if (*out != nullptr) {
     return ZX_ERR_BAD_STATE;
   }
 
-  auto new_cap =
-      std::make_unique<CapabilityType>(cfg, static_cast<typename CapabilityType::RegType>(offset));
+  auto new_cap = fbl::make_unique_checked<CapabilityType>(
+      &ac, cfg, static_cast<typename CapabilityType::RegType>(offset));
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
   *out = new_cap.get();
   list->push_back(std::move(new_cap));
   return ZX_OK;
@@ -147,6 +151,7 @@ zx::result<> Device::ConfigureCapabilities() {
 
 zx_status_t Device::ParseCapabilities() {
   // Our starting point comes from the Capability Pointer in the config header.
+  fbl::AllocChecker ac;
   struct CapabilityHdr hdr;
   auto cap_offset = cfg_->Read(Config::kCapabilitiesPtr);
   if (!cap_offset) {
@@ -216,7 +221,8 @@ zx_status_t Device::ParseCapabilities() {
       case Capability::Id::kAdvancedFeatures:
       case Capability::Id::kEnhancedAllocation:
       case Capability::Id::kFlatteningPortalBridge:
-        caps_.list.push_back(std::make_unique<Capability>(hdr.id, cap_offset));
+        caps_.list.push_back(fbl::make_unique_checked<Capability>(&ac, hdr.id, cap_offset));
+        ZX_DEBUG_ASSERT(ac.check());
         break;
     }
 
@@ -232,6 +238,8 @@ zx_status_t Device::ParseCapabilities() {
 }
 
 zx_status_t Device::ParseExtendedCapabilities() {
+  fbl::AllocChecker ac;
+
   // Extended capabilities always start at offset 256, the first byte in extended
   // configuration space.
   struct ExtCapabilityHdr hdr;
@@ -295,7 +303,9 @@ zx_status_t Device::ParseExtendedCapabilities() {
       case ExtCapability::Id::kPhysicalLayer32:
       case ExtCapability::Id::kAlternateProtocol:
       case ExtCapability::Id::kSystemFirmwareIntermediary:
-        caps_.ext_list.push_back(std::make_unique<ExtCapability>(hdr.id, hdr.version, cap_offset));
+        caps_.ext_list.push_back(
+            fbl::make_unique_checked<ExtCapability>(&ac, hdr.id, hdr.version, cap_offset));
+        ZX_DEBUG_ASSERT(ac.check());
         break;
     }
 

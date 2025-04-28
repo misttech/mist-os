@@ -12,6 +12,7 @@
 // #include <lib/ddk/binding_driver.h>
 #include <lib/fit/defer.h>
 // #include <lib/inspect/cpp/inspector.h>
+#include <lib/mistos/util/allocator.h>
 #include <lib/zx/interrupt.h>
 #include <string.h>
 #include <zircon/compiler.h>
@@ -48,7 +49,7 @@ namespace {  // anon namespace.  Externals do not need to know about DeviceImpl
 
 class DeviceImpl : public Device {
  public:
-  static zx_status_t Create(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&& cfg,
+  static zx_status_t Create(zx_device_t* parent, std::unique_ptr<Config>&& cfg,
                             UpstreamNode* upstream, BusDeviceInterface* bdi, /*inspect::Node node,*/
                             bool has_acpi);
 
@@ -59,13 +60,13 @@ class DeviceImpl : public Device {
   DISALLOW_COPY_ASSIGN_AND_MOVE(DeviceImpl);
 
  protected:
-  DeviceImpl(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&& cfg, UpstreamNode* upstream,
+  DeviceImpl(zx_device_t* parent, std::unique_ptr<Config>&& cfg, UpstreamNode* upstream,
              BusDeviceInterface* bdi, /*inspect::Node node,*/ bool has_acpi)
       : Device(parent, std::move(cfg), upstream, bdi, /*std::move(node),*/ /*is_bridge=*/false,
                has_acpi) {}
 };
 
-zx_status_t DeviceImpl::Create(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&& cfg,
+zx_status_t DeviceImpl::Create(zx_device_t* parent, std::unique_ptr<Config>&& cfg,
                                UpstreamNode* upstream,
                                BusDeviceInterface* bdi, /*inspect::Node node,*/
                                bool has_acpi) {
@@ -91,16 +92,15 @@ zx_status_t DeviceImpl::Create(fbl::RefPtr<pci::Device> parent, std::unique_ptr<
 
 }  // namespace
 
-Device::Device(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&& config,
-               UpstreamNode* upstream, BusDeviceInterface* bdi /*, inspect::Node node*/,
-               bool is_bridge, bool has_acpi)
+Device::Device(zx_device_t* parent, std::unique_ptr<Config>&& config, UpstreamNode* upstream,
+               BusDeviceInterface* bdi /*, inspect::Node node*/, bool is_bridge, bool has_acpi)
     : cfg_(std::move(config)),
       upstream_(upstream),
       bdi_(bdi),
       bar_count_(is_bridge ? PCI_BAR_REGS_PER_BRIDGE : PCI_BAR_REGS_PER_DEVICE),
       is_bridge_(is_bridge),
       has_acpi_(has_acpi),
-      parent_(std::move(parent)) /*,
+      parent_(parent) /*,
        inspect_(std::move(node))*/
 
 {}
@@ -119,7 +119,7 @@ Device::~Device() {
   LTRACEF("%s [%s] dtor finished\n", is_bridge() ? "bridge" : "device", cfg_->addr());
 }
 
-zx_status_t Device::Create(fbl::RefPtr<pci::Device> parent, std::unique_ptr<Config>&& config,
+zx_status_t Device::Create(zx_device_t* parent, std::unique_ptr<Config>&& config,
                            UpstreamNode* upstream, BusDeviceInterface* bdi /*, inspect::Node node*/,
                            bool has_acpi) {
   return DeviceImpl::Create(parent, std::move(config), upstream, bdi,
@@ -177,7 +177,7 @@ zx_status_t Device::InitInterrupts() {
     }
   }
 
-  irqs_.mode = INTERRUPT_MODE_DISABLED;
+  irqs_.mode = PCI_INTERRUPT_MODE_DISABLED;
   return ZX_OK;
 }
 
@@ -220,6 +220,11 @@ zx_status_t Device::InitLocked() {
       LTRACEF("[%s] transitioning power state from D%d to D0\n", cfg_->addr(), state);
       caps_.power->SetPowerState(*cfg_, PowerManagementCapability::PowerState::D0);
     }
+  }
+
+  auto result = BanjoDevice::Create(parent_, this);
+  if (result.is_error()) {
+    return result.status_value();
   }
 
 #if 0
@@ -501,7 +506,7 @@ zx::result<> Device::AllocateBars() {
   // Ensure we allocate BARs that already have an assigned address first, in
   // case it lines up with the allocators that we might use an address in a
   // lower BAR that is already assigned to a later BAR.
-  std::deque<uint32_t> bar_allocation_order;
+  std::deque<uint32_t, util::Allocator<uint32_t>> bar_allocation_order;
   for (auto& bar : bars_) {
     if (bar) {
       if (bar->address) {

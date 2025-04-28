@@ -6,7 +6,7 @@
 
 #include <assert.h>
 #include <inttypes.h>
-//#include <lib/ddk/debug.h>
+// #include <lib/ddk/debug.h>
 #include <mistos/hardware/pciroot/cpp/banjo.h>
 
 #include <optional>
@@ -29,8 +29,14 @@ zx::result<std::unique_ptr<Config>> MmioConfig::Create(pci_bdf_t bdf, const fdf:
   zx_vaddr_t config_offset = GetConfigOffsetInCam(bdf, start_bus, /*is_extended=*/is_extended);
   zx_vaddr_t config_size = (is_extended) ? PCIE_EXTENDED_CONFIG_SIZE : PCI_BASE_CONFIG_SIZE;
 
-  return zx::ok(
-      std::unique_ptr<MmioConfig>(new MmioConfig(bdf, ecam.View(config_offset, config_size))));
+  fbl::AllocChecker ac;
+  auto config =
+      std::unique_ptr<MmioConfig>(new (&ac) MmioConfig(bdf, ecam.View(config_offset, config_size)));
+  if (!ac.check()) {
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  return zx::ok(ktl::move(config));
 }
 
 uint8_t MmioConfig::Read(const PciReg8 addr) const { return view_.Read<uint8_t>(addr.offset()); }
@@ -51,7 +57,13 @@ const char* MmioConfig::type() const { return "mmio"; }
 zx::result<std::unique_ptr<Config>> ProxyConfig::Create(pci_bdf_t bdf,
                                                         ddk::PcirootProtocolClient* proto) {
   // Can't use std::make_unique because the constructor is private.
-  return zx::ok(std::unique_ptr<ProxyConfig>(new ProxyConfig(bdf, proto)));
+  fbl::AllocChecker ac;
+  auto config = std::unique_ptr<ProxyConfig>(new (&ac) ProxyConfig(bdf, proto));
+  if (!ac.check()) {
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  return zx::ok(ktl::move(config));
 }
 
 uint8_t ProxyConfig::Read(const PciReg8 addr) const {

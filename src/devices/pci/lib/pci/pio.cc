@@ -1,8 +1,9 @@
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #include <assert.h>
-#include <lib/ddk/hw/inout.h>
+//#include <lib/ddk/hw/inout.h>
 #include <lib/pci/pio.h>
 #include <zircon/hw/pci.h>
 #include <zircon/types.h>

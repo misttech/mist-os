@@ -19,17 +19,17 @@ zx_library("pci") {
     "root_host.cc",
   ]
   deps = [
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//vendor/misttech/src/lib/ddk",
+    "//vendor/misttech/src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/zx",
   ]
 
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.pciroot:fuchsia.hardware.pciroot_banjo_cpp",
+    "//sdk/banjo/mistos.hardware.pciroot:mistos.hardware.pciroot_banjo_cpp",
+    "//zircon/kernel/object:headers",
     "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/region-alloc",
   ]
 
@@ -44,7 +44,7 @@ test("pci-roothost") {
 
   deps = [
     ":pci",
-    "//sdk/banjo/fuchsia.hardware.pciroot:fuchsia.hardware.pciroot_banjo_cpp",
+    "//sdk/banjo/mistos.hardware.pciroot:mistos.hardware.pciroot_banjo_cpp",
     "//sdk/lib/inspect/testing/cpp",
     "//src/devices/testing/fake-msi",
     "//src/devices/testing/fake-resource",

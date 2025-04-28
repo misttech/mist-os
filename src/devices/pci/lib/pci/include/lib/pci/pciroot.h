@@ -1,12 +1,14 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #ifndef SRC_DEVICES_PCI_LIB_PCI_INCLUDE_LIB_PCI_PCIROOT_H_
 #define SRC_DEVICES_PCI_LIB_PCI_INCLUDE_LIB_PCI_PCIROOT_H_
-#include <fuchsia/hardware/pciroot/cpp/banjo.h>
-#include <lib/inspect/cpp/inspect.h>
+
+#include <mistos/hardware/pciroot/cpp/banjo.h>
+// #include <lib/inspect/cpp/inspect.h>
 #include <lib/pci/root_host.h>
-#include <lib/zx/msi.h>
+// #include <lib/zx/msi.h>
 #include <stdint.h>
 #include <string.h>
 #include <zircon/compiler.h>
@@ -23,14 +25,14 @@ class PcirootInspect {
   static constexpr char kAllocatedMmioName[] = "Allocated MMIO Regions";
   static constexpr char kAllocatedIoName[] = "Allocated IO Regions";
 
-  inspect::Inspector& inspect() { return inspect_; }
+  // inspect::Inspector& inspect() { return inspect_; }
 
  protected:
   void InitializeInspect(PciRootHost* host) {
-    board_mmio_ = inspect_.GetRoot().CreateChild(kBoardMmioName);
-    board_io_ = inspect_.GetRoot().CreateChild(kBoardIoName);
-    allocated_mmio_ = inspect_.GetRoot().CreateChild(kAllocatedMmioName);
-    allocated_io_ = inspect_.GetRoot().CreateChild(kAllocatedIoName);
+    // board_mmio_ = inspect_.GetRoot().CreateChild(kBoardMmioName);
+    // board_io_ = inspect_.GetRoot().CreateChild(kBoardIoName);
+    // allocated_mmio_ = inspect_.GetRoot().CreateChild(kAllocatedMmioName);
+    // allocated_io_ = inspect_.GetRoot().CreateChild(kAllocatedIoName);
 
     // Add the regions to Pciroot from the Board Driver / RootHost. When
     // properly supporting multiple pciroots with an external driver this will
@@ -53,23 +55,23 @@ class PcirootInspect {
   }
 
   void AddAllocatedIoRegion(const ralloc_region_t region) {
-    static size_t index = 0;
-    AddRegionToInspect(allocated_io_, index++, &region);
+    // static size_t index = 0;
+    // AddRegionToInspect(allocated_io_, index++, &region);
   }
 
   void AddAllocatedMmioRegion(const ralloc_region_t region) {
-    static size_t index = 0;
-    AddRegionToInspect(allocated_mmio_, index++, &region);
+    // static size_t index = 0;
+    // AddRegionToInspect(allocated_mmio_, index++, &region);
   }
 
   void AddBoardIoRegion(const ralloc_region_t* region) {
-    static size_t index = 0;
-    AddRegionToInspect(board_io_, index++, region);
+    // static size_t index = 0;
+    // AddRegionToInspect(board_io_, index++, region);
   }
 
   void AddBoardMmioRegion(const ralloc_region_t* region) {
-    static size_t index = 0;
-    AddRegionToInspect(board_mmio_, index++, region);
+    // static size_t index = 0;
+    // AddRegionToInspect(board_mmio_, index++, region);
   }
 
   // This does the brunt of the work to give us inspect data that looks similar to:
@@ -85,22 +87,22 @@ class PcirootInspect {
   //  ..
   //  Board MMIO Regions:
   //    [0x280000000, 0xa80000000) = 0x800000000
-  static void AddRegionToInspect(inspect::Node& parent, size_t index,
+  static void AddRegionToInspect(/*inspect::Node& parent,*/ size_t index,
                                  const ralloc_region_t* region) {
     std::array<char, kMaxRegionStringSize> value;
     std::array<char, 8> key;
     snprintf(key.data(), key.size(), "%02zx", index);
     snprintf(value.data(), value.size(), "[%#lx, %#lx) %#lx", region->base,
              region->base + region->size, region->size);
-    parent.RecordString(key.data(), value.data());
+    // parent.RecordString(key.data(), value.data());
   }
 
  private:
-  inspect::Inspector inspect_;
-  inspect::Node board_mmio_;
-  inspect::Node board_io_;
-  inspect::Node allocated_mmio_;
-  inspect::Node allocated_io_;
+  // inspect::Inspector inspect_;
+  // inspect::Node board_mmio_;
+  // inspect::Node board_io_;
+  // inspect::Node allocated_mmio_;
+  // inspect::Node allocated_io_;
 };
 // PcirootBase is the interface between a platform's PCI RootHost, and the PCI Bus Driver instances.
 // It is templated on |PlatformContextType| so that platform specific context can be provided to
@@ -125,7 +127,7 @@ class PcirootBase : public PcirootInspect {
     // is safe to have config handled in the bus driver through MMIO. This can
     // be overriden by a given derived Pciroot implementation for a specific
     // board target.
-    return !root_host_->mcfgs().empty();
+    return !root_host_->mcfgs().is_empty();
   }
 
   // Config space read/write accessors for PCI systems that require platform
@@ -158,17 +160,23 @@ class PcirootBase : public PcirootInspect {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  zx_status_t PcirootAllocateMsi(uint32_t msi_cnt, bool can_target_64bit, zx::msi* allocation) {
+  zx_status_t PcirootAllocateMsi(uint32_t msi_count, bool can_target_64bit,
+                                 uint8_t* out_allocation_list, size_t allocation_count,
+                                 size_t* out_allocation_actual) {
     // AllocateMsi already uses platform specific MSI impleemnation methods and
     // syscalls, so this likely suits most platforms.
-    return root_host_->AllocateMsi(msi_cnt, allocation);
+    // return root_host_->AllocateMsi(msi_cnt, allocation);
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
   // Allocate out of the IO / MMIO32 allocators if required, otherwise try to use whichever
   // MMIO allocator can fulfill the given request of specified base and size.
-  zx_status_t PcirootGetAddressSpace(zx_paddr_t in_base, size_t size, pci_address_space_t type,
-                                     bool low, uint64_t* out_base, zx::resource* out_resource,
-                                     zx::eventpair* out_eventpair) {
+  zx_status_t PcirootGetAddressSpace(uint64_t in_base, uint64_t size, pci_address_space_t type,
+                                     bool low, uint64_t* out_base, uint8_t* out_resource_list,
+                                     size_t resource_count, size_t* out_resource_actual,
+                                     uint8_t* out_token_list, size_t token_count,
+                                     size_t* out_token_actual) {
+#if 0
     if (type == PCI_ADDRESS_SPACE_IO) {
       auto result = root_host_->AllocateIoWindow(in_base, size, out_resource, out_eventpair);
       if (result.is_ok()) {
@@ -193,6 +201,8 @@ class PcirootBase : public PcirootInspect {
       *out_base = result.value();
     }
     return result.status_value();
+#endif
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
  private:

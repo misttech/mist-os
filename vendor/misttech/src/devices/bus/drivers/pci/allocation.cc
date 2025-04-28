@@ -17,30 +17,30 @@
 #include <memory>
 
 #include <fbl/algorithm.h>
+#include <vm/vm_object_physical.h>
 
 #define LOCAL_TRACE 0
 
 namespace pci {
 
 zx::result<fbl::RefPtr<VmObjectDispatcher>> PciAllocation::CreateVmo() const {
-  fbl::RefPtr<VmObjectDispatcher> vmo;
-  // zx_status_t status = zx::vmo::create_physical(resource(), base(), size(), &vmo);
-  // if (status != ZX_OK) {
-  //   return zx::error(status);
-  // }
-
-  return zx::ok(std::move(vmo));
+  fbl::RefPtr<VmObjectPhysical> vmo;
+  zx_status_t status = VmObjectPhysical::Create(base(), size(), &vmo);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  zx_rights_t rights;
+  KernelHandle<VmObjectDispatcher> handle;
+  status = VmObjectDispatcher::Create(vmo, size(), VmObjectDispatcher::InitialMutability::kMutable,
+                                      &handle, &rights);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(ktl::move(handle.release()));
 }
 
 zx::result<fbl::RefPtr<ResourceDispatcher>> PciAllocation::CreateResource() const {
-  fbl::RefPtr<ResourceDispatcher> resource;
-  // A BAR allocation will already be sized to the BAR, so we can simply
-  // duplicate the resource rather than creating a sub-resource.
-  // zx_status_t status = resource_.duplicate(ZX_RIGHT_SAME_RIGHTS, &resource);
-  // if (status != ZX_OK) {
-  //  return zx::error(status);
-  //}
-  return zx::ok(std::move(resource));
+  return zx::ok(resource_);
 }
 
 zx::result<std::unique_ptr<PciAllocation>> PciRootAllocator::Allocate(
@@ -61,8 +61,13 @@ zx::result<std::unique_ptr<PciAllocation>> PciRootAllocator::Allocate(
     return zx::error(status);
   }
 
+  fbl::AllocChecker ac;
   auto allocation = std::unique_ptr<PciAllocation>(
-      new PciRootAllocation(pciroot_, type(), std::move(res), std::move(ep), out_base, size));
+      new (&ac) PciRootAllocation(pciroot_, type(), std::move(res), std::move(ep), out_base, size));
+  if (!ac.check()) {
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
   return zx::ok(std::move(allocation));
 }
 
@@ -90,19 +95,17 @@ zx::result<std::unique_ptr<PciAllocation>> PciRegionAllocator::Allocate(
     return zx::error(status);
   }
 
-  fbl::RefPtr<ResourceDispatcher> out_resource = {};
-  // TODO(https://fxbug.dev/42108122): When the resource subset CL lands, make this a smaller
-  // resource.
-  // status = parent_alloc_->resource().duplicate(ZX_DEFAULT_RESOURCE_RIGHTS, &out_resource);
-  // if (status != ZX_OK) {
-  //  return zx::error(status);
-  //}
 
   LTRACEF("bridge: assigned [%#lx, %#lx) downstream\n", region_uptr->base,
           region_uptr->base + size);
 
+  fbl::AllocChecker ac;
   auto allocation = std::unique_ptr<PciAllocation>(
-      new PciRegionAllocation(type(), std::move(out_resource), std::move(region_uptr)));
+      new (&ac) PciRegionAllocation(type(),  parent_alloc_->resource(), std::move(region_uptr)));
+  if (!ac.check()) {
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
   return zx::ok(std::move(allocation));
 }
 

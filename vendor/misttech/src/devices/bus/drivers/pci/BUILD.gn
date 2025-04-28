@@ -20,6 +20,7 @@ source_set("bus-pci") {
 
   sources = [
     "allocation.cc",
+    "banjo.cc",
     "bridge.cc",
     "bus.cc",
     "bus_device_interface.cc",
@@ -48,8 +49,9 @@ source_set("bus-pci") {
 
   public_deps = [
     "//sdk/banjo/mistos.hardware.pciroot:mistos.hardware.pciroot_banjo_cpp",
-    "//sdk/fidl/mistos.hardware.pci:mistos.hardware.pci_banjo_cpp",
-    "//sdk/fidl/mistos.hardware.pci:mistos.hardware.pci_bindlib_cpp",
+
+    #"//sdk/fidl/mistos.hardware.pci:mistos.hardware.pci_banjo_cpp",
+    #"//sdk/fidl/mistos.hardware.pci:mistos.hardware.pci_bindlib_cpp",
     "//vendor/misttech/zircon/kernel/lib/mistos/util:headers",
     "//zircon/kernel/object:headers",
 
@@ -58,11 +60,13 @@ source_set("bus-pci") {
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
 
+    #"//src/devices/pci/lib/device-protocol-pci",
     #"//src/devices/lib/driver",
     #"//src/devices/lib/driver:driver_runtime",
-    #"//src/devices/pci/lib/device-protocol-pci",
     "//src/devices/pci/lib/pci",
+    "//vendor/misttech/src/devices/pci/lib/mistos.hardware.pci:mistos.hardware.pci_banjo_cpp",
     "//vendor/misttech/src/lib/ddk",
+    "//vendor/misttech/src/lib/ddk:ddk-deprecated-binding-headers",
     "//vendor/misttech/src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
