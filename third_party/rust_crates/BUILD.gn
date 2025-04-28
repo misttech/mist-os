@@ -962,7 +962,7 @@ group("sha2") {
 
 if (!(current_os == "fuchsia")) {
   group("shared_child") {
-    public_deps = [ ":shared_child-v1_0_0" ]
+    public_deps = [ ":shared_child-v1_0_1" ]
   }
 }
 
@@ -15355,16 +15355,16 @@ rust_library("sharded-slab-v0_1_4") {
   applicable_licenses = [ ":sharded-slab-v0_1_4.license" ]
 }
 
-license("shared_child-v1_0_0.license") {
+license("shared_child-v1_0_1.license") {
   public_package_name = "shared_child"
   license_files =
-      [ "//third_party/rust_crates/vendor/shared_child-1.0.0/LICENSE" ]
+      [ "//third_party/rust_crates/vendor/shared_child-1.0.1/LICENSE" ]
 }
 
-rust_library("shared_child-v1_0_0") {
+rust_library("shared_child-v1_0_1") {
   crate_name = "shared_child"
-  crate_root = "//third_party/rust_crates/vendor/shared_child-1.0.0/src/lib.rs"
-  output_name = "shared_child-343c2e19f8d8c087"
+  crate_root = "//third_party/rust_crates/vendor/shared_child-1.0.1/src/lib.rs"
+  output_name = "shared_child-e778e191c2d57837"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -15372,21 +15372,21 @@ rust_library("shared_child-v1_0_0") {
     deps += [ ":libc-v0_2_171" ]
   }
   if (false) {
-    deps += [ ":winapi-v0_3_9" ]
+    deps += [ ":windows-sys-v0_59_0" ]
   }
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=343c2e19f8d8c087",
-    "-Cextra-filename=-343c2e19f8d8c087",
+    "--edition=2021",
+    "-Cmetadata=e778e191c2d57837",
+    "-Cextra-filename=-e778e191c2d57837",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":shared_child-v1_0_0.license" ]
+  applicable_licenses = [ ":shared_child-v1_0_1.license" ]
 }
 
 license("signal-hook-v0_1_17.license") {
@@ -19188,7 +19188,6 @@ rust_library("winapi-v0_3_9") {
     "--cfg=feature=\"securitybaseapi\"",
     "--cfg=feature=\"sspi\"",
     "--cfg=feature=\"std\"",
-    "--cfg=feature=\"synchapi\"",
     "--cfg=feature=\"sysinfoapi\"",
     "--cfg=feature=\"timezoneapi\"",
     "--cfg=feature=\"winbase\"",
@@ -19356,6 +19355,30 @@ rust_library("windows-sys-v0_52_0") {
     "--cfg=feature=\"Win32_System_Threading\"",
     "--cfg=feature=\"Win32_System_WindowsProgramming\"",
     "--cfg=feature=\"Win32_UI_Shell\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
+}
+
+rust_library("windows-sys-v0_59_0") {
+  crate_name = "windows_sys"
+  crate_root = "//third_party/rust_crates/empty/windows-sys-0.59.0/src/lib.rs"
+  output_name = "windows_sys-160906ccdd05e721"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=160906ccdd05e721",
+    "-Cextra-filename=-160906ccdd05e721",
+    "--cfg=feature=\"Win32_Foundation\"",
+    "--cfg=feature=\"Win32_System_Threading\"",
   ]
 
   visibility = [ ":*" ]

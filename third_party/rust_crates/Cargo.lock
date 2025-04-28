@@ -4418,12 +4418,12 @@ dependencies = [
 
 [[package]]
 name = "shared_child"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0d94659ad3c2137fef23ae75b03d5241d633f8acded53d672decfa0e6e0caef"
+checksum = "09fa9338aed9a1df411814a5b2252f7cd206c55ae9bf2fa763f8de84603aa60c"
 dependencies = [
  "libc",
- "winapi",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5455,6 +5455,10 @@ version = "0.48.0"
 [[package]]
 name = "windows-sys"
 version = "0.52.0"
+
+[[package]]
+name = "windows-sys"
+version = "0.59.0"
 
 [[package]]
 name = "windows-targets"
