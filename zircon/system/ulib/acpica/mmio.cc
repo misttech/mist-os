@@ -76,11 +76,16 @@ static zx_status_t mmap_physical(zx_paddr_t phys, size_t size, uint32_t cache_po
     return mapping_result.error_value();
   }
 
+  // Setup a handler to destroy the new mapping if the syscall is unsuccessful.
+  auto cleanup_handler = fit::defer([&mapping_result]() { mapping_result->mapping->Destroy(); });
+
   // Prepopulate the mapping's page tables so there are no page faults taken.
   status = mapping_result->mapping->MapRange(0, size, true);
   if (status != ZX_OK) {
     return status;
   }
+
+  cleanup_handler.cancel();
 
   *out_mapping = ktl::move(mapping_result->mapping);
   *out_vaddr = mapping_result->base;
