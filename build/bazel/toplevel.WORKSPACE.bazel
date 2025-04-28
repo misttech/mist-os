@@ -10,7 +10,7 @@ sync with toplevel.MODULE.bazel whenever possible!!
 
 # LINT.IfChange
 workspace(name = "main")
-# LINT.ThenChange(//build/bazel/scripts/bazel_action.py)
+# LINT.ThenChange(//build/bazel/scripts/bazel_action.py, //build/bazel/bazel_workspace.gni)
 
 local_repository(
     name = "platforms",
