@@ -66,7 +66,7 @@ void LogSource::Start() {
 
   fuchsia::diagnostics::StreamParameters params;
   params.set_data_type(fuchsia::diagnostics::DataType::LOGS)
-      .set_format(fuchsia::diagnostics::Format::JSON)
+      .set_format(fuchsia::diagnostics::Format::FXT)
       .set_stream_mode(fuchsia::diagnostics::StreamMode::SNAPSHOT_THEN_SUBSCRIBE)
       .set_client_selector_configuration(
           fuchsia::diagnostics::ClientSelectorConfiguration::WithSelectAll(true));
