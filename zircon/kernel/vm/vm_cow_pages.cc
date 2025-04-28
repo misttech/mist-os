@@ -117,6 +117,8 @@ void InitializeVmPage(vm_page_t* p) {
   p->object.pin_count = 0;
   p->object.always_need = 0;
   p->object.dirty_state = uint8_t(VmCowPages::DirtyState::Untracked);
+  p->object.set_object(nullptr);
+  p->object.set_page_offset(0);
 }
 
 inline uint64_t CheckedAdd(uint64_t a, uint64_t b) {
