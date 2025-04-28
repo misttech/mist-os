@@ -15,6 +15,7 @@ executable("sdio") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.sdio:fuchsia.hardware.sdio_cpp",
     "//sdk/lib/component/incoming/cpp",
+    "//zircon/system/ulib/fzl",
   ]
 }
 
@@ -34,6 +35,7 @@ test("sdio-test-bin") {
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//src/devices/testing/driver-runtime-main:zxtest",
+    "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zxtest",
   ]
 }

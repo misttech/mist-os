@@ -4,7 +4,10 @@
 
 #include "sdio.h"
 
+#include <lib/fzl/vmo-mapper.h>
 #include <lib/zx/clock.h>
+
+#include <span>
 
 namespace sdio {
 
@@ -19,8 +22,10 @@ constexpr char kUsageMessage[] = R"""(Usage: sdio <device> <command> [options]
     info - Display information about the host controller and the card
     read-byte <address> - Read one byte from the SDIO function
     write-byte <address> <byte> - Write one byte to the SDIO function
+    read <address> <size> [--fifo] - Read a number of blocks from the SDIO function
     read-stress <address> <size> <loops> [--fifo] - Read a number of blocks from the SDIO
                                                     function and measure the throughput
+    reset - Reset the SDIO function
 
     Example:
     sdio /dev/class/sdio/001 read-stress 0x01234 256 100
@@ -88,6 +93,40 @@ std::string GetTxnStats(const zx::duration duration, const uint64_t bytes) {
   }
 
   return std::string(duration_str) + std::string(bytes_second_str);
+}
+
+void PrintBuffer(std::span<const uint8_t> buffer) {
+  char ascii[16];
+  char* a = ascii;
+  for (size_t i = 0; i < buffer.size(); i++) {
+    if (i % 16 == 0) {
+      printf("%04zx: ", i);
+      a = ascii;
+    }
+
+    printf("%02x ", buffer[i]);
+    if (isprint(buffer[i])) {
+      *a++ = static_cast<char>(buffer[i]);
+    } else {
+      *a++ = '.';
+    }
+
+    if (i % 16 == 15) {
+      printf("|%.16s|\n", ascii);
+    } else if (i % 8 == 7) {
+      printf(" ");
+    }
+  }
+
+  if (const int remainder = static_cast<int>(buffer.size() % 16); remainder > 0) {
+    // There are some ASCII bytes left to print. Add some padding to align with the bytes that were
+    // printed on the line above (if there was one).
+    int spaces = (16 - remainder) * 3;  // 3 for "%02x "
+    if (remainder < 8) {
+      spaces++;  // Add a space between bytes 0-7 and bytes 8-15 like the loop above.
+    }
+    printf("%*s|%.*s|\n", spaces, "", remainder, ascii);
+  }
 }
 
 int Info(SdioClient client) {
@@ -281,6 +320,91 @@ int ReadStress(SdioClient client, uint32_t address, int argc, const char** argv)
   return 0;
 }
 
+int Read(SdioClient client, uint32_t address, int argc, const char** argv) {
+  if (argc < 1) {
+    fprintf(stderr, "Expected <size> argument\n");
+    PrintUsage();
+    return 1;
+  }
+
+  uint32_t size = 0;
+  if (!ParseNumericalArg(argv[0], &size)) {
+    return 1;
+  }
+
+  bool incr = true;
+
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--fifo") == 0) {
+      incr = false;
+    } else {
+      fprintf(stderr, "Unexpected option: %s\n", argv[i]);
+      PrintUsage();
+      return 1;
+    }
+  }
+
+  zx::vmo dma_vmo;
+  zx_status_t status = zx::vmo::create(size, 0, &dma_vmo);
+  if (status != ZX_OK) {
+    fprintf(stderr, "Failed to create VMO: %s\n", zx_status_get_string(status));
+    return 1;
+  }
+
+  fzl::VmoMapper mapper;
+  status = mapper.Map(dma_vmo, 0, 0, ZX_VM_PERM_READ);
+  if (status != ZX_OK) {
+    fprintf(stderr, "Failed to map VMO: %s\n", zx_status_get_string(status));
+    return 1;
+  }
+
+  fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion buffers[1];
+  buffers[0] = fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion{
+      .buffer = fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmo(std::move(dma_vmo)),
+      .offset = 0,
+      .size = size,
+  };
+  SdioRwTxn txn{
+      .addr = address,
+      .incr = incr,
+      .write = false,
+      .buffers = fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion>::FromExternal(
+          buffers, 1),
+  };
+
+  auto result = client->DoRwTxn(std::move(txn));
+  if (!result.ok()) {
+    fprintf(stderr, "FIDL call DoRwTxn failed  status: %s\n",
+            zx_status_get_string(result.status()));
+    return 1;
+  }
+  if (result->is_error()) {
+    fprintf(stderr, "DoRwTxn failed status: %s\n", zx_status_get_string(result->error_value()));
+    return 1;
+  }
+
+  std::span<const uint8_t> read_buffer{reinterpret_cast<const uint8_t*>(mapper.start()), size};
+  PrintBuffer(read_buffer);
+  return 0;
+}
+
+int Reset(SdioClient client) {
+  auto result = client->RequestCardReset();
+  if (!result.ok()) {
+    fprintf(stderr, "FIDL call RequestCardReset failed  status: %s\n",
+            zx_status_get_string(result.status()));
+    return 1;
+  }
+  if (result->is_error()) {
+    fprintf(stderr, "RequestCardReset failed status: %s\n",
+            zx_status_get_string(result->error_value()));
+    return 1;
+  }
+
+  printf("Reset completed successfully.\n");
+  return 0;
+}
+
 int RunSdioTool(SdioClient client, int argc, const char** argv) {
   if (argc < 1) {
     fprintf(stderr, "Expected <command> argument\n");
@@ -291,6 +415,9 @@ int RunSdioTool(SdioClient client, int argc, const char** argv) {
   const char* const command = argv[0];
   if (strcmp(command, "info") == 0) {
     return Info(std::move(client));
+  }
+  if (strcmp(command, "reset") == 0) {
+    return Reset(std::move(client));
   }
 
   if (argc < 2) {
@@ -322,6 +449,8 @@ int RunSdioTool(SdioClient client, int argc, const char** argv) {
     return WriteByte(std::move(client), address, argc, argv);
   } else if (strcmp(command, "read-stress") == 0) {
     return ReadStress(std::move(client), address, argc, argv);
+  } else if (strcmp(command, "read") == 0) {
+    return Read(std::move(client), address, argc, argv);
   } else {
     fprintf(stderr, "Unexpected command: %s\n", command);
     PrintUsage();
