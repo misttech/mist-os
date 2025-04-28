@@ -135,8 +135,6 @@ impl Config {
         self.source_config.early_exit
     }
 
-    // TODO: b/295537795 - remove annotation once used.
-    #[allow(dead_code)]
     fn power_topology_integration_enabled(&self) -> bool {
         self.source_config.power_topology_integration_enabled
     }

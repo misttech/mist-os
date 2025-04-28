@@ -110,8 +110,7 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
             .field("first_sampling_delay_sec", config.first_sampling_delay_sec)?
             .field("utc_start_at_startup", utc_start_at_startup)?
             .field("early_exit", early_exit)?
-            // TODO: b/295537795 - provide this setting somehow.
-            .field("power_topology_integration_enabled", false)?
+            .field("power_topology_integration_enabled", config.power_topology_integration_enabled)?
             .field("serve_test_protocols", serve_test_protocols)?
             // Should this now be removed in favor of WritableUTCTime above?
             .field("serve_fuchsia_time_external_adjust", config.serve_fuchsia_time_external_adjust)?
