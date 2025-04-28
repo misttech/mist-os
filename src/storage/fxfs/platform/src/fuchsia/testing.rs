@@ -11,7 +11,7 @@ use crate::fuchsia::volumes_directory::VolumesDirectory;
 use anyhow::{Context, Error};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_io as fio;
-use fxfs::filesystem::{FxFilesystem, FxFilesystemBuilder, OpenFxFilesystem};
+use fxfs::filesystem::{FxFilesystem, FxFilesystemBuilder, OpenFxFilesystem, PreCommitHook};
 use fxfs::fsck::errors::FsckIssue;
 use fxfs::fsck::{fsck_volume_with_options, fsck_with_options, FsckOptions};
 use fxfs::object_store::volume::root_volume;
@@ -42,6 +42,19 @@ pub struct TestFixtureOptions {
     pub as_blob: bool,
     pub format: bool,
     pub serve_volume: bool,
+    pub pre_commit_hook: PreCommitHook,
+}
+
+impl Default for TestFixtureOptions {
+    fn default() -> Self {
+        Self {
+            encrypted: true,
+            as_blob: false,
+            format: true,
+            serve_volume: false,
+            pre_commit_hook: None,
+        }
+    }
 }
 
 fn ensure_unique_or_poison(holder: DeviceHolder) -> DeviceHolder {
@@ -68,40 +81,18 @@ fn ensure_unique_or_poison(holder: DeviceHolder) -> DeviceHolder {
 
 impl TestFixture {
     pub async fn new() -> Self {
-        Self::open(
-            DeviceHolder::new(FakeDevice::new(16384, 512)),
-            TestFixtureOptions {
-                encrypted: true,
-                as_blob: false,
-                format: true,
-                serve_volume: false,
-            },
-        )
-        .await
+        Self::open(DeviceHolder::new(FakeDevice::new(16384, 512)), TestFixtureOptions::default())
+            .await
     }
 
     pub async fn new_with_device(device: DeviceHolder) -> Self {
-        Self::open(
-            device,
-            TestFixtureOptions {
-                encrypted: true,
-                as_blob: false,
-                format: false,
-                serve_volume: false,
-            },
-        )
-        .await
+        Self::open(device, TestFixtureOptions { format: false, ..Default::default() }).await
     }
 
     pub async fn new_unencrypted() -> Self {
         Self::open(
             DeviceHolder::new(FakeDevice::new(16384, 512)),
-            TestFixtureOptions {
-                encrypted: false,
-                as_blob: false,
-                format: true,
-                serve_volume: false,
-            },
+            TestFixtureOptions { encrypted: false, ..Default::default() },
         )
         .await
     }
@@ -109,7 +100,11 @@ impl TestFixture {
     pub async fn open(device: DeviceHolder, options: TestFixtureOptions) -> Self {
         let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
         let (filesystem, volume, volumes_directory) = if options.format {
-            let filesystem = FxFilesystemBuilder::new().format(true).open(device).await.unwrap();
+            let mut builder = FxFilesystemBuilder::new().format(true);
+            if let Some(pre_commit_hook) = options.pre_commit_hook {
+                builder = builder.pre_commit_hook(pre_commit_hook);
+            }
+            let filesystem = builder.open(device).await.unwrap();
             let root_volume = root_volume(filesystem.clone()).await.unwrap();
             let store = root_volume
                 .new_volume(

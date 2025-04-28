@@ -249,7 +249,7 @@ macro_rules! immutable_attributes {
 }
 
 /// Represents if and how objects should be created with an open request.
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum CreationMode {
     // Never create object.
     Never,

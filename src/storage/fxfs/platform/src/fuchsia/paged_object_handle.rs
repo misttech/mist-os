@@ -2722,12 +2722,7 @@ mod tests {
 
         let fixture = TestFixture::open(
             device,
-            TestFixtureOptions {
-                encrypted: false,
-                as_blob: false,
-                format: false,
-                serve_volume: false,
-            },
+            TestFixtureOptions { encrypted: false, format: false, ..Default::default() },
         )
         .await;
         let root = fixture.root();

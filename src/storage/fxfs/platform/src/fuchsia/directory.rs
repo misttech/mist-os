@@ -238,17 +238,18 @@ impl FxDirectory {
                                 )
                                 .await?
                         };
-                        let node = OpenedNode::new(new_node.clone());
                         if let GetResult::Placeholder(p) =
-                            self.volume().cache().get_or_reserve(node.object_id()).await
+                            self.volume().cache().get_or_reserve(new_node.object_id()).await
                         {
-                            transaction
+                            return transaction
                                 .commit_with_callback(|_| {
-                                    p.commit(&node);
-                                    current_dir.did_add(name, Some(new_node));
+                                    p.commit(&new_node);
+                                    current_dir.did_add(name, Some(new_node.clone()));
+                                    // NOTE: We don't take the open count until here in case the
+                                    // transaction fails.
+                                    OpenedNode::new(new_node)
                                 })
-                                .await?;
-                            return Ok(node);
+                                .await;
                         } else {
                             // We created a node, but the object ID was already used in the cache,
                             // which suggests a object ID was reused (which would either be a bug or
@@ -652,7 +653,7 @@ impl MutableDirectory for FxDirectory {
                     .commit_with_callback(|_| self.did_remove(name))
                     .await
                     .map_err(map_to_status)?;
-                // If purging fails , we should still return success, since the file will appear
+                // If purging fails, we should still return success, since the file will appear
                 // unlinked at this point anyways.  The file should be cleaned up on a later mount.
                 if let Err(e) = self.volume().maybe_purge_file(id).await {
                     warn!(error:? = e; "Failed to purge file");
@@ -1102,6 +1103,7 @@ mod tests {
         close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
         open_file_checked, TestFixture, TestFixtureOptions,
     };
+    use anyhow::bail;
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_proxy, ClientEnd, Proxy};
     use fuchsia_fs::directory::{DirEntry, DirentKind};
@@ -1156,12 +1158,7 @@ mod tests {
         for i in 0..2 {
             let fixture = TestFixture::open(
                 device,
-                TestFixtureOptions {
-                    format: i == 0,
-                    encrypted: true,
-                    as_blob: false,
-                    serve_volume: false,
-                },
+                TestFixtureOptions { format: i == 0, ..Default::default() },
             )
             .await;
             let root = fixture.root();
@@ -4840,16 +4837,9 @@ mod tests {
             fixture.close().await
         };
 
-        let fixture = TestFixture::open(
-            device,
-            TestFixtureOptions {
-                format: false,
-                as_blob: false,
-                encrypted: true,
-                serve_volume: false,
-            },
-        )
-        .await;
+        let fixture =
+            TestFixture::open(device, TestFixtureOptions { format: false, ..Default::default() })
+                .await;
         let root = fixture.root();
         let dir = open_dir_checked(
             &root,
@@ -4945,16 +4935,9 @@ mod tests {
             (fixture.close().await, mutable_attributes.access_time, initial_ctime)
         };
 
-        let fixture = TestFixture::open(
-            device,
-            TestFixtureOptions {
-                format: false,
-                as_blob: false,
-                encrypted: true,
-                serve_volume: false,
-            },
-        )
-        .await;
+        let fixture =
+            TestFixture::open(device, TestFixtureOptions { format: false, ..Default::default() })
+                .await;
         let root = fixture.root();
         let dir = open_dir_checked(
             &root,
@@ -5052,6 +5035,40 @@ mod tests {
             .expect("unlink failed");
 
         assert_not_found(foo_object_id).await;
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_failed_create_unnamed_file_transaction() {
+        let fail = Arc::new(AtomicU64::new(0));
+        let fail_clone = fail.clone();
+        let fixture = TestFixture::open(
+            DeviceHolder::new(FakeDevice::new(16384, 512)),
+            TestFixtureOptions {
+                pre_commit_hook: Some(Box::new(move |_| {
+                    if fail_clone.load(Ordering::Relaxed) > 0 {
+                        fail_clone.fetch_sub(1, Ordering::Relaxed);
+                        bail!("Aborted transaction");
+                    }
+                    Ok(())
+                })),
+                ..Default::default()
+            },
+        )
+        .await;
+        let root = fixture.root();
+
+        fail.fetch_add(1, Ordering::Relaxed);
+
+        let _dir = open_file(
+            &root,
+            ".",
+            fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY,
+            &fio::Options::default(),
+        )
+        .await
+        .expect_err("Create unexpectedly succeeded");
 
         fixture.close().await;
     }

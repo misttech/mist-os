@@ -1979,12 +1979,7 @@ mod test {
         // Simulate a second run to ensure the symlink was persisted correctly.
         let fixture = TestFixture::open(
             fixture.close().await,
-            TestFixtureOptions {
-                encrypted: true,
-                as_blob: false,
-                format: false,
-                serve_volume: false,
-            },
+            TestFixtureOptions { format: false, ..Default::default() },
         )
         .await;
 
@@ -2098,12 +2093,7 @@ mod test {
         // Simulate a second run.
         let fixture = TestFixture::open(
             fixture.close().await,
-            TestFixtureOptions {
-                encrypted: true,
-                as_blob: false,
-                format: false,
-                serve_volume: false,
-            },
+            TestFixtureOptions { format: false, ..Default::default() },
         )
         .await;
 
@@ -2385,12 +2375,7 @@ mod test {
 
         let fixture = TestFixture::open(
             fixture.close().await,
-            TestFixtureOptions {
-                encrypted: true,
-                as_blob: false,
-                format: false,
-                serve_volume: false,
-            },
+            TestFixtureOptions { format: false, ..Default::default() },
         )
         .await;
 
@@ -2478,12 +2463,7 @@ mod test {
         // Test that lookup works as expected for an fsverity-enabled file.
         let fixture = TestFixture::open(
             fixture.close().await,
-            TestFixtureOptions {
-                encrypted: true,
-                as_blob: false,
-                format: false,
-                serve_volume: false,
-            },
+            TestFixtureOptions { format: false, ..Default::default() },
         )
         .await;
         let (server, client) = zx::Channel::create();
@@ -2560,12 +2540,7 @@ mod test {
         // Tear down the kernel and open the file again. Check that changes persisted.
         let fixture = TestFixture::open(
             fixture.close().await,
-            TestFixtureOptions {
-                encrypted: true,
-                as_blob: false,
-                format: false,
-                serve_volume: false,
-            },
+            TestFixtureOptions { format: false, ..Default::default() },
         )
         .await;
         let (server, client) = zx::Channel::create();
@@ -2820,12 +2795,7 @@ mod test {
         // last modified the contents of the file
         let fixture = TestFixture::open(
             fixture.close().await,
-            TestFixtureOptions {
-                encrypted: true,
-                as_blob: false,
-                format: false,
-                serve_volume: false,
-            },
+            TestFixtureOptions { format: false, ..Default::default() },
         )
         .await;
         let (server, client) = zx::Channel::create();
@@ -3079,12 +3049,7 @@ mod test {
         // Tear down the kernel and open the dir again. Check that casefold is preserved.
         let fixture = TestFixture::open(
             fixture.close().await,
-            TestFixtureOptions {
-                encrypted: true,
-                as_blob: false,
-                format: false,
-                serve_volume: false,
-            },
+            TestFixtureOptions { format: false, ..Default::default() },
         )
         .await;
         let (server, client) = zx::Channel::create();
@@ -3196,12 +3161,7 @@ mod test {
         // Tear down the kernel and open the file again. The file should no longer be cached.
         let fixture = TestFixture::open(
             fixture.close().await,
-            TestFixtureOptions {
-                encrypted: true,
-                as_blob: false,
-                format: false,
-                serve_volume: false,
-            },
+            TestFixtureOptions { format: false, ..Default::default() },
         )
         .await;
 

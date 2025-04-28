@@ -866,12 +866,7 @@ mod tests {
 
         let fixture = TestFixture::open(
             reused_device,
-            TestFixtureOptions {
-                format: false,
-                as_blob: false,
-                encrypted: true,
-                serve_volume: false,
-            },
+            TestFixtureOptions { format: false, ..Default::default() },
         )
         .await;
         let root = fixture.root();
@@ -911,12 +906,7 @@ mod tests {
         let reused_device = {
             let fixture = TestFixture::open(
                 DeviceHolder::new(device),
-                TestFixtureOptions {
-                    format: true,
-                    as_blob: false,
-                    encrypted: true,
-                    serve_volume: false,
-                },
+                TestFixtureOptions { format: true, ..Default::default() },
             )
             .await;
             let root = fixture.root();
@@ -946,12 +936,7 @@ mod tests {
 
         let fixture = TestFixture::open(
             reused_device,
-            TestFixtureOptions {
-                format: false,
-                as_blob: false,
-                encrypted: true,
-                serve_volume: false,
-            },
+            TestFixtureOptions { format: false, ..Default::default() },
         )
         .await;
         let root = fixture.root();
@@ -981,12 +966,7 @@ mod tests {
         for i in 0..2 {
             let fixture = TestFixture::open(
                 device,
-                TestFixtureOptions {
-                    format: i == 0,
-                    as_blob: false,
-                    encrypted: true,
-                    serve_volume: false,
-                },
+                TestFixtureOptions { format: i == 0, ..Default::default() },
             )
             .await;
             let root = fixture.root();
@@ -1936,16 +1916,9 @@ mod tests {
         let device = fixture.close().await;
         device.ensure_unique();
         device.reopen(false);
-        let fixture = TestFixture::open(
-            device,
-            TestFixtureOptions {
-                format: false,
-                encrypted: true,
-                as_blob: false,
-                serve_volume: false,
-            },
-        )
-        .await;
+        let fixture =
+            TestFixture::open(device, TestFixtureOptions { format: false, ..Default::default() })
+                .await;
 
         let root = fixture.root();
         let file =
@@ -2006,12 +1979,7 @@ mod tests {
 
         let fixture = TestFixture::open(
             reused_device,
-            TestFixtureOptions {
-                format: false,
-                as_blob: false,
-                encrypted: true,
-                serve_volume: false,
-            },
+            TestFixtureOptions { format: false, ..Default::default() },
         )
         .await;
         let root = fixture.root();
@@ -2083,12 +2051,7 @@ mod tests {
 
         let fixture = TestFixture::open(
             reused_device,
-            TestFixtureOptions {
-                format: false,
-                as_blob: false,
-                encrypted: true,
-                serve_volume: false,
-            },
+            TestFixtureOptions { format: false, ..Default::default() },
         )
         .await;
         let root = fixture.root();
@@ -2341,12 +2304,7 @@ mod tests {
 
         let fixture = TestFixture::open(
             reused_device,
-            TestFixtureOptions {
-                format: false,
-                as_blob: false,
-                encrypted: true,
-                serve_volume: false,
-            },
+            TestFixtureOptions { format: false, ..Default::default() },
         )
         .await;
         let root = fixture.root();
@@ -2420,12 +2378,7 @@ mod tests {
 
         let fixture = TestFixture::open(
             reused_device,
-            TestFixtureOptions {
-                format: false,
-                as_blob: false,
-                encrypted: true,
-                serve_volume: false,
-            },
+            TestFixtureOptions { format: false, ..Default::default() },
         )
         .await;
         let root = fixture.root();
@@ -2717,16 +2670,9 @@ mod tests {
             fixture.close().await
         };
 
-        let fixture = TestFixture::open(
-            device,
-            TestFixtureOptions {
-                format: false,
-                as_blob: false,
-                encrypted: true,
-                serve_volume: false,
-            },
-        )
-        .await;
+        let fixture =
+            TestFixture::open(device, TestFixtureOptions { format: false, ..Default::default() })
+                .await;
         let root = fixture.root();
         let file = open_file_checked(
             &root,
@@ -2819,16 +2765,9 @@ mod tests {
             (fixture.close().await, mutable_attributes.access_time, initial_ctime)
         };
 
-        let fixture = TestFixture::open(
-            device,
-            TestFixtureOptions {
-                format: false,
-                as_blob: false,
-                encrypted: true,
-                serve_volume: false,
-            },
-        )
-        .await;
+        let fixture =
+            TestFixture::open(device, TestFixtureOptions { format: false, ..Default::default() })
+                .await;
         let root = fixture.root();
         let file = open_file_checked(
             &root,

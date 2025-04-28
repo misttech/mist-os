@@ -1199,12 +1199,7 @@ mod tests {
         device.reopen(false);
         let fixture = TestFixture::open(
             device,
-            TestFixtureOptions {
-                encrypted: true,
-                as_blob: false,
-                format: false,
-                serve_volume: false,
-            },
+            TestFixtureOptions { encrypted: true, format: false, ..Default::default() },
         )
         .await;
         {
