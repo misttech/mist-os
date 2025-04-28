@@ -6,6 +6,7 @@
 #define LIB_FDIO_IO_H_
 
 #include <lib/fdio/limits.h>
+#include <lib/fdio/processargs.h>
 #include <limits.h>
 #include <poll.h>
 #include <stdbool.h>
@@ -13,10 +14,6 @@
 #include <zircon/availability.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
-
-// Flag on handle args in processargs instructing that this fd should be dup'd to 0/1/2 and be used
-// for all of stdio.
-#define FDIO_FLAG_USE_FOR_STDIO ((uint32_t)0x8000)
 
 // # Wait events
 //

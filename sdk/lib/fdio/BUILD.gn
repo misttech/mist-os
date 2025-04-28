@@ -28,14 +28,16 @@ if (is_fuchsia) {
 
 fdio_constants = [
   "include/lib/fdio/limits.h",
+  "include/lib/fdio/processargs.h",
   "include/lib/fdio/vfs.h",
 ]
 
-# This target provides access to some shared constants and helper macros, without requiring fdio as
-# a runtime dependency. This target must never provide (or reference) any public/extern symbols.
+# This target provides access to some shared constants and helper macros,
+# without requiring fdio as a runtime dependency. This target must never
+# provide (or reference) any public/extern symbols.
 source_set("constants") {
   public_configs = [ ":fdio_includes" ]
-  sources = fdio_constants
+  public = fdio_constants
 }
 
 # Headers exposed by fdio that we also want to use for the documentation target.
