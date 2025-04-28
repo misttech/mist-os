@@ -16,6 +16,7 @@ export BT_FILE_DEPS=(
 export BT_MOCKED_TOOLS=(
   "tools/devshell/lib/metrics.sh"
   "tools/devshell/lib/platform.sh"
+  "tools/devshell/rbe"
   "_isolated_path_for/git"
 )
 export BT_MKDIR_DEPS=(
@@ -101,6 +102,35 @@ EOF
   BT_EXPECT_STRING_CONTAINS_SUBSTRING "$output" "$fx_set_output"
   # `fx go build` should have been called.
   BT_EXPECT_STRING_CONTAINS_SUBSTRING "$output" "rebuilding"
+}
+
+TEST_fx-set-with-dir() {
+  echo "$CURRENT_REVISION" > "${_FUCHSIA_DIR}/.fx/fx-set-revision"
+  fx_set_output="fx-set running"
+  cat > "${_FUCHSIA_DIR}/.fx/fx-set" << EOF
+if [[ -n "\$_FX_BUILD_DIR" ]]; then
+    echo _FX_BUILD_DIR=[\$_FX_BUILD_DIR]
+else
+    echo ARGS=["\$@"]
+fi
+EOF
+  chmod +x "${_FUCHSIA_DIR}/.fx/fx-set"
+
+  # Make sure `fx go` fails if called.
+  btf::make_mock "${BT_TEMP_DIR}/tools/devshell/go"
+  cat > "${BT_TEMP_DIR}/tools/devshell/go.mock_side_effects" << "EOF"
+    exit 1
+EOF
+  # Verify that using `--dir <name>` sets _FX_BUILD_DIR to <name>
+  # before calling the fx-set binary.
+  output="$(BT_ASSERT "$fx" --dir out/foo set myproduct.myboard)"
+  BT_EXPECT_STRING_CONTAINS_SUBSTRING "$output" "_FX_BUILD_DIR=\[out/foo\]"
+
+  # Verify that not using `--dir <name>` does not set _FX_BUILD_DIR
+  # before calling the fx-set binary. The real binary's behavior
+  # will be to use the args to select the build directory.
+  output="$(BT_ASSERT "$fx" set myproduct.myboard)"
+  BT_EXPECT_STRING_CONTAINS_SUBSTRING "$output" "ARGS=\[myproduct.myboard\]"
 }
 
 BT_RUN_TESTS "$@"

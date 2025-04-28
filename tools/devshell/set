@@ -135,6 +135,7 @@
 ##      product: //products/core.gni
 ##      developer_test_labels: //bundles/tests (all test packages)
 
+# shellcheck source=/dev/null
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 
 set -e
@@ -189,7 +190,7 @@ function main {
     trap 'rm -rf $BUILD_DIR' EXIT
     pushd "$BUILD_DIR" > /dev/null
     for target in go.{mod,sum} vendor; do
-      ln -s "$FUCHSIA_DIR"/third_party/golibs/$target .
+      ln -s "$FUCHSIA_DIR"/third_party/golibs/"${target}" .
     done
     # fx-set's only local imports (direct and transitive) are from //tools. We
     # can symlink more top-level directories as necessary if fx-set ever needs
@@ -218,6 +219,11 @@ function main {
     echo "$current_revision" > "$revision_file"
   fi
 
+  # If --dir is used, FUCHSIA_BUILD_DIR will not be empty, and _FX_BUILD_DIR
+  # must be set to its value before calling $exe_path, see https://fxbug.dev/413713238
+  if [[ -n "$FUCHSIA_BUILD_DIR" ]]; then
+    export _FX_BUILD_DIR="${FUCHSIA_BUILD_DIR}"
+  fi
   "$exe_path" "$@"
   status="$?"
 
