@@ -8,9 +8,9 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 /// A mapping from logical node ID to block address.
 #[repr(C, packed)]
-#[derive(Copy, Clone, Debug, Immutable, Unaligned, KnownLayout, FromBytes, IntoBytes)]
+#[derive(Copy, Clone, Default, Debug, Immutable, Unaligned, KnownLayout, FromBytes, IntoBytes)]
 pub struct RawNatEntry {
-    _unused_version: u8,
+    pub version: u8,
     pub ino: u32,
     pub block_addr: u32,
 }

@@ -1,0 +1,34 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_library.gni")
+
+rustc_library("proxy_filename") {
+  name = "proxy_filename"
+  edition = "2021"
+  with_unit_tests = true
+  sources = [ "src/lib.rs" ]
+  deps = [
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:base64",
+    "//third_party/rust_crates:sha2",
+    "//third_party/rust_crates:zerocopy",
+  ]
+}
+
+fuchsia_component("proxy-filename-test") {
+  testonly = true
+  deps = [ ":proxy_filename_test" ]
+  manifest = "meta/proxy_filename_test.cml"
+}
+
+fuchsia_test_package("proxy-filename-tests") {
+  test_components = [ ":proxy-filename-test" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":proxy-filename-tests" ]
+}

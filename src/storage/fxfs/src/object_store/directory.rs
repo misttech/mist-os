@@ -20,17 +20,15 @@ use crate::object_store::{
     SetExtendedAttributeMode, StoreObjectHandle,
 };
 use anyhow::{anyhow, bail, ensure, Context, Error};
-use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD;
-use base64::engine::Engine as _;
 use fidl_fuchsia_io as fio;
 use fuchsia_sync::Mutex;
 use fxfs_crypto::{Cipher, CipherSet, Key, WrappedKeys};
-use mundane::hash::{Digest, Hasher as MundaneHasher};
+use proxy_filename::ProxyFilename;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
+use zerocopy::IntoBytes;
 
 use super::FSCRYPT_KEY_ID;
 
@@ -117,88 +115,17 @@ fn decrypt_filename(key: &Key, object_id: u64, data: &Vec<u8>) -> Result<String,
     Ok(String::from_utf8(raw)?)
 }
 
-/// A proxy filename is used when we don't have the keys to decrypt the actual filename.
-///
-/// When working with locked directories, we encode both Dentry and user provided
-/// filenames using this struct before comparing them.
-///
-/// The hash code is encoded directly, allowing an index in some cases, even when entries
-/// are encrypted.
-///
-/// Encrypted filenames are unprintable so we base64 encode but base64 encoding uses 4 bytes for
-/// every 3 bytes of input long filenames cannot be represented like this without exceeding the
-/// NAME_LEN limit (255).
-///
-/// As a work around to keep uniqueness, for filenames longer than 149 bytes, we use the filename
-/// prefix and calculate the sha256 of the full encrypted name.  This produces a filename that is
-/// under the limit and very likely to remain unique.
-///
-#[repr(C, packed)]
-#[derive(
-    Copy,
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    PartialOrd,
-    FromBytes,
-    Immutable,
-    KnownLayout,
-    IntoBytes,
-    Unaligned,
-)]
-pub struct ProxyFilename {
-    hash_code: u64,
-    filename: [u8; 149], // Note: This may be a prefix for long filenames.
-    sha256: [u8; 32],    // This is only set if filename is a prefix.
-}
-
-impl ProxyFilename {
-    pub fn new(hash_code: u64, raw_filename: &[u8]) -> Self {
-        let mut filename = [0u8; 149];
-        let mut sha256 = [0u8; 32];
-        if raw_filename.len() < filename.len() {
-            filename[..raw_filename.len()].copy_from_slice(raw_filename);
-        } else {
-            let len = filename.len();
-            filename.copy_from_slice(&raw_filename[..len]);
-            sha256 = mundane::hash::Sha256::hash(raw_filename).bytes();
-        }
-        Self { hash_code, filename, sha256 }
+/// Returns an ObjectKey that is guaranteed to be equal to or less than the file that this
+/// ProxyFilename represents. The only case it is less is if a file has the same
+/// casefold_hash and also the same 48 byte filename prefix. In this rare case, we lean on
+/// sha256 to disambiguate, which may lead to the prefix pointing to records before the
+/// desired file.
+fn proxy_filename_to_query_key(proxy: &ProxyFilename, object_id: u64) -> ObjectKey {
+    let mut filename = proxy.filename.to_vec();
+    while let Some(0) = filename.last() {
+        filename.pop();
     }
-
-    /// Returns an ObjectKey that is guaranteed to be equal to or less than the file that this
-    /// ProxyFilename represents. The only case it is less is if a file has the same
-    /// casefold_hash and also the same 48 byte filename prefix. In this rare case, we lean on
-    /// sha256 to disambiguate, which may lead to the prefix pointing to records before the
-    /// desired file.
-    pub fn to_query_key(&self, object_id: u64) -> ObjectKey {
-        let mut filename = self.filename.to_vec();
-        while let Some(0) = filename.last() {
-            filename.pop();
-        }
-        ObjectKey::encrypted_child(object_id, filename, self.hash_code as u32)
-    }
-}
-
-impl Into<String> for ProxyFilename {
-    fn into(self) -> String {
-        let mut bytes = self.as_bytes().to_vec();
-        while let Some(0) = bytes.last() {
-            bytes.pop();
-        }
-        BASE64_URL_SAFE_NO_PAD.encode(bytes)
-    }
-}
-
-impl From<&str> for ProxyFilename {
-    fn from(s: &str) -> Self {
-        let mut bytes = BASE64_URL_SAFE_NO_PAD
-            .decode(s)
-            .unwrap_or_else(|_| vec![0; std::mem::size_of::<ProxyFilename>()]);
-        bytes.resize(std::mem::size_of::<ProxyFilename>(), 0);
-        Self::read_from_bytes(&bytes).unwrap()
-    }
+    ObjectKey::encrypted_child(object_id, filename, proxy.hash_code as u32)
 }
 
 #[fxfs_trace::trace]
@@ -649,8 +576,9 @@ impl<S: HandleOwner> Directory<S> {
                     }
                 }
             } else {
-                let target_filename: ProxyFilename = name.into();
-                let query_key = target_filename.to_query_key(self.object_id());
+                let target_filename: ProxyFilename =
+                    name.try_into().unwrap_or_else(|_| ProxyFilename::new(0, &[]));
+                let query_key = proxy_filename_to_query_key(&target_filename, self.object_id());
                 let layer_set = self.store().tree().layer_set();
                 let mut merger = layer_set.merger();
                 let mut iter = merger.query(Query::FullRange(&query_key)).await?;
@@ -1330,8 +1258,9 @@ impl<S: HandleOwner> Directory<S> {
                 (ObjectKey::encrypted_child(self.object_id(), encrypted_name, casefold_hash), None)
             } else {
                 // Locked EncryptedChild case.
-                let filename: ProxyFilename = from.into();
-                let key = filename.to_query_key(self.object_id());
+                let filename: ProxyFilename =
+                    from.try_into().unwrap_or_else(|_| ProxyFilename::new(0, &[]));
+                let key = proxy_filename_to_query_key(&filename, self.object_id());
                 if from == "" {
                     // The empty filename case indicates we want to iterate everything...
                     (key, None)
@@ -1669,7 +1598,8 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
             // We have to scan for the right child as proxy filenames
             // only contain a encrypted filename prefix and we need the full key for the
             // destination.
-            let proxy_filename: ProxyFilename = dst.1.into();
+            let proxy_filename: ProxyFilename =
+                dst.1.try_into().unwrap_or_else(|_| ProxyFilename::new(0, &[]));
 
             let layer_set = dst.0.store().tree().layer_set();
             let mut merger = layer_set.merger();

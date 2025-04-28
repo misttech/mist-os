@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use anyhow::{anyhow, ensure, Error};
-use bitflags::bitflags;
+use enumn::N;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, Unaligned};
 
 pub const XATTR_MAGIC: u32 = 0xF2F52011;
@@ -16,22 +16,21 @@ pub struct XattrHeader {
 }
 
 /// xattr have an attached 'index' that serves as a namespace/purpose.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Immutable, FromBytes, IntoBytes)]
-pub struct Index(u8);
-bitflags! {
-    impl Index: u8 {
-        const User = 1;
-        const PosixAclAccess = 2;
-        const PosixAclDefault = 3;
-        const Trusted = 4;
-        const Lustre = 5;
-        const Security = 6;
-        const IndexAdvise = 7;
-        const Unused8 = 8;
-        const Encryption = 9;
-        const Unused10 = 10;
-        const Verity = 11;
-    }
+#[derive(Copy, Clone, Debug, Eq, PartialEq, N)]
+#[repr(u8)]
+pub enum Index {
+    Unused0 = 0,
+    User = 1,
+    PosixAclAccess = 2,
+    PosixAclDefault = 3,
+    Trusted = 4,
+    Lustre = 5,
+    Security = 6,
+    IndexAdvise = 7,
+    Unused8 = 8,
+    Encryption = 9,
+    Unused10 = 10,
+    Verity = 11,
 }
 
 #[repr(C, packed)]
@@ -71,7 +70,7 @@ pub fn decode_xattr(raw_data: &[u8]) -> Result<Vec<XattrEntry>, Error> {
         let (entry, remainder): (Ref<_, RawXattrEntry>, _) = Ref::from_prefix(rest).unwrap();
         rest = remainder;
         if entry.name_index > 0 {
-            let index = Index(entry.name_index);
+            let index = Index::n(entry.name_index).ok_or(anyhow!("Unexpected xattr index"))?;
             ensure!(
                 (entry.name_len as usize + entry.value_size as usize) <= rest.len(),
                 "invalid name_len/value_size in xattr"

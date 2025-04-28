@@ -23,11 +23,11 @@ rustc_library("lib") {
     "src/xattr.rs",
   ]
   deps = [
+    "//src/storage/lib/proxy_filename",
     "//src/storage/lib/storage_device",
     "//third_party/rust_crates:aes",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
-    "//third_party/rust_crates:base64",
     "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:cbc",
     "//third_party/rust_crates:enumn",

@@ -27,6 +27,7 @@ fxfs_deps = [
   "//src/storage/fxfs/trace",
   "//src/storage/fxfs/unicode",
   "//src/storage/lib/fsverity-merkle",
+  "//src/storage/lib/proxy_filename",
   "//src/storage/lib/storage_device",
   "//src/storage/type-fprint:fprint",
   "//third_party/rust_crates:anyhow",

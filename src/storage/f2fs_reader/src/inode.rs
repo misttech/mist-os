@@ -181,6 +181,10 @@ pub struct Inode {
 
     // Crypto context, if present in xattr.
     pub(super) context: Option<crypto::Context>,
+
+    // Contains the set of block addresses in the data segment used by this inode.
+    // This includes nids, indirect and double indirect address pages, and the xattr page
+    pub block_addrs: Vec<u32>,
 }
 
 /// Both direct and indirect node address pages use this same format.
@@ -224,9 +228,11 @@ impl Debug for Inode {
 impl Inode {
     /// Attempt to load (and validate) an inode at a given nid.
     pub(super) async fn try_load(f2fs: &impl Reader, ino: u32) -> Result<Box<Inode>, Error> {
+        let mut block_addrs = vec![];
         let mut raw_xattr = vec![];
         let mut this = {
             let block = f2fs.read_node(ino).await?;
+            block_addrs.push(f2fs.get_nat_entry(ino).await?.block_addr);
             // Layout:
             //   header: InodeHeader
             //   extra: InodeExtraAttr # optional, based on header flag.
@@ -288,7 +294,7 @@ impl Inode {
             Box::new(Self {
                 header: (*header).clone(),
                 extra,
-                inline_data: inline_data.map(|x| x.into()).clone(),
+                inline_data: inline_data.map(|x| x.into()),
                 inline_dentry,
                 i_addrs,
                 nids,
@@ -297,6 +303,8 @@ impl Inode {
                 nid_pages: HashMap::new(),
                 xattr: vec![],
                 context: None,
+
+                block_addrs,
             })
         };
 
@@ -304,6 +312,7 @@ impl Inode {
         // that '.await' produces by ensuring any unnecessary local variables are out of scope.
         if this.header.xattr_nid != 0 {
             raw_xattr.extend_from_slice(f2fs.read_node(this.header.xattr_nid).await?.as_slice());
+            this.block_addrs.push(f2fs.get_nat_entry(this.header.xattr_nid).await?.block_addr);
         }
         this.xattr = decode_xattr(&raw_xattr)?;
 
@@ -318,12 +327,15 @@ impl Inode {
             match i {
                 0..2 => {
                     this.nid_pages.insert(nid, f2fs.read_node(nid).await?.try_into()?);
+                    this.block_addrs.push(f2fs.get_nat_entry(nid).await?.block_addr);
                 }
                 2..4 => {
                     let indirect = Box::<RawAddrBlock>::try_from(f2fs.read_node(nid).await?)?;
+                    this.block_addrs.push(f2fs.get_nat_entry(nid).await?.block_addr);
                     for nid in indirect.addrs {
                         if nid != NULL_ADDR {
                             this.nid_pages.insert(nid, f2fs.read_node(nid).await?.try_into()?);
+                            this.block_addrs.push(f2fs.get_nat_entry(nid).await?.block_addr);
                         }
                     }
                     this.nid_pages.insert(nid, indirect);
@@ -331,14 +343,18 @@ impl Inode {
                 4 => {
                     let double_indirect =
                         Box::<RawAddrBlock>::try_from(f2fs.read_node(nid).await?)?;
+                    this.block_addrs.push(f2fs.get_nat_entry(nid).await?.block_addr);
                     for nid in double_indirect.addrs {
                         if nid != NULL_ADDR {
                             let indirect =
                                 Box::<RawAddrBlock>::try_from(f2fs.read_node(nid).await?)?;
+                            this.block_addrs.push(f2fs.get_nat_entry(nid).await?.block_addr);
                             for nid in indirect.addrs {
                                 if nid != NULL_ADDR {
                                     this.nid_pages
                                         .insert(nid, f2fs.read_node(nid).await?.try_into()?);
+                                    this.block_addrs
+                                        .push(f2fs.get_nat_entry(nid).await?.block_addr);
                                 }
                             }
                             this.nid_pages.insert(nid, indirect);
@@ -353,122 +369,195 @@ impl Inode {
         Ok(this)
     }
 
-    /// Calls 'f' for each non-zero data block in order, passing block_num and block_addr.
-    pub fn for_each_data_block(&self, mut f: impl FnMut(u32, u32)) {
-        let mut block_num = 0;
-
-        for &addr in &self.i_addrs {
-            if addr != NULL_ADDR {
-                f(block_num as u32, addr);
-            }
-            block_num += 1;
-        }
-
-        for nid in &self.nids[0..2] {
-            if let Some(addrs) = self.nid_pages.get(nid) {
-                let addrs = addrs.addrs;
-                for addr in addrs {
-                    if addr != NULL_ADDR {
-                        f(block_num as u32, addr);
-                    }
-                    block_num += 1;
-                }
-            } else {
-                block_num += ADDR_BLOCK_NUM_ADDR as usize;
-            };
-        }
-        for nid in &self.nids[2..4] {
-            if let Some(addrs) = self.nid_pages.get(nid) {
-                let addrs = addrs.addrs;
-                for nid in addrs {
-                    if let Some(addrs) = self.nid_pages.get(&nid) {
-                        let addrs = addrs.addrs;
-                        for addr in addrs {
-                            if addr != NULL_ADDR {
-                                f(block_num as u32, addr);
-                            }
-                            block_num += 1;
-                        }
-                    } else {
-                        block_num += ADDR_BLOCK_NUM_ADDR as usize;
-                    }
-                }
-            } else {
-                block_num += ADDR_BLOCK_NUM_ADDR as usize * ADDR_BLOCK_NUM_ADDR as usize;
-            }
-        }
-
-        if let Some(addrs) = self.nid_pages.get(&self.nids[4]) {
-            let addrs = addrs.addrs;
-            for &nid in &addrs {
-                if let Some(addrs) = self.nid_pages.get(&nid) {
-                    let addrs = addrs.addrs;
-                    for nid in addrs {
-                        if let Some(addrs) = self.nid_pages.get(&nid) {
-                            let addrs = addrs.addrs;
-                            for &addr in &addrs {
-                                if addr != NULL_ADDR {
-                                    f(block_num as u32, addr);
-                                }
-                                block_num += 1;
-                            }
-                        } else {
-                            block_num += ADDR_BLOCK_NUM_ADDR as usize;
-                        }
-                    }
-                } else {
-                    block_num += ADDR_BLOCK_NUM_ADDR as usize * ADDR_BLOCK_NUM_ADDR as usize;
-                }
-            }
-        }
+    /// Walks through the data blocks of the file in order, handling sparse regions.
+    /// Emits pairs of (logical_block_num, physical_block_num).
+    pub fn data_blocks(&self) -> DataBlocksIter<'_> {
+        DataBlocksIter { inode: self, stage: 0, offset: 0, a: 0, b: 0, c: 0 }
     }
 
-    /// Convenience function that enumerates and returns all data block addresses
-    /// Note that performance of this method is poor.
-    /// We shouldn't need this outside of tests.
-    #[cfg(test)]
-    pub fn data_blocks(&self) -> Vec<(u32, u32)> {
-        let mut out = Vec::new();
-        self.for_each_data_block(|block_num, block_addr| {
-            out.push((block_num, block_addr));
-        });
-        out
-    }
+    /// Get the address of a specific logical data block.
+    /// NULL_ADDR and NEW_ADDR should be considered sparse (unallocated) zero blocks.
+    pub fn data_block_addr(&self, mut block_num: u32) -> u32 {
+        let offset = block_num;
 
-    /// Convenience function that reads and returns the data for a block.
-    /// Note that performance of this method is (very) poor but we don't need
-    /// this outside of tests. Will return 'None' for empty pages.
-    #[cfg(test)]
-    pub(super) async fn read_data_block<'a>(
-        &self,
-        f2fs: &'a impl Reader,
-        block_num: u32,
-    ) -> Result<Option<Buffer<'a>>, Error> {
-        let mut addr = None;
-        self.for_each_data_block(|ix, block_addr| {
-            if block_num == ix {
-                addr = Some(block_addr);
+        if block_num < self.i_addrs.len() as u32 {
+            return self.i_addrs[block_num as usize];
+        }
+        block_num -= self.i_addrs.len() as u32;
+
+        // After we adjust for i_addrs, all offsets are simple constants.
+        const NID0_END: u32 = ADDR_BLOCK_NUM_ADDR;
+        const NID1_END: u32 = NID0_END + ADDR_BLOCK_NUM_ADDR;
+        const NID2_END: u32 = NID1_END + ADDR_BLOCK_NUM_ADDR * ADDR_BLOCK_NUM_ADDR;
+        const NID3_END: u32 = NID2_END + ADDR_BLOCK_NUM_ADDR * ADDR_BLOCK_NUM_ADDR;
+
+        let mut iter = match block_num {
+            ..NID0_END => {
+                let a = block_num;
+                DataBlocksIter { inode: self, stage: 1, offset, a, b: 0, c: 0 }
             }
-        });
-        if let Some(block_addr) = addr {
-            if block_addr == NEW_ADDR {
-                // Treat as an empty page
-                return Ok(None);
+            ..NID1_END => {
+                let a = block_num - NID0_END;
+                DataBlocksIter { inode: self, stage: 2, offset, a, b: 0, c: 0 }
             }
-            let mut buffer = f2fs.read_raw_block(block_addr).await?;
-            if let Some(decryptor) = f2fs.get_decryptor_for_inode(self) {
-                decryptor.decrypt_data(block_num, buffer.as_mut().as_mut_slice());
+            ..NID2_END => {
+                block_num -= NID1_END;
+                let a = block_num / ADDR_BLOCK_NUM_ADDR;
+                let b = block_num % ADDR_BLOCK_NUM_ADDR;
+                DataBlocksIter { inode: self, stage: 3, offset, a, b, c: 0 }
             }
-            Ok(Some(buffer))
+            ..NID3_END => {
+                block_num -= NID2_END;
+                let a = block_num / ADDR_BLOCK_NUM_ADDR;
+                let b = block_num % ADDR_BLOCK_NUM_ADDR;
+                DataBlocksIter { inode: self, stage: 4, offset, a, b, c: 0 }
+            }
+            _ => {
+                block_num -= NID3_END;
+                let a = block_num / ADDR_BLOCK_NUM_ADDR / ADDR_BLOCK_NUM_ADDR;
+                let b = (block_num / ADDR_BLOCK_NUM_ADDR) % ADDR_BLOCK_NUM_ADDR;
+                let c = block_num % ADDR_BLOCK_NUM_ADDR;
+                DataBlocksIter { inode: self, stage: 5, offset, a, b, c }
+            }
+        };
+        if let Some((logical, physical)) = iter.next() {
+            if logical == offset {
+                physical
+            } else {
+                NULL_ADDR
+            }
         } else {
-            Ok(None)
+            NULL_ADDR
         }
+    }
+}
+
+pub struct DataBlocksIter<'a> {
+    inode: &'a Inode,
+    stage: u32, // 0 -> i_addr, 1-> nids[0], 2 -> nids[1] -> ...
+    offset: u32,
+    a: u32, // depends on stage
+    b: u32, // used for nids 2+ for indirection
+    c: u32, // used for nids[4] for double-indirection.
+}
+
+impl Iterator for DataBlocksIter<'_> {
+    type Item = (u32, u32);
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            match self.stage {
+                0 => {
+                    // i_addrs
+                    while let Some(&addr) = self.inode.i_addrs.get(self.a as usize) {
+                        self.a += 1;
+                        self.offset += 1;
+                        if addr != NULL_ADDR && addr != NEW_ADDR {
+                            return Some((self.offset - 1, addr));
+                        }
+                    }
+                    self.stage += 1;
+                    self.a = 0;
+                }
+                1..3 => {
+                    // "direct"
+                    let nid = self.inode.nids[self.stage as usize - 1];
+
+                    if nid == NULL_ADDR || nid == NEW_ADDR {
+                        self.stage += 1;
+                        self.offset += ADDR_BLOCK_NUM_ADDR;
+                    } else {
+                        let addrs = self.inode.nid_pages.get(&nid).unwrap().addrs;
+                        while let Some(&addr) = addrs.get(self.a as usize) {
+                            self.a += 1;
+                            self.offset += 1;
+                            if addr != NULL_ADDR && addr != NEW_ADDR {
+                                return Some((self.offset - 1, addr));
+                            }
+                        }
+                        self.stage += 1;
+                        self.a = 0;
+                    }
+                }
+
+                3..5 => {
+                    let nid = self.inode.nids[self.stage as usize - 1];
+                    // "indirect"
+                    if nid == NULL_ADDR || nid == NEW_ADDR {
+                        self.stage += 1;
+                        self.offset += ADDR_BLOCK_NUM_ADDR * ADDR_BLOCK_NUM_ADDR;
+                    } else {
+                        let addrs = self.inode.nid_pages.get(&nid).unwrap().addrs;
+                        while let Some(&nid) = addrs.get(self.a as usize) {
+                            if nid == NULL_ADDR || nid == NEW_ADDR {
+                                self.a += 1;
+                                self.offset += ADDR_BLOCK_NUM_ADDR;
+                            } else {
+                                let addrs = self.inode.nid_pages.get(&nid).unwrap().addrs;
+                                while let Some(&addr) = addrs.get(self.b as usize) {
+                                    self.b += 1;
+                                    self.offset += 1;
+                                    if addr != NULL_ADDR && addr != NEW_ADDR {
+                                        return Some((self.offset - 1, addr));
+                                    }
+                                }
+                                self.a += 1;
+                                self.b = 0;
+                            }
+                        }
+                        self.stage += 1;
+                        self.a = 0;
+                    }
+                }
+
+                5 => {
+                    let nid = self.inode.nids[4];
+                    // "double-indirect"
+                    if nid != NULL_ADDR && nid != NEW_ADDR {
+                        let addrs = self.inode.nid_pages.get(&nid).unwrap().addrs;
+                        while let Some(&nid) = addrs.get(self.a as usize) {
+                            if nid == NULL_ADDR || nid == NEW_ADDR {
+                                self.a += 1;
+                                self.offset += ADDR_BLOCK_NUM_ADDR * ADDR_BLOCK_NUM_ADDR;
+                            } else {
+                                let addrs = self.inode.nid_pages.get(&nid).unwrap().addrs;
+                                while let Some(&nid) = addrs.get(self.b as usize) {
+                                    if nid == NULL_ADDR || nid == NEW_ADDR {
+                                        self.b += 1;
+                                        self.offset += ADDR_BLOCK_NUM_ADDR;
+                                    } else {
+                                        let addrs = self.inode.nid_pages.get(&nid).unwrap().addrs;
+                                        while let Some(&addr) = addrs.get(self.c as usize) {
+                                            self.c += 1;
+                                            self.offset += 1;
+                                            if addr != NULL_ADDR && addr != NEW_ADDR {
+                                                return Some((self.offset - 1, addr));
+                                            }
+                                        }
+                                        self.b += 1;
+                                        self.c = 0;
+                                    }
+                                }
+
+                                self.a += 1;
+                                self.b = 0;
+                            }
+                        }
+                    }
+                    self.stage += 1;
+                }
+                _ => {
+                    break;
+                }
+            }
+        }
+        None
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::nat::RawNatEntry;
     use crate::reader;
     use anyhow;
     use async_trait::async_trait;
@@ -504,6 +593,14 @@ mod test {
                     Ok(block)
                 }
             }
+        }
+
+        fn fs_uuid(&self) -> &[u8; 16] {
+            &[0; 16]
+        }
+
+        async fn get_nat_entry(&self, nid: u32) -> Result<RawNatEntry, Error> {
+            Ok(RawNatEntry { ino: nid, block_addr: 0, ..Default::default() })
         }
     }
 
@@ -558,5 +655,99 @@ mod test {
             ..std::mem::size_of::<InodeHeader>() + std::mem::size_of::<InodeExtraAttr>()]
             .copy_from_slice(&extra.as_bytes());
         assert!(Inode::try_load(&reader, 1).await.is_err());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use zerocopy::FromZeros;
+
+    use super::*;
+
+    fn last_addr_block(addr: u32) -> Box<RawAddrBlock> {
+        let mut addr_block = RawAddrBlock::new_zeroed();
+        addr_block.addrs[ADDR_BLOCK_NUM_ADDR as usize - 1] = addr;
+        Box::new(addr_block)
+    }
+
+    #[test]
+    fn test_data_iter() {
+        // Fake up an inode with datablocks for the last block in each layer.
+        //   1. The last i_addrs.
+        //   2. The last nids[0] and nids[1].
+        //   3. The last block of the last nids[2] and nids[3] blocks.
+        //   4. The last block of the last block of nids[4] block.
+        // All other blocks are unallocated.
+        let header = InodeHeader::new_zeroed();
+        let footer = InodeFooter::new_zeroed();
+        let mut nids = [0u32; 5];
+        let mut nid_pages = HashMap::new();
+        nid_pages.insert(101, last_addr_block(1001));
+        nid_pages.insert(102, last_addr_block(1002));
+
+        let mut i_addrs: Vec<u32> = Vec::new();
+        i_addrs.resize(INODE_BLOCK_MAX_ADDR, 0);
+        i_addrs[INODE_BLOCK_MAX_ADDR - 1] = 1000;
+
+        nids[0] = 101;
+        nid_pages.insert(101, last_addr_block(1001));
+
+        nids[1] = 102;
+        nid_pages.insert(102, last_addr_block(1002));
+
+        nids[2] = 103;
+        nid_pages.insert(103, last_addr_block(104));
+        nid_pages.insert(104, last_addr_block(1003));
+
+        nids[3] = 105;
+        nid_pages.insert(105, last_addr_block(106));
+        nid_pages.insert(106, last_addr_block(1004));
+
+        nids[4] = 107;
+        nid_pages.insert(107, last_addr_block(108));
+        nid_pages.insert(108, last_addr_block(109));
+        nid_pages.insert(109, last_addr_block(1005));
+
+        let inode = Box::new(Inode {
+            header,
+            extra: None,
+            inline_data: None,
+            inline_dentry: None,
+            i_addrs,
+            nids,
+            footer: footer,
+
+            nid_pages,
+            xattr: vec![],
+            context: None,
+
+            block_addrs: vec![],
+        });
+
+        // Also test data_block_addr while we're walking.
+        assert_eq!(inode.data_block_addr(0), 0);
+
+        let mut iter = inode.data_blocks();
+        let mut block_num = 922;
+        assert_eq!(iter.next(), Some((block_num, 1000))); // i_addrs
+        assert_eq!(inode.data_block_addr(block_num), 1000);
+        block_num += ADDR_BLOCK_NUM_ADDR;
+        assert_eq!(iter.next(), Some((block_num, 1001))); // nids[0]
+        assert_eq!(inode.data_block_addr(block_num), 1001);
+        block_num += ADDR_BLOCK_NUM_ADDR;
+        assert_eq!(iter.next(), Some((block_num, 1002))); // nids[1]
+        assert_eq!(inode.data_block_addr(block_num), 1002);
+        block_num += ADDR_BLOCK_NUM_ADDR * ADDR_BLOCK_NUM_ADDR;
+        assert_eq!(iter.next(), Some((block_num, 1003))); // nids[2]
+        assert_eq!(inode.data_block_addr(block_num), 1003);
+        block_num += ADDR_BLOCK_NUM_ADDR * ADDR_BLOCK_NUM_ADDR;
+        assert_eq!(iter.next(), Some((block_num, 1004))); // nids[3]
+        assert_eq!(inode.data_block_addr(block_num), 1004);
+        block_num += ADDR_BLOCK_NUM_ADDR * ADDR_BLOCK_NUM_ADDR * ADDR_BLOCK_NUM_ADDR;
+        assert_eq!(iter.next(), Some((block_num, 1005))); // nids[4]
+        assert_eq!(inode.data_block_addr(block_num), 1005);
+        assert_eq!(iter.next(), None);
+        assert_eq!(inode.data_block_addr(block_num - 1), 0);
+        assert_eq!(inode.data_block_addr(block_num + 1), 0);
     }
 }
