@@ -10,9 +10,9 @@ _host_platform = "${host_os}-${host_cpu}"
 
 # Prebuilt RBE binaries
 rbe_common_tools = [
-  "//prebuilt/proprietary/third_party/reclient/${_host_platform}/bootstrap",
-  "//prebuilt/proprietary/third_party/reclient/${_host_platform}/reproxy",
-  "//prebuilt/proprietary/third_party/reclient/${_host_platform}/rewrapper",
+  "//prebuilt/third_party/reclient/${_host_platform}/bootstrap",
+  "//prebuilt/third_party/reclient/${_host_platform}/reproxy",
+  "//prebuilt/third_party/reclient/${_host_platform}/rewrapper",
 ]
 
 rewrapper_config_file = "//build/rbe/fuchsia-rewrapper.cfg"
@@ -76,10 +76,11 @@ cxx_remote_wrapper_minimalist = "//build/rbe/reclient_cxx.sh"
 prebuilt_tool_remote_wrapper = "//build/rbe/prebuilt_tool_remote_wrapper.py"
 
 rbe_dlwrap = "//build/rbe/dlwrap.py"
-rbe_dlwrap_inputs = [
-                      "//prebuilt/proprietary/third_party/reclient/${_host_platform}/remotetool",
-                      reproxy_config_file,
-                    ] + rbe_extra_reproxy_configs
+rbe_dlwrap_inputs =
+    [
+      "//prebuilt/third_party/reclient/${_host_platform}/remotetool",
+      reproxy_config_file,
+    ] + rbe_extra_reproxy_configs
 
 declare_args() {
   #########################

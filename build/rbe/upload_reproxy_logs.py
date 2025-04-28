@@ -30,7 +30,7 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 # There is never a need to checkout non-host platforms of the reclient tools.
 # This should be unique.  Path may be relative or absolute.
 _DEFAULT_RECLIENT_BINDIR = glob.glob(
-    os.path.join(_PROJECT_ROOT, "prebuilt/proprietary/third_party/reclient/*")
+    os.path.join(_PROJECT_ROOT, "prebuilt/third_party/reclient/*")
 )[0]
 
 _DEFAULT_REPROXY_LOGS_TABLE = (

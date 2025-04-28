@@ -1509,10 +1509,10 @@ group("tool_paths.metadata") {
     # reclient is using fairly generic names (bootstrap, dumpstats). We may
     # need to move these into their own group() at some point to namespace
     # them.
-    "//prebuilt/proprietary/third_party/reclient/$host_platform/bootstrap",
-    "//prebuilt/proprietary/third_party/reclient/$host_platform/dumpstats",
-    "//prebuilt/proprietary/third_party/reclient/$host_platform/reproxy",
-    "//prebuilt/proprietary/third_party/reclient/$host_platform/rewrapper",
+    "//prebuilt/third_party/reclient/$host_platform/bootstrap",
+    "//prebuilt/third_party/reclient/$host_platform/dumpstats",
+    "//prebuilt/third_party/reclient/$host_platform/reproxy",
+    "//prebuilt/third_party/reclient/$host_platform/rewrapper",
 
     "//prebuilt/sdk/bazel/bazel",
     "//prebuilt/third_party/buildifier/$host_platform/buildifier",

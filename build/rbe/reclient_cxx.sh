@@ -79,7 +79,7 @@ esac
 
 readonly HOST_PLATFORM="$_HOST_OS-$_HOST_ARCH"
 
-readonly reclient_bindir="$exec_root/prebuilt/proprietary/third_party/reclient/$HOST_PLATFORM"
+readonly reclient_bindir="$exec_root/prebuilt/third_party/reclient/$HOST_PLATFORM"
 readonly rewrapper="$reclient_bindir"/rewrapper
 readonly cfg="$script_dir"/fuchsia-rewrapper.cfg
 readonly reproxy_wrap="$script_dir"/fuchsia-reproxy-wrap.sh
