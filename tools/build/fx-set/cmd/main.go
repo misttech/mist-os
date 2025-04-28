@@ -35,7 +35,7 @@ const (
 	// fx ensures that this env var is set.
 	checkoutDirEnvVar = "FUCHSIA_DIR"
 
-	// Populated when fx's top-level `--dir` flag is set. Guaranteed to be absolute.
+	// Populated when fx's top-level `--dir` flag is set.
 	buildDirEnvVar = "_FX_BUILD_DIR"
 
 	// We'll fall back to using this build dir if neither `fx --dir` nor `fx set
@@ -228,6 +228,17 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	cmd.ccacheDir = env[ccacheDirEnvVar] // Not required.
 
 	cmd.buildDir = env[buildDirEnvVar] // Not required.
+	// Check and rebase if buildDir is an absolute path.
+	if filepath.IsAbs(cmd.buildDir) {
+		if !strings.HasPrefix(cmd.buildDir, cmd.checkoutDir+"/") {
+			return nil, fmt.Errorf("build dir %q is not under checkout dir %q", cmd.buildDir, cmd.checkoutDir)
+		}
+		var err error
+		cmd.buildDir, err = filepath.Rel(cmd.checkoutDir, cmd.buildDir)
+		if err != nil {
+			return nil, fmt.Errorf("rebasing build dir to check out dir: %v", err)
+		}
+	}
 
 	flagSet := flag.NewFlagSet("fx set", flag.ExitOnError)
 	// TODO(olivernewman): Decide whether to have this tool print usage or

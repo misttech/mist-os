@@ -148,6 +148,33 @@ func TestParseArgsAndEnv(t *testing.T) {
 			},
 		},
 		{
+			name: "absolute build dir env var",
+			env: map[string]string{
+				checkoutDirEnvVar: "/abs/path/to/fuchsia/dir",
+				buildDirEnvVar:    "/abs/path/to/fuchsia/dir/out/ninja",
+			},
+			args: []string{
+				"--fint-params-path", "bar.fint.textproto",
+			},
+			expected: setArgs{
+				fintParamsPath: "bar.fint.textproto",
+				includeClippy:  true,
+				checkoutDir:    "/abs/path/to/fuchsia/dir",
+				buildDir:       "out/ninja",
+			},
+		},
+		{
+			name: "build dir not under checkout dir",
+			env: map[string]string{
+				checkoutDirEnvVar: "/abs/path/to/fuchsia/dir",
+				buildDirEnvVar:    "/somewhere/else/out/samurai",
+			},
+			args: []string{
+				"--fint-params-path", "bar.fint.textproto",
+			},
+			expectErr: true,
+		},
+		{
 			name:      "rejects --cxx-rbe and --no-cxx-rbe",
 			args:      []string{"core.x64", "--cxx-rbe", "--no-cxx-rbe"},
 			expectErr: true,
@@ -161,6 +188,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			name: "honors top-level fx --dir flag",
 			args: []string{"core.x64"},
 			env: map[string]string{
+				checkoutDirEnvVar: "/usr/foo/fuchsia",
 				// fx sets this env var if the top-level --dir flag is set.
 				buildDirEnvVar: "/usr/foo/fuchsia/out/foo",
 			},
@@ -168,7 +196,8 @@ func TestParseArgsAndEnv(t *testing.T) {
 				product:       "core",
 				board:         "x64",
 				includeClippy: true,
-				buildDir:      "/usr/foo/fuchsia/out/foo",
+				checkoutDir:   "/usr/foo/fuchsia",
+				buildDir:      "out/foo",
 			},
 		},
 		{
@@ -279,18 +308,18 @@ func TestParseArgsAndEnv(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			checkoutDir := t.TempDir()
-			tc.expected.checkoutDir = checkoutDir
-
+			if _, ok := tc.env[checkoutDirEnvVar]; !ok {
+				checkoutDir := t.TempDir()
+				tc.expected.checkoutDir = checkoutDir
+				if tc.env == nil {
+					tc.env = make(map[string]string)
+				}
+				tc.env[checkoutDirEnvVar] = checkoutDir
+			}
 			if tc.expected.rbeMode == "" {
 				tc.expected.rbeMode = defaultRbeMode
 			}
-
-			env := map[string]string{checkoutDirEnvVar: checkoutDir}
-			for k, v := range tc.env {
-				env[k] = v
-			}
-			cmd, err := parseArgsAndEnv(tc.args, env)
+			cmd, err := parseArgsAndEnv(tc.args, tc.env)
 			if err != nil {
 				if !tc.expectErr {
 					t.Fatalf("Parse args error: %s", err)
