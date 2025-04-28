@@ -174,8 +174,13 @@ zx_status_t AddUsbPhyComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
   }
 
   std::vector<fpbus::Metadata> usb_phy_metadata{
+      // TODO(b/408003904): Remove once DEVICE_METADATA_USB_MODE is no longer used.
       {{
           .id = std::to_string(DEVICE_METADATA_USB_MODE),
+          .data = persisted_metadata.value(),
+      }},
+      {{
+          .id = fuchsia_hardware_usb_phy::Metadata::kSerializableName,
           .data = std::move(persisted_metadata.value()),
       }},
   };

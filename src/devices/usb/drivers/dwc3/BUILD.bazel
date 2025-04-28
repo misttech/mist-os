@@ -54,6 +54,7 @@ cc_library(
         "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
         "@fuchsia_sdk//fidl/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_cpp",
         "@fuchsia_sdk//fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
         "@fuchsia_sdk//fidl/fuchsia.io:fuchsia.io_cpp",
         "@fuchsia_sdk//pkg/driver_component_cpp",
         "@fuchsia_sdk//pkg/driver_logging_cpp",

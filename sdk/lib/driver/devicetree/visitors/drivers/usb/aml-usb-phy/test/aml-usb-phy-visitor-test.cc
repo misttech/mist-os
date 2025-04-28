@@ -51,25 +51,47 @@ TEST(AmlUsbPhyVisitorTest, TestMetadataAndBindProperty) {
 
       // Test metadata properties.
       ASSERT_TRUE(metadata);
-      ASSERT_EQ(1lu, metadata->size());
+      ASSERT_EQ(2lu, metadata->size());
 
-      // Drive mode metadata
-      std::vector<uint8_t> metadata_blob_1 = std::move(*(*metadata)[0].data());
-      fit::result usb_phy_metadata =
-          fidl::Unpersist<fuchsia_hardware_usb_phy::Metadata>(metadata_blob_1);
-      ASSERT_TRUE(usb_phy_metadata.is_ok());
-      EXPECT_EQ(usb_phy_metadata->phy_type(), fuchsia_hardware_usb_phy::AmlogicPhyType::kG12B);
-      const auto& phy_modes = usb_phy_metadata->usb_phy_modes().value();
-      ASSERT_EQ(phy_modes.size(), 3lu);
-      EXPECT_EQ(phy_modes[0].protocol(), fuchsia_hardware_usb_phy::ProtocolVersion::kUsb20);
-      EXPECT_EQ(phy_modes[0].dr_mode(), fuchsia_hardware_usb_phy::Mode::kHost);
-      EXPECT_EQ(phy_modes[0].is_otg_capable(), false);
-      EXPECT_EQ(phy_modes[1].protocol(), fuchsia_hardware_usb_phy::ProtocolVersion::kUsb20);
-      EXPECT_EQ(phy_modes[1].dr_mode(), fuchsia_hardware_usb_phy::Mode::kPeripheral);
-      EXPECT_EQ(phy_modes[1].is_otg_capable(), true);
-      EXPECT_EQ(phy_modes[2].protocol(), fuchsia_hardware_usb_phy::ProtocolVersion::kUsb30);
-      EXPECT_EQ(phy_modes[2].dr_mode(), fuchsia_hardware_usb_phy::Mode::kHost);
-      EXPECT_EQ(phy_modes[2].is_otg_capable(), false);
+      // Legacy drive mode metadata.
+      {
+        std::vector<uint8_t> metadata_blob_1 = std::move(*(*metadata)[0].data());
+        fit::result usb_phy_metadata =
+            fidl::Unpersist<fuchsia_hardware_usb_phy::Metadata>(metadata_blob_1);
+        ASSERT_TRUE(usb_phy_metadata.is_ok());
+        EXPECT_EQ(usb_phy_metadata->phy_type(), fuchsia_hardware_usb_phy::AmlogicPhyType::kG12B);
+        const auto& phy_modes = usb_phy_metadata->usb_phy_modes().value();
+        ASSERT_EQ(phy_modes.size(), 3lu);
+        EXPECT_EQ(phy_modes[0].protocol(), fuchsia_hardware_usb_phy::ProtocolVersion::kUsb20);
+        EXPECT_EQ(phy_modes[0].dr_mode(), fuchsia_hardware_usb_phy::Mode::kHost);
+        EXPECT_EQ(phy_modes[0].is_otg_capable(), false);
+        EXPECT_EQ(phy_modes[1].protocol(), fuchsia_hardware_usb_phy::ProtocolVersion::kUsb20);
+        EXPECT_EQ(phy_modes[1].dr_mode(), fuchsia_hardware_usb_phy::Mode::kPeripheral);
+        EXPECT_EQ(phy_modes[1].is_otg_capable(), true);
+        EXPECT_EQ(phy_modes[2].protocol(), fuchsia_hardware_usb_phy::ProtocolVersion::kUsb30);
+        EXPECT_EQ(phy_modes[2].dr_mode(), fuchsia_hardware_usb_phy::Mode::kHost);
+        EXPECT_EQ(phy_modes[2].is_otg_capable(), false);
+      }
+
+      // Drive mode metadata.
+      {
+        std::vector<uint8_t> metadata_blob_2 = std::move(*(*metadata)[1].data());
+        fit::result usb_phy_metadata =
+            fidl::Unpersist<fuchsia_hardware_usb_phy::Metadata>(metadata_blob_2);
+        ASSERT_TRUE(usb_phy_metadata.is_ok());
+        EXPECT_EQ(usb_phy_metadata->phy_type(), fuchsia_hardware_usb_phy::AmlogicPhyType::kG12B);
+        const auto& phy_modes = usb_phy_metadata->usb_phy_modes().value();
+        ASSERT_EQ(phy_modes.size(), 3lu);
+        EXPECT_EQ(phy_modes[0].protocol(), fuchsia_hardware_usb_phy::ProtocolVersion::kUsb20);
+        EXPECT_EQ(phy_modes[0].dr_mode(), fuchsia_hardware_usb_phy::Mode::kHost);
+        EXPECT_EQ(phy_modes[0].is_otg_capable(), false);
+        EXPECT_EQ(phy_modes[1].protocol(), fuchsia_hardware_usb_phy::ProtocolVersion::kUsb20);
+        EXPECT_EQ(phy_modes[1].dr_mode(), fuchsia_hardware_usb_phy::Mode::kPeripheral);
+        EXPECT_EQ(phy_modes[1].is_otg_capable(), true);
+        EXPECT_EQ(phy_modes[2].protocol(), fuchsia_hardware_usb_phy::ProtocolVersion::kUsb30);
+        EXPECT_EQ(phy_modes[2].dr_mode(), fuchsia_hardware_usb_phy::Mode::kHost);
+        EXPECT_EQ(phy_modes[2].is_otg_capable(), false);
+      }
     }
   }
 
