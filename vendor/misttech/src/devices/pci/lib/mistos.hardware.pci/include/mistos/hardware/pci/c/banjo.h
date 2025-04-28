@@ -162,12 +162,12 @@ typedef struct pci_protocol_ops pci_protocol_ops_t;
 // Declarations
 struct pci_io_bar {
   uint64_t address;
-  zx_handle_t resource;
+  uintptr_t resource;
 };
 
 union pci_bar_result {
   pci_io_bar_t io;
-  zx_handle_t vmo;
+  uintptr_t vmo;
 };
 
 // Returned by |GetInterruptModes|. Contains the number of interrupts supported
@@ -216,7 +216,7 @@ struct pci_protocol_ops {
   zx_status_t (*set_bus_mastering)(void* ctx, bool enabled);
   zx_status_t (*reset_device)(void* ctx);
   zx_status_t (*ack_interrupt)(void* ctx);
-  zx_status_t (*map_interrupt)(void* ctx, uint32_t which_irq, zx_handle_t* out_interrupt);
+  zx_status_t (*map_interrupt)(void* ctx, uint32_t which_irq, uintptr_t* out_interrupt);
   void (*get_interrupt_modes)(void* ctx, pci_interrupt_modes_t* out_modes);
   zx_status_t (*set_interrupt_mode)(void* ctx, pci_interrupt_mode_t mode,
                                     uint32_t requested_irq_count);
@@ -233,7 +233,7 @@ struct pci_protocol_ops {
                                                uint16_t* out_offset);
   zx_status_t (*get_next_extended_capability)(void* ctx, pci_extended_capability_id_t id,
                                               uint16_t start_offset, uint16_t* out_offset);
-  zx_status_t (*get_bti)(void* ctx, uint32_t index, zx_handle_t* out_bti);
+  zx_status_t (*get_bti)(void* ctx, uint32_t index, uintptr_t* out_bti);
 };
 
 struct pci_protocol {
@@ -316,7 +316,7 @@ static inline zx_status_t pci_ack_interrupt(const pci_protocol_t* proto) {
 // |ZX_ERR_BAD_STATE|: interrupts are currently disabled for the device.
 // |ZX_ERR_INVALID_ARGS|: |which_irq| is invalid for the mode.
 static inline zx_status_t pci_map_interrupt(const pci_protocol_t* proto, uint32_t which_irq,
-                                            zx_handle_t* out_interrupt) {
+                                            uintptr_t* out_interrupt) {
   return proto->ops->map_interrupt(proto->ctx, which_irq, out_interrupt);
 }
 
@@ -509,7 +509,7 @@ static inline zx_status_t pci_get_next_extended_capability(const pci_protocol_t*
 // Errors:
 // |ZX_ERR_OUT_OF_RANGE|: |index| was not 0.
 static inline zx_status_t pci_get_bti(const pci_protocol_t* proto, uint32_t index,
-                                      zx_handle_t* out_bti) {
+                                      uintptr_t* out_bti) {
   return proto->ops->get_bti(proto->ctx, index, out_bti);
 }
 

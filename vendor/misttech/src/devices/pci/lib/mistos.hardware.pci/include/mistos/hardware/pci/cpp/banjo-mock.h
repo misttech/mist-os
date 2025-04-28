@@ -8,7 +8,7 @@
 #ifndef SRC_DEVICES_PCI_LIB_FUCHSIA_HARDWARE_PCI_INCLUDE_FUCHSIA_HARDWARE_PCI_CPP_BANJO_MOCK_H_
 #define SRC_DEVICES_PCI_LIB_FUCHSIA_HARDWARE_PCI_INCLUDE_FUCHSIA_HARDWARE_PCI_CPP_BANJO_MOCK_H_
 
-#include <fuchsia/hardware/pci/cpp/banjo.h>
+#include <mistos/hardware/pci/cpp/banjo.h>
 #include <lib/mock-function/mock-function.h>
 
 #include <tuple>

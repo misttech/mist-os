@@ -1,0 +1,32 @@
+# Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
+# Copyright 2021 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+config("include") {
+  include_dirs = [ "include" ]
+}
+
+source_set("mistos.hardware.pci_banjo_c") {
+  sources = [ "include/mistos/hardware/pci/c/banjo.h" ]
+  public_configs = [ ":include" ]
+  public_deps = [ "//vendor/misttech/src/lib/ddk" ]
+}
+
+source_set("mistos.hardware.pci_banjo_cpp") {
+  sources = [
+    "include/mistos/hardware/pci/cpp/banjo-internal.h",
+    "include/mistos/hardware/pci/cpp/banjo.h",
+  ]
+  public_configs = [ ":include" ]
+  public_deps = [
+    ":mistos.hardware.pci_banjo_c",
+    "//vendor/misttech/src/lib/ddktl",
+  ]
+}
+
+source_set("mistos.hardware.pci_banjo_cpp_mock") {
+  sources = [ "include/mistos/hardware/pci/cpp/banjo-mock.h" ]
+  public_configs = [ ":include" ]
+  public_deps = [ ":mistos.hardware.pci_banjo_cpp" ]
+}

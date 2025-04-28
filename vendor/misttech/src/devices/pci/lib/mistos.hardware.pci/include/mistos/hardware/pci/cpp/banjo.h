@@ -8,16 +8,17 @@
 #ifndef SRC_DEVICES_PCI_LIB_FUCHSIA_HARDWARE_PCI_INCLUDE_FUCHSIA_HARDWARE_PCI_CPP_BANJO_H_
 #define SRC_DEVICES_PCI_LIB_FUCHSIA_HARDWARE_PCI_INCLUDE_FUCHSIA_HARDWARE_PCI_CPP_BANJO_H_
 
-#include <fuchsia/hardware/pci/c/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/zx/bti.h>
-#include <lib/zx/interrupt.h>
+#include <mistos/hardware/pci/c/banjo.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
 #include <ddktl/device-internal.h>
+#include <fbl/ref_ptr.h>
+#include <object/bus_transaction_initiator_dispatcher.h>
+#include <object/virtual_interrupt_dispatcher.h>
 
 #include "banjo-internal.h"
 
@@ -200,10 +201,8 @@ class PciProtocol : public Base {
   // already mapped to a valid handle.
   // |ZX_ERR_BAD_STATE|: interrupts are currently disabled for the device.
   // |ZX_ERR_INVALID_ARGS|: |which_irq| is invalid for the mode.
-  static zx_status_t PciMapInterrupt(void* ctx, uint32_t which_irq, zx_handle_t* out_interrupt) {
-    zx::interrupt out_interrupt2;
-    auto ret = static_cast<D*>(ctx)->PciMapInterrupt(which_irq, &out_interrupt2);
-    *out_interrupt = out_interrupt2.release();
+  static zx_status_t PciMapInterrupt(void* ctx, uint32_t which_irq, uintptr_t* out_handle) {
+    auto ret = static_cast<D*>(ctx)->PciMapInterrupt(which_irq, out_handle);
     return ret;
   }
   // Returns the supported interrupt modes for a device.
@@ -380,10 +379,8 @@ class PciProtocol : public Base {
   //
   // Errors:
   // |ZX_ERR_OUT_OF_RANGE|: |index| was not 0.
-  static zx_status_t PciGetBti(void* ctx, uint32_t index, zx_handle_t* out_bti) {
-    zx::bti out_bti2;
-    auto ret = static_cast<D*>(ctx)->PciGetBti(index, &out_bti2);
-    *out_bti = out_bti2.release();
+  static zx_status_t PciGetBti(void* ctx, uint32_t index, uintptr_t* out_bti) {
+    auto ret = static_cast<D*>(ctx)->PciGetBti(index, out_bti);
     return ret;
   }
 };
@@ -518,8 +515,8 @@ class PciProtocolClient {
   // already mapped to a valid handle.
   // |ZX_ERR_BAD_STATE|: interrupts are currently disabled for the device.
   // |ZX_ERR_INVALID_ARGS|: |which_irq| is invalid for the mode.
-  zx_status_t MapInterrupt(uint32_t which_irq, zx::interrupt* out_interrupt) const {
-    return ops_->map_interrupt(ctx_, which_irq, out_interrupt->reset_and_get_address());
+  zx_status_t MapInterrupt(uint32_t which_irq, uintptr_t* out_interrupt) const {
+    return ops_->map_interrupt(ctx_, which_irq, out_interrupt);
   }
 
   // Returns the supported interrupt modes for a device.
@@ -696,8 +693,8 @@ class PciProtocolClient {
   //
   // Errors:
   // |ZX_ERR_OUT_OF_RANGE|: |index| was not 0.
-  zx_status_t GetBti(uint32_t index, zx::bti* out_bti) const {
-    return ops_->get_bti(ctx_, index, out_bti->reset_and_get_address());
+  zx_status_t GetBti(uint32_t index, uintptr_t* out_bti) const {
+    return ops_->get_bti(ctx_, index, out_bti);
   }
 
  private:

@@ -33,7 +33,7 @@ DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_pci_protocol_ack_interru
 
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(
     has_pci_protocol_map_interrupt, PciMapInterrupt,
-    zx_status_t (C::*)(uint32_t which_irq, zx::interrupt* out_interrupt));
+    zx_status_t (C::*)(uint32_t which_irq, uintptr_t* out_handle));
 
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_pci_protocol_get_interrupt_modes,
                                                     PciGetInterruptModes,
@@ -89,7 +89,7 @@ DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(
 
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_pci_protocol_get_bti, PciGetBti,
                                                     zx_status_t (C::*)(uint32_t index,
-                                                                       zx::bti* out_bti));
+                                                                       uintptr_t* out_bti));
 
 template <typename D>
 constexpr void CheckPciProtocolSubclass() {
@@ -115,7 +115,7 @@ constexpr void CheckPciProtocolSubclass() {
 
   static_assert(internal::has_pci_protocol_map_interrupt<D>::value,
                 "PciProtocol subclasses must implement "
-                "zx_status_t PciMapInterrupt(uint32_t which_irq, zx::interrupt* out_interrupt);");
+                "zx_status_t PciMapInterrupt(uint32_t which_irq, uintptr_t* out_handle);");
 
   static_assert(internal::has_pci_protocol_get_interrupt_modes<D>::value,
                 "PciProtocol subclasses must implement "
@@ -171,7 +171,7 @@ constexpr void CheckPciProtocolSubclass() {
 
   static_assert(internal::has_pci_protocol_get_bti<D>::value,
                 "PciProtocol subclasses must implement "
-                "zx_status_t PciGetBti(uint32_t index, zx::bti* out_bti);");
+                "zx_status_t PciGetBti(uint32_t index, uintptr_t* out_bti);");
 }
 
 }  // namespace internal
