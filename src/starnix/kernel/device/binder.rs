@@ -31,8 +31,8 @@ use fidl::endpoints::ClientEnd;
 use fuchsia_inspect_contrib::profile_duration;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{
-    log_error, log_trace, log_warn, trace_duration, trace_instant_flow_begin,
-    trace_instant_flow_end, track_stub, with_zx_name, CATEGORY_STARNIX,
+    log_error, log_trace, log_warn, trace_duration, trace_instaflow_begin, trace_instaflow_end,
+    track_stub, with_zx_name, CATEGORY_STARNIX,
 };
 use starnix_sync::{
     ordered_lock_vec, DeviceOpen, FileOpsCore, InterruptibleEvent, LockBefore, Locked, Mutex,
@@ -2356,7 +2356,7 @@ impl CommandTraceGuard {
     fn begin(kind: &'static CStr) -> Self {
         if starnix_logging::regular_trace_category_enabled(TRACE_CATEGORY) {
             let id = fuchsia_trace::Id::random();
-            trace_instant_flow_begin!(TRACE_CATEGORY, kind, c"BinderFlow", id);
+            trace_instaflow_begin!(TRACE_CATEGORY, kind, c"BinderFlow", id);
             Self(Some(CommandTraceGuardInner { id, kind }))
         } else {
             Self(None)
@@ -2367,7 +2367,7 @@ impl CommandTraceGuard {
 impl Drop for CommandTraceGuard {
     fn drop(&mut self) {
         if let Some(CommandTraceGuardInner { id, kind }) = self.0.take() {
-            trace_instant_flow_end!(TRACE_CATEGORY, kind, c"BinderFlow", id);
+            trace_instaflow_end!(TRACE_CATEGORY, kind, c"BinderFlow", id);
         }
     }
 }
