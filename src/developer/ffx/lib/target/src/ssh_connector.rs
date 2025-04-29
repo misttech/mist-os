@@ -13,6 +13,7 @@ use ffx_config::{EnvironmentContext, TryFromEnvContext};
 use ffx_ssh::ssh::{build_ssh_command_with_env, SshError};
 use fuchsia_async::Task;
 use futures::future::LocalBoxFuture;
+use netext::ScopedSocketAddr;
 use nix::sys::signal::kill;
 use nix::sys::signal::Signal::SIGKILL;
 use nix::sys::wait::waitpid;
@@ -51,19 +52,20 @@ enum FDomainConnectionError {
 #[derive(Debug)]
 pub struct SshConnector {
     pub(crate) overnet_cmd: Option<Child>,
-    target: SocketAddr,
+    target: ScopedSocketAddr,
     env_context: EnvironmentContext,
 }
 
 impl SshConnector {
-    pub async fn new(target: SocketAddr, env_context: &EnvironmentContext) -> Result<Self> {
+    pub fn new(target: ScopedSocketAddr, env_context: &EnvironmentContext) -> Result<Self> {
         Ok(Self { overnet_cmd: None, target, env_context: env_context.clone() })
     }
 }
 
 impl SshConnector {
     async fn connect_overnet(&mut self) -> Result<OvernetConnection, TargetConnectionError> {
-        self.overnet_cmd = Some(start_overnet_ssh_command(self.target, &self.env_context).await?);
+        self.overnet_cmd =
+            Some(start_overnet_ssh_command(self.target.clone(), &self.env_context).await?);
         let cmd = self.overnet_cmd.as_mut().unwrap();
         let mut stdout = BufReader::with_capacity(
             BUFFER_SIZE,
@@ -112,7 +114,7 @@ impl SshConnector {
 
     async fn connect_fdomain(&mut self) -> Result<FDomainConnection, FDomainConnectionError> {
         self.overnet_cmd = Some(
-            start_fdomain_ssh_command(self.target, &self.env_context)
+            start_fdomain_ssh_command(self.target.clone(), &self.env_context)
                 .await
                 .map_err(|x| FDomainConnectionError::ConnectionError(x.into()))?,
         );
@@ -181,14 +183,15 @@ impl TryFromEnvContext for SshConnector {
                     resolution,
                 )
             })?;
-            tracing::debug!("connecting to address {res}");
-            SshConnector::new(res, env).await.bug().map_err(Into::into)
+            let target = ScopedSocketAddr::from_socket_addr(res)
+                .user_message(format!("Failed to verify IP '{res}'"))?;
+            SshConnector::new(target, env).bug().map_err(Into::into)
         })
     }
 }
 
 async fn start_fdomain_ssh_command(
-    target: SocketAddr,
+    target: ScopedSocketAddr,
     env_context: &EnvironmentContext,
 ) -> Result<Child> {
     let args = vec!["fdomain_runner"];
@@ -203,7 +206,7 @@ async fn start_fdomain_ssh_command(
 }
 
 async fn start_overnet_ssh_command(
-    target: SocketAddr,
+    target: ScopedSocketAddr,
     env_context: &EnvironmentContext,
 ) -> Result<Child> {
     let rev: u64 =
@@ -290,7 +293,7 @@ impl TargetConnector for SshConnector {
     }
 
     fn device_address(&self) -> Option<SocketAddr> {
-        Some(self.target.clone())
+        Some(*self.target.addr())
     }
 }
 

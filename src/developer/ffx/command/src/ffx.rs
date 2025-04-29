@@ -297,7 +297,7 @@ enum StrictCheckErrorEnum {
     MustHaveTarget,
     #[error("ffx strict requires that the Target be specified by address or have the prefix \"serial:\". Actually passed: \"{}\"", .0)]
     TargetMustBeAddressOrSerial(String),
-    #[error("ffx strict requires that the Target be a valid IP address. Invalid ID: \"{}\"", .0)]
+    #[error("ffx strict requires that the Target be a valid IP address. Invalid scope ID: \"{}\"", .0)]
     TargetAddressMustHaveValidScopeId(String),
     #[error("When running in strict mode, config flags must be list of Key Value Pairs or valid JSON. Passed: \"{}\"", .0)]
     ConfigArgMustBeJsonOrKeyValuePair(String),

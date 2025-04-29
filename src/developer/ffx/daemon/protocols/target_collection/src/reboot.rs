@@ -380,7 +380,8 @@ async fn build_ssh_command_local(
         TargetRebootState::Recovery => vec!["dm", "reboot-recovery"],
         TargetRebootState::Product => vec!["dm", "reboot"],
     };
-    Ok(build_ssh_command(addr.into(), device_command).await?)
+    Ok(build_ssh_command(netext::ScopedSocketAddr::from_socket_addr(addr.into())?, device_command)
+        .await?)
 }
 
 // END BLOCK

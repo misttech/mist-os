@@ -467,9 +467,10 @@ pub async fn knock_target_daemonless(
         let conn = match res.connection {
             Some(c) => c,
             None => {
-                let conn = connection::Connection::new(
-                    ssh_connector::SshConnector::new(res.addr()?, context).await?,
-                )
+                let conn = connection::Connection::new(ssh_connector::SshConnector::new(
+                    netext::ScopedSocketAddr::from_socket_addr(res.addr()?)?,
+                    context,
+                )?)
                 .await
                 .map_err(|e| KnockError::CriticalError(e.into()))?;
                 tracing::debug!("daemonless knock connection established");

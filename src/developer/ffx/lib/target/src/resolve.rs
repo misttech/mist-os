@@ -16,7 +16,7 @@ use fuchsia_async::TimeoutExt;
 use futures::future::{join_all, LocalBoxFuture};
 use futures::{pin_mut, select, FutureExt, StreamExt};
 use itertools::Itertools;
-use netext::IsLocalAddr;
+use netext::{IsLocalAddr, ScopedSocketAddr};
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -218,7 +218,7 @@ struct RetrievedTargetInfo {
     rcs_state: ffx::RemoteControlState,
     product_config: Option<String>,
     board_config: Option<String>,
-    ssh_address: Option<SocketAddr>,
+    ssh_address: Option<ScopedSocketAddr>,
 }
 
 impl Default for RetrievedTargetInfo {
@@ -233,10 +233,10 @@ impl Default for RetrievedTargetInfo {
 }
 
 async fn try_get_target_info(
-    addr: SocketAddr,
+    addr: &ScopedSocketAddr,
     context: &EnvironmentContext,
 ) -> Result<(Option<String>, Option<String>), crate::KnockError> {
-    let connector = SshConnector::new(addr, context).await.context("making ssh connector")?;
+    let connector = SshConnector::new(addr.clone(), context).context("making ssh connector")?;
     let conn = Connection::new(connector).await.context("making direct connection")?;
     let rcs = conn.rcs_proxy().await.context("getting RCS proxy")?;
     let (pc, bc) = match rcs.identify_host().await {
@@ -256,10 +256,10 @@ impl RetrievedTargetInfo {
                 continue;
             };
             // Ensure there's a port
-            let addr = replace_default_port(addr);
+            let addr = ScopedSocketAddr::from_socket_addr(replace_default_port(addr))?;
             tracing::debug!("Trying to make a connection to {addr:?}");
 
-            match try_get_target_info(addr, context)
+            match try_get_target_info(&addr, context)
                 .on_timeout(ssh_timeout, || {
                     Err(crate::KnockError::NonCriticalError(anyhow::anyhow!(
                         "knock_rcs() timed out"
@@ -339,7 +339,7 @@ async fn get_handle_info(
         product_config,
         serial_number,
         fastboot_interface,
-        ssh_address: ssh_address.map(|a| TargetIpAddr::from(a).into()),
+        ssh_address: ssh_address.map(|a| TargetIpAddr::from(*a).into()),
         ..Default::default()
     })
 }
@@ -751,7 +751,10 @@ impl Resolution {
 
     pub async fn get_connection(&mut self, context: &EnvironmentContext) -> Result<&Connection> {
         if self.connection.is_none() {
-            let connector = SshConnector::new(self.addr()?, context).await?;
+            let connector = SshConnector::new(
+                netext::ScopedSocketAddr::from_socket_addr(self.addr()?)?,
+                context,
+            )?;
             let conn = Connection::new(connector)
                 .await
                 .map_err(|e| crate::KnockError::CriticalError(e.into()))?;

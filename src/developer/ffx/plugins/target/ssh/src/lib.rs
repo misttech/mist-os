@@ -101,7 +101,7 @@ fn get_addr(addr_info: &TargetIpAddrInfo) -> fho::Result<TargetIpAddr> {
 }
 
 async fn make_ssh_command(cmd: SshCommand, addr: TargetIpAddr) -> Result<Command> {
-    let addr = addr.into();
+    let addr = netext::ScopedSocketAddr::from_socket_addr(addr.into())?;
     let ssh_cmd = if let Some(config_file) = cmd.sshconfig {
         build_ssh_command_with_config_file(
             &PathBuf::from(config_file),
@@ -190,7 +190,7 @@ mod test {
                 &keys[1].to_string_lossy(),
                 "-p",
                 "22",
-                "fe80::1%1",
+                "fe80::1%lo",
                 "echo",
                 "'foo'",
             ]

@@ -124,9 +124,15 @@ impl HostPipeChildBuilder for HostPipeChildDefaultBuilder {
         let ctx = ffx_config::global_env_context().expect("Global env context uninitialized");
         let args = vec!["echo", "$SSH_CONNECTION"];
         let mut ssh = tokio::process::Command::from(
-            build_ssh_command_with_env(&self.ssh_path, addr, &ctx, args)
-                .await
-                .map_err(|e| PipeError::Error(e.to_string()))?,
+            build_ssh_command_with_env(
+                &self.ssh_path,
+                netext::ScopedSocketAddr::from_socket_addr(addr)
+                    .map_err(PipeError::AddressError)?,
+                &ctx,
+                args,
+            )
+            .await
+            .map_err(|e| PipeError::Error(e.to_string()))?,
         );
 
         let ssh_cmd = ssh.stdout(Stdio::piped()).stdin(Stdio::null()).stderr(Stdio::null());
@@ -305,9 +311,15 @@ impl HostPipeChild {
         }
 
         let mut ssh = tokio::process::Command::from(
-            build_ssh_command_with_env(ssh_path, addr, &ctx, args)
-                .await
-                .map_err(|e| PipeError::Error(e.to_string()))?,
+            build_ssh_command_with_env(
+                ssh_path,
+                netext::ScopedSocketAddr::from_socket_addr(addr)
+                    .map_err(PipeError::AddressError)?,
+                &ctx,
+                args,
+            )
+            .await
+            .map_err(|e| PipeError::Error(e.to_string()))?,
         );
 
         tracing::debug!("Spawning new ssh instance: {:?}", ssh);
@@ -1081,7 +1093,14 @@ mod test {
 
         let addr = SocketAddr::new(Ipv4Addr::new(192, 0, 2, 0).into(), 2345);
         let cmd = tokio::process::Command::from(
-            build_ssh_command_with_env("path-to-ssh", addr, &env.context, vec![]).await.unwrap(),
+            build_ssh_command_with_env(
+                "path-to-ssh",
+                netext::ScopedSocketAddr::from_socket_addr(addr).unwrap(),
+                &env.context,
+                vec![],
+            )
+            .await
+            .unwrap(),
         );
         // Kind of a hack, but there's no non-debug method that returns a string corresponding to the command.
         assert!(format!("{cmd:?}").contains("ServerAliveCountMax=30"));

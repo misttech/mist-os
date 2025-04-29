@@ -51,7 +51,7 @@ async fn new_device_connection(
 ) -> Result<Connection> {
     let resolution = ffx_target::resolve_target_address(target_spec, ctx).await?;
     let addr = resolution.addr()?;
-    let connector = SshConnector::new(addr, ctx).await?;
+    let connector = SshConnector::new(netext::ScopedSocketAddr::from_socket_addr(addr)?, ctx)?;
     Ok(Connection::new(connector).await?)
 }
 

@@ -11,7 +11,9 @@ use nix::sys::socket::{SockaddrLike, SockaddrStorage};
 use regex::Regex;
 use std::cell::RefCell;
 use std::ffi::CString;
+use std::fmt::{Display, Formatter};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::ops::{Deref, DerefMut};
 use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -258,6 +260,101 @@ impl IsLocalAddr for Ipv6Addr {
     }
 }
 
+/// Represents a SocketAddr with an optional string for the ScopeID.
+///
+/// The reason for the existence of this is that strings for scope ID's are generally more stable
+/// than using scope ID's as integers, but `std::net::SocketAddr` is limited to representing them
+/// as integers. This can be a problem because if a CDC ethernet device, for example, is unplugged
+/// and then plugged back in, the scope ID as a string will remain the same for most setups, while
+/// the scope ID as an integer will be incremented by one.
+///
+/// This can result in unstable connection recovery, as things that may deactivate a CDC Ethernet
+/// connection (rebooting, adb, etc), will cause the scope ID to increment without changing the
+/// string scope ID.
+#[derive(Debug, Hash, Clone, Eq, PartialEq)]
+pub struct ScopedSocketAddr {
+    addr: SocketAddr,
+    scope_id: Option<String>,
+}
+
+impl ScopedSocketAddr {
+    /// Attempts to construct a scoped socket addr by taking a socketaddr and
+    /// converting its numeric scope ID into a string by looking it up.
+    pub fn from_socket_addr(addr: SocketAddr) -> Result<Self> {
+        match &addr {
+            SocketAddr::V6(a) => {
+                // This should also apply to link-scope multicast, but this is only really being
+                // used for `ssh`, so does not apply here.
+                if addr.ip().is_link_local_addr() && a.scope_id() > 0 {
+                    return Ok(Self {
+                        addr,
+                        scope_id: Some(scope_id_to_name_checked(a.scope_id())?),
+                    });
+                } else {
+                    Ok(Self { addr, scope_id: None })
+                }
+            }
+            _ => Ok(Self { addr, scope_id: None }),
+        }
+    }
+
+    pub fn addr(&self) -> &SocketAddr {
+        &self.addr
+    }
+
+    pub fn set_scope_id(&mut self, scope_id: u32) -> Result<()> {
+        match &self.addr {
+            SocketAddr::V6(mut inner) => {
+                let scope_id_str = scope_id_to_name_checked(scope_id)?;
+                inner.set_scope_id(scope_id);
+                self.scope_id.replace(scope_id_str);
+            }
+            _ => (),
+        }
+        Ok(())
+    }
+
+    pub fn scope_id(&self) -> Option<&str> {
+        self.scope_id.as_ref().map(|s| s.as_str())
+    }
+
+    pub fn scope_id_integer(&self) -> u32 {
+        match &self.addr {
+            SocketAddr::V6(inner) => inner.scope_id(),
+            _ => 0,
+        }
+    }
+}
+
+impl Display for ScopedSocketAddr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if self.addr.is_ipv6() && self.addr.ip().is_link_local_addr() {
+            write!(f, "[{}", self.addr.ip())?;
+            if let Some(scope) = &self.scope_id {
+                write!(f, "%{}", scope)?;
+            }
+            write!(f, "]:{}", self.addr.port())?;
+            Ok(())
+        } else {
+            write!(f, "{}", self.addr)
+        }
+    }
+}
+
+impl Deref for ScopedSocketAddr {
+    type Target = SocketAddr;
+
+    fn deref(&self) -> &Self::Target {
+        &self.addr
+    }
+}
+
+impl DerefMut for ScopedSocketAddr {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.addr
+    }
+}
+
 /// An Mcast interface is:
 /// -- Not a loopback.
 /// -- Up (as opposed to down).
@@ -342,7 +439,7 @@ pub fn scope_id_to_name(scope_id: u32) -> String {
     scope_id_to_name_checked(scope_id).unwrap_or_else(|_| scope_id.to_string())
 }
 
-fn scope_id_to_name_checked(scope_id: u32) -> Result<String> {
+pub fn scope_id_to_name_checked(scope_id: u32) -> Result<String> {
     let mut buf = vec![0; libc::IF_NAMESIZE];
     let res = unsafe { libc::if_indextoname(scope_id, buf.as_mut_ptr() as *mut libc::c_char) };
     if res.is_null() {
@@ -834,5 +931,54 @@ mod tests {
     #[test]
     fn test_parse_address_parts_too_many_percents() {
         assert!(parse_address_parts("64:ff9b::192.0.2.33%fo%ober").is_err());
+    }
+
+    #[test]
+    fn test_scoped_socket_addr_formatting() {
+        let addr: SocketAddr = "[fe80::12%1]:8022".parse().unwrap();
+        let saddr = ScopedSocketAddr::from_socket_addr(addr).unwrap();
+        let expect = "[fe80::12%lo]:8022".to_owned();
+        assert_eq!(expect, saddr.to_string());
+        assert_eq!(Some("lo"), saddr.scope_id());
+        assert_eq!(1, saddr.scope_id_integer());
+        let addr: SocketAddr = "[fe80::12%1]:0".parse().unwrap();
+        let saddr = ScopedSocketAddr::from_socket_addr(addr).unwrap();
+        let expect = "[fe80::12%lo]:0".to_owned();
+        assert_eq!(expect, saddr.to_string());
+        assert_eq!(Some("lo"), saddr.scope_id());
+        assert_eq!(1, saddr.scope_id_integer());
+        let addr: SocketAddr = "192.168.4.2:22".parse().unwrap();
+        let saddr = ScopedSocketAddr::from_socket_addr(addr).unwrap();
+        let expect = "192.168.4.2:22".to_owned();
+        assert_eq!(expect, saddr.to_string());
+        assert_eq!(saddr.scope_id(), None);
+        assert_eq!(0, saddr.scope_id_integer());
+    }
+
+    #[test]
+    fn test_setting_scope_id_scoped_socketaddr() {
+        // The error cases are not covered here, as in infra there doesn't appear to be a
+        // consistent programmatic way to find a scope ID that does not exist. So far the only
+        // approach attempted has been to find the maximum scope ID, then attempt to set the scope
+        // ID to that plus one, which is a bit flakey.
+        let addr: SocketAddr = "[fe80::12%1]:8022".parse().unwrap();
+        let mut saddr = ScopedSocketAddr::from_socket_addr(addr).unwrap();
+        saddr.set_scope_id(1).unwrap();
+        assert_eq!(Some("lo"), saddr.scope_id());
+        assert_eq!(1, saddr.scope_id_integer());
+        // Testing Deref trait.
+        assert_eq!(8022, saddr.port());
+        saddr.set_port(22);
+        assert_eq!(22, saddr.port());
+        let addr: SocketAddr = "[fe80::12%1]:0".parse().unwrap();
+        let mut saddr = ScopedSocketAddr::from_socket_addr(addr).unwrap();
+        saddr.set_scope_id(1).unwrap();
+        assert_eq!(Some("lo"), saddr.scope_id());
+        assert_eq!(1, saddr.scope_id_integer());
+        let addr: SocketAddr = "192.168.4.2:22".parse().unwrap();
+        let mut saddr = ScopedSocketAddr::from_socket_addr(addr).unwrap();
+        saddr.set_scope_id(2).unwrap();
+        assert_eq!(saddr.scope_id(), None);
+        assert_eq!(saddr.scope_id_integer(), 0);
     }
 }
