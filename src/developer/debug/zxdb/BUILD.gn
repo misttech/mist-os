@@ -41,6 +41,11 @@ if (is_host) {
     deps = [ ":zxdb" ]
   }
 
+  install_host_tools("zxdb_host_tool") {
+    deps = [ ":zxdb" ]
+    outputs = [ "zxdb" ]
+  }
+
   test("zxdb_tests") {
     deps = [
       "//src/developer/debug/ipc:tests",
