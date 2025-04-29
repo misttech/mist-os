@@ -83,6 +83,22 @@ fit::result<int> WriteTaskAttr(std::string_view attr_name, std::string_view cont
   return WriteExistingFile(attr_path, context);
 }
 
+ScopedTaskAttrResetter ScopedTaskAttrResetter::SetTaskAttr(std::string_view attr_name,
+                                                           std::string_view context) {
+  return ScopedTaskAttrResetter(attr_name, context);
+}
+
+ScopedTaskAttrResetter::ScopedTaskAttrResetter(std::string_view attr_name,
+                                               std::string_view context) {
+  EXPECT_EQ(WriteTaskAttr(attr_name, context), fit::ok());
+  attr_name_ = std::string(attr_name);
+  context_ = std::string(context);
+}
+
+ScopedTaskAttrResetter::~ScopedTaskAttrResetter() {
+  EXPECT_EQ(WriteTaskAttr(attr_name_, "\n"), fit::ok());
+}
+
 fit::result<int, std::string> GetLabel(int fd) {
   char buf[256];
   ssize_t result = fgetxattr(fd, "security.selinux", buf, sizeof(buf));

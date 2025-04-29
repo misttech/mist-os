@@ -132,4 +132,40 @@ TEST(SocketTest, SockFileLabelIsCorrect) {
   EXPECT_EQ(GetLabel(kSockPath), "test_u:object_r:sock_file_test_t:s0");
 }
 
+TEST(SocketTest, ListenAllowed) {
+  const int kBacklog = 5;
+  LoadPolicy("socket_policy.pp");
+  ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_listen_test_t:s0"), fit::ok());
+  auto sockcreate =
+      ScopedTaskAttrResetter::SetTaskAttr("sockcreate", "test_u:test_r:socket_listen_yes_t:s0");
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  fbl::unique_fd sockfd;
+  ASSERT_THAT((sockfd = fbl::unique_fd(socket(AF_INET, SOCK_STREAM, 0))), SyscallSucceeds());
+  sockaddr_in addr;
+  std::memset(&addr, 0, sizeof(addr));
+  addr.sin_family = AF_INET;
+  addr.sin_addr.s_addr = INADDR_ANY;
+  ASSERT_THAT(bind(sockfd.get(), (struct sockaddr*)&addr, sizeof(addr)), SyscallSucceeds());
+  EXPECT_THAT(listen(sockfd.get(), kBacklog), SyscallSucceeds());
+}
+
+TEST(SocketTest, ListenDenied) {
+  const int kBacklog = 5;
+  LoadPolicy("socket_policy.pp");
+  ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_listen_test_t:s0"), fit::ok());
+  auto sockcreate =
+      ScopedTaskAttrResetter::SetTaskAttr("sockcreate", "test_u:test_r:socket_listen_no_t:s0");
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  fbl::unique_fd sockfd;
+  ASSERT_THAT((sockfd = fbl::unique_fd(socket(AF_INET, SOCK_STREAM, 0))), SyscallSucceeds());
+  sockaddr_in addr;
+  std::memset(&addr, 0, sizeof(addr));
+  addr.sin_family = AF_INET;
+  addr.sin_addr.s_addr = INADDR_ANY;
+  ASSERT_THAT(bind(sockfd.get(), (struct sockaddr*)&addr, sizeof(addr)), SyscallSucceeds());
+  EXPECT_THAT(listen(sockfd.get(), kBacklog), SyscallFailsWithErrno(EACCES));
+}
+
 }  // namespace
