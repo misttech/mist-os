@@ -736,7 +736,7 @@ void Session::DispatchNotifyProcessStarting(const debug_ipc::NotifyProcessStarti
                         : Process::StartType::kLaunch;
 
   found_target->CreateProcess(start_type, notify.koid, notify.name, notify.timestamp,
-                              notify.components);
+                              notify.components, notify.shared_address_space);
 
   auto matched_filter = system().GetFilterForId(notify.filter_id);
 

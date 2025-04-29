@@ -15,6 +15,7 @@
 #include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/shared/message_loop.h"
 #include "src/developer/debug/zxdb/client/memory_dump.h"
+#include "src/developer/debug/zxdb/client/process.h"
 #include "src/developer/debug/zxdb/client/process_symbol_data_provider.h"
 #include "src/developer/debug/zxdb/client/remote_api.h"
 #include "src/developer/debug/zxdb/client/session.h"
@@ -32,12 +33,14 @@ namespace zxdb {
 
 ProcessImpl::ProcessImpl(TargetImpl* target, uint64_t koid, const std::string& name,
                          Process::StartType start_type,
-                         const std::vector<debug_ipc::ComponentInfo>& component_info)
+                         const std::vector<debug_ipc::ComponentInfo>& component_info,
+                         std::optional<debug_ipc::AddressRegion> shared_aspace)
     : Process(target->session(), start_type),
       target_(target),
       koid_(koid),
       name_(name),
       component_info_(std::move(component_info)),
+      shared_aspace_(std::move(shared_aspace)),
       symbols_(this, target->symbols()),
       weak_factory_(this) {}
 
@@ -53,7 +56,8 @@ ProcessImpl::~ProcessImpl() {
 std::unique_ptr<ProcessImpl> ProcessImpl::FromPreviousProcess(
     TargetImpl* target, const debug_ipc::ProcessRecord& record) {
   auto process = std::make_unique<ProcessImpl>(target, record.process_koid, record.process_name,
-                                               StartType::kAttach, record.components);
+                                               StartType::kAttach, record.components,
+                                               record.shared_address_space);
 
   process->UpdateThreads(record.threads);
 
@@ -283,6 +287,10 @@ void ProcessImpl::LoadInfoHandleTable(
           callback(err);
         }
       });
+}
+
+std::optional<debug_ipc::AddressRegion> ProcessImpl::GetSharedAddressSpace() const {
+  return shared_aspace_;
 }
 
 void ProcessImpl::OnThreadStarting(const debug_ipc::ThreadRecord& record) {

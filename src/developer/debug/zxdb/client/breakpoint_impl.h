@@ -110,8 +110,8 @@ class BreakpointImpl : public Breakpoint,
 
   // Helper for detecting when we're about to install a breakpoint in the starnix_kernel module.
   // This is fairly hacky, but should be good enough for most cases.
-  bool IsResolvedLocationInStarnixKernel(Process* process,
-                                         const std::vector<Location>& locations) const;
+  bool IsResolvedLocationInSharedAddressSpace(Process* process,
+                                              const std::vector<Location>& locations) const;
 
   bool is_internal_;
 

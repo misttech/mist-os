@@ -25,7 +25,7 @@ Software breakpoints in starnix kernel are currently not supported. This breakpo
 Hardware breakpoints can be specified on the command line:
 	break --type execute sys_exit_group
 See `help break` for details and follow https://fxbug.dev/396421111 for updates on enabling software breakpoints in starnix_kernel.
-Created Breakpoint 2 type=execute @ sys_exit_group
+Created Breakpoint 2 scope="pr 1" type=execute @ sys_exit_group
 
 [zxdb] c
 🛑 on bp 2
@@ -43,7 +43,7 @@ sys_exit_group
 main() • starnix_proc.cc
 
 [zxdb] bp rm
-Removed Breakpoint 2 type=execute @ sys_exit_group
+Removed Breakpoint 2 scope="pr 1" type=execute @ sys_exit_group
 
 [zxdb] c
 Process 1 exited with code 0.

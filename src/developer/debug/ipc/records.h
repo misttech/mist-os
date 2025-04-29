@@ -284,6 +284,27 @@ struct ThreadRecord {
   }
 };
 
+struct AddressRegion {
+  std::string name;
+  uint64_t base = 0;
+  uint64_t size = 0;
+  uint64_t depth = 0;
+  uint64_t vmo_koid = 0;  // Fuchsia only.
+  uint64_t vmo_offset = 0;
+  uint64_t committed_bytes = 0;
+
+  // MMU flags.
+  bool read = false;
+  bool write = false;
+  bool execute = false;
+  bool shared = false;  // Linux only.
+
+  void Serialize(Serializer& ser, uint32_t ver) {
+    ser | name | base | size | depth | vmo_koid | vmo_offset | committed_bytes | read | write |
+        execute | shared;
+  }
+};
+
 struct ProcessRecord {
   uint64_t process_koid = 0;
   std::string process_name;
@@ -295,8 +316,16 @@ struct ProcessRecord {
 
   std::vector<ThreadRecord> threads;
 
+  // The shared address space if this is either a prototype process (it was created with
+  // zx_process_create(ZX_PROCESS_SHARED)) or if this is a shared process (it was created with
+  // zx_process_create_shared()). Empty if there is no shared address space.
+  std::optional<AddressRegion> shared_address_space = std::nullopt;
+
   void Serialize(Serializer& ser, uint32_t ver) {
     ser | process_koid | process_name | threads | components;
+    if (ver > 69) {
+      ser | shared_address_space;
+    }
   }
 };
 
@@ -417,27 +446,6 @@ struct Module {
   std::string build_id;
 
   void Serialize(Serializer& ser, uint32_t ver) { ser | name | base | debug_address | build_id; }
-};
-
-struct AddressRegion {
-  std::string name;
-  uint64_t base = 0;
-  uint64_t size = 0;
-  uint64_t depth = 0;
-  uint64_t vmo_koid = 0;  // Fuchsia only.
-  uint64_t vmo_offset = 0;
-  uint64_t committed_bytes = 0;
-
-  // MMU flags.
-  bool read = false;
-  bool write = false;
-  bool execute = false;
-  bool shared = false;  // Linux only.
-
-  void Serialize(Serializer& ser, uint32_t ver) {
-    ser | name | base | size | depth | vmo_koid | vmo_offset | committed_bytes | read | write |
-        execute | shared;
-  }
 };
 
 struct AttachConfig {

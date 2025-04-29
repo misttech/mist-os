@@ -24,6 +24,10 @@ namespace debug_agent {
 
 namespace {
 
+// From USER_ASPACE_BASE in zircon/kernel/arch/<target_arch>/include/arch/kernel_aspace.h
+// Currently this is the same for all target architectures, so we don't need any special casing.
+constexpr uintptr_t kUserAspaceBase = 0x0000000000200000UL;
+
 void FillVmoInfo(const zx_info_vmo_t& source, debug_ipc::InfoHandleVmo& dest) {
   static_assert(sizeof(dest.name) == sizeof(source.name));
   memcpy(dest.name, source.name, sizeof(source.name));
@@ -175,6 +179,26 @@ std::vector<debug_ipc::AddressRegion> ZirconProcessHandle::GetAddressSpace(uint6
   }
 
   return regions;
+}
+
+std::optional<debug_ipc::AddressRegion> ZirconProcessHandle::GetSharedAddressSpace() const {
+  size_t num_address_spaces = 0;
+  auto maps = GetMaps();
+
+  for (const auto& map : maps) {
+    if (map.type == ZX_INFO_MAPS_TYPE_ASPACE) {
+      // Having two TYPE_ASPACE map types in one process means this is a process that has a private
+      // aspace and a shared aspace, i.e. this is a restricted mode process. An address space with a
+      // base address higher than kUserAspaceBase means that this process was created with
+      // PROCESS_CREATE_SHARED, and is the prototype process for creating restricted mode processes
+      // sharing this singular, private address space.
+      if (++num_address_spaces > 1 || map.base > kUserAspaceBase) {
+        return MapToAddressRegion(map);
+      }
+    }
+  }
+
+  return std::nullopt;
 }
 
 std::vector<debug_ipc::Module> ZirconProcessHandle::GetModules() const {

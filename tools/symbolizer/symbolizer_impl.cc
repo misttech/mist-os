@@ -671,7 +671,7 @@ void SymbolizerImpl::InitProcess() {
   // to, which makes those notifications inappropriate to use here. Since we provide all of the
   // module information ourselves we need to manually set up the client objects to operate on.
   zxdb::TargetImpl* target_impl = session_.system().CreateNewTargetImpl(nullptr);
-  target_impl->CreateProcess(zxdb::Process::StartType::kAttach, 0, "", 0, {});
+  target_impl->CreateProcess(zxdb::Process::StartType::kAttach, 0, "", 0, {}, std::nullopt);
   target_ = static_cast<zxdb::Target*>(target_impl);
 
   // This will match against process koid 0 we gave to the CreateProcess call above. We don't need

@@ -212,8 +212,20 @@ void BreakpointImpl::DidLoadModuleSymbols(Process* process, LoadedModuleSymbols*
 
     needs_sync |= procs_[process].AddLocations(this, process, resolved_locations);
 
-    if (IsResolvedLocationInStarnixKernel(process, resolved_locations)) {
+    if (settings_.type == debug_ipc::BreakpointType::kSoftware &&
+        IsResolvedLocationInSharedAddressSpace(process, resolved_locations)) {
+      // Software breakpoints will cause issues in processes that access the shared address space
+      // when the debugger is not attached (causing restricted mode processes to crash
+      // starnix_kernel due to an unhandled breakpoint instruction for example). Hardware
+      // breakpoints don't have this problem because it's not a fatal error for these to go
+      // unhandled. The tradeoff is that there are a limited number of hardware breakpoints for a
+      // given target architecture, so we have to be careful about installing too many. Because of
+      // that we restrict the scope of this breakpoint to just this process, otherwise we could blow
+      // the hardware breakpoint limits with a single breakpoint.
+      //
+      // TODO(https://fxbug.dev/413338075): Handle installing many HW breakpoints better.
       settings_.type = debug_ipc::BreakpointType::kHardware;
+      settings_.scope = ExecutionScope(process->GetTarget());
       for (auto& observer : session()->breakpoint_observers())
         observer.OnBreakpointImplicitUpdate(this, BreakpointObserver::What::kType);
     }
@@ -407,10 +419,20 @@ bool BreakpointImpl::RegisterProcess(Process* process) {
 
   changed |= record.AddLocations(this, process, resolved_locations);
 
-  if (IsResolvedLocationInStarnixKernel(process, resolved_locations)) {
-    // Explicitly set the type without going through SetSettings to avoid extra unnecessary
-    // syncing since the backend shouldn't even know about this breakpoint yet.
+  if (settings_.type == debug_ipc::BreakpointType::kSoftware &&
+      IsResolvedLocationInSharedAddressSpace(process, resolved_locations)) {
+    // Software breakpoints will cause issues in processes that access the shared address space
+    // when the debugger is not attached (causing restricted mode processes to crash starnix_kernel
+    // due to an unhandled breakpoint instruction for example). Hardware breakpoints don't have this
+    // problem because it's not a fatal error for these to go unhandled. The tradeoff is that there
+    // are a limited number of hardware breakpoints for a given target architecture, so we have to
+    // be careful about installing too many. Because of that we restrict the scope of this
+    // breakpoint to just this process, otherwise we could blow the hardware breakpoint limits with
+    // a single breakpoint.
+    //
+    // TODO(https://fxbug.dev/413338075): Handle installing many HW breakpoints better.
     settings_.type = debug_ipc::BreakpointType::kHardware;
+    settings_.scope = ExecutionScope(process->GetTarget());
     for (auto& observer : session()->breakpoint_observers())
       observer.OnBreakpointImplicitUpdate(this, BreakpointObserver::What::kType);
   }
@@ -443,8 +465,29 @@ ResolveOptions BreakpointImpl::GetResolveOptions() const {
   return options;
 }
 
-bool BreakpointImpl::IsResolvedLocationInStarnixKernel(
+bool BreakpointImpl::IsResolvedLocationInSharedAddressSpace(
     Process* process, const std::vector<Location>& locations) const {
+  std::optional<debug_ipc::AddressRegion> maybe_shared_aspace;
+
+  if (maybe_shared_aspace = process->GetSharedAddressSpace(); !maybe_shared_aspace) {
+    return false;
+  }
+
+  const debug_ipc::AddressRegion* shared_aspace = &*maybe_shared_aspace;
+
+  auto addr_is_in_region = fit::function<bool(uint64_t, const debug_ipc::AddressRegion*)>(
+      [](uint64_t addr, const debug_ipc::AddressRegion* region) -> bool {
+        FX_DCHECK(region);
+        uint64_t end = 0;
+
+        // Care for overflow.
+        if (__builtin_add_overflow(region->base, region->size, &end)) {
+          return false;
+        }
+
+        return region->base <= addr && addr < end;
+      });
+
   const std::vector<ModuleSymbolStatus>& module_status = process->GetSymbols()->GetStatus();
   for (const auto& location : locations) {
     if (location.has_symbols()) {
@@ -458,13 +501,7 @@ bool BreakpointImpl::IsResolvedLocationInStarnixKernel(
                                   return loaded_module->load_address() == status.base;
                                 });
 
-      // The starnix_kernel's module name is only "starnix_kernel.cm" in its own process. In other
-      // restricted mode processes that share the same address space, it's called "useralloc".
-      // There's nothing stopping other processes from loading modules into self-allocated storage,
-      // which would also appear with this name, but that's not very prevalant in practice so false
-      // positives here are not expected.
-      if (found != module_status.end() && settings_.type == debug_ipc::BreakpointType::kSoftware &&
-          (found->name == "starnix_kernel.cm" || found->name == "useralloc")) {
+      if (found != module_status.end() && addr_is_in_region(found->base, shared_aspace)) {
         // TODO(https://fxbug.dev/396421111): Make software breakpoints work for starnix_kernel.
         return true;
       }

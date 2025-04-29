@@ -12,6 +12,7 @@
 
 #include "src/developer/debug/debug_agent/mock_thread_handle.h"
 #include "src/developer/debug/debug_agent/process_handle.h"
+#include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/shared/mock_memory.h"
 
 namespace debug_agent {
@@ -58,6 +59,7 @@ class MockProcessHandle final : public ProcessHandle {
   void Detach() override;
   uint64_t GetLoaderBreakpointAddress() override;
   std::vector<debug_ipc::AddressRegion> GetAddressSpace(uint64_t address) const override;
+  std::optional<debug_ipc::AddressRegion> GetSharedAddressSpace() const override;
   std::vector<debug_ipc::Module> GetModules() const override;
   fit::result<debug::Status, std::vector<debug_ipc::InfoHandle>> GetHandles() const override;
   debug::Status ReadMemory(uintptr_t address, void* buffer, size_t len,

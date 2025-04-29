@@ -27,7 +27,8 @@ class ProcessImpl : public Process, public ProcessSymbols::Notifications {
  public:
   ProcessImpl(TargetImpl* target, uint64_t koid, const std::string& name,
               Process::StartType start_type,
-              const std::vector<debug_ipc::ComponentInfo>& component_info);
+              const std::vector<debug_ipc::ComponentInfo>& component_info,
+              std::optional<debug_ipc::AddressRegion> shared_aspace);
   ~ProcessImpl() override;
 
   static std::unique_ptr<ProcessImpl> FromPreviousProcess(TargetImpl* target,
@@ -68,6 +69,7 @@ class ProcessImpl : public Process, public ProcessSymbols::Notifications {
                    fit::callback<void(const Err&)> callback) override;
   void LoadInfoHandleTable(
       fit::callback<void(ErrOr<std::vector<debug_ipc::InfoHandle>> handles)> callback) override;
+  std::optional<debug_ipc::AddressRegion> GetSharedAddressSpace() const override;
 
   // Notifications from the agent that a thread has started or exited.
   void OnThreadStarting(const debug_ipc::ThreadRecord& record);
@@ -127,6 +129,7 @@ class ProcessImpl : public Process, public ProcessSymbols::Notifications {
   const uint64_t koid_;
   std::string name_;
   std::vector<debug_ipc::ComponentInfo> component_info_;
+  std::optional<debug_ipc::AddressRegion> shared_aspace_ = std::nullopt;
 
   // Threads indexed by their thread koid.
   std::map<uint64_t, std::unique_ptr<ThreadImpl>> threads_;

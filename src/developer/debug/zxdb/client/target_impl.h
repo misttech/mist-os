@@ -5,6 +5,7 @@
 #ifndef SRC_DEVELOPER_DEBUG_ZXDB_CLIENT_TARGET_IMPL_H_
 #define SRC_DEVELOPER_DEBUG_ZXDB_CLIENT_TARGET_IMPL_H_
 
+#include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/zxdb/client/process.h"
 #include "src/developer/debug/zxdb/client/process_observer.h"
 #include "src/developer/debug/zxdb/client/target.h"
@@ -34,7 +35,8 @@ class TargetImpl : public Target {
   // Create a process in the target. The process should have been attached in debug_agent.
   void CreateProcess(Process::StartType start_type, uint64_t koid, const std::string& process_name,
                      uint64_t timestamp,
-                     const std::vector<debug_ipc::ComponentInfo>& component_info);
+                     const std::vector<debug_ipc::ComponentInfo>& component_info,
+                     std::optional<debug_ipc::AddressRegion> shared_aspace);
 
   // Tests can use this to create a target for mocking purposes without making any IPC. To destroy
   // call ImplicitlyDetach().
@@ -68,10 +70,12 @@ class TargetImpl : public Target {
   static void OnLaunchOrAttachReplyThunk(
       fxl::WeakPtr<TargetImpl> target, CallbackWithTimestamp callback, const Err& err,
       uint64_t koid, const debug::Status& status, const std::string& process_name,
-      uint64_t timestamp, const std::vector<debug_ipc::ComponentInfo>& component_info);
+      uint64_t timestamp, const std::vector<debug_ipc::ComponentInfo>& component_info,
+      std::optional<debug_ipc::AddressRegion> shared_aspace);
   void OnLaunchOrAttachReply(CallbackWithTimestamp callback, const Err& err, uint64_t koid,
                              const std::string& process_name, uint64_t timestamp,
-                             const std::vector<debug_ipc::ComponentInfo>& component_info);
+                             const std::vector<debug_ipc::ComponentInfo>& component_info,
+                             std::optional<debug_ipc::AddressRegion> shared_aspace);
 
   void OnKillOrDetachReply(ProcessObserver::DestroyReason reason, const Err& err,
                            const debug::Status& status, Callback callback, uint64_t timestamp);
