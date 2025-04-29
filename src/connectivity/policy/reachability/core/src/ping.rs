@@ -6,7 +6,7 @@ use anyhow::{anyhow, Context as _};
 use async_trait::async_trait;
 use fuchsia_async::{self as fasync, TimeoutExt as _};
 use futures::{FutureExt as _, SinkExt as _, TryFutureExt as _, TryStreamExt as _};
-use log::info;
+use log::{info, warn};
 use net_types::ip::{Ipv4, Ipv6};
 use std::net::SocketAddr;
 
@@ -75,7 +75,20 @@ impl Ping for Pinger {
         match r {
             Ok(()) => true,
             Err(e) => {
-                info!("error while pinging {}: {:?}", addr, e);
+                // Check to see if the error is due to the host/network being
+                // unreachable. In that case, this error is likely unconcerning
+                // and signifies a network may not have connectivity across
+                // one of the IP protocols, which can be common for home
+                // network configurations.
+                if let Some(io_error) = e.root_cause().downcast_ref::<std::io::Error>() {
+                    if io_error.raw_os_error() == Some(libc::ENETUNREACH)
+                        || io_error.raw_os_error() == Some(libc::EHOSTUNREACH)
+                    {
+                        info!("error while pinging {}: {:?}", addr, e);
+                        return false;
+                    }
+                }
+                warn!("error while pinging {}: {:?}", addr, e);
                 false
             }
         }
