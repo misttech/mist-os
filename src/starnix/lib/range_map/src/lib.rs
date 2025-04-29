@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use arrayvec::ArrayVec;
-use std::borrow::Borrow;
 use std::cmp::{Eq, PartialEq};
 use std::fmt;
 use std::fmt::{Debug, Formatter};
@@ -1661,7 +1660,7 @@ where
     }
 
     /// Iterate through the keys and values stored in the given range in the map.
-    fn range(&self, bounds: impl RangeBounds<K>) -> Iter<'_, K, V> {
+    pub fn range(&self, bounds: impl RangeBounds<K>) -> Iter<'_, K, V> {
         let forward = self.find_start_bound(&bounds);
         let backward = self.find_end_bound(&bounds);
         Iter { forward, backward, root: &self.node }
@@ -1675,15 +1674,6 @@ where
     /// Iterate over the ranges in the map, starting at the last range starting before or at the given point.
     pub fn iter_ending_at(&self, key: K) -> impl DoubleEndedIterator<Item = (&Range<K>, &V)> {
         self.range(..key)
-    }
-
-    /// Iterate over the ranges in the map that intersect the given range.
-    pub fn intersection(
-        &self,
-        range: impl Borrow<Range<K>>,
-    ) -> impl DoubleEndedIterator<Item = (&Range<K>, &V)> {
-        let range = range.borrow();
-        self.range(range.start..range.end)
     }
 }
 
@@ -1853,22 +1843,22 @@ mod test {
 
         map.insert(2..7, -10);
 
-        let mut iter = map.intersection(3..4);
+        let mut iter = map.range(3..4);
         assert_eq!(iter.next(), Some((&(2..7), &-10)));
         assert_eq!(iter.next(), None);
 
-        let mut iter = map.intersection(2..3);
+        let mut iter = map.range(2..3);
         assert_eq!(iter.next(), Some((&(2..7), &-10)));
         assert_eq!(iter.next(), None);
 
-        let mut iter = map.intersection(1..4);
+        let mut iter = map.range(1..4);
         assert_eq!(iter.next(), Some((&(2..7), &-10)));
         assert_eq!(iter.next(), None);
 
-        let mut iter = map.intersection(1..2);
+        let mut iter = map.range(1..2);
         assert_eq!(iter.next(), None);
 
-        let mut iter = map.intersection(6..7);
+        let mut iter = map.range(6..7);
         assert_eq!(iter.next(), Some((&(2..7), &-10)));
         assert_eq!(iter.next(), None);
     }
@@ -1881,12 +1871,12 @@ mod test {
         map.insert(7..9, -20);
         map.insert(10..11, -30);
 
-        let mut iter = map.intersection(3..8);
+        let mut iter = map.range(3..8);
         assert_eq!(iter.next(), Some((&(2..7), &-10)));
         assert_eq!(iter.next(), Some((&(7..9), &-20)));
         assert_eq!(iter.next(), None);
 
-        let mut iter = map.intersection(3..11);
+        let mut iter = map.range(3..11);
         assert_eq!(iter.next(), Some((&(2..7), &-10)));
         assert_eq!(iter.next(), Some((&(7..9), &-20)));
         assert_eq!(iter.next(), Some((&(10..11), &-30)));
@@ -1901,7 +1891,7 @@ mod test {
         map.insert(1..2, -20);
         map.insert(2..3, -30);
 
-        let mut iter = map.intersection(0..3);
+        let mut iter = map.range(0..3);
         assert_eq!(iter.next(), Some((&(0..1), &-10)));
         assert_eq!(iter.next(), Some((&(1..2), &-20)));
         assert_eq!(iter.next(), Some((&(2..3), &-30)));
@@ -2124,7 +2114,7 @@ mod test {
         // Verify intersection()
         let intersect_start = 4000;
         let intersect_end = 4050;
-        let mut iter = map.intersection(intersect_start..intersect_end);
+        let mut iter = map.range(intersect_start..intersect_end);
         while let Some((range, _)) = iter.next() {
             assert!((range.start < intersect_end && range.end > intersect_start));
         }

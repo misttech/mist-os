@@ -307,7 +307,7 @@ impl FileOps for Ashmem {
                         return Ok(ASHMEM_IS_UNPINNED.into());
                     }
                     ASHMEM_GET_PIN_STATUS => {
-                        let mut intervals = state.unpinned.intersection(lo..hi);
+                        let mut intervals = state.unpinned.range(lo..hi);
                         return match intervals.next() {
                             Some(_) => Ok(ASHMEM_IS_UNPINNED.into()),
                             None => Ok(ASHMEM_IS_PINNED.into()),

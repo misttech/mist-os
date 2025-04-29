@@ -53,12 +53,11 @@ use starnix_uapi::{
     MADV_UNMERGEABLE, MADV_WILLNEED, MADV_WIPEONFORK, MREMAP_DONTUNMAP, MREMAP_FIXED,
     MREMAP_MAYMOVE, PROT_EXEC, PROT_GROWSDOWN, PROT_READ, PROT_WRITE, SI_KERNEL, UIO_MAXIOV,
 };
-use std::borrow::Borrow;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
-use std::ops::{Deref, DerefMut, Range};
+use std::ops::{Deref, DerefMut, Range, RangeBounds};
 use std::sync::{Arc, LazyLock, Weak};
 use syncio::zxio::zxio_default_maybe_faultable_copy;
 use usercopy::slice_to_maybe_uninit_mut;
@@ -479,7 +478,7 @@ impl MemoryManagerState {
             ..(subrange
                 .end
                 .saturating_add(*PAGE_SIZE as usize * GUARD_PAGE_COUNT_FOR_GROWSDOWN_MAPPINGS));
-        self.mappings.intersection(query_range).filter_map(|(range, mapping)| {
+        self.mappings.range(query_range).filter_map(|(range, mapping)| {
             let occupied_range = mapping.inflate_to_include_guard_pages(range);
             if occupied_range.start < subrange.end && subrange.start < occupied_range.end {
                 Some(occupied_range)
@@ -903,7 +902,7 @@ impl MemoryManagerState {
             return Ok(Some(old_addr));
         }
 
-        if self.mappings.intersection(old_range.end..new_range_in_place.end).next().is_some() {
+        if self.mappings.range(old_range.end..new_range_in_place.end).next().is_some() {
             // There is some mapping in the growth range prevening an in-place growth.
             return Ok(None);
         }
@@ -1176,7 +1175,7 @@ impl MemoryManagerState {
     // an existing mapping with the `MappingOptions::DONT_SPLIT` flag set.
     fn check_has_unauthorized_splits(&self, addr: UserAddress, length: usize) -> bool {
         let query_range = addr..addr.saturating_add(length);
-        let mut intersection = self.mappings.intersection(query_range.clone());
+        let mut intersection = self.mappings.range(query_range.clone());
 
         // A mapping is not OK if it disallows splitting and the target range
         // does not fully cover the mapping range.
@@ -1436,7 +1435,7 @@ impl MemoryManagerState {
 
         // Update the flags on each mapping in the range.
         let mut updates = vec![];
-        for (range, mapping) in self.mappings.intersection(prot_range.clone()) {
+        for (range, mapping) in self.mappings.range(prot_range.clone()) {
             let range = range.intersect(&prot_range);
             let mut mapping = mapping.clone();
             mapping.set_flags(mapping.flags().with_access_flags(prot_flags));
@@ -1474,7 +1473,7 @@ impl MemoryManagerState {
 
         let mut updates = vec![];
         let range_for_op = addr..end_addr;
-        for (range, mapping) in self.mappings.intersection(&range_for_op) {
+        for (range, mapping) in self.mappings.range(range_for_op.clone()) {
             let range_to_zero = range.intersect(&range_for_op);
             if range_to_zero.is_empty() {
                 continue;
@@ -1656,7 +1655,7 @@ impl MemoryManagerState {
         let mut bytes_mapped_in_range = 0;
         let mut num_new_locked_bytes = 0;
         let mut failed_to_lock = false;
-        for (range, mapping) in self.mappings.intersection(start_addr..end_addr) {
+        for (range, mapping) in self.mappings.range(start_addr..end_addr) {
             let mut range = range.clone();
             let mut mapping = mapping.clone();
 
@@ -1780,7 +1779,7 @@ impl MemoryManagerState {
 
         let mut updates = vec![];
         let mut bytes_mapped_in_range = 0;
-        for (range, mapping) in self.mappings.intersection(start_addr..end_addr) {
+        for (range, mapping) in self.mappings.range(start_addr..end_addr) {
             let mut range = range.clone();
             let mut mapping = mapping.clone();
 
@@ -1823,12 +1822,9 @@ impl MemoryManagerState {
         )
     }
 
-    pub fn num_locked_bytes<R>(&self, range: R) -> u64
-    where
-        R: Borrow<Range<UserAddress>>,
-    {
+    pub fn num_locked_bytes(&self, range: impl RangeBounds<UserAddress>) -> u64 {
         self.mappings
-            .intersection(range)
+            .range(range)
             .filter(|(_, mapping)| mapping.flags().contains(MappingFlags::LOCKED))
             .map(|(range, _)| (range.end - range.start) as u64)
             .sum()
@@ -1905,7 +1901,7 @@ impl MemoryManagerState {
         }
 
         // Iterate over all contiguous mappings intersecting the requested range.
-        let mut mappings = self.mappings.intersection(addr..end_addr);
+        let mut mappings = self.mappings.range(addr..end_addr);
         let mut prev_range_end = None;
         let mut offset = 0;
         let result = std::iter::from_fn(move || {
@@ -3265,7 +3261,7 @@ impl MemoryManager {
                 let delta = new_end - old_end;
 
                 // Check for mappings over the program break region.
-                if state.mappings.intersection(&range).next().is_some() {
+                if state.mappings.range(range).next().is_some() {
                     return Ok(brk.current);
                 }
 
@@ -3359,7 +3355,7 @@ impl MemoryManager {
         let mut updates = vec![];
 
         let mut state = self.state.write();
-        for (range, mapping) in state.mappings.intersection(range_for_op.clone()) {
+        for (range, mapping) in state.mappings.range(range_for_op.clone()) {
             if !mapping.private_anonymous() {
                 track_stub!(TODO("https://fxbug.dev/391599171"), "uffd for shmem and hugetlbfs");
                 return error!(EINVAL);
@@ -3394,7 +3390,7 @@ impl MemoryManager {
         let mut updates = vec![];
 
         let mut state = self.state.write();
-        for (range, mapping) in state.mappings.intersection(range_for_op.clone()) {
+        for (range, mapping) in state.mappings.range(range_for_op.clone()) {
             if !mapping.private_anonymous() {
                 track_stub!(TODO("https://fxbug.dev/391599171"), "uffd for shmem and hugetlbfs");
                 return error!(EINVAL);
@@ -3891,7 +3887,7 @@ impl MemoryManager {
 
         let mappings_in_range = state
             .mappings
-            .intersection(addr..end)
+            .range(addr..end)
             .map(|(r, m)| (r.clone(), m.clone()))
             .collect::<Vec<_>>();
 
@@ -3998,7 +3994,7 @@ impl MemoryManager {
         let end_addr = addr.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
         let state = self.state.read();
         let mut last_end = addr;
-        for (range, _) in state.mappings.intersection(addr..end_addr) {
+        for (range, _) in state.mappings.range(addr..end_addr) {
             if range.start > last_end {
                 // This mapping does not start immediately after the last.
                 return error!(ENOMEM);
