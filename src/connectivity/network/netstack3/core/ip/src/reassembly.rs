@@ -303,9 +303,6 @@ pub enum FragmentProcessingState<I: IpExt, B: SplitByteSlice> {
     ///     choose the same behaviour for IPv4 for the same reasons.
     ///  3) Packet's fragment offset + # of fragment blocks >
     ///     `MAX_FRAGMENT_BLOCKS`.
-    // TODO(ghanan): Investigate whether disallowing overlapping fragments for
-    //               IPv4 cause issues interoperating with hosts that produce
-    //               overlapping fragments.
     InvalidFragment,
 
     /// Successfully processed the provided fragment. We are still waiting on
@@ -414,34 +411,77 @@ impl Default for FragmentCacheData {
 }
 
 impl FragmentCacheData {
-    /// Attempts to find a gap where `fragment_blocks_range` will fit in.
-    ///
-    /// Returns `Some(o)` if a valid gap is found where `o` is the gap's offset
-    /// range; otherwise, returns `None`. `fragment_blocks_range` is an
-    /// inclusive range of fragment block offsets.
-    fn find_gap(&self, BlockRange { start, end }: BlockRange) -> Option<BlockRange> {
-        use core::ops::Bound::{Included, Unbounded};
+    /// Attempts to find a gap where the provided `BlockRange` will fit in.
+    fn find_gap(&self, BlockRange { start, end }: BlockRange) -> FindGapResult {
+        let result = self.missing_blocks.iter().find_map(|gap| {
+            // This gap completely contains the provided range.
+            if gap.start <= start && gap.end >= end {
+                return Some(FindGapResult::Found { gap: *gap });
+            }
 
-        // Find a gap that starts earlier or at the same point as a fragment.
-        let possible_free_place =
-            self.missing_blocks.range((Unbounded, Included(BlockRange { start, end: u16::MAX })));
+            // This gap is completely disjoint from the provided range.
+            // Ignore it.
+            if gap.start > end || gap.end < start {
+                return None;
+            }
 
-        // Make sure that `fragment` belongs purely within
-        // `potential_gap`.
-        //
-        // If `fragment` does not fit purely within
-        // `potential_gap`, then at least one block in
-        // `fragment` overlaps with an already received block.
-        // We should never receive overlapping fragments from non-malicious
-        // nodes.
-        possible_free_place
-            .last()
-            .filter(|&range| {
-                // range.start <= start must be always true here - so comparing only ending part
-                return end <= range.end;
-            })
-            .copied()
+            // If neither of the above are true, this gap must overlap with
+            // the provided range.
+            return Some(FindGapResult::Overlap);
+        });
+
+        match result {
+            Some(result) => result,
+            None => {
+                // Searching the missing blocks didn't find a suitable gap nor
+                // an overlap. Check for an out-of-bounds range before
+                // concluding that this range must be a duplicate.
+
+                // Note: `last` *must* exist and *must* represent the final
+                // fragment. If we had not yet received the final fragment, the
+                // search through the `missing_blocks` would be guaranteed to
+                // return `Some` (because it would contain a range with an end
+                // equal to u16::Max).
+                let last = self.body_fragments.peek().unwrap();
+                if last.offset < start {
+                    FindGapResult::OutOfBounds
+                } else {
+                    FindGapResult::Duplicate
+                }
+            }
+        }
     }
+}
+
+/// The result of calling [`FragmentCacheData::find_gap`].
+enum FindGapResult {
+    // The provided `BlockRange` fits inside of an existing gap. The gap may be
+    // completely or partially filled by the provided `BlockRange`.
+    Found {
+        gap: BlockRange,
+    },
+    // The provided `BlockRange` overlaps with data we've already received.
+    // Specifically, an overlap occurs if the provided `BlockRange` is partially
+    // contained within a gap.
+    Overlap,
+    /// The provided `BlockRange` has an end beyond the known end of the packet.
+    OutOfBounds,
+    // The provided `BlockRange` has already been received. Specifically, a
+    // duplicate occurs if the provided `BlockRange` is completely disjoint from
+    // all known gaps.
+    //
+    // RFC 8200, Section 4.5 states:
+    //   It should be noted that fragments may be duplicated in the
+    //   network.  Instead of treating these exact duplicate fragments
+    //   as overlapping fragments, an implementation may choose to
+    //   detect this case and drop exact duplicate fragments while
+    //   keeping the other fragments belonging to the same packet.
+    //
+    // Here we take a loose interpretation of "exact" and choose not to verify
+    // that the *data* contained within the fragment matches the previously
+    // received data. This is in the spirit of reducing the work performed by
+    // the assembler, and is in line with the behavior of other platforms.
+    Duplicate,
 }
 
 /// A cache of inbound IP packet fragments.
@@ -555,10 +595,7 @@ impl<I: IpExt, BT: FragmentBindingsTypes> IpPacketFragmentCache<I, BT> {
 
         // Find the gap where `packet` belongs.
         let found_gap = match fragment_data.find_gap(fragment_blocks_range) {
-            // We did not find a potential gap `packet` fits in so some of the
-            // fragment blocks in `packet` overlaps with fragment blocks we
-            // already received.
-            None => {
+            FindGapResult::Overlap | FindGapResult::OutOfBounds => {
                 // Drop all reassembly data as per RFC 8200 section 4.5 (IPv6).
                 // See RFC 5722 for more information.
                 //
@@ -570,20 +607,6 @@ impl<I: IpExt, BT: FragmentBindingsTypes> IpPacketFragmentCache<I, BT> {
                 // practice, non-malicious nodes should not intentionally send
                 // data for the same fragment block multiple times, so we will
                 // do the same thing as IPv6 in this case.
-                //
-                // TODO(ghanan): Check to see if the fragment block's data is
-                //               identical to already received data before
-                //               dropping the reassembly data as packets may be
-                //               duplicated in the network. Duplicate packets
-                //               which are also fragmented are probably rare, so
-                //               we should first determine if it is even
-                //               worthwhile to do this check first. Note, we can
-                //               choose to simply not do this check as RFC 8200
-                //               section 4.5 mentions an implementation *may
-                //               choose* to do this check. It does not say we
-                //               MUST, so we would not be violating the RFC if
-                //               we don't check for this case and just drop the
-                //               packet.
                 assert_matches!(self.remove_data(&key), Some(_));
 
                 return (
@@ -592,7 +615,21 @@ impl<I: IpExt, BT: FragmentBindingsTypes> IpPacketFragmentCache<I, BT> {
                         .then_some(CacheTimerAction::CancelExistingTimer(key)),
                 );
             }
-            Some(f) => f,
+            FindGapResult::Duplicate => {
+                // Ignore duplicate fragments as per RFC 8200 section 4.5
+                // (IPv6):
+                //   It should be noted that fragments may be duplicated in the
+                //   network.  Instead of treating these exact duplicate fragments
+                //   as overlapping fragments, an implementation may choose to
+                //   detect this case and drop exact duplicate fragments while
+                //   keeping the other fragments belonging to the same packet.
+                //
+                // Ipv4 (RFC 791) does not specify what to do for duplicate
+                // fragments. As such we choose to do the same as IPv6 in this
+                // case.
+                return (FragmentProcessingState::NeedMoreFragments, None);
+            }
+            FindGapResult::Found { gap } => gap,
         };
 
         let timer_id = timer_not_yet_scheduled.then_some(CacheTimerAction::CreateNewTimer(key));
@@ -1461,8 +1498,6 @@ mod tests {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let id = 5;
 
-        // Test that we error on overlapping/duplicate fragments.
-
         // Process fragment #0
         process_ip_fragment(
             &mut core_ctx,
@@ -1492,7 +1527,7 @@ mod tests {
     #[test_case(1)]
     #[test_case(10)]
     #[test_case(100)]
-    fn test_ip_overlapping_single_fragment<I: TestIpExt>(size: u16) {
+    fn test_ip_duplicate_fragment<I: TestIpExt + netstack3_base::IpExt>(size: u16) {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let id = 5;
 
@@ -1504,11 +1539,74 @@ mod tests {
             ExpectedResult::NeedMore,
         );
 
-        // Process fragment #0 (overlaps original fragment #0 completely)
+        // Process the exact same fragment over again. It should be ignored.
         process_ip_fragment(
             &mut core_ctx,
             &mut bindings_ctx,
             FragmentSpec { id, offset: 0, size, m_flag: true },
+            ExpectedResult::NeedMore,
+        );
+
+        // Verify that the fragment's cache is intact by sending the remaining
+        // fragment.
+        process_ip_fragment(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            FragmentSpec { id, offset: size, size, m_flag: false },
+            ExpectedResult::Ready { body_fragment_blocks: 2 * size },
+        );
+
+        try_reassemble_ip_packet(&mut core_ctx, &mut bindings_ctx, id, 2 * size);
+    }
+
+    #[ip_test(I)]
+    #[test_case(1)]
+    #[test_case(10)]
+    #[test_case(100)]
+    fn test_ip_out_of_bounds_fragment<I: TestIpExt>(size: u16) {
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let id = 5;
+
+        // Process fragment #1
+        process_ip_fragment(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            FragmentSpec { id, offset: size, size, m_flag: false },
+            ExpectedResult::NeedMore,
+        );
+
+        // Process a fragment after fragment #1. It should be deemed invalid
+        // because fragment #1 was the end.
+        process_ip_fragment(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            FragmentSpec { id, offset: 2 * size, size, m_flag: false },
+            ExpectedResult::Invalid,
+        );
+    }
+
+    #[ip_test(I)]
+    #[test_case(50, 100; "overlaps_front")]
+    #[test_case(150, 100; "overlaps_back")]
+    #[test_case(50, 200; "overlaps_both")]
+    fn test_ip_overlapping_fragment<I: TestIpExt>(offset: u16, size: u16) {
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let id = 5;
+
+        // Process fragment #0
+        process_ip_fragment(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            FragmentSpec { id, offset: 100, size: 100, m_flag: true },
+            ExpectedResult::NeedMore,
+        );
+
+        // Process a fragment that overlaps with fragment 0. It should be deemed
+        // invalid.
+        process_ip_fragment(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            FragmentSpec { id, offset, size, m_flag: true },
             ExpectedResult::Invalid,
         );
     }
@@ -1888,8 +1986,6 @@ mod tests {
     #[ip_test(I)]
     fn test_cancel_timer_on_overlap<I: TestIpExt>() {
         const FRAGMENT_ID: u16 = 1;
-        const SPEC: FragmentSpec =
-            FragmentSpec { id: FRAGMENT_ID, offset: 0, size: 1, m_flag: true };
 
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
@@ -1899,14 +1995,24 @@ mod tests {
         // Do this a couple times to make sure that new packets matching the
         // invalid packet's fragment cache key create a new entry.
         for _ in 0..=2 {
-            process_ip_fragment(&mut core_ctx, &mut bindings_ctx, SPEC, ExpectedResult::NeedMore);
+            process_ip_fragment(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                FragmentSpec { id: FRAGMENT_ID, offset: 0, size: 10, m_flag: true },
+                ExpectedResult::NeedMore,
+            );
             core_ctx
                 .state
                 .cache
                 .timers
                 .assert_timers_after(&mut bindings_ctx, [(key, (), I::REASSEMBLY_TIMEOUT)]);
 
-            process_ip_fragment(&mut core_ctx, &mut bindings_ctx, SPEC, ExpectedResult::Invalid);
+            process_ip_fragment(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                FragmentSpec { id: FRAGMENT_ID, offset: 5, size: 10, m_flag: true },
+                ExpectedResult::Invalid,
+            );
             assert_eq!(bindings_ctx.timers.timers(), [],);
         }
     }
