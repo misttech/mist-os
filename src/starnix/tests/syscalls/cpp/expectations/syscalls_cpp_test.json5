@@ -36,6 +36,23 @@
                 // TODO(https://fxbug.dev/411617451)
                 "MMapProcTest.MProtectAppliedPartially",
 
+                // TODO(https://fxbug.dev/297438799)
+                "MMapAllProtectionsTest/MMapAllProtectionsTest.PrivateFileMappingAllowAllProtections/____and_rwx",
+                "MMapAllProtectionsTest/MMapAllProtectionsTest.PrivateFileMappingAllowAllProtections/r___and_rwx",
+                "MMapAllProtectionsTest/MMapAllProtectionsTest.PrivateFileMappingAllowAllProtections/r___and_rw_",
+                "MMapAllProtectionsTest/MMapAllProtectionsTest.PrivateFileMappingAllowAllProtections/rwx_and_r_x",
+                "MMapAllProtectionsTest/MMapAllProtectionsTest.PrivateFileMappingAllowAllProtections/rw__and_r_x",
+                "MMapAllProtectionsTest/MMapAllProtectionsTest.PrivateFileMappingAllowAllProtections/rwx_and_rw_",
+                "MMapAllProtectionsTest/MMapAllProtectionsTest.PrivateFileMappingAllowAllProtections/r_x_and_rwx",
+                "MMapAllProtectionsTest/MMapAllProtectionsTest.PrivateFileMappingAllowAllProtections/r___and_r_x",
+                "MMapAllProtectionsTest/MMapAllProtectionsTest.PrivateFileMappingAllowAllProtections/rwx_and_r__",
+                "MMapAllProtectionsTest/MMapAllProtectionsTest.PrivateFileMappingAllowAllProtections/____and_r_x",
+                "MMapAllProtectionsTest/MMapAllProtectionsTest.PrivateFileMappingAllowAllProtections/____and_rw_",
+                "MMapAllProtectionsTest/MMapAllProtectionsTest.PrivateFileMappingAllowAllProtections/rw__and_rwx",
+                "MMapAllProtectionsTest/MMapAllProtectionsTest.PrivateFileMappingAllowAllProtections/rwx_and____",
+                "MMapAllProtectionsTest/MMapAllProtectionsTest.PrivateFileMappingAllowAllProtections/rwx_and_rwx",
+                "MMapAllProtectionsTest/MMapAllProtectionsTest.PrivateFileMappingAllowAllProtections/r_x_and_rw_",
+
                 // TODO(https://fxbug.dev/42079266)
                 "VdsoTest.VdsoCanBeMadvised",
 

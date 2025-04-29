@@ -1085,6 +1085,71 @@ TEST_F(MMapProcTest, MProtectAppliedPartially) {
   EXPECT_TRUE(perms_of_mapping_match(*third_mapping, "---p"));
 }
 
+class MMapAllProtectionsTest : public testing::TestWithParam<std::tuple<int, int>> {};
+
+TEST_P(MMapAllProtectionsTest, PrivateFileMappingAllowAllProtections) {
+  // Calls with the given protection levels `mmap` with `MAP_PRIVATE` and `mprotect`.
+  // Does so over various file descriptors, and expect the calls to succeed.
+
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+
+  test_helper::ScopedTempDir tmp_dir;
+  std::string path = tmp_dir.path() + "/private_mapped_file";
+
+  std::vector<fbl::unique_fd> fds;
+  fds.emplace_back(test_helper::MemFdCreate("try_read", O_RDONLY));
+  fds.emplace_back(open("/proc/self/exe", O_RDONLY));
+  fds.emplace_back(open(path.c_str(), O_RDONLY | O_CREAT | O_TRUNC, 0666));
+
+  const auto [mmap_prot, mprotect_flag] = MMapAllProtectionsTest::GetParam();
+  for (const auto& fd : fds) {
+    ASSERT_TRUE(fd.is_valid());
+    auto mapping =
+        test_helper::ScopedMMap::MMap(NULL, page_size, mmap_prot, MAP_PRIVATE, fd.get(), 0);
+    EXPECT_EQ(mapping.is_ok(), true) << mapping.error_value();
+    if (mapping.is_ok()) {
+      auto addr = mapping->mapping();
+      EXPECT_EQ(mprotect(addr, page_size, mprotect_flag), 0)
+          << "mprotect failed: " << std::strerror(errno);
+    }
+  }
+}
+
+namespace {
+
+std::string ProtectionToString(int prot) {
+  std::string result;
+  if (prot & PROT_READ) {
+    result += "r";
+  } else {
+    result += "_";
+  }
+  if (prot & PROT_WRITE) {
+    result += "w";
+  } else {
+    result += "_";
+  }
+  if (prot & PROT_EXEC) {
+    result += "x";
+  } else {
+    result += "_";
+  }
+  return result;
+}
+
+const auto kAllMmapProtections =
+    testing::Values(PROT_READ, PROT_READ | PROT_WRITE, PROT_READ | PROT_EXEC,
+                    PROT_READ | PROT_WRITE | PROT_EXEC, PROT_NONE);
+
+}  // namespace
+
+INSTANTIATE_TEST_SUITE_P(MMapAllProtectionsTest, MMapAllProtectionsTest,
+                         testing::Combine(kAllMmapProtections, kAllMmapProtections),
+                         [](const testing::TestParamInfo<std::tuple<int, int>>& info) {
+                           return ProtectionToString(std::get<0>(info.param)) + "_and_" +
+                                  ProtectionToString(std::get<1>(info.param));
+                         });
+
 bool IsMapped(uintptr_t addr) {
   static const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
   int rv = msync(reinterpret_cast<void*>(addr & ~(page_size - 1)), page_size, MS_ASYNC);
