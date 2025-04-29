@@ -61,6 +61,12 @@ impl FsNodeState {
     }
 }
 
+/// Opaque structure holding security state for a [`crate::vfs::Socket`].
+#[derive(Debug, Default)]
+pub struct SocketState {
+    state: selinux_hooks::SocketState,
+}
+
 /// Opaque structure holding security state for a [`crate::vfs::FileObject`].
 #[derive(Debug)]
 pub struct FileObjectState {

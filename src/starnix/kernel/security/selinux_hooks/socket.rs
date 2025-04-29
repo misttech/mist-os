@@ -15,7 +15,7 @@ use crate::TODO_DENY;
 use selinux::permission_check::PermissionCheck;
 use selinux::{
     CommonFsNodePermission, CommonSocketPermission, FsNodeClass, InitialSid, KernelPermission,
-    SecurityId, SecurityServer, SocketClass,
+    SecurityId, SecurityServer, SocketClass, UnixStreamSocketPermission,
 };
 use starnix_logging::BugRef;
 use starnix_uapi::errors::Errno;
@@ -335,6 +335,41 @@ pub(in crate::security) fn unix_may_send(
         CommonSocketPermission::SendTo.for_class(receiving_class),
         current_task.into(),
     )
+}
+
+/// Checks if the Unix domain `client_socket` is allowed to connect to `listening_sock`, and
+/// initializes security state for the client and server sockets.
+pub(in crate::security) fn unix_stream_connect(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    client_socket: &Socket,
+    listening_socket: &Socket,
+    server_socket: &Socket,
+) -> Result<(), Errno> {
+    let client_node = client_socket.fs_node();
+    let listening_node = listening_socket.fs_node();
+
+    // Verify whether the `client_socket` has permission to connect to the `listening_socket`.
+    let client_sid = fs_node_effective_sid_and_class(&client_node).sid;
+    todo_has_socket_permission(
+        TODO_DENY!("https://fxbug.dev/364569156", "Enforce unix_stream_connect"),
+        &security_server.as_permission_check(),
+        current_task.kernel(),
+        client_sid,
+        &listening_node,
+        UnixStreamSocketPermission::ConnectTo.into(),
+        current_task.into(),
+    )?;
+
+    // Permission is granted, so populate the `peer_sid` of the client & server sockets with one
+    // another's SIDs, for e.g. `SO_GETPEERSEC` to return.
+    // TODO: https://fxbug.dev/414583985 - the `server_socket` does not yet have an associated
+    // `FsNode`, nor security label, so the `listening_socket` label must be used for now.
+    let listening_sid = fs_node_effective_sid_and_class(&listening_node).sid;
+    *client_socket.security.state.peer_sid.lock() = Some(listening_sid);
+    *server_socket.security.state.peer_sid.lock() = Some(client_sid);
+
+    Ok(())
 }
 
 #[cfg(test)]

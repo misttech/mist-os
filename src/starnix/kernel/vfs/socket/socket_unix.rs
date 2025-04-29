@@ -235,6 +235,7 @@ impl UnixSocket {
 
         let server =
             Socket::new(current_task, peer.domain, peer.socket_type, SocketProtocol::default())?;
+        security::unix_stream_connect(current_task, socket, peer, &server)?;
         client.state = UnixSocketState::Connected(server.clone());
         client.credentials = Some(current_task.as_ucred());
         {

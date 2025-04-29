@@ -723,6 +723,13 @@ struct FsNodeSidAndClass {
     class: FsNodeClass,
 }
 
+/// Security state for a [`crate::vfs::Socket`] instance. This holds the [`selinux::SecurityId`] of
+/// the peer socket.
+#[derive(Debug, Default)]
+pub(super) struct SocketState {
+    peer_sid: Mutex<Option<SecurityId>>,
+}
+
 /// Security state for a bpf [`ebpf_api::maps::Map`] instance. This currently just holds the
 /// SID that the [`crate::task::Task`] that created the file object had.
 #[derive(Clone, Debug, PartialEq)]

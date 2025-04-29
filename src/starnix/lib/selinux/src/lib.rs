@@ -1041,6 +1041,10 @@ class_permission_enum! {
     /// policy enforcement hooks.
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     UnixStreamSocketPermission extends CommonSocketPermission {
+        // keep-sorted start
+        /// Permission to connect a streaming Unix-domain socket.
+        ConnectTo("connectto"),
+        // keep-sorted end
     }
 }
 

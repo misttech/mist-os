@@ -354,6 +354,10 @@ pub struct Socket {
     pub protocol: SocketProtocol,
 
     state: Mutex<SocketState>,
+
+    /// Security module state associated with this socket. Note that the socket's security label is
+    /// applied to the associated `fs_node`.
+    pub security: security::SocketState,
 }
 
 #[derive(Default)]
@@ -466,7 +470,14 @@ impl Socket {
         socket_type: SocketType,
         protocol: SocketProtocol,
     ) -> SocketHandle {
-        Arc::new(Socket { ops, domain, socket_type, protocol, state: Mutex::default() })
+        Arc::new(Socket {
+            ops,
+            domain,
+            socket_type,
+            protocol,
+            state: Mutex::default(),
+            security: security::SocketState::default(),
+        })
     }
 
     /// Creates a `FileHandle` where the associated `FsNode` contains a socket.

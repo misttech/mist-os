@@ -989,6 +989,27 @@ pub fn unix_may_send(
     })
 }
 
+/// Checks if the Unix domain `client_socket` is allowed to connect to `listening_socket`, and
+/// initialises the peer information in the client and server sockets.
+/// Corresponds to the `unix_stream_connect()` LSM hook.
+pub fn unix_stream_connect(
+    current_task: &CurrentTask,
+    client_socket: &Socket,
+    listening_socket: &Socket,
+    server_socket: &Socket,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.unix_stream_connect");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::unix_stream_connect(
+            &security_server,
+            current_task,
+            client_socket,
+            listening_socket,
+            server_socket,
+        )
+    })
+}
+
 /// Updates the SELinux thread group state on exec.
 /// Corresponds to the `bprm_committing_creds()` and `bprm_committed_creds()` LSM hooks.
 pub fn update_state_on_exec(current_task: &CurrentTask, elf_security_state: &ResolvedElfState) {
