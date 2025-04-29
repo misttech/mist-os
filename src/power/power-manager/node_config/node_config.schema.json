@@ -91,12 +91,21 @@
                                 "minimum": 0,
                                 "exclusiveMinimum": true
                             },
+                            "sensor_temperature_poll_interval_s": {
+                                "type": "number",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                            },
+                            "sensor_temperature_measurement_buffer_capacity": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                            },
                             "throttle_debounce_timeout_s": {
                                 "type": "number",
                                 "minimum": 0
                             }
                         },
-                        "additionalProperties": false,
                         "required": [
                             "cpu_temperature_poll_interval_s",
                             "throttle_debounce_timeout_s"
@@ -110,9 +119,14 @@
                             },
                             "crash_report_handler_node": {
                                 "type": "string"
+                            },
+                            "sensor_temperature_handler_nodes": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
                             }
                         },
-                        "additionalProperties": false,
                         "required": [
                             "cpu_temperature_handler_node",
                             "crash_report_handler_node"
