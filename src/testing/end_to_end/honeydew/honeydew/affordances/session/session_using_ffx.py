@@ -39,6 +39,35 @@ class SessionUsingFfx(session.Session):
 
         self._started = True
 
+    def is_started(self) -> bool:
+        """Check if session is started.
+
+        Returns:
+            True if session is started.
+
+        Raises:
+            SessionError: failed to check the session state.
+        """
+
+        self._started = False
+        try:
+            res = self._ffx.run(["session", "show"])
+            lines = res.splitlines()
+            for line in lines:
+                if "Execution State:  Running" in line:
+                    self._started = True
+        except ffx_errors.FfxCommandError as err:
+            if (
+                'No matching component instance found for query "core/session-manager/session:session"'
+                in str(err)
+            ):
+                # session is not running.
+                return False
+
+            raise session_errors.SessionError(err)
+
+        return self._started
+
     def add_component(self, url: str) -> None:
         """Instantiates a component by its URL and adds to the session.
 
@@ -55,6 +84,26 @@ class SessionUsingFfx(session.Session):
             self._ffx.run(["session", "add", url])
         except ffx_errors.FfxCommandError as err:
             raise session_errors.SessionError(err)
+
+    def restart(self) -> None:
+        """Restart session.
+
+        It is ok to call `ffx session restart` regardless of whether a session
+        has started or not.
+
+        Raises:
+            honeydew.errors.SessionError: session failed to restart.
+        """
+
+        if not self._started:
+            raise session_errors.SessionError("session is not started.")
+
+        try:
+            self._ffx.run(["session", "restart"])
+        except ffx_errors.FfxCommandError as err:
+            raise session_errors.SessionError(err)
+
+        self._started = True
 
     def stop(self) -> None:
         """Stop the session.

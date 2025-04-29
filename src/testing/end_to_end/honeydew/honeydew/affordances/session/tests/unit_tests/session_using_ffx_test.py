@@ -103,6 +103,58 @@ class SessionFFXTests(unittest.TestCase):
         with self.assertRaises(subprocess.TimeoutExpired):
             self.session_obj.stop()
 
+    def test_restart(self) -> None:
+        """Test for Session.restart() method."""
+        self.session_obj.start()
+        self.ffx_obj.reset_mock()
+
+        self.session_obj.restart()
+        self.ffx_obj.run.assert_called_once_with(["session", "restart"])
+
+    def test_restart_not_started_error(self) -> None:
+        """Test for session not started in Session.restart()."""
+        with self.assertRaises(session_errors.SessionError):
+            self.session_obj.restart()
+
+    def test_restart_ffx_error(self) -> None:
+        """Test for ffx raise ffx error in Session.restart()."""
+        self.session_obj.start()
+        self.ffx_obj.reset_mock()
+
+        self.ffx_obj.run.side_effect = ffx_errors.FfxCommandError("ffx error")
+
+        with self.assertRaises(session_errors.SessionError):
+            self.session_obj.restart()
+
+    def test_restart_timeout_error(self) -> None:
+        """Test for ffx raise timeout error in Session.restart()."""
+        self.session_obj.start()
+        self.ffx_obj.reset_mock()
+
+        self.ffx_obj.run.side_effect = subprocess.TimeoutExpired("ffx", 1)
+
+        with self.assertRaises(subprocess.TimeoutExpired):
+            self.session_obj.restart()
+
+    def test_is_started(self) -> None:
+        """Test for Session.is_started() method."""
+        self.session_obj.is_started()
+        self.ffx_obj.run.assert_called_once_with(["session", "show"])
+
+    def test_is_started_ffx_error(self) -> None:
+        """Test for ffx raise ffx error in Session.is_started()."""
+        self.ffx_obj.run.side_effect = ffx_errors.FfxCommandError("ffx error")
+
+        with self.assertRaises(session_errors.SessionError):
+            self.session_obj.is_started()
+
+    def test_is_started_timeout_error(self) -> None:
+        """Test for ffx raise timeout error in Session.is_started()."""
+        self.ffx_obj.run.side_effect = subprocess.TimeoutExpired("ffx", 1)
+
+        with self.assertRaises(subprocess.TimeoutExpired):
+            self.session_obj.is_started()
+
 
 if __name__ == "__main__":
     unittest.main()

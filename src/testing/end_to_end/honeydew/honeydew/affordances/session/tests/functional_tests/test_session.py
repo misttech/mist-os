@@ -103,6 +103,40 @@ class SessionAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         self.device.session.stop()
         self.device.session.stop()
 
+    def test_restart_session_stopped_session(self) -> None:
+        """Test case for session.restart() starting a stopped session."""
+
+        self.device.session.start()
+        started = self.device.session.is_started()
+        asserts.assert_true(started, "after session start")
+
+        self.device.session.stop()
+
+        started = self.device.session.is_started()
+        asserts.assert_false(started, "after session stop")
+
+        with asserts.assert_raises(session_errors.SessionError):
+            # restart when session is stopped will get error: Not Running
+            self.device.session.restart()
+
+    def test_restart_session_started_session(self) -> None:
+        """Test case for session.restart() restarting a started session."""
+
+        self.device.session.start()
+        # Give the system a chance to fully start the session before starting
+        # the second session.
+        _LOGGER.info("Waiting for session to fully start up...")
+        time.sleep(10)
+
+        self.device.session.restart()
+
+        # Give the system a chance to fully start the session before starting
+        # the second session.
+        _LOGGER.info("Waiting for session to fully start up...")
+        time.sleep(10)
+
+        self.device.session.add_component(TILE_URL)
+
 
 if __name__ == "__main__":
     test_runner.main()
