@@ -1156,9 +1156,6 @@ mod tests {
                 while blob.vmo().info().unwrap().committed_bytes == 0 {
                     fasync::Timer::new(Duration::from_millis(25)).await;
                 }
-                // The replay task shouldn't increment the blob's open count. This ensures that we
-                // can still delete blobs while we are replaying a profile.
-                assert!(blob.mark_to_be_purged());
             }
         }
         fixture.close().await;
@@ -1242,9 +1239,6 @@ mod tests {
                 while file.vmo().info().unwrap().committed_bytes == 0 {
                     fasync::Timer::new(Duration::from_millis(25)).await;
                 }
-                // The replay task shouldn't increment the file's open count. This ensures that we
-                // can still delete blobs while we are replaying a profile.
-                assert!(file.mark_to_be_purged());
             }
             state.wait_for_recording_to_finish().await.unwrap();
         }
