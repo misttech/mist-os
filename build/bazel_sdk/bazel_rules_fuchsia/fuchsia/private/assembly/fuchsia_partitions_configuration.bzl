@@ -28,7 +28,14 @@ def _fuchsia_partitions_configuration(ctx):
 
     # Create Partitions Config
     partitions_dir = ctx.actions.declare_directory(ctx.label.name)
-    args = ["partitions", "--config", partitions_config_file.path, "--output", partitions_dir.path]
+    args = [
+        "generate",
+        "partitions",
+        "--config",
+        partitions_config_file.path,
+        "--output",
+        partitions_dir.path,
+    ]
     ctx.actions.run(
         executable = sdk.assembly_generate_config,
         arguments = args,

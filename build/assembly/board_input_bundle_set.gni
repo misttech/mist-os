@@ -61,6 +61,7 @@ template("board_input_bundle_set") {
 
     deps = board_input_bundles
     args = [
+      "generate",
       "board-input-bundle-set",
       "--name",
       target_name,

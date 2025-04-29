@@ -340,6 +340,7 @@ template("boot_test") {
       inputs = [ partition_config_intermediate_path ]
 
       args = [
+        "generate",
         "partitions",
         "--config",
         rebase_path(inputs[0], root_build_dir),

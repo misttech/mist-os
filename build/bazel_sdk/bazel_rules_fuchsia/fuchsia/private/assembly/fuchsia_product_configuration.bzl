@@ -155,6 +155,7 @@ def _fuchsia_product_configuration_impl(ctx):
 
     product_config_dir = ctx.actions.declare_directory(ctx.label.name)
     args = [
+        "generate",
         "product",
         "--config",
         product_config_file.path,
@@ -347,6 +348,7 @@ def fuchsia_hybrid_product_configuration_impl(ctx):
     product_config_dir = ctx.actions.declare_directory(ctx.label.name)
     product_config = ctx.attr.product_configuration[FuchsiaProductConfigInfo]
     args = [
+        "generate",
         "hybrid-product",
         "--input",
         product_config.directory,

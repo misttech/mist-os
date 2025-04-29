@@ -269,6 +269,7 @@ template("generated_partitions_config") {
     }
 
     args = [
+      "generate",
       "partitions",
       "--config",
       rebase_path(inputs[0], root_build_dir),

@@ -137,6 +137,7 @@ def _fuchsia_board_configuration_impl(ctx):
 
     board_config_dir = ctx.actions.declare_directory(ctx.label.name)
     args = [
+        "generate",
         "board",
         "--config",
         board_config_file.path,
@@ -314,6 +315,7 @@ def _fuchsia_hybrid_board_configuration_impl(ctx):
         build_id_dirs.extend(bib_set.build_id_dirs)
 
     args = [
+        "generate",
         "hybrid-board",
         "--config",
         board_config.directory,

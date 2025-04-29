@@ -490,6 +490,7 @@ template("product_assembly_configuration") {
     depfile = "${target_out_dir}/${labels.target_name}.d"
 
     args = [
+      "generate",
       "product",
       "--config",
       rebase_path(files.assembly_config_file_intermediate, root_build_dir),

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{common, HybridProductArgs, ProductArgs};
+use crate::{common, ExtractProductPackageArgs, HybridProductArgs, ProductArgs};
 
 use anyhow::Result;
 use assembly_config_schema::AssemblyConfig;
@@ -44,6 +44,10 @@ pub fn hybrid(args: &HybridProductArgs) -> Result<()> {
         }
     }
     config.write_to_dir(&args.output, args.depfile.as_ref())?;
+    Ok(())
+}
+
+pub fn extract_package(_: &ExtractProductPackageArgs) -> Result<()> {
     Ok(())
 }
 

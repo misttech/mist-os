@@ -25,11 +25,27 @@ struct Args {
     command: Subcommand,
 }
 
-/// A subcommand to generate a specific assembly config.
 #[derive(FromArgs)]
 #[argh(subcommand)]
 #[allow(clippy::large_enum_variant)]
 enum Subcommand {
+    Generate(GenerateCommand),
+    Extract(ExtractCommand),
+}
+
+/// An intermediate pass-through struct to manage the `generate` subcommand
+#[derive(FromArgs)]
+#[argh(subcommand, name = "generate")]
+struct GenerateCommand {
+    #[argh(subcommand)]
+    pub subcommand: GenerateSubcommand,
+}
+
+/// Subcommands to generate a specific assembly config.
+#[derive(FromArgs)]
+#[argh(subcommand)]
+#[allow(clippy::large_enum_variant)]
+enum GenerateSubcommand {
     /// generate a product config.
     Product(ProductArgs),
 
@@ -50,6 +66,23 @@ enum Subcommand {
 
     /// generate a partitions config.
     Partitions(PartitionsArgs),
+}
+
+/// An intermediate pass-through struct to manage the `extract` subcommand
+#[derive(FromArgs)]
+#[argh(subcommand, name = "extract")]
+struct ExtractCommand {
+    #[argh(subcommand)]
+    pub subcommand: ExtractSubcommand,
+}
+
+/// Subcommands to extract artifacts from an assembly config.
+#[derive(FromArgs)]
+#[argh(subcommand)]
+#[allow(dead_code)]
+enum ExtractSubcommand {
+    /// extract a package from an existing product config.
+    ProductPackage(ExtractProductPackageArgs),
 }
 
 /// Arguments to generate a product config.
@@ -280,15 +313,46 @@ struct PartitionsArgs {
     depfile: Option<Utf8PathBuf>,
 }
 
+#[derive(FromArgs)]
+#[argh(subcommand, name = "product-package")]
+#[allow(dead_code)]
+/// Arguments to extract a package from an assembly product config container.
+struct ExtractProductPackageArgs {
+    /// the input product config with absolute paths.
+    #[argh(option)]
+    config: Utf8PathBuf,
+
+    /// the name of the package to extract.
+    #[argh(option)]
+    package_name: String,
+
+    /// the directory to write the package contents to.
+    #[argh(option)]
+    outdir: Utf8PathBuf,
+
+    /// the filename to write the package manifest to.
+    #[argh(option)]
+    output_package_manifest: Utf8PathBuf,
+
+    /// a depfile to write.
+    #[argh(option)]
+    depfile: Option<Utf8PathBuf>,
+}
+
 fn main() -> Result<()> {
     let args: Args = argh::from_env();
     match args.command {
-        Subcommand::Product(args) => product_config::new(&args),
-        Subcommand::HybridProduct(args) => product_config::hybrid(&args),
-        Subcommand::BoardInputBundle(args) => board_input_bundle::new(&args),
-        Subcommand::BoardInputBundleSet(args) => board_input_bundle_set::new(&args),
-        Subcommand::Board(args) => board_config::new(&args),
-        Subcommand::HybridBoard(args) => board_config::hybrid(&args),
-        Subcommand::Partitions(args) => partitions_config::new(&args),
+        Subcommand::Generate(args) => match args.subcommand {
+            GenerateSubcommand::Product(args) => product_config::new(&args),
+            GenerateSubcommand::HybridProduct(args) => product_config::hybrid(&args),
+            GenerateSubcommand::BoardInputBundle(args) => board_input_bundle::new(&args),
+            GenerateSubcommand::BoardInputBundleSet(args) => board_input_bundle_set::new(&args),
+            GenerateSubcommand::Board(args) => board_config::new(&args),
+            GenerateSubcommand::HybridBoard(args) => board_config::hybrid(&args),
+            GenerateSubcommand::Partitions(args) => partitions_config::new(&args),
+        },
+        Subcommand::Extract(args) => match args.subcommand {
+            ExtractSubcommand::ProductPackage(args) => product_config::extract_package(&args),
+        },
     }
 }

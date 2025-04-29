@@ -33,7 +33,14 @@ def _fuchsia_board_input_bundle_set_impl(ctx):
 
     # Create Board Input Bundle Set
     board_input_bundle_set_dir = ctx.actions.declare_directory(ctx.label.name)
-    args = ["board-input-bundle-set", "--name", ctx.label.name, "--output", board_input_bundle_set_dir.path] + creation_args
+    args = [
+        "generate",
+        "board-input-bundle-set",
+        "--name",
+        ctx.label.name,
+        "--output",
+        board_input_bundle_set_dir.path,
+    ] + creation_args
     ctx.actions.run(
         executable = sdk.assembly_generate_config,
         arguments = args,

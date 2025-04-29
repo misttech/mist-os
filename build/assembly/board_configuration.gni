@@ -253,6 +253,7 @@ template("board_configuration") {
     depfile = "${target_out_dir}/${target_name}.d"
 
     args = [
+      "generate",
       "board",
       "--config",
       rebase_path(files.board_config_file_intermediate, root_build_dir),

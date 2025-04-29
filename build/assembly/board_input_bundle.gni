@@ -374,6 +374,7 @@ template("board_input_bundle") {
     depfile = files.depfile
     deps = creation_deps
     args = [
+             "generate",
              "board-input-bundle",
              "--name",
              target_name,
