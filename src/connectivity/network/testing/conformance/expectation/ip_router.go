@@ -92,11 +92,11 @@ var ipRouterExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNum
 	{3, 2}: AnvlSkip,
 	{3, 3}: AnvlSkip,
 	{3, 4}: Pass,
-	{3, 5}: Inconclusive,
-	{3, 6}: Inconclusive,
-	// TODO(https://fxbug.dev/400727923): Fix the cross-test contamination. Case
-	// 3.7 is reassembling fragments from previous cases.
-	{3, 7}:  Inconclusive,
+	{3, 5}: Pass,
+	{3, 6}: Pass,
+	{3, 7}: Pass,
+	// TODO(https://fxbug.dev/414373926) Don't assemble fragments with different
+	// protocols.
 	{3, 8}:  Inconclusive,
 	{4, 1}:  Pass,
 	{4, 2}:  Pass,
@@ -148,8 +148,10 @@ var ipRouterExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNum
 	{6, 13}: Fail,
 	{7, 1}:  Pass,
 	{7, 2}:  Inconclusive,
-	{7, 3}:  Fail,
-	{7, 4}:  Pass,
-	{7, 5}:  Pass,
-	{7, 6}:  Pass,
+	{7, 3}:  Pass,
+	// TODO(https://fxbug.dev/414413500) Consider the TTL of IPv4 fragments when
+	// setting the reassembly timeout.
+	{7, 4}: Inconclusive,
+	{7, 5}: Pass,
+	{7, 6}: Pass,
 }

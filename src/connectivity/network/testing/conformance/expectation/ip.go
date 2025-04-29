@@ -92,8 +92,8 @@ var ipExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]ou
 	{3, 2}: AnvlSkip,
 	{3, 3}: AnvlSkip,
 	{3, 4}: Pass,
-	{3, 5}: Inconclusive,
-	{3, 6}: Inconclusive,
+	{3, 5}: Pass,
+	{3, 6}: Pass,
 	{3, 7}: AnvlSkip,
 	// TODO(https://fxbug.dev/414373926) Don't assemble fragments with different
 	// protocols.
@@ -148,8 +148,10 @@ var ipExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]ou
 	{6, 13}: AnvlSkip,
 	{7, 1}:  Pass,
 	{7, 2}:  AnvlSkip,
-	{7, 3}:  Fail,
-	{7, 4}:  Pass,
-	{7, 5}:  Pass,
-	{7, 6}:  Pass,
+	{7, 3}:  Pass,
+	// TODO(https://fxbug.dev/414413500) Consider the TTL of IPv4 fragments when
+	// setting the reassembly timeout.
+	{7, 4}: Inconclusive,
+	{7, 5}: Pass,
+	{7, 6}: Pass,
 }

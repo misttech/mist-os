@@ -38,7 +38,7 @@ use core::time::Duration;
 
 use assert_matches::assert_matches;
 use log::debug;
-use net_types::ip::{GenericOverIp, Ip, IpAddr, IpAddress, IpVersionMarker};
+use net_types::ip::{GenericOverIp, Ip, IpAddr, IpAddress, IpVersionMarker, Ipv4, Ipv6};
 use netstack3_base::{
     CoreTimerContext, HandleableTimer, InstantBindingsTypes, IpExt, LocalTimerHeap,
     TimerBindingsTypes, TimerContext,
@@ -50,11 +50,32 @@ use packet_formats::ipv6::ext_hdrs::Ipv6ExtensionHeaderData;
 use packet_formats::ipv6::Ipv6Packet;
 use zerocopy::{SplitByteSlice, SplitByteSliceMut};
 
-/// The maximum amount of time from receipt of the first fragment to reassembly
-/// of a packet. Note, "first fragment" does not mean a fragment with offset 0;
-/// it means the first fragment packet we receive with a new combination of
-/// source address, destination address and fragment identification value.
-const REASSEMBLY_TIMEOUT: Duration = Duration::from_secs(60);
+/// An IP extension trait supporting reassembly of fragments.
+trait ReassemblyIpExt: Ip {
+    /// The maximum amount of time from receipt of the first fragment to
+    /// reassembly of a packet. Note, "first fragment" does not mean a fragment
+    /// with offset 0; it means the first fragment packet we receive with a new
+    /// combination of source address, destination address and fragment
+    /// identification value.
+    const REASSEMBLY_TIMEOUT: Duration;
+}
+
+impl ReassemblyIpExt for Ipv4 {
+    /// This value is specified in RFC 729, section 3.1:
+    ///   The current recommendation for the initial timer setting is 15
+    ///   seconds.
+    const REASSEMBLY_TIMEOUT: Duration = Duration::from_secs(15);
+}
+
+impl ReassemblyIpExt for Ipv6 {
+    /// This value is specified in RFC 8200, section 4.5:
+    ///   If insufficient fragments are received to complete reassembly
+    ///   of a packet within 60 seconds of the reception of the first-
+    ///   arriving fragment of that packet, reassembly of that packet
+    ///   must be abandoned and all the fragments that have been received
+    ///   for that packet must be discarded.
+    const REASSEMBLY_TIMEOUT: Duration = Duration::from_secs(60);
+}
 
 /// Number of bytes per fragment block for IPv4 and IPv6.
 ///
@@ -140,8 +161,8 @@ pub trait FragmentHandler<I: IpExt, BC> {
     ) -> Result<(), FragmentReassemblyError>;
 }
 
-impl<I: IpExt, BC: FragmentBindingsContext, CC: FragmentContext<I, BC>> FragmentHandler<I, BC>
-    for CC
+impl<I: IpExt + ReassemblyIpExt, BC: FragmentBindingsContext, CC: FragmentContext<I, BC>>
+    FragmentHandler<I, BC> for CC
 {
     fn process_fragment<B: SplitByteSlice>(
         &mut self,
@@ -156,9 +177,16 @@ impl<I: IpExt, BC: FragmentBindingsContext, CC: FragmentContext<I, BC>> Fragment
 
             if let Some(timer_action) = timer_action {
                 match timer_action {
+                    // TODO(https://fxbug.dev/414413500): for IPv4, use the
+                    // fragment's TTL to determine the timeout.
                     CacheTimerAction::CreateNewTimer(key) => {
                         assert_eq!(
-                            cache.timers.schedule_after(bindings_ctx, key, (), REASSEMBLY_TIMEOUT),
+                            cache.timers.schedule_after(
+                                bindings_ctx,
+                                key,
+                                (),
+                                I::REASSEMBLY_TIMEOUT,
+                            ),
                             None
                         )
                     }
@@ -1074,7 +1102,7 @@ mod tests {
         }
     }
 
-    trait TestIpExt: netstack3_base::testutil::TestIpExt {
+    trait TestIpExt: netstack3_base::testutil::TestIpExt + ReassemblyIpExt {
         const HEADER_LENGTH: usize;
 
         fn process_ip_fragment<CC: FragmentContext<Self, BC>, BC: FragmentBindingsContext>(
@@ -1291,7 +1319,7 @@ mod tests {
     }
 
     #[ip_test(I)]
-    fn test_ip_reassemble_after_timer<I: TestIpExt + netstack3_base::IpExt>() {
+    fn test_ip_reassemble_after_timer<I: TestIpExt + IpExt>() {
         let fake_config = I::TEST_ADDRS;
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let id = 5;
@@ -1315,7 +1343,7 @@ mod tests {
         core_ctx.state.cache.timers.assert_timers([(
             key,
             (),
-            FakeInstant::from(REASSEMBLY_TIMEOUT),
+            FakeInstant::from(I::REASSEMBLY_TIMEOUT),
         )]);
         validate_size(&core_ctx.state.cache);
 
@@ -1330,7 +1358,7 @@ mod tests {
         core_ctx.state.cache.timers.assert_timers([(
             key,
             (),
-            FakeInstant::from(REASSEMBLY_TIMEOUT),
+            FakeInstant::from(I::REASSEMBLY_TIMEOUT),
         )]);
         validate_size(&core_ctx.state.cache);
 
@@ -1345,7 +1373,7 @@ mod tests {
         core_ctx.state.cache.timers.assert_timers([(
             key,
             (),
-            FakeInstant::from(REASSEMBLY_TIMEOUT),
+            FakeInstant::from(I::REASSEMBLY_TIMEOUT),
         )]);
         validate_size(&core_ctx.state.cache);
 
@@ -1380,7 +1408,7 @@ mod tests {
     #[test_case(1)]
     #[test_case(10)]
     #[test_case(100)]
-    fn test_ip_fragment_cache_oom<I: TestIpExt + netstack3_base::IpExt>(size: u16) {
+    fn test_ip_fragment_cache_oom<I: TestIpExt + IpExt>(size: u16) {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let mut id = 0;
         const THRESHOLD: usize = 8196usize;
@@ -1412,7 +1440,7 @@ mod tests {
 
         // Trigger the timers, which will clear the cache.
         let _timers = bindings_ctx
-            .trigger_timers_for(REASSEMBLY_TIMEOUT + Duration::from_secs(1), &mut core_ctx);
+            .trigger_timers_for(I::REASSEMBLY_TIMEOUT + Duration::from_secs(1), &mut core_ctx);
         assert_eq!(core_ctx.state.cache.size, 0);
         validate_size(&core_ctx.state.cache);
 
@@ -1693,9 +1721,7 @@ mod tests {
     }
 
     #[ip_test(I)]
-    fn test_ip_reassembly_timer_with_multiple_intertwined_packets<
-        I: TestIpExt + netstack3_base::IpExt,
-    >() {
+    fn test_ip_reassembly_timer_with_multiple_intertwined_packets<I: TestIpExt + IpExt>() {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         const SIZE: u16 = 1;
         let id_0 = 5;
@@ -1707,24 +1733,31 @@ mod tests {
         // packet 1 to fail due to the reassembly timer.
         //
         // The flow of events:
-        //   T=0s:
+        //   T=0:
         //     - Packet #0, Fragment #0 arrives (timer scheduled for T=60s).
         //     - Packet #1, Fragment #2 arrives (timer scheduled for T=60s).
         //     - Packet #2, Fragment #2 arrives (timer scheduled for T=60s).
-        //   T=30s:
+        //   T=BEFORE_TIMEOUT1:
         //     - Packet #0, Fragment #2 arrives.
-        //   T=40s:
+        //   T=BEFORE_TIMEOUT2:
         //     - Packet #2, Fragment #1 arrives.
         //     - Packet #0, Fragment #1 arrives (timer cancelled since all
         //       fragments arrived).
-        //   T=50s:
+        //   T=BEFORE_TIMEOUT3:
         //     - Packet #1, Fragment #0 arrives.
         //     - Packet #2, Fragment #0 arrives (timer cancelled since all
         //       fragments arrived).
-        //   T=60s:
+        //   T=TIMEOUT:
         //     - Timeout for reassembly of Packet #1.
         //     - Packet #1, Fragment #1 arrives (final fragment but timer
         //       already triggered so fragment not complete).
+
+        const BEFORE_TIMEOUT1: Duration = Duration::from_secs(1);
+        const BEFORE_TIMEOUT2: Duration = Duration::from_secs(2);
+        const BEFORE_TIMEOUT3: Duration = Duration::from_secs(3);
+        assert!(BEFORE_TIMEOUT1 < I::REASSEMBLY_TIMEOUT);
+        assert!(BEFORE_TIMEOUT2 < I::REASSEMBLY_TIMEOUT);
+        assert!(BEFORE_TIMEOUT3 < I::REASSEMBLY_TIMEOUT);
 
         // Process fragment #0 for packet #0
         process_ip_fragment(
@@ -1750,8 +1783,11 @@ mod tests {
             ExpectedResult::NeedMore,
         );
 
-        // Advance time by 30s (should be at 30s now).
-        assert_empty(bindings_ctx.trigger_timers_for(Duration::from_secs(30), &mut core_ctx));
+        // Advance time.
+        assert_empty(
+            bindings_ctx
+                .trigger_timers_until_instant(FakeInstant::from(BEFORE_TIMEOUT1), &mut core_ctx),
+        );
 
         // Process fragment #2 for packet #0
         process_ip_fragment(
@@ -1761,8 +1797,11 @@ mod tests {
             ExpectedResult::NeedMore,
         );
 
-        // Advance time by 10s (should be at 40s now).
-        assert_empty(bindings_ctx.trigger_timers_for(Duration::from_secs(10), &mut core_ctx));
+        // Advance time.
+        assert_empty(
+            bindings_ctx
+                .trigger_timers_until_instant(FakeInstant::from(BEFORE_TIMEOUT2), &mut core_ctx),
+        );
 
         // Process fragment #1 for packet #2
         process_ip_fragment(
@@ -1782,8 +1821,11 @@ mod tests {
 
         try_reassemble_ip_packet(&mut core_ctx, &mut bindings_ctx, id_0, 3);
 
-        // Advance time by 10s (should be at 50s now).
-        assert_empty(bindings_ctx.trigger_timers_for(Duration::from_secs(10), &mut core_ctx));
+        // Advance time.
+        assert_empty(
+            bindings_ctx
+                .trigger_timers_until_instant(FakeInstant::from(BEFORE_TIMEOUT3), &mut core_ctx),
+        );
 
         // Process fragment #0 for packet #1
         process_ip_fragment(
@@ -1803,10 +1845,10 @@ mod tests {
 
         try_reassemble_ip_packet(&mut core_ctx, &mut bindings_ctx, id_2, 3);
 
-        // Advance time by 10s (should be at 60s now)), triggering the timer for
-        // the reassembly of packet #1
-        bindings_ctx.trigger_timers_for_and_expect(
-            Duration::from_secs(10),
+        // Advance time to the timeout, triggering the timer for the reassembly
+        // of packet #1
+        bindings_ctx.trigger_timers_until_and_expect_unordered(
+            FakeInstant::from(I::REASSEMBLY_TIMEOUT),
             [FragmentTimerId::<I>::default()],
             &mut core_ctx,
         );
@@ -1862,7 +1904,7 @@ mod tests {
                 .state
                 .cache
                 .timers
-                .assert_timers_after(&mut bindings_ctx, [(key, (), REASSEMBLY_TIMEOUT)]);
+                .assert_timers_after(&mut bindings_ctx, [(key, (), I::REASSEMBLY_TIMEOUT)]);
 
             process_ip_fragment(&mut core_ctx, &mut bindings_ctx, SPEC, ExpectedResult::Invalid);
             assert_eq!(bindings_ctx.timers.timers(), [],);
