@@ -133,7 +133,9 @@ async fn create_realm(options: RealmOptions) -> Result<SagRealm, Error> {
     builder
         .add_route(
             Route::new()
-                .capability(Capability::service_by_name("fuchsia.hardware.suspend.SuspendService"))
+                .capability(Capability::service_by_name(
+                    "fuchsia.hardware.power.suspend.SuspendService",
+                ))
                 .from(&fake_suspend_ref)
                 .to(&component_ref),
         )

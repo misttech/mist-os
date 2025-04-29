@@ -13,11 +13,11 @@ use log::info;
 use power_framework_test_realm::PowerFrameworkTestRealmBuilder;
 use rand::RngCore;
 use {
-    fidl_fuchsia_example_power as fexample, fidl_fuchsia_hardware_suspend as fhardware_suspend,
-    fidl_fuchsia_power_system as fsag, fidl_fuchsia_testing_harness as ftest_harness,
-    fidl_test_sagcontrol as sagcontrol, fidl_test_suspendcontrol as fsuspend_control,
-    fidl_test_systemactivitygovernor as sag_test, fuchsia_async as fasync,
-    fuchsia_component_test as ftest,
+    fidl_fuchsia_example_power as fexample,
+    fidl_fuchsia_hardware_power_suspend as fhardware_suspend, fidl_fuchsia_power_system as fsag,
+    fidl_fuchsia_testing_harness as ftest_harness, fidl_test_sagcontrol as sagcontrol,
+    fidl_test_suspendcontrol as fsuspend_control, fidl_test_systemactivitygovernor as sag_test,
+    fuchsia_async as fasync, fuchsia_component_test as ftest,
 };
 
 #[fuchsia::test]

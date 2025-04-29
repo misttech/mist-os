@@ -19,7 +19,7 @@ use std::cell::Cell;
 use std::collections::HashMap;
 use std::sync::Arc;
 use {
-    fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_observability as fobs,
+    fidl_fuchsia_hardware_power_suspend as fhsuspend, fidl_fuchsia_power_observability as fobs,
     fidl_fuchsia_power_suspend as fsuspend, fidl_fuchsia_power_system as fsystem,
     fidl_test_suspendcontrol as tsc, fidl_test_systemactivitygovernor as ftest,
     fuchsia_async as fasync,

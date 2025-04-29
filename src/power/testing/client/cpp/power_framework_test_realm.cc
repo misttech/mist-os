@@ -22,17 +22,17 @@ void Setup(component_testing::RealmBuilder& realm_builder) {
                   component_testing::Protocol{"fuchsia.power.system.ActivityGovernor"},
                   component_testing::Protocol{"test.sagcontrol.State"},
                   component_testing::Protocol{"test.suspendcontrol.Device"},
-                  component_testing::Service{"fuchsia.hardware.suspend.SuspendService"},
+                  component_testing::Service{"fuchsia.hardware.power.suspend.SuspendService"},
               },
           .source = component_testing::ChildRef{kComponentName},
           .targets = {component_testing::ParentRef()}});
 }
 
-zx::result<fidl::ClientEnd<fuchsia_hardware_suspend::Suspender>> ConnectToSuspender(
+zx::result<fidl::ClientEnd<fuchsia_hardware_power_suspend::Suspender>> ConnectToSuspender(
     component_testing::RealmRoot& root) {
   fidl::UnownedClientEnd<fuchsia_io::Directory> svc(
       root.component().exposed().unowned_channel()->get());
-  return component::ConnectAtMember<fuchsia_hardware_suspend::SuspendService::Suspender>(svc);
+  return component::ConnectAtMember<fuchsia_hardware_power_suspend::SuspendService::Suspender>(svc);
 }
 
 }  // namespace power_framework_test_realm

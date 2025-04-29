@@ -594,7 +594,7 @@
 
         // Suspend Control
         {
-            service: [ "fuchsia.hardware.suspend.SuspendService" ],
+            service: [ "fuchsia.hardware.power.suspend.SuspendService" ],
             from: "parent",
             to: "#sshd-host",
         },

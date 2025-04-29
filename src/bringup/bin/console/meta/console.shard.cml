@@ -330,7 +330,7 @@
             ],
         },
         {
-            service: "fuchsia.hardware.suspend.SuspendService",
+            service: "fuchsia.hardware.power.suspend.SuspendService",
             from: "#boot-drivers",
             to: "#console-launcher",
         },

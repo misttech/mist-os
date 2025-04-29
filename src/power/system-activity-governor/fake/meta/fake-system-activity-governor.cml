@@ -49,7 +49,7 @@
             to: [ "#system-activity-governor" ],
         },
         {
-            service: "fuchsia.hardware.suspend.SuspendService",
+            service: "fuchsia.hardware.power.suspend.SuspendService",
             from: "parent",
             to: [ "#system-activity-governor" ],
         },

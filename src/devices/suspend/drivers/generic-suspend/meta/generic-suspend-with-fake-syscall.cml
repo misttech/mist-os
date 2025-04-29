@@ -21,7 +21,7 @@
     capabilities: [
         {
             service: [
-                "fuchsia.hardware.suspend.SuspendService",
+                "fuchsia.hardware.power.suspend.SuspendService",
                 "fuchsia.test.syscalls.ControlService",
             ],
         },
@@ -34,7 +34,7 @@
     expose: [
         {
             service: [
-                "fuchsia.hardware.suspend.SuspendService",
+                "fuchsia.hardware.power.suspend.SuspendService",
                 "fuchsia.test.syscalls.ControlService",
             ],
             from: "self",

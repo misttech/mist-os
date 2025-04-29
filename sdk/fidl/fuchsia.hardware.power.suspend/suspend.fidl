@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 @available(added=HEAD)
-library fuchsia.hardware.suspend;
+library fuchsia.hardware.power.suspend;
 
 using zx;
 
@@ -27,10 +27,10 @@ type WakeReason = table {
 };
 
 open protocol Suspender {
-    /// Returns a list of [`fuchsia.hardware.suspend/SuspendState`] supported.
+    /// Returns a list of [`fuchsia.hardware.power.suspend/SuspendState`] supported.
     /// by the system. The system must return at least 1 suspend state which
     /// corresponds to the "suspend-to-idle" state but may return up to
-    /// [`fuchsia.hardware.suspend/MAX_SUSPEND_STATES`] states.
+    /// [`fuchsia.hardware.power.suspend/MAX_SUSPEND_STATES`] states.
     /// The suspend states must be ordered in order of decreasing
     /// `resume_latency` (and thereby increasing power consumption).
     /// A particular build of the system must always return the same set of

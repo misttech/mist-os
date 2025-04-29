@@ -19,7 +19,7 @@ rustc_binary("bin") {
   deps = [
     "//sdk/fidl/fuchsia.component.test:fuchsia.component.test_rust",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
-    "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_rust",
+    "//sdk/fidl/fuchsia.hardware.power.suspend:fuchsia.hardware.power.suspend_rust",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
     "//sdk/lib/driver_test_realm/realm_builder/rust",
     "//src/devices/testing/syscall-intercept:fuchsia.test.syscalls_rust",

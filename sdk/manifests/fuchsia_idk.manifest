@@ -297,6 +297,7 @@ fidl_library://fidl/fuchsia.hardware.spi (unstable)
 fidl_library://fidl/fuchsia.hardware.spi.businfo (unstable)
 fidl_library://fidl/fuchsia.hardware.spiimpl (unstable)
 fidl_library://fidl/fuchsia.hardware.spmi (unstable)
+fidl_library://fidl/fuchsia.hardware.power.suspend (unstable)
 fidl_library://fidl/fuchsia.hardware.temperature
 fidl_library://fidl/fuchsia.hardware.trippoint
 fidl_library://fidl/fuchsia.hardware.usb.dci (unstable)

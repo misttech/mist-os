@@ -12,8 +12,8 @@
 #include <zircon/syscalls-next.h>
 #include <zircon/time.h>
 
-#include "fidl/fuchsia.hardware.suspend/cpp/markers.h"
-#include "fidl/fuchsia.hardware.suspend/cpp/wire_types.h"
+#include "fidl/fuchsia.hardware.power.suspend/cpp/markers.h"
+#include "fidl/fuchsia.hardware.power.suspend/cpp/wire_types.h"
 #include "fidl/fuchsia.kernel/cpp/markers.h"
 #include "fidl/fuchsia.power.observability/cpp/fidl.h"
 #include "fidl/fuchsia.power.observability/cpp/natural_types.h"
@@ -91,12 +91,12 @@ zx::result<> GenericSuspend::CreateDevfsNode() {
 }
 
 zx::result<> GenericSuspend::Start() {
-  fuchsia_hardware_suspend::SuspendService::InstanceHandler handler({
+  fuchsia_hardware_power_suspend::SuspendService::InstanceHandler handler({
       .suspender = suspend_bindings_.CreateHandler(this, dispatcher(), fidl::kIgnoreBindingClosure),
   });
 
   auto result =
-      outgoing()->AddService<fuchsia_hardware_suspend::SuspendService>(std::move(handler));
+      outgoing()->AddService<fuchsia_hardware_power_suspend::SuspendService>(std::move(handler));
   if (result.is_error()) {
     FDF_LOG(ERROR, "Failed to add Suspender service %s", result.status_string());
     return result.take_error();
@@ -131,12 +131,14 @@ void GenericSuspend::GetSuspendStates(GetSuspendStatesCompleter::Sync& completer
   fidl::Arena arena;
 
   auto suspend_to_idle =
-      fuchsia_hardware_suspend::wire::SuspendState::Builder(arena).resume_latency(0).Build();
-  std::vector<fuchsia_hardware_suspend::wire::SuspendState> suspend_states = {suspend_to_idle};
+      fuchsia_hardware_power_suspend::wire::SuspendState::Builder(arena).resume_latency(0).Build();
+  std::vector<fuchsia_hardware_power_suspend::wire::SuspendState> suspend_states = {
+      suspend_to_idle};
 
-  auto resp = fuchsia_hardware_suspend::wire::SuspenderGetSuspendStatesResponse::Builder(arena)
-                  .suspend_states(std::move(suspend_states))
-                  .Build();
+  auto resp =
+      fuchsia_hardware_power_suspend::wire::SuspenderGetSuspendStatesResponse::Builder(arena)
+          .suspend_states(std::move(suspend_states))
+          .Build();
 
   completer.ReplySuccess(resp);
 }
@@ -178,7 +180,7 @@ void GenericSuspend::Suspend(SuspendRequestView request, SuspendCompleter::Sync&
       n.RecordInt(fobs::kSuspendResumedAt, suspend_return);
     });
     auto resp =
-        fuchsia_hardware_suspend::wire::SuspenderSuspendResponse::Builder(arena)
+        fuchsia_hardware_power_suspend::wire::SuspenderSuspendResponse::Builder(arena)
             .suspend_duration(suspend_return - suspend_start)
             .suspend_overhead(suspend_start - function_start + zx_clock_get_boot() - suspend_return)
             .Build();
@@ -186,7 +188,7 @@ void GenericSuspend::Suspend(SuspendRequestView request, SuspendCompleter::Sync&
   }
 }
 
-void GenericSuspend::Serve(fidl::ServerEnd<fuchsia_hardware_suspend::Suspender> request) {
+void GenericSuspend::Serve(fidl::ServerEnd<fuchsia_hardware_power_suspend::Suspender> request) {
   suspend_bindings_.AddBinding(dispatcher(), std::move(request), this, fidl::kIgnoreBindingClosure);
 }
 

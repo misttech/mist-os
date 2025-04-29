@@ -142,7 +142,7 @@
             to: [ "#kernel" ],
         },
         {
-            service: [ "fuchsia.hardware.suspend.SuspendService" ],
+            service: [ "fuchsia.hardware.power.suspend.SuspendService" ],
             from: "parent",
             to: [ "#test-system-activity-governor" ],
         },

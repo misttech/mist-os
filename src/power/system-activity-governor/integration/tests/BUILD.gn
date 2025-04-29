@@ -18,7 +18,7 @@ rustc_test("bin") {
   sources = [ source_root ]
   name = "system_activity_governor_test"
   deps = [
-    "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_rust",
+    "//sdk/fidl/fuchsia.hardware.power.suspend:fuchsia.hardware.power.suspend_rust",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
     "//sdk/fidl/fuchsia.power.observability:fuchsia.power.observability_rust",
     "//sdk/fidl/fuchsia.power.suspend:fuchsia.power.suspend_rust",

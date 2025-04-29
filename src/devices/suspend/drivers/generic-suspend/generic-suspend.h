@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_SUSPEND_DRIVERS_GENERIC_SUSPEND_GENERIC_SUSPEND_H_
 #define SRC_DEVICES_SUSPEND_DRIVERS_GENERIC_SUSPEND_GENERIC_SUSPEND_H_
 
-#include <fidl/fuchsia.hardware.suspend/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.power.suspend/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/inspect/component/cpp/component.h>
@@ -17,7 +17,7 @@
 namespace suspend {
 
 class GenericSuspend : public fdf::DriverBase,
-                       public fidl::WireServer<fuchsia_hardware_suspend::Suspender> {
+                       public fidl::WireServer<fuchsia_hardware_power_suspend::Suspender> {
  public:
   GenericSuspend(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher);
 
@@ -26,7 +26,7 @@ class GenericSuspend : public fdf::DriverBase,
   void Stop() override;
 
   void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_hardware_suspend::Suspender> metadata,
+      fidl::UnknownMethodMetadata<fuchsia_hardware_power_suspend::Suspender> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override {
     FDF_LOG(ERROR, "Unexpected suspend FIDL call: 0x%lx", metadata.method_ordinal);
   }
@@ -42,15 +42,15 @@ class GenericSuspend : public fdf::DriverBase,
   virtual void AtStart() {}
 
  private:
-  void Serve(fidl::ServerEnd<fuchsia_hardware_suspend::Suspender> request);
+  void Serve(fidl::ServerEnd<fuchsia_hardware_power_suspend::Suspender> request);
   zx::result<> CreateDevfsNode();
 
   inspect::contrib::BoundedListNode inspect_events_;
 
-  fidl::ServerBindingGroup<fuchsia_hardware_suspend::Suspender> suspend_bindings_;
+  fidl::ServerBindingGroup<fuchsia_hardware_power_suspend::Suspender> suspend_bindings_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
-  driver_devfs::Connector<fuchsia_hardware_suspend::Suspender> devfs_connector_;
+  driver_devfs::Connector<fuchsia_hardware_power_suspend::Suspender> devfs_connector_;
 
   zx::resource cpu_resource_;
 };

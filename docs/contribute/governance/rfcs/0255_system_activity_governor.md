@@ -127,9 +127,9 @@ product, SAG must meet the following requirements:
 1. SAG will just be responsible for determining *when* to transition. The
   definition and facilitation of a transition to each suspend state will be
   handled by a component that implements the
-  `fuchsia.hardware.suspend.Suspender` protocol which SAG uses. This RFC defers
-  defining the full protocol, but `Suspender` **MUST** provide the following
-  functionality:
+  `fuchsia.hardware.power.suspend.Suspender` protocol which SAG uses. This RFC
+  defers defining the full protocol, but `Suspender` **MUST** provide the
+  following functionality:
 
     - List suspend states supported by the hardware.
     - Transition the hardware to a suspend state.

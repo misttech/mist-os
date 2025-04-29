@@ -5,9 +5,9 @@
 #include "suspendctl.h"
 
 #include <fidl/fuchsia.device/cpp/wire_test_base.h>
-#include <fidl/fuchsia.hardware.suspend/cpp/markers.h>
-#include <fidl/fuchsia.hardware.suspend/cpp/wire_test_base.h>
-#include <fidl/fuchsia.hardware.suspend/cpp/wire_types.h>
+#include <fidl/fuchsia.hardware.power.suspend/cpp/markers.h>
+#include <fidl/fuchsia.hardware.power.suspend/cpp/wire_test_base.h>
+#include <fidl/fuchsia.hardware.power.suspend/cpp/wire_types.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/zx/time.h>

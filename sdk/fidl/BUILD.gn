@@ -109,6 +109,7 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi",
   "//sdk/fidl/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl",
   "//sdk/fidl/fuchsia.hardware.spmi:fuchsia.hardware.spmi",
+  "//sdk/fidl/fuchsia.hardware.power.suspend:fuchsia.hardware.power.suspend",
   "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature",
   "//sdk/fidl/fuchsia.hardware.trippoint:fuchsia.hardware.trippoint",
   "//sdk/fidl/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci",

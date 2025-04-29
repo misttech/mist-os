@@ -19,14 +19,15 @@ int main() {
 
   auto device_server = std::make_shared<fake_suspend::DeviceServer>();
 
-  fuchsia_hardware_suspend::SuspendService::InstanceHandler handler({
+  fuchsia_hardware_power_suspend::SuspendService::InstanceHandler handler({
       .suspender =
-          [device_server](fidl::ServerEnd<fuchsia_hardware_suspend::Suspender> server_end) {
+          [device_server](fidl::ServerEnd<fuchsia_hardware_power_suspend::Suspender> server_end) {
             device_server->Serve(async_get_default_dispatcher(), std::move(server_end));
           },
   });
 
-  auto result = outgoing.AddService<fuchsia_hardware_suspend::SuspendService>(std::move(handler));
+  auto result =
+      outgoing.AddService<fuchsia_hardware_power_suspend::SuspendService>(std::move(handler));
   if (result.is_error()) {
     return -1;
   }

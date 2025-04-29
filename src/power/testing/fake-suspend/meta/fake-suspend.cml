@@ -11,12 +11,12 @@
         binary: "bin/fake-suspend-bin",
     },
     capabilities: [
-        { service: "fuchsia.hardware.suspend.SuspendService" },
+        { service: "fuchsia.hardware.power.suspend.SuspendService" },
         { protocol: "test.suspendcontrol.Device" },
     ],
     expose: [
         {
-            service: "fuchsia.hardware.suspend.SuspendService",
+            service: "fuchsia.hardware.power.suspend.SuspendService",
             from: "self",
         },
         {
