@@ -58,6 +58,10 @@ impl DefineSubsystemConfiguration<(&BluetoothConfig, &PlatformMediaConfig)>
             "fuchsia.bluetooth.LegacyPairing",
             Config::new(ConfigValueType::Bool, core.legacy_pairing_enabled.into()),
         )?;
+        builder.set_config_capability(
+            "fuchsia.bluetooth.ScoOffloadPathIndex",
+            Config::new(ConfigValueType::Uint8, core.sco_offload_path_index.into()),
+        )?;
 
         if profiles.a2dp.enabled {
             builder.platform_bundle("bluetooth_a2dp");
