@@ -6,17 +6,13 @@ include /src/developer/ffx/OWNERS
 include /src/developer/ffx/plugins/fuzz/OWNERS
 include /src/developer/ffx/plugins/package/OWNERS
 include /src/developer/ffx/plugins/product/OWNERS
-include /src/developer/ffx/plugins/test/OWNERS
-include /src/developer/fuchsia-criterion/OWNERS
 include /src/devices/lib/OWNERS
 include /src/lib/android/OWNERS
 include /src/lib/assembly/OWNERS
 include /src/sys/fuzzing/OWNERS
 include /src/sys/pkg/OWNERS
 include /third_party/rust_crates/forks/notify/OWNERS
-include /third_party/rust_crates/vendor/criterion-0.2.11/OWNERS
 include /tools/auto_owners/OWNERS
 include /tools/cargo-gnaw/OWNERS
 include /tools/pbtool/OWNERS
 include /tools/testgen/OWNERS
-include /tools/update_crates/OWNERS

@@ -13,11 +13,8 @@ include /src/connectivity/wlan/tools/wlantool/OWNERS
 include /src/connectivity/wlan/wlancfg/OWNERS
 include /src/developer/ffx/lib/symbolize/OWNERS
 include /src/developer/ffx/plugins/assembly/OWNERS
-include /src/developer/ffx/plugins/fuzz/OWNERS
 include /src/developer/ffx/plugins/wlan/OWNERS
-include /src/firmware/OWNERS
 include /src/lib/assembly/OWNERS
-include /src/media/OWNERS
 include /src/performance/memory/OWNERS
 include /src/security/lib/scrutiny/OWNERS
 include /src/starnix/OWNERS
@@ -27,6 +24,4 @@ include /src/sys/lib/component_id_index/OWNERS
 include /src/sys/lib/fidl-fuchsia-pkg-ext/OWNERS
 include /src/sys/pkg/OWNERS
 include /src/testing/sl4f/OWNERS
-include /third_party/rust_crates/vendor/mock-omaha-server-0.3.3/OWNERS
 include /third_party/rust_crates/vendor/omaha_client-0.2.1/OWNERS
-include /tools/update_crates/OWNERS

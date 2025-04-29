@@ -2,5 +2,4 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/lib/async-gunzip/OWNERS
 include /third_party/rust_crates/vendor/flate2-1.0.14/OWNERS

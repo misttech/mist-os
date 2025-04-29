@@ -4,6 +4,5 @@
 
 include /src/connectivity/wlan/tools/wlantool/OWNERS
 include /src/connectivity/wlan/wlancfg/OWNERS
-include /third_party/rust_crates/vendor/criterion-0.2.11/OWNERS
-include /third_party/rust_crates/vendor/structopt-0.2.14/OWNERS
+include /third_party/rust_crates/vendor/structopt-0.3.26/OWNERS
 include /tools/zedmon/OWNERS

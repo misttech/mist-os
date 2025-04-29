@@ -4,8 +4,8 @@
 
 include /src/connectivity/lib/at-commands/OWNERS
 include /src/connectivity/network/OWNERS
-include /src/starnix/OWNERS
 include /third_party/rust_crates/vendor/handlebars-4.3.5/OWNERS
 include /third_party/rust_crates/vendor/pest_derive-2.7.8/OWNERS
 include /third_party/rust_crates/vendor/pest_generator-2.7.8/OWNERS
 include /third_party/rust_crates/vendor/pest_meta-2.7.8/OWNERS
+include /third_party/rust_crates/vendor/serde_json5-0.2.1/OWNERS

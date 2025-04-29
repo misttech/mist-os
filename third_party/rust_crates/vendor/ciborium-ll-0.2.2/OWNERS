@@ -2,7 +2,4 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/developer/ffx/OWNERS
-include /src/sys/pkg/OWNERS
-include /third_party/rust_crates/vendor/omaha_client-0.2.1/OWNERS
-include /tools/funnel/OWNERS
+include /third_party/rust_crates/vendor/ciborium-0.2.2/OWNERS

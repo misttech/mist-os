@@ -2,17 +2,12 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /examples/fidl/OWNERS
 include /src/connectivity/bluetooth/OWNERS
 include /src/connectivity/wlan/OWNERS
-include /src/developer/ffx/OWNERS
 include /src/devices/lib/OWNERS
 include /src/diagnostics/iquery/OWNERS
 include /src/diagnostics/lib/triage/OWNERS
-include /src/factory/OWNERS
 include /src/lib/diagnostics/selectors/OWNERS
-include /src/lib/fidl_codec/OWNERS
 include /src/performance/OWNERS
 include /src/starnix/OWNERS
-include /src/ui/lib/input_pipeline/OWNERS
 include /third_party/rust_crates/vendor/askama_parser-0.2.1/OWNERS

@@ -3,4 +3,3 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /src/storage/OWNERS
-include /src/sys/pkg/OWNERS

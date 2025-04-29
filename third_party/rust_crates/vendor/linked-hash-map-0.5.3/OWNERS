@@ -4,6 +4,5 @@
 
 include /src/starnix/OWNERS
 include /src/storage/OWNERS
-include /src/sys/test_manager/OWNERS
 include /third_party/rust_crates/vendor/lru-cache-0.1.2/OWNERS
 include /third_party/rust_crates/vendor/toml_edit-0.2.1/OWNERS

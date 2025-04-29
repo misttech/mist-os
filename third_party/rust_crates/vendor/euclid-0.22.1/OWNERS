@@ -7,6 +7,4 @@ include /src/lib/ui/OWNERS
 include /src/lib/ui/carnelian/OWNERS
 include /src/recovery/OWNERS
 include /src/recovery/system/OWNERS
-include /src/ui/bin/terminal/OWNERS
 include /src/ui/testing/OWNERS
-include /src/ui/tests/integration_graphics_tests/OWNERS

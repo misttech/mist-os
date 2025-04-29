@@ -4,4 +4,4 @@
 
 include /third_party/rust_crates/vendor/proc-macro2-1.0.94/OWNERS
 include /third_party/rust_crates/vendor/syn-1.0.98/OWNERS
-include /third_party/rust_crates/vendor/syn-2.0.87/OWNERS
+include /third_party/rust_crates/vendor/syn-2.0.100/OWNERS

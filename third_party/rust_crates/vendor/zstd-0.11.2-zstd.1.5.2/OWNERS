@@ -2,9 +2,6 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/developer/ffx/plugins/test/OWNERS
 include /src/devices/bin/OWNERS
 include /src/lib/test_diagnostics/OWNERS
 include /src/storage/OWNERS
-include /src/sys/run_test_suite/OWNERS
-include /tools/make-fuchsia-vol/OWNERS

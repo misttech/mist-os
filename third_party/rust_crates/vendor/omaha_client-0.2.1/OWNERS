@@ -5,4 +5,3 @@
 include /src/developer/ffx/plugins/product/OWNERS
 include /src/sys/pkg/OWNERS
 include /src/sys/pkg/bin/omaha-client/OWNERS
-include /third_party/rust_crates/vendor/mock-omaha-server-0.3.3/OWNERS

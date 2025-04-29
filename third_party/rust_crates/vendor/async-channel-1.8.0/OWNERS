@@ -2,12 +2,9 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /examples/components/OWNERS
 include /src/developer/ffx/OWNERS
 include /src/developer/ffx/lib/fuchsia-controller/OWNERS
-include /src/diagnostics/lib/log_symbolizer/OWNERS
 include /src/starnix/OWNERS
 include /src/storage/OWNERS
-include /src/sys/component_manager/OWNERS
 include /src/testing/sl4f/OWNERS
 include /third_party/rust_crates/vendor/blocking-1.3.0/OWNERS

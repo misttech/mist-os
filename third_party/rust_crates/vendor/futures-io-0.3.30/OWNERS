@@ -2,10 +2,8 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/sys/pkg/OWNERS
 include /third_party/rust_crates/vendor/futures-0.3.30/OWNERS
 include /third_party/rust_crates/vendor/futures-lite-1.11.3/OWNERS
-include /third_party/rust_crates/vendor/futures-test-0.3.30/OWNERS
 include /third_party/rust_crates/vendor/futures-util-0.3.30/OWNERS
 include /third_party/rust_crates/vendor/trust-dns-proto-0.22.0/OWNERS
 include /third_party/rust_crates/vendor/tuf-0.3.0-beta13/OWNERS

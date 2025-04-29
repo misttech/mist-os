@@ -2,7 +2,6 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/developer/ffx/OWNERS
 include /third_party/rust_crates/forks/prettytable-rs/OWNERS
 include /third_party/rust_crates/forks/rustyline/OWNERS
 include /third_party/rust_crates/vendor/clap-2.34.0/OWNERS

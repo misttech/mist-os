@@ -2,7 +2,6 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/developer/ffx/daemon/protocols/repo/OWNERS
 include /src/developer/ffx/lib/pkg/OWNERS
 include /src/developer/ffx/plugins/repository/OWNERS
 include /src/lib/fuchsia-hyper/OWNERS

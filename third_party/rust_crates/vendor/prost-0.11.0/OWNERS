@@ -5,6 +5,5 @@
 include /src/developer/ffx/plugins/profile/heapdump/OWNERS
 include /src/performance/memory/OWNERS
 include /src/starnix/OWNERS
-include /src/virtualization/OWNERS
 include /third_party/rust_crates/vendor/prost-build-0.11.1/OWNERS
 include /third_party/rust_crates/vendor/prost-types-0.11.1/OWNERS

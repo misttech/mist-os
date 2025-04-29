@@ -4,7 +4,6 @@
 
 include /src/developer/ffx/OWNERS
 include /src/lib/assembly/OWNERS
-include /src/sys/pkg/OWNERS
 include /third_party/rust_crates/vendor/rustls-0.21.12/OWNERS
 include /third_party/rust_crates/vendor/rustls-webpki-0.101.7/OWNERS
 include /third_party/rust_crates/vendor/sct-0.7.1/OWNERS

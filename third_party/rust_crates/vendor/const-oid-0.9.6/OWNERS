@@ -3,3 +3,4 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /third_party/rust_crates/vendor/der-0.6.1/OWNERS
+include /third_party/rust_crates/vendor/digest-0.10.7/OWNERS

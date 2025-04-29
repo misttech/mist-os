@@ -7,5 +7,4 @@ include /src/connectivity/wlan/OWNERS
 include /src/devices/lib/OWNERS
 include /src/devices/pci/OWNERS
 include /src/lib/diagnostics/OWNERS
-include /src/media/OWNERS
 include /src/performance/OWNERS

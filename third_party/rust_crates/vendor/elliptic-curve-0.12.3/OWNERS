@@ -2,7 +2,6 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/connectivity/bluetooth/OWNERS
 include /third_party/rust_crates/vendor/ecdsa-0.14.8/OWNERS
 include /third_party/rust_crates/vendor/omaha_client-0.2.1/OWNERS
 include /third_party/rust_crates/vendor/p256-0.11.1/OWNERS

@@ -3,5 +3,4 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /src/developer/ffx/OWNERS
-include /third_party/rust_crates/vendor/loom-0.7.1/OWNERS
 include /tools/funnel/OWNERS

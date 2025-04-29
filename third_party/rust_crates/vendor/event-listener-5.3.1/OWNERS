@@ -6,4 +6,3 @@ include /src/connectivity/lib/network-device/rust/OWNERS
 include /src/connectivity/overnet/OWNERS
 include /src/developer/lib/OWNERS
 include /src/storage/OWNERS
-include /src/sys/fuzzing/OWNERS

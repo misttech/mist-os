@@ -2,10 +2,10 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/bringup/bin/netsvc/OWNERS
 include /src/connectivity/lib/packet-formats/OWNERS
 include /src/connectivity/network/OWNERS
 include /src/connectivity/network/dhcpv6/OWNERS
 include /src/lib/network/OWNERS
 include /src/lib/network/packet/OWNERS
 include /src/starnix/OWNERS
+include /third_party/rust_crates/vendor/vte-0.15.0/OWNERS

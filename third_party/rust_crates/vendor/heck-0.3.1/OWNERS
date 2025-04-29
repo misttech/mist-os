@@ -2,15 +2,13 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/connectivity/network/tests/fidl/OWNERS
 include /src/developer/ffx/OWNERS
 include /src/devices/lib/OWNERS
 include /src/devices/tools/fidlgen_banjo/OWNERS
 include /src/fonts/OWNERS
 include /src/lib/fidl_table_validation/OWNERS
 include /src/sys/test_runners/starnix/OWNERS
-include /third_party/rust_crates/vendor/heck-0.4.1/OWNERS
-include /third_party/rust_crates/vendor/structopt-derive-0.2.14/OWNERS
+include /third_party/rust_crates/vendor/structopt-derive-0.4.18/OWNERS
 include /tools/create/OWNERS
 include /tools/fidl/fidldoc/OWNERS
 include /tools/test_pilot/OWNERS

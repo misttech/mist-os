@@ -2,32 +2,15 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/bringup/OWNERS
-include /src/connectivity/network/tests/integration/OWNERS
-include /src/developer/ffx/lib/pkg/OWNERS
 include /src/developer/ffx/plugins/product/OWNERS
-include /src/diagnostics/OWNERS
-include /src/diagnostics/lib/inspect-fidl-load/OWNERS
-include /src/diagnostics/lib/triage/OWNERS
-include /src/fonts/OWNERS
 include /src/lib/diagnostics/inspect/rust/OWNERS
-include /src/lib/fuchsia-component-test/OWNERS
-include /src/performance/memory/OWNERS
-include /src/recovery/system/OWNERS
 include /src/security/lib/scrutiny/OWNERS
-include /src/session/OWNERS
 include /src/starnix/OWNERS
-include /src/storage/OWNERS
 include /src/sys/component_manager/OWNERS
 include /src/sys/lib/routing/OWNERS
 include /src/sys/pkg/OWNERS
-include /src/sys/run_test_suite/OWNERS
-include /src/sys/test_manager/OWNERS
 include /src/sys/test_runners/OWNERS
 include /src/testing/sl4f/OWNERS
-include /src/ui/bin/text/OWNERS
 include /src/ui/lib/input_pipeline/OWNERS
-include /tools/fidl/OWNERS
-include /tools/lib/cm_fidl_analyzer/OWNERS
 include /tools/lib/cml/OWNERS
 include /tools/test_list_tool/OWNERS

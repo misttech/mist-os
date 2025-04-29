@@ -3,6 +3,5 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /src/connectivity/wlan/wlancfg/OWNERS
-include /src/developer/ffx/lib/pkg/OWNERS
 include /src/lib/fuchsia-url/OWNERS
 include /third_party/rust_crates/vendor/url-1.7.2/OWNERS

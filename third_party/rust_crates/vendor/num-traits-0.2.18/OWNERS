@@ -14,13 +14,11 @@ include /src/devices/lib/OWNERS
 include /src/devices/usb/OWNERS
 include /src/diagnostics/iquery/OWNERS
 include /src/diagnostics/lib/triage/OWNERS
-include /src/diagnostics/validator/inspect/OWNERS
 include /src/lib/diagnostics/OWNERS
 include /src/lib/diagnostics/hierarchy/rust/OWNERS
 include /src/lib/diagnostics/inspect/format/rust/OWNERS
 include /src/lib/fuchsia-runtime/OWNERS
 include /src/lib/process_builder/OWNERS
-include /src/media/OWNERS
 include /src/power/OWNERS
 include /src/power/metrics-logger/OWNERS
 include /src/recovery/OWNERS
@@ -33,7 +31,6 @@ include /src/ui/bin/brightness_manager/OWNERS
 include /src/ui/lib/scene_management/OWNERS
 include /src/virtualization/OWNERS
 include /third_party/rust_crates/vendor/chrono-0.4.34/OWNERS
-include /third_party/rust_crates/vendor/criterion-0.2.11/OWNERS
 include /third_party/rust_crates/vendor/euclid-0.22.1/OWNERS
 include /third_party/rust_crates/vendor/float-cmp-0.8.0/OWNERS
 include /third_party/rust_crates/vendor/num-0.4.0/OWNERS

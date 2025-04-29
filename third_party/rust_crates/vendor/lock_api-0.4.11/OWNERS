@@ -5,6 +5,5 @@
 include /src/lib/diagnostics/inspect/derive/OWNERS
 include /src/lib/fuchsia-sync/OWNERS
 include /src/starnix/OWNERS
-include /third_party/rust_crates/vendor/parking_lot-0.11.1/OWNERS
 include /third_party/rust_crates/vendor/parking_lot-0.12.0/OWNERS
 include /third_party/rust_crates/vendor/tracing-mutex-0.3.0/OWNERS

@@ -2,5 +2,4 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /third_party/rust_crates/vendor/ghash-0.5.0/OWNERS
 include /third_party/rust_crates/vendor/polyval-0.6.0/OWNERS

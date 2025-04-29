@@ -4,8 +4,6 @@
 
 include /src/connectivity/bluetooth/OWNERS
 include /src/connectivity/lib/at-commands/OWNERS
-include /src/connectivity/network/dhcpv4/OWNERS
-include /src/developer/ffx/daemon/protocols/repo/OWNERS
 include /tools/auto_owners/OWNERS
 include /tools/clidoc/OWNERS
 include /tools/fidl/fidldoc/OWNERS

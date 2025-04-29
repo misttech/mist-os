@@ -2,5 +2,4 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /third_party/rust_crates/vendor/criterion-0.2.11/OWNERS
 include /third_party/rust_crates/vendor/rayon-1.10.0/OWNERS

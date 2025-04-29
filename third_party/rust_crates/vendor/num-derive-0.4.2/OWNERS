@@ -11,7 +11,6 @@ include /src/connectivity/wlan/OWNERS
 include /src/devices/lib/OWNERS
 include /src/devices/usb/OWNERS
 include /src/diagnostics/lib/triage/OWNERS
-include /src/diagnostics/validator/inspect/OWNERS
 include /src/lib/diagnostics/hierarchy/rust/OWNERS
 include /src/lib/diagnostics/inspect/format/rust/OWNERS
 include /src/lib/fuchsia-runtime/OWNERS

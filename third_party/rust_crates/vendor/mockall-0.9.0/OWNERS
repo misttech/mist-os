@@ -5,4 +5,3 @@
 include /src/developer/ffx/OWNERS
 include /src/developer/ffx/plugins/emulator/OWNERS
 include /src/developer/ffx/plugins/package/OWNERS
-include /src/recovery/OWNERS

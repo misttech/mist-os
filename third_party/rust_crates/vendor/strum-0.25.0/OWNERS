@@ -3,6 +3,7 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /build/assembly/OWNERS
+include /src/connectivity/network/OWNERS
 include /src/connectivity/wlan/OWNERS
 include /src/lib/assembly/OWNERS
 include /src/lib/diagnostics/inspect/contrib/rust/OWNERS

@@ -5,7 +5,6 @@
 include /build/sdk/meta/OWNERS
 include /src/lib/android/OWNERS
 include /src/lib/assembly/OWNERS
-include /src/lib/testing/expectation/OWNERS
 include /src/lib/utf8_path/OWNERS
 include /src/security/lib/scrutiny/OWNERS
 include /tools/pbtool/OWNERS

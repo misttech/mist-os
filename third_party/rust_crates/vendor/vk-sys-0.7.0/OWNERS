@@ -3,4 +3,3 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /src/lib/fuchsia-image-format/OWNERS
-include /src/lib/ui/fuchsia-vulkan/OWNERS

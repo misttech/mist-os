@@ -2,8 +2,3 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/connectivity/network/OWNERS
-include /src/connectivity/network/netstack3/bench/OWNERS
-include /src/developer/fuchsia-criterion/OWNERS
-include /src/power/OWNERS
-include /src/tests/benchmarks/fidl/OWNERS

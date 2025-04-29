@@ -4,26 +4,18 @@
 
 include /build/OWNERS
 include /build/components/OWNERS
-include /examples/intl/OWNERS
 include /src/connectivity/bluetooth/OWNERS
-include /src/connectivity/weave/OWNERS
 include /src/connectivity/wlan/tools/wlantool/OWNERS
 include /src/connectivity/wlan/wlancfg/OWNERS
 include /src/devices/tools/fidlgen_banjo/OWNERS
-include /src/diagnostics/iquery/OWNERS
 include /src/diagnostics/triage/OWNERS
-include /src/factory/OWNERS
 include /src/fonts/OWNERS
 include /src/intl/OWNERS
-include /src/lib/diagnostics/inspect/rust/OWNERS
 include /src/lib/ui/wayland/OWNERS
-include /src/testing/fidl/OWNERS
 include /src/ui/tools/OWNERS
-include /src/virtualization/OWNERS
 include /tools/bindc/OWNERS
 include /tools/cmc/OWNERS
 include /tools/component_id_index/OWNERS
 include /tools/jq5/OWNERS
 include /tools/test_list_tool/OWNERS
-include /tools/test_pilot/OWNERS
 include /tools/validate_test_type/OWNERS

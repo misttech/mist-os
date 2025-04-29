@@ -2,7 +2,6 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/developer/fuchsia-criterion/OWNERS
+include /src/developer/ffx/plugins/profile/memory/OWNERS
 include /third_party/rust_crates/forks/prettytable-rs/OWNERS
-include /third_party/rust_crates/vendor/criterion-0.2.11/OWNERS
 include /tools/zedmon/OWNERS

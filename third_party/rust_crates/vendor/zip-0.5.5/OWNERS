@@ -6,5 +6,4 @@ include /build/python/OWNERS
 include /build/sdk/meta/OWNERS
 include /src/developer/ffx/OWNERS
 include /src/developer/ffx/tools/triage/OWNERS
-include /src/security/OWNERS
 include /src/storage/OWNERS

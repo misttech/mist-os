@@ -4,7 +4,6 @@
 
 include /src/starnix/lib/selinux/OWNERS
 include /src/sys/OWNERS
-include /src/tee/OWNERS
 include /third_party/rust_crates/vendor/petgraph-0.6.2/OWNERS
 include /third_party/rust_crates/vendor/schemars-0.8.10/OWNERS
 include /third_party/rust_crates/vendor/serde_yaml-0.9.14/OWNERS

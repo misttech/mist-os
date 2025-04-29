@@ -6,8 +6,6 @@ include /src/connectivity/network/OWNERS
 include /src/graphics/OWNERS
 include /src/lib/ui/carnelian/OWNERS
 include /src/starnix/OWNERS
-include /src/starnix/lib/third_party/rust_netlink/netlink_packet_sock_diag/OWNERS
-include /third_party/rust_crates/vendor/parking_lot_core-0.8.3/OWNERS
 include /third_party/rust_crates/vendor/parking_lot_core-0.9.9/OWNERS
 include /third_party/rust_crates/vendor/tracing-subscriber-0.3.18/OWNERS
 include /third_party/rust_crates/vendor/trust-dns-proto-0.22.0/OWNERS

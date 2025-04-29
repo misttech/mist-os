@@ -2,7 +2,6 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/sys/pkg/OWNERS
 include /third_party/rust_crates/ask2patch/csv/OWNERS
 include /third_party/rust_crates/vendor/hyper-0.14.19/OWNERS
 include /third_party/rust_crates/vendor/serde_json-1.0.128/OWNERS

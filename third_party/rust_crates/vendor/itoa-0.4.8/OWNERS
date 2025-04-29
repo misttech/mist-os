@@ -2,6 +2,4 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/sys/pkg/OWNERS
 include /third_party/rust_crates/vendor/http-0.2.4/OWNERS
-include /third_party/rust_crates/vendor/itoa-1.0.5/OWNERS

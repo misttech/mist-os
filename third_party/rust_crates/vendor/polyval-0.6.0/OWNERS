@@ -3,4 +3,3 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /third_party/rust_crates/vendor/aes-gcm-siv-0.11.1/OWNERS
-include /third_party/rust_crates/vendor/ghash-0.5.0/OWNERS
