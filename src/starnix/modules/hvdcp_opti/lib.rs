@@ -4,6 +4,7 @@
 
 mod device;
 mod iio_file;
+mod power_supply_file;
 mod qbg_battery_file;
 mod qbg_file;
 mod utils;

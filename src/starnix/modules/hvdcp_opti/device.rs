@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use super::iio_file::{IioDirectory0, IioDirectory1};
+use super::power_supply_file::{BatteryPowerSupply, BmsPowerSupply, UsbPowerSupply};
 use super::qbg_battery_file::create_battery_profile_device;
 use super::qbg_file::{create_qbg_device, QbgClassDirectory};
 use starnix_core::device::kobject::DeviceMetadata;
@@ -65,5 +66,36 @@ where
         "iio:device1".into(),
         iio,
         IioDirectory1::new,
+    );
+
+    // power_supply devices don't show up under any bus. This makes it show up under virtual_bus,
+    // but it's OK.
+    let power_supply =
+        registry.objects.get_or_create_class("power_supply".into(), registry.objects.virtual_bus());
+    // /sys/class/power_supply/usb
+    registry.add_numberless_device(
+        locked,
+        current_task,
+        "usb".into(),
+        power_supply.clone(),
+        UsbPowerSupply::new,
+    );
+
+    // /sys/class/power_supply/battery
+    registry.add_numberless_device(
+        locked,
+        current_task,
+        "battery".into(),
+        power_supply.clone(),
+        BatteryPowerSupply::new,
+    );
+
+    // /sys/class/power_supply/bms
+    registry.add_numberless_device(
+        locked,
+        current_task,
+        "bms".into(),
+        power_supply,
+        BmsPowerSupply::new,
     );
 }

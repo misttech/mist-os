@@ -19,6 +19,7 @@ rustc_library("hvdcp_opti_module") {
     "device.rs",
     "iio_file.rs",
     "lib.rs",
+    "power_supply_file.rs",
     "qbg_battery_file.rs",
     "qbg_file.rs",
     "utils.rs",
