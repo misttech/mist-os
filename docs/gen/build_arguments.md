@@ -1056,7 +1056,7 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
@@ -1134,7 +1134,7 @@ This should never be set as a build argument.
 }
   riscv64_unknown_linux_gnu = {
   libclang_rt_profile_a = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.profile.a"
-  libunwind_so = "../../../../out/not-default/libunwind.so"
+  libunwind_so = ""
   resource_dir = "lib/clang/21"
   variants = {
   asan = {
@@ -1865,7 +1865,7 @@ from infra builds, and later inspection.
 
 **Current value (from the default):** `"//out/not-default/comparison-reports"`
 
-From //build/toolchain/rbe.gni:228
+From //build/toolchain/rbe.gni:229
 
 ### compilation_mode
 
@@ -2083,7 +2083,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:213
+From //build/toolchain/rbe.gni:214
 
 ### cxx_rbe_download_obj_files
 
@@ -2095,7 +2095,7 @@ and not restricted environments that lack direct network access.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:235
+From //build/toolchain/rbe.gni:236
 
 ### cxx_rbe_enable
 
@@ -2104,7 +2104,7 @@ Remote execution offers increased build parallelism and caching.
 
 **Current value (from the default):** `false`
 
-From //build/toolchain/rbe.gni:163
+From //build/toolchain/rbe.gni:164
 
 ### cxx_rbe_exec_strategy
 
@@ -2130,7 +2130,7 @@ One of:
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:189
+From //build/toolchain/rbe.gni:190
 
 ### cxx_rbe_full_toolchain
 
@@ -2145,7 +2145,7 @@ Use this primarily for debugging and as an emergency workaround.
 
 **Current value (from the default):** `false`
 
-From //build/toolchain/rbe.gni:223
+From //build/toolchain/rbe.gni:224
 
 ### cxx_rbe_minimalist_wrapper
 
@@ -2155,7 +2155,7 @@ This flag is only meaningful when `cxx_rbe_enable` is true.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:168
+From //build/toolchain/rbe.gni:169
 
 ### data_filesystem_format
 
@@ -3789,13 +3789,13 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:285
+From //build/toolchain/rbe.gni:286
 
 ### link_rbe_download_unstripped_outputs
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:301
+From //build/toolchain/rbe.gni:302
 
 ### link_rbe_enable
 
@@ -3805,7 +3805,7 @@ linkers like `lld`.
 
 **Current value (from the default):** `false`
 
-From //build/toolchain/rbe.gni:244
+From //build/toolchain/rbe.gni:245
 
 ### link_rbe_exec_strategy
 
@@ -3831,7 +3831,7 @@ One of:
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:265
+From //build/toolchain/rbe.gni:266
 
 ### link_rbe_full_toolchain
 
@@ -3846,7 +3846,7 @@ Use this primarily for debugging and as an emergency workaround.
 
 **Current value (from the default):** `false`
 
-From //build/toolchain/rbe.gni:295
+From //build/toolchain/rbe.gni:296
 
 ### llvm_prefix
 
@@ -5164,7 +5164,7 @@ This is required to support skipping downloads of rlibs.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:151
+From //build/toolchain/rbe.gni:152
 
 ### rust_incremental
 
@@ -5231,7 +5231,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:137
+From //build/toolchain/rbe.gni:138
 
 ### rust_rbe_download_rlibs
 
@@ -5240,13 +5240,13 @@ rlibs from remote Rust build actions.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:155
+From //build/toolchain/rbe.gni:156
 
 ### rust_rbe_download_unstripped_binaries
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:145
+From //build/toolchain/rbe.gni:146
 
 ### rust_rbe_enable
 
@@ -5254,7 +5254,7 @@ Set to true to enable distributed compilation of Rust using RBE.
 
 **Current value (from the default):** `false`
 
-From //build/toolchain/rbe.gni:90
+From //build/toolchain/rbe.gni:91
 
 ### rust_rbe_exec_strategy
 
@@ -5280,7 +5280,7 @@ One of:
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:111
+From //build/toolchain/rbe.gni:112
 
 ### rust_v0_symbol_mangling
 
