@@ -773,6 +773,8 @@ common_permission_enum! {
         Listen("listen"),
         /// Permission to send datagrams to the socket.
         SendTo("sendto"),
+        /// Permission to terminate connection.
+        Shutdown("shutdown"),
         // keep-sorted end
     }
 }

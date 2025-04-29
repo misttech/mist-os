@@ -13,7 +13,8 @@ use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::socket::{
-    Socket, SocketAddress, SocketDomain, SocketPeer, SocketProtocol, SocketType,
+    Socket, SocketAddress, SocketDomain, SocketPeer, SocketProtocol, SocketShutdownFlags,
+    SocketType,
 };
 use crate::vfs::{
     Anon, DirEntryHandle, FileHandle, FileObject, FileSystem, FileSystemHandle, FsNode, FsStr,
@@ -948,6 +949,24 @@ pub fn check_socket_listen_access(
     track_hook_duration!(c"security.hooks.check_socket_listen_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::socket::check_socket_listen_access(&security_server, current_task, socket)
+    })
+}
+
+/// Checks if the `current_task` is allowed to shutdown `socket`.
+/// Corresponds to the `socket_shutdown()` LSM hook.
+pub fn check_socket_shutdown_access(
+    current_task: &CurrentTask,
+    socket: &Socket,
+    how: SocketShutdownFlags,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.check_socket_shutdown_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::check_socket_shutdown_access(
+            &security_server,
+            current_task,
+            socket,
+            how,
+        )
     })
 }
 

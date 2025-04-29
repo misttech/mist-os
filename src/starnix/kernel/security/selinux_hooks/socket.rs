@@ -7,7 +7,8 @@ use super::fs_node::compute_new_fs_node_sid;
 use super::{check_permission, fs_node_effective_sid_and_class, todo_check_permission};
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::socket::{
-    NetlinkFamily, Socket, SocketAddress, SocketDomain, SocketPeer, SocketProtocol, SocketType,
+    NetlinkFamily, Socket, SocketAddress, SocketDomain, SocketPeer, SocketProtocol,
+    SocketShutdownFlags, SocketType,
 };
 use crate::vfs::{Anon, FileSystemHandle, FsNode};
 use crate::TODO_DENY;
@@ -200,7 +201,7 @@ pub(in crate::security) fn check_socket_create_access(
     )
 }
 
-/// Computes and sets the security class for `socket_node`.
+/// Computes and sets the security class for `socket`.
 pub(in crate::security) fn socket_post_create(socket: &Socket) {
     let socket_node = socket.fs_node();
     socket_node.security_state.lock().class =
@@ -208,7 +209,7 @@ pub(in crate::security) fn socket_post_create(socket: &Socket) {
 }
 
 /// Checks that `current_task` has the right permissions to perform a bind operation on
-/// `socket_node`.
+/// `socket`.
 pub(in crate::security) fn check_socket_bind_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
@@ -235,7 +236,7 @@ pub(in crate::security) fn check_socket_bind_access(
 }
 
 /// Checks that `current_task` has the right permissions to initiate a connection with
-/// `socket_node`.
+/// `socket`.
 pub(in crate::security) fn check_socket_connect_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
@@ -261,7 +262,7 @@ pub(in crate::security) fn check_socket_connect_access(
     )
 }
 
-/// Checks that `current_task` has permission to listen on `socket_node`.
+/// Checks that `current_task` has permission to listen on `socket`.
 pub(in crate::security) fn check_socket_listen_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
@@ -280,6 +281,30 @@ pub(in crate::security) fn check_socket_listen_access(
         current_sid,
         &socket_node,
         CommonSocketPermission::Listen.for_class(socket_class),
+        current_task.into(),
+    )
+}
+
+/// Checks that `current_task` has permission to shutdown `socket`.
+pub(in crate::security) fn check_socket_shutdown_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    socket: &Socket,
+    _how: SocketShutdownFlags,
+) -> Result<(), Errno> {
+    let socket_node = socket.fs_node();
+    let current_sid = current_task.security_state.lock().current_sid;
+    let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
+        panic!("check_socket_shutdown_access called for non-Socket class")
+    };
+
+    todo_has_socket_permission(
+        TODO_DENY!("https://fxbug.dev/411396154", "Enforce socket_shutdown checks."),
+        &security_server.as_permission_check(),
+        current_task.kernel(),
+        current_sid,
+        &socket_node,
+        CommonSocketPermission::Shutdown.for_class(socket_class),
         current_task.into(),
     )
 }

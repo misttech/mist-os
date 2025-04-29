@@ -1177,11 +1177,13 @@ impl Socket {
     pub fn shutdown<L>(
         &self,
         locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
         how: SocketShutdownFlags,
     ) -> Result<(), Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
+        security::check_socket_shutdown_access(current_task, self, how)?;
         self.ops.shutdown(&mut locked.cast_locked::<FileOpsCore>(), self, how)
     }
 

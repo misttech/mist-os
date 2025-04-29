@@ -961,7 +961,7 @@ pub fn sys_shutdown(
         SHUT_RDWR => SocketShutdownFlags::READ | SocketShutdownFlags::WRITE,
         _ => return error!(EINVAL),
     };
-    socket.shutdown(locked, how)?;
+    socket.shutdown(locked, current_task, how)?;
     Ok(())
 }
 
