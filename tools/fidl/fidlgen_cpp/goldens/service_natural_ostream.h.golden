@@ -16,49 +16,29 @@
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_service::FirstProtocol>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_service::FirstProtocol>& value) {
-    return os << "ClientEnd<" << "test_service::FirstProtocol" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_service::FirstProtocol>& value);
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_service::FirstProtocol>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_service::FirstProtocol>& value) {
-    return os << "ServerEnd<" << "test_service::FirstProtocol" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_service::FirstProtocol>& value);
 };
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_service::SecondProtocol>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_service::SecondProtocol>& value) {
-    return os << "ClientEnd<" << "test_service::SecondProtocol" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_service::SecondProtocol>& value);
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_service::SecondProtocol>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_service::SecondProtocol>& value) {
-    return os << "ServerEnd<" << "test_service::SecondProtocol" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_service::SecondProtocol>& value);
 };
 
-namespace fidl {
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_service::FirstProtocol>& value);
 
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_service::FirstProtocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_service::FirstProtocol>>::Format(os, value);
-}
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_service::FirstProtocol>& value);
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_service::SecondProtocol>& value);
 
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_service::FirstProtocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_service::FirstProtocol>>::Format(os, value);
-}
-
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_service::SecondProtocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_service::SecondProtocol>>::Format(os, value);
-}
-
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_service::SecondProtocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_service::SecondProtocol>>::Format(os, value);
-}
-}  // namespace fidl
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_service::SecondProtocol>& value);
 
 #endif  // __Fuchsia__
 

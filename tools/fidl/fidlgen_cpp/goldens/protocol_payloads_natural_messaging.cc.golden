@@ -110,6 +110,8 @@ constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnAnon_DynamicFlags =
 #ifdef __Fuchsia__
 }  // namespace test_protocolpayloads
 
+::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayComposed>::Response(::test_protocolpayloads_imported::ImportStructPayload v) : ImportStructPayload(std::move(v)) {}
+
 ::fidl::internal::NaturalThenable<::test_protocolpayloads::MainProtocol::TwoWayComposed>
 fidl::internal::NaturalClientImpl<::test_protocolpayloads::MainProtocol>::TwoWayComposed(const ::fidl::Request<::test_protocolpayloads::MainProtocol::TwoWayComposed>& request) const {
   return ::fidl::internal::NaturalThenable<::test_protocolpayloads::MainProtocol::TwoWayComposed>(
@@ -125,6 +127,15 @@ fidl::internal::NaturalClientImpl<::test_protocolpayloads::MainProtocol>::TwoWay
         ::fidl::OutgoingMessage msg = encoder.GetMessage();
         return base->SendTwoWay(msg, response_context);
       });
+}
+
+::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>::Response(::fit::result<uint32_t, ::test_protocolpayloads_imported::ImportStructPayload> v) : result(std::move(v)) {}
+::test_protocolpayloads_imported::ComposedProtocolTwoWayComposedWithErrorResult fidl::internal::ResponseMessageConverter<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>::IntoDomainObject(const ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>& m) {
+  if (m.is_error()) {
+    return DomainObject::WithErr(m.error_value());
+  } else {
+    return DomainObject::WithResponse(std::move(m.value()));
+  }
 }
 
 ::fidl::internal::NaturalThenable<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>
@@ -144,6 +155,8 @@ fidl::internal::NaturalClientImpl<::test_protocolpayloads::MainProtocol>::TwoWay
       });
 }
 
+::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayLocal>::Response(::test_protocolpayloads::LocalStructPayload v) : LocalStructPayload(std::move(v)) {}
+
 ::fidl::internal::NaturalThenable<::test_protocolpayloads::MainProtocol::TwoWayLocal>
 fidl::internal::NaturalClientImpl<::test_protocolpayloads::MainProtocol>::TwoWayLocal(const ::fidl::Request<::test_protocolpayloads::MainProtocol::TwoWayLocal>& request) const {
   return ::fidl::internal::NaturalThenable<::test_protocolpayloads::MainProtocol::TwoWayLocal>(
@@ -159,6 +172,15 @@ fidl::internal::NaturalClientImpl<::test_protocolpayloads::MainProtocol>::TwoWay
         ::fidl::OutgoingMessage msg = encoder.GetMessage();
         return base->SendTwoWay(msg, response_context);
       });
+}
+
+::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>::Response(::fit::result<uint32_t, ::test_protocolpayloads::LocalStructPayload> v) : result(std::move(v)) {}
+::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult fidl::internal::ResponseMessageConverter<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>::IntoDomainObject(const ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>& m) {
+  if (m.is_error()) {
+    return DomainObject::WithErr(m.error_value());
+  } else {
+    return DomainObject::WithResponse(std::move(m.value()));
+  }
 }
 
 ::fidl::internal::NaturalThenable<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>
@@ -178,6 +200,8 @@ fidl::internal::NaturalClientImpl<::test_protocolpayloads::MainProtocol>::TwoWay
       });
 }
 
+::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayImport>::Response(::test_protocolpayloads_imported::ImportStructPayload v) : ImportStructPayload(std::move(v)) {}
+
 ::fidl::internal::NaturalThenable<::test_protocolpayloads::MainProtocol::TwoWayImport>
 fidl::internal::NaturalClientImpl<::test_protocolpayloads::MainProtocol>::TwoWayImport(const ::fidl::Request<::test_protocolpayloads::MainProtocol::TwoWayImport>& request) const {
   return ::fidl::internal::NaturalThenable<::test_protocolpayloads::MainProtocol::TwoWayImport>(
@@ -193,6 +217,15 @@ fidl::internal::NaturalClientImpl<::test_protocolpayloads::MainProtocol>::TwoWay
         ::fidl::OutgoingMessage msg = encoder.GetMessage();
         return base->SendTwoWay(msg, response_context);
       });
+}
+
+::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>::Response(::fit::result<uint32_t, ::test_protocolpayloads_imported::ImportStructPayload> v) : result(std::move(v)) {}
+::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult fidl::internal::ResponseMessageConverter<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>::IntoDomainObject(const ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>& m) {
+  if (m.is_error()) {
+    return DomainObject::WithErr(m.error_value());
+  } else {
+    return DomainObject::WithResponse(std::move(m.value()));
+  }
 }
 
 ::fidl::internal::NaturalThenable<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>
@@ -212,6 +245,8 @@ fidl::internal::NaturalClientImpl<::test_protocolpayloads::MainProtocol>::TwoWay
       });
 }
 
+::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayAnon>::Response(::test_protocolpayloads::MainProtocolTwoWayAnonResponse v) : MainProtocolTwoWayAnonResponse(std::move(v)) {}
+
 ::fidl::internal::NaturalThenable<::test_protocolpayloads::MainProtocol::TwoWayAnon>
 fidl::internal::NaturalClientImpl<::test_protocolpayloads::MainProtocol>::TwoWayAnon(const ::fidl::Request<::test_protocolpayloads::MainProtocol::TwoWayAnon>& request) const {
   return ::fidl::internal::NaturalThenable<::test_protocolpayloads::MainProtocol::TwoWayAnon>(
@@ -227,6 +262,15 @@ fidl::internal::NaturalClientImpl<::test_protocolpayloads::MainProtocol>::TwoWay
         ::fidl::OutgoingMessage msg = encoder.GetMessage();
         return base->SendTwoWay(msg, response_context);
       });
+}
+
+::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>::Response(::fit::result<uint32_t, ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse> v) : result(std::move(v)) {}
+::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult fidl::internal::ResponseMessageConverter<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>::IntoDomainObject(const ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>& m) {
+  if (m.is_error()) {
+    return DomainObject::WithErr(m.error_value());
+  } else {
+    return DomainObject::WithResponse(std::move(m.value()));
+  }
 }
 
 ::fidl::internal::NaturalThenable<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>
@@ -425,6 +469,11 @@ fidl::internal::NaturalSyncClientImpl<::test_protocolpayloads::MainProtocol>::On
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
+::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol> fidl::internal::NaturalSyncClientImpl<::test_protocolpayloads::MainProtocol>::_client_end() const {
+  return ::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol>(
+      _transport().get<::fidl::internal::ChannelTransport>());
+}
+
 ::fidl::Status fidl::SyncEventHandler<::test_protocolpayloads::MainProtocol>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol> client_end) {
   ::fidl::internal::IncomingEventsStorage<::test_protocolpayloads::MainProtocol> event_storage;
@@ -485,6 +534,13 @@ fidl::internal::NaturalEventDispatcher<::test_protocolpayloads::MainProtocol>::D
       return ::fidl::Status::UnknownOrdinal();
   }
 }
+
+::fidl::internal::NaturalEventDispatcher<::test_protocolpayloads::MainProtocol>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocolpayloads::MainProtocol>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
+void fidl::AsyncEventHandler<::test_protocolpayloads::MainProtocol>::OnComposed(::fidl::Event<::test_protocolpayloads::MainProtocol::OnComposed>&) {}
+void fidl::AsyncEventHandler<::test_protocolpayloads::MainProtocol>::OnLocal(::fidl::Event<::test_protocolpayloads::MainProtocol::OnLocal>&) {}
+void fidl::AsyncEventHandler<::test_protocolpayloads::MainProtocol>::OnImport(::fidl::Event<::test_protocolpayloads::MainProtocol::OnImport>&) {}
+void fidl::AsyncEventHandler<::test_protocolpayloads::MainProtocol>::OnAnon(::fidl::Event<::test_protocolpayloads::MainProtocol::OnAnon>&) {}
 
 ::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_protocolpayloads::MainProtocol>::OnComposed(const ::test_protocolpayloads_imported::ImportStructPayload& payload) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
@@ -626,6 +682,12 @@ void fidl::internal::NaturalCompleterBase<::test_protocolpayloads::MainProtocol:
       ::fidl::internal::ResponseMessageConverter<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>::IntoDomainObject(response));
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
+}
+
+::fidl::ProtocolHandler<::test_protocolpayloads::MainProtocol> fidl::Server<::test_protocolpayloads::MainProtocol>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocolpayloads::MainProtocol> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
 }
 
 #ifdef __Fuchsia__

@@ -40,21 +40,13 @@ class Simple {
   Simple(const Simple& other) noexcept;
   Simple& operator=(const Simple& other) noexcept;
 
-  bool operator==(const Simple& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_struct::Simple, 2>::Equal(this, &other);
-  }
-  bool operator!=(const Simple& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_struct::Simple, 2>::Equal(this, &other);
-  }
+  bool operator==(const Simple& other) const noexcept;
+  bool operator!=(const Simple& other) const noexcept;
 
   uint8_t
-  f1() const {
-    return storage_.f1;
-  }
+  f1() const;
 
-  uint8_t& f1() {
-    return storage_.f1;
-  }
+  uint8_t& f1();
 
   // Setter for f1.
   //
@@ -62,13 +54,9 @@ class Simple {
   Simple& f1(uint8_t value);
 
   bool
-  f2() const {
-    return storage_.f2;
-  }
+  f2() const;
 
-  bool& f2() {
-    return storage_.f2;
-  }
+  bool& f2();
 
   // Setter for f2.
   //
@@ -113,21 +101,13 @@ class BasicStruct {
   BasicStruct(const BasicStruct& other) noexcept;
   BasicStruct& operator=(const BasicStruct& other) noexcept;
 
-  bool operator==(const BasicStruct& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_struct::BasicStruct, 24>::Equal(this, &other);
-  }
-  bool operator!=(const BasicStruct& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_struct::BasicStruct, 24>::Equal(this, &other);
-  }
+  bool operator==(const BasicStruct& other) const noexcept;
+  bool operator!=(const BasicStruct& other) const noexcept;
 
   uint32_t
-  x() const {
-    return storage_.x;
-  }
+  x() const;
 
-  uint32_t& x() {
-    return storage_.x;
-  }
+  uint32_t& x();
 
   // Setter for x.
   //
@@ -135,13 +115,9 @@ class BasicStruct {
   BasicStruct& x(uint32_t value);
 
   const ::std::string&
-  y() const {
-    return storage_.y;
-  }
+  y() const;
 
-  ::std::string& y() {
-    return storage_.y;
-  }
+  ::std::string& y();
 
   // Setter for y.
   //
@@ -169,52 +145,6 @@ class BasicStruct {
       .mask = 0xffffffff00000000,
   });
 };
-
-inline Simple::Simple(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Simple::Simple(uint8_t f1, bool f2) noexcept
-    : storage_({.f1 = std::move(f1),
-                .f2 = std::move(f2)}) {}
-inline Simple::Simple(const ::test_struct::Simple& other) noexcept : ::test_struct::Simple(other.CloneStorage_()) {}
-inline Simple& ::test_struct::Simple::operator=(const ::test_struct::Simple& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline Simple::Simple(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Simple(Storage_{
-                                                                                        .f1 = {},
-                                                                                        .f2 = {},
-                                                                                    }) {}
-inline Simple& Simple::f1(uint8_t value) {
-  storage_.f1 = std::move(value);
-  return *this;
-}
-inline Simple& Simple::f2(bool value) {
-  storage_.f2 = std::move(value);
-  return *this;
-}
-
-inline BasicStruct::BasicStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline BasicStruct::BasicStruct(uint32_t x, ::std::string y) noexcept
-    : storage_({.x = std::move(x),
-                .y = std::move(y)}) {}
-inline BasicStruct::BasicStruct(const ::test_struct::BasicStruct& other) noexcept : ::test_struct::BasicStruct(other.CloneStorage_()) {}
-inline BasicStruct& ::test_struct::BasicStruct::operator=(const ::test_struct::BasicStruct& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline BasicStruct::BasicStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : BasicStruct(Storage_{
-                                                                                                  .x = {},
-                                                                                                  .y = {},
-                                                                                              }) {}
-inline BasicStruct& BasicStruct::x(uint32_t value) {
-  storage_.x = std::move(value);
-  return *this;
-}
-inline BasicStruct& BasicStruct::y(::std::string value) {
-  storage_.y = std::move(value);
-  return *this;
-}
 
 }  // namespace test_struct
 namespace fidl {

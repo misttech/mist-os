@@ -92,7 +92,6 @@ std::ostream& fidl::ostream::Formatter<::test_handlesintypes::EmptyResourceUnion
 }
 
 #endif  // __Fuchsia__
-
 namespace test_handlesintypes {
 
 std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::ObjType& value) {

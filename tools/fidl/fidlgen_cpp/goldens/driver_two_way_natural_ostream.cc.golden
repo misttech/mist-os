@@ -25,7 +25,25 @@ std::ostream& fidl::ostream::Formatter<::test_drivertwoway::TwoWayAddResponse>::
   os << "}";
   return os;
 }
+#ifdef __Fuchsia__
 
+std::ostream& fidl::ostream::Formatter<::fdf::ClientEnd<::test_drivertwoway::TwoWay>>::Format(std::ostream& os, const ::fdf::ClientEnd<::test_drivertwoway::TwoWay>& value) {
+  return os << "ClientEnd<" << "test_drivertwoway::TwoWay" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& fidl::ostream::Formatter<::fdf::ServerEnd<::test_drivertwoway::TwoWay>>::Format(std::ostream& os, const ::fdf::ServerEnd<::test_drivertwoway::TwoWay>& value) {
+  return os << "ServerEnd<" << "test_drivertwoway::TwoWay" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fdf::ClientEnd<::test_drivertwoway::TwoWay>& value) {
+  return fidl::ostream::Formatter<::fdf::ClientEnd<::test_drivertwoway::TwoWay>>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fdf::ServerEnd<::test_drivertwoway::TwoWay>& value) {
+  return fidl::ostream::Formatter<::fdf::ServerEnd<::test_drivertwoway::TwoWay>>::Format(os, value);
+}
+
+#endif  // __Fuchsia__
 namespace test_drivertwoway {
 
 std::ostream& operator<<(std::ostream& os, const ::test_drivertwoway::TwoWayAddRequest& value) {

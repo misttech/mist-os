@@ -2712,11 +2712,11 @@ class ::fidl::WireAsyncEventHandler<::test_protocollayouts::MainProtocol>
     : public ::fidl::internal::WireEventHandlerInterface<::test_protocollayouts::MainProtocol>, public ::fidl::internal::AsyncEventHandler {
  public:
   WireAsyncEventHandler() = default;
-    void OnAnonComposed(::fidl::WireEvent<::test_protocollayouts::MainProtocol::OnAnonComposed>* event) override {}
-    void OnNamedComposed(::fidl::WireEvent<::test_protocollayouts::MainProtocol::OnNamedComposed>* event) override {}
-    void OnImport(::fidl::WireEvent<::test_protocollayouts::MainProtocol::OnImport>* event) override {}
-    void OnLocal(::fidl::WireEvent<::test_protocollayouts::MainProtocol::OnLocal>* event) override {}
-    void OnAnon(::fidl::WireEvent<::test_protocollayouts::MainProtocol::OnAnon>* event) override {}
+    void OnAnonComposed(::fidl::WireEvent<::test_protocollayouts::MainProtocol::OnAnonComposed>* event) override;
+    void OnNamedComposed(::fidl::WireEvent<::test_protocollayouts::MainProtocol::OnNamedComposed>* event) override;
+    void OnImport(::fidl::WireEvent<::test_protocollayouts::MainProtocol::OnImport>* event) override;
+    void OnLocal(::fidl::WireEvent<::test_protocollayouts::MainProtocol::OnLocal>* event) override;
+    void OnAnon(::fidl::WireEvent<::test_protocollayouts::MainProtocol::OnAnon>* event) override;
 };
 
   template<>
@@ -4529,8 +4529,8 @@ class ::fidl::WireAsyncEventHandler<::test_protocollayouts::OpenProtocol>
     : public ::fidl::internal::WireEventHandlerInterface<::test_protocollayouts::OpenProtocol>, public ::fidl::internal::AsyncEventHandler {
  public:
   WireAsyncEventHandler() = default;
-    void FlexibleEvent(::fidl::WireEvent<::test_protocollayouts::OpenProtocol::FlexibleEvent>* event) override {}
-    void StrictEvent(::fidl::WireEvent<::test_protocollayouts::OpenProtocol::StrictEvent>* event) override {}
+    void FlexibleEvent(::fidl::WireEvent<::test_protocollayouts::OpenProtocol::FlexibleEvent>* event) override;
+    void StrictEvent(::fidl::WireEvent<::test_protocollayouts::OpenProtocol::StrictEvent>* event) override;
 };
 
   template<>

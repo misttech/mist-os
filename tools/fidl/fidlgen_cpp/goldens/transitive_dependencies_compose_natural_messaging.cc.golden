@@ -20,6 +20,8 @@ constexpr inline ::fidl::MessageDynamicFlags kTop_GetFoo_DynamicFlags = ::fidl::
 #ifdef __Fuchsia__
 }  // namespace test_transitivedependenciescompose
 
+::fidl::Response<::test_transitivedependenciescompose::Top::GetFoo>::Response(::test_bottom::BottomGetFooResponse v) : BottomGetFooResponse(std::move(v)) {}
+
 ::fidl::internal::NaturalThenable<::test_transitivedependenciescompose::Top::GetFoo>
 fidl::internal::NaturalClientImpl<::test_transitivedependenciescompose::Top>::GetFoo() const {
   return ::fidl::internal::NaturalThenable<::test_transitivedependenciescompose::Top::GetFoo>(
@@ -54,12 +56,20 @@ fidl::internal::NaturalSyncClientImpl<::test_transitivedependenciescompose::Top>
       msg.Call(_client_end().handle(), response_storage.view()), nullptr);
 }
 
+::fidl::UnownedClientEnd<::test_transitivedependenciescompose::Top> fidl::internal::NaturalSyncClientImpl<::test_transitivedependenciescompose::Top>::_client_end() const {
+  return ::fidl::UnownedClientEnd<::test_transitivedependenciescompose::Top>(
+      _transport().get<::fidl::internal::ChannelTransport>());
+}
+
 ::fidl::Status fidl::SyncEventHandler<::test_transitivedependenciescompose::Top>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_transitivedependenciescompose::Top> client_end) {
   ::fidl::internal::IncomingEventsStorage<::test_transitivedependenciescompose::Top> event_storage;
   fidl::internal::NaturalEventDispatcher<::test_transitivedependenciescompose::Top> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
+
+::fidl::internal::NaturalEventDispatcher<::test_transitivedependenciescompose::Top>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_transitivedependenciescompose::Top>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
 
 #endif  // __Fuchsia__
 
@@ -70,6 +80,12 @@ void fidl::internal::NaturalCompleterBase<::test_transitivedependenciescompose::
       ::fidl::internal::ResponseMessageConverter<::test_transitivedependenciescompose::Top::GetFoo>::IntoDomainObject(response));
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
+}
+
+::fidl::ProtocolHandler<::test_transitivedependenciescompose::Top> fidl::Server<::test_transitivedependenciescompose::Top>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_transitivedependenciescompose::Top> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
 }
 
 #ifdef __Fuchsia__

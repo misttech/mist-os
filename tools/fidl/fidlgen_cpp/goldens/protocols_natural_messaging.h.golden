@@ -93,7 +93,7 @@ template <>
 class ::fidl::Response<::test_protocols::WithAndWithoutRequestResponse::NoRequestWithResponse> final : public ::test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse {
  public:
   using ::test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse::WithAndWithoutRequestResponseNoRequestWithResponseResponse;
-  Response(::test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse v) : WithAndWithoutRequestResponseNoRequestWithResponseResponse(std::move(v)) {}
+  Response(::test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse v);
 };
 
 template <>
@@ -123,7 +123,7 @@ template <>
 class ::fidl::Response<::test_protocols::WithAndWithoutRequestResponse::WithRequestWithResponse> final : public ::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse {
  public:
   using ::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse::WithAndWithoutRequestResponseWithRequestWithResponseResponse;
-  Response(::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse v) : WithAndWithoutRequestResponseWithRequestWithResponseResponse(std::move(v)) {}
+  Response(::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse v);
 };
 
 template <>
@@ -169,10 +169,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocols::WithAndWithoutRe
   ::fit::result<::fidl::OneWayError> WithRequestNoResponse(const ::fidl::Request<::test_protocols::WithAndWithoutRequestResponse::WithRequestNoResponse>& request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_protocols::WithAndWithoutRequestResponse> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_protocols::WithAndWithoutRequestResponse>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_protocols::WithAndWithoutRequestResponse> _client_end() const;
 };
 
 template <>
@@ -189,8 +186,8 @@ class ::fidl::AsyncEventHandler<::test_protocols::WithAndWithoutRequestResponse>
     : public ::fidl::internal::NaturalEventHandlerInterface<::test_protocols::WithAndWithoutRequestResponse>, public ::fidl::internal::AsyncEventHandler {
  public:
   AsyncEventHandler() = default;
-  void OnEmptyResponse() override {}
-  void OnWithResponse(::fidl::Event<::test_protocols::WithAndWithoutRequestResponse::OnWithResponse>&) override {}
+  void OnEmptyResponse() override;
+  void OnWithResponse(::fidl::Event<::test_protocols::WithAndWithoutRequestResponse::OnWithResponse>&) override;
 };
 
 template <>
@@ -209,8 +206,7 @@ class ::fidl::SyncEventHandler<::test_protocols::WithAndWithoutRequestResponse>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_protocols::WithAndWithoutRequestResponse> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocols::WithAndWithoutRequestResponse>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::WithAndWithoutRequestResponse>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::WithAndWithoutRequestResponse>* event_handler);
   ::fidl::Status DispatchEvent(
       ::fidl::IncomingHeaderAndMessage& msg,
       internal::MessageStorageViewBase* storage_view) override;
@@ -326,11 +322,7 @@ class ::fidl::Server<::test_protocols::WithAndWithoutRequestResponse> : public :
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::WithAndWithoutRequestResponse> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
@@ -402,7 +394,7 @@ template <>
 class ::fidl::Response<::test_protocols::WithErrorSyntax::ResponseAsStruct> final : public ::fit::result<uint32_t, ::test_protocols::WithErrorSyntaxResponseAsStructResponse> {
  public:
   using ::fit::result<uint32_t, ::test_protocols::WithErrorSyntaxResponseAsStructResponse>::result;
-  Response(::fit::result<uint32_t, ::test_protocols::WithErrorSyntaxResponseAsStructResponse> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_protocols::WithErrorSyntaxResponseAsStructResponse> v);
   Response() = delete;
 };
 template <>
@@ -410,13 +402,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocols::WithErrorSynt
   using DomainObject = ::test_protocols::WithErrorSyntaxResponseAsStructResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocols::WithErrorSyntax::ResponseAsStruct>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocols::WithErrorSyntax::ResponseAsStruct>& m);
 };
 
 template <>
@@ -432,7 +418,7 @@ template <>
 class ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsPrimitive> final : public ::fit::result<uint32_t> {
  public:
   using ::fit::result<uint32_t>::result;
-  Response(::fit::result<uint32_t> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t> v);
   Response() = delete;
 };
 template <>
@@ -440,13 +426,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocols::WithErrorSynt
   using DomainObject = ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsPrimitive>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse({});
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsPrimitive>& m);
 };
 
 template <>
@@ -462,7 +442,7 @@ template <>
 class ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsEnum> final : public ::fit::result<::test_protocols::ErrorEnum> {
  public:
   using ::fit::result<::test_protocols::ErrorEnum>::result;
-  Response(::fit::result<::test_protocols::ErrorEnum> v) : result(std::move(v)) {}
+  Response(::fit::result<::test_protocols::ErrorEnum> v);
   Response() = delete;
 };
 template <>
@@ -470,13 +450,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocols::WithErrorSynt
   using DomainObject = ::test_protocols::WithErrorSyntaxErrorAsEnumResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsEnum>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse({});
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsEnum>& m);
 };
 
 template <>
@@ -492,7 +466,7 @@ template <>
 class ::fidl::Response<::test_protocols::WithErrorSyntax::HandleInResult> final : public ::fit::result<uint32_t, ::test_protocols::WithErrorSyntaxHandleInResultResponse> {
  public:
   using ::fit::result<uint32_t, ::test_protocols::WithErrorSyntaxHandleInResultResponse>::result;
-  Response(::fit::result<uint32_t, ::test_protocols::WithErrorSyntaxHandleInResultResponse> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_protocols::WithErrorSyntaxHandleInResultResponse> v);
   Response() = delete;
 };
 template <>
@@ -500,13 +474,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocols::WithErrorSynt
   using DomainObject = ::test_protocols::WithErrorSyntaxHandleInResultResult;
 
  public:
-  static DomainObject IntoDomainObject(::fidl::Response<::test_protocols::WithErrorSyntax::HandleInResult> m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(::fidl::Response<::test_protocols::WithErrorSyntax::HandleInResult> m);
 };
 
 template <>
@@ -544,10 +512,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocols::WithErrorSyntax>
   ::fidl::Result<::test_protocols::WithErrorSyntax::HandleInResult> HandleInResult();
 
  private:
-  ::fidl::UnownedClientEnd<::test_protocols::WithErrorSyntax> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_protocols::WithErrorSyntax>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_protocols::WithErrorSyntax> _client_end() const;
 };
 
 template <>
@@ -580,8 +545,7 @@ class ::fidl::SyncEventHandler<::test_protocols::WithErrorSyntax>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_protocols::WithErrorSyntax> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocols::WithErrorSyntax>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::WithErrorSyntax>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::WithErrorSyntax>* event_handler);
 };
 
 template <>
@@ -673,11 +637,7 @@ class ::fidl::Server<::test_protocols::WithErrorSyntax> : public ::fidl::interna
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::WithErrorSyntax> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
@@ -752,7 +712,7 @@ template <>
 class ::fidl::Response<::test_protocols::ChannelProtocol::MethodB> final : public ::test_protocols::ChannelProtocolMethodBResponse {
  public:
   using ::test_protocols::ChannelProtocolMethodBResponse::ChannelProtocolMethodBResponse;
-  Response(::test_protocols::ChannelProtocolMethodBResponse v) : ChannelProtocolMethodBResponse(std::move(v)) {}
+  Response(::test_protocols::ChannelProtocolMethodBResponse v);
 };
 
 template <>
@@ -782,7 +742,7 @@ template <>
 class ::fidl::Response<::test_protocols::ChannelProtocol::MutateSocket> final : public ::test_protocols::ChannelProtocolMutateSocketResponse {
  public:
   using ::test_protocols::ChannelProtocolMutateSocketResponse::ChannelProtocolMutateSocketResponse;
-  Response(::test_protocols::ChannelProtocolMutateSocketResponse v) : ChannelProtocolMutateSocketResponse(std::move(v)) {}
+  Response(::test_protocols::ChannelProtocolMutateSocketResponse v);
 };
 
 template <>
@@ -820,10 +780,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocols::ChannelProtocol>
   ::fit::result<::fidl::OneWayError> MethodA(const ::fidl::Request<::test_protocols::ChannelProtocol::MethodA>& request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_protocols::ChannelProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_protocols::ChannelProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_protocols::ChannelProtocol> _client_end() const;
 };
 
 template <>
@@ -839,7 +796,7 @@ class ::fidl::AsyncEventHandler<::test_protocols::ChannelProtocol>
     : public ::fidl::internal::NaturalEventHandlerInterface<::test_protocols::ChannelProtocol>, public ::fidl::internal::AsyncEventHandler {
  public:
   AsyncEventHandler() = default;
-  void EventA(::fidl::Event<::test_protocols::ChannelProtocol::EventA>&) override {}
+  void EventA(::fidl::Event<::test_protocols::ChannelProtocol::EventA>&) override;
 };
 
 template <>
@@ -858,8 +815,7 @@ class ::fidl::SyncEventHandler<::test_protocols::ChannelProtocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_protocols::ChannelProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocols::ChannelProtocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::ChannelProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::ChannelProtocol>* event_handler);
   ::fidl::Status DispatchEvent(
       ::fidl::IncomingHeaderAndMessage& msg,
       internal::MessageStorageViewBase* storage_view) override;
@@ -953,11 +909,7 @@ class ::fidl::Server<::test_protocols::ChannelProtocol> : public ::fidl::interna
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::ChannelProtocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
@@ -1004,10 +956,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocols::DiscoverableProt
   ::fit::result<::fidl::OneWayError> Method();
 
  private:
-  ::fidl::UnownedClientEnd<::test_protocols::DiscoverableProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_protocols::DiscoverableProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_protocols::DiscoverableProtocol> _client_end() const;
 };
 
 template <>
@@ -1040,8 +989,7 @@ class ::fidl::SyncEventHandler<::test_protocols::DiscoverableProtocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_protocols::DiscoverableProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocols::DiscoverableProtocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::DiscoverableProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::DiscoverableProtocol>* event_handler);
 };
 
 template <>
@@ -1082,11 +1030,7 @@ class ::fidl::Server<::test_protocols::DiscoverableProtocol> : public ::fidl::in
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
@@ -1121,10 +1065,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocols::AnotherDiscovera
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_protocols::AnotherDiscoverableProtocol>> {
  public:
  private:
-  ::fidl::UnownedClientEnd<::test_protocols::AnotherDiscoverableProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_protocols::AnotherDiscoverableProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_protocols::AnotherDiscoverableProtocol> _client_end() const;
 };
 
 template <>
@@ -1157,8 +1098,7 @@ class ::fidl::SyncEventHandler<::test_protocols::AnotherDiscoverableProtocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_protocols::AnotherDiscoverableProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocols::AnotherDiscoverableProtocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::AnotherDiscoverableProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::AnotherDiscoverableProtocol>* event_handler);
 };
 
 template <>
@@ -1194,11 +1134,7 @@ class ::fidl::Server<::test_protocols::AnotherDiscoverableProtocol> : public ::f
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::AnotherDiscoverableProtocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
@@ -1233,10 +1169,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocols::PlatformServer> 
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_protocols::PlatformServer>> {
  public:
  private:
-  ::fidl::UnownedClientEnd<::test_protocols::PlatformServer> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_protocols::PlatformServer>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_protocols::PlatformServer> _client_end() const;
 };
 
 template <>
@@ -1269,8 +1202,7 @@ class ::fidl::SyncEventHandler<::test_protocols::PlatformServer>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_protocols::PlatformServer> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocols::PlatformServer>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::PlatformServer>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::PlatformServer>* event_handler);
 };
 
 template <>
@@ -1306,11 +1238,7 @@ class ::fidl::Server<::test_protocols::PlatformServer> : public ::fidl::internal
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::PlatformServer> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
@@ -1365,7 +1293,7 @@ template <>
 class ::fidl::Response<::test_protocols::HandleRightsProtocol::ResponseMethod> final : public ::test_protocols::HandleRightsProtocolResponseMethodResponse {
  public:
   using ::test_protocols::HandleRightsProtocolResponseMethodResponse::HandleRightsProtocolResponseMethodResponse;
-  Response(::test_protocols::HandleRightsProtocolResponseMethodResponse v) : HandleRightsProtocolResponseMethodResponse(std::move(v)) {}
+  Response(::test_protocols::HandleRightsProtocolResponseMethodResponse v);
 };
 
 template <>
@@ -1395,10 +1323,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocols::HandleRightsProt
   ::fit::result<::fidl::OneWayError> NoResponseMethod(::fidl::Request<::test_protocols::HandleRightsProtocol::NoResponseMethod> request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_protocols::HandleRightsProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_protocols::HandleRightsProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_protocols::HandleRightsProtocol> _client_end() const;
 };
 
 template <>
@@ -1414,7 +1339,7 @@ class ::fidl::AsyncEventHandler<::test_protocols::HandleRightsProtocol>
     : public ::fidl::internal::NaturalEventHandlerInterface<::test_protocols::HandleRightsProtocol>, public ::fidl::internal::AsyncEventHandler {
  public:
   AsyncEventHandler() = default;
-  void AnEvent(::fidl::Event<::test_protocols::HandleRightsProtocol::AnEvent>&) override {}
+  void AnEvent(::fidl::Event<::test_protocols::HandleRightsProtocol::AnEvent>&) override;
 };
 
 template <>
@@ -1433,8 +1358,7 @@ class ::fidl::SyncEventHandler<::test_protocols::HandleRightsProtocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_protocols::HandleRightsProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocols::HandleRightsProtocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::HandleRightsProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::HandleRightsProtocol>* event_handler);
   ::fidl::Status DispatchEvent(
       ::fidl::IncomingHeaderAndMessage& msg,
       internal::MessageStorageViewBase* storage_view) override;
@@ -1498,11 +1422,7 @@ class ::fidl::Server<::test_protocols::HandleRightsProtocol> : public ::fidl::in
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::HandleRightsProtocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
@@ -1567,7 +1487,7 @@ template <>
 class ::fidl::Response<::test_protocols::WithProtocolEnds::ClientEnds> final : public ::test_protocols::WithProtocolEndsClientEndsResponse {
  public:
   using ::test_protocols::WithProtocolEndsClientEndsResponse::WithProtocolEndsClientEndsResponse;
-  Response(::test_protocols::WithProtocolEndsClientEndsResponse v) : WithProtocolEndsClientEndsResponse(std::move(v)) {}
+  Response(::test_protocols::WithProtocolEndsClientEndsResponse v);
 };
 
 template <>
@@ -1583,7 +1503,7 @@ template <>
 class ::fidl::Response<::test_protocols::WithProtocolEnds::ServerEnds> final : public ::test_protocols::WithProtocolEndsServerEndsResponse {
  public:
   using ::test_protocols::WithProtocolEndsServerEndsResponse::WithProtocolEndsServerEndsResponse;
-  Response(::test_protocols::WithProtocolEndsServerEndsResponse v) : WithProtocolEndsServerEndsResponse(std::move(v)) {}
+  Response(::test_protocols::WithProtocolEndsServerEndsResponse v);
 };
 
 template <>
@@ -1599,7 +1519,7 @@ template <>
 class ::fidl::Response<::test_protocols::WithProtocolEnds::StructContainingEnds> final : public ::test_protocols::WithProtocolEndsStructContainingEndsResponse {
  public:
   using ::test_protocols::WithProtocolEndsStructContainingEndsResponse::WithProtocolEndsStructContainingEndsResponse;
-  Response(::test_protocols::WithProtocolEndsStructContainingEndsResponse v) : WithProtocolEndsStructContainingEndsResponse(std::move(v)) {}
+  Response(::test_protocols::WithProtocolEndsStructContainingEndsResponse v);
 };
 
 template <>
@@ -1633,10 +1553,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocols::WithProtocolEnds
   ::fidl::Result<::test_protocols::WithProtocolEnds::StructContainingEnds> StructContainingEnds(::fidl::Request<::test_protocols::WithProtocolEnds::StructContainingEnds> request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_protocols::WithProtocolEnds> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_protocols::WithProtocolEnds>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_protocols::WithProtocolEnds> _client_end() const;
 };
 
 template <>
@@ -1669,8 +1586,7 @@ class ::fidl::SyncEventHandler<::test_protocols::WithProtocolEnds>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_protocols::WithProtocolEnds> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocols::WithProtocolEnds>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::WithProtocolEnds>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::WithProtocolEnds>* event_handler);
 };
 
 template <>
@@ -1751,11 +1667,7 @@ class ::fidl::Server<::test_protocols::WithProtocolEnds> : public ::fidl::intern
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::WithProtocolEnds> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
@@ -1804,10 +1716,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocols::ManyParameters> 
   ::fit::result<::fidl::OneWayError> Fifteen(const ::fidl::Request<::test_protocols::ManyParameters::Fifteen>& request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_protocols::ManyParameters> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_protocols::ManyParameters>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_protocols::ManyParameters> _client_end() const;
 };
 
 template <>
@@ -1840,8 +1749,7 @@ class ::fidl::SyncEventHandler<::test_protocols::ManyParameters>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_protocols::ManyParameters> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocols::ManyParameters>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::ManyParameters>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::ManyParameters>* event_handler);
 };
 
 template <>
@@ -1883,11 +1791,7 @@ class ::fidl::Server<::test_protocols::ManyParameters> : public ::fidl::internal
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::ManyParameters> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
@@ -1930,7 +1834,7 @@ template <>
 class ::fidl::Response<::test_protocols::MethodWithUnion::UnionMethod> final : public ::test_protocols::MethodWithUnionUnionMethodResponse {
  public:
   using ::test_protocols::MethodWithUnionUnionMethodResponse::MethodWithUnionUnionMethodResponse;
-  Response(::test_protocols::MethodWithUnionUnionMethodResponse v) : MethodWithUnionUnionMethodResponse(std::move(v)) {}
+  Response(::test_protocols::MethodWithUnionUnionMethodResponse v);
 };
 
 template <>
@@ -1956,10 +1860,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocols::MethodWithUnion>
   ::fidl::Result<::test_protocols::MethodWithUnion::UnionMethod> UnionMethod(const ::fidl::Request<::test_protocols::MethodWithUnion::UnionMethod>& request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_protocols::MethodWithUnion> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_protocols::MethodWithUnion>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_protocols::MethodWithUnion> _client_end() const;
 };
 
 template <>
@@ -1992,8 +1893,7 @@ class ::fidl::SyncEventHandler<::test_protocols::MethodWithUnion>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_protocols::MethodWithUnion> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocols::MethodWithUnion>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::MethodWithUnion>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::MethodWithUnion>* event_handler);
 };
 
 template <>
@@ -2044,11 +1944,7 @@ class ::fidl::Server<::test_protocols::MethodWithUnion> : public ::fidl::interna
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::MethodWithUnion> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(

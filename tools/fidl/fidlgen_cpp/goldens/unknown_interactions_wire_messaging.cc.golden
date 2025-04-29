@@ -2045,6 +2045,14 @@
         return ::fidl::Status::UnknownOrdinal();
     }
   }
+void fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteractionsProtocol>::StrictEvent() {}
+void fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteractionsProtocol>::StrictEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFields>* event) {}
+void fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteractionsProtocol>::StrictEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnion>* event) {}
+void fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteractionsProtocol>::StrictEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTable>* event) {}
+void fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteractionsProtocol>::FlexibleEvent() {}
+void fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteractionsProtocol>::FlexibleEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFields>* event) {}
+void fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteractionsProtocol>::FlexibleEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnion>* event) {}
+void fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteractionsProtocol>::FlexibleEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTable>* event) {}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_unknowninteractions::UnknownInteractionsProtocol>::entries_[] = {
     { ::test_unknowninteractions::kUnknownInteractionsProtocol_StrictOneWay_Ordinal,
@@ -6518,6 +6526,14 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_unknowninteracti
         return ::fidl::Status::UnknownOrdinal();
     }
   }
+void fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::StrictEvent() {}
+void fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::StrictEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFields>* event) {}
+void fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::StrictEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnion>* event) {}
+void fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::StrictEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTable>* event) {}
+void fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::FlexibleEvent() {}
+void fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::FlexibleEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFields>* event) {}
+void fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::FlexibleEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnion>* event) {}
+void fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::FlexibleEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTable>* event) {}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_unknowninteractions::UnknownInteractionsAjarProtocol>::entries_[] = {
     { ::test_unknowninteractions::kUnknownInteractionsAjarProtocol_StrictOneWay_Ordinal,
@@ -9531,6 +9547,10 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_unknowninteracti
         return ::fidl::Status::UnknownOrdinal();
     }
   }
+void fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteractionsClosedProtocol>::StrictEvent() {}
+void fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteractionsClosedProtocol>::StrictEventFields(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFields>* event) {}
+void fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteractionsClosedProtocol>::StrictEventUnion(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnion>* event) {}
+void fidl::WireAsyncEventHandler<::test_unknowninteractions::UnknownInteractionsClosedProtocol>::StrictEventTable(::fidl::WireEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTable>* event) {}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::WireServerDispatcher<::test_unknowninteractions::UnknownInteractionsClosedProtocol>::entries_[] = {
     { ::test_unknowninteractions::kUnknownInteractionsClosedProtocol_StrictOneWay_Ordinal,

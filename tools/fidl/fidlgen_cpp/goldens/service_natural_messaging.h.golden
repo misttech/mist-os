@@ -37,10 +37,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_service::FirstProtocol> fin
   ::fit::result<::fidl::OneWayError> MethodOnFirst();
 
  private:
-  ::fidl::UnownedClientEnd<::test_service::FirstProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_service::FirstProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_service::FirstProtocol> _client_end() const;
 };
 
 template <>
@@ -73,8 +70,7 @@ class ::fidl::SyncEventHandler<::test_service::FirstProtocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_service::FirstProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_service::FirstProtocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_service::FirstProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_service::FirstProtocol>* event_handler);
 };
 
 template <>
@@ -115,11 +111,7 @@ class ::fidl::Server<::test_service::FirstProtocol> : public ::fidl::internal::I
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_service::FirstProtocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
@@ -166,10 +158,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_service::SecondProtocol> fi
   ::fit::result<::fidl::OneWayError> MethodOnSecond();
 
  private:
-  ::fidl::UnownedClientEnd<::test_service::SecondProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_service::SecondProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_service::SecondProtocol> _client_end() const;
 };
 
 template <>
@@ -202,8 +191,7 @@ class ::fidl::SyncEventHandler<::test_service::SecondProtocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_service::SecondProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_service::SecondProtocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_service::SecondProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_service::SecondProtocol>* event_handler);
 };
 
 template <>
@@ -244,11 +232,7 @@ class ::fidl::Server<::test_service::SecondProtocol> : public ::fidl::internal::
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_service::SecondProtocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(

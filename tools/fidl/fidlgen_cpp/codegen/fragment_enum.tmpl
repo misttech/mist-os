@@ -192,12 +192,21 @@ using {{ .Name }} = {{ .Unified }};
     static constexpr size_t kInlineSize = sizeof({{ .Type }});
     static constexpr bool kIsMemcpyCompatible = {{ not .Strictness }};
 
-    static void Encode(internal::NaturalEncoder* encoder, {{ . }}* value, size_t offset, size_t recursion_depth) {
-      {{- if .Strictness }}
-      {{- $enumType := . }}
+    static void Encode(internal::NaturalEncoder* encoder, {{ . }}* value, size_t offset, size_t recursion_depth);
+    static void Decode(internal::NaturalDecoder* decoder, {{ . }}* value, size_t offset, size_t recursion_depth);
+  };
+
+{{- end }}
+
+{{- define "Enum:NaturalTypesSource" }}
+  {{ EnsureNamespace "" }}
+
+  void fidl::internal::NaturalCodingTraits<{{ . }}, ::fidl::internal::NaturalCodingConstraintEmpty>::Encode(
+      fidl::internal::NaturalEncoder* encoder, {{ . }}* value, size_t offset, size_t recursion_depth) {
+    {{- if .Strictness }}
       switch (*value) {
         {{- range .Members }}
-        case {{ $enumType }}::{{ .Unified }}:
+          case {{ $ }}::{{ .Unified }}:
         {{- end }}
         {{- if .Members }}
           break;
@@ -206,16 +215,17 @@ using {{ .Name }} = {{ .Unified }};
           encoder->SetError(::fidl::internal::kCodingErrorUnknownEnumValue);
           return;
       }
-      {{- end }}
-      *encoder->template GetPtr<{{ . }}>(offset) = *value;
-    }
-    static void Decode(internal::NaturalDecoder* decoder, {{ . }}* value, size_t offset, size_t recursion_depth) {
-      *value = *decoder->template GetPtr<{{ . }}>(offset);
-      {{- if .Strictness }}
-      {{- $enumType := . }}
+    {{- end }}
+    *encoder->template GetPtr<{{ . }}>(offset) = *value;
+  }
+
+  void fidl::internal::NaturalCodingTraits<{{ . }}, ::fidl::internal::NaturalCodingConstraintEmpty>::Decode(
+      fidl::internal::NaturalDecoder* decoder, {{ . }}* value, size_t offset, size_t recursion_depth) {
+    *value = *decoder->template GetPtr<{{ . }}>(offset);
+    {{- if .Strictness }}
       switch (*value) {
         {{- range .Members }}
-        case {{ $enumType }}::{{ .Unified }}:
+          case {{ $ }}::{{ .Unified }}:
         {{- end }}
         {{- if .Members }}
           break;
@@ -224,13 +234,9 @@ using {{ .Name }} = {{ .Unified }};
           decoder->SetError(::fidl::internal::kCodingErrorUnknownEnumValue);
           return;
       }
-      {{- end }}
-    }
-  };
-
+    {{- end }}
+  }
 {{- end }}
-
-
 
 {{- define "Enums:Traits:TypeConversionsHeader" }}
 template <>

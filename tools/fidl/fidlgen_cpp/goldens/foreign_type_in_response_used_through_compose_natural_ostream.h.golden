@@ -18,28 +18,17 @@
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_foreigntypeinresponseusedthroughcompose::Top>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_foreigntypeinresponseusedthroughcompose::Top>& value) {
-    return os << "ClientEnd<" << "test_foreigntypeinresponseusedthroughcompose::Top" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_foreigntypeinresponseusedthroughcompose::Top>& value);
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_foreigntypeinresponseusedthroughcompose::Top>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_foreigntypeinresponseusedthroughcompose::Top>& value) {
-    return os << "ServerEnd<" << "test_foreigntypeinresponseusedthroughcompose::Top" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_foreigntypeinresponseusedthroughcompose::Top>& value);
 };
 
-namespace fidl {
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_foreigntypeinresponseusedthroughcompose::Top>& value);
 
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_foreigntypeinresponseusedthroughcompose::Top>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_foreigntypeinresponseusedthroughcompose::Top>>::Format(os, value);
-}
-
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_foreigntypeinresponseusedthroughcompose::Top>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_foreigntypeinresponseusedthroughcompose::Top>>::Format(os, value);
-}
-}  // namespace fidl
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_foreigntypeinresponseusedthroughcompose::Top>& value);
 
 #endif  // __Fuchsia__
 

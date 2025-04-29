@@ -47,7 +47,7 @@ class {{ .Name }} {
   };
 
   {{- if .IsFlexible }}
-  constexpr bool IsUnknown() const {
+  bool IsUnknown() const {
     return Which() == {{ .TagUnknown }};
   }
   {{- end }}

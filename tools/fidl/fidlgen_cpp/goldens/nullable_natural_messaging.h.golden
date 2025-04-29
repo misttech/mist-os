@@ -33,7 +33,7 @@ template <>
 class ::fidl::Response<::test_nullable::SimpleProtocol::Add> final : public ::test_nullable::SimpleProtocolAddResponse {
  public:
   using ::test_nullable::SimpleProtocolAddResponse::SimpleProtocolAddResponse;
-  Response(::test_nullable::SimpleProtocolAddResponse v) : SimpleProtocolAddResponse(std::move(v)) {}
+  Response(::test_nullable::SimpleProtocolAddResponse v);
 };
 
 template <>
@@ -59,10 +59,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_nullable::SimpleProtocol> f
   ::fidl::Result<::test_nullable::SimpleProtocol::Add> Add(const ::fidl::Request<::test_nullable::SimpleProtocol::Add>& request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_nullable::SimpleProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_nullable::SimpleProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_nullable::SimpleProtocol> _client_end() const;
 };
 
 template <>
@@ -95,8 +92,7 @@ class ::fidl::SyncEventHandler<::test_nullable::SimpleProtocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_nullable::SimpleProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_nullable::SimpleProtocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_nullable::SimpleProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_nullable::SimpleProtocol>* event_handler);
 };
 
 template <>
@@ -147,11 +143,7 @@ class ::fidl::Server<::test_nullable::SimpleProtocol> : public ::fidl::internal:
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_nullable::SimpleProtocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(

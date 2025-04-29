@@ -490,7 +490,7 @@ class Expression {
     kFunctionApplication = 3,  // 0x3
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  constexpr bool IsUnknown() const {
+  bool IsUnknown() const {
     return Which() == ::test_anonymous::wire::Expression::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
@@ -567,7 +567,7 @@ class UnionMember {
     kUnionData = 2,  // 0x2
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
-  constexpr bool IsUnknown() const {
+  bool IsUnknown() const {
     return Which() == ::test_anonymous::wire::UnionMember::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 

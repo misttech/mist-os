@@ -68,21 +68,13 @@ class Padding1ByteEnd {
   Padding1ByteEnd(const Padding1ByteEnd& other) noexcept;
   Padding1ByteEnd& operator=(const Padding1ByteEnd& other) noexcept;
 
-  bool operator==(const Padding1ByteEnd& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding1ByteEnd, 4>::Equal(this, &other);
-  }
-  bool operator!=(const Padding1ByteEnd& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding1ByteEnd, 4>::Equal(this, &other);
-  }
+  bool operator==(const Padding1ByteEnd& other) const noexcept;
+  bool operator!=(const Padding1ByteEnd& other) const noexcept;
 
   uint16_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint16_t& a() {
-    return storage_.a;
-  }
+  uint16_t& a();
 
   // Setter for a.
   //
@@ -90,13 +82,9 @@ class Padding1ByteEnd {
   Padding1ByteEnd& a(uint16_t value);
 
   uint8_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint8_t& b() {
-    return storage_.b;
-  }
+  uint8_t& b();
 
   // Setter for b.
   //
@@ -144,21 +132,13 @@ class Padding2ByteEnd {
   Padding2ByteEnd(const Padding2ByteEnd& other) noexcept;
   Padding2ByteEnd& operator=(const Padding2ByteEnd& other) noexcept;
 
-  bool operator==(const Padding2ByteEnd& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding2ByteEnd, 8>::Equal(this, &other);
-  }
-  bool operator!=(const Padding2ByteEnd& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding2ByteEnd, 8>::Equal(this, &other);
-  }
+  bool operator==(const Padding2ByteEnd& other) const noexcept;
+  bool operator!=(const Padding2ByteEnd& other) const noexcept;
 
   uint32_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint32_t& a() {
-    return storage_.a;
-  }
+  uint32_t& a();
 
   // Setter for a.
   //
@@ -166,13 +146,9 @@ class Padding2ByteEnd {
   Padding2ByteEnd& a(uint32_t value);
 
   uint16_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint16_t& b() {
-    return storage_.b;
-  }
+  uint16_t& b();
 
   // Setter for b.
   //
@@ -220,21 +196,13 @@ class Padding3ByteEnd {
   Padding3ByteEnd(const Padding3ByteEnd& other) noexcept;
   Padding3ByteEnd& operator=(const Padding3ByteEnd& other) noexcept;
 
-  bool operator==(const Padding3ByteEnd& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding3ByteEnd, 8>::Equal(this, &other);
-  }
-  bool operator!=(const Padding3ByteEnd& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding3ByteEnd, 8>::Equal(this, &other);
-  }
+  bool operator==(const Padding3ByteEnd& other) const noexcept;
+  bool operator!=(const Padding3ByteEnd& other) const noexcept;
 
   uint32_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint32_t& a() {
-    return storage_.a;
-  }
+  uint32_t& a();
 
   // Setter for a.
   //
@@ -242,13 +210,9 @@ class Padding3ByteEnd {
   Padding3ByteEnd& a(uint32_t value);
 
   uint8_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint8_t& b() {
-    return storage_.b;
-  }
+  uint8_t& b();
 
   // Setter for b.
   //
@@ -296,21 +260,13 @@ class Padding4ByteEnd {
   Padding4ByteEnd(const Padding4ByteEnd& other) noexcept;
   Padding4ByteEnd& operator=(const Padding4ByteEnd& other) noexcept;
 
-  bool operator==(const Padding4ByteEnd& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding4ByteEnd, 16>::Equal(this, &other);
-  }
-  bool operator!=(const Padding4ByteEnd& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding4ByteEnd, 16>::Equal(this, &other);
-  }
+  bool operator==(const Padding4ByteEnd& other) const noexcept;
+  bool operator!=(const Padding4ByteEnd& other) const noexcept;
 
   uint64_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint64_t& a() {
-    return storage_.a;
-  }
+  uint64_t& a();
 
   // Setter for a.
   //
@@ -318,13 +274,9 @@ class Padding4ByteEnd {
   Padding4ByteEnd& a(uint64_t value);
 
   uint32_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint32_t& b() {
-    return storage_.b;
-  }
+  uint32_t& b();
 
   // Setter for b.
   //
@@ -372,21 +324,13 @@ class Padding5ByteEnd {
   Padding5ByteEnd(const Padding5ByteEnd& other) noexcept;
   Padding5ByteEnd& operator=(const Padding5ByteEnd& other) noexcept;
 
-  bool operator==(const Padding5ByteEnd& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding5ByteEnd, 16>::Equal(this, &other);
-  }
-  bool operator!=(const Padding5ByteEnd& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding5ByteEnd, 16>::Equal(this, &other);
-  }
+  bool operator==(const Padding5ByteEnd& other) const noexcept;
+  bool operator!=(const Padding5ByteEnd& other) const noexcept;
 
   uint64_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint64_t& a() {
-    return storage_.a;
-  }
+  uint64_t& a();
 
   // Setter for a.
   //
@@ -394,13 +338,9 @@ class Padding5ByteEnd {
   Padding5ByteEnd& a(uint64_t value);
 
   uint16_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint16_t& b() {
-    return storage_.b;
-  }
+  uint16_t& b();
 
   // Setter for b.
   //
@@ -408,13 +348,9 @@ class Padding5ByteEnd {
   Padding5ByteEnd& b(uint16_t value);
 
   uint8_t
-  c() const {
-    return storage_.c;
-  }
+  c() const;
 
-  uint8_t& c() {
-    return storage_.c;
-  }
+  uint8_t& c();
 
   // Setter for c.
   //
@@ -463,21 +399,13 @@ class Padding6ByteEnd {
   Padding6ByteEnd(const Padding6ByteEnd& other) noexcept;
   Padding6ByteEnd& operator=(const Padding6ByteEnd& other) noexcept;
 
-  bool operator==(const Padding6ByteEnd& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding6ByteEnd, 16>::Equal(this, &other);
-  }
-  bool operator!=(const Padding6ByteEnd& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding6ByteEnd, 16>::Equal(this, &other);
-  }
+  bool operator==(const Padding6ByteEnd& other) const noexcept;
+  bool operator!=(const Padding6ByteEnd& other) const noexcept;
 
   uint64_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint64_t& a() {
-    return storage_.a;
-  }
+  uint64_t& a();
 
   // Setter for a.
   //
@@ -485,13 +413,9 @@ class Padding6ByteEnd {
   Padding6ByteEnd& a(uint64_t value);
 
   uint16_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint16_t& b() {
-    return storage_.b;
-  }
+  uint16_t& b();
 
   // Setter for b.
   //
@@ -539,21 +463,13 @@ class Padding7ByteEnd {
   Padding7ByteEnd(const Padding7ByteEnd& other) noexcept;
   Padding7ByteEnd& operator=(const Padding7ByteEnd& other) noexcept;
 
-  bool operator==(const Padding7ByteEnd& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding7ByteEnd, 16>::Equal(this, &other);
-  }
-  bool operator!=(const Padding7ByteEnd& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding7ByteEnd, 16>::Equal(this, &other);
-  }
+  bool operator==(const Padding7ByteEnd& other) const noexcept;
+  bool operator!=(const Padding7ByteEnd& other) const noexcept;
 
   uint64_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint64_t& a() {
-    return storage_.a;
-  }
+  uint64_t& a();
 
   // Setter for a.
   //
@@ -561,13 +477,9 @@ class Padding7ByteEnd {
   Padding7ByteEnd& a(uint64_t value);
 
   uint8_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint8_t& b() {
-    return storage_.b;
-  }
+  uint8_t& b();
 
   // Setter for b.
   //
@@ -615,21 +527,13 @@ class Padding1ByteMiddle {
   Padding1ByteMiddle(const Padding1ByteMiddle& other) noexcept;
   Padding1ByteMiddle& operator=(const Padding1ByteMiddle& other) noexcept;
 
-  bool operator==(const Padding1ByteMiddle& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding1ByteMiddle, 4>::Equal(this, &other);
-  }
-  bool operator!=(const Padding1ByteMiddle& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding1ByteMiddle, 4>::Equal(this, &other);
-  }
+  bool operator==(const Padding1ByteMiddle& other) const noexcept;
+  bool operator!=(const Padding1ByteMiddle& other) const noexcept;
 
   uint8_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint8_t& a() {
-    return storage_.a;
-  }
+  uint8_t& a();
 
   // Setter for a.
   //
@@ -637,13 +541,9 @@ class Padding1ByteMiddle {
   Padding1ByteMiddle& a(uint8_t value);
 
   uint16_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint16_t& b() {
-    return storage_.b;
-  }
+  uint16_t& b();
 
   // Setter for b.
   //
@@ -691,21 +591,13 @@ class Padding2ByteMiddle {
   Padding2ByteMiddle(const Padding2ByteMiddle& other) noexcept;
   Padding2ByteMiddle& operator=(const Padding2ByteMiddle& other) noexcept;
 
-  bool operator==(const Padding2ByteMiddle& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding2ByteMiddle, 8>::Equal(this, &other);
-  }
-  bool operator!=(const Padding2ByteMiddle& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding2ByteMiddle, 8>::Equal(this, &other);
-  }
+  bool operator==(const Padding2ByteMiddle& other) const noexcept;
+  bool operator!=(const Padding2ByteMiddle& other) const noexcept;
 
   uint16_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint16_t& a() {
-    return storage_.a;
-  }
+  uint16_t& a();
 
   // Setter for a.
   //
@@ -713,13 +605,9 @@ class Padding2ByteMiddle {
   Padding2ByteMiddle& a(uint16_t value);
 
   uint32_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint32_t& b() {
-    return storage_.b;
-  }
+  uint32_t& b();
 
   // Setter for b.
   //
@@ -767,21 +655,13 @@ class Padding3ByteMiddle {
   Padding3ByteMiddle(const Padding3ByteMiddle& other) noexcept;
   Padding3ByteMiddle& operator=(const Padding3ByteMiddle& other) noexcept;
 
-  bool operator==(const Padding3ByteMiddle& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding3ByteMiddle, 8>::Equal(this, &other);
-  }
-  bool operator!=(const Padding3ByteMiddle& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding3ByteMiddle, 8>::Equal(this, &other);
-  }
+  bool operator==(const Padding3ByteMiddle& other) const noexcept;
+  bool operator!=(const Padding3ByteMiddle& other) const noexcept;
 
   uint8_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint8_t& a() {
-    return storage_.a;
-  }
+  uint8_t& a();
 
   // Setter for a.
   //
@@ -789,13 +669,9 @@ class Padding3ByteMiddle {
   Padding3ByteMiddle& a(uint8_t value);
 
   uint32_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint32_t& b() {
-    return storage_.b;
-  }
+  uint32_t& b();
 
   // Setter for b.
   //
@@ -843,21 +719,13 @@ class Padding4ByteMiddle {
   Padding4ByteMiddle(const Padding4ByteMiddle& other) noexcept;
   Padding4ByteMiddle& operator=(const Padding4ByteMiddle& other) noexcept;
 
-  bool operator==(const Padding4ByteMiddle& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding4ByteMiddle, 16>::Equal(this, &other);
-  }
-  bool operator!=(const Padding4ByteMiddle& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding4ByteMiddle, 16>::Equal(this, &other);
-  }
+  bool operator==(const Padding4ByteMiddle& other) const noexcept;
+  bool operator!=(const Padding4ByteMiddle& other) const noexcept;
 
   uint32_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint32_t& a() {
-    return storage_.a;
-  }
+  uint32_t& a();
 
   // Setter for a.
   //
@@ -865,13 +733,9 @@ class Padding4ByteMiddle {
   Padding4ByteMiddle& a(uint32_t value);
 
   uint64_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint64_t& b() {
-    return storage_.b;
-  }
+  uint64_t& b();
 
   // Setter for b.
   //
@@ -919,21 +783,13 @@ class Padding5ByteMiddle {
   Padding5ByteMiddle(const Padding5ByteMiddle& other) noexcept;
   Padding5ByteMiddle& operator=(const Padding5ByteMiddle& other) noexcept;
 
-  bool operator==(const Padding5ByteMiddle& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding5ByteMiddle, 16>::Equal(this, &other);
-  }
-  bool operator!=(const Padding5ByteMiddle& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding5ByteMiddle, 16>::Equal(this, &other);
-  }
+  bool operator==(const Padding5ByteMiddle& other) const noexcept;
+  bool operator!=(const Padding5ByteMiddle& other) const noexcept;
 
   uint16_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint16_t& a() {
-    return storage_.a;
-  }
+  uint16_t& a();
 
   // Setter for a.
   //
@@ -941,13 +797,9 @@ class Padding5ByteMiddle {
   Padding5ByteMiddle& a(uint16_t value);
 
   uint8_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint8_t& b() {
-    return storage_.b;
-  }
+  uint8_t& b();
 
   // Setter for b.
   //
@@ -955,13 +807,9 @@ class Padding5ByteMiddle {
   Padding5ByteMiddle& b(uint8_t value);
 
   uint64_t
-  c() const {
-    return storage_.c;
-  }
+  c() const;
 
-  uint64_t& c() {
-    return storage_.c;
-  }
+  uint64_t& c();
 
   // Setter for c.
   //
@@ -1010,21 +858,13 @@ class Padding6ByteMiddle {
   Padding6ByteMiddle(const Padding6ByteMiddle& other) noexcept;
   Padding6ByteMiddle& operator=(const Padding6ByteMiddle& other) noexcept;
 
-  bool operator==(const Padding6ByteMiddle& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding6ByteMiddle, 16>::Equal(this, &other);
-  }
-  bool operator!=(const Padding6ByteMiddle& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding6ByteMiddle, 16>::Equal(this, &other);
-  }
+  bool operator==(const Padding6ByteMiddle& other) const noexcept;
+  bool operator!=(const Padding6ByteMiddle& other) const noexcept;
 
   uint16_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint16_t& a() {
-    return storage_.a;
-  }
+  uint16_t& a();
 
   // Setter for a.
   //
@@ -1032,13 +872,9 @@ class Padding6ByteMiddle {
   Padding6ByteMiddle& a(uint16_t value);
 
   uint64_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint64_t& b() {
-    return storage_.b;
-  }
+  uint64_t& b();
 
   // Setter for b.
   //
@@ -1086,21 +922,13 @@ class Padding7ByteMiddle {
   Padding7ByteMiddle(const Padding7ByteMiddle& other) noexcept;
   Padding7ByteMiddle& operator=(const Padding7ByteMiddle& other) noexcept;
 
-  bool operator==(const Padding7ByteMiddle& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding7ByteMiddle, 16>::Equal(this, &other);
-  }
-  bool operator!=(const Padding7ByteMiddle& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding7ByteMiddle, 16>::Equal(this, &other);
-  }
+  bool operator==(const Padding7ByteMiddle& other) const noexcept;
+  bool operator!=(const Padding7ByteMiddle& other) const noexcept;
 
   uint8_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint8_t& a() {
-    return storage_.a;
-  }
+  uint8_t& a();
 
   // Setter for a.
   //
@@ -1108,13 +936,9 @@ class Padding7ByteMiddle {
   Padding7ByteMiddle& a(uint8_t value);
 
   uint64_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint64_t& b() {
-    return storage_.b;
-  }
+  uint64_t& b();
 
   // Setter for b.
   //
@@ -1162,21 +986,13 @@ class Padding4ByteAlignmentLength12 {
   Padding4ByteAlignmentLength12(const Padding4ByteAlignmentLength12& other) noexcept;
   Padding4ByteAlignmentLength12& operator=(const Padding4ByteAlignmentLength12& other) noexcept;
 
-  bool operator==(const Padding4ByteAlignmentLength12& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding4ByteAlignmentLength12, 12>::Equal(this, &other);
-  }
-  bool operator!=(const Padding4ByteAlignmentLength12& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding4ByteAlignmentLength12, 12>::Equal(this, &other);
-  }
+  bool operator==(const Padding4ByteAlignmentLength12& other) const noexcept;
+  bool operator!=(const Padding4ByteAlignmentLength12& other) const noexcept;
 
   uint32_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint32_t& a() {
-    return storage_.a;
-  }
+  uint32_t& a();
 
   // Setter for a.
   //
@@ -1184,13 +1000,9 @@ class Padding4ByteAlignmentLength12 {
   Padding4ByteAlignmentLength12& a(uint32_t value);
 
   uint8_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint8_t& b() {
-    return storage_.b;
-  }
+  uint8_t& b();
 
   // Setter for b.
   //
@@ -1198,13 +1010,9 @@ class Padding4ByteAlignmentLength12 {
   Padding4ByteAlignmentLength12& b(uint8_t value);
 
   uint16_t
-  c() const {
-    return storage_.c;
-  }
+  c() const;
 
-  uint16_t& c() {
-    return storage_.c;
-  }
+  uint16_t& c();
 
   // Setter for c.
   //
@@ -1212,13 +1020,9 @@ class Padding4ByteAlignmentLength12 {
   Padding4ByteAlignmentLength12& c(uint16_t value);
 
   uint16_t
-  d() const {
-    return storage_.d;
-  }
+  d() const;
 
-  uint16_t& d() {
-    return storage_.d;
-  }
+  uint16_t& d();
 
   // Setter for d.
   //
@@ -1272,21 +1076,13 @@ class Padding2ByteAlignmentLength6 {
   Padding2ByteAlignmentLength6(const Padding2ByteAlignmentLength6& other) noexcept;
   Padding2ByteAlignmentLength6& operator=(const Padding2ByteAlignmentLength6& other) noexcept;
 
-  bool operator==(const Padding2ByteAlignmentLength6& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding2ByteAlignmentLength6, 6>::Equal(this, &other);
-  }
-  bool operator!=(const Padding2ByteAlignmentLength6& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding2ByteAlignmentLength6, 6>::Equal(this, &other);
-  }
+  bool operator==(const Padding2ByteAlignmentLength6& other) const noexcept;
+  bool operator!=(const Padding2ByteAlignmentLength6& other) const noexcept;
 
   uint8_t
-  a() const {
-    return storage_.a;
-  }
+  a() const;
 
-  uint8_t& a() {
-    return storage_.a;
-  }
+  uint8_t& a();
 
   // Setter for a.
   //
@@ -1294,13 +1090,9 @@ class Padding2ByteAlignmentLength6 {
   Padding2ByteAlignmentLength6& a(uint8_t value);
 
   uint16_t
-  b() const {
-    return storage_.b;
-  }
+  b() const;
 
-  uint16_t& b() {
-    return storage_.b;
-  }
+  uint16_t& b();
 
   // Setter for b.
   //
@@ -1308,13 +1100,9 @@ class Padding2ByteAlignmentLength6 {
   Padding2ByteAlignmentLength6& b(uint16_t value);
 
   uint8_t
-  c() const {
-    return storage_.c;
-  }
+  c() const;
 
-  uint8_t& c() {
-    return storage_.c;
-  }
+  uint8_t& c();
 
   // Setter for c.
   //
@@ -1347,404 +1135,6 @@ class Padding2ByteAlignmentLength6 {
                                                        .mask = 0xff00,
                                                    });
 };
-
-inline Padding1ByteEnd::Padding1ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Padding1ByteEnd::Padding1ByteEnd(uint16_t a, uint8_t b) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b)}) {}
-inline Padding1ByteEnd::Padding1ByteEnd(const ::test_padding::Padding1ByteEnd& other) noexcept : ::test_padding::Padding1ByteEnd(other.CloneStorage_()) {}
-inline Padding1ByteEnd& ::test_padding::Padding1ByteEnd::operator=(const ::test_padding::Padding1ByteEnd& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline Padding1ByteEnd::Padding1ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding1ByteEnd(Storage_{
-                                                                                                          .a = {},
-                                                                                                          .b = {},
-                                                                                                      }) {}
-inline Padding1ByteEnd& Padding1ByteEnd::a(uint16_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline Padding1ByteEnd& Padding1ByteEnd::b(uint8_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-
-inline Padding2ByteEnd::Padding2ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Padding2ByteEnd::Padding2ByteEnd(uint32_t a, uint16_t b) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b)}) {}
-inline Padding2ByteEnd::Padding2ByteEnd(const ::test_padding::Padding2ByteEnd& other) noexcept : ::test_padding::Padding2ByteEnd(other.CloneStorage_()) {}
-inline Padding2ByteEnd& ::test_padding::Padding2ByteEnd::operator=(const ::test_padding::Padding2ByteEnd& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline Padding2ByteEnd::Padding2ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding2ByteEnd(Storage_{
-                                                                                                          .a = {},
-                                                                                                          .b = {},
-                                                                                                      }) {}
-inline Padding2ByteEnd& Padding2ByteEnd::a(uint32_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline Padding2ByteEnd& Padding2ByteEnd::b(uint16_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-
-inline Padding3ByteEnd::Padding3ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Padding3ByteEnd::Padding3ByteEnd(uint32_t a, uint8_t b) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b)}) {}
-inline Padding3ByteEnd::Padding3ByteEnd(const ::test_padding::Padding3ByteEnd& other) noexcept : ::test_padding::Padding3ByteEnd(other.CloneStorage_()) {}
-inline Padding3ByteEnd& ::test_padding::Padding3ByteEnd::operator=(const ::test_padding::Padding3ByteEnd& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline Padding3ByteEnd::Padding3ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding3ByteEnd(Storage_{
-                                                                                                          .a = {},
-                                                                                                          .b = {},
-                                                                                                      }) {}
-inline Padding3ByteEnd& Padding3ByteEnd::a(uint32_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline Padding3ByteEnd& Padding3ByteEnd::b(uint8_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-
-inline Padding4ByteEnd::Padding4ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Padding4ByteEnd::Padding4ByteEnd(uint64_t a, uint32_t b) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b)}) {}
-inline Padding4ByteEnd::Padding4ByteEnd(const ::test_padding::Padding4ByteEnd& other) noexcept : ::test_padding::Padding4ByteEnd(other.CloneStorage_()) {}
-inline Padding4ByteEnd& ::test_padding::Padding4ByteEnd::operator=(const ::test_padding::Padding4ByteEnd& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline Padding4ByteEnd::Padding4ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding4ByteEnd(Storage_{
-                                                                                                          .a = {},
-                                                                                                          .b = {},
-                                                                                                      }) {}
-inline Padding4ByteEnd& Padding4ByteEnd::a(uint64_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline Padding4ByteEnd& Padding4ByteEnd::b(uint32_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-
-inline Padding5ByteEnd::Padding5ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Padding5ByteEnd::Padding5ByteEnd(uint64_t a, uint16_t b, uint8_t c) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b),
-                .c = std::move(c)}) {}
-inline Padding5ByteEnd::Padding5ByteEnd(const ::test_padding::Padding5ByteEnd& other) noexcept : ::test_padding::Padding5ByteEnd(other.CloneStorage_()) {}
-inline Padding5ByteEnd& ::test_padding::Padding5ByteEnd::operator=(const ::test_padding::Padding5ByteEnd& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline Padding5ByteEnd::Padding5ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding5ByteEnd(Storage_{
-                                                                                                          .a = {},
-                                                                                                          .b = {},
-                                                                                                          .c = {},
-                                                                                                      }) {}
-inline Padding5ByteEnd& Padding5ByteEnd::a(uint64_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline Padding5ByteEnd& Padding5ByteEnd::b(uint16_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-inline Padding5ByteEnd& Padding5ByteEnd::c(uint8_t value) {
-  storage_.c = std::move(value);
-  return *this;
-}
-
-inline Padding6ByteEnd::Padding6ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Padding6ByteEnd::Padding6ByteEnd(uint64_t a, uint16_t b) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b)}) {}
-inline Padding6ByteEnd::Padding6ByteEnd(const ::test_padding::Padding6ByteEnd& other) noexcept : ::test_padding::Padding6ByteEnd(other.CloneStorage_()) {}
-inline Padding6ByteEnd& ::test_padding::Padding6ByteEnd::operator=(const ::test_padding::Padding6ByteEnd& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline Padding6ByteEnd::Padding6ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding6ByteEnd(Storage_{
-                                                                                                          .a = {},
-                                                                                                          .b = {},
-                                                                                                      }) {}
-inline Padding6ByteEnd& Padding6ByteEnd::a(uint64_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline Padding6ByteEnd& Padding6ByteEnd::b(uint16_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-
-inline Padding7ByteEnd::Padding7ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Padding7ByteEnd::Padding7ByteEnd(uint64_t a, uint8_t b) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b)}) {}
-inline Padding7ByteEnd::Padding7ByteEnd(const ::test_padding::Padding7ByteEnd& other) noexcept : ::test_padding::Padding7ByteEnd(other.CloneStorage_()) {}
-inline Padding7ByteEnd& ::test_padding::Padding7ByteEnd::operator=(const ::test_padding::Padding7ByteEnd& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline Padding7ByteEnd::Padding7ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding7ByteEnd(Storage_{
-                                                                                                          .a = {},
-                                                                                                          .b = {},
-                                                                                                      }) {}
-inline Padding7ByteEnd& Padding7ByteEnd::a(uint64_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline Padding7ByteEnd& Padding7ByteEnd::b(uint8_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-
-inline Padding1ByteMiddle::Padding1ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Padding1ByteMiddle::Padding1ByteMiddle(uint8_t a, uint16_t b) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b)}) {}
-inline Padding1ByteMiddle::Padding1ByteMiddle(const ::test_padding::Padding1ByteMiddle& other) noexcept : ::test_padding::Padding1ByteMiddle(other.CloneStorage_()) {}
-inline Padding1ByteMiddle& ::test_padding::Padding1ByteMiddle::operator=(const ::test_padding::Padding1ByteMiddle& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline Padding1ByteMiddle::Padding1ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding1ByteMiddle(Storage_{
-                                                                                                                .a = {},
-                                                                                                                .b = {},
-                                                                                                            }) {}
-inline Padding1ByteMiddle& Padding1ByteMiddle::a(uint8_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline Padding1ByteMiddle& Padding1ByteMiddle::b(uint16_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-
-inline Padding2ByteMiddle::Padding2ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Padding2ByteMiddle::Padding2ByteMiddle(uint16_t a, uint32_t b) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b)}) {}
-inline Padding2ByteMiddle::Padding2ByteMiddle(const ::test_padding::Padding2ByteMiddle& other) noexcept : ::test_padding::Padding2ByteMiddle(other.CloneStorage_()) {}
-inline Padding2ByteMiddle& ::test_padding::Padding2ByteMiddle::operator=(const ::test_padding::Padding2ByteMiddle& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline Padding2ByteMiddle::Padding2ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding2ByteMiddle(Storage_{
-                                                                                                                .a = {},
-                                                                                                                .b = {},
-                                                                                                            }) {}
-inline Padding2ByteMiddle& Padding2ByteMiddle::a(uint16_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline Padding2ByteMiddle& Padding2ByteMiddle::b(uint32_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-
-inline Padding3ByteMiddle::Padding3ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Padding3ByteMiddle::Padding3ByteMiddle(uint8_t a, uint32_t b) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b)}) {}
-inline Padding3ByteMiddle::Padding3ByteMiddle(const ::test_padding::Padding3ByteMiddle& other) noexcept : ::test_padding::Padding3ByteMiddle(other.CloneStorage_()) {}
-inline Padding3ByteMiddle& ::test_padding::Padding3ByteMiddle::operator=(const ::test_padding::Padding3ByteMiddle& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline Padding3ByteMiddle::Padding3ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding3ByteMiddle(Storage_{
-                                                                                                                .a = {},
-                                                                                                                .b = {},
-                                                                                                            }) {}
-inline Padding3ByteMiddle& Padding3ByteMiddle::a(uint8_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline Padding3ByteMiddle& Padding3ByteMiddle::b(uint32_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-
-inline Padding4ByteMiddle::Padding4ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Padding4ByteMiddle::Padding4ByteMiddle(uint32_t a, uint64_t b) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b)}) {}
-inline Padding4ByteMiddle::Padding4ByteMiddle(const ::test_padding::Padding4ByteMiddle& other) noexcept : ::test_padding::Padding4ByteMiddle(other.CloneStorage_()) {}
-inline Padding4ByteMiddle& ::test_padding::Padding4ByteMiddle::operator=(const ::test_padding::Padding4ByteMiddle& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline Padding4ByteMiddle::Padding4ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding4ByteMiddle(Storage_{
-                                                                                                                .a = {},
-                                                                                                                .b = {},
-                                                                                                            }) {}
-inline Padding4ByteMiddle& Padding4ByteMiddle::a(uint32_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline Padding4ByteMiddle& Padding4ByteMiddle::b(uint64_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-
-inline Padding5ByteMiddle::Padding5ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Padding5ByteMiddle::Padding5ByteMiddle(uint16_t a, uint8_t b, uint64_t c) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b),
-                .c = std::move(c)}) {}
-inline Padding5ByteMiddle::Padding5ByteMiddle(const ::test_padding::Padding5ByteMiddle& other) noexcept : ::test_padding::Padding5ByteMiddle(other.CloneStorage_()) {}
-inline Padding5ByteMiddle& ::test_padding::Padding5ByteMiddle::operator=(const ::test_padding::Padding5ByteMiddle& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline Padding5ByteMiddle::Padding5ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding5ByteMiddle(Storage_{
-                                                                                                                .a = {},
-                                                                                                                .b = {},
-                                                                                                                .c = {},
-                                                                                                            }) {}
-inline Padding5ByteMiddle& Padding5ByteMiddle::a(uint16_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline Padding5ByteMiddle& Padding5ByteMiddle::b(uint8_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-inline Padding5ByteMiddle& Padding5ByteMiddle::c(uint64_t value) {
-  storage_.c = std::move(value);
-  return *this;
-}
-
-inline Padding6ByteMiddle::Padding6ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Padding6ByteMiddle::Padding6ByteMiddle(uint16_t a, uint64_t b) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b)}) {}
-inline Padding6ByteMiddle::Padding6ByteMiddle(const ::test_padding::Padding6ByteMiddle& other) noexcept : ::test_padding::Padding6ByteMiddle(other.CloneStorage_()) {}
-inline Padding6ByteMiddle& ::test_padding::Padding6ByteMiddle::operator=(const ::test_padding::Padding6ByteMiddle& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline Padding6ByteMiddle::Padding6ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding6ByteMiddle(Storage_{
-                                                                                                                .a = {},
-                                                                                                                .b = {},
-                                                                                                            }) {}
-inline Padding6ByteMiddle& Padding6ByteMiddle::a(uint16_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline Padding6ByteMiddle& Padding6ByteMiddle::b(uint64_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-
-inline Padding7ByteMiddle::Padding7ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Padding7ByteMiddle::Padding7ByteMiddle(uint8_t a, uint64_t b) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b)}) {}
-inline Padding7ByteMiddle::Padding7ByteMiddle(const ::test_padding::Padding7ByteMiddle& other) noexcept : ::test_padding::Padding7ByteMiddle(other.CloneStorage_()) {}
-inline Padding7ByteMiddle& ::test_padding::Padding7ByteMiddle::operator=(const ::test_padding::Padding7ByteMiddle& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline Padding7ByteMiddle::Padding7ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding7ByteMiddle(Storage_{
-                                                                                                                .a = {},
-                                                                                                                .b = {},
-                                                                                                            }) {}
-inline Padding7ByteMiddle& Padding7ByteMiddle::a(uint8_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline Padding7ByteMiddle& Padding7ByteMiddle::b(uint64_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-
-inline Padding4ByteAlignmentLength12::Padding4ByteAlignmentLength12(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Padding4ByteAlignmentLength12::Padding4ByteAlignmentLength12(uint32_t a, uint8_t b, uint16_t c, uint16_t d) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b),
-                .c = std::move(c),
-                .d = std::move(d)}) {}
-inline Padding4ByteAlignmentLength12::Padding4ByteAlignmentLength12(const ::test_padding::Padding4ByteAlignmentLength12& other) noexcept : ::test_padding::Padding4ByteAlignmentLength12(other.CloneStorage_()) {}
-inline Padding4ByteAlignmentLength12& ::test_padding::Padding4ByteAlignmentLength12::operator=(const ::test_padding::Padding4ByteAlignmentLength12& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline Padding4ByteAlignmentLength12::Padding4ByteAlignmentLength12(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding4ByteAlignmentLength12(Storage_{
-                                                                                                                                      .a = {},
-                                                                                                                                      .b = {},
-                                                                                                                                      .c = {},
-                                                                                                                                      .d = {},
-                                                                                                                                  }) {}
-inline Padding4ByteAlignmentLength12& Padding4ByteAlignmentLength12::a(uint32_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline Padding4ByteAlignmentLength12& Padding4ByteAlignmentLength12::b(uint8_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-inline Padding4ByteAlignmentLength12& Padding4ByteAlignmentLength12::c(uint16_t value) {
-  storage_.c = std::move(value);
-  return *this;
-}
-inline Padding4ByteAlignmentLength12& Padding4ByteAlignmentLength12::d(uint16_t value) {
-  storage_.d = std::move(value);
-  return *this;
-}
-
-inline Padding2ByteAlignmentLength6::Padding2ByteAlignmentLength6(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Padding2ByteAlignmentLength6::Padding2ByteAlignmentLength6(uint8_t a, uint16_t b, uint8_t c) noexcept
-    : storage_({.a = std::move(a),
-                .b = std::move(b),
-                .c = std::move(c)}) {}
-inline Padding2ByteAlignmentLength6::Padding2ByteAlignmentLength6(const ::test_padding::Padding2ByteAlignmentLength6& other) noexcept : ::test_padding::Padding2ByteAlignmentLength6(other.CloneStorage_()) {}
-inline Padding2ByteAlignmentLength6& ::test_padding::Padding2ByteAlignmentLength6::operator=(const ::test_padding::Padding2ByteAlignmentLength6& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline Padding2ByteAlignmentLength6::Padding2ByteAlignmentLength6(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding2ByteAlignmentLength6(Storage_{
-                                                                                                                                    .a = {},
-                                                                                                                                    .b = {},
-                                                                                                                                    .c = {},
-                                                                                                                                }) {}
-inline Padding2ByteAlignmentLength6& Padding2ByteAlignmentLength6::a(uint8_t value) {
-  storage_.a = std::move(value);
-  return *this;
-}
-inline Padding2ByteAlignmentLength6& Padding2ByteAlignmentLength6::b(uint16_t value) {
-  storage_.b = std::move(value);
-  return *this;
-}
-inline Padding2ByteAlignmentLength6& Padding2ByteAlignmentLength6::c(uint8_t value) {
-  storage_.c = std::move(value);
-  return *this;
-}
 
 }  // namespace test_padding
 namespace fidl {

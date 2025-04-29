@@ -26,6 +26,8 @@ constexpr inline ::fidl::MessageDynamicFlags kTestProtocol_FlexibleUnionHenceRes
 #ifdef __Fuchsia__
 }  // namespace test_union
 
+::fidl::Response<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>::Response(::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse v) : TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse(std::move(v)) {}
+
 ::fidl::internal::NaturalThenable<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>
 fidl::internal::NaturalClientImpl<::test_union::TestProtocol>::StrictUnionHenceResponseMayBeStackAllocated() const {
   return ::fidl::internal::NaturalThenable<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>(
@@ -41,6 +43,8 @@ fidl::internal::NaturalClientImpl<::test_union::TestProtocol>::StrictUnionHenceR
         return base->SendTwoWay(msg, response_context);
       });
 }
+
+::fidl::Response<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>::Response(::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse v) : TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse(std::move(v)) {}
 
 ::fidl::internal::NaturalThenable<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>
 fidl::internal::NaturalClientImpl<::test_union::TestProtocol>::FlexibleUnionHenceResponseMustBeHeapAllocated() const {
@@ -86,12 +90,20 @@ fidl::internal::NaturalSyncClientImpl<::test_union::TestProtocol>::FlexibleUnion
       msg.Call(_client_end().handle(), response_storage.view()), nullptr);
 }
 
+::fidl::UnownedClientEnd<::test_union::TestProtocol> fidl::internal::NaturalSyncClientImpl<::test_union::TestProtocol>::_client_end() const {
+  return ::fidl::UnownedClientEnd<::test_union::TestProtocol>(
+      _transport().get<::fidl::internal::ChannelTransport>());
+}
+
 ::fidl::Status fidl::SyncEventHandler<::test_union::TestProtocol>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_union::TestProtocol> client_end) {
   ::fidl::internal::IncomingEventsStorage<::test_union::TestProtocol> event_storage;
   fidl::internal::NaturalEventDispatcher<::test_union::TestProtocol> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
+
+::fidl::internal::NaturalEventDispatcher<::test_union::TestProtocol>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_union::TestProtocol>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
 
 #endif  // __Fuchsia__
 
@@ -111,6 +123,12 @@ void fidl::internal::NaturalCompleterBase<::test_union::TestProtocol::FlexibleUn
       ::fidl::internal::ResponseMessageConverter<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>::IntoDomainObject(response));
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
+}
+
+::fidl::ProtocolHandler<::test_union::TestProtocol> fidl::Server<::test_union::TestProtocol>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_union::TestProtocol> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
 }
 
 #ifdef __Fuchsia__

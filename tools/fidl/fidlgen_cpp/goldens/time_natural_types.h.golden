@@ -40,21 +40,13 @@ class AllInstants {
   AllInstants(const AllInstants& other) noexcept;
   AllInstants& operator=(const AllInstants& other) noexcept;
 
-  bool operator==(const AllInstants& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_time::AllInstants, 32>::Equal(this, &other);
-  }
-  bool operator!=(const AllInstants& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_time::AllInstants, 32>::Equal(this, &other);
-  }
+  bool operator==(const AllInstants& other) const noexcept;
+  bool operator!=(const AllInstants& other) const noexcept;
 
   ::fidl::basic_time<ZX_CLOCK_MONOTONIC>
-  monotonic() const {
-    return storage_.monotonic;
-  }
+  monotonic() const;
 
-  ::fidl::basic_time<ZX_CLOCK_MONOTONIC>& monotonic() {
-    return storage_.monotonic;
-  }
+  ::fidl::basic_time<ZX_CLOCK_MONOTONIC>& monotonic();
 
   // Setter for monotonic.
   //
@@ -62,13 +54,9 @@ class AllInstants {
   AllInstants& monotonic(::fidl::basic_time<ZX_CLOCK_MONOTONIC> value);
 
   ::fidl::basic_time<ZX_CLOCK_BOOT>
-  boot() const {
-    return storage_.boot;
-  }
+  boot() const;
 
-  ::fidl::basic_time<ZX_CLOCK_BOOT>& boot() {
-    return storage_.boot;
-  }
+  ::fidl::basic_time<ZX_CLOCK_BOOT>& boot();
 
   // Setter for boot.
   //
@@ -76,13 +64,9 @@ class AllInstants {
   AllInstants& boot(::fidl::basic_time<ZX_CLOCK_BOOT> value);
 
   ::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>
-  monotonic_ticks() const {
-    return storage_.monotonic_ticks;
-  }
+  monotonic_ticks() const;
 
-  ::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>& monotonic_ticks() {
-    return storage_.monotonic_ticks;
-  }
+  ::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>& monotonic_ticks();
 
   // Setter for monotonic_ticks.
   //
@@ -90,13 +74,9 @@ class AllInstants {
   AllInstants& monotonic_ticks(::fidl::basic_ticks<ZX_CLOCK_MONOTONIC> value);
 
   ::fidl::basic_ticks<ZX_CLOCK_BOOT>
-  boot_ticks() const {
-    return storage_.boot_ticks;
-  }
+  boot_ticks() const;
 
-  ::fidl::basic_ticks<ZX_CLOCK_BOOT>& boot_ticks() {
-    return storage_.boot_ticks;
-  }
+  ::fidl::basic_ticks<ZX_CLOCK_BOOT>& boot_ticks();
 
   // Setter for boot_ticks.
   //
@@ -135,43 +115,37 @@ class ComplexInstants {
   ComplexInstants& operator=(ComplexInstants&&) noexcept = default;
   ComplexInstants(const ComplexInstants& other) noexcept;
   ComplexInstants& operator=(const ComplexInstants& other) noexcept;
-  bool operator==(const ComplexInstants& other) const noexcept {
-    return ::fidl::internal::NaturalTableCodingTraits<::test_time::ComplexInstants>::Equal(this, &other);
-  }
-  bool operator!=(const ComplexInstants& other) const noexcept {
-    return !::fidl::internal::NaturalTableCodingTraits<::test_time::ComplexInstants>::Equal(this, &other);
-  }
+  bool operator==(const ComplexInstants& other) const noexcept;
+  bool operator!=(const ComplexInstants& other) const noexcept;
 
-  bool IsEmpty() const {
-    return !(storage_.monotonic.has_value() || storage_.boot.has_value() || storage_.monotonic_ticks.has_value() || storage_.boot_ticks.has_value());
-  }
+  bool IsEmpty() const;
 
-  const std::optional<::std::array<::fidl::basic_time<ZX_CLOCK_MONOTONIC>, 10>>& monotonic() const { return storage_.monotonic; }
-  ::std::optional<::std::array<::fidl::basic_time<ZX_CLOCK_MONOTONIC>, 10>>& monotonic() { return storage_.monotonic; }
+  const std::optional<::std::array<::fidl::basic_time<ZX_CLOCK_MONOTONIC>, 10>>& monotonic() const;
+  ::std::optional<::std::array<::fidl::basic_time<ZX_CLOCK_MONOTONIC>, 10>>& monotonic();
 
   // Setter for monotonic.
   //
 
   ComplexInstants& monotonic(std::optional<::std::array<::fidl::basic_time<ZX_CLOCK_MONOTONIC>, 10>> value);
 
-  const std::optional<::std::vector<::fidl::basic_time<ZX_CLOCK_BOOT>>>& boot() const { return storage_.boot; }
-  ::std::optional<::std::vector<::fidl::basic_time<ZX_CLOCK_BOOT>>>& boot() { return storage_.boot; }
+  const std::optional<::std::vector<::fidl::basic_time<ZX_CLOCK_BOOT>>>& boot() const;
+  ::std::optional<::std::vector<::fidl::basic_time<ZX_CLOCK_BOOT>>>& boot();
 
   // Setter for boot.
   //
 
   ComplexInstants& boot(std::optional<::std::vector<::fidl::basic_time<ZX_CLOCK_BOOT>>> value);
 
-  const std::optional<::std::array<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, 10>>& monotonic_ticks() const { return storage_.monotonic_ticks; }
-  ::std::optional<::std::array<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, 10>>& monotonic_ticks() { return storage_.monotonic_ticks; }
+  const std::optional<::std::array<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, 10>>& monotonic_ticks() const;
+  ::std::optional<::std::array<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, 10>>& monotonic_ticks();
 
   // Setter for monotonic_ticks.
   //
 
   ComplexInstants& monotonic_ticks(std::optional<::std::array<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, 10>> value);
 
-  const std::optional<::std::array<::fidl::basic_ticks<ZX_CLOCK_BOOT>, 10>>& boot_ticks() const { return storage_.boot_ticks; }
-  ::std::optional<::std::array<::fidl::basic_ticks<ZX_CLOCK_BOOT>, 10>>& boot_ticks() { return storage_.boot_ticks; }
+  const std::optional<::std::array<::fidl::basic_ticks<ZX_CLOCK_BOOT>, 10>>& boot_ticks() const;
+  ::std::optional<::std::array<::fidl::basic_ticks<ZX_CLOCK_BOOT>, 10>>& boot_ticks();
 
   // Setter for boot_ticks.
   //
@@ -197,66 +171,6 @@ class ComplexInstants {
                                                        1, &Storage_::monotonic},
                                                    ::fidl::internal::NaturalTableMember<Storage_, ::std::vector<::fidl::basic_time<ZX_CLOCK_BOOT>>, fidl::internal::NaturalCodingConstraintVector<fidl::internal::NaturalCodingConstraintEmpty>>{2, &Storage_::boot}, ::fidl::internal::NaturalTableMember<Storage_, ::std::array<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, 10>, fidl::internal::NaturalCodingConstraintEmpty>{3, &Storage_::monotonic_ticks}, ::fidl::internal::NaturalTableMember<Storage_, ::std::array<::fidl::basic_ticks<ZX_CLOCK_BOOT>, 10>, fidl::internal::NaturalCodingConstraintEmpty>{4, &Storage_::boot_ticks});
 };
-
-inline AllInstants::AllInstants(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline AllInstants::AllInstants(::fidl::basic_time<ZX_CLOCK_MONOTONIC> monotonic, ::fidl::basic_time<ZX_CLOCK_BOOT> boot, ::fidl::basic_ticks<ZX_CLOCK_MONOTONIC> monotonic_ticks, ::fidl::basic_ticks<ZX_CLOCK_BOOT> boot_ticks) noexcept
-    : storage_({.monotonic = std::move(monotonic),
-                .boot = std::move(boot),
-                .monotonic_ticks = std::move(monotonic_ticks),
-                .boot_ticks = std::move(boot_ticks)}) {}
-inline AllInstants::AllInstants(const ::test_time::AllInstants& other) noexcept : ::test_time::AllInstants(other.CloneStorage_()) {}
-inline AllInstants& ::test_time::AllInstants::operator=(const ::test_time::AllInstants& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline AllInstants::AllInstants(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : AllInstants(Storage_{
-                                                                                                  .monotonic = {},
-                                                                                                  .boot = {},
-                                                                                                  .monotonic_ticks = {},
-                                                                                                  .boot_ticks = {},
-                                                                                              }) {}
-inline AllInstants& AllInstants::monotonic(::fidl::basic_time<ZX_CLOCK_MONOTONIC> value) {
-  storage_.monotonic = std::move(value);
-  return *this;
-}
-inline AllInstants& AllInstants::boot(::fidl::basic_time<ZX_CLOCK_BOOT> value) {
-  storage_.boot = std::move(value);
-  return *this;
-}
-inline AllInstants& AllInstants::monotonic_ticks(::fidl::basic_ticks<ZX_CLOCK_MONOTONIC> value) {
-  storage_.monotonic_ticks = std::move(value);
-  return *this;
-}
-inline AllInstants& AllInstants::boot_ticks(::fidl::basic_ticks<ZX_CLOCK_BOOT> value) {
-  storage_.boot_ticks = std::move(value);
-  return *this;
-}
-
-inline ComplexInstants::ComplexInstants(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline ComplexInstants::ComplexInstants(const ::test_time::ComplexInstants& other) noexcept : ComplexInstants(other.CloneStorage_()) {}
-inline ComplexInstants& ::test_time::ComplexInstants::operator=(const ComplexInstants& other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
-
-inline ComplexInstants::ComplexInstants(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ComplexInstants(Storage_{}) {}
-inline ComplexInstants& ComplexInstants::monotonic(std::optional<::std::array<::fidl::basic_time<ZX_CLOCK_MONOTONIC>, 10>> value) {
-  storage_.monotonic = std::move(value);
-  return *this;
-}
-inline ComplexInstants& ComplexInstants::boot(std::optional<::std::vector<::fidl::basic_time<ZX_CLOCK_BOOT>>> value) {
-  storage_.boot = std::move(value);
-  return *this;
-}
-inline ComplexInstants& ComplexInstants::monotonic_ticks(std::optional<::std::array<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, 10>> value) {
-  storage_.monotonic_ticks = std::move(value);
-  return *this;
-}
-inline ComplexInstants& ComplexInstants::boot_ticks(std::optional<::std::array<::fidl::basic_ticks<ZX_CLOCK_BOOT>, 10>> value) {
-  storage_.boot_ticks = std::move(value);
-  return *this;
-}
 
 }  // namespace test_time
 namespace fidl {

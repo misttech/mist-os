@@ -140,6 +140,8 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
       });
 }
 
+    ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFields>::Response(::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse v) : UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse(std::move(v)) {}
+
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFields>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::StrictTwoWayFields() const {
   fdf::Arena _arena('FIDL');
@@ -162,6 +164,8 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
         return base->SendTwoWay(arena_msg, response_context);
       });
 }
+
+    ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnion>::Response(::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse v) : UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse(std::move(v)) {}
 
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnion>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::StrictTwoWayUnion() const {
@@ -186,6 +190,8 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
       });
 }
 
+    ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTable>::Response(::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse v) : UnknownInteractionsDriverProtocolStrictTwoWayTableResponse(std::move(v)) {}
+
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTable>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::StrictTwoWayTable() const {
   fdf::Arena _arena('FIDL');
@@ -208,6 +214,15 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
         return base->SendTwoWay(arena_msg, response_context);
       });
 }
+
+      ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayErr>::Response(::fit::result<int32_t> v) : result(std::move(v)) {}
+  ::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayErrResult fidl::internal::ResponseMessageConverter<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayErr>::IntoDomainObject(const ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayErr>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+        return DomainObject::WithResponse({});
+    }
+  }
 
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayErr>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::StrictTwoWayErr() const {
@@ -232,6 +247,15 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
       });
 }
 
+      ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFieldsErr>::Response(::fit::result<int32_t, ::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse> v) : result(std::move(v)) {}
+  ::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult fidl::internal::ResponseMessageConverter<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFieldsErr>::IntoDomainObject(const ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFieldsErr>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+        return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
+
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFieldsErr>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::StrictTwoWayFieldsErr() const {
   fdf::Arena _arena('FIDL');
@@ -254,6 +278,15 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
         return base->SendTwoWay(arena_msg, response_context);
       });
 }
+
+      ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnionErr>::Response(::fit::result<int32_t, ::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse> v) : result(std::move(v)) {}
+  ::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult fidl::internal::ResponseMessageConverter<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnionErr>::IntoDomainObject(const ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnionErr>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+        return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
 
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnionErr>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::StrictTwoWayUnionErr() const {
@@ -278,6 +311,15 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
       });
 }
 
+      ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTableErr>::Response(::fit::result<int32_t, ::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse> v) : result(std::move(v)) {}
+  ::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult fidl::internal::ResponseMessageConverter<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTableErr>::IntoDomainObject(const ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTableErr>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+        return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
+
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTableErr>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::StrictTwoWayTableErr() const {
   fdf::Arena _arena('FIDL');
@@ -300,6 +342,11 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
         return base->SendTwoWay(arena_msg, response_context);
       });
 }
+
+  ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResult fidl::internal::ResponseMessageConverter<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWay>::IntoDomainObject() {
+
+        return DomainObject::WithResponse({});
+  }
 
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWay>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::FlexibleTwoWay() const {
@@ -324,6 +371,12 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
       });
 }
 
+    ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFields>::Response(::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse v) : UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse(std::move(v)) {}
+  ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult fidl::internal::ResponseMessageConverter<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFields>::IntoDomainObject(const ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFields>& m) {
+
+        return DomainObject::WithResponse(std::move(m));
+  }
+
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFields>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::FlexibleTwoWayFields() const {
   fdf::Arena _arena('FIDL');
@@ -346,6 +399,12 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
         return base->SendTwoWay(arena_msg, response_context);
       });
 }
+
+    ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnion>::Response(::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse v) : UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse(std::move(v)) {}
+  ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult fidl::internal::ResponseMessageConverter<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnion>::IntoDomainObject(const ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnion>& m) {
+
+        return DomainObject::WithResponse(std::move(m));
+  }
 
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnion>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::FlexibleTwoWayUnion() const {
@@ -370,6 +429,12 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
       });
 }
 
+    ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTable>::Response(::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse v) : UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse(std::move(v)) {}
+  ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult fidl::internal::ResponseMessageConverter<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTable>::IntoDomainObject(const ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTable>& m) {
+
+        return DomainObject::WithResponse(std::move(m));
+  }
+
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTable>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::FlexibleTwoWayTable() const {
   fdf::Arena _arena('FIDL');
@@ -392,6 +457,15 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
         return base->SendTwoWay(arena_msg, response_context);
       });
 }
+
+      ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayErr>::Response(::fit::result<int32_t> v) : result(std::move(v)) {}
+  ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult fidl::internal::ResponseMessageConverter<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayErr>::IntoDomainObject(const ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayErr>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+        return DomainObject::WithResponse({});
+    }
+  }
 
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayErr>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::FlexibleTwoWayErr() const {
@@ -416,6 +490,15 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
       });
 }
 
+      ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFieldsErr>::Response(::fit::result<int32_t, ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse> v) : result(std::move(v)) {}
+  ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult fidl::internal::ResponseMessageConverter<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFieldsErr>::IntoDomainObject(const ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFieldsErr>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+        return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
+
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFieldsErr>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::FlexibleTwoWayFieldsErr() const {
   fdf::Arena _arena('FIDL');
@@ -439,6 +522,15 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
       });
 }
 
+      ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnionErr>::Response(::fit::result<int32_t, ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse> v) : result(std::move(v)) {}
+  ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult fidl::internal::ResponseMessageConverter<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnionErr>::IntoDomainObject(const ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnionErr>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+        return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
+
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnionErr>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::FlexibleTwoWayUnionErr() const {
   fdf::Arena _arena('FIDL');
@@ -461,6 +553,15 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
         return base->SendTwoWay(arena_msg, response_context);
       });
 }
+
+      ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTableErr>::Response(::fit::result<int32_t, ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse> v) : result(std::move(v)) {}
+  ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult fidl::internal::ResponseMessageConverter<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTableErr>::IntoDomainObject(const ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTableErr>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+        return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
 
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTableErr>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::FlexibleTwoWayTableErr() const {
@@ -550,6 +651,9 @@ namespace test_unknowninteractions {
         return ::fidl::Status::UnknownOrdinal();
     }
   }
+
+::fidl::internal::NaturalEventDispatcher<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_unknowninteractions::UnknownInteractionsDriverProtocol>* event_handler)
+: IncomingEventDispatcher(event_handler) {}
 
 #endif  // __Fuchsia__
 
@@ -772,6 +876,12 @@ void fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInt
   ::fidl::OutgoingMessage _msg = _encoder.GetMessage();
   ::fidl::OutgoingMessage _arena_msg = ::fdf::internal::MoveToArena(_msg, _arena);
   SendReply(&_arena_msg, std::move(_context));
+}
+
+::fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsDriverProtocol> fdf::Server<::test_unknowninteractions::UnknownInteractionsDriverProtocol>::bind_handler(fdf_dispatcher_t* dispatcher) {
+  return [impl=this, dispatcher=dispatcher](::fdf::ServerEnd<::test_unknowninteractions::UnknownInteractionsDriverProtocol> request) {
+      (void) ::fdf::BindServer(dispatcher, std::move(request), impl);
+  };
 }
 #ifdef __Fuchsia__
 
@@ -1166,6 +1276,8 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
       });
 }
 
+    ::fidl::Response<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFields>::Response(::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse v) : UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse(std::move(v)) {}
+
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFields>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>::StrictTwoWayFields() const {
   fdf::Arena _arena('FIDL');
@@ -1188,6 +1300,8 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
         return base->SendTwoWay(arena_msg, response_context);
       });
 }
+
+    ::fidl::Response<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnion>::Response(::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse v) : UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse(std::move(v)) {}
 
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnion>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>::StrictTwoWayUnion() const {
@@ -1212,6 +1326,8 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
       });
 }
 
+    ::fidl::Response<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTable>::Response(::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse v) : UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse(std::move(v)) {}
+
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTable>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>::StrictTwoWayTable() const {
   fdf::Arena _arena('FIDL');
@@ -1234,6 +1350,15 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
         return base->SendTwoWay(arena_msg, response_context);
       });
 }
+
+      ::fidl::Response<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayErr>::Response(::fit::result<int32_t> v) : result(std::move(v)) {}
+  ::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult fidl::internal::ResponseMessageConverter<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayErr>::IntoDomainObject(const ::fidl::Response<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayErr>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+        return DomainObject::WithResponse({});
+    }
+  }
 
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayErr>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>::StrictTwoWayErr() const {
@@ -1258,6 +1383,15 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
       });
 }
 
+      ::fidl::Response<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFieldsErr>::Response(::fit::result<int32_t, ::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse> v) : result(std::move(v)) {}
+  ::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult fidl::internal::ResponseMessageConverter<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFieldsErr>::IntoDomainObject(const ::fidl::Response<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFieldsErr>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+        return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
+
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFieldsErr>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>::StrictTwoWayFieldsErr() const {
   fdf::Arena _arena('FIDL');
@@ -1281,6 +1415,15 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
       });
 }
 
+      ::fidl::Response<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnionErr>::Response(::fit::result<int32_t, ::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse> v) : result(std::move(v)) {}
+  ::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult fidl::internal::ResponseMessageConverter<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnionErr>::IntoDomainObject(const ::fidl::Response<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnionErr>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+        return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
+
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnionErr>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>::StrictTwoWayUnionErr() const {
   fdf::Arena _arena('FIDL');
@@ -1303,6 +1446,15 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
         return base->SendTwoWay(arena_msg, response_context);
       });
 }
+
+      ::fidl::Response<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTableErr>::Response(::fit::result<int32_t, ::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse> v) : result(std::move(v)) {}
+  ::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult fidl::internal::ResponseMessageConverter<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTableErr>::IntoDomainObject(const ::fidl::Response<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTableErr>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+        return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
 
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTableErr>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>::StrictTwoWayTableErr() const {
@@ -1392,6 +1544,9 @@ namespace test_unknowninteractions {
         return ::fidl::Status::UnknownOrdinal();
     }
   }
+
+::fidl::internal::NaturalEventDispatcher<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>* event_handler)
+: IncomingEventDispatcher(event_handler) {}
 
 #endif  // __Fuchsia__
 
@@ -1503,6 +1658,12 @@ void fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInt
   ::fidl::OutgoingMessage _msg = _encoder.GetMessage();
   ::fidl::OutgoingMessage _arena_msg = ::fdf::internal::MoveToArena(_msg, _arena);
   SendReply(&_arena_msg, std::move(_context));
+}
+
+::fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol> fdf::Server<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>::bind_handler(fdf_dispatcher_t* dispatcher) {
+  return [impl=this, dispatcher=dispatcher](::fdf::ServerEnd<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol> request) {
+      (void) ::fdf::BindServer(dispatcher, std::move(request), impl);
+  };
 }
 #ifdef __Fuchsia__
 
@@ -1769,6 +1930,8 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
       });
 }
 
+    ::fidl::Response<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFields>::Response(::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse v) : UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse(std::move(v)) {}
+
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFields>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>::StrictTwoWayFields() const {
   fdf::Arena _arena('FIDL');
@@ -1791,6 +1954,8 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
         return base->SendTwoWay(arena_msg, response_context);
       });
 }
+
+    ::fidl::Response<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnion>::Response(::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse v) : UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse(std::move(v)) {}
 
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnion>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>::StrictTwoWayUnion() const {
@@ -1815,6 +1980,8 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
       });
 }
 
+    ::fidl::Response<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTable>::Response(::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse v) : UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse(std::move(v)) {}
+
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTable>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>::StrictTwoWayTable() const {
   fdf::Arena _arena('FIDL');
@@ -1837,6 +2004,15 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
         return base->SendTwoWay(arena_msg, response_context);
       });
 }
+
+      ::fidl::Response<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayErr>::Response(::fit::result<int32_t> v) : result(std::move(v)) {}
+  ::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult fidl::internal::ResponseMessageConverter<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayErr>::IntoDomainObject(const ::fidl::Response<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayErr>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+        return DomainObject::WithResponse({});
+    }
+  }
 
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayErr>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>::StrictTwoWayErr() const {
@@ -1861,6 +2037,15 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
       });
 }
 
+      ::fidl::Response<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFieldsErr>::Response(::fit::result<int32_t, ::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse> v) : result(std::move(v)) {}
+  ::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult fidl::internal::ResponseMessageConverter<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFieldsErr>::IntoDomainObject(const ::fidl::Response<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFieldsErr>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+        return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
+
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFieldsErr>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>::StrictTwoWayFieldsErr() const {
   fdf::Arena _arena('FIDL');
@@ -1884,6 +2069,15 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
       });
 }
 
+      ::fidl::Response<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnionErr>::Response(::fit::result<int32_t, ::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse> v) : result(std::move(v)) {}
+  ::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult fidl::internal::ResponseMessageConverter<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnionErr>::IntoDomainObject(const ::fidl::Response<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnionErr>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+        return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
+
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnionErr>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>::StrictTwoWayUnionErr() const {
   fdf::Arena _arena('FIDL');
@@ -1906,6 +2100,15 @@ fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteraction
         return base->SendTwoWay(arena_msg, response_context);
       });
 }
+
+      ::fidl::Response<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTableErr>::Response(::fit::result<int32_t, ::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse> v) : result(std::move(v)) {}
+  ::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult fidl::internal::ResponseMessageConverter<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTableErr>::IntoDomainObject(const ::fidl::Response<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTableErr>& m) {
+    if (m.is_error()) {
+      return DomainObject::WithErr(m.error_value());
+    } else {
+        return DomainObject::WithResponse(std::move(m.value()));
+    }
+  }
 
 ::fidl::internal::NaturalThenable<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTableErr>
 fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>::StrictTwoWayTableErr() const {
@@ -1950,6 +2153,13 @@ namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
 }  // namespace test_unknowninteractions
+
+#ifdef __Fuchsia__
+
+::fidl::internal::NaturalEventDispatcher<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>* event_handler)
+: IncomingEventDispatcher(event_handler) {}
+
+#endif  // __Fuchsia__
 
 void fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWay>::Reply() {
   ::fidl::internal::NaturalMessageEncoder _encoder{
@@ -2059,6 +2269,12 @@ void fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInt
   ::fidl::OutgoingMessage _msg = _encoder.GetMessage();
   ::fidl::OutgoingMessage _arena_msg = ::fdf::internal::MoveToArena(_msg, _arena);
   SendReply(&_arena_msg, std::move(_context));
+}
+
+::fidl::ProtocolHandler<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol> fdf::Server<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>::bind_handler(fdf_dispatcher_t* dispatcher) {
+  return [impl=this, dispatcher=dispatcher](::fdf::ServerEnd<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol> request) {
+      (void) ::fdf::BindServer(dispatcher, std::move(request), impl);
+  };
 }
 #ifdef __Fuchsia__
 

@@ -1050,8 +1050,8 @@ class ::fidl::WireAsyncEventHandler<::test_protocols::WithAndWithoutRequestRespo
     : public ::fidl::internal::WireEventHandlerInterface<::test_protocols::WithAndWithoutRequestResponse>, public ::fidl::internal::AsyncEventHandler {
  public:
   WireAsyncEventHandler() = default;
-    void OnEmptyResponse() override {}
-    void OnWithResponse(::fidl::WireEvent<::test_protocols::WithAndWithoutRequestResponse::OnWithResponse>* event) override {}
+    void OnEmptyResponse() override;
+    void OnWithResponse(::fidl::WireEvent<::test_protocols::WithAndWithoutRequestResponse::OnWithResponse>* event) override;
 };
 
   template<>
@@ -3185,7 +3185,7 @@ class ::fidl::WireAsyncEventHandler<::test_protocols::ChannelProtocol>
     : public ::fidl::internal::WireEventHandlerInterface<::test_protocols::ChannelProtocol>, public ::fidl::internal::AsyncEventHandler {
  public:
   WireAsyncEventHandler() = default;
-    void EventA(::fidl::WireEvent<::test_protocols::ChannelProtocol::EventA>* event) override {}
+    void EventA(::fidl::WireEvent<::test_protocols::ChannelProtocol::EventA>* event) override;
 };
 
   template<>
@@ -4301,7 +4301,7 @@ class ::fidl::WireAsyncEventHandler<::test_protocols::HandleRightsProtocol>
     : public ::fidl::internal::WireEventHandlerInterface<::test_protocols::HandleRightsProtocol>, public ::fidl::internal::AsyncEventHandler {
  public:
   WireAsyncEventHandler() = default;
-    void AnEvent(::fidl::WireEvent<::test_protocols::HandleRightsProtocol::AnEvent>* event) override {}
+    void AnEvent(::fidl::WireEvent<::test_protocols::HandleRightsProtocol::AnEvent>* event) override;
 };
 
   template<>
