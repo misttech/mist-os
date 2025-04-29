@@ -129,8 +129,6 @@ class MagmaTestServer : public fidl::WireServer<fuchsia_gpu_magma::TestDevice2> 
   zx_status_t unit_test_status_ = ZX_ERR_NOT_FOUND;
 };
 
-using MagmaProductionDriverBase = MagmaDriverBase;
-
 }  // namespace msd
 
 #endif  // SRC_GRAPHICS_MAGMA_LIB_MAGMA_SERVICE_SYS_DRIVER_MAGMA_DRIVER_BASE_H_

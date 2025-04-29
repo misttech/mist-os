@@ -10,12 +10,11 @@
 
 #include "virtio_gpu_control.h"
 
-class VirtioDriver : public msd::MagmaProductionDriverBase, VirtioGpuControlFidl {
+class VirtioDriver : public msd::MagmaDriverBase, VirtioGpuControlFidl {
  public:
   explicit VirtioDriver(fdf::DriverStartArgs start_args,
                         fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : msd::MagmaProductionDriverBase("virtio", std::move(start_args),
-                                       std::move(driver_dispatcher)) {}
+      : msd::MagmaDriverBase("virtio", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> MagmaStart() override;
 

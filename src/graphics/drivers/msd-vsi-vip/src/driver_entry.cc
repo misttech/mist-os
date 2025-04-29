@@ -32,11 +32,10 @@ constexpr char kDriverName[] = "vsi-vip";
 
 #endif
 
-class NpuDevice : public msd::MagmaProductionDriverBase {
+class NpuDevice : public msd::MagmaDriverBase {
  public:
   NpuDevice(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : msd::MagmaProductionDriverBase(kDriverName, std::move(start_args),
-                                       std::move(driver_dispatcher)),
+      : msd::MagmaDriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)),
         parent_{.incoming_ = incoming()} {}
 
   zx::result<> MagmaStart() override;

@@ -29,16 +29,15 @@ zx_status_t magma_indriver_test(magma::PlatformPciDevice* platform_device);
 constexpr char kDriverName[] = "magma-gpu";
 #endif
 
-class IntelDevice : public msd::MagmaProductionDriverBase {
+class IntelDevice : public msd::MagmaDriverBase {
  public:
   IntelDevice(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : msd::MagmaProductionDriverBase(kDriverName, std::move(start_args),
-                                       std::move(driver_dispatcher)) {}
+      : msd::MagmaDriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> MagmaStart() override;
 
   void Stop() override {
-    msd::MagmaProductionDriverBase::Stop();
+    msd::MagmaDriverBase::Stop();
     magma::PlatformBusMapper::SetInfoResource(zx::resource{});
   }
 

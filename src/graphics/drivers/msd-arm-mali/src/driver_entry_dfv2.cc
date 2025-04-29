@@ -27,12 +27,11 @@ zx_status_t magma_indriver_test(ParentDevice* device);
 constexpr char kDriverName[] = "mali";
 #endif
 
-class MaliDriver : public msd::MagmaProductionDriverBase,
+class MaliDriver : public msd::MagmaDriverBase,
                    public fidl::WireServer<fuchsia_hardware_gpu_mali::MaliUtils> {
  public:
   MaliDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : msd::MagmaProductionDriverBase(kDriverName, std::move(start_args),
-                                       std::move(driver_dispatcher)) {}
+      : msd::MagmaDriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> MagmaStart() override {
     zx::result info_resource = GetInfoResource();
@@ -85,7 +84,7 @@ class MaliDriver : public msd::MagmaProductionDriverBase,
   }
 
   void Stop() override {
-    msd::MagmaProductionDriverBase::Stop();
+    msd::MagmaDriverBase::Stop();
     magma::PlatformBusMapper::SetInfoResource(zx::resource{});
   }
 
