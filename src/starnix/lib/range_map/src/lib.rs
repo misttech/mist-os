@@ -1670,11 +1670,6 @@ where
     pub fn iter_starting_at(&self, key: K) -> impl Iterator<Item = (&Range<K>, &V)> {
         self.range(key..).filter(move |(range, _)| key <= range.start)
     }
-
-    /// Iterate over the ranges in the map, starting at the last range starting before or at the given point.
-    pub fn iter_ending_at(&self, key: K) -> impl DoubleEndedIterator<Item = (&Range<K>, &V)> {
-        self.range(..key)
-    }
 }
 
 #[cfg(test)]
@@ -1768,21 +1763,12 @@ mod test {
         let mut iter = map.iter_starting_at(75);
         assert_eq!(iter.next(), None);
 
-        assert_eq!(map.iter_ending_at(9).collect::<Vec<_>>(), vec![]);
-        assert_eq!(map.iter_ending_at(34).collect::<Vec<_>>(), vec![(&(10..34), &-14)]);
-        assert_eq!(map.iter_ending_at(74).collect::<Vec<_>>(), vec![(&(10..34), &-14)]);
-        assert_eq!(
-            map.iter_ending_at(75).collect::<Vec<_>>(),
-            vec![(&(10..34), &-14), (&(74..92), &-12)]
-        );
-        assert_eq!(
-            map.iter_ending_at(91).collect::<Vec<_>>(),
-            vec![(&(10..34), &-14), (&(74..92), &-12)]
-        );
-        assert_eq!(
-            map.iter_ending_at(92).collect::<Vec<_>>(),
-            vec![(&(10..34), &-14), (&(74..92), &-12)]
-        );
+        assert_eq!(map.range(..9).collect::<Vec<_>>(), vec![]);
+        assert_eq!(map.range(..34).collect::<Vec<_>>(), vec![(&(10..34), &-14)]);
+        assert_eq!(map.range(..74).collect::<Vec<_>>(), vec![(&(10..34), &-14)]);
+        assert_eq!(map.range(..75).collect::<Vec<_>>(), vec![(&(10..34), &-14), (&(74..92), &-12)]);
+        assert_eq!(map.range(..91).collect::<Vec<_>>(), vec![(&(10..34), &-14), (&(74..92), &-12)]);
+        assert_eq!(map.range(..92).collect::<Vec<_>>(), vec![(&(10..34), &-14), (&(74..92), &-12)]);
     }
 
     #[::fuchsia::test]
@@ -2090,9 +2076,9 @@ mod test {
             map.insert(start..end, value);
         }
 
-        // Verify iter_ending_at()
+        // Verify range(..end_point)
         let end_point = 5000;
-        let mut iter = map.iter_ending_at(end_point);
+        let mut iter = map.range(..end_point);
         while let Some((range, _)) = iter.next() {
             assert!(range.start < end_point);
         }
