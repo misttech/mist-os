@@ -44,7 +44,7 @@
             "projects": [
               "prebuilt/starnix/linux-amd64",
               "prebuilt/starnix/linux-arm64",
-              "prebuilt/starnix/linux-armhf64",
+              "prebuilt/starnix/linux-armhf",
               "prebuilt/starnix/linux-riscv64"
             ],
             "bug": "",
