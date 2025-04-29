@@ -26,6 +26,7 @@ ffx_plugin("ffx_product_create") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/writer:lib",
     "//src/lib/assembly/assembly_manifest",
+    "//src/lib/assembly/container",
     "//src/lib/assembly/partitions_config",
     "//src/lib/assembly/tool",
     "//src/lib/assembly/update_package",
@@ -38,7 +39,6 @@ ffx_plugin("ffx_product_create") {
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tempfile",
-    "//third_party/rust_crates:walkdir",
   ]
 
   test_deps = [

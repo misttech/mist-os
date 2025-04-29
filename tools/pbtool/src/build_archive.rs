@@ -251,6 +251,7 @@ impl GenerateBuildArchive {
 mod tests {
     use super::*;
 
+    use assembly_container::AssemblyContainer;
     use assembly_partitions_config::PartitionsConfig;
     use camino::Utf8Path;
     use sdk_metadata::ProductBundleV2;
@@ -338,7 +339,7 @@ mod tests {
         create_temp_file("zedboot.vbmeta");
         create_temp_file("fastboot");
 
-        let config = PartitionsConfig::try_load_from(partitions_config_path).unwrap();
+        let config = PartitionsConfig::from_dir(&tempdir).unwrap();
 
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),

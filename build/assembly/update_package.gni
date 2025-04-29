@@ -57,6 +57,10 @@ template("update_package") {
     epoch = "$gendir/epoch.json"
     images = "$gendir/images.json"
     packages = "$gendir/packages.json"
+
+    partitions_dir = get_label_info(invoker.partitions, "target_out_dir") +
+                     "/" + get_label_info(invoker.partitions, "name")
+    partitions_json = "$partitions_dir/partitions_config.json"
   }
 
   python_action(labels.hermetic_inputs) {
@@ -66,16 +70,21 @@ template("update_package") {
                              "testonly",
                              "visibility",
                            ])
+    if (!defined(deps)) {
+      deps = []
+    }
+
     binary_label =
         "//build/assembly/scripts:hermetic_inputs_from_assembly_outputs"
 
-    inputs = [ invoker.partitions ]
+    deps += [ invoker.partitions ]
+    inputs = [ files.partitions_json ]
     outputs = [ files.hermetic_inputs ]
     depfile = files.hermetic_inputs_depfile
 
     args = [
       "--partitions",
-      rebase_path(invoker.partitions, root_build_dir),
+      rebase_path(files.partitions_json, root_build_dir),
       "--output",
       rebase_path(files.hermetic_inputs, root_build_dir),
       "--depfile",
@@ -121,7 +130,7 @@ template("update_package") {
       "assembly",
       "create-update",
       "--partitions",
-      rebase_path(invoker.partitions, root_build_dir),
+      rebase_path(files.partitions_dir, root_build_dir),
       "--outdir",
       rebase_path(files.outdir, root_build_dir),
       "--gendir",
@@ -169,9 +178,10 @@ template("update_package") {
     ]
 
     inputs = [
-      invoker.partitions,
+      files.partitions_json,
       invoker.version_file,
     ]
+    deps += [ invoker.partitions ]
 
     if (defined(invoker.system_a)) {
       args += [

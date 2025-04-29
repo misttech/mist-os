@@ -246,6 +246,7 @@ impl PbGetArtifactsTool {
 mod tests {
     use super::*;
 
+    use assembly_container::AssemblyContainer;
     use assembly_partitions_config::PartitionsConfig;
     use ffx_config::ConfigLevel;
     use ffx_writer::{Format, TestBuffers};
@@ -311,7 +312,7 @@ mod tests {
         create_temp_file("bootloader_path");
         create_temp_file("credential.zip");
 
-        let config = PartitionsConfig::try_load_from(partitions_config_path).unwrap();
+        let config = PartitionsConfig::from_dir(&tempdir).unwrap();
 
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),
@@ -409,7 +410,7 @@ mod tests {
         create_temp_file("bootloader_path");
         create_temp_file("credential.zip");
 
-        let config = PartitionsConfig::try_load_from(partitions_config_path).unwrap();
+        let config = PartitionsConfig::from_dir(&tempdir).unwrap();
 
         let virtual_device = tempdir.join("manifest.json");
         let mut vd_file1 = File::create(&virtual_device).unwrap();
@@ -499,7 +500,7 @@ mod tests {
         create_temp_file("bootloader_path2");
         create_temp_file("credential.zip");
 
-        let config = PartitionsConfig::try_load_from(partitions_config_path).unwrap();
+        let config = PartitionsConfig::from_dir(&tempdir).unwrap();
 
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),

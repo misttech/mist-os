@@ -101,10 +101,9 @@ FuchsiaLegacyBundleInfo = provider(
 )
 
 FuchsiaPartitionsConfigInfo = provider(
-    doc = "The partitions configuration files and manifest.",
+    doc = "A partitions config info used to contain the partitions config directory",
     fields = {
-        "files": "A list of files consisting the partitions config.",
-        "config": "The partitions config json manifest.",
+        "directory": "Directory of the partitions config container",
     },
 )
 

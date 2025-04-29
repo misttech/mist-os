@@ -10,6 +10,7 @@ mod board_config;
 mod board_input_bundle;
 mod board_input_bundle_set;
 mod common;
+mod partitions_config;
 mod product_config;
 
 use anyhow::Result;
@@ -46,6 +47,9 @@ enum Subcommand {
 
     /// generate a board config using an input board config as a template.
     HybridBoard(HybridBoardArgs),
+
+    /// generate a partitions config.
+    Partitions(PartitionsArgs),
 }
 
 /// Arguments to generate a product config.
@@ -259,6 +263,23 @@ struct HybridBoardArgs {
     depfile: Option<Utf8PathBuf>,
 }
 
+/// Arguments to generate a partitions config.
+#[derive(FromArgs)]
+#[argh(subcommand, name = "partitions")]
+struct PartitionsArgs {
+    /// the input partitions config with absolute paths.
+    #[argh(option)]
+    config: Utf8PathBuf,
+
+    /// the directory to write the partitions config to.
+    #[argh(option)]
+    output: Utf8PathBuf,
+
+    /// a depfile to write.
+    #[argh(option)]
+    depfile: Option<Utf8PathBuf>,
+}
+
 fn main() -> Result<()> {
     let args: Args = argh::from_env();
     match args.command {
@@ -268,5 +289,6 @@ fn main() -> Result<()> {
         Subcommand::BoardInputBundleSet(args) => board_input_bundle_set::new(&args),
         Subcommand::Board(args) => board_config::new(&args),
         Subcommand::HybridBoard(args) => board_config::hybrid(&args),
+        Subcommand::Partitions(args) => partitions_config::new(&args),
     }
 }

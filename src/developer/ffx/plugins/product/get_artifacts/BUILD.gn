@@ -37,6 +37,7 @@ ffx_plugin("ffx_product_get_artifacts") {
 
   test_deps = [
     "//src/developer/ffx/config:lib",
+    "//src/lib/assembly/container",
     "//src/lib/assembly/partitions_config",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:serde_json",

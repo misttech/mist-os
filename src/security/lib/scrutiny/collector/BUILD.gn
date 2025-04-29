@@ -94,7 +94,6 @@ if (is_host) {
 # Build the fake product bundle for testing.
 if (is_fuchsia) {
   files = {
-    partitions = "$target_out_dir/partitions/partitions_config.json"
     board_config = "$target_out_dir/board_config.json"
 
     assembly_outdir = "$target_out_dir/assembly"
@@ -108,7 +107,6 @@ if (is_fuchsia) {
   generated_partitions_config("partitions") {
     testonly = true
     hw_revision = "board"
-    output_path = get_path_info(files.partitions, "dir")
   }
 
   generated_file("version") {
@@ -153,10 +151,9 @@ if (is_fuchsia) {
     name = "scrutiny"
     deps = [
       ":assembly",
-      ":partitions",
       ":version",
     ]
-    partitions = files.partitions
+    partitions = ":partitions"
     system_a = files.assembly_manifest
     system_a_contents = [
       files.qemu_kernel,

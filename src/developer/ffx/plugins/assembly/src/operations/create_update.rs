@@ -4,6 +4,7 @@
 
 use crate::subpackage_blobs_package::construct_subpackage_blobs_package;
 use anyhow::{Context, Result};
+use assembly_container::AssemblyContainer;
 use assembly_manifest::{AssemblyManifest, PackagesMetadata};
 use assembly_partitions_config::PartitionsConfig;
 use assembly_tool::SdkToolProvider;
@@ -16,7 +17,7 @@ use fuchsia_url::RepositoryUrl;
 use std::collections::BTreeSet;
 
 pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
-    let partitions = PartitionsConfig::try_load_from(args.partitions)
+    let partitions = PartitionsConfig::from_dir(args.partitions)
         .context("Failed to parse the partitions config")?;
     let epoch: EpochFile = EpochFile::Version1 { epoch: args.epoch };
 

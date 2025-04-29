@@ -162,6 +162,7 @@ impl PbGetImagePathTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assembly_container::AssemblyContainer;
     use assembly_manifest::BlobfsContents;
     use assembly_partitions_config::PartitionsConfig;
     use ffx_config::ConfigLevel;
@@ -231,7 +232,7 @@ mod tests {
         create_temp_file("bootloader");
         create_temp_file("credential.zip");
 
-        let config = PartitionsConfig::try_load_from(partitions_config_path).unwrap();
+        let config = PartitionsConfig::from_dir(&tempdir).unwrap();
 
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),

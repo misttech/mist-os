@@ -29,6 +29,7 @@ rustc_binary("pbtool") {
   test_deps = [
     "//src/developer/ffx/lib/pkg:empty-repo-keys",
     "//src/developer/ffx/lib/pkg:empty-repo-metadata",
+    "//src/lib/assembly/container",
     "//src/lib/assembly/partitions_config",
     "//src/sys/pkg/lib/fuchsia-repo",
     "//third_party/rust_crates:camino",

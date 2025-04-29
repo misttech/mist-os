@@ -9,49 +9,47 @@ load(
     "FuchsiaPartitionInfo",
     "FuchsiaPartitionsConfigInfo",
 )
-load(":utils.bzl", "select_single_file")
+load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS", "select_root_dir_with_file")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_partitions_configuration(ctx):
-    partitions_config_file = ctx.actions.declare_file("%s/partitions_config.json" % ctx.label.name)
-
-    output_files = [partitions_config_file]
-
-    def _symlink(category, file):
-        symlink = ctx.actions.declare_file("%s/%s/%s" % (ctx.label.name, category, file.basename))
-        output_files.append(symlink)
-        ctx.actions.symlink(output = symlink, target_file = file)
-        return "%s/%s" % (category, symlink.basename)
-
-    def _rebase_image(category, partition_target):
-        partition = partition_target[FuchsiaPartitionInfo].partition
-        return partition | {"image": "%s/%s" % (category, partition["image"].rpartition("/")[-1])}
+    sdk = get_fuchsia_sdk_toolchain(ctx)
 
     partitions_config = {
         "hardware_revision": ctx.attr.hardware_revision,
-        "bootstrap_partitions": [_rebase_image("bootstrap", partition) for partition in ctx.attr.bootstrap_partitions],
-        "bootloader_partitions": [_rebase_image("bootloaders", partition) for partition in ctx.attr.bootloader_partitions],
+        "bootstrap_partitions": [p[FuchsiaPartitionInfo].partition for p in ctx.attr.bootstrap_partitions],
+        "bootloader_partitions": [p[FuchsiaPartitionInfo].partition for p in ctx.attr.bootloader_partitions],
         "partitions": [partition[FuchsiaPartitionInfo].partition for partition in ctx.attr.partitions],
-        "unlock_credentials": [_symlink("credentials", cred) for cred in ctx.files.unlock_credentials],
+        "unlock_credentials": [f.path for f in ctx.files.unlock_credentials],
     }
+    content = json.encode_indent(partitions_config, indent = "  ")
+    partitions_config_file = ctx.actions.declare_file(ctx.label.name + "_partitions_config.json")
+    ctx.actions.write(partitions_config_file, content)
 
-    for file in ctx.files.bootstrap_partitions:
-        _symlink("bootstrap", file)
-    for file in ctx.files.bootloader_partitions:
-        _symlink("bootloaders", file)
-
-    ctx.actions.write(partitions_config_file, json.encode(partitions_config))
+    # Create Partitions Config
+    partitions_dir = ctx.actions.declare_directory(ctx.label.name)
+    args = ["partitions", "--config", partitions_config_file.path, "--output", partitions_dir.path]
+    ctx.actions.run(
+        executable = sdk.assembly_generate_config,
+        arguments = args,
+        inputs = ctx.files.bootstrap_partitions + ctx.files.bootloader_partitions + ctx.files.unlock_credentials + [partitions_config_file],
+        outputs = [partitions_dir],
+        progress_message = "Creating partitions config for %s" % ctx.label.name,
+        mnemonic = "CreatePartitionsConfig",
+        **LOCAL_ONLY_ACTION_KWARGS
+    )
 
     return [
-        DefaultInfo(files = depset(direct = output_files)),
+        DefaultInfo(files = depset([partitions_dir])),
         FuchsiaPartitionsConfigInfo(
-            files = output_files,
-            config = partitions_config_file,
+            directory = partitions_dir.path,
         ),
     ]
 
 fuchsia_partitions_configuration = rule(
     doc = """Creates a partitions configuration.""",
     implementation = _fuchsia_partitions_configuration,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "bootstrap_partitions": attr.label_list(
             doc = "Partitions that are only flashed in the \"fuchsia\" configuration.",
@@ -76,16 +74,11 @@ fuchsia_partitions_configuration = rule(
 )
 
 def _fuchsia_prebuilt_partitions_configuration_impl(ctx):
-    partitions_config = ctx.file.partitions_config or select_single_file(
-        ctx.files.files,
-        "partitions_config.json",
-        "Use the 'partitions_config' attribute to manually specify the partitions config file.",
-    )
+    directory = select_root_dir_with_file(ctx.files.files, "partitions_config.json")
     return [
         DefaultInfo(files = depset(ctx.files.files)),
         FuchsiaPartitionsConfigInfo(
-            files = ctx.files.files,
-            config = partitions_config,
+            directory = directory,
         ),
     ]
 
@@ -99,8 +92,7 @@ fuchsia_prebuilt_partitions_configuration = rule(
             mandatory = True,
         ),
         "partitions_config": attr.label(
-            doc = """For manually specifying the prebuilt partition config file.
-                This file must be present within `files` as well.""",
+            doc = """Deprecated. This no longer does anything.""",
             allow_single_file = [".json"],
         ),
     },

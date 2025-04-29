@@ -73,7 +73,6 @@ if (is_host) {
   # they're expanded on variant toolchains like for asan.
   if (current_toolchain == default_toolchain) {
     files = {
-      partitions_config = "$target_out_dir/partitions/partitions_config.json"
       outdir = target_out_dir + "/fuchsia"
       images_json = "${outdir}/images.json"
     }
@@ -82,13 +81,10 @@ if (is_host) {
       testonly = true
       name = "ffx-symbolize-test"
 
-      partitions = files.partitions_config
+      partitions = ":partitions_config"
       system_a = files.images_json
 
-      deps = [
-        ":assembly",
-        ":partitions_config",
-      ]
+      deps = [ ":assembly" ]
     }
 
     assembled_system("assembly") {
@@ -103,7 +99,6 @@ if (is_host) {
 
     generated_partitions_config("partitions_config") {
       testonly = true
-      output_path = get_path_info(files.partitions_config, "dir")
       hw_revision = board_name
     }
 

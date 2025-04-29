@@ -319,30 +319,32 @@ template("boot_test") {
       deps = [ ":$efi_disk_manifest_target" ]
     }
 
-    partition_config_base_path =
-        "${target_out_dir}/${main_target}.partition_config"
-    partition_config_path = "$partition_config_base_path/partitions_config.json"
-    partition_config_target =
-        "_boot_test.${target_name}.create_efi_partition_config"
-    python_action(partition_config_target) {
+    partition_config_path = "${target_out_dir}/${main_target}.partitions_config"
+    partition_config_target = "${main_target}.partitions_config"
+    compiled_action(partition_config_target) {
       testonly = true
 
-      binary_label = "//build/assembly/scripts:collect_partitions_config"
+      # The contents of these folders are dynamic, and managed entirely by this
+      # action.  Further, this action will need to delete items from these
+      # directories that are not added back (on an incremental build, if an item
+      # is removed from one of these sets)
+      hermetic_action_ignored_prefixes = [ partition_config_path ]
 
-      depfile_path = "$target_out_dir/$partition_config_target.depfile"
+      tool = "//build/assembly/tools/generate_config"
+      tool_output_name = "assembly_generate_config"
+
+      depfile_path = "$target_out_dir/$target_name.depfile"
       depfile = depfile_path
 
-      outputs = [
-        partition_config_base_path,
-        partition_config_path,
-      ]
+      outputs = [ "$partition_config_path/partitions_config.json" ]
       inputs = [ partition_config_intermediate_path ]
 
       args = [
-        "--partitions-config",
+        "partitions",
+        "--config",
         rebase_path(inputs[0], root_build_dir),
         "--output",
-        rebase_path(outputs[0], root_build_dir),
+        rebase_path(partition_config_path, root_build_dir),
         "--depfile",
         rebase_path(depfile_path, root_build_dir),
       ]
@@ -358,10 +360,6 @@ template("boot_test") {
              "Need to define partitions_config_label")
       _partition_config_label = partitions_config_label
     }
-    partition_config_path =
-        get_label_info(_partition_config_label, "target_out_dir") + "/" +
-        get_label_info(_partition_config_label, "name") +
-        "/partitions_config.json"
   }
 
   product_bundle(product_bundle_target) {
@@ -369,12 +367,9 @@ template("boot_test") {
 
     name = main_target
     system_a = rebased_image_manifest
-    partitions = partition_config_path
+    partitions = _partition_config_label
 
-    deps = [
-      ":$rebased_image_manifest_target",
-      _partition_config_label,
-    ]
+    deps = [ ":$rebased_image_manifest_target" ]
   }
 
   # If host_cpu != target_cpu, then we make sure to define a separate boot

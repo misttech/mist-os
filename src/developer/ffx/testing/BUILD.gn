@@ -14,7 +14,7 @@ if (is_host && target_cpu == "x64") {
   emu_dir = "//prebuilt/third_party/qemu/${host_platform}"
   product_bundle =
       get_label_info(labels.images, "target_out_dir") + "/product_bundle"
-  bootloader = "${product_bundle}/partitions/bootloaders/fuchsia.esp.blk"
+  bootloader = "${product_bundle}/partitions/bootloader_partitions/0/image/fuchsia.esp.blk"
   run_zircon = "//zircon/scripts/run-zircon"
 
   rustc_library("ffx_testing") {

@@ -7,9 +7,24 @@ load("@rules_fuchsia//fuchsia:private_defs.bzl", "FuchsiaPartitionsConfigInfo")
 load("//test_utils:json_validator.bzl", "CREATE_VALIDATION_SCRIPT_ATTRS", "create_validation_script_provider")
 
 def _fuchsia_partitions_configuration_test_impl(ctx):
-    partitions_config_file = ctx.attr.partitions_config[FuchsiaPartitionsConfigInfo].config
     golden_file = ctx.file.golden_file
-    return [create_validation_script_provider(ctx, partitions_config_file, golden_file)]
+    partitions_config = ctx.attr.partitions_config[FuchsiaPartitionsConfigInfo]
+    if len(ctx.files.partitions_config) == 1:
+        # This is a newly constructed partitions config with the only file being
+        # the directory.
+        config_dir = ctx.files.partitions_config[0]
+    else:
+        # This is a prebuilt partitions config.
+        config_dir = partitions_config.directory
+
+    relative_path = "partitions_config.json"
+    return [create_validation_script_provider(
+        ctx,
+        config_dir,
+        golden_file,
+        relative_path,
+        runfiles = ctx.runfiles(files = ctx.files.partitions_config),
+    )]
 
 fuchsia_partitions_configuration_test = rule(
     doc = """Validate the generated partitions configuration file.""",

@@ -2,15 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/python/python_action.gni")
+import("//build/compiled_action.gni")
 
 # Generates a partitions config to be consumed by the Image Assembler.
 #
 # Arguments:
-#   output_path (optional)
-#     [path] Partitions config output directory.
-#     Defaults to $target_out_dir
-#
 #   hw_revision (required)
 #     [string] The name of the hardware revision.
 #     This is placed in the flash manifest to ensure partitions are not
@@ -81,9 +77,6 @@ template("generated_partitions_config") {
   assert(defined(invoker.hw_revision), "Need to define hw_revision")
 
   output_path = "$target_out_dir/$target_name"
-  if (defined(invoker.output_path)) {
-    output_path = invoker.output_path
-  }
 
   bootloaders = []
   if (defined(invoker.bootloader_partitions)) {
@@ -243,7 +236,7 @@ template("generated_partitions_config") {
     }
   }
 
-  python_action(target_name) {
+  compiled_action(target_name) {
     forward_variables_from(invoker,
                            [
                              "testonly",
@@ -256,7 +249,8 @@ template("generated_partitions_config") {
     # is removed from one of these sets)
     hermetic_action_ignored_prefixes = [ output_path ]
 
-    binary_label = "//build/assembly/scripts:collect_partitions_config"
+    tool = "//build/assembly/tools/generate_config"
+    tool_output_name = "assembly_generate_config"
 
     depfile_path = "$target_out_dir/$target_name.depfile"
     depfile = depfile_path
@@ -275,7 +269,8 @@ template("generated_partitions_config") {
     }
 
     args = [
-      "--partitions-config",
+      "partitions",
+      "--config",
       rebase_path(inputs[0], root_build_dir),
       "--output",
       rebase_path(output_path, root_build_dir),

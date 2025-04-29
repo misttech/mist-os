@@ -607,14 +607,14 @@ def _build_fuchsia_product_bundle_impl(ctx):
     env = {
         "FFX": ffx_tool.path,
         "OUTDIR": pb_out_dir.path,
-        "PARTITIONS_PATH": partitions_configuration.config.path,
+        "PARTITIONS_PATH": partitions_configuration.directory,
         "SYSTEM_A_MANIFEST": system_a_out.path + "/images.json",
         "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
         "SIZE_REPORT": size_report.path,
     }
 
     # Gather all the inputs.
-    inputs = partitions_configuration.files + ctx.files.main + get_ffx_product_inputs(fuchsia_toolchain)
+    inputs = ctx.files.partitions_config + ctx.files.main + get_ffx_product_inputs(fuchsia_toolchain)
 
     # Add virtual devices.
     for virtual_device in ctx.attr.virtual_devices:
@@ -672,7 +672,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
         mnemonic = "CreatePB",
         **LOCAL_ONLY_ACTION_KWARGS
     )
-    deps = [pb_out_dir, size_report] + partitions_configuration.files + ctx.files.main
+    deps = [pb_out_dir, size_report] + ctx.files.partitions_config + ctx.files.main
 
     # Scrutiny Validation
     if ctx.attr.main_scrutiny_config:

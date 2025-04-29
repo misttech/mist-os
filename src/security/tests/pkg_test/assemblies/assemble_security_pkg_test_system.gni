@@ -143,7 +143,6 @@ template("assemble_security_pkg_test_system") {
   directories = {
     assembly_target_out =
         get_label_info(":${labels.assembly}", "target_out_dir")
-    partitions_out = "${assembly_target_out}/${assembly_name}_partitions"
     assembly_out = "${assembly_target_out}/${assembly_name}"
     update_out = "${assembly_target_out}/${labels.update_package}"
     all_package_manifests_list_out =
@@ -158,7 +157,6 @@ template("assemble_security_pkg_test_system") {
     assembly_out_packages_json = "${directories.assembly_out}/packages.json"
     packages_json =
         "${directories.assembly_out}/security_pkg_test_packages.json"
-    partitions_json = "${directories.partitions_out}/partitions_config.json"
     images_json = "${directories.assembly_out}/images.json"
     board_config = "${directories.assembly_out}/board_config.json"
     base_package_manifests_list =
@@ -304,18 +302,14 @@ template("assemble_security_pkg_test_system") {
   }
 
   generated_partitions_config(labels.assembly_partitions_config) {
-    output_path = directories.partitions_out
     hw_revision = board_name
   }
 
   # Construct an update package for the system assembly.
   update_package(labels.update_package) {
     testonly = true
-    deps = [
-      ":${labels.assembly_image_assembler}",
-      ":${labels.assembly_partitions_config}",
-    ]
-    partitions = files.partitions_json
+    deps = [ ":${labels.assembly_image_assembler}" ]
+    partitions = ":${labels.assembly_partitions_config}"
     system_a = files.images_json
     board_name = board_name
     version_file = invoker.system_version_file

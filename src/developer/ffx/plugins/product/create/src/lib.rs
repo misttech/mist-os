@@ -5,7 +5,8 @@
 //! FFX plugin for constructing product bundles, which are distributable containers for a product's
 //! images and packages, and can be used to emulate, flash, or update a product.
 
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{ensure, Context, Result};
+use assembly_container::AssemblyContainer;
 use assembly_manifest::{AssemblyManifest, BlobfsContents, Image, PackagesMetadata};
 use assembly_partitions_config::{PartitionImageMapper, PartitionsConfig, Slot as PartitionSlot};
 use assembly_tool::{SdkToolProvider, ToolProvider};
@@ -26,9 +27,8 @@ use fuchsia_repo::repository::FileSystemRepository;
 use sdk_metadata::{
     ProductBundle, ProductBundleV2, Repository, VirtualDevice, VirtualDeviceManifest,
 };
-use std::fs::{self, File};
+use std::fs::File;
 use tempfile::TempDir;
-use walkdir::WalkDir;
 
 /// Default delivery blob type to use for products.
 const DEFAULT_DELIVERY_BLOB_TYPE: u32 = 1;
@@ -310,33 +310,8 @@ fn load_partitions_config(
     path: impl AsRef<Utf8Path>,
     out_dir: impl AsRef<Utf8Path>,
 ) -> Result<PartitionsConfig> {
-    let path = path.as_ref().parent().context("Determine base path")?;
-    let out_dir = out_dir.as_ref();
-
-    std::fs::create_dir_all(&out_dir).context("Creating the out_dir")?;
-
-    // This is invalid, causing a cycle since WalkDir would infinitely iterate
-    // as we keep adding subdirectories/subfiles.
-    if out_dir.canonicalize_utf8()?.starts_with(path.canonicalize_utf8()?) {
-        bail!("out_dir {:?} cannot be nested in partitions_config base path {:?}", out_dir, path);
-    }
-
-    for entry in WalkDir::new(path).follow_links(true) {
-        let entry = entry?;
-        let entry_path = entry.path();
-
-        let relative_path = entry_path.strip_prefix(path)?;
-        let rebased_path = out_dir.join_os(relative_path);
-
-        if entry.file_type().is_dir() {
-            fs::create_dir_all(rebased_path).context("Create directory")?;
-        } else if entry.file_type().is_file() {
-            fs::copy(entry_path, rebased_path).context("Copy file")?;
-        }
-    }
-
-    PartitionsConfig::try_load_from(out_dir.join("partitions_config.json"))
-        .context("Loading partitions config")
+    let config = PartitionsConfig::from_dir(path)?;
+    config.write_to_dir(out_dir, None::<Utf8PathBuf>)
 }
 
 /// Open and parse an AssemblyManifest from a path, copying the images into `out_dir`.
@@ -455,6 +430,7 @@ mod test {
     use assembly_tool::testing::{blobfs_side_effect, FakeToolProvider};
     use fuchsia_repo::test_utils;
     use sdk_metadata::VirtualDeviceV1;
+    use std::fs;
     use std::io::Write;
 
     const VIRTUAL_DEVICE_VALID: &str =
@@ -493,18 +469,11 @@ mod test {
         let mut error_file = File::create(&error_path).unwrap();
         error_file.write_all("error".as_bytes()).unwrap();
 
-        let nested_error_path = pb_dir.join("partitions_config.json");
-        let nested_error_file = File::create(&nested_error_path).unwrap();
-        serde_json::to_writer(&nested_error_file, &PartitionsConfig::default()).unwrap();
-
-        let parsed = load_partitions_config(&config_path, &pb_dir);
+        let parsed = load_partitions_config(&config_dir, &pb_dir);
         assert!(parsed.is_ok());
 
-        let error = load_partitions_config(&error_path, &pb_dir);
+        let error = load_partitions_config(&error_dir, &pb_dir);
         assert!(error.is_err());
-
-        let nested_error = load_partitions_config(&nested_error_path, &pb_dir);
-        assert!(nested_error.is_err());
     }
 
     #[test]
@@ -551,7 +520,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: partitions_path,
+                partitions: partitions_dir,
                 system_a: None,
                 system_b: None,
                 system_r: None,
@@ -612,7 +581,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: partitions_path,
+                partitions: partitions_dir,
                 system_a: Some(system_path.clone()),
                 system_b: None,
                 system_r: Some(system_path.clone()),
@@ -677,7 +646,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: partitions_path,
+                partitions: partitions_dir,
                 system_a: Some(system_path.clone()),
                 system_b: None,
                 system_r: Some(system_path.clone()),
@@ -724,7 +693,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: partitions_path,
+                partitions: partitions_dir,
                 system_a: Some(system_path.clone()),
                 system_b: None,
                 system_r: Some(system_path.clone()),
@@ -795,7 +764,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: partitions_path,
+                partitions: partitions_dir,
                 system_a: None,
                 system_b: None,
                 system_r: None,
@@ -872,7 +841,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: partitions_path,
+                partitions: partitions_dir,
                 system_a: None,
                 system_b: None,
                 system_r: None,

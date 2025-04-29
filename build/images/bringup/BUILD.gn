@@ -19,8 +19,6 @@ assert(current_toolchain == default_toolchain,
        "//build/images/* are only valid in the Fuchsia toolchain")
 
 files = {
-  partitions_config = "$target_out_dir/partitions_config.json"
-
   # Outputs of assembly.
   outdir = target_out_dir + "/bringup"
   zbi = "${outdir}/bringup.zbi"
@@ -46,9 +44,6 @@ if (has_board) {
          "Need to define partitions_config_label")
   _partitions_config = partitions_config_label
 }
-_partitions_config_file =
-    get_label_info(_partitions_config, "target_out_dir") + "/" +
-    get_label_info(_partitions_config, "name") + "/partitions_config.json"
 
 assert(fuchsia_product_assembly_config_label != false,
        "fuchsia_product_assembly_config_label must be defined to use bringup")
@@ -82,12 +77,11 @@ product_bundle("product_bundle") {
   testonly = true
   deps = [
     ":bringup_assembly",
-    _partitions_config,
     recovery_label,
   ]
 
   name = main_product_bundle_name
-  partitions = _partitions_config_file
+  partitions = _partitions_config
   system_a = files.images_json
   system_r = files.recovery_images_json
 
