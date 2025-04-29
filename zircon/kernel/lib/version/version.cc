@@ -21,6 +21,15 @@
 
 #include <ktl/enforce.h>
 
+// Forward declaration so the type can be used in `extern "C"` first.  The
+// `extern "C"` declarations have to stay outside the anonymous namespace.
+namespace {
+struct build_id_note;
+}  // namespace
+
+extern "C" const struct build_id_note __build_id_note_start;
+extern "C" const ktl::byte __build_id_note_end[];
+
 namespace {
 
 // The kernel is linked at 0, making the bias the load address.
@@ -47,9 +56,6 @@ struct build_id_note {
   char name[(sizeof(NOTE_NAME) + 3) & -4];
   ktl::byte id[];
 };
-
-extern "C" const struct build_id_note __build_id_note_start;
-extern "C" const ktl::byte __build_id_note_end[];
 
 void init_build_id(uint level) {
   const build_id_note* const note = &__build_id_note_start;

@@ -30,15 +30,15 @@
 #include <kernel/thread.h>
 #include <vm/vm_aspace.h>
 
+// External references to the testcase registration tables.
+extern "C" unittest_testcase_registration_t __start_unittest_testcases[];
+extern "C" unittest_testcase_registration_t __stop_unittest_testcases[];
+
 namespace {
 
 // Ensures unittests are not run concurrently.
 DECLARE_SINGLETON_MUTEX(UnittestLock);
 unsigned long g_repeat;
-
-// External references to the testcase registration tables.
-extern "C" unittest_testcase_registration_t __start_unittest_testcases[];
-extern "C" unittest_testcase_registration_t __stop_unittest_testcases[];
 
 void usage(const char* progname) {
   printf(

@@ -21,10 +21,10 @@
 // This is just here to get the static_asserts done somewhere.
 #include "regs.h"
 
-namespace {
-
 // The vector table is defined in assembly (see exception.S).
 extern "C" const uint32_t phys_exception[];
+
+namespace {
 
 template <typename Elr, typename Spsr, typename Sp>
 struct ResumeRegs {
