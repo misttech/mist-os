@@ -53,6 +53,8 @@ open protocol ProcessAccessor {
     }) -> () error fuchsia.posix.Errno;
 
     /// Writes the contents of `bytes` to `address` in the process memory.
+    /// `WriteBytes` is functionally equivalent to `WriteMemory`, but is
+    /// optimized for small writes of less than `MAX_WRITE_BYTES`.
     flexible WriteBytes(resource struct {
         address uint64;
         bytes vector<uint8>:MAX_WRITE_BYTES;
