@@ -8718,6 +8718,7 @@ pub mod tests {
                     content.read(buffer, 0)?;
                     responder.send(Ok(()))?;
                 }
+                fbinder::ProcessAccessorRequest::WriteBytes { .. } => todo!(),
                 fbinder::ProcessAccessorRequest::FileRequest { payload, responder } => {
                     let mut response = fbinder::FileResponse::default();
                     for fd in payload.close_requests.unwrap_or(vec![]) {

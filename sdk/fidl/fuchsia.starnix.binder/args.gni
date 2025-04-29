@@ -4,5 +4,5 @@
 
 declare_args() {
   # Whether to use ProcessAccessor::WriteBytes
-  binder_use_write_bytes = false
+  binder_use_write_bytes = true
 }
