@@ -257,7 +257,7 @@ impl From<UserAddress32> for UserAddress {
     }
 }
 
-#[derive(Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
 #[repr(transparent)]
 pub struct UserRef<T> {
     addr: UserAddress,
@@ -329,6 +329,12 @@ impl<T> ops::Deref for UserRef<T> {
 impl<T> fmt::Display for UserRef<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.addr().fmt(f)
+    }
+}
+
+impl<T> fmt::Debug for UserRef<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "UserRef<{}>({:#x})", std::any::type_name::<T>(), self.addr().ptr())
     }
 }
 
