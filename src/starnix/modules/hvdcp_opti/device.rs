@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::iio_file::{IioDirectory0, IioDirectory1};
 use super::qbg_battery_file::create_battery_profile_device;
 use super::qbg_file::{create_qbg_device, QbgClassDirectory};
 use starnix_core::device::kobject::DeviceMetadata;
@@ -42,5 +43,27 @@ where
         registry.objects.get_or_create_class("qbg_battery".into(), registry.objects.virtual_bus()),
         DeviceDirectory::new,
         create_battery_profile_device,
+    );
+
+    // /sys/bus/iio/devices/iio:device
+    // IIO devices should not show up under /sys/class. This makes it show up under /sys/class,
+    // but it's OK.
+    let iio = registry
+        .objects
+        .get_or_create_class("iio".into(), registry.objects.get_or_create_bus("iio".into()));
+    registry.add_numberless_device(
+        locked,
+        current_task,
+        "iio:device0".into(),
+        iio.clone(),
+        IioDirectory0::new,
+    );
+
+    registry.add_numberless_device(
+        locked,
+        current_task,
+        "iio:device1".into(),
+        iio,
+        IioDirectory1::new,
     );
 }

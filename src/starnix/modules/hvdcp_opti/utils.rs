@@ -4,7 +4,10 @@
 
 use fidl_fuchsia_hardware_qcom_hvdcpopti as fhvdcpopti;
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::{BytesFile, BytesFileOps, FsNodeOps, SimpleFileNode};
+use starnix_core::vfs::{
+    fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, BytesFile,
+    BytesFileOps, FileOps, FsNodeOps, SimpleFileNode,
+};
 use starnix_sync::Mutex;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
@@ -52,4 +55,18 @@ impl BytesFileOps for ReadWriteBytesFile {
         *self.data.lock() = data;
         Ok(())
     }
+}
+
+pub struct InvalidFile;
+
+impl InvalidFile {
+    pub fn new_node() -> impl FsNodeOps {
+        SimpleFileNode::new(move || Ok(InvalidFile))
+    }
+}
+
+impl FileOps for InvalidFile {
+    fileops_impl_dataless!();
+    fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 }
