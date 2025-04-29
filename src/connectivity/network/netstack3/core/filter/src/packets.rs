@@ -1068,11 +1068,15 @@ impl<I: IpExt, Inner, M: IcmpMessage<I>> MaybeTransportPacketMut<I>
 
 impl<I: IpExt, M: IcmpMessage<I>> TransportPacketMut<I> for IcmpPacketBuilder<I, M> {
     fn set_src_port(&mut self, id: NonZeroU16) {
-        let _: u16 = self.message_mut().update_icmp_id(id.get());
+        if M::IS_REWRITABLE {
+            let _: u16 = self.message_mut().update_icmp_id(id.get());
+        }
     }
 
     fn set_dst_port(&mut self, id: NonZeroU16) {
-        let _: u16 = self.message_mut().update_icmp_id(id.get());
+        if M::IS_REWRITABLE {
+            let _: u16 = self.message_mut().update_icmp_id(id.get());
+        }
     }
 
     fn update_pseudo_header_src_addr(&mut self, _old: I::Addr, new: I::Addr) {
@@ -1102,6 +1106,9 @@ impl<Inner, I: IpExt> MaybeIcmpErrorPayload<I>
 
 /// An ICMP message type that may allow for transport-layer packet inspection.
 pub trait IcmpMessage<I: IpExt>: icmp::IcmpMessage<I> + MaybeTransportPacket {
+    /// Whether this ICMP message supports rewriting the ID.
+    const IS_REWRITABLE: bool;
+
     /// Sets the ICMP ID for the message, returning the previous value.
     ///
     /// The ICMP ID is both the *src* AND *dst* ports for conntrack entries.
@@ -1119,6 +1126,8 @@ impl MaybeTransportPacket for IcmpEchoReply {
 }
 
 impl<I: IpExt> IcmpMessage<I> for IcmpEchoReply {
+    const IS_REWRITABLE: bool = true;
+
     fn update_icmp_id(&mut self, id: u16) -> u16 {
         let old = self.id();
         self.set_id(id);
@@ -1137,6 +1146,8 @@ impl MaybeTransportPacket for IcmpEchoRequest {
 }
 
 impl<I: IpExt> IcmpMessage<I> for IcmpEchoRequest {
+    const IS_REWRITABLE: bool = true;
+
     fn update_icmp_id(&mut self, id: u16) -> u16 {
         let old = self.id();
         self.set_id(id);
@@ -1154,6 +1165,8 @@ macro_rules! unsupported_icmp_message_type {
 
         $(
             impl IcmpMessage<$ips> for $message {
+                const IS_REWRITABLE: bool = false;
+
                 fn update_icmp_id(&mut self, _: u16) -> u16 {
                     unreachable!("non-echo ICMP packets should never be rewritten")
                 }
@@ -1208,6 +1221,8 @@ macro_rules! icmp_error_message {
 
         $(
             impl IcmpMessage<$ips> for $message {
+                const IS_REWRITABLE: bool = false;
+
                 fn update_icmp_id(&mut self, _: u16) -> u16 {
                     unreachable!("non-echo ICMP packets should never be rewritten")
                 }
@@ -2824,29 +2839,6 @@ mod tests {
         ));
 
         assert_eq!(equivalent, serializer);
-    }
-
-    #[test]
-    #[should_panic]
-    fn icmp_serializer_set_port_panics_on_unsupported_type() {
-        let mut serializer = [].into_serializer().encapsulate(IcmpPacketBuilder::new(
-            Ipv4::SRC_IP,
-            Ipv4::DST_IP,
-            IcmpZeroCode,
-            icmp::Icmpv4TimestampRequest::new(
-                /* origin_timestamp */ 0,
-                /* id */ SRC_PORT.get(),
-                /* seq */ 0,
-            )
-            .reply(/* recv_timestamp */ 0, /* tx_timestamp */ 0),
-        ));
-        let Some(packet) = serializer.transport_packet_mut() else {
-            // We expect this method to always return Some, and this test is expected to
-            // panic, so *do not* panic in order to fail the test if this method returns
-            // None.
-            return;
-        };
-        packet.set_src_port(SRC_PORT_2);
     }
 
     fn ip_packet<I: FilterIpExt, P: Protocol>(src: I::Addr, dst: I::Addr) -> Buf<Vec<u8>> {
