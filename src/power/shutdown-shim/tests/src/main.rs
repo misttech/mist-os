@@ -50,14 +50,31 @@ async fn new_realm(
         builder.add_local_child("mocks-server", mocks_provider, ChildOptions::new()).await?;
 
     // Give config capabilities.
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::configuration("fuchsia.power.SuspendEnabled"))
-                .from(Ref::void())
-                .to(&shutdown_shim),
-        )
-        .await?;
+    if is_power_framework_available {
+        builder
+            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                name: "fuchsia.power.SuspendEnabled".parse()?,
+                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(true)),
+            }))
+            .await?;
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::configuration("fuchsia.power.SuspendEnabled"))
+                    .from(Ref::self_())
+                    .to(&shutdown_shim),
+            )
+            .await?;
+    } else {
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::configuration("fuchsia.power.SuspendEnabled"))
+                    .from(Ref::void())
+                    .to(&shutdown_shim),
+            )
+            .await?;
+    }
 
     // Give the shim logging
     builder
@@ -176,11 +193,40 @@ impl RebootReason {
     }
 }
 
+async fn verify_shutdown_shim_common_behavior(
+    realm_instance: RealmInstance,
+    is_power_framework_available: bool,
+    mut recv_signals: mpsc::UnboundedReceiver<Signal>,
+) -> Result<(), Error> {
+    // Conditionally checks the mock receives the TakeWakeLease call
+    if is_power_framework_available {
+        assert_matches!(
+            recv_signals.next().await,
+            Some(Signal::ShutdownControlLease(LeaseState::Acquired))
+        );
+    }
+
+    // Verify the system controller service gets the shutdown request from shutdown-shim
+    assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
+
+    // Conditionally checks the mock detects the lease drop.
+    if is_power_framework_available {
+        assert_matches!(
+            recv_signals.next().await,
+            Some(Signal::ShutdownControlLease(LeaseState::Dropped))
+        );
+    } else {
+        drop(realm_instance);
+        assert_matches!(recv_signals.next().await, None);
+    }
+    Ok(())
+}
+
 #[test_case(true; "with_power_framework")]
 #[test_case(false; "without_power_framework")]
 #[fuchsia::test]
 async fn test_poweroff(is_power_framework_available: bool) -> Result<(), Error> {
-    let (realm_instance, mut recv_signals) = new_realm(is_power_framework_available).await?;
+    let (realm_instance, recv_signals) = new_realm(is_power_framework_available).await?;
     let shim_statecontrol =
         realm_instance.root.connect_to_protocol_at_exposed_dir::<fstatecontrol::AdminMarker>()?;
 
@@ -189,27 +235,15 @@ async fn test_poweroff(is_power_framework_available: bool) -> Result<(), Error> 
             "the shutdown shim should close the channel when manual shutdown driving is complete",
         );
     });
-    if is_power_framework_available {
-        assert_matches!(
-            recv_signals.next().await,
-            Some(Signal::ShutdownControlLease(LeaseState::Acquired))
-        );
-    }
-    assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
-    if is_power_framework_available {
-        assert_matches!(
-            recv_signals.next().await,
-            Some(Signal::ShutdownControlLease(LeaseState::Dropped))
-        );
-    }
-    Ok(())
+    verify_shutdown_shim_common_behavior(realm_instance, is_power_framework_available, recv_signals)
+        .await
 }
 
 #[test_case(true; "with_power_framework")]
 #[test_case(false; "without_power_framework")]
 #[fuchsia::test]
 async fn test_mexec(is_power_framework_available: bool) -> Result<(), Error> {
-    let (realm_instance, mut recv_signals) = new_realm(is_power_framework_available).await?;
+    let (realm_instance, recv_signals) = new_realm(is_power_framework_available).await?;
     let shim_statecontrol =
         realm_instance.root.connect_to_protocol_at_exposed_dir::<fstatecontrol::AdminMarker>()?;
 
@@ -221,20 +255,8 @@ async fn test_mexec(is_power_framework_available: bool) -> Result<(), Error> {
         );
     });
 
-    if is_power_framework_available {
-        assert_matches!(
-            recv_signals.next().await,
-            Some(Signal::ShutdownControlLease(LeaseState::Acquired))
-        );
-    }
-    assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
-    if is_power_framework_available {
-        assert_matches!(
-            recv_signals.next().await,
-            Some(Signal::ShutdownControlLease(LeaseState::Dropped))
-        );
-    }
-    Ok(())
+    verify_shutdown_shim_common_behavior(realm_instance, is_power_framework_available, recv_signals)
+        .await
 }
 
 #[test_matrix(
@@ -248,7 +270,7 @@ async fn test_reboot(
     reboot_type: RebootType,
     reason: RebootReason,
 ) -> Result<(), Error> {
-    let (realm_instance, mut recv_signals) = new_realm(is_power_framework_available).await?;
+    let (realm_instance, recv_signals) = new_realm(is_power_framework_available).await?;
     let shim_statecontrol =
         realm_instance.root.connect_to_protocol_at_exposed_dir::<fstatecontrol::AdminMarker>()?;
 
@@ -265,27 +287,15 @@ async fn test_reboot(
     })
     .detach();
 
-    if is_power_framework_available {
-        assert_matches!(
-            recv_signals.next().await,
-            Some(Signal::ShutdownControlLease(LeaseState::Acquired))
-        );
-    }
-    assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
-    if is_power_framework_available {
-        assert_matches!(
-            recv_signals.next().await,
-            Some(Signal::ShutdownControlLease(LeaseState::Dropped))
-        );
-    }
-    Ok(())
+    verify_shutdown_shim_common_behavior(realm_instance, is_power_framework_available, recv_signals)
+        .await
 }
 
 #[test_case(true; "with_power_framework")]
 #[test_case(false; "without_power_framework")]
 #[fuchsia::test]
 async fn test_collaborative_reboot(is_power_framework_available: bool) -> Result<(), Error> {
-    let (realm_instance, mut recv_signals) = new_realm(is_power_framework_available).await?;
+    let (realm_instance, recv_signals) = new_realm(is_power_framework_available).await?;
     let shim_scheduler = realm_instance
         .root
         .connect_to_protocol_at_exposed_dir::<fpower_internal::CollaborativeRebootSchedulerMarker>(
@@ -305,22 +315,8 @@ async fn test_collaborative_reboot(is_power_framework_available: bool) -> Result
     })
     .detach();
 
-    if is_power_framework_available {
-        assert_matches!(
-            recv_signals.next().await,
-            Some(Signal::ShutdownControlLease(LeaseState::Acquired))
-        );
-    }
-
-    assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
-
-    if is_power_framework_available {
-        assert_matches!(
-            recv_signals.next().await,
-            Some(Signal::ShutdownControlLease(LeaseState::Dropped))
-        );
-    }
-    Ok(())
+    verify_shutdown_shim_common_behavior(realm_instance, is_power_framework_available, recv_signals)
+        .await
 }
 
 /// Verifies that `fuchsia.hardware.power.statecontrol/Admin.Reboot` requests
@@ -332,7 +328,7 @@ async fn test_collaborative_reboot(is_power_framework_available: bool) -> Result
 #[test_case(false; "without_power_framework")]
 #[fuchsia::test]
 async fn deprecated_shutdown_test(is_power_framework_available: bool) -> Result<(), Error> {
-    let (realm_instance, mut recv_signals) = new_realm(is_power_framework_available).await?;
+    let (realm_instance, recv_signals) = new_realm(is_power_framework_available).await?;
 
     // Verify both the "current" and "deprecated" watcher APIs.
     let mut reboot_watcher = RebootWatcherClient::new(&realm_instance).await;
@@ -355,21 +351,8 @@ async fn deprecated_shutdown_test(is_power_framework_available: bool) -> Result<
         fstatecontrol::RebootReason::SystemUpdate
     );
 
-    // Verify the system controller service gets the shutdown request from shutdown-shim
-    if is_power_framework_available {
-        assert_matches!(
-            recv_signals.next().await,
-            Some(Signal::ShutdownControlLease(LeaseState::Acquired))
-        );
-    }
-    assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
-    if is_power_framework_available {
-        assert_matches!(
-            recv_signals.next().await,
-            Some(Signal::ShutdownControlLease(LeaseState::Dropped))
-        );
-    }
-    Ok(())
+    verify_shutdown_shim_common_behavior(realm_instance, is_power_framework_available, recv_signals)
+        .await
 }
 
 /// Verifies that `fuchsia.hardware.power.statecontrol/Admin.PerformReboot`
@@ -380,7 +363,7 @@ async fn deprecated_shutdown_test(is_power_framework_available: bool) -> Result<
 #[test_case(false; "without_power_framework")]
 #[fuchsia::test]
 async fn shutdown_test(is_power_framework_available: bool) -> Result<(), Error> {
-    let (realm_instance, mut recv_signals) = new_realm(is_power_framework_available).await?;
+    let (realm_instance, recv_signals) = new_realm(is_power_framework_available).await?;
 
     // Verify both the "current" and "deprecated" watcher APIs.
     let mut reboot_watcher = RebootWatcherClient::new(&realm_instance).await;
@@ -417,21 +400,8 @@ async fn shutdown_test(is_power_framework_available: bool) -> Result<(), Error> 
         fstatecontrol::RebootReason::SystemUpdate
     );
 
-    // Verify the system controller service gets the shutdown request from shutdown-shim
-    if is_power_framework_available {
-        assert_matches!(
-            recv_signals.next().await,
-            Some(Signal::ShutdownControlLease(LeaseState::Acquired))
-        );
-    }
-    assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
-    if is_power_framework_available {
-        assert_matches!(
-            recv_signals.next().await,
-            Some(Signal::ShutdownControlLease(LeaseState::Dropped))
-        );
-    }
-    Ok(())
+    verify_shutdown_shim_common_behavior(realm_instance, is_power_framework_available, recv_signals)
+        .await
 }
 
 #[fuchsia::test]

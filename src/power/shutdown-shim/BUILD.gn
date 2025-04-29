@@ -23,7 +23,6 @@ rustc_library("lib") {
   sources = [
     "src/collaborative_reboot.rs",
     "src/lib.rs",
-    "src/lib.rs",
     "src/reboot_reasons.rs",
     "src/shutdown_watcher.rs",
   ]
