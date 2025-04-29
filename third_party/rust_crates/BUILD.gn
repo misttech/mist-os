@@ -914,7 +914,7 @@ if (current_os == "fuchsia") {
 
 if (!(current_os == "fuchsia")) {
   group("semver") {
-    public_deps = [ ":semver-v1_0_23" ]
+    public_deps = [ ":semver-v1_0_26" ]
   }
 }
 
@@ -3206,7 +3206,7 @@ rust_library("cargo_metadata-v0_18_1") {
   deps = []
   deps += [ ":camino-v1_1_9" ]
   deps += [ ":cargo-platform-v0_1_2" ]
-  deps += [ ":semver-v1_0_23" ]
+  deps += [ ":semver-v1_0_26" ]
   deps += [ ":serde-v1_0_204" ]
   deps += [ ":serde_json-v1_0_128" ]
   deps += [ ":thiserror-v1_0_69" ]
@@ -14875,18 +14875,18 @@ rust_library("security-framework-sys-v2_4_2") {
   applicable_licenses = [ ":security-framework-sys-v2_4_2.license" ]
 }
 
-license("semver-v1_0_23.license") {
+license("semver-v1_0_26.license") {
   public_package_name = "semver"
   license_files = [
-    "//third_party/rust_crates/vendor/semver-1.0.23/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/semver-1.0.23/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/semver-1.0.26/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/semver-1.0.26/LICENSE-MIT",
   ]
 }
 
-rust_library("semver-v1_0_23") {
+rust_library("semver-v1_0_26") {
   crate_name = "semver"
-  crate_root = "//third_party/rust_crates/vendor/semver-1.0.23/src/lib.rs"
-  output_name = "semver-47f24701556f43a4"
+  crate_root = "//third_party/rust_crates/vendor/semver-1.0.26/src/lib.rs"
+  output_name = "semver-b7ff60676363bf77"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -14897,8 +14897,8 @@ rust_library("semver-v1_0_23") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=47f24701556f43a4",
-    "-Cextra-filename=-47f24701556f43a4",
+    "-Cmetadata=b7ff60676363bf77",
+    "-Cextra-filename=-b7ff60676363bf77",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"serde\"",
     "--cfg=feature=\"std\"",
@@ -14906,7 +14906,7 @@ rust_library("semver-v1_0_23") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":semver-v1_0_23.license" ]
+  applicable_licenses = [ ":semver-v1_0_26.license" ]
 }
 
 license("serde-v1_0_204.license") {

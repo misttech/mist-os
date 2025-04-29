@@ -23,7 +23,7 @@ package_info(
     name = "package_info",
     package_name = "semver",
     package_url = "https://github.com/dtolnay/semver",
-    package_version = "1.0.23",
+    package_version = "1.0.26",
 )
 
 license(
@@ -76,9 +76,9 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "1.0.23",
+    version = "1.0.26",
     deps = [
-        "//third_party/rust_crates/vendor/semver-1.0.23:build_script_build",
+        "//third_party/rust_crates/vendor/semver-1.0.26:build_script_build",
         "//third_party/rust_crates/vendor/serde-1.0.204:serde",
     ],
 )
@@ -133,7 +133,7 @@ cargo_build_script(
         "noclippy",
         "norustfmt",
     ],
-    version = "1.0.23",
+    version = "1.0.26",
     visibility = ["//visibility:private"],
 )
 

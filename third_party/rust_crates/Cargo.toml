@@ -331,7 +331,7 @@ pulldown-cmark = { version = "0.9.3", features = ["serde"] }
 quote = "1.0.38"
 rustfix = "0.9.0"
 rustls-native-certs = "0.6.3"
-semver = "1.0.23"
+semver = "1.0.26"
 serde_yaml = "0.9.14" # To use on Fuchsia, serde_yaml and unsafe-libyaml will need to be re-audited.
 serial_test = "0.5.1" # Not for use on Fuchsia, only for a single process.
 shared_child = "1.0.1"
@@ -951,7 +951,7 @@ visibility = [
 ]
 testonly = true
 
-[gn.package.semver."1.0.23"]
+[gn.package.semver."1.0.26"]
 rustflags = []
 
 [gn.package.serde."1.0.204"]

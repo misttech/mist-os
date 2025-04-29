@@ -13,9 +13,10 @@
 edition = "2018"
 rust-version = "1.31"
 name = "semver"
-version = "1.0.23"
+version = "1.0.26"
 authors = ["David Tolnay <dtolnay@gmail.com>"]
 build = "build.rs"
+autolib = false
 autobins = false
 autoexamples = false
 autotests = false
@@ -33,32 +34,39 @@ repository = "https://github.com/dtolnay/semver"
 
 [package.metadata.docs.rs]
 rustdoc-args = [
-    "--cfg",
-    "doc_cfg",
     "--generate-link-to-definition",
+    "--extern-html-root-url=core=https://doc.rust-lang.org",
+    "--extern-html-root-url=alloc=https://doc.rust-lang.org",
+    "--extern-html-root-url=std=https://doc.rust-lang.org",
 ]
 targets = ["x86_64-unknown-linux-gnu"]
+
+[package.metadata.playground]
+features = ["serde"]
+
+[features]
+default = ["std"]
+std = []
 
 [lib]
 name = "semver"
 path = "src/lib.rs"
-doc-scrape-examples = false
-
-[[test]]
-name = "test_version_req"
-path = "tests/test_version_req.rs"
-
-[[test]]
-name = "test_identifier"
-path = "tests/test_identifier.rs"
 
 [[test]]
 name = "test_autotrait"
 path = "tests/test_autotrait.rs"
 
 [[test]]
+name = "test_identifier"
+path = "tests/test_identifier.rs"
+
+[[test]]
 name = "test_version"
 path = "tests/test_version.rs"
+
+[[test]]
+name = "test_version_req"
+path = "tests/test_version_req.rs"
 
 [[bench]]
 name = "parse"
@@ -68,7 +76,3 @@ path = "benches/parse.rs"
 version = "1.0.194"
 optional = true
 default-features = false
-
-[features]
-default = ["std"]
-std = []
