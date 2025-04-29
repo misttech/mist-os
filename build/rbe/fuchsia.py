@@ -123,7 +123,6 @@ def remote_executable(host_tool: Path) -> Path:
 
 RECLIENT_BINDIR = Path(
     "prebuilt",
-    "proprietary",
     "third_party",
     "reclient",
     HOST_PREBUILT_PLATFORM_SUBDIR,
