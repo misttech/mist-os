@@ -96,12 +96,12 @@ impl InputHandler for MouseInjectorHandler {
                 trace_id,
             } => {
                 fuchsia_trace::duration!(c"input", c"mouse_injector_hander");
-                let tracing_id = match trace_id {
+                let trace_id = match trace_id {
                     Some(id) => {
                         fuchsia_trace::flow_end!(c"input", c"event_in_input_pipeline", id.into());
                         id
                     }
-                    None => fuchsia_trace::Id::new(),
+                    None => fuchsia_trace::Id::random(),
                 };
 
                 self.inspect_status
@@ -131,7 +131,7 @@ impl InputHandler for MouseInjectorHandler {
                         &mouse_event,
                         &mouse_device_descriptor,
                         event_time,
-                        tracing_id.into(),
+                        trace_id.into(),
                     )
                     .await
                 {
@@ -554,7 +554,7 @@ impl MouseInjectorHandler {
                         let events = &[pointerinjector::Event {
                             timestamp: Some(fuchsia_async::MonotonicInstant::now().into_nanos()),
                             data: Some(pointerinjector::Data::Viewport(new_viewport.clone())),
-                            trace_flow_id: Some(fuchsia_trace::Id::new().into()),
+                            trace_flow_id: Some(fuchsia_trace::Id::random().into()),
                             ..Default::default()
                         }];
                         injector.inject(events).await.expect("Failed to inject updated viewport.");

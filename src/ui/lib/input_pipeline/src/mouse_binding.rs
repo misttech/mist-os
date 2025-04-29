@@ -564,7 +564,7 @@ fn send_mouse_event(
         return;
     }
 
-    let trace_id = fuchsia_trace::Id::new();
+    let trace_id = fuchsia_trace::Id::random();
     fuchsia_trace::duration!(c"input", c"mouse-binding-send-event");
     fuchsia_trace::flow_begin!(c"input", c"event_in_input_pipeline", trace_id);
 
