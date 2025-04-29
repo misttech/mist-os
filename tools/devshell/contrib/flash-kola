@@ -48,15 +48,25 @@ if [[ "${BOOTLOADER}" != "sorrel" ]]; then
   # Ensure bootmode is set to factory before flashing partitions.
   fx-info "Checking current bootmode..."
   # Capture output and potential errors. Use awk to extract the value after 'bootmode='.
-  CURRENT_BOOTMODE=$(${FASTBOOT} oem get_config bootmode 2>&1 | awk '/bootmode:/ {print $3}')
-  if [[ "${CURRENT_BOOTMODE}" != "factory" ]]; then
-    fx-info "Current bootmode is '${CURRENT_BOOTMODE}', setting it to 'factory'."
-    ${FASTBOOT} oem set_config bootmode factory || {
-      fx-error "Failed to set bootmode to factory. Please check the device."
-      exit 1
-    }
+  # Store the exit code separately.
+  BOOTMODE_OUTPUT=$(${FASTBOOT} oem get_config bootmode 2>&1)
+  BOOTMODE_EXIT_CODE=$?
+  INITIAL_BOOTMODE="" # Initialize to empty
+
+  if [[ ${BOOTMODE_EXIT_CODE} -eq 0 ]]; then
+    CURRENT_BOOTMODE=$(echo "${BOOTMODE_OUTPUT}" | awk '/bootmode:/ {print $3}')
+    INITIAL_BOOTMODE="${CURRENT_BOOTMODE}" # Store the initial bootmode
+    if [[ "${CURRENT_BOOTMODE}" != "factory" ]]; then
+      fx-info "Current bootmode is '${CURRENT_BOOTMODE}', setting it to 'factory'."
+      ${FASTBOOT} oem set_config bootmode factory || {
+        fx-warn "Failed to set bootmode to factory. Attempting to flash anyway."
+      }
+    else
+      fx-info "Bootmode: 'factory'."
+    fi
   else
-    fx-info "Bootmode: 'factory'."
+    fx-warn "Failed to get current bootmode (Exit code: ${BOOTMODE_EXIT_CODE}). Output: ${BOOTMODE_OUTPUT}"
+    fx-warn "Proceeding with flashing, but bootmode might not be 'factory'."
   fi
 else
   fx-info "Bootloader is '${BOOTLOADER}'."
@@ -111,6 +121,17 @@ fi
 # after flashing large super partition data so we want to do as much as
 # possible before this while the USB is more reliable (b/405436515).
 ${FASTBOOT} flash super "$FVM_PATH"
+
+# Attempt to restore the initial bootmode if it was changed
+if [[ -n "${INITIAL_BOOTMODE}" && "${INITIAL_BOOTMODE}" != "factory" ]]; then
+  fx-info "Attempting to restore initial bootmode to '${INITIAL_BOOTMODE}'..."
+  # Check the exit status of the set_config command
+  if ${FASTBOOT} oem set_config bootmode "${INITIAL_BOOTMODE}"; then
+    fx-info "Successfully restored bootmode to '${INITIAL_BOOTMODE}'."
+  else
+    fx-warn "Failed to restore initial bootmode to '${INITIAL_BOOTMODE}'. Device might remain in 'factory' mode."
+  fi
+fi
 
 # SSH keys require `fastboot continue`, since they are stored in RAM and would
 # get lost in a reboot. We rebooted earlier to ensure a complete boot chain
