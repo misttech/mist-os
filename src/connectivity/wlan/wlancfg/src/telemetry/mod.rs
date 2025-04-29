@@ -908,6 +908,7 @@ const INSPECT_SCAN_EVENTS_LIMIT: usize = 7;
 const INSPECT_CONNECT_EVENTS_LIMIT: usize = 7;
 const INSPECT_DISCONNECT_EVENTS_LIMIT: usize = 7;
 const INSPECT_EXTERNAL_DISCONNECT_EVENTS_LIMIT: usize = 2;
+const INSPECT_ROAM_EVENTS_LIMIT: usize = 7;
 
 /// Inspect node with properties queried by external entities.
 /// Do not change or remove existing properties that are still used.
@@ -945,6 +946,7 @@ pub struct Telemetry {
     scan_events_node: Mutex<AutoPersist<BoundedListNode>>,
     connect_events_node: Mutex<AutoPersist<BoundedListNode>>,
     disconnect_events_node: Mutex<AutoPersist<BoundedListNode>>,
+    roam_events_node: Mutex<AutoPersist<BoundedListNode>>,
     external_inspect_node: ExternalInspectNode,
 
     // Auto-persistence on various client stats counters
@@ -977,6 +979,7 @@ impl Telemetry {
         let scan_events = inspect_node.create_child("scan_events");
         let connect_events = inspect_node.create_child("connect_events");
         let disconnect_events = inspect_node.create_child("disconnect_events");
+        let roam_events = inspect_node.create_child("roam_events");
         let external_inspect_node = ExternalInspectNode::new(external_inspect_node);
         inspect_record_external_data(
             &external_inspect_node,
@@ -1003,6 +1006,11 @@ impl Telemetry {
             disconnect_events_node: Mutex::new(AutoPersist::new(
                 BoundedListNode::new(disconnect_events, INSPECT_DISCONNECT_EVENTS_LIMIT),
                 "wlancfg-disconnect-events",
+                persistence_req_sender.clone(),
+            )),
+            roam_events_node: Mutex::new(AutoPersist::new(
+                BoundedListNode::new(roam_events, INSPECT_ROAM_EVENTS_LIMIT),
+                "wlancfg-roam-events",
                 persistence_req_sender.clone(),
             )),
             external_inspect_node,
@@ -1353,6 +1361,9 @@ impl Telemetry {
                             self.last_checked_connection_state = now;
                             // TODO(https://fxbug.dev/135975) Log roam success to Cobalt and Inspect.
                         }
+                        // Log roam event to Inspect
+                        self.log_roam_event_inspect(iface_id, &result, &request);
+
                         // Log metrics following a roam result
                         self.stats_logger
                             .log_roam_result_metrics(
@@ -1669,6 +1680,24 @@ impl Telemetry {
                     primary: info.ap_state.tracked.channel.primary,
                 },
             },
+        });
+    }
+
+    pub fn log_roam_event_inspect(
+        &self,
+        iface_id: u16,
+        result: &fidl_sme::RoamResult,
+        request: &PolicyRoamRequest,
+    ) {
+        inspect_log!(self.roam_events_node.lock().get_mut(), {
+            iface_id: iface_id,
+            target: {
+                ssid: request.candidate.network.ssid.to_string(),
+                bssid: request.candidate.bss.bssid.to_string(),
+            },
+            reasons: InspectList(request.reasons.iter().map(|reason| format!("{:?}", reason)).collect::<Vec<String>>().as_slice()),
+            status: result.status_code.into_primitive(),
+            original_association_maintained: result.original_association_maintained,
         });
     }
 
