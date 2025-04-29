@@ -22,8 +22,8 @@ use zerocopy::{
 use crate::error::{IpParseError, IpParseResult};
 use crate::ethernet::EthernetIpExt;
 use crate::icmp::IcmpIpExt;
-use crate::ipv4::{Ipv4Header, Ipv4OnlyMeta, Ipv4Packet, Ipv4PacketBuilder};
-use crate::ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder};
+use crate::ipv4::{Ipv4Header, Ipv4OnlyMeta, Ipv4Packet, Ipv4PacketBuilder, Ipv4PacketRaw};
+use crate::ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder, Ipv6PacketRaw};
 use crate::private::Sealed;
 
 /// An [`Ip`] extension trait adding an associated type for the IP protocol
@@ -63,17 +63,24 @@ pub trait IpExt: EthernetIpExt + IcmpIpExt {
         + GenericOverIp<Self, Type = Self::Packet<B>>
         + GenericOverIp<Ipv4, Type = Ipv4Packet<B>>
         + GenericOverIp<Ipv6, Type = Ipv6Packet<B>>;
+    /// A raw IP packet type for this IP version.
+    type PacketRaw<B: SplitByteSlice>: IpPacketRaw<B, Self>
+        + GenericOverIp<Self, Type = Self::PacketRaw<B>>
+        + GenericOverIp<Ipv4, Type = Ipv4PacketRaw<B>>
+        + GenericOverIp<Ipv6, Type = Ipv6PacketRaw<B>>;
     /// An IP packet builder type for the IP version.
     type PacketBuilder: IpPacketBuilder<Self> + Eq;
 }
 
 impl IpExt for Ipv4 {
     type Packet<B: SplitByteSlice> = Ipv4Packet<B>;
+    type PacketRaw<B: SplitByteSlice> = Ipv4PacketRaw<B>;
     type PacketBuilder = Ipv4PacketBuilder;
 }
 
 impl IpExt for Ipv6 {
     type Packet<B: SplitByteSlice> = Ipv6Packet<B>;
+    type PacketRaw<B: SplitByteSlice> = Ipv6PacketRaw<B>;
     type PacketBuilder = Ipv6PacketBuilder;
 }
 
@@ -348,6 +355,24 @@ impl<B: SplitByteSlice> IpPacket<B, Ipv6> for Ipv6Packet<B> {
     fn builder(&self) -> Self::Builder {
         self.builder()
     }
+}
+
+/// A raw IPv4 or IPv6 packet.
+///
+/// `IpPacketRaw` is implemented by `Ipv4PacketRaw` and `Ipv6PacketRaw`.
+pub trait IpPacketRaw<B: SplitByteSlice, I: IpExt>:
+    Sized + ParsablePacket<B, (), Error = IpParseError<I>>
+{
+}
+
+impl<B: SplitByteSlice> IpPacketRaw<B, Ipv4> for Ipv4PacketRaw<B> {}
+impl<B: SplitByteSlice, I: IpExt> GenericOverIp<I> for Ipv4PacketRaw<B> {
+    type Type = <I as IpExt>::PacketRaw<B>;
+}
+
+impl<B: SplitByteSlice> IpPacketRaw<B, Ipv6> for Ipv6PacketRaw<B> {}
+impl<B: SplitByteSlice, I: IpExt> GenericOverIp<I> for Ipv6PacketRaw<B> {
+    type Type = <I as IpExt>::PacketRaw<B>;
 }
 
 /// A builder for IP packets.

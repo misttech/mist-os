@@ -896,6 +896,21 @@ pub struct Ipv6PacketRaw<B> {
     body_proto: Result<(MaybeParsed<B, B>, Ipv6Proto), ExtHdrParseError>,
 }
 
+impl<B> Ipv6PacketRaw<B> {
+    /// Returns a mutable reference to the body bytes of this [`Ipv6PacketRaw`].
+    ///
+    /// Might not be complete if a full packet was not received.
+    pub fn body_mut(&mut self) -> Option<&mut B> {
+        match self.body_proto {
+            Ok(ref mut b) => match b {
+                (MaybeParsed::Complete(ref mut b), _) => Some(b),
+                (MaybeParsed::Incomplete(ref mut b), _) => Some(b),
+            },
+            Err(_) => None,
+        }
+    }
+}
+
 impl<B: SplitByteSlice> Ipv6Header for Ipv6PacketRaw<B> {
     fn get_fixed_header(&self) -> &FixedHeader {
         &self.fixed_hdr

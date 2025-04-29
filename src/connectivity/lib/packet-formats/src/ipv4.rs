@@ -644,6 +644,18 @@ pub struct Ipv4PacketRaw<B> {
     body: MaybeParsed<B, B>,
 }
 
+impl<B> Ipv4PacketRaw<B> {
+    /// Returns a mutable reference to the body bytes of this [`Ipv4PacketRaw`].
+    ///
+    /// Might not be complete if a full packet was not received.
+    pub fn body_mut(&mut self) -> &mut B {
+        match &mut self.body {
+            MaybeParsed::Complete(b) => b,
+            MaybeParsed::Incomplete(b) => b,
+        }
+    }
+}
+
 impl<B: SplitByteSlice> Ipv4Header for Ipv4PacketRaw<B> {
     fn get_header_prefix(&self) -> &HeaderPrefix {
         &self.hdr_prefix
