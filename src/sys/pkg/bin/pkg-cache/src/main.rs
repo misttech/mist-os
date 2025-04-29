@@ -121,7 +121,6 @@ async fn main_inner() -> Result<(), Error> {
     // determine whether executability should be enforced.
     let pkg_cache_config::Config {
         all_packages_executable: _,
-        use_fxblob: _,
         use_system_image,
         enable_upgradable_packages,
     } = config;

@@ -45,9 +45,10 @@ rustc_library("blobfs-ramdisk") {
   ]
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 
-  # The GN variable `fxfs_blob` sets the structured config that determines whether production
-  # pkg-cache uses the fuchsa.fxfs/BlobCreator write API. Tests that use the production pkg-cache
-  # structured config need to know this value so they can create the correct blobfs dependency.
+  # The GN variable `fxfs_blob` sets the structured config that determines whether fxblob or blobfs
+  # are used on the system. Tests that use the production pkg-cache structured config should create
+  # the correct associated blobfs dependency. They should both work, but if we're testing the
+  # current pkg-cache environment, we should use the current storage implementation as well.
   rustenv = [ "FXFS_BLOB=${fxfs_blob}" ]
 }
 

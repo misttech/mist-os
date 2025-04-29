@@ -40,18 +40,7 @@ fuchsia_component("component") {
   deps = [ ":bin" ]
 }
 
-fuchsia_structured_config_values("config_values_from_gn") {
-  cm_label = ":manifest"
-  values = {
-    use_fxblob = false
-  }
-  visibility = [ ":*" ]
-}
-
 group("production-component-and-config") {
   testonly = true
-  public_deps = [
-    ":component",
-    ":config_values_from_gn",
-  ]
+  public_deps = [ ":component" ]
 }

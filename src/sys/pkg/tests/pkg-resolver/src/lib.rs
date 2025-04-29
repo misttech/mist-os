@@ -658,13 +658,6 @@ where
 
         builder
             .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
-                name: "fuchsia.pkgcache.UseFxblob".parse().unwrap(),
-                value: matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob).into(),
-            }))
-            .await
-            .unwrap();
-        builder
-            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
                 name: "fuchsia.pkgcache.UseSystemImage".parse().unwrap(),
                 value: system_image.is_some().into(),
             }))
@@ -673,7 +666,6 @@ where
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::configuration("fuchsia.pkgcache.UseFxblob"))
                     .capability(Capability::configuration("fuchsia.pkgcache.UseSystemImage"))
                     .from(Ref::self_())
                     .to(&pkg_cache),

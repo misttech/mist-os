@@ -7,24 +7,4 @@
         runner: "elf",
         binary: "bin/base_resolver_fake_dependencies_fxblob_bin",
     },
-    capabilities: [
-        {
-            protocol: "fuchsia.fxfs.BlobCreator",
-            path: "/fxfs-svc/fuchsia.fxfs.BlobCreator",
-        },
-        {
-            protocol: "fuchsia.fxfs.BlobReader",
-            path: "/fxfs-svc/fuchsia.fxfs.BlobReader",
-        },
-    ],
-    expose: [
-        {
-            protocol: "fuchsia.fxfs.BlobCreator",
-            from: "self",
-        },
-        {
-            protocol: "fuchsia.fxfs.BlobReader",
-            from: "self",
-        },
-    ],
 }

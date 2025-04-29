@@ -12,21 +12,4 @@
             url: "#meta/fake-dependencies-fxblob.cm",
         },
     ],
-    offer: [
-        {
-            protocol: "fuchsia.fxfs.BlobCreator",
-            from: "#fake_dependencies",
-            to: "#pkg-cache",
-        },
-        {
-            protocol: "fuchsia.fxfs.BlobReader",
-            from: "#fake_dependencies",
-            to: "#pkg-cache",
-        },
-        {
-            protocol: "fuchsia.kernel.VmexResource",
-            from: "parent",
-            to: "#pkg-cache",
-        },
-    ],
 }

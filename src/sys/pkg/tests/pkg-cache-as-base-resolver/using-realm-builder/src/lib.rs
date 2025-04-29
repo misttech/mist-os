@@ -163,13 +163,6 @@ impl TestEnvBuilder {
             .unwrap();
 
         builder.init_mutable_config_from_package(&pkg_cache).await.unwrap();
-        builder
-            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
-                name: "fuchsia.pkgcache.UseFxblob".parse().unwrap(),
-                value: true.into(),
-            }))
-            .await
-            .unwrap();
 
         let svc_dir = vfs::remote::remote_dir(blobfs.svc_dir().unwrap().unwrap());
         let service_reflector = builder
@@ -212,15 +205,6 @@ impl TestEnvBuilder {
                         format!("/blob-svc/{}", fidl_fuchsia_fxfs::BlobReaderMarker::PROTOCOL_NAME),
                     ))
                     .from(&service_reflector)
-                    .to(&pkg_cache),
-            )
-            .await
-            .unwrap();
-        builder
-            .add_route(
-                Route::new()
-                    .capability(Capability::configuration("fuchsia.pkgcache.UseFxblob"))
-                    .from(Ref::self_())
                     .to(&pkg_cache),
             )
             .await

@@ -145,7 +145,6 @@ pub(crate) mod for_tests {
                         .capability(Capability::configuration(
                             "fuchsia.pkgcache.AllPackagesExecutable",
                         ))
-                        .capability(Capability::configuration("fuchsia.pkgcache.UseFxblob"))
                         .capability(Capability::configuration("fuchsia.pkgcache.UseSystemImage"))
                         .capability(Capability::configuration(
                             "fuchsia.pkgcache.EnableUpgradablePackages",

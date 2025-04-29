@@ -26,7 +26,6 @@
             config: [
                 "fuchsia.pkgcache.AllPackagesExecutable",
                 "fuchsia.pkgcache.EnableUpgradablePackages",
-                "fuchsia.pkgcache.UseFxblob",
                 "fuchsia.pkgcache.UseSystemImage",
             ],
             from: "#pkg-cache-config",
@@ -41,6 +40,21 @@
         {
             directory: "blob-exec",
             from: "#fake_dependencies",
+            to: "#pkg-cache",
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobCreator",
+            from: "#fake_dependencies",
+            to: "#pkg-cache",
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobReader",
+            from: "#fake_dependencies",
+            to: "#pkg-cache",
+        },
+        {
+            protocol: "fuchsia.kernel.VmexResource",
+            from: "parent",
             to: "#pkg-cache",
         },
         {

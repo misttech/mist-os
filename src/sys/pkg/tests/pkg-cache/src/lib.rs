@@ -497,9 +497,9 @@ where
     }
 
     async fn build(self) -> TestEnv<ConcreteBlobfs> {
-        let (blob_implementation, blob_implementation_overridden) = match self.blob_implementation {
-            Some(blob_implementation) => (blob_implementation, true),
-            None => (blobfs_ramdisk::Implementation::from_env(), false),
+        let blob_implementation = match self.blob_implementation {
+            Some(blob_implementation) => blob_implementation,
+            None => blobfs_ramdisk::Implementation::from_env(),
         };
         let (blobfs, system_image) = (self.blobfs_and_system_image)(blob_implementation).await;
         let local_child_svc_dir = vfs::pseudo_directory! {};
@@ -674,28 +674,6 @@ where
                         "fuchsia.pkgcache.EnableUpgradablePackages",
                     ))
                     .from(if self.enable_upgradable_packages {
-                        Ref::self_()
-                    } else {
-                        (&pkg_cache_config).into()
-                    })
-                    .to(&pkg_cache),
-            )
-            .await
-            .unwrap();
-        if blob_implementation_overridden {
-            builder
-                .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
-                    name: "fuchsia.pkgcache.UseFxblob".parse().unwrap(),
-                    value: true.into(),
-                }))
-                .await
-                .unwrap();
-        }
-        builder
-            .add_route(
-                Route::new()
-                    .capability(Capability::configuration("fuchsia.pkgcache.UseFxblob"))
-                    .from(if blob_implementation_overridden {
                         Ref::self_()
                     } else {
                         (&pkg_cache_config).into()

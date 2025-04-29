@@ -30,7 +30,4 @@
             from: "self",
         },
     ],
-    config: {
-        use_fxblob: { type: "bool" },
-    },
 }
