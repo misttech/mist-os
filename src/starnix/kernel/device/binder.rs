@@ -3163,16 +3163,27 @@ impl MemoryAccessor for RemoteResourceAccessor {
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         profile_duration!("RemoteWriteMemory");
-        let vmo = with_zx_name(
-            zx::Vmo::create(bytes.len() as u64).map_err(|_| errno!(EINVAL))?,
-            b"starnix:device_binder",
-        );
-        vmo.write(bytes, 0).map_err(|_| errno!(EFAULT))?;
-        vmo.set_content_size(&(bytes.len() as u64)).map_err(|_| errno!(EINVAL))?;
-        self.process_accessor
-            .write_memory(addr.ptr() as u64, vmo, zx::MonotonicInstant::INFINITE)
-            .map_err(|_| errno!(ENOENT))?
-            .map_err(Self::map_fidl_posix_errno)?;
+        if bytes.len() <= fbinder::MAX_WRITE_BYTES as usize {
+            self.process_accessor.write_bytes(
+                addr.ptr() as u64,
+                bytes,
+                zx::MonotonicInstant::INFINITE,
+            )
+        } else {
+            let vmo = with_zx_name(
+                zx::Vmo::create(bytes.len() as u64).map_err(|_| errno!(EINVAL))?,
+                b"starnix:device_binder",
+            );
+            vmo.write(bytes, 0).map_err(|_| errno!(EFAULT))?;
+            vmo.set_content_size(&(bytes.len() as u64)).map_err(|_| errno!(EINVAL))?;
+            self.process_accessor.write_memory(
+                addr.ptr() as u64,
+                vmo,
+                zx::MonotonicInstant::INFINITE,
+            )
+        }
+        .map_err(|_| errno!(ENOENT))?
+        .map_err(Self::map_fidl_posix_errno)?;
         Ok(bytes.len())
     }
 
@@ -5120,6 +5131,7 @@ pub mod tests {
         binder_transaction_data__bindgen_ty_1, binder_transaction_data__bindgen_ty_2,
         BINDER_TYPE_WEAK_HANDLE,
     };
+    use static_assertions::const_assert;
     use std::sync::Weak;
     use zerocopy::{FromZeros, KnownLayout};
 
@@ -8718,7 +8730,13 @@ pub mod tests {
                     content.read(buffer, 0)?;
                     responder.send(Ok(()))?;
                 }
-                fbinder::ProcessAccessorRequest::WriteBytes { .. } => todo!(),
+                fbinder::ProcessAccessorRequest::WriteBytes { address, bytes, responder } => {
+                    // SAFETY: This is not safe and rely on the client being correct.
+                    let buffer =
+                        unsafe { std::slice::from_raw_parts_mut(address as *mut u8, bytes.len()) };
+                    buffer.copy_from_slice(bytes.as_slice());
+                    responder.send(Ok(()))?;
+                }
                 fbinder::ProcessAccessorRequest::FileRequest { payload, responder } => {
                     let mut response = fbinder::FileResponse::default();
                     for fd in payload.close_requests.unwrap_or(vec![]) {
@@ -8768,6 +8786,9 @@ pub mod tests {
     #[::fuchsia::test]
     async fn remote_binder_task() {
         const vector_size: usize = 128 * 1024 * 1024;
+        const_assert!(vector_size > fbinder::MAX_WRITE_BYTES as usize);
+        const small_size: usize = 128;
+        const_assert!(small_size <= fbinder::MAX_WRITE_BYTES as usize);
         let (process_accessor_client_end, process_accessor_server_end) =
             create_endpoints::<fbinder::ProcessAccessorMarker>();
 
@@ -8797,9 +8818,16 @@ pub mod tests {
             vector.resize(vector_size, 0);
             remote_binder_task
                 .write_memory((vector.as_ptr() as u64).into(), &other_vector)
-                .expect("read_memory");
+                .expect("write_memory");
             assert_eq!(vector[1], 1);
             assert_eq!(vector, other_vector);
+            vector.clear();
+            vector.resize(vector_size, 0);
+            remote_binder_task
+                .write_memory((vector.as_ptr() as u64).into(), &other_vector[..small_size])
+                .expect("write_memory");
+            assert_eq!(vector[1], 1);
+            assert_eq!(vector[..small_size], other_vector[..small_size]);
 
             let mut locked = locked.cast_locked::<ResourceAccessorAddFile>();
             let fd0 = remote_binder_task
