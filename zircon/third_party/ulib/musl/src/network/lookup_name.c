@@ -53,6 +53,9 @@ static int _getaddrinfo_from_dns_stub(struct address buf[static MAXADDRS], char 
 weak_alias(_getaddrinfo_from_dns_stub, _getaddrinfo_from_dns);
 
 static const struct policy {
+#if __has_attribute(nonstring)
+  __attribute__((nonstring))
+#endif
   unsigned char addr[16];
   unsigned char len, mask;
   unsigned char prec, label;
