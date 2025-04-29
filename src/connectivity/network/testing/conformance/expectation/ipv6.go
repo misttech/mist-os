@@ -197,7 +197,7 @@ var ipv6ExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{7, 3}:  AnvlSkip,
 	{7, 4}:  Pass,
 	{7, 5}:  Pass,
-	{8, 1}:  Fail,
+	{8, 1}:  Pass,
 	{8, 2}:  Pass,
 	{8, 3}:  Pass,
 	{8, 4}:  Pass,
