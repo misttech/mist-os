@@ -32,6 +32,14 @@ class Args:
 
 def main(args: Args) -> int:
     paths: list[str] = get_default_paths(args.fuchsia_dir, args.build_dir)
+
+    if not os.path.exists(args.python_path_json):
+        print(
+            "Failed to find extra Python paths. Run `fx build` and re-run this script.",
+            file=sys.stderr,
+        )
+        return 1
+
     with open(args.python_path_json, "r") as f:
         paths.extend(json.load(f))
 
