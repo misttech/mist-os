@@ -53,6 +53,9 @@ type client interface {
 		createRewriteRule bool,
 		rewritePackages []string) (*packages.Server, error)
 	Run(ctx context.Context, command []string, stdout io.Writer, stderr io.Writer) error
+	SetUpdateChannel(ctx context.Context, ffxTool *ffx.FFXTool, channel string) error
+	MonitorUpdate(ctx context.Context, ffxTool *ffx.FFXTool) (string, error)
+	ForceInstall(ctx context.Context, ffxTool *ffx.FFXTool, url string) error
 }
 
 type Updater interface {
@@ -225,7 +228,7 @@ func updateCheckNow(
 
 		ch := c.DisconnectionListener()
 
-		if err := ffxTool.TargetUpdateChannelSet(ctx, "trigger-ota"); err != nil {
+		if err := c.SetUpdateChannel(ctx, ffxTool, "trigger-ota"); err != nil {
 			logger.Warningf(ctx, "update channel set via ffx failed: %v. The device may be running an old version of system-update-checker or incompatible RCS.", err)
 			logger.Warningf(ctx, "retrying with /bin/update")
 			cmd := []string{
@@ -239,8 +242,7 @@ func updateCheckNow(
 			}
 		}
 
-		s, err := ffxTool.TargetUpdateCheckNowMonitor(ctx)
-		stdout := string(s)
+		stdout, err := c.MonitorUpdate(ctx, ffxTool)
 		if err != nil {
 			logger.Warningf(ctx, "update monitoring via ffx failed: %v. Retrying via /bin/update.", err)
 			cmd := []string{
@@ -347,7 +349,7 @@ func (u *SystemUpdater) Update(
 	updatePackageUrl := fmt.Sprintf("fuchsia-pkg://%s/%s", repoName, dstUpdate.Path())
 	logger.Infof(ctx, "Downloading OTA %q", updatePackageUrl)
 
-	if err := ffxTool.TargetUpdateForceInstallNoReboot(ctx, fmt.Sprintf("%q", updatePackageUrl)); err != nil {
+	if err := c.ForceInstall(ctx, ffxTool, fmt.Sprintf("%q", updatePackageUrl)); err != nil {
 		logger.Errorf(ctx, "failed to run system updater via ffx: %w, retrying via /bin/update", err)
 		cmd := []string{
 			"/bin/update",

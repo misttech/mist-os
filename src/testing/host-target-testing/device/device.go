@@ -719,6 +719,33 @@ func (c *Client) Flash(
 	return nil
 }
 
+// Forces an install of an update from an url, without requesting a reboot
+func (c *Client) ForceInstall(
+	ctx context.Context,
+	ffx *ffx.FFXTool,
+	url string,
+) error {
+	return ffx.TargetUpdateForceInstallNoReboot(ctx, url)
+}
+
+// Monitors the update for the connected client
+func (c *Client) MonitorUpdate(
+	ctx context.Context,
+	ffx *ffx.FFXTool,
+) (string, error) {
+	s, err := ffx.TargetUpdateCheckNowMonitor(ctx)
+	return string(s), err
+}
+
+// Set the update channel for the connected client
+func (c *Client) SetUpdateChannel(
+	ctx context.Context,
+	ffx *ffx.FFXTool,
+	channel string,
+) error {
+	return ffx.TargetUpdateChannelSet(ctx, channel)
+}
+
 func (c *Client) Name() string {
 	return c.deviceResolver.NodeName()
 }
