@@ -67,8 +67,6 @@ source_set("legacy-mem-config") {
   visibility = [ ":*" ]
   sources = [ "legacy-mem-config.cc" ]
   public_deps = [
-    "//sdk/lib/stdcompat",
-
     # legacy-mem-config.h has #include <lib/zbi-format/zbi.h>
     "//sdk/lib/zbi-format",
 

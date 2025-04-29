@@ -64,7 +64,6 @@ if (current_toolchain == default_toolchain) {
         # TODO(https://fxbug.dev/42121444): Many include/ headers use <ktl/*.h> headers.
         "//zircon/kernel/lib/ktl:headers.config",
         "//sdk/lib/fit:headers.config",
-        "//sdk/lib/stdcompat:headers.config",
 
         # <stdlib.h> has #include <lib/heap.h>.
         "//zircon/kernel/lib/heap:headers.config",
@@ -125,8 +124,11 @@ if (current_toolchain == default_toolchain) {
         "//zircon/system/ulib/mmio-ptr:headers.config",
 
         # Everywhere has #include <lib/fit/result.h>
-        # Everywhere has #include <zx/result.h>
+        # Everywhere has #include <lib/zx/result.h>
         "//zircon/system/ulib/zx:headers.config",
+
+        # Those (and others, like fbl) lead to stdcompat.
+        "//sdk/lib/stdcompat:headers.config",
 
         "//zircon/kernel/lib/backtrace:headers.config",
 

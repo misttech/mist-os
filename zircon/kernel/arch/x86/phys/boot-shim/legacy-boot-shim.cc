@@ -9,14 +9,14 @@
 #include <lib/acpi_lite.h>
 #include <lib/arch/zbi-boot.h>
 #include <lib/boot-shim/boot-shim.h>
-#include <lib/memalloc/pool.h>
-#include <lib/stdcompat/span.h>
-#include <lib/uart/all.h>
 #include <lib/fit/defer.h>
+#include <lib/memalloc/pool.h>
+#include <lib/uart/all.h>
 #include <lib/zbi-format/zbi.h>
 #include <stdlib.h>
 
 #include <ktl/optional.h>
+#include <ktl/span.h>
 #include <phys/address-space.h>
 #include <phys/allocation.h>
 #include <phys/boot-zbi.h>
@@ -89,10 +89,9 @@ bool LegacyBootShim::IsProperZbi() const {
 // first item is the kernel item, and items are appended.  The symbols is weak,
 // such that bug compatible shims can override this.  Examples of such bugs are
 // bootloaders prepending items to the ZBI (preceding the original kernel).
-[[gnu::weak]] uart::all::Config<> UartFromZbi(LegacyBootShim::InputZbi zbi, const uart::all::Config<>& uart_config) {
-  auto cleanup = fit::defer([&zbi](){
-    zbi.ignore_error();
-  });
+[[gnu::weak]] uart::all::Config<> UartFromZbi(LegacyBootShim::InputZbi zbi,
+                                              const uart::all::Config<>& uart_config) {
+  auto cleanup = fit::defer([&zbi]() { zbi.ignore_error(); });
 
   if (ktl::optional new_uart_config = GetUartFromRange(zbi.begin(), zbi.end())) {
     return *new_uart_config;
