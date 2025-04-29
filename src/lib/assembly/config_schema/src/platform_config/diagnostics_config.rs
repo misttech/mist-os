@@ -40,6 +40,10 @@ pub struct DiagnosticsConfig {
     /// The set of log levels components will receive as their initial interest.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub component_log_initial_interests: Vec<ComponentInitialInterest>,
+
+    /// Disable the console.
+    #[serde(default)]
+    pub no_console: bool,
 }
 
 /// Diagnostics configuration options for the archivist configuration area.

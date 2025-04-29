@@ -47,9 +47,6 @@ impl<'a> DefineSubsystemConfiguration<DiagnosticsSubsystemConfig<'a>> for Diagno
         config: &DiagnosticsSubsystemConfig<'a>,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        // Unconditionally include console AIB for now. In the future, we may add an option to
-        // disable this.
-        builder.platform_bundle("console");
         if context.build_type == &BuildType::User {
             builder.platform_bundle("detect_user");
         }
@@ -61,7 +58,14 @@ impl<'a> DefineSubsystemConfiguration<DiagnosticsSubsystemConfig<'a>> for Diagno
             sampler,
             memory_monitor,
             component_log_initial_interests,
+            no_console,
         } = config.diagnostics;
+
+        // Console is enabled unless specifically turned off.
+        if !no_console {
+            builder.platform_bundle("console");
+        }
+
         // LINT.IfChange
         let mut bind_services = BTreeSet::from([
             "fuchsia.component.PersistenceBinder",
@@ -1009,5 +1013,28 @@ mod tests {
                 }
             ]
         );
+    }
+
+    #[test]
+    fn test_no_console() {
+        let resource_dir = ResourceDir::new();
+        let context = ConfigurationContext {
+            feature_set_level: &FeatureSetLevel::Standard,
+            build_type: &BuildType::User,
+            resource_dir: resource_dir.path(),
+            ..ConfigurationContext::default_for_tests()
+        };
+        let mut builder = ConfigurationBuilderImpl::default();
+        DiagnosticsSubsystem::define_configuration(
+            &context,
+            &DiagnosticsSubsystemConfig {
+                diagnostics: &DiagnosticsConfig { no_console: true, ..Default::default() },
+                storage: &Default::default(),
+            },
+            &mut builder,
+        )
+        .expect("defined config");
+        let config = builder.build();
+        assert!(!config.bundles.contains("console"));
     }
 }
