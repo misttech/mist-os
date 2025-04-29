@@ -38,6 +38,7 @@ Set `NINJA_STATUS_REFRESH_MILLIS=t` to change the refresh rate.""",
     """`fx format-code` reformats changed code.  Do this before `jiri upload`.""",
     """`fx test-remote` runs tests in infra with locally built artifacts.
     go/fx-test-remote-docs for more details.""",
+    """`fx doc-preview` (Googler only) lets you preview documentation on fuchsia.dev.""",
     # ffx
     # editors
     # Infra
