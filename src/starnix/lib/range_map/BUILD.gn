@@ -2,38 +2,21 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-declare_args() {
-  # Whether to use CowMap instead of BTreeMap to back RangeMap.
-  starnix_use_cowmap = true
-}
-
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 
 rustc_library("range_map") {
   edition = "2021"
-  sources = [
-    "src/btree.rs",
-    "src/classic.rs",
-    "src/lib.rs",
-  ]
+  sources = [ "src/lib.rs" ]
   deps = [ "//third_party/rust_crates:arrayvec" ]
 
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
-
-  if (starnix_use_cowmap) {
-    features = [ "use_cowmap" ]
-  }
 }
 
 # Include starnix in the name for easier dashboarding of flakes.
 rustc_test("starnix_range_map_test") {
   edition = "2021"
-  sources = [
-    "src/btree.rs",
-    "src/classic.rs",
-    "src/lib.rs",
-  ]
+  sources = [ "src/lib.rs" ]
   deps = [
     "//src/lib/fuchsia",
     "//third_party/rust_crates:arrayvec",
