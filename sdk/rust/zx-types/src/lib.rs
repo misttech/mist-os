@@ -1274,7 +1274,7 @@ multiconst!(zx_exception_state_t, [
 
 #[cfg(target_arch = "x86_64")]
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, KnownLayout, FromBytes, Immutable)]
+#[derive(Default, Copy, Clone, Eq, PartialEq, KnownLayout, FromBytes, Immutable)]
 pub struct zx_thread_state_general_regs_t {
     pub rax: u64,
     pub rbx: u64,
@@ -1296,6 +1296,34 @@ pub struct zx_thread_state_general_regs_t {
     pub rflags: u64,
     pub fs_base: u64,
     pub gs_base: u64,
+}
+
+#[cfg(target_arch = "x86_64")]
+impl std::fmt::Debug for zx_thread_state_general_regs_t {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct(std::any::type_name::<Self>())
+            .field("rax", &format_args!("{:#x}", self.rax))
+            .field("rbx", &format_args!("{:#x}", self.rbx))
+            .field("rcx", &format_args!("{:#x}", self.rcx))
+            .field("rdx", &format_args!("{:#x}", self.rdx))
+            .field("rsi", &format_args!("{:#x}", self.rsi))
+            .field("rdi", &format_args!("{:#x}", self.rdi))
+            .field("rbp", &format_args!("{:#x}", self.rbp))
+            .field("rsp", &format_args!("{:#x}", self.rsp))
+            .field("r8", &format_args!("{:#x}", self.r8))
+            .field("r9", &format_args!("{:#x}", self.r9))
+            .field("r10", &format_args!("{:#x}", self.r10))
+            .field("r11", &format_args!("{:#x}", self.r11))
+            .field("r12", &format_args!("{:#x}", self.r12))
+            .field("r13", &format_args!("{:#x}", self.r13))
+            .field("r14", &format_args!("{:#x}", self.r14))
+            .field("r15", &format_args!("{:#x}", self.r15))
+            .field("rip", &format_args!("{:#x}", self.rip))
+            .field("rflags", &format_args!("{:#x}", self.rflags))
+            .field("fs_base", &format_args!("{:#x}", self.fs_base))
+            .field("gs_base", &format_args!("{:#x}", self.gs_base))
+            .finish()
+    }
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -1334,7 +1362,7 @@ multiconst!(u64, [
 
 #[cfg(target_arch = "aarch64")]
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_thread_state_general_regs_t {
     pub r: [u64; 30],
     pub lr: u64,
@@ -1342,6 +1370,27 @@ pub struct zx_thread_state_general_regs_t {
     pub pc: u64,
     pub cpsr: u64,
     pub tpidr: u64,
+}
+
+#[cfg(target_arch = "aarch64")]
+impl std::fmt::Debug for zx_thread_state_general_regs_t {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        struct RegisterAsHex(u64);
+        impl std::fmt::Debug for RegisterAsHex {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{:#x}", self.0)
+            }
+        }
+
+        f.debug_struct(std::any::type_name::<Self>())
+            .field("r", &self.r.map(RegisterAsHex))
+            .field("lr", &format_args!("{:#x}", self.lr))
+            .field("sp", &format_args!("{:#x}", self.sp))
+            .field("pc", &format_args!("{:#x}", self.pc))
+            .field("cpsr", &format_args!("{:#x}", self.cpsr))
+            .field("tpidr", &format_args!("{:#x}", self.tpidr))
+            .finish()
+    }
 }
 
 #[cfg(target_arch = "aarch64")]
@@ -1436,7 +1485,7 @@ impl From<&zx_restricted_state_t> for zx_thread_state_general_regs_t {
 
 #[cfg(target_arch = "riscv64")]
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_thread_state_general_regs_t {
     pub pc: u64,
     pub ra: u64,  // x1
@@ -1470,6 +1519,46 @@ pub struct zx_thread_state_general_regs_t {
     pub t4: u64,  // x29
     pub t5: u64,  // x30
     pub t6: u64,  // x31
+}
+
+#[cfg(target_arch = "riscv64")]
+impl std::fmt::Debug for zx_thread_state_general_regs_t {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct(std::any::type_name::<Self>())
+            .field("pc", &format_args!("{:#x}", self.pc))
+            .field("ra", &format_args!("{:#x}", self.ra)) // x1
+            .field("sp", &format_args!("{:#x}", self.sp)) // x2
+            .field("gp", &format_args!("{:#x}", self.gp)) // x3
+            .field("tp", &format_args!("{:#x}", self.tp)) // x4
+            .field("t0", &format_args!("{:#x}", self.t0)) // x5
+            .field("t1", &format_args!("{:#x}", self.t1)) // x6
+            .field("t2", &format_args!("{:#x}", self.t2)) // x7
+            .field("s0", &format_args!("{:#x}", self.s0)) // x8
+            .field("s1", &format_args!("{:#x}", self.s1)) // x9
+            .field("a0", &format_args!("{:#x}", self.a0)) // x10
+            .field("a1", &format_args!("{:#x}", self.a1)) // x11
+            .field("a2", &format_args!("{:#x}", self.a2)) // x12
+            .field("a3", &format_args!("{:#x}", self.a3)) // x13
+            .field("a4", &format_args!("{:#x}", self.a4)) // x14
+            .field("a5", &format_args!("{:#x}", self.a5)) // x15
+            .field("a6", &format_args!("{:#x}", self.a6)) // x16
+            .field("a7", &format_args!("{:#x}", self.a7)) // x17
+            .field("s2", &format_args!("{:#x}", self.s2)) // x18
+            .field("s3", &format_args!("{:#x}", self.s3)) // x19
+            .field("s4", &format_args!("{:#x}", self.s4)) // x20
+            .field("s5", &format_args!("{:#x}", self.s5)) // x21
+            .field("s6", &format_args!("{:#x}", self.s6)) // x22
+            .field("s7", &format_args!("{:#x}", self.s7)) // x23
+            .field("s8", &format_args!("{:#x}", self.s8)) // x24
+            .field("s9", &format_args!("{:#x}", self.s9)) // x25
+            .field("s10", &format_args!("{:#x}", self.s10)) // x26
+            .field("s11", &format_args!("{:#x}", self.s11)) // x27
+            .field("t3", &format_args!("{:#x}", self.t3)) // x28
+            .field("t4", &format_args!("{:#x}", self.t4)) // x29
+            .field("t5", &format_args!("{:#x}", self.t5)) // x30
+            .field("t6", &format_args!("{:#x}", self.t6)) // x31
+            .finish()
+    }
 }
 
 multiconst!(zx_restricted_reason_t, [
