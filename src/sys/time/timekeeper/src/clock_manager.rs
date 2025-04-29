@@ -12,7 +12,7 @@ use crate::rtc::Rtc;
 use crate::time_source::Sample;
 use crate::time_source_manager::{KernelBootTimeProvider, TimeSourceManager};
 use crate::{Config, UtcTransform};
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use chrono::prelude::*;
 use fuchsia_runtime::{UtcClock, UtcClockUpdate, UtcDuration, UtcInstant};
 use futures::channel::mpsc;
@@ -645,8 +645,12 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
 
                     match command {
                         Some(Command::PowerManagement) => {
-                            self.record_correction(
-                                ClockCorrection::MaxErrorBound, &Default::default(), zx::BootInstant::ZERO);
+                            if clock_started {
+                                // Updating an unstarted clock without actually starting it
+                                // returns BAD_STATE.
+                                self.record_correction(
+                                    ClockCorrection::MaxErrorBound, &Default::default(), zx::BootInstant::ZERO);
+                            }
                         }
                         Some(Command::Reference{
                             boot_reference, utc_reference, mut responder
@@ -853,6 +857,16 @@ fn update_clock(clock: &Arc<UtcClock>, track: &Track, update: impl Into<UtcClock
         // Clock update errors should only be caused by an invalid clock (or potentially a
         // serious bug in the generation of a time update). There isn't anything Timekeeper
         // could do to gracefully handle them.
+        //
+        // This panic will apparently not be logged if it happens in production at very early
+        // system startup, making diagnosis challenging. One way to force it to appear would be to
+        // try restarting a crashed timekeeper manually after the fact, for example via:
+        //
+        // ```
+        // fx ffx component start core/timekeeper
+        // ```
+        //
+        // The newly started timekeeper will log its panics as expected.
         panic!("Failed to apply update to {:?} clock: {}", track, status);
     }
     // Signal any waiters that the UTC clock has been synchronized with an external
@@ -862,7 +876,8 @@ fn update_clock(clock: &Arc<UtcClock>, track: &Track, update: impl Into<UtcClock
         zx::Signals::from_bits(
             fft::SIGNAL_UTC_CLOCK_SYNCHRONIZED | fft::SIGNAL_UTC_CLOCK_LOGGING_QUALITY,
         )
-        .unwrap(),
+        .context("while trying to signal clock start")
+        .expect("signaling clock should succeed"),
     ) {
         panic!("Failed to signal clock synchronization to {:?} clock: {}", track, status);
     }
