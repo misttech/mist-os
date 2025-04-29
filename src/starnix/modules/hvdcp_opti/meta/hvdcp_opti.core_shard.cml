@@ -8,4 +8,11 @@
             url: "fuchsia-pkg://fuchsia.com/hvdcp_opti#meta/hvdcp_opti.cm",
         },
     ],
+    offer: [
+        {
+            service: "fuchsia.hardware.qcom.hvdcpopti.Service",
+            from: "parent",
+            to: "#hvdcpopti",
+        },
+    ],
 }

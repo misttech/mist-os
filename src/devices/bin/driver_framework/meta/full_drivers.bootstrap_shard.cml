@@ -118,6 +118,7 @@
             service: [
                 "fuchsia.gpu.magma.TestService",
                 "fuchsia.hardware.google.nanohub.Service",
+                "fuchsia.hardware.qcom.hvdcpopti.Service",
                 "fuchsia.hardware.sockettunnel.Service",
 
                 // These duplicate a service advertised by devfs, below.

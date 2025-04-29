@@ -209,6 +209,11 @@
             source_availability: "unknown",
         },
         {
+            service: "fuchsia.hardware.qcom.hvdcpopti.Service",
+            from: "parent",
+            to: [ "#starnix_runner" ],
+        },
+        {
             service: "fuchsia.power.broker.ElementInfoProviderService",
             from: "parent",
             to: "#starnix_runner",

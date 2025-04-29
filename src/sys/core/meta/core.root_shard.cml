@@ -276,6 +276,7 @@
                 "fuchsia.hardware.nfc.Service",
                 "fuchsia.hardware.overnet.Service",
                 "fuchsia.hardware.power.suspend.SuspendService",
+                "fuchsia.hardware.qcom.hvdcpopti.Service",
                 "fuchsia.hardware.sockettunnel.Service",
                 "fuchsia.hardware.spmi.DebugService",
                 "fuchsia.hardware.vsock.Service",

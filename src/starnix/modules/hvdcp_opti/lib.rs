@@ -3,5 +3,8 @@
 // found in the LICENSE file.
 
 mod device;
+mod qbg_battery_file;
+mod qbg_file;
+mod utils;
 
 pub use device::hvdcp_opti_init;

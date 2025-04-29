@@ -82,6 +82,11 @@
             from: "parent",
         },
         {
+            service: "fuchsia.hardware.qcom.hvdcpopti.Service",
+            from: "parent",
+            availability: "optional",
+        },
+        {
             directory: "container_config",
             from: "parent",
             rights: [ "r*" ],

@@ -8,4 +8,7 @@
         policy: "first_instance_to_protocol",
         protocol_name: "hvdcp_opti",
     },
+    use: [
+        { service: "fuchsia.hardware.qcom.hvdcpopti.Service" },
+    ],
 }

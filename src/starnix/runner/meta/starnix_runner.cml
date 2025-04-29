@@ -176,6 +176,11 @@
             to: [ "#kernels" ],
         },
         {
+            service: "fuchsia.hardware.qcom.hvdcpopti.Service",
+            from: "parent",
+            to: [ "#kernels" ],
+        },
+        {
             config: [
                 "fuchsia.time.config.WritableUTCTime",
                 "fuchsia.ui.VisualDebuggingLevel",
