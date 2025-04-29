@@ -23,7 +23,6 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::UserRef;
 use starnix_uapi::{error, uapi};
-use zerocopy::{Immutable, IntoBytes};
 
 static READ_FORMAT_ID_GENERATOR: AtomicU64 = AtomicU64::new(0);
 
@@ -56,20 +55,9 @@ uapi::check_arch_independent_layout! {
     }
 }
 
-// See "Reading results" section of https://man7.org/linux/man-pages/man2/perf_event_open.2.html.
-#[repr(C)]
-#[derive(IntoBytes, Immutable, Default)]
-struct ReadFormatData {
-    value: u64,
-    time_enabled: u64,
-    time_running: u64,
-    id: u64,
-    _lost: u64,
-}
-
 #[derive(Default)]
 struct PerfEventFileState {
-    _attr: perf_event_attr,
+    attr: perf_event_attr,
     rf_value: u64, // "count" for the config we passed in for the event.
     // The most recent timestamp (ns) where we changed into an enabled state
     // i.e. the most recent time we got an ENABLE ioctl().
@@ -98,6 +86,7 @@ impl FileOps for PerfEventFile {
     fileops_impl_nonseekable!();
     fileops_impl_noop_sync!();
 
+    // See "Reading results" section of https://man7.org/linux/man-pages/man2/perf_event_open.2.html.
     fn read(
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
@@ -106,26 +95,15 @@ impl FileOps for PerfEventFile {
         _offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        // The regular read() call allows the case where the bytes-we-want-to-read-in won't
-        // fit in the output buffer. However, for perf_event_open's read(), "If you attempt to read
-        // into a buffer that is not big enough to hold the data, the error ENOSPC results."
-        if data.available() < std::mem::size_of::<ReadFormatData>() {
-            return error!(ENOSPC);
-        }
-        track_stub!(
-            TODO("https://fxbug.dev/402453955"),
-            "[perf_event_open] implement remaining error handling"
-        );
-
         // Create/calculate and return the ReadFormatData object.
         // If we create it earlier we might want to change it and it's immutable once created.
-        let output = {
+        let read_format_data = {
             // Once we get the `value` or count from kernel, we can change this to a read()
             // call instead of write().
             let mut perf_event_file = self.perf_event_file.write();
             let mut total_time_running_including_curr = perf_event_file.total_time_running;
 
-            // If enabled, update values. If disabled, don't.
+            // Only update values if enabled (either by perf_event_attr or ioctl ENABLE call).
             if perf_event_file.disabled == 0 {
                 // Calculate the value or "count" of the config we're interested in.
                 // This value should reflect the value we are counting (defined in the config).
@@ -143,20 +121,39 @@ impl FileOps for PerfEventFile {
                     curr_time - perf_event_file.most_recent_enabled_time;
             }
 
-            ReadFormatData {
-                value: perf_event_file.rf_value,
+            let mut output = Vec::<u8>::new();
+            let value = perf_event_file.rf_value.to_ne_bytes();
+            output.extend(value);
+
+            let read_format = perf_event_file.attr.read_format;
+
+            if (read_format & perf_event_read_format_PERF_FORMAT_TOTAL_TIME_ENABLED as u64) != 0 {
                 // Total time (ns) event was enabled and running (currently same as TIME_RUNNING).
-                time_enabled: total_time_running_including_curr,
-                // Total time (ns) event was enabled and running (currently same as TIME_ENABLED).
-                time_running: total_time_running_including_curr,
-                id: perf_event_file.rf_id,
-                ..Default::default()
+                output.extend(total_time_running_including_curr.to_ne_bytes());
             }
+            if (read_format & perf_event_read_format_PERF_FORMAT_TOTAL_TIME_RUNNING as u64) != 0 {
+                // Total time (ns) event was enabled and running (currently same as TIME_ENABLED).
+                output.extend(total_time_running_including_curr.to_ne_bytes());
+            }
+            if (read_format & perf_event_read_format_PERF_FORMAT_ID as u64) != 0 {
+                output.extend(perf_event_file.rf_id.to_ne_bytes());
+            }
+
+            output
         };
 
-        let bytes: &[u8; std::mem::size_of::<ReadFormatData>()] = zerocopy::transmute_ref!(&output);
+        // The regular read() call allows the case where the bytes-we-want-to-read-in won't
+        // fit in the output buffer. However, for perf_event_open's read(), "If you attempt to read
+        // into a buffer that is not big enough to hold the data, the error ENOSPC results."
+        if data.available() < read_format_data.len() {
+            return error!(ENOSPC);
+        }
+        track_stub!(
+            TODO("https://fxbug.dev/402453955"),
+            "[perf_event_open] implement remaining error handling"
+        );
 
-        data.write(bytes)
+        data.write(&read_format_data)
     }
 
     fn ioctl(
@@ -257,7 +254,7 @@ pub fn sys_perf_event_open(
     // Other features will be added in the future (see below track_stubs).
     let perf_event_attrs: perf_event_attr = current_task.read_object(attr)?;
     let mut perf_event_file = PerfEventFileState {
-        _attr: perf_event_attrs,
+        attr: perf_event_attrs,
         disabled: perf_event_attrs.disabled(),
         rf_value: 0,
         ..Default::default()

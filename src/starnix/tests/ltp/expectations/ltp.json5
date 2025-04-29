@@ -129,7 +129,6 @@
                 "msync03",
                 "msync04",
                 "munlockall01",
-                "perf_event_open01",
 
                 // Needs /proc/sys/fs/pipe-user-pages-soft
                 "pipe15",

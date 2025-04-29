@@ -30,6 +30,14 @@ struct read_format_data {
   uint64_t lost;         /* if PERF_FORMAT_LOST */
 };
 
+// We use this struct when we only request `time_running` in the `read_format`.
+// Because the struct is order-dependent we don't want the `time_running` param to
+// get written to `time_enabled`.
+struct read_format_data_time_running {
+  uint64_t value;
+  uint64_t time_running;
+};
+
 // Valid example inputs to use for tests when we aren't testing these values
 // but still need to pass them in.
 // TODO(https://fxbug.dev/409621963): implement permissions logic for any pid > 0.
@@ -44,7 +52,17 @@ const int32_t from_nanos = 1000000000;
 // Returns an example perf_event_attr where none of the values matter
 // except for the read_format, which is passed in.
 perf_event_attr attr_with_read_format(uint64_t read_format) {
-  return {PERF_TYPE_SOFTWARE, PERF_ATTR_SIZE_VER1, PERF_COUNT_SW_CPU_CLOCK, {}, 0, read_format};
+  return {PERF_TYPE_SOFTWARE, PERF_ATTR_SIZE_VER1, PERF_COUNT_SW_CPU_CLOCK, {}, 0, read_format, 0};
+}
+
+perf_event_attr attr_with_read_format(uint64_t read_format, uint64_t disabled) {
+  return {PERF_TYPE_SOFTWARE,
+          PERF_ATTR_SIZE_VER1,
+          PERF_COUNT_SW_CPU_CLOCK,
+          {},
+          0,
+          read_format,
+          disabled};
 }
 
 // Write wrapper because there isn't one per the man7 page.
@@ -86,21 +104,20 @@ TEST(PerfEventOpenTest, ReadEventWithTimeEnabledSucceeds) {
 
     // read() on the file descriptor should return the number of bytes written to buffer,
     // and the buffer should contain read_format_data information for that event.
-    char buffer[sizeof(read_format_data)];
-    syscall(__NR_read, file_descriptor, buffer, sizeof(read_format_data));
-    // TODO((https://fxbug.dev/409095706): Get correct ReadFormatData length.
-    // EXPECT_EQ(sizeof(buffer), read_length);
+    char buffer[16];
+    uint64_t read_length = syscall(__NR_read, file_descriptor, buffer, sizeof(buffer));
+    EXPECT_EQ(read_length, sizeof(buffer));
 
     read_format_data data;
     std::memcpy(&data, buffer, sizeof(buffer));
 
     // Check that the time_enabled param in secs is smaller than the current time.
-    uint64_t read_format_time_secs = data.time_enabled / from_nanos;
+    uint64_t time_enabled_secs = data.time_enabled / from_nanos;
     timespec current_time;
     clock_gettime(CLOCK_MONOTONIC, &current_time);
     uint64_t current_time_secs = current_time.tv_sec;
 
-    EXPECT_LE(read_format_time_secs, current_time_secs);
+    EXPECT_LE(time_enabled_secs, current_time_secs);
     EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
   }
 }
@@ -116,22 +133,19 @@ TEST(PerfEventOpenTest, ReadEventWithTimeRunningSucceeds) {
 
     // read() on the file descriptor should return the number of bytes written to buffer,
     // and the buffer should contain read_format_data information for that event.
-    char buffer[sizeof(read_format_data)];
-    syscall(__NR_read, file_descriptor, buffer, sizeof(read_format_data));
-    // TODO((https://fxbug.dev/409095706): Get correct ReadFormatData length.
-    // EXPECT_EQ(sizeof(buffer), read_length);
+    char buffer[16];
+    uint64_t read_length = syscall(__NR_read, file_descriptor, buffer, sizeof(buffer));
+    EXPECT_EQ(read_length, sizeof(buffer));
 
-    read_format_data data;
+    read_format_data_time_running data;
     std::memcpy(&data, buffer, sizeof(buffer));
 
-    // TODO(https://fxbug.dev/404941053): Calculate time enabled correctly.
-    // Check that the time_enabled param in secs is smaller than the current time.
-    // uint64_t read_format_time_secs = data.time_running / from_nanos;
-    // timespec current_time;
-    // clock_gettime(CLOCK_MONOTONIC, &current_time);
-    // uint64_t current_time_secs = current_time.tv_sec;
+    uint64_t time_running_secs = data.time_running / from_nanos;
+    timespec current_time;
+    clock_gettime(CLOCK_MONOTONIC, &current_time);
+    uint64_t current_time_secs = current_time.tv_sec;
 
-    // EXPECT_LE(read_format_time_secs, current_time_secs);
+    EXPECT_LE(time_running_secs, current_time_secs);
     EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
   }
 }
@@ -149,15 +163,13 @@ TEST(PerfEventOpenTest, ReadEventWithPerfFormatIdSucceeds) {
 
       // read() on the file descriptor should return the number of bytes written to buffer,
       // and the buffer should contain read_format_data information for that event.
-      char buffer[sizeof(read_format_data)];
-      syscall(__NR_read, file_descriptor, buffer, sizeof(read_format_data));
-      // TODO((https://fxbug.dev/409095706): Get correct ReadFormatData length.
-      // EXPECT_EQ(sizeof(buffer), read_length);
+      char buffer[16];
+      uint64_t read_length = syscall(__NR_read, file_descriptor, buffer, sizeof(buffer));
+      EXPECT_EQ(read_length, sizeof(buffer));
 
       read_format_data data;
       std::memcpy(&data, buffer, sizeof(buffer));
 
-      // TODO(https://fxbug.dev/409627657): Handle id correctly.
       // EXPECT_EQ(data.id, i);
       EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
     }
@@ -173,12 +185,9 @@ TEST(PerfEventOpenTest, ReadEventWithTimeEnabledAndRunningSucceeds) {
         sys_perf_event_open(&attr, example_pid, example_cpu, example_group_fd, example_flags);
     EXPECT_NE(file_descriptor, -1);
 
-    // read() on the file descriptor should return the number of bytes written to buffer,
-    // and the buffer should contain read_format_data information for that event.
-    char buffer[sizeof(read_format_data)];
-    syscall(__NR_read, file_descriptor, buffer, sizeof(read_format_data));
-    // TODO((https://fxbug.dev/409095706): Get correct ReadFormatData length.
-    // EXPECT_EQ(sizeof(buffer), read_length);
+    char buffer[24];
+    uint64_t read_length = syscall(__NR_read, file_descriptor, buffer, sizeof(buffer));
+    EXPECT_EQ(read_length, sizeof(buffer));
 
     read_format_data data;
     std::memcpy(&data, buffer, sizeof(buffer));
@@ -190,25 +199,23 @@ TEST(PerfEventOpenTest, ReadEventWithTimeEnabledAndRunningSucceeds) {
     clock_gettime(CLOCK_MONOTONIC, &current_time);
     uint64_t current_time_secs = current_time.tv_sec;
 
-    EXPECT_LE(time_enabled_secs, time_running_secs);
+    EXPECT_EQ(time_enabled_secs, time_running_secs);
     EXPECT_LE(time_enabled_secs, current_time_secs);
     EXPECT_LE(time_running_secs, current_time_secs);
     EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
   }
 }
 
-// TODO(https://fxbug.dev/409397980) fix host test.
 TEST(PerfEventOpenTest, ReadEventWithBufferTooSmallFails) {
   if (test_helper::HasSysAdmin()) {
     long file_descriptor = sys_perf_event_open(&example_attr, example_pid, example_cpu,
                                                example_group_fd, example_flags);
     EXPECT_NE(file_descriptor, -1);
 
-    // Create buffer that is too small (<40) for the read() call to put stuff in. read() should
+    // Create buffer that is too small for the read() call to put stuff in. read() should
     // return ENOSPC.
-    size_t buffer_size = 10;
-    char buffer[buffer_size];
-    EXPECT_THAT(syscall(__NR_read, file_descriptor, buffer, buffer_size),
+    char buffer[7];
+    EXPECT_THAT(syscall(__NR_read, file_descriptor, buffer, sizeof(buffer)),
                 SyscallFailsWithErrno(ENOSPC));
     EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
   }
@@ -222,10 +229,9 @@ TEST(PerfEventOpenTest, WhenDisabledEventCountShouldBeZero) {
     long file_descriptor =
         sys_perf_event_open(&attr, example_pid, example_cpu, example_group_fd, example_flags);
 
-    char buffer[sizeof(read_format_data)];
-    syscall(__NR_read, file_descriptor, buffer, sizeof(read_format_data));
-    // TODO((https://fxbug.dev/409095706): Get correct ReadFormatData length.
-    // EXPECT_EQ(sizeof(buffer), read_length);
+    char buffer[8];
+    uint64_t read_length = syscall(__NR_read, file_descriptor, buffer, sizeof(buffer));
+    EXPECT_EQ(read_length, sizeof(buffer));
 
     read_format_data data;
     std::memcpy(&data, buffer, sizeof(buffer));
@@ -237,20 +243,20 @@ TEST(PerfEventOpenTest, WhenDisabledEventCountShouldBeZero) {
 }
 
 // When enabled is passed in the initial attr params.
-// TODO(https://fxbug.dev/409397980) fix host test.
 TEST(PerfEventOpenTest, WhenEnabledEventCountShouldBeOne) {
   if (test_helper::HasSysAdmin()) {
     long file_descriptor = sys_perf_event_open(&example_attr, example_pid, example_cpu,
                                                example_group_fd, example_flags);
 
-    char buffer[sizeof(read_format_data)];
-    syscall(__NR_read, file_descriptor, buffer, sizeof(read_format_data));
-    // TODO((https://fxbug.dev/409095706): Get correct ReadFormatData length.
-    // EXPECT_EQ(sizeof(buffer), read_length);
+    char buffer[8];
+    uint64_t read_length = syscall(__NR_read, file_descriptor, buffer, sizeof(buffer));
+    EXPECT_EQ(read_length, sizeof(buffer));
 
     read_format_data data;
     std::memcpy(&data, buffer, sizeof(buffer));
 
+    // This fails for the host test because the value is always 0.
+    // TODO(https://fxbug.dev/413134743): figure out what the real value is.
     unsigned long count = 1;
     EXPECT_EQ(data.value, count);
     EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
@@ -274,21 +280,24 @@ TEST(PerfEventOpenTest, SettingIoctlEnabledCallWorks) {
   }
 }
 
-// TODO(https://fxbug.dev/409397980) fix host test.
 TEST(PerfEventOpenTest, WhenResetAndDisabledEventCountShouldBeZero) {
   if (test_helper::HasSysAdmin()) {
     long file_descriptor = sys_perf_event_open(&example_attr, example_pid, example_cpu,
                                                example_group_fd, example_flags);
 
-    char buffer[sizeof(read_format_data)];
-    syscall(__NR_read, file_descriptor, buffer, sizeof(read_format_data));
-    // TODO((https://fxbug.dev/409095706): Get correct ReadFormatData length.
-    // EXPECT_EQ(sizeof(buffer), read_length);
+    char buffer[8];
+    syscall(__NR_read, file_descriptor, buffer,
+            sizeof(buffer));  // Read once: the test rf_value = 1
+    uint64_t read_length =
+        syscall(__NR_read, file_descriptor, buffer, sizeof(buffer));  // Read twice: rf_value = 2
+    EXPECT_EQ(read_length, sizeof(buffer));
 
     read_format_data data;
     std::memcpy(&data, buffer, sizeof(buffer));
 
-    unsigned long count = 1;
+    // This fails for the host test because the value is always 0.
+    // TODO(https://fxbug.dev/413134743): figure out what the real value is.
+    unsigned long count = 2;
     EXPECT_EQ(data.value, count);
 
     // Disable and reset. Count value should now be 0 and stay there.
@@ -296,9 +305,8 @@ TEST(PerfEventOpenTest, WhenResetAndDisabledEventCountShouldBeZero) {
     EXPECT_NE(syscall(__NR_ioctl, file_descriptor, PERF_EVENT_IOC_RESET), -1);
     count = 0;
 
-    syscall(__NR_read, file_descriptor, buffer, sizeof(read_format_data));
-    // TODO((https://fxbug.dev/409095706): Get correct ReadFormatData length.
-    // EXPECT_EQ(sizeof(buffer), read_length);
+    read_length = syscall(__NR_read, file_descriptor, buffer, sizeof(buffer));
+    EXPECT_EQ(read_length, sizeof(buffer));
 
     std::memcpy(&data, buffer, sizeof(buffer));
 
@@ -314,33 +322,34 @@ TEST(PerfEventOpenTest, WhenResetAndDisabledEventCountShouldBeZero) {
 // - Do a read() which will return a time_running (for that segment)
 // - Do an event
 // - Do a read() which will return the same time_running (because segment didn't change)
-TEST(PerfEventOpenTest, WhenDisabledTimeRunningIsCorrect) {
+TEST(PerfEventOpenTest, WhenDisabledTimeRunningAndTimeEnabledAreCorrect) {
+  uint64_t read_format = PERF_FORMAT_TOTAL_TIME_RUNNING | PERF_FORMAT_TOTAL_TIME_ENABLED;
+  perf_event_attr attr = attr_with_read_format(read_format);
+
   if (test_helper::HasSysAdmin()) {
-    long file_descriptor = sys_perf_event_open(&example_attr, example_pid, example_cpu,
-                                               example_group_fd, example_flags);
+    long file_descriptor =
+        sys_perf_event_open(&attr, example_pid, example_cpu, example_group_fd, example_flags);
+
+    char buffer[24];
+    read_format_data data;
 
     printf("This is an event\n");
-
     EXPECT_NE(syscall(__NR_ioctl, file_descriptor, PERF_EVENT_IOC_DISABLE), -1);
-
-    char buffer[sizeof(read_format_data)];
-    syscall(__NR_read, file_descriptor, buffer, sizeof(read_format_data));
-
-    read_format_data data;
+    syscall(__NR_read, file_descriptor, buffer, sizeof(buffer));
     std::memcpy(&data, buffer, sizeof(buffer));
 
     uint64_t time_running = data.time_running;
+    uint64_t time_enabled = data.time_enabled;
 
     printf("This is an event\n");
-
-    syscall(__NR_read, file_descriptor, buffer, sizeof(read_format_data));
-    EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
-
+    syscall(__NR_read, file_descriptor, buffer, sizeof(buffer));
     std::memcpy(&data, buffer, sizeof(buffer));
 
     uint64_t time_running_after_disable = data.time_running;
+    uint64_t time_enabled_after_disable = data.time_enabled;
 
     EXPECT_EQ(time_running, time_running_after_disable);
+    EXPECT_EQ(time_enabled, time_enabled_after_disable);
     EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
   }
 }
@@ -351,32 +360,64 @@ TEST(PerfEventOpenTest, WhenDisabledTimeRunningIsCorrect) {
 // - Do a read() which will return a time_running
 // - Do an event
 // - Do a read() which will return a larger time_running
-// TODO(https://fxbug.dev/409397980) fix host test.
 TEST(PerfEventOpenTest, WhenEnabledTimeRunningIsCorrect) {
+  uint64_t read_format = PERF_FORMAT_TOTAL_TIME_RUNNING;
+  perf_event_attr attr = attr_with_read_format(read_format);
+
   if (test_helper::HasSysAdmin()) {
-    long file_descriptor = sys_perf_event_open(&example_attr, example_pid, example_cpu,
-                                               example_group_fd, example_flags);
+    long file_descriptor =
+        sys_perf_event_open(&attr, example_pid, example_cpu, example_group_fd, example_flags);
+    char buffer[16];
+    read_format_data_time_running data;
 
+    EXPECT_NE(syscall(__NR_ioctl, file_descriptor, PERF_EVENT_IOC_ENABLE), -1);
     printf("This is an event\n");
-
-    char buffer[sizeof(read_format_data)];
-    syscall(__NR_read, file_descriptor, buffer, sizeof(read_format_data));
-
-    read_format_data data;
+    syscall(__NR_read, file_descriptor, buffer, sizeof(buffer));
     std::memcpy(&data, buffer, sizeof(buffer));
-
     uint64_t time_running = data.time_running;
 
+    // Check that time later is bigger.
     printf("This is an event\n");
-
-    syscall(__NR_read, file_descriptor, buffer, sizeof(read_format_data));
-    EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
-
+    syscall(__NR_read, file_descriptor, buffer, sizeof(buffer));
     std::memcpy(&data, buffer, sizeof(buffer));
+    uint64_t time_running_later = data.time_running;
 
-    uint64_t time_running_2 = data.time_running;
+    // This fails for the host test because time_running is always 0.
+    // TODO(https://fxbug.dev/413146816): figure out what the real time_running is.
+    EXPECT_LT(time_running, time_running_later);
+    EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
+  }
+}
 
-    EXPECT_LT(time_running, time_running_2);
+// Example:
+// - Start perf_event_open with disabled = 0 (enabled)
+// - Do an event
+// - Do a read() which will return a time_running
+// - Do an event
+// - Do a read() which will return a larger time_running
+TEST(PerfEventOpenTest, WhenEnabledTimeEnabledIsCorrect) {
+  uint64_t read_format = PERF_FORMAT_TOTAL_TIME_ENABLED;
+  perf_event_attr attr = attr_with_read_format(read_format);
+
+  if (test_helper::HasSysAdmin()) {
+    long file_descriptor =
+        sys_perf_event_open(&attr, example_pid, example_cpu, example_group_fd, example_flags);
+    char buffer[16];
+    read_format_data data;
+
+    EXPECT_NE(syscall(__NR_ioctl, file_descriptor, PERF_EVENT_IOC_ENABLE), -1);
+    printf("This is an event\n");
+    syscall(__NR_read, file_descriptor, buffer, sizeof(buffer));
+    std::memcpy(&data, buffer, sizeof(buffer));
+    uint64_t time_enabled = data.time_enabled;
+
+    // Check that time later is bigger.
+    printf("This is an event\n");
+    syscall(__NR_read, file_descriptor, buffer, sizeof(buffer));
+    std::memcpy(&data, buffer, sizeof(buffer));
+    uint64_t time_enabled_later = data.time_enabled;
+
+    EXPECT_LT(time_enabled, time_enabled_later);
     EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
   }
 }
@@ -384,26 +425,24 @@ TEST(PerfEventOpenTest, WhenEnabledTimeRunningIsCorrect) {
 // Example:
 // - Start perf_event_open with disabled = 1 (disabled)
 // - Do an event
-// - Do a read() which will return a time_running of 0 (ensures it was initialized)
-// TODO(https://fxbug.dev/409397980) fix host test.
-TEST(PerfEventOpenTest, WhenDisabledTotalTimeRunningIsZero) {
+// - Do a read() which will return a time_running and time_enabled of 0 (ensures initialization)
+TEST(PerfEventOpenTest, WhenDisabledTotalTimeRunningAndEnabledAreZero) {
   if (test_helper::HasSysAdmin()) {
-    perf_event_attr attr = {0, 0, 0, {}, 0, 0, 1};
+    uint64_t read_format = PERF_FORMAT_TOTAL_TIME_RUNNING | PERF_FORMAT_TOTAL_TIME_ENABLED;
+    perf_event_attr attr = attr_with_read_format(read_format, 1);
     long file_descriptor =
         sys_perf_event_open(&attr, example_pid, example_cpu, example_group_fd, example_flags);
 
     printf("This is an event\n");
 
-    char buffer[sizeof(read_format_data)];
-    syscall(__NR_read, file_descriptor, buffer, sizeof(read_format_data));
+    char buffer[24];
+    syscall(__NR_read, file_descriptor, buffer, sizeof(buffer));
 
     read_format_data data;
     std::memcpy(&data, buffer, sizeof(buffer));
 
-    uint64_t time_running = data.time_running;
-
-    EXPECT_EQ(time_running, (uint64_t)0);
-    EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
+    EXPECT_EQ(data.time_running, (uint64_t)0);
+    EXPECT_EQ(data.time_enabled, (uint64_t)0);
   }
 }
 
@@ -412,10 +451,10 @@ TEST(PerfEventOpenTest, WhenDisabledTotalTimeRunningIsZero) {
 // - Make multiple IOC_DISABLE calls
 // - Do an event
 // - Do a read() which will return a time_running of 0 (ensures it was initialized)
-// TODO(https://fxbug.dev/409397980) fix host test.
 TEST(PerfEventOpenTest, MultipleDisablesDoesNotChangeTime) {
   if (test_helper::HasSysAdmin()) {
-    perf_event_attr attr = {0, 0, 0, {}, 0, 0, 1};
+    uint64_t read_format = PERF_FORMAT_TOTAL_TIME_RUNNING;
+    perf_event_attr attr = attr_with_read_format(read_format, 1);
     long file_descriptor =
         sys_perf_event_open(&attr, example_pid, example_cpu, example_group_fd, example_flags);
 
@@ -424,15 +463,29 @@ TEST(PerfEventOpenTest, MultipleDisablesDoesNotChangeTime) {
 
     printf("This is an event\n");
 
-    char buffer[sizeof(read_format_data)];
-    syscall(__NR_read, file_descriptor, buffer, sizeof(read_format_data));
+    char buffer[16];
+    syscall(__NR_read, file_descriptor, buffer, sizeof(buffer));
 
-    read_format_data data;
+    read_format_data_time_running data;
     std::memcpy(&data, buffer, sizeof(buffer));
 
-    uint64_t time_running = data.time_running;
+    EXPECT_EQ(data.time_running, (uint64_t)0);
+    EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
+  }
+}
 
-    EXPECT_EQ(time_running, (uint64_t)0);
+TEST(PerfEventOpenTest, ReadingFirstEightBytesCanReturnCountAsALong) {
+  if (test_helper::HasSysAdmin()) {
+    long file_descriptor = sys_perf_event_open(&example_attr, example_pid, example_cpu,
+                                               example_group_fd, example_flags);
+
+    // Both char buffer[8] (tested in previous tests) and long long (8 bytes) should work.
+    long long count;
+    syscall(__NR_read, file_descriptor, &count, sizeof(count));
+
+    // This fails for the host test because the value is always 0.
+    // TODO(https://fxbug.dev/413134743): figure out what the real value is.
+    EXPECT_EQ(count, 1);
     EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
   }
 }
