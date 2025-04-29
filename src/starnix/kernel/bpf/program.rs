@@ -15,6 +15,7 @@ use ebpf::{
 use ebpf_api::{
     get_common_helpers, AttachType, EbpfApiError, Map, MapsContext, PinnedMap, ProgramType,
 };
+use fidl_fuchsia_ebpf as febpf;
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_uapi::auth::{CAP_BPF, CAP_NET_ADMIN, CAP_PERFMON, CAP_SYS_ADMIN};
 use starnix_uapi::errors::Errno;
@@ -98,7 +99,7 @@ impl Program {
         }
 
         let mut helpers = HashMap::new();
-        helpers.extend(get_common_helpers::<C>().iter().cloned());
+        helpers.extend(get_common_helpers::<C>().drain(..));
         helpers.extend(local_helpers.iter().cloned());
 
         let program = link_program(&self.program, struct_mappings, self.maps.clone(), helpers)
@@ -158,6 +159,41 @@ impl Program {
             | ProgramType::Unspec
             | ProgramType::Fuse => Ok(()),
         }
+    }
+}
+
+impl TryFrom<&Program> for febpf::VerifiedProgram {
+    type Error = Errno;
+
+    fn try_from(program: &Program) -> Result<febpf::VerifiedProgram, Errno> {
+        let mut maps = Vec::with_capacity(program.maps.len());
+        for map in program.maps.iter() {
+            maps.push(map.share().map_err(|_| errno!(EIO))?);
+        }
+
+        // SAFETY: EbpfInstruction is 64-bit, so it's safe to transmute it to u64.
+        let code = program.program.code();
+        let code_u64 =
+            unsafe { std::slice::from_raw_parts(code.as_ptr() as *const u64, code.len()) };
+
+        let struct_access_instructions = program
+            .program
+            .struct_access_instructions()
+            .iter()
+            .map(|v| febpf::StructAccess {
+                pc: v.pc.try_into().unwrap(),
+                struct_memory_id: v.memory_id.id(),
+                field_offset: v.field_offset.try_into().unwrap(),
+                is_32_bit_ptr_load: v.is_32_bit_ptr_load,
+            })
+            .collect();
+
+        Ok(febpf::VerifiedProgram {
+            code: Some(code_u64.to_vec()),
+            struct_access_instructions: Some(struct_access_instructions),
+            maps: Some(maps),
+            ..Default::default()
+        })
     }
 }
 

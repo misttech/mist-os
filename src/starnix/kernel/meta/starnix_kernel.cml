@@ -99,6 +99,7 @@
                 "fuchsia.hardware.sockettunnel.Device",
                 "fuchsia.kernel.Stats",
                 "fuchsia.net.filter.Control",
+                "fuchsia.net.filter.SocketControl",
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.ndp.RouterAdvertisementOptionWatcherProvider",

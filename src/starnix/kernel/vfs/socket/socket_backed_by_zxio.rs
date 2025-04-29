@@ -280,7 +280,7 @@ impl ZxioBackedSocket {
         op: SockAddrOp,
         socket_address: &SocketAddress,
     ) -> Result<(), Errno> {
-        let ebpf_result = current_task.kernel().root_cgroup_ebpf_programs.run_sock_addr_prog(
+        let ebpf_result = current_task.kernel().ebpf_attachments.root_cgroup().run_sock_addr_prog(
             locked,
             op,
             socket.domain,

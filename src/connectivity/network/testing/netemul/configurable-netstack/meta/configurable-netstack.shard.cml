@@ -30,6 +30,7 @@
         {
             protocol: [
                 "fuchsia.net.debug.Interfaces",
+                "fuchsia.net.filter.SocketControl",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.ndp.RouterAdvertisementOptionWatcherProvider",
                 "fuchsia.net.root.Interfaces",

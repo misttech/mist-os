@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::bpf::attachments::CgroupEbpfProgramSet;
+use crate::bpf::attachments::EbpfAttachments;
 use crate::container_namespace::ContainerNamespace;
 use crate::device::android::bootloader_message_store::AndroidBootloaderMessageStore;
 use crate::device::binder::BinderDevice;
@@ -322,10 +322,8 @@ pub struct Kernel {
     /// Control handle to the running container's ComponentController.
     pub container_control_handle: Mutex<Option<ComponentControllerControlHandle>>,
 
-    /// eBPF programs attached to the root cgroup.
-    /// TODO(https://fxbug.dev/388077431) Move this out of `Kernel` once cgroup hierarchy is
-    /// moved to starnix_core.
-    pub root_cgroup_ebpf_programs: CgroupEbpfProgramSet,
+    /// Keeps track of attached eBPF programs.
+    pub ebpf_attachments: EbpfAttachments,
 
     /// Cgroups of the kernel.
     pub cgroups: KernelCgroups,
@@ -458,7 +456,7 @@ impl Kernel {
             procfs_device_tree_setup,
             shutting_down: AtomicBool::new(false),
             container_control_handle: Mutex::new(None),
-            root_cgroup_ebpf_programs: Default::default(),
+            ebpf_attachments: Default::default(),
             cgroups: KernelCgroups::new(kernel.clone()),
             time_adjustment_proxy,
         });

@@ -58,6 +58,13 @@
             source_availability: "unknown",
         },
         {
+            protocol: [ "fuchsia.net.filter.SocketControl_OnlyForStarnix" ],
+            from: "#network",
+            as: "fuchsia.net.filter.SocketControl",
+            to: "#starnix_runner",
+            source_availability: "unknown",
+        },
+        {
             protocol: [ "fuchsia.net.root.Interfaces_OnlyForStarnix" ],
             from: "#network",
             as: "fuchsia.net.root.Interfaces",

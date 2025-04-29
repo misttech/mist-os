@@ -6,30 +6,30 @@
 #![allow(non_upper_case_globals)]
 
 use crate::bpf::fs::{get_bpf_object, BpfHandle};
+use crate::bpf::program::Program;
 use crate::task::CurrentTask;
 use crate::vfs::socket::{SocketAddress, SocketDomain, SocketProtocol, SocketType};
 use crate::vfs::FdNumber;
 use ebpf::{EbpfProgram, EbpfProgramContext, ProgramArgument, Type};
 use ebpf_api::{AttachType, BaseEbpfRunContext, PinnedMap, BPF_SOCK_ADDR_TYPE};
-use starnix_logging::{log_warn, track_stub};
+use fidl_fuchsia_net_filter as fnet_filter;
+use fuchsia_component::client::connect_to_protocol_sync;
+use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{BpfPrograms, FileOpsCore, Locked, OrderedRwLock, Unlocked};
 use starnix_syscalls::{SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{bpf_attr__bindgen_ty_6, bpf_sock_addr, errno, error, CGROUP2_SUPER_MAGIC};
 use std::ops::{Deref, DerefMut};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use zerocopy::FromBytes;
 
 pub type BpfAttachAttr = bpf_attr__bindgen_ty_6;
 
-fn get_cgroup_program_set<'a>(
+fn check_root_cgroup_fd(
     locked: &mut Locked<'_, Unlocked>,
-    current_task: &'a CurrentTask,
-    attr: &'_ BpfAttachAttr,
-) -> Result<&'a CgroupEbpfProgramSet, Errno> {
-    // SAFETY: reading i32 field from a union is always safe.
-    let cgroup_fd = unsafe { attr.__bindgen_anon_1.target_fd };
-    let cgroup_fd = FdNumber::from_raw(cgroup_fd as i32);
+    current_task: &CurrentTask,
+    cgroup_fd: FdNumber,
+) -> Result<(), Errno> {
     let file = current_task.files.get(cgroup_fd)?;
 
     // Check that `cgroup_fd` is from the CGROUP2 file system.
@@ -54,7 +54,7 @@ fn get_cgroup_program_set<'a>(
         return error!(EINVAL);
     }
 
-    Ok(&current_task.kernel().root_cgroup_ebpf_programs)
+    Ok(())
 }
 
 pub fn bpf_prog_attach(
@@ -91,90 +91,17 @@ pub fn bpf_prog_attach(
         return error!(EINVAL);
     }
 
-    match attach_type {
-        AttachType::CgroupInet4Bind
-        | AttachType::CgroupInet6Bind
-        | AttachType::CgroupInet4Connect
-        | AttachType::CgroupInet6Connect
-        | AttachType::CgroupUdp4Sendmsg
-        | AttachType::CgroupUdp6Sendmsg => {
-            let cgroup = get_cgroup_program_set(locked, current_task, &attr)?;
-            let linked_program =
-                SockAddrEbpfProgram(program.link(attach_type.get_program_type(), &[], &[])?);
-            *cgroup.get_program_by_type(attach_type)?.write(locked) = Some(linked_program);
+    // SAFETY: reading i32 field from a union is always safe.
+    let target_fd = unsafe { attr.__bindgen_anon_1.target_fd };
+    let target_fd = FdNumber::from_raw(target_fd as i32);
 
-            Ok(SUCCESS)
-        }
-
-        AttachType::CgroupGetsockopt
-        | AttachType::CgroupInetEgress
-        | AttachType::CgroupInetIngress
-        | AttachType::CgroupInetSockCreate
-        | AttachType::CgroupInetSockRelease
-        | AttachType::CgroupSetsockopt
-        | AttachType::CgroupUdp4Recvmsg
-        | AttachType::CgroupUdp6Recvmsg => {
-            // Validate cgroup FD.
-            let _cgroup = get_cgroup_program_set(locked, current_task, &attr)?;
-
-            track_stub!(TODO("https://fxbug.dev/322873416"), "BPF_PROG_ATTACH", attr.attach_type);
-
-            // Fake success to avoid breaking apps that depends on the attachments above.
-            // TODO(https://fxbug.dev/391380601) Actually implement these attachments.
-            Ok(SUCCESS)
-        }
-
-        AttachType::CgroupDevice
-        | AttachType::CgroupInet4Getpeername
-        | AttachType::CgroupInet4Getsockname
-        | AttachType::CgroupInet4PostBind
-        | AttachType::CgroupInet6Getpeername
-        | AttachType::CgroupInet6Getsockname
-        | AttachType::CgroupInet6PostBind
-        | AttachType::CgroupSysctl
-        | AttachType::CgroupUnixConnect
-        | AttachType::CgroupUnixGetpeername
-        | AttachType::CgroupUnixGetsockname
-        | AttachType::CgroupUnixRecvmsg
-        | AttachType::CgroupUnixSendmsg
-        | AttachType::CgroupSockOps
-        | AttachType::SkSkbStreamParser
-        | AttachType::SkSkbStreamVerdict
-        | AttachType::SkMsgVerdict
-        | AttachType::LircMode2
-        | AttachType::FlowDissector
-        | AttachType::TraceRawTp
-        | AttachType::TraceFentry
-        | AttachType::TraceFexit
-        | AttachType::ModifyReturn
-        | AttachType::LsmMac
-        | AttachType::TraceIter
-        | AttachType::XdpDevmap
-        | AttachType::XdpCpumap
-        | AttachType::SkLookup
-        | AttachType::Xdp
-        | AttachType::SkSkbVerdict
-        | AttachType::SkReuseportSelect
-        | AttachType::SkReuseportSelectOrMigrate
-        | AttachType::PerfEvent
-        | AttachType::TraceKprobeMulti
-        | AttachType::LsmCgroup
-        | AttachType::StructOps
-        | AttachType::Netfilter
-        | AttachType::TcxIngress
-        | AttachType::TcxEgress
-        | AttachType::TraceUprobeMulti
-        | AttachType::NetkitPrimary
-        | AttachType::NetkitPeer
-        | AttachType::TraceKprobeSession => {
-            track_stub!(TODO("https://fxbug.dev/322873416"), "BPF_PROG_ATTACH", attr.attach_type);
-            error!(ENOTSUP)
-        }
-
-        AttachType::Unspecified | AttachType::Invalid(_) => {
-            error!(EINVAL)
-        }
-    }
+    current_task.kernel().ebpf_attachments.attach_prog(
+        locked,
+        current_task,
+        attach_type,
+        target_fd,
+        program,
+    )
 }
 
 pub fn bpf_prog_detach(
@@ -184,84 +111,11 @@ pub fn bpf_prog_detach(
 ) -> Result<SyscallResult, Errno> {
     let attach_type = AttachType::from(attr.attach_type);
 
-    match attach_type {
-        AttachType::CgroupInet4Bind
-        | AttachType::CgroupInet6Bind
-        | AttachType::CgroupInet4Connect
-        | AttachType::CgroupInet6Connect
-        | AttachType::CgroupUdp4Sendmsg
-        | AttachType::CgroupUdp6Sendmsg => {
-            let cgroup = get_cgroup_program_set(locked, current_task, &attr)?;
-            let mut prog_guard = cgroup.get_program_by_type(attach_type)?.write(locked);
+    // SAFETY: reading i32 field from a union is always safe.
+    let target_fd = unsafe { attr.__bindgen_anon_1.target_fd };
+    let target_fd = FdNumber::from_raw(target_fd as i32);
 
-            if prog_guard.is_none() {
-                return error!(ENOENT);
-            }
-
-            *prog_guard = None;
-
-            Ok(SUCCESS)
-        }
-
-        AttachType::CgroupGetsockopt
-        | AttachType::CgroupInetEgress
-        | AttachType::CgroupInetIngress
-        | AttachType::CgroupInetSockCreate
-        | AttachType::CgroupInetSockRelease
-        | AttachType::CgroupSetsockopt
-        | AttachType::CgroupUdp4Recvmsg
-        | AttachType::CgroupUdp6Recvmsg
-        | AttachType::CgroupDevice
-        | AttachType::CgroupInet4Getpeername
-        | AttachType::CgroupInet4Getsockname
-        | AttachType::CgroupInet4PostBind
-        | AttachType::CgroupInet6Getpeername
-        | AttachType::CgroupInet6Getsockname
-        | AttachType::CgroupInet6PostBind
-        | AttachType::CgroupSysctl
-        | AttachType::CgroupUnixConnect
-        | AttachType::CgroupUnixGetpeername
-        | AttachType::CgroupUnixGetsockname
-        | AttachType::CgroupUnixRecvmsg
-        | AttachType::CgroupUnixSendmsg
-        | AttachType::CgroupSockOps
-        | AttachType::SkSkbStreamParser
-        | AttachType::SkSkbStreamVerdict
-        | AttachType::SkMsgVerdict
-        | AttachType::LircMode2
-        | AttachType::FlowDissector
-        | AttachType::TraceRawTp
-        | AttachType::TraceFentry
-        | AttachType::TraceFexit
-        | AttachType::ModifyReturn
-        | AttachType::LsmMac
-        | AttachType::TraceIter
-        | AttachType::XdpDevmap
-        | AttachType::XdpCpumap
-        | AttachType::SkLookup
-        | AttachType::Xdp
-        | AttachType::SkSkbVerdict
-        | AttachType::SkReuseportSelect
-        | AttachType::SkReuseportSelectOrMigrate
-        | AttachType::PerfEvent
-        | AttachType::TraceKprobeMulti
-        | AttachType::LsmCgroup
-        | AttachType::StructOps
-        | AttachType::Netfilter
-        | AttachType::TcxIngress
-        | AttachType::TcxEgress
-        | AttachType::TraceUprobeMulti
-        | AttachType::NetkitPrimary
-        | AttachType::NetkitPeer
-        | AttachType::TraceKprobeSession => {
-            track_stub!(TODO("https://fxbug.dev/322873416"), "BPF_PROG_DETACH", attr.attach_type);
-            error!(ENOTSUP)
-        }
-
-        AttachType::Unspecified | AttachType::Invalid(_) => {
-            error!(EINVAL)
-        }
-    }
+    current_task.kernel().ebpf_attachments.detach_prog(locked, current_task, attach_type, target_fd)
 }
 
 // Wrapper for `bpf_sock_addr` used to implement `ProgramArgument` trait.
@@ -403,5 +257,247 @@ impl CgroupEbpfProgramSet {
         };
 
         Ok(prog.run(&mut bpf_sockaddr))
+    }
+}
+
+fn attach_type_to_netstack_hook(attach_type: AttachType) -> Option<fnet_filter::SocketHook> {
+    let hook = match attach_type {
+        AttachType::CgroupInetEgress => fnet_filter::SocketHook::Egress,
+        AttachType::CgroupInetIngress => fnet_filter::SocketHook::Ingress,
+        _ => return None,
+    };
+    Some(hook)
+}
+
+// Defined a location where eBPF programs can be attached.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum AttachLocation {
+    // Attached in Starnix kernel.
+    Kernel,
+
+    // Attached in Netstack.
+    Netstack,
+
+    // The program type is not attached, but attach operation should not fail
+    // to avoid breaking apps that depend it.
+    Stub,
+}
+
+impl TryFrom<AttachType> for AttachLocation {
+    type Error = Errno;
+
+    fn try_from(attach_type: AttachType) -> Result<Self, Self::Error> {
+        match attach_type {
+            AttachType::CgroupInet4Bind
+            | AttachType::CgroupInet6Bind
+            | AttachType::CgroupInet4Connect
+            | AttachType::CgroupInet6Connect
+            | AttachType::CgroupUdp4Sendmsg
+            | AttachType::CgroupUdp6Sendmsg => Ok(AttachLocation::Kernel),
+
+            AttachType::CgroupInetEgress | AttachType::CgroupInetIngress => {
+                Ok(AttachLocation::Netstack)
+            }
+
+            AttachType::CgroupGetsockopt
+            | AttachType::CgroupInetSockCreate
+            | AttachType::CgroupInetSockRelease
+            | AttachType::CgroupSetsockopt
+            | AttachType::CgroupUdp4Recvmsg
+            | AttachType::CgroupUdp6Recvmsg => {
+                track_stub!(TODO("https://fxbug.dev/322873416"), "BPF_PROG_ATTACH", attach_type);
+
+                // Fake success to avoid breaking apps that depends on the attachments above.
+                // TODO(https://fxbug.dev/391380601) Actually implement these attachments.
+                Ok(AttachLocation::Stub)
+            }
+
+            AttachType::CgroupDevice
+            | AttachType::CgroupInet4Getpeername
+            | AttachType::CgroupInet4Getsockname
+            | AttachType::CgroupInet4PostBind
+            | AttachType::CgroupInet6Getpeername
+            | AttachType::CgroupInet6Getsockname
+            | AttachType::CgroupInet6PostBind
+            | AttachType::CgroupSysctl
+            | AttachType::CgroupUnixConnect
+            | AttachType::CgroupUnixGetpeername
+            | AttachType::CgroupUnixGetsockname
+            | AttachType::CgroupUnixRecvmsg
+            | AttachType::CgroupUnixSendmsg
+            | AttachType::CgroupSockOps
+            | AttachType::SkSkbStreamParser
+            | AttachType::SkSkbStreamVerdict
+            | AttachType::SkMsgVerdict
+            | AttachType::LircMode2
+            | AttachType::FlowDissector
+            | AttachType::TraceRawTp
+            | AttachType::TraceFentry
+            | AttachType::TraceFexit
+            | AttachType::ModifyReturn
+            | AttachType::LsmMac
+            | AttachType::TraceIter
+            | AttachType::XdpDevmap
+            | AttachType::XdpCpumap
+            | AttachType::SkLookup
+            | AttachType::Xdp
+            | AttachType::SkSkbVerdict
+            | AttachType::SkReuseportSelect
+            | AttachType::SkReuseportSelectOrMigrate
+            | AttachType::PerfEvent
+            | AttachType::TraceKprobeMulti
+            | AttachType::LsmCgroup
+            | AttachType::StructOps
+            | AttachType::Netfilter
+            | AttachType::TcxIngress
+            | AttachType::TcxEgress
+            | AttachType::TraceUprobeMulti
+            | AttachType::NetkitPrimary
+            | AttachType::NetkitPeer
+            | AttachType::TraceKprobeSession => {
+                track_stub!(TODO("https://fxbug.dev/322873416"), "BPF_PROG_ATTACH", attach_type);
+                error!(ENOTSUP)
+            }
+
+            AttachType::Unspecified | AttachType::Invalid(_) => {
+                error!(EINVAL)
+            }
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct EbpfAttachments {
+    root_cgroup: CgroupEbpfProgramSet,
+    socket_control: OnceLock<fnet_filter::SocketControlSynchronousProxy>,
+}
+
+impl EbpfAttachments {
+    pub fn root_cgroup(&self) -> &CgroupEbpfProgramSet {
+        &self.root_cgroup
+    }
+
+    fn socket_control(&self) -> &fnet_filter::SocketControlSynchronousProxy {
+        self.socket_control.get_or_init(|| {
+            connect_to_protocol_sync::<fnet_filter::SocketControlMarker>()
+                .expect("Failed to connect to fuchsia.net.filter.SocketControl.")
+        })
+    }
+
+    fn attach_prog(
+        &self,
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        attach_type: AttachType,
+        target_fd: FdNumber,
+        program: Arc<Program>,
+    ) -> Result<SyscallResult, Errno> {
+        let location = attach_type.try_into()?;
+        match location {
+            AttachLocation::Kernel => {
+                check_root_cgroup_fd(locked, current_task, target_fd)?;
+
+                let linked_program =
+                    SockAddrEbpfProgram(program.link(attach_type.get_program_type(), &[], &[])?);
+                *self.root_cgroup.get_program_by_type(attach_type)?.write(locked) =
+                    Some(linked_program);
+
+                Ok(SUCCESS)
+            }
+
+            AttachLocation::Netstack => {
+                check_root_cgroup_fd(locked, current_task, target_fd)?;
+                self.attach_prog_in_netstack(attach_type, program)
+            }
+
+            AttachLocation::Stub => Ok(SUCCESS),
+        }
+    }
+
+    fn detach_prog(
+        &self,
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        attach_type: AttachType,
+        target_fd: FdNumber,
+    ) -> Result<SyscallResult, Errno> {
+        let location = attach_type.try_into()?;
+        match location {
+            AttachLocation::Kernel => {
+                check_root_cgroup_fd(locked, current_task, target_fd)?;
+
+                let mut prog_guard =
+                    self.root_cgroup.get_program_by_type(attach_type)?.write(locked);
+                if prog_guard.is_none() {
+                    return error!(ENOENT);
+                }
+
+                *prog_guard = None;
+
+                Ok(SUCCESS)
+            }
+
+            AttachLocation::Netstack => {
+                check_root_cgroup_fd(locked, current_task, target_fd)?;
+                self.detach_prog_in_netstack(attach_type)
+            }
+
+            AttachLocation::Stub => {
+                error!(ENOTSUP)
+            }
+        }
+    }
+
+    fn attach_prog_in_netstack(
+        &self,
+        attach_type: AttachType,
+        program: Arc<Program>,
+    ) -> Result<SyscallResult, Errno> {
+        let hook = attach_type_to_netstack_hook(attach_type).ok_or_else(|| errno!(ENOTSUP))?;
+        let opts = fnet_filter::AttachEbpfProgramOptions {
+            hook: Some(hook),
+            program: Some((&*program).try_into()?),
+            ..Default::default()
+        };
+        self.socket_control()
+            .attach_ebpf_program(opts, zx::MonotonicInstant::INFINITE)
+            .map_err(|e| {
+                log_error!(
+                    "failed to send fuchsia.net.filter/SocketControl.AttachEbpfProgram: {}",
+                    e
+                );
+                errno!(EIO)
+            })?
+            .map_err(|e| {
+                use fnet_filter::SocketControlAttachEbpfProgramError as Error;
+                match e {
+                    Error::NotSupported => errno!(ENOTSUP),
+                    Error::LinkFailed => errno!(EINVAL),
+                    Error::MapFailed => errno!(EIO),
+                    Error::DuplicateAttachment => errno!(EEXIST),
+                }
+            })?;
+
+        Ok(SUCCESS)
+    }
+
+    fn detach_prog_in_netstack(&self, attach_type: AttachType) -> Result<SyscallResult, Errno> {
+        let hook = attach_type_to_netstack_hook(attach_type).ok_or_else(|| errno!(ENOTSUP))?;
+        self.socket_control()
+            .detach_ebpf_program(hook, zx::MonotonicInstant::INFINITE)
+            .map_err(|e| {
+                log_error!(
+                    "failed to send fuchsia.net.filter/SocketControl.DetachEbpfProgram: {}",
+                    e
+                );
+                errno!(EIO)
+            })?
+            .map_err(|e| {
+                use fnet_filter::SocketControlDetachEbpfProgramError as Error;
+                match e {
+                    Error::NotFound => errno!(ENOENT),
+                }
+            })?;
+        Ok(SUCCESS)
     }
 }

@@ -365,7 +365,7 @@ impl CgroupSkbProgram {
     ) -> u64 {
         // TODO(https://fxbug.dev/407809292): Actually run the programs.
         let _ = self.program;
-        0
+        Self::RESULT_PASS_BIT
     }
 }
 
