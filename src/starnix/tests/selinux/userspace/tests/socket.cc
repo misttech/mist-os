@@ -13,7 +13,10 @@
 #include "src/lib/files/file.h"
 #include "src/starnix/tests/selinux/userspace/util.h"
 
+extern std::string DoPrePolicyLoadWork() { return "socket_policy.pp"; }
+
 namespace {
+
 struct SocketTestCase {
   int domain;
   int type;
@@ -23,7 +26,6 @@ class SocketTest : public ::testing::TestWithParam<SocketTestCase> {};
 
 TEST_P(SocketTest, SocketTakesProcessLabel) {
   const SocketTestCase& test_case = GetParam();
-  LoadPolicy("socket_policy.pp");
   ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_test_no_trans_t:s0"), fit::ok());
 
   fbl::unique_fd sockfd;
@@ -76,7 +78,6 @@ class SocketTransitionTest : public ::testing::TestWithParam<SocketTransitionTes
  protected:
   void SetUp() override {
     const SocketTransitionTestCase& test_case = GetParam();
-    LoadPolicy("socket_policy.pp");
     MaybeUpdatePingRange(test_case.domain, test_case.protocol);
   }
 };
@@ -113,7 +114,6 @@ INSTANTIATE_TEST_SUITE_P(
                                  "test_u:test_r:netlink_socket_test_t:s0"}));
 
 TEST(SocketTest, SockFileLabelIsCorrect) {
-  LoadPolicy("socket_policy.pp");
   ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_test_t:s0"), fit::ok());
 
   fbl::unique_fd sockfd;
@@ -134,7 +134,6 @@ TEST(SocketTest, SockFileLabelIsCorrect) {
 
 TEST(SocketTest, ListenAllowed) {
   const int kBacklog = 5;
-  LoadPolicy("socket_policy.pp");
   ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_listen_test_t:s0"), fit::ok());
   auto sockcreate =
       ScopedTaskAttrResetter::SetTaskAttr("sockcreate", "test_u:test_r:socket_listen_yes_t:s0");
@@ -152,7 +151,6 @@ TEST(SocketTest, ListenAllowed) {
 
 TEST(SocketTest, ListenDenied) {
   const int kBacklog = 5;
-  LoadPolicy("socket_policy.pp");
   ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_listen_test_t:s0"), fit::ok());
   auto sockcreate =
       ScopedTaskAttrResetter::SetTaskAttr("sockcreate", "test_u:test_r:socket_listen_no_t:s0");

@@ -15,6 +15,8 @@
 
 #include "src/starnix/tests/selinux/userspace/util.h"
 
+extern std::string DoPrePolicyLoadWork() { return "ioctl_policy.pp"; }
+
 namespace {
 
 constexpr char kTestFilePathTemplate[] = "/tmp/ioctl_test_file:XXXXXX";
@@ -46,8 +48,6 @@ fit::result<int, int> GetBlockSize(int fd) {
 /// Check that the `ioctl` permission is granted when it is allowed by the policy,
 /// and ioctl extended permissions are not filtered.
 TEST(IoctlTest, BasicCommandAllowed) {
-  LoadPolicy("ioctl_policy.pp");
-
   auto enforce = ScopedEnforcement::SetEnforcing();
 
   auto test_fd = CreateTestFile();
@@ -63,8 +63,6 @@ TEST(IoctlTest, BasicCommandAllowed) {
 
 /// Check that the `ioctl` permission is denied when it is disallowed by the policy.
 TEST(IoctlTest, BasicCommandDenied) {
-  LoadPolicy("ioctl_policy.pp");
-
   auto enforce = ScopedEnforcement::SetEnforcing();
 
   auto test_fd = CreateTestFile();
@@ -80,8 +78,6 @@ TEST(IoctlTest, BasicCommandDenied) {
 /// Check that the `getattr` permission is granted when it is invoked by a special-cased
 /// ioctl command, and is allowed by the policy.
 TEST(IoctlTest, GetAttrCommandAllowed) {
-  LoadPolicy("ioctl_policy.pp");
-
   auto enforce = ScopedEnforcement::SetEnforcing();
 
   auto test_fd = CreateTestFile();
@@ -97,8 +93,6 @@ TEST(IoctlTest, GetAttrCommandAllowed) {
 /// Check that the `getattr` permission is denied when it is invoked by a special-cased
 /// ioctl command, and is disallowed by the policy.
 TEST(IoctlTest, GetAttrCommandDenied) {
-  LoadPolicy("ioctl_policy.pp");
-
   auto enforce = ScopedEnforcement::SetEnforcing();
 
   auto test_fd = CreateTestFile();
@@ -115,8 +109,6 @@ TEST(IoctlTest, GetAttrCommandDenied) {
 /// in the case where ioctl commands are filtered and the specified command is
 /// allowed by the filter.
 TEST(IoctlTest, FilteredCommandAllowed) {
-  LoadPolicy("ioctl_policy.pp");
-
   auto enforce = ScopedEnforcement::SetEnforcing();
 
   auto test_fd = CreateTestFile();
@@ -134,8 +126,6 @@ TEST(IoctlTest, FilteredCommandAllowed) {
 /// by the policy but the specified ioctl command is disallowed by extended permission
 /// filtering.
 TEST(IoctlTest, FilteredCommandDenied) {
-  LoadPolicy("ioctl_policy.pp");
-
   auto enforce = ScopedEnforcement::SetEnforcing();
 
   auto test_fd = CreateTestFile();
@@ -152,8 +142,6 @@ TEST(IoctlTest, FilteredCommandDenied) {
 /// are filtered and the specified command is allowed by the filter, but the `ioctl`
 /// permission itself is disallowed by the policy.
 TEST(IoctlTest, FilteredCommandDeniedByPermission) {
-  LoadPolicy("ioctl_policy.pp");
-
   auto enforce = ScopedEnforcement::SetEnforcing();
 
   auto test_fd = CreateTestFile();

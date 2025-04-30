@@ -15,6 +15,8 @@
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/starnix/tests/selinux/userspace/util.h"
 
+extern std::string DoPrePolicyLoadWork() { return "selinuxfs_policy.pp"; }
+
 namespace {
 
 using SeLinuxApiResult = fit::result<int, std::string>;
@@ -75,8 +77,6 @@ SeLinuxApiResult ComputeCreateContext(std::string_view source_context,
 }
 
 TEST(SeLinuxFsContext, ValidatesRequiredFieldsPresent) {
-  LoadPolicy("selinuxfs_policy.pp");
-
   // Contexts that have too few colons to provide user, role, type & sensitivity are rejected.
   EXPECT_EQ(ValidateContext("test_selinuxfs_u"), fit::failed());
   EXPECT_EQ(ValidateContext("test_selinuxfs_u:test_selinuxfs_r"), fit::failed());
@@ -89,8 +89,6 @@ TEST(SeLinuxFsContext, ValidatesRequiredFieldsPresent) {
 }
 
 TEST(SeLinuxFsContext, ValidatesFieldValues) {
-  LoadPolicy("selinuxfs_policy.pp");
-
   // Valid contexts are successfully written, and can be read-back.
   constexpr std::string_view kValidContext =
       "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0:c0-s2:c0.c2";
@@ -126,8 +124,6 @@ TEST(SeLinuxFsContext, ValidatesFieldValues) {
 }
 
 TEST(SeLinuxFsContext, ValidatesAllowedUserFieldValues) {
-  LoadPolicy("selinuxfs_policy.pp");
-
   // The "test_selinuxfs_u" user is granted the full range of categories.
   constexpr std::string_view kValidContext =
       "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0:c0-s2:c0.c2";
@@ -149,8 +145,6 @@ TEST(SeLinuxFsContext, ValidatesAllowedUserFieldValues) {
 }
 
 TEST(SeLinuxFsContext, NormalizeCategories) {
-  LoadPolicy("selinuxfs_policy.pp");
-
   // Expansion of a three-element category span results in the same Security Context as using the
   // range syntax directly.
   constexpr std::string_view kThreeCategoryContextFormA =
@@ -170,8 +164,6 @@ TEST(SeLinuxFsContext, NormalizeCategories) {
 
 // Validate that Security Contexts for new "process" class instances inherit the source role & type.
 TEST(SeLinuxFsCreate, DefaultComputeCreateForProcess) {
-  LoadPolicy("selinuxfs_policy.pp");
-
   constexpr std::string_view kSourceContext =
       "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0";
   constexpr std::string_view kTargetContext =
@@ -183,8 +175,6 @@ TEST(SeLinuxFsCreate, DefaultComputeCreateForProcess) {
 
 // Validate that Security Contexts for new socket-like class instances behave the same as "process".
 TEST(SeLinuxFsCreate, DefaultComputeCreateForSocket) {
-  LoadPolicy("selinuxfs_policy.pp");
-
   constexpr std::string_view kSourceContext =
       "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0";
   constexpr std::string_view kTargetContext =
@@ -197,8 +187,6 @@ TEST(SeLinuxFsCreate, DefaultComputeCreateForSocket) {
 // Validate that Security Contexts for non-process/socket-like class instances receive "object_r"
 // role, and the target/parent type.
 TEST(SeLinuxFsCreate, DefaultComputeCreateForFile) {
-  LoadPolicy("selinuxfs_policy.pp");
-
   constexpr std::string_view kSourceContext =
       "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0";
   constexpr std::string_view kTargetContext =
@@ -210,8 +198,6 @@ TEST(SeLinuxFsCreate, DefaultComputeCreateForFile) {
 
 // Validate handling of whitespace between request elements.
 TEST(SeLinuxFsCreate, ExtraWhitespace) {
-  LoadPolicy("selinuxfs_policy.pp");
-
   constexpr std::string_view kExpectedContext =
       "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0";
 
@@ -262,8 +248,6 @@ TEST(SeLinuxFsCreate, ExtraWhitespace) {
 
 // Validate that various badly-formed "create" API requests are rejected as invalid.
 TEST(SeLinuxFsCreate, MalformedComputeCreateRequest) {
-  LoadPolicy("selinuxfs_policy.pp");
-
   // Fewer than three arguments is an invalid request.
   EXPECT_EQ(CallSeLinuxApi("create", "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0"),
             fit::error(EINVAL));
