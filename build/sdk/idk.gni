@@ -179,7 +179,19 @@ template("idk") {
   python_action(target_name) {
     binary_label = "//build/sdk/generate_idk"
 
-    deps = _subbuild_targets
+    _schema_validator_tool =
+        "//build/tools/json_validator:json_validator_valico($host_toolchain)"
+
+    # Get the path to the schema validator executable.
+    schema_validator_tool_output_name =
+        get_label_info(_schema_validator_tool, "name")
+    schema_validator_tool_output_dir =
+        get_label_info(_schema_validator_tool, "root_out_dir")
+    host_executable =
+        "$schema_validator_tool_output_dir/$schema_validator_tool_output_name"
+    inputs = [ host_executable ]
+
+    deps = _subbuild_targets + [ _schema_validator_tool ]
     outputs = [
       _exported_dir_manifest,
       _exported_dir_stamp,
@@ -199,11 +211,16 @@ template("idk") {
         rebase_path(dir, root_build_dir),
       ]
     }
+
     args += [
       "--relative-manifest",
       _relative_collection_build_manifest,
       "--output-directory",
       rebase_path(_exported_dir, root_build_dir),
+      "--schema-directory",
+      rebase_path("//build/sdk/meta", root_build_dir),
+      "--json-validator-path",
+      rebase_path(host_executable, root_build_dir),
       "--stamp-file",
       rebase_path(_exported_dir_stamp, root_build_dir),
       "--depfile",

@@ -11,7 +11,9 @@ import dataclasses
 import filecmp
 import itertools
 import json
+import os
 import pathlib
+import subprocess
 from typing import (
     Any,
     Callable,
@@ -30,6 +32,74 @@ VERSION_HISTORY_PATH = pathlib.Path("version_history.json")
 
 # These atom types include a "stable" field because they support unstable atoms.
 TYPES_SUPPORTING_UNSTABLE_ATOMS = ["cc_source_library", "fidl_library"]
+
+
+# Atom types that are treated as type "data".
+_VALID_DATA_ATOM_TYPES = [
+    # LINT.IfChange
+    "component_manifest",
+    "config",
+    # LINT.ThenChange(//build/sdk/sdk_atom.gni)
+]
+
+
+def _get_idk_manifest_type_file_for_atom_type(type: str) -> str:
+    """Returns the type string used in the IDK manifest for the atom `type`.
+
+    Args:
+        type: The atom type as used in an individual atom manifest.
+    Returns:
+        The corresponding type used in the IDK manifest.
+    """
+    if type in _VALID_DATA_ATOM_TYPES:
+        return "data"
+    else:
+        return type
+
+
+class AtomSchemaValidator:
+    """Validates atom metadata against JSON schemas."""
+
+    def __init__(
+        self, schema_directory: pathlib.Path, json_validator_path: pathlib.Path
+    ):
+        self.schema_directory = schema_directory
+        self.json_validator_path = json_validator_path
+
+    def _get_schema_filename_for_atom_type(self, type: str) -> str:
+        """Returns the filename of the schema file for the atom `type`.
+
+        Args:
+            type: The atom type as used in an individual atom manifest.
+        Returns:
+            The filename for the schema file used to validate `type`.
+        """
+        manifest_type = _get_idk_manifest_type_file_for_atom_type(type)
+        return f"{manifest_type}.json"
+
+    def validate(self, file_path: pathlib.Path, type: str) -> int:
+        """Validates that `file_path` complies with the schema for the `type`.
+
+        Deps on the schema files is covered by the collection's deps on
+        # "//build/sdk/meta".
+
+        Args:
+            file_path: The metadata file to validate.
+            type: The file's atom type as used in an individual atom manifest.
+        Returns:
+            0 if successful and non-zero otherwise.
+        """
+        schema_filename = self._get_schema_filename_for_atom_type(type)
+        schema_file = self.schema_directory / schema_filename
+
+        ret = subprocess.run([self.json_validator_path, schema_file, file_path])
+        if ret.returncode != 0:
+            print(
+                f"ERROR: Metadata schema validation failed for '{os.path.abspath(file_path)}' of type '{type}' using schema '{schema_file}'."
+            )
+            return ret.returncode
+
+        return 0
 
 
 class BuildManifestJson(TypedDict):
@@ -273,13 +343,7 @@ class MergedIDK:
         in the IDK itself at `meta/manifest.json`."""
         index = []
         for meta_path, atom in self.atoms.items():
-            # Some atoms are given different "types" in the overall manifest...
-            # LINT.IfChange
-            if atom["type"] in ["component_manifest", "config"]:
-                type = "data"
-            # LINT.ThenChange(//build/sdk/sdk_atom.gni)
-            else:
-                type = atom["type"]
+            type = _get_idk_manifest_type_file_for_atom_type(atom["type"])
 
             if type in TYPES_SUPPORTING_UNSTABLE_ATOMS:
                 is_stable = atom["stable"]

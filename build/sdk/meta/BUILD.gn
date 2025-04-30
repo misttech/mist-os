@@ -10,8 +10,10 @@ import("//build/sdk/sdk_documentation.gni")
 # This list should only contain schemas that are currently exported outside of
 # the Fuchsia source tree.
 schemas = [
+  "bind_library.json",
   "cc_prebuilt_library.json",
   "cc_source_library.json",
+  "companion_host_tool.json",
   "common.json",
   "dart_library.json",
   "data.json",

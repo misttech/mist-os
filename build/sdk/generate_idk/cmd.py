@@ -63,6 +63,18 @@ def main() -> int:
         required=True,
     )
     parser.add_argument(
+        "--schema-directory",
+        type=pathlib.Path,
+        help="Path containing the metadata schema files",
+        required=True,
+    )
+    parser.add_argument(
+        "--json-validator-path",
+        type=pathlib.Path,
+        help="Path containing the metadata schema files",
+        required=True,
+    )
+    parser.add_argument(
         "--target-arch",
         help="List of target architectures supported by the IDK",
         action="append",
@@ -100,6 +112,10 @@ def main() -> int:
         input_files |= manifest.input_files()
         merged = merged.merge_with(manifest)
 
+    schema_validator = generate_idk.AtomSchemaValidator(
+        args.schema_directory, args.json_validator_path
+    )
+
     output_dir: pathlib.Path = args.output_directory
 
     # NOTE: Delete any directory that may already be there from a
@@ -125,6 +141,11 @@ def main() -> int:
         dest_path.parent.mkdir(exist_ok=True, parents=True)
         with dest_path.open("w") as f:
             json.dump(atom_meta, f, indent=2, sort_keys=True)
+
+        result = schema_validator.validate(dest_path, type)
+        if result != 0:
+            # A message was already printed.
+            return result
 
     # Symlink all the other files.
     for dest, src in merged.dest_to_src.items():
