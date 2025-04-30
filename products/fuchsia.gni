@@ -29,3 +29,5 @@ product_bundle_labels = [ "//products:product_bundles" ]
 
 # Upload these boards to CIPD.
 assembly_board_configs = [ "//boards" ]
+
+product_bundle_test_groups = [ "//bundles/buildbot/minimal/arm64" ]

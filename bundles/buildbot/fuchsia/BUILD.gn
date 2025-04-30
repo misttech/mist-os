@@ -5,4 +5,7 @@
 group("fuchsia") {
   testonly = true
   deps = []
+  if (current_cpu == "arm64") {
+    deps += [ "//bundles/buildbot/minimal/arm64($host_toolchain)" ]
+  }
 }
