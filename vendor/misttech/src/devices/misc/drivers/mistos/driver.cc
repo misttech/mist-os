@@ -238,7 +238,7 @@ zx_status_t Driver::GetFragmentProtocol(const char* fragment, uint32_t proto_id,
 }
 
 void Driver::CompleteStart(zx::result<> result) {
-  LTRACEF("CompleteStart '%.*s'\n", static_cast<int>(name().size()), name().data());
+  LTRACEF("CompleteStart '%.*s'\n", static_cast<int>(driver_name_.size()), driver_name_.data());
 }
 
 }  // namespace mistos

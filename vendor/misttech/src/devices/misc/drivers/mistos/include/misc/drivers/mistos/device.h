@@ -8,10 +8,9 @@
 
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
+#include <lib/mistos/util/bstring.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
-
-#include <string>
 
 #include <fbl/mutex.h>
 #include <fbl/vector.h>
@@ -65,9 +64,8 @@ class Device {
 
   DeviceServer device_server_;
 
-  //const std::string name_;
-  const char* name_;
-  
+  const mtl::BString name_;
+
   // A unique id for the device.
   uint32_t device_id_ = 0;
 

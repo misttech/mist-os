@@ -111,7 +111,7 @@ Device::~Device() {
 
 zx_device_t* Device::ZxDevice() { return static_cast<zx_device_t*>(this); }
 
-const char* Device::Name() const { return name_; }
+const char* Device::Name() const { return name_.c_str(); }
 
 bool Device::HasChildren() const { return !children_.is_empty(); }
 
@@ -132,7 +132,7 @@ zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
   fbl::AllocChecker ac;
   auto device = ktl::make_unique<Device>(&ac, compat_device, zx_args->ops, driver_, this);
   // Update the compat symbol name pointer with a pointer the device owns.
-  device->compat_symbol_.name = device->name_;
+  device->compat_symbol_.name = device->name_.c_str();
 
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
