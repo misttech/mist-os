@@ -578,6 +578,16 @@ assembly_input_bundle("sdhci_driver") {
   ]
 }
 
+# AIB for the ufs driver
+assembly_input_bundle("ufs_driver") {
+  boot_driver_packages = [
+    {
+      package_target = "//src/devices/block/drivers/ufs:package"
+      driver_components = [ "meta/ufs.cm" ]
+    },
+  ]
+}
+
 # Trusted execution environment.
 assembly_input_bundle("trusted_execution_environment") {
   bootfs_packages = [

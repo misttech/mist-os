@@ -155,6 +155,9 @@ bootstrap_eng_platform_aib_names = [
 
   # PCI utilities
   "lspci",
+
+  # Platform drivers.
+  "ufs_driver",
 ]
 
 # The names of all of the platform's 'testonly=false' Assembly Input Bundles

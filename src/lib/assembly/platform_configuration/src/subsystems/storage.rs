@@ -264,6 +264,11 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             builder.platform_bundle("sdhci_driver");
         }
 
+        // Include UFS driver through a platform AIB.
+        if context.board_info.provides_feature("fuchsia::ufs") {
+            builder.platform_bundle("ufs_driver");
+        }
+
         Ok(())
     }
 }

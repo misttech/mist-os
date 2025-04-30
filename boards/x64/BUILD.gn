@@ -36,6 +36,7 @@ common_board_configuration = {
     "fuchsia::wlan_softmac",
     "fuchsia::xhci",
     "fuchsia::sdhci",
+    "fuchsia::ufs",
   ]
 
   input_bundles = [ ":paver" ]
@@ -187,11 +188,6 @@ board_input_bundle("x64_common") {
       package_target = "//src/devices/block/drivers/pci-sdhci:package"
       package_set = "bootfs"
       driver_components = [ "meta/pci-sdhci.cm" ]
-    },
-    {
-      package_target = "//src/devices/block/drivers/ufs:pkg"
-      package_set = "bootfs"
-      driver_components = [ "meta/ufs.cm" ]
     },
     {
       package_target = "//src/devices/board/drivers/x86:package"
