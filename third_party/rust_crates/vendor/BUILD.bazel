@@ -1675,14 +1675,14 @@ alias(
 )
 
 alias(
-    name = "num-traits-0.2.18",
-    actual = "//third_party/rust_crates/vendor/num-traits-0.2.18:num_traits",
+    name = "num-traits-0.2.19",
+    actual = "//third_party/rust_crates/vendor/num-traits-0.2.19:num_traits",
     tags = ["manual"],
 )
 
 alias(
     name = "num-traits",
-    actual = "//third_party/rust_crates/vendor/num-traits-0.2.18:num_traits",
+    actual = "//third_party/rust_crates/vendor/num-traits-0.2.19:num_traits",
     tags = ["manual"],
 )
 

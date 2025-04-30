@@ -83,6 +83,6 @@ rust_library(
         "//third_party/rust_crates/vendor/num-integer-0.1.44:num_integer",
         "//third_party/rust_crates/vendor/num-iter-0.1.42:num_iter",
         "//third_party/rust_crates/vendor/num-rational-0.4.0:num_rational",
-        "//third_party/rust_crates/vendor/num-traits-0.2.18:num_traits",
+        "//third_party/rust_crates/vendor/num-traits-0.2.19:num_traits",
     ],
 )

@@ -23,7 +23,7 @@ package_info(
     name = "package_info",
     package_name = "num-traits",
     package_url = "https://github.com/rust-num/num-traits",
-    package_version = "0.2.18",
+    package_version = "0.2.19",
 )
 
 license(
@@ -60,7 +60,7 @@ rust_library(
         "std",
     ],
     crate_root = "src/lib.rs",
-    edition = "2018",
+    edition = "2021",
     rustc_flags = [
         "--cap-lints=allow",
     ],
@@ -77,10 +77,10 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "0.2.18",
+    version = "0.2.19",
     deps = [
         "//third_party/rust_crates/forks/libm",
-        "//third_party/rust_crates/vendor/num-traits-0.2.18:build_script_build",
+        "//third_party/rust_crates/vendor/num-traits-0.2.19:build_script_build",
     ],
 )
 
@@ -123,7 +123,7 @@ cargo_build_script(
             "WORKSPACE.bazel",
         ],
     ),
-    edition = "2018",
+    edition = "2021",
     pkg_name = "num-traits",
     rustc_flags = [
         "--cap-lints=allow",
@@ -135,7 +135,7 @@ cargo_build_script(
         "noclippy",
         "norustfmt",
     ],
-    version = "0.2.18",
+    version = "0.2.19",
     visibility = ["//visibility:private"],
     deps = [
         "//third_party/rust_crates/vendor/autocfg-1.1.0:autocfg",

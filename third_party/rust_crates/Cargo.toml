@@ -163,7 +163,7 @@ nom_locate = "5.0.0"
 nu-ansi-term = "0.46.0"
 num = { version = "0.4.0", features = ["rand"] }
 num-derive = "0.4.2"
-num-traits = "0.2.18"
+num-traits = "0.2.19"
 omaha_client = "0.2"
 once_cell = "1.20.2"
 overload = "0.1.1"
@@ -770,7 +770,7 @@ rustflags = ["--cfg=has_i128"]
 [gn.package.num-rational."0.4.0"]
 rustflags = ["--cfg=has_int_exp_fmt"]
 
-[gn.package.num-traits."0.2.18"]
+[gn.package.num-traits."0.2.19"]
 rustflags = [
   "--cfg=has_copysign",
   "--cfg=has_div_euclid",

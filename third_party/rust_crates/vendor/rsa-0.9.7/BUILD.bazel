@@ -80,7 +80,7 @@ rust_library(
         "//third_party/rust_crates/vendor/const-oid-0.9.6:const_oid",
         "//third_party/rust_crates/vendor/digest-0.10.7:digest",
         "//third_party/rust_crates/vendor/num-integer-0.1.44:num_integer",
-        "//third_party/rust_crates/vendor/num-traits-0.2.18:num_traits",
+        "//third_party/rust_crates/vendor/num-traits-0.2.19:num_traits",
         "//third_party/rust_crates/vendor/pkcs1-0.7.5:pkcs1",
         "//third_party/rust_crates/vendor/pkcs8-0.10.2:pkcs8",
         "//third_party/rust_crates/vendor/rand_core-0.6.4:rand_core",

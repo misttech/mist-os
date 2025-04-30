@@ -615,7 +615,7 @@ group("num-derive") {
 }
 
 group("num-traits") {
-  public_deps = [ ":num-traits-v0_2_18" ]
+  public_deps = [ ":num-traits-v0_2_19" ]
 }
 
 if (!(current_os == "fuchsia")) {
@@ -3431,7 +3431,7 @@ rust_library("chrono-v0_4_34") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":num-traits-v0_2_18" ]
+  deps += [ ":num-traits-v0_2_19" ]
   deps += [ ":serde-v1_0_204" ]
   if (current_cpu == "wasm32" && !(false || false)) {
     deps += [ ":js-sys-v0_3_68" ]
@@ -4059,7 +4059,7 @@ rust_library("criterion-v0_2_11") {
   deps += [ ":itertools-v0_8_0" ]
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":libc-v0_2_171" ]
-  deps += [ ":num-traits-v0_2_18" ]
+  deps += [ ":num-traits-v0_2_19" ]
   deps += [ ":rand_core-v0_3_1" ]
   deps += [ ":rand_os-v0_1_3" ]
   deps += [ ":rand_xoshiro-v0_1_0" ]
@@ -5736,7 +5736,7 @@ rust_library("euclid-v0_22_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":num-traits-v0_2_18" ]
+  deps += [ ":num-traits-v0_2_19" ]
   deps += [ ":serde-v1_0_204" ]
 
   rustenv = []
@@ -6147,7 +6147,7 @@ rust_library("float-cmp-v0_8_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":num-traits-v0_2_18" ]
+  deps += [ ":num-traits-v0_2_19" ]
 
   rustenv = []
 
@@ -10116,7 +10116,7 @@ rust_library("num-v0_4_0") {
   deps += [ ":num-integer-v0_1_44" ]
   deps += [ ":num-iter-v0_1_42" ]
   deps += [ ":num-rational-v0_4_0" ]
-  deps += [ ":num-traits-v0_2_18" ]
+  deps += [ ":num-traits-v0_2_19" ]
 
   rustenv = []
 
@@ -10152,7 +10152,7 @@ rust_library("num-bigint-v0_4_3") {
 
   deps = []
   deps += [ ":num-integer-v0_1_44" ]
-  deps += [ ":num-traits-v0_2_18" ]
+  deps += [ ":num-traits-v0_2_19" ]
   deps += [ ":rand-v0_8_4" ]
 
   rustenv = [ "OUT_DIR=../../../../compat/num-bigint" ]
@@ -10197,7 +10197,7 @@ rust_library("num-bigint-dig-v0_8_4") {
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":num-integer-v0_1_44" ]
   deps += [ ":num-iter-v0_1_42" ]
-  deps += [ ":num-traits-v0_2_18" ]
+  deps += [ ":num-traits-v0_2_19" ]
   deps += [ ":rand-v0_8_4" ]
   deps += [ ":smallvec-v1_14_0" ]
 
@@ -10235,7 +10235,7 @@ rust_library("num-complex-v0_4_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":num-traits-v0_2_18" ]
+  deps += [ ":num-traits-v0_2_19" ]
   deps += [ ":rand-v0_8_4" ]
 
   rustenv = []
@@ -10341,7 +10341,7 @@ rust_library("num-integer-v0_1_44") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":num-traits-v0_2_18" ]
+  deps += [ ":num-traits-v0_2_19" ]
 
   rustenv = []
 
@@ -10376,7 +10376,7 @@ rust_library("num-iter-v0_1_42") {
 
   deps = []
   deps += [ ":num-integer-v0_1_44" ]
-  deps += [ ":num-traits-v0_2_18" ]
+  deps += [ ":num-traits-v0_2_19" ]
 
   rustenv = []
 
@@ -10413,7 +10413,7 @@ rust_library("num-rational-v0_4_0") {
   deps = []
   deps += [ ":num-bigint-v0_4_3" ]
   deps += [ ":num-integer-v0_1_44" ]
-  deps += [ ":num-traits-v0_2_18" ]
+  deps += [ ":num-traits-v0_2_19" ]
 
   rustenv = []
 
@@ -10433,18 +10433,18 @@ rust_library("num-rational-v0_4_0") {
   applicable_licenses = [ ":num-rational-v0_4_0.license" ]
 }
 
-license("num-traits-v0_2_18.license") {
+license("num-traits-v0_2_19.license") {
   public_package_name = "num_traits"
   license_files = [
-    "//third_party/rust_crates/vendor/num-traits-0.2.18/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/num-traits-0.2.18/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/num-traits-0.2.19/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/num-traits-0.2.19/LICENSE-MIT",
   ]
 }
 
-rust_library("num-traits-v0_2_18") {
+rust_library("num-traits-v0_2_19") {
   crate_name = "num_traits"
-  crate_root = "//third_party/rust_crates/vendor/num-traits-0.2.18/src/lib.rs"
-  output_name = "num_traits-7866ac47502981a8"
+  crate_root = "//third_party/rust_crates/vendor/num-traits-0.2.19/src/lib.rs"
+  output_name = "num_traits-1af94858b29d7f9d"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -10454,9 +10454,9 @@ rust_library("num-traits-v0_2_18") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=7866ac47502981a8",
-    "-Cextra-filename=-7866ac47502981a8",
+    "--edition=2021",
+    "-Cmetadata=1af94858b29d7f9d",
+    "-Cextra-filename=-1af94858b29d7f9d",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"i128\"",
     "--cfg=feature=\"libm\"",
@@ -10474,7 +10474,7 @@ rust_library("num-traits-v0_2_18") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":num-traits-v0_2_18.license" ]
+  applicable_licenses = [ ":num-traits-v0_2_19.license" ]
 }
 
 license("numtoa-v0_1_0.license") {
@@ -12235,7 +12235,7 @@ rust_library("proptest-v1_5_0") {
   deps += [ ":bit-vec-v0_6_3" ]
   deps += [ ":bitflags-v2_8_0" ]
   deps += [ ":lazy_static-v1_4_0" ]
-  deps += [ ":num-traits-v0_2_18" ]
+  deps += [ ":num-traits-v0_2_19" ]
   deps += [ ":rand-v0_8_4" ]
   deps += [ ":rand_chacha-v0_3_1" ]
   deps += [ ":rand_xorshift-v0_3_0" ]
@@ -13699,7 +13699,7 @@ rust_library("rsa-v0_9_7") {
   deps += [ ":const-oid-v0_9_6" ]
   deps += [ ":digest-v0_10_7" ]
   deps += [ ":num-integer-v0_1_44" ]
-  deps += [ ":num-traits-v0_2_18" ]
+  deps += [ ":num-traits-v0_2_19" ]
   deps += [ ":pkcs1-v0_7_5" ]
   deps += [ ":pkcs8-v0_10_2" ]
   deps += [ ":rand_core-v0_6_4" ]

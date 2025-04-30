@@ -4,4 +4,4 @@
 
 include /src/power/OWNERS
 include /src/ui/lib/scene_management/OWNERS
-include /third_party/rust_crates/vendor/num-traits-0.2.18/OWNERS
+include /third_party/rust_crates/vendor/num-traits-0.2.19/OWNERS
