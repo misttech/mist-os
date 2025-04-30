@@ -490,4 +490,37 @@ TEST(PerfEventOpenTest, ReadingFirstEightBytesCanReturnCountAsALong) {
   }
 }
 
+// Here is a full example of a counting case.
+TEST(PerfEventOpenTest, CountingCPUClockSucceeds) {
+  if (test_helper::HasSysAdmin()) {
+    perf_event_attr attr;
+    memset(&attr, 0, sizeof(attr));
+    attr.type = PERF_TYPE_SOFTWARE;
+    attr.size = sizeof(attr);
+    attr.config = PERF_COUNT_SW_CPU_CLOCK;
+    attr.disabled = 1;
+
+    long file_descriptor =
+        sys_perf_event_open(&attr, example_pid, -1, example_group_fd, example_flags);
+    EXPECT_NE(file_descriptor, -1);
+
+    EXPECT_NE(syscall(__NR_ioctl, file_descriptor, PERF_EVENT_IOC_RESET), -1);
+    EXPECT_NE(syscall(__NR_ioctl, file_descriptor, PERF_EVENT_IOC_ENABLE), -1);
+
+    printf("This is an event\n");
+
+    EXPECT_NE(syscall(__NR_ioctl, file_descriptor, PERF_EVENT_IOC_DISABLE), -1);
+
+    long long count;
+    syscall(__NR_read, file_descriptor, &count, sizeof(count));
+
+    // TODO(https://fxbug.dev/402938671): this is expected to be 0 right now
+    // because real value hasn't been implemented. When running on host, it will give
+    // a real number (~6000-10000). Update this when we get a real instruction count.
+    EXPECT_GT(count, -1);
+
+    EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
+  }
+}
+
 }  // namespace
