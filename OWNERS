@@ -40,7 +40,7 @@ per-file shac.star,shac.textproto = file:/scripts/shac/OWNERS
 per-file .gitmodules = file:/third_party/OWNERS
 
 # Add owners to source related files
-per-file .gitignore,.gitmodules = file:/manifests/OWNERS
+per-file .gitignore,.gitmodules = file:/manifests/SOURCE_OWNERS
 
 # OSS Compliance:
 per-file **/README.fuchsia = file:/build/licenses/OWNERS
