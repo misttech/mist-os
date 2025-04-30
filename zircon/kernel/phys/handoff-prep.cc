@@ -367,16 +367,6 @@ void HandoffPrep::SetVersionString(ktl::string_view version) {
 
   debugf("%s: Handing off at physical load address %#" PRIxPTR ", entry %#" PRIx64 "...\n",
          gSymbolize->name(), kernel.physical_load_address(), kernel.entry());
-#ifdef __aarch64__
-  // Make sure all prior stores have been written back to main memory so that
-  // secondary CPUs booting with MMU/caches off will see a coherent view.
-  //
-  // TODO(https://fxbug.dev/42164859): This is expediently done to the whole
-  // cache rather than to the lines possibly holding the precise memory of
-  // interest to the secondaries. Formalize or rethink this hammer in the
-  // context of the physboot's hand-off contract with the kernel.
-  arch::CleanAndInvalidateLocalCaches();
-#endif
   kernel.Handoff<void(PhysHandoff*)>(handoff());
   ZX_PANIC("ElfImage::Handoff returned!");
 }

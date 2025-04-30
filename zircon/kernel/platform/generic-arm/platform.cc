@@ -135,25 +135,6 @@ void platform_halt_cpu(void) {
 }
 
 zx_status_t platform_start_cpu(cpu_num_t cpu_id, uint64_t mpid) {
-  auto clean_data_object = [](auto& mem) {
-    ZX_ASSERT(sizeof(mem) < arm64_dcache_size);
-    __asm__ volatile("dc cvac, %0" ::"r"(&mem), "m"(mem));
-  };
-
-  // We must ensure that the memory the secondary CPUs will touch before
-  // enabling its caches (i.e., at .Lmmu_enable in start.S) is coherent with
-  // the boot CPU. Beyond the instruction memory itself, this is comprised of
-  // the variables modified by the boot CPU and read by the secondaries in
-  // this stage, which are those holding the root bootstrap and kernel page
-  // tables. We explicitly clean that memory to the point of coherency and
-  // issue a memory barrier to commit them.
-  //
-  // TODO(https://fxbug.dev/42164859): Explicitly clean the pre-caches-on
-  // instruction memory as well.
-  clean_data_object(root_lower_page_table_phys);
-  clean_data_object(root_kernel_page_table_phys);
-  arch::ThreadMemoryBarrier();
-
   uintptr_t kernel_secondary_entry_paddr =
       KernelPhysicalLoadAddress() + (reinterpret_cast<uintptr_t>(&arm64_secondary_start) -
                                      reinterpret_cast<uintptr_t>(__executable_start));
@@ -172,6 +153,16 @@ zx::result<power_cpu_state> platform_get_cpu_state(cpu_num_t cpu_id) {
 }
 
 static void topology_cpu_init(void) {
+  // We need booted secondary CPUs - *before* they enable their caches - to
+  // have a view of the relevant memory that's coherent with the boot CPU. It
+  // should suffice to ensure that (1) the code the secondary CPUs would touch
+  // before enabling data caches and (2) the variables it loads are cleaned to
+  // the point of coherency. While we could be surgical about that, it suffices
+  // to simply clean the whole kernel load image, which surely includes (1) and
+  // (2).
+  arch_clean_cache_range(reinterpret_cast<vaddr_t>(__executable_start),
+                         static_cast<size_t>(_end - __executable_start));
+
   for (auto* node : system_topology::GetSystemTopology().processors()) {
     if (node->entity.discriminant != ZBI_TOPOLOGY_ENTITY_PROCESSOR ||
         node->entity.processor.architecture_info.discriminant !=
