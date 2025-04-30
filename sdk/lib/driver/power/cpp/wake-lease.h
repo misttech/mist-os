@@ -152,15 +152,15 @@ class ManagedWakeLease {
 // dropped.
 class SharedWakeLease {
  public:
-  explicit SharedWakeLease(const std::shared_ptr<WakeLease>& lease) : fdf_lease_(lease) {}
-  zx::result<zx::eventpair> GetWakeLeaseCopy() { return fdf_lease_->GetWakeLeaseCopy(); }
+  explicit SharedWakeLease(const std::shared_ptr<WakeLease>& lease) : lease_(lease) {}
+  zx::result<zx::eventpair> GetDuplicateLeaseHandle() { return lease_->GetWakeLeaseCopy(); }
   // Intended for testing, gets a shared pointer to the wrapped
   // fdf_power::WakeLease object.
-  std::shared_ptr<WakeLease> GetFdfLease() { return fdf_lease_; }
-  ~SharedWakeLease() { zx::result<zx::eventpair> obsolete_lease = fdf_lease_->TakeWakeLease(); }
+  std::shared_ptr<WakeLease> GetWakeLease() { return lease_; }
+  ~SharedWakeLease() { zx::result<zx::eventpair> obsolete_lease = lease_->TakeWakeLease(); }
 
  private:
-  std::shared_ptr<WakeLease> fdf_lease_;
+  std::shared_ptr<WakeLease> lease_;
 };
 
 // This class is **not** threadsafe! `SharedWakeLeaseProvider` and

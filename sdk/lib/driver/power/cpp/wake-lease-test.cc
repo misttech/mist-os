@@ -354,7 +354,7 @@ TEST_F(WakeLeaseTest, SharedWakeLeaseProviderTest) {
       // the SharedWakeLease after all strong pointers to it were
       // dropped.
       fdf_power::SharedWakeLease* old_addr = op1.get();
-      std::shared_ptr<fdf_power::WakeLease> first_lease = op1->GetFdfLease();
+      std::shared_ptr<fdf_power::WakeLease> first_lease = op1->GetWakeLease();
       op1.reset();
       op2.reset();
 
@@ -369,7 +369,7 @@ TEST_F(WakeLeaseTest, SharedWakeLeaseProviderTest) {
 
       // The fdf_power::WakeLease should be the same, even though the
       // SharedWakeLease changed.
-      std::shared_ptr<fdf_power::WakeLease> second_lease = op3->GetFdfLease();
+      std::shared_ptr<fdf_power::WakeLease> second_lease = op3->GetWakeLease();
       EXPECT_EQ(first_lease, second_lease);
 
       client_loop.Quit();
