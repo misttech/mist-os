@@ -38,16 +38,8 @@ common_board_configuration = {
     "fuchsia::sdhci",
   ]
 
-  input_bundles = [
-    ":main_bundle",
-    ":x64_common",
-    ":paver",
-    "//boards/emulation/virtio",
-  ]
-
-  # TODO(https://fxbug.dev/388852272): Enable this once vendor repos properly
-  # swap both the independent BIBs and the BIBs from sets.
-  # board_input_bundle_sets = [ ":x64_bibs" ]
+  input_bundles = [ ":paver" ]
+  board_input_bundle_sets = [ ":x64_bibs" ]
 
   filesystems = {
     vbmeta = {
