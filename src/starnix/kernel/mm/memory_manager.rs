@@ -1262,7 +1262,7 @@ impl MemoryManagerState {
 
         #[cfg(feature = "alternate_anon_allocs")]
         {
-            for (range, mapping) in self.mappings.intersection(&unmap_range) {
+            for (range, mapping) in self.mappings.range(unmap_range.clone()) {
                 // Deallocate any pages in the private, anonymous backing that are now unreachable.
                 if let MappingBacking::PrivateAnonymous = mapping.backing() {
                     let unmapped_range = &unmap_range.intersect(range);
