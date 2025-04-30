@@ -16,7 +16,7 @@ use fidl_contrib::ProtocolConnector;
 use fidl_fuchsia_metrics::MetricEvent;
 use fuchsia_cobalt_builders::MetricEventExt;
 use fuchsia_inspect::{self as inspect, HistogramProperty, LinearHistogramParams, Property};
-use futures::future::{self, join_all, LocalBoxFuture};
+use futures::future::{self, LocalBoxFuture};
 use futures::stream::FuturesUnordered;
 use futures::{FutureExt, StreamExt};
 use log::*;
@@ -51,9 +51,6 @@ pub struct PlatformMetricsBuilder<'a> {
     inspect_root: Option<&'a inspect::Node>,
     cpu_temperature_handler: Option<Rc<dyn Node>>,
     crash_report_handler: Option<Rc<dyn Node>>,
-    sensor_temperature_poll_interval: Option<Seconds>,
-    sensor_temperature_measurement_buffer_capacity: Option<usize>,
-    sensor_temperature_handlers: Option<Vec<Rc<dyn Node>>>,
     throttle_debounce_timeout: Seconds,
 }
 
@@ -110,15 +107,12 @@ impl<'a> PlatformMetricsBuilder<'a> {
         struct Config {
             cpu_temperature_poll_interval_s: f64,
             throttle_debounce_timeout_s: f64,
-            sensor_temperature_poll_interval_s: Option<f64>,
-            sensor_temperature_measurement_buffer_capacity: Option<usize>,
         }
 
         #[derive(Deserialize)]
         struct Dependencies {
             cpu_temperature_handler_node: String,
             crash_report_handler_node: String,
-            sensor_temperature_handler_nodes: Option<Vec<String>>,
         }
 
         #[derive(Deserialize)]
@@ -128,11 +122,6 @@ impl<'a> PlatformMetricsBuilder<'a> {
         }
 
         let data: JsonData = json::from_value(json_data).unwrap();
-        let sensor_temperature_handlers = match data.dependencies.sensor_temperature_handler_nodes {
-            Some(ns) => Some(ns.into_iter().map(|n| (nodes[&n].clone())).collect()),
-            None => None,
-        };
-
         Self {
             cpu_temperature_poll_interval: Seconds(data.config.cpu_temperature_poll_interval_s),
             cpu_temperature_handler: Some(
@@ -141,14 +130,6 @@ impl<'a> PlatformMetricsBuilder<'a> {
             cobalt_sender: None,
             inspect_root: None,
             crash_report_handler: Some(nodes[&data.dependencies.crash_report_handler_node].clone()),
-            sensor_temperature_poll_interval: data
-                .config
-                .sensor_temperature_poll_interval_s
-                .map(|i| Seconds(i)),
-            sensor_temperature_measurement_buffer_capacity: data
-                .config
-                .sensor_temperature_measurement_buffer_capacity,
-            sensor_temperature_handlers: sensor_temperature_handlers,
             throttle_debounce_timeout: Seconds(data.config.throttle_debounce_timeout_s),
         }
     }
@@ -159,21 +140,6 @@ impl<'a> PlatformMetricsBuilder<'a> {
     ) -> Result<Rc<PlatformMetrics>> {
         let cpu_temperature_handler = ok_or_default_err!(self.cpu_temperature_handler)?;
         let crash_report_handler = ok_or_default_err!(self.crash_report_handler)?;
-        let sensor_temperature_handling = {
-            match (
-                self.sensor_temperature_handlers,
-                self.sensor_temperature_poll_interval,
-                self.sensor_temperature_measurement_buffer_capacity,
-            ) {
-                (Some(handlers), Some(poll_interval), Some(measurement_buffer_capacity)) => Some(SensorTemperatureHandling {
-                    handlers,
-                    poll_interval,
-                    measurement_buffer_capacity,
-                }),
-                (None, None, None) => None,
-                _ => return Err(format_err!("Invalid combination of sensor_temperature_handlers, sensor_temperature_poll_interval, and sensor_temperature_measurement_buffer_capacity set")),
-            }
-        };
 
         let cobalt_sender = self.cobalt_sender.unwrap_or_else(|| {
             let (cobalt_sender, sender_future) =
@@ -219,13 +185,11 @@ impl<'a> PlatformMetricsBuilder<'a> {
             })),
             cpu_temperature_handler,
             cpu_temperature_poll_interval: self.cpu_temperature_poll_interval,
-            sensor_temperature_handling: sensor_temperature_handling,
             crash_report_handler,
             throttle_debounce_timeout: self.throttle_debounce_timeout,
         });
 
         futures_out.push(node.clone().cpu_temperature_polling_loop());
-        futures_out.push(node.clone().sensor_temperatures_polling_loop());
 
         Ok(node)
     }
@@ -237,9 +201,6 @@ pub struct PlatformMetrics {
     cpu_temperature_handler: Rc<dyn Node>,
     cpu_temperature_poll_interval: Seconds,
 
-    /// Inspect temperature handlers and state required for reporting data to Inspect.
-    sensor_temperature_handling: Option<SensorTemperatureHandling>,
-
     /// The node used for filing a crash report. It is expected that this node responds to the
     /// `FileCrashReport` message.
     crash_report_handler: Rc<dyn Node>,
@@ -250,17 +211,6 @@ pub struct PlatformMetrics {
 
     /// Mutable inner state.
     inner: Rc<RefCell<PlatformMetricsInner>>,
-}
-
-struct SensorTemperatureHandling {
-    /// Nodes that will have their temperatures published to Inspect.
-    handlers: Vec<Rc<dyn Node>>,
-
-    /// Poll interval for reporting node temperature.
-    poll_interval: Seconds,
-
-    /// Number of temperature measurements per node to publish to Inspect.
-    measurement_buffer_capacity: usize,
 }
 
 struct PlatformMetricsInner {
@@ -336,57 +286,6 @@ impl PlatformMetrics {
         }
 
         data.inspect.historical_max_cpu_temperature.log_raw_cpu_temperature(temperature);
-    }
-
-    /// Returns a future that calls `poll_sensor_temperatures` at
-    /// `sensor_temperature_poll_interval`.
-    fn sensor_temperatures_polling_loop<'a>(self: Rc<Self>) -> LocalBoxFuture<'a, ()> {
-        if let Some(p) = &self.sensor_temperature_handling {
-            let capacity = p.measurement_buffer_capacity;
-            let mut periodic_timer = fasync::Interval::new(p.poll_interval.into());
-            return async move {
-                loop {
-                    for r in self.poll_sensor_temperatures(capacity).await {
-                        log_if_err!(r, "Error while polling temperature");
-                    }
-
-                    if let None = periodic_timer.next().await {
-                        error!("Failed to wait for next interval, stopping polling");
-                        break;
-                    }
-                }
-            }
-            .boxed_local();
-        } else {
-            return async {}.boxed_local();
-        }
-    }
-
-    /// Polls the `sensor_temperature_handlers` for temperatures and write them to the system logs.
-    // TODO(https://fxbug.dev/412649068): Write temperature data to Inspect.
-    async fn poll_sensor_temperatures(&self, capacity: usize) -> Vec<Result<()>> {
-        if let Some(p) = &self.sensor_temperature_handling {
-            let futures = p.handlers.iter().map(|h| async move {
-                (h.clone(), self.send_message(&h, &Message::ReadTemperature).await)
-            });
-            let results = join_all(futures).await;
-            return results
-                .into_iter()
-                .map(|(h, r)| match r {
-                    Ok(MessageReturn::ReadTemperature(temperature)) => {
-                        self.log_raw_sensor_temperature(&h.name(), temperature, capacity);
-                        Ok(())
-                    }
-                    e => Err(format_err!("Error polling temperature of {}: {:?}", h.name(), e)),
-                })
-                .collect();
-        } else {
-            return vec![];
-        }
-    }
-
-    fn log_raw_sensor_temperature(&self, name: &str, temperature: Celsius, capacity: usize) {
-        info!("Temperature of {} is {:?}C. Not yet published to Inspect with a buffer capacity of {} -- see https://fxbug.dev/412649068 for progress", name, temperature, capacity);
     }
 
     fn handle_log_platform_metric(
@@ -964,10 +863,9 @@ mod tests {
     use diagnostics_assertions::{assert_data_tree, HistogramAssertion};
     use fidl_fuchsia_metrics::MetricEventPayload;
 
-    /// Tests that well-formed configuration JSON without sensor temperature values does not panic
-    /// in the `new_from_json` function.
+    /// Tests that well-formed configuration JSON does not panic the `new_from_json` function.
     #[fasync::run_singlethreaded(test)]
-    async fn test_new_from_json_without_sensor_values() {
+    async fn test_new_from_json() {
         let json_data = json::json!({
             "type": "PlatformMetrics",
             "name": "platform_metrics",
@@ -985,88 +883,6 @@ mod tests {
         nodes.insert("soc_pll_thermal".to_string(), create_dummy_node());
         nodes.insert("crash_report_handler".to_string(), create_dummy_node());
         let _ = PlatformMetricsBuilder::new_from_json(json_data, &nodes);
-    }
-
-    /// Tests that well-formed configuration JSON with sensor temperature values does not panic
-    /// in the `new_from_json` function.
-    #[fasync::run_singlethreaded(test)]
-    async fn test_new_from_json_with_sensor_values() {
-        let json_data = json::json!({
-            "type": "PlatformMetrics",
-            "name": "platform_metrics",
-            "config": {
-              "cpu_temperature_poll_interval_s": 1,
-              "sensor_temperature_poll_interval_s": 2,
-              "throttle_debounce_timeout_s": 60
-            },
-            "dependencies": {
-              "cpu_temperature_handler_node": "soc_pll_thermal",
-              "sensor_temperature_handler_node": ["soc_pll_thermal"],
-              "crash_report_handler_node": "crash_report_handler"
-            }
-        });
-
-        let mut nodes: HashMap<String, Rc<dyn Node>> = HashMap::new();
-        nodes.insert("soc_pll_thermal".to_string(), create_dummy_node());
-        nodes.insert("crash_report_handler".to_string(), create_dummy_node());
-        let _ = PlatformMetricsBuilder::new_from_json(json_data, &nodes);
-    }
-
-    /// Tests that PlatformMetrics can't be built if not all sensor temperature values are
-    /// provided.
-    #[test]
-    fn test_build_returns_error_when_sensor_handlers_is_none() {
-        let inspector = inspect::Inspector::default();
-        let platform_metrics = PlatformMetricsBuilder {
-            cpu_temperature_handler: Some(create_dummy_node()),
-            crash_report_handler: Some(create_dummy_node()),
-            sensor_temperature_handlers: None,
-            sensor_temperature_poll_interval: Some(Seconds(1.0)),
-            sensor_temperature_measurement_buffer_capacity: Some(1),
-            inspect_root: Some(inspector.root()),
-            ..Default::default()
-        }
-        .build(&FuturesUnordered::new());
-
-        assert!(platform_metrics.is_err());
-    }
-
-    /// Tests that PlatformMetrics can't be built if not all sensor temperature values are
-    /// provided.
-    #[test]
-    fn test_build_returns_error_when_sensor_poll_interval_is_none() {
-        let inspector = inspect::Inspector::default();
-        let platform_metrics = PlatformMetricsBuilder {
-            cpu_temperature_handler: Some(create_dummy_node()),
-            crash_report_handler: Some(create_dummy_node()),
-            sensor_temperature_handlers: Some(vec![create_dummy_node()]),
-            sensor_temperature_poll_interval: None,
-            sensor_temperature_measurement_buffer_capacity: Some(1),
-            inspect_root: Some(inspector.root()),
-            ..Default::default()
-        }
-        .build(&FuturesUnordered::new());
-
-        assert!(platform_metrics.is_err());
-    }
-
-    /// Tests that PlatformMetrics can't be built if not all sensor temperature values are
-    /// provided.
-    #[test]
-    fn test_build_returns_error_when_sensor_measurement_capacity_is_none() {
-        let inspector = inspect::Inspector::default();
-        let platform_metrics = PlatformMetricsBuilder {
-            cpu_temperature_handler: Some(create_dummy_node()),
-            crash_report_handler: Some(create_dummy_node()),
-            sensor_temperature_handlers: Some(vec![create_dummy_node()]),
-            sensor_temperature_poll_interval: Some(Seconds(1.0)),
-            sensor_temperature_measurement_buffer_capacity: None,
-            inspect_root: Some(inspector.root()),
-            ..Default::default()
-        }
-        .build(&FuturesUnordered::new());
-
-        assert!(platform_metrics.is_err());
     }
 
     /// Tests for the correct behavior when the `ThrottlingActive` metric is received:
@@ -1420,73 +1236,6 @@ mod tests {
 
         // Verify there were no more dispatched Cobalt events
         assert!(cobalt_receiver.try_next().is_err());
-    }
-
-    /// Tests that the PlatformMetrics node correctly polls sensor temperatures and does not panic
-    /// in the process.
-    // TODO(https://fxbug.dev/412649068): Check temperatures are written to Inspect.
-    #[test]
-    fn test_sensor_temperature_logging_task() {
-        let mut executor = fasync::TestExecutor::new_with_fake_time();
-
-        // Initialize current time
-        executor.set_fake_time(Seconds(0.0).into());
-
-        let mut mock_maker = MockNodeMaker::new();
-        let mock_foo_temperature = mock_maker.make("MockFooTemperature", vec![]);
-        let mock_bar_temperature = mock_maker.make("MockBarTemperature", vec![]);
-        let inspector = inspect::Inspector::default();
-        let futures_out = FuturesUnordered::new();
-        let _platform_metrics = PlatformMetricsBuilder {
-            cpu_temperature_handler: Some(create_dummy_node()),
-            crash_report_handler: Some(create_dummy_node()),
-            cpu_temperature_poll_interval: Seconds(1.0),
-            cobalt_sender: None,
-            sensor_temperature_poll_interval: Some(Seconds(1.0)),
-            sensor_temperature_measurement_buffer_capacity: Some(1),
-            sensor_temperature_handlers: Some(vec![
-                mock_foo_temperature.clone(),
-                mock_bar_temperature.clone(),
-            ]),
-            inspect_root: Some(inspector.root()),
-            ..Default::default()
-        }
-        .build(&futures_out)
-        .unwrap();
-
-        // Resolve to a single future to provide to the executor
-        let mut futures_out = futures_out.collect::<()>();
-
-        let mut iterate_polling_loop = |foo_temperature, bar_temperature| {
-            mock_foo_temperature.add_msg_response_pair((
-                msg_eq!(ReadTemperature),
-                msg_ok_return!(ReadTemperature(foo_temperature)),
-            ));
-
-            mock_bar_temperature.add_msg_response_pair((
-                msg_eq!(ReadTemperature),
-                msg_ok_return!(ReadTemperature(bar_temperature)),
-            ));
-
-            executor.set_fake_time(executor.now() + Seconds(1.0).into());
-            assert!(executor.run_until_stalled(&mut futures_out).is_pending());
-        };
-
-        // The first poll sequence results in a poll, wait, poll because temperatures are polled
-        // before waiting.
-        mock_foo_temperature.add_msg_response_pair((
-            msg_eq!(ReadTemperature),
-            msg_ok_return!(ReadTemperature(Celsius(40.0))),
-        ));
-        mock_bar_temperature.add_msg_response_pair((
-            msg_eq!(ReadTemperature),
-            msg_ok_return!(ReadTemperature(Celsius(50.0))),
-        ));
-
-        // Iterate 60 times to perform 60 reads of both nodes.
-        for _ in 0..60 {
-            iterate_polling_loop(Celsius(40.0), Celsius(50.0));
-        }
     }
 
     /// Tests for the correct behavior when the `ThermalLoad` metric is received: record thermal
