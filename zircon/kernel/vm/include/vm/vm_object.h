@@ -555,7 +555,7 @@ class VmObject : public VmHierarchyBase,
   // on this value unless instructed by user operations, and it is therefore the responsibility of
   // the user to ensure any synchronization of the reported value with the operation being
   // requested.
-  virtual void SetUserContentSize(fbl::RefPtr<ContentSizeManager> csm) = 0;
+  virtual void SetUserStreamSize(fbl::RefPtr<ContentSizeManager> csm) = 0;
 
   // The associated VmObjectDispatcher will set an observer to notify user mode.
   void SetChildObserver(VmObjectChildObserver* child_observer);

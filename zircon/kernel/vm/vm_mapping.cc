@@ -1067,7 +1067,7 @@ ktl::pair<zx_status_t, uint32_t> VmMapping::PageFaultLocked(vaddr_t va, const ui
     // If fault-beyond-stream-size is set, throw exception on memory accesses past the page
     // containing the user defined stream size.
     const uint64_t vmo_size = (flags_ & VMAR_FLAG_FAULT_BEYOND_STREAM_SIZE)
-                                  ? *paged->saturating_content_size_locked()
+                                  ? *paged->saturating_stream_size_locked()
                                   : paged->size_locked();
     auto pages = calculate_pages(vmo_size);
     if (!pages) {
@@ -1499,7 +1499,7 @@ uint64_t VmMapping::TrimmedObjectRangeLocked(uint64_t offset, uint64_t len) cons
     VmObjectPaged* paged = DownCastVmObject<VmObjectPaged>(object_.get());
     DEBUG_ASSERT(paged);
     AssertHeld(paged->lock_ref());
-    auto stream_size_res = paged->saturating_content_size_locked();
+    auto stream_size_res = paged->saturating_stream_size_locked();
     // Creating a fault-beyond-stream-size mapping should have allocated a CSM.
     DEBUG_ASSERT(stream_size_res);
     size_t stream_size = stream_size_res.value();

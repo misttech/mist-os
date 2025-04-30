@@ -74,7 +74,7 @@ zx_status_t VmObjectDispatcher::CreateWithCsm(fbl::RefPtr<VmObject> vmo,
     return ZX_ERR_NO_MEMORY;
   }
 
-  new_handle.dispatcher()->vmo()->SetUserContentSize(ktl::move(content_size_manager));
+  new_handle.dispatcher()->vmo()->SetUserStreamSize(ktl::move(content_size_manager));
 
   new_handle.dispatcher()->vmo()->set_user_id(new_handle.dispatcher()->get_koid());
   *rights =
@@ -616,7 +616,7 @@ zx::result<fbl::RefPtr<ContentSizeManager>> VmObjectDispatcher::content_size_man
       return result.take_error();
     }
     content_size_mgr_ = ktl::move(*result);
-    vmo_->SetUserContentSize(content_size_mgr_);
+    vmo_->SetUserStreamSize(content_size_mgr_);
   }
   return zx::ok(content_size_mgr_);
 }

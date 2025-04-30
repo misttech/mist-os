@@ -4055,7 +4055,7 @@ static bool vmo_user_stream_size_test() {
     Guard<VmoLockType> guard{vmo->lock()};
     EXPECT_EQ(vmo->size_locked(), (uint64_t)4 * PAGE_SIZE);
     // Should not have an allocated stream size.
-    auto result = vmo->user_content_size_locked();
+    auto result = vmo->user_stream_size_locked();
     EXPECT_FALSE(result.has_value());
   }
 
@@ -4065,11 +4065,11 @@ static bool vmo_user_stream_size_test() {
   ASSERT_OK(csm_result.status_value());
   csm = ktl::move(*csm_result);
 
-  vmo->SetUserContentSize(csm);
+  vmo->SetUserStreamSize(csm);
 
   {
     Guard<VmoLockType> guard{vmo->lock()};
-    auto result = vmo->user_content_size_locked();
+    auto result = vmo->user_stream_size_locked();
     ASSERT_TRUE(result.has_value());
     const uint64_t stream_size = result.value();
     EXPECT_EQ(stream_size, (uint64_t)2 * PAGE_SIZE);
