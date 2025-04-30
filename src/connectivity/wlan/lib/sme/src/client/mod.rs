@@ -167,12 +167,10 @@ impl ClientConfig {
         // secure to least secure, though the APIs that expose this data provide no such guarantee.
         match bss.protection() {
             BssProtection::Open => vec![SecurityDescriptor::OPEN],
-            BssProtection::Wep => {
-                has_wep_support().then(|| vec![SecurityDescriptor::WEP]).unwrap_or_default()
-            }
-            BssProtection::Wpa1 => {
-                has_wpa1_support().then(|| vec![SecurityDescriptor::WPA1]).unwrap_or_default()
-            }
+            BssProtection::Wep if has_wep_support() => vec![SecurityDescriptor::WEP],
+            BssProtection::Wep => vec![],
+            BssProtection::Wpa1 if has_wpa1_support() => vec![SecurityDescriptor::WPA1],
+            BssProtection::Wpa1 => vec![],
             BssProtection::Wpa1Wpa2PersonalTkipOnly | BssProtection::Wpa1Wpa2Personal => {
                 has_wpa2_support()
                     .then_some(SecurityDescriptor::WPA2_PERSONAL)
@@ -180,17 +178,24 @@ impl ClientConfig {
                     .chain(has_wpa1_support().then_some(SecurityDescriptor::WPA1))
                     .collect()
             }
-            BssProtection::Wpa2PersonalTkipOnly | BssProtection::Wpa2Personal => has_wpa2_support()
-                .then(|| vec![SecurityDescriptor::WPA2_PERSONAL])
-                .unwrap_or_default(),
-            BssProtection::Wpa2Wpa3Personal => has_wpa3_support()
-                .then_some(SecurityDescriptor::WPA3_PERSONAL)
-                .into_iter()
-                .chain(has_wpa2_support().then_some(SecurityDescriptor::WPA2_PERSONAL))
-                .collect(),
-            BssProtection::Wpa3Personal => has_wpa3_support()
-                .then(|| vec![SecurityDescriptor::WPA3_PERSONAL])
-                .unwrap_or_default(),
+            BssProtection::Wpa2PersonalTkipOnly | BssProtection::Wpa2Personal
+                if has_wpa2_support() =>
+            {
+                vec![SecurityDescriptor::WPA2_PERSONAL]
+            }
+            BssProtection::Wpa2PersonalTkipOnly | BssProtection::Wpa2Personal => vec![],
+            BssProtection::Wpa2Wpa3Personal => match (has_wpa3_support(), has_wpa2_support()) {
+                (true, true) => {
+                    vec![SecurityDescriptor::WPA3_PERSONAL, SecurityDescriptor::WPA2_PERSONAL]
+                }
+                (true, false) => vec![SecurityDescriptor::WPA3_PERSONAL],
+                (false, true) => vec![SecurityDescriptor::WPA2_PERSONAL],
+                (false, false) => vec![],
+            },
+            BssProtection::Wpa3Personal if has_wpa3_support() => {
+                vec![SecurityDescriptor::WPA3_PERSONAL]
+            }
+            BssProtection::Wpa3Personal => vec![],
             // TODO(https://fxbug.dev/42174395): Implement conversions for WPA Enterprise protocols.
             BssProtection::Wpa2Enterprise | BssProtection::Wpa3Enterprise => vec![],
             BssProtection::Unknown => vec![],
