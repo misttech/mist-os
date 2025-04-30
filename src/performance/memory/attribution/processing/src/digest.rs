@@ -30,7 +30,7 @@ const ZRAM_COMPRESSED_BYTES: &str = "[Addl]ZramCompressedBytes";
 ///
 // Note: This needs to mirror `//src/lib/assembly/memory_buckets/src/memory_buckets.rs`, but cannot
 // reuse it directly because it is an host-only library.
-#[derive(Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct BucketDefinition {
     pub name: String,
     #[serde(deserialize_with = "deserialize_regex")]
@@ -161,8 +161,8 @@ impl Digest {
     /// aggregates the current memory usage into human displayable units we call buckets.
     pub fn compute(
         attribution_data_service: Arc<impl AttributionDataProvider + 'static>,
-        kmem_stats: fkernel::MemoryStats,
-        kmem_stats_compression: fkernel::MemoryStatsCompression,
+        kmem_stats: &fkernel::MemoryStats,
+        kmem_stats_compression: &fkernel::MemoryStatsCompression,
         bucket_definitions: &Vec<BucketDefinition>,
     ) -> Result<Digest, anyhow::Error> {
         let mut digest_visitor = DigestComputer::new(bucket_definitions);
@@ -357,8 +357,8 @@ mod tests {
         let (kernel_stats, kernel_stats_compression) = get_kernel_stats();
         let digest = Digest::compute(
             get_attribution_data_provider(),
-            kernel_stats,
-            kernel_stats_compression,
+            &kernel_stats,
+            &kernel_stats_compression,
             &vec![],
         )
         .unwrap();
@@ -383,8 +383,8 @@ mod tests {
         let (kernel_stats, kernel_stats_compression) = get_kernel_stats();
         let digest = Digest::compute(
             get_attribution_data_provider(),
-            kernel_stats,
-            kernel_stats_compression,
+            &kernel_stats,
+            &kernel_stats_compression,
             &vec![BucketDefinition {
                 name: "matched".to_string(),
                 process: None,
@@ -416,8 +416,8 @@ mod tests {
         let (kernel_stats, kernel_stats_compression) = get_kernel_stats();
         let digest = Digest::compute(
             get_attribution_data_provider(),
-            kernel_stats,
-            kernel_stats_compression,
+            &kernel_stats,
+            &kernel_stats_compression,
             &vec![BucketDefinition {
                 name: "matched".to_string(),
                 process: Some(Regex::new("matched")?),
@@ -449,8 +449,8 @@ mod tests {
         let (kernel_stats, kernel_stats_compression) = get_kernel_stats();
         let digest = Digest::compute(
             get_attribution_data_provider(),
-            kernel_stats,
-            kernel_stats_compression,
+            &kernel_stats,
+            &kernel_stats_compression,
             &vec![BucketDefinition {
                 name: "matched".to_string(),
                 process: Some(Regex::new("matched")?),

@@ -10,6 +10,7 @@ import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_staticlib.gni")
 import("//build/test.gni")
+import("//third_party/cobalt/metrics_registry.gni")
 
 rustc_binary("bin") {
   output_name = "memory-monitor2"
@@ -21,6 +22,7 @@ rustc_binary("bin") {
     "src/attribution_data.rs",
     "src/common.rs",
     "src/main.rs",
+    "src/metrics.rs",
     "src/resources.rs",
     "src/snapshot.rs",
   ]
@@ -28,6 +30,7 @@ rustc_binary("bin") {
   deps = [
     ":inspect_nodes",
     ":memory-monitor2-config",
+    ":memory_metrics_registry",
     ":stalls",
     ":traces",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
@@ -35,6 +38,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
     "//sdk/fidl/fuchsia.memory.attribution.plugin:fuchsia.memory.attribution.plugin_rust",
     "//sdk/fidl/fuchsia.memorypressure:fuchsia.memorypressure_rust",
+    "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//sdk/rust/zx",
     "//sdk/rust/zx-types",
     "//src/lib/fidl/rust/fidl",
@@ -46,6 +50,7 @@ rustc_binary("bin") {
     "//src/lib/trace/rust:trace",
     "//src/performance/memory/attribution/processing",
     "//src/performance/memory/index_table_builder",
+    "//third_party/cobalt/src/lib/client/rust:cobalt-client",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
@@ -60,6 +65,14 @@ rustc_binary("bin") {
     "//src/performance/memory/attribution/server",
     "//third_party/rust_crates:futures",
   ]
+}
+
+metrics_registry("memory_metrics_registry") {
+  # This must match the ID of our Cobalt project as specified in:
+  # third_party/cobalt_config/projects.yaml
+  project_id = 3509424520
+  namespace = "cobalt_registry"
+  generate_rust = true
 }
 
 rustc_library("inspect_nodes") {

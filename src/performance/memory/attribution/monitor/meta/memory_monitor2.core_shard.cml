@@ -28,6 +28,11 @@
             to: "#memory_monitor2",
         },
         {
+            protocol: "fuchsia.metrics.MetricEventLoggerFactory",
+            from: "#cobalt",
+            to: "#memory_monitor2",
+        },
+        {
             protocol: "fuchsia.memorypressure.Provider",
             from: "#memory_pressure_signaler",
             to: "#memory_monitor2",

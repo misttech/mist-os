@@ -15,6 +15,7 @@ use fuchsia_trace::duration;
 use futures::StreamExt;
 use log::{error, warn};
 use memory_monitor2_config::Config;
+use metrics::{collect_metrics, create_metric_event_logger};
 use resources::Job;
 use snapshot::AttributionSnapshot;
 use std::sync::Arc;
@@ -25,12 +26,13 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_kernel as fkernel,
     fidl_fuchsia_memory_attribution as fattribution,
     fidl_fuchsia_memory_attribution_plugin as fattribution_plugin,
-    fidl_fuchsia_memorypressure as fpressure,
+    fidl_fuchsia_memorypressure as fpressure, fidl_fuchsia_metrics as fmetrics,
 };
 
 mod attribution_client;
 mod attribution_data;
 mod common;
+mod metrics;
 mod resources;
 mod snapshot;
 
@@ -57,14 +59,16 @@ async fn main() -> Result<(), Error> {
     let introspector =
         connect_to_protocol_at_path::<fcomponent::IntrospectorMarker>(&INTROSPECTOR_PATH)
             .context("Failed to connect to the memory attribution provider")?;
-    let root_job = connect_to_protocol::<fkernel::RootJobForInspectMarker>()
-        .context("Error connecting to the root job")?
-        .get()
-        .await?;
+    let root_job: Mutex<Box<dyn Job>> = Mutex::new(Box::new(
+        connect_to_protocol::<fkernel::RootJobForInspectMarker>()
+            .context("error connecting to the root job")?
+            .get()
+            .await?,
+    ));
     let attribution_client = attribution_client::AttributionClientImpl::new(
         attribution_provider,
         introspector,
-        root_job.get_koid().context("Unable to get the root job's koid")?,
+        root_job.lock().get_koid().context("Unable to get the root job's koid")?,
     );
 
     let kernel_stats = connect_to_protocol::<fkernel::StatsMarker>()
@@ -84,15 +88,8 @@ async fn main() -> Result<(), Error> {
         stall_provider.clone(),
     ));
 
-    let root_job: Mutex<Box<dyn Job>> = Mutex::new(Box::new(
-        connect_to_protocol::<fkernel::RootJobForInspectMarker>()
-            .context("error connecting to the root job")?
-            .get()
-            .await?,
-    ));
-
     let attribution_data_provider = AttributionDataProviderImpl::new(attribution_client, root_job);
-
+    let bucket_definitions = read_bucket_definitions();
     // Serves Fuchsia component inspection protocol
     // https://fuchsia.dev/fuchsia-src/development/diagnostics/inspect
     let _inspect_nodes_service = inspect_nodes::start_service(
@@ -102,8 +99,17 @@ async fn main() -> Result<(), Error> {
         Config::take_from_startup_handle(),
         connect_to_protocol::<fpressure::ProviderMarker>()
             .context("Failed to connect to the memory pressure provider")?,
-        read_bucket_definitions(),
+        bucket_definitions.clone(),
     )?;
+
+    let metric_event_logger_factory =
+        connect_to_protocol::<fmetrics::MetricEventLoggerFactoryMarker>()?;
+    let _collect_metrics_task = collect_metrics(
+        attribution_data_provider.clone(),
+        kernel_stats.clone(),
+        create_metric_event_logger(metric_event_logger_factory).await?,
+        bucket_definitions,
+    );
 
     service_fs
         .for_each_concurrent(None, |stream| async {

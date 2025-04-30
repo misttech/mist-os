@@ -259,6 +259,7 @@ fn digest_service(
                 _ = timer => {timer = new_timer(current_level);}
             };
 
+            let timestamp = zx::BootInstant::get();
             // Retrieve (concurrently) the data necessary to perform the aggregation.
             let (kmem_stats, kmem_stats_compression) = try_join!(
                 kernel_stats_proxy.get_memory_stats().map_err(anyhow::Error::from),
@@ -268,8 +269,8 @@ fn digest_service(
             // Compute the aggregation.
             let Digest { buckets } = Digest::compute(
                 attribution_data_service.clone(),
-                kmem_stats,
-                kmem_stats_compression,
+                &kmem_stats,
+                &kmem_stats_compression,
                 &bucket_definitions,
             )?;
 
@@ -287,7 +288,7 @@ fn digest_service(
 
             // Add an entry for the current aggregation.
             buckets_list_node.add_entry(|n| {
-                n.record_int("timestamp", zx::BootInstant::get().into_nanos());
+                n.record_int("timestamp", timestamp.into_nanos());
                 let ia = n.create_uint_array("bucket_sizes", buckets.len());
                 for (i, b) in buckets.iter().enumerate() {
                     ia.set(i, b.size as u64);
