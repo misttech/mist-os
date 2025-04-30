@@ -643,7 +643,7 @@ async fn handle_event(
                         FlashMessage::Progress(FlashProgress::OemCommand {
                             oem_command: oem_command.clone(),
                         }),
-                        format!("Sendinge command: \"{}\"", oem_command),
+                        format!("Sending command: \"{}\"", oem_command),
                     );
                     writer.machine_or(&machine, message)?;
                 }
