@@ -111,13 +111,14 @@ differ in that we don't want to drop the initial iterations' timings.
 ## Running the Benchmarks
 1. Include `//src/storage/benchmarks` in `fx set`.
 2. Run `fx test fuchsia-pkg://fuchsia.com/storage-benchmarks#meta/storage-benchmarks.cm`
-3. If you are running on an emulator, provide an external block device to run the tests on:
+3. If you are running on an emulator, you will need to run the emulator in UEFI mode:
 
-```
-touch /tmp/blk.bin
-truncate -s 256M /tmp/blk.bin
-fdisk /tmp/blk.bin  # Press 'g' to create a GPT partition table, and then 'w' to save
-fx qemu -kN  -- -drive file=/tmp/blk.bin,index=0,media=disk,cache=directsync
+```sh
+ffx emu start --net tap -H --uefi \
+  --vbmeta-key \
+    third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem \
+  --vbmeta-key-metadata \
+    third_party/android/platform/external/avb/test/data/atx_metadata.bin
 ```
 
 The set of benchmarks and filesystems can filtered with the `--filter` flag.
