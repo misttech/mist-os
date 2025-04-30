@@ -54,6 +54,9 @@ source_set("top") {
       # Platform Drivers
       "//vendor/misttech/src/devices/bus/drivers/platform",
 
+      # Board Drivers (x86)
+      "//vendor/misttech/src/devices/board/drivers/x86",
+
       # PCI Drivers
       "//vendor/misttech/src/devices/bus/drivers/pci:bus-pci-driver",
     ]
