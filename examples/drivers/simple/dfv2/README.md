@@ -25,6 +25,8 @@ $ fx build
 
 ## Running
 
+Note: Ensure you have a package server serving to the emulator.
+
 Register the driver by running this command
 ```bash
 $ ffx driver register fuchsia-pkg://fuchsia.com/simple_driver#meta/simple_driver.cm
