@@ -2013,10 +2013,6 @@ assembly_input_bundle("standard_userdebug") {
           destination = "config.json"
         },
         {
-          source = "//src/diagnostics/detect/configs/netstack-detect.triage"
-          destination = "netstack-detect.triage"
-        },
-        {
           source = "//src/diagnostics/detect/configs/cobalt-detect.triage"
           destination = "cobalt-detect.triage"
         },
