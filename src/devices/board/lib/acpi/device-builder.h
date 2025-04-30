@@ -9,6 +9,7 @@
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
+#include <lib/mistos/util/bstring.h>
 #include <lib/zx/result.h>
 #include <stdint.h>
 
@@ -68,7 +69,7 @@ struct OwnedStringProp : zx_device_str_prop_t {
   }
 
  private:
-  std::string value_;
+  mtl::BString value_;
 };
 
 // PCI topology in the ACPI format.
@@ -100,7 +101,7 @@ class DeviceBuilder {
   }
 
   static DeviceBuilder MakeRootDevice(ACPI_HANDLE handle, zx_device_t* acpi_root) {
-    DeviceBuilder builder("root", handle, nullptr, false, 0);
+    DeviceBuilder builder("root"sv, handle, nullptr, false, 0);
     builder.zx_device_ = acpi_root;
     return builder;
   }
@@ -148,7 +149,7 @@ class DeviceBuilder {
   bool HasBusId() { return bus_id_.has_value(); }
 
   // For unit test use only.
-  // std::vector<OwnedStringProp>& GetStrProps() { return str_props_; }
+  fbl::Vector<OwnedStringProp>& GetStrProps() { return str_props_; }
 
   uint32_t device_id() const { return device_id_; }
 
@@ -176,7 +177,7 @@ class DeviceBuilder {
   bool CheckForDeviceTreeCompatible(acpi::Acpi* acpi);
 
   // Information about the device to be published.
-  std::string name_;
+  mtl::BString name_;
   ACPI_HANDLE handle_;
   BusType bus_type_ = kUnknown;
   // For PCI, this is the result of evaluating _BBN.

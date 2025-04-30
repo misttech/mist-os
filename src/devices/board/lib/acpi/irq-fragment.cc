@@ -26,7 +26,12 @@ IrqFragment::IrqFragment(/*async_dispatcher_t* dispatcher,*/ acpi::Device& paren
 
 zx::result<> IrqFragment::Create(/*async_dispatcher_t* dispatcher,*/ acpi::Device& parent,
                                  uint32_t irq_index, uint32_t acpi_device_id) {
-  auto device = std::unique_ptr<IrqFragment>(new IrqFragment(/*dispatcher,*/ parent, irq_index));
+  fbl::AllocChecker ac;
+  auto device =
+      std::unique_ptr<IrqFragment>(new (&ac) IrqFragment(/*dispatcher,*/ parent, irq_index));
+  if (!ac.check()) {
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
 
   auto result = device->Init(acpi_device_id);
   if (result.is_ok()) {

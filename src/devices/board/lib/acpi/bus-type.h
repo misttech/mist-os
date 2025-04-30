@@ -5,29 +5,18 @@
 #ifndef SRC_DEVICES_BOARD_LIB_ACPI_BUS_TYPE_H_
 #define SRC_DEVICES_BOARD_LIB_ACPI_BUS_TYPE_H_
 
-#ifndef __mist_os__
-#ifdef __Fuchsia__
+#ifdef __mist_os__
 #include <bind/fuchsia/acpi/cpp/bind.h>
-#endif
 #endif
 
 namespace acpi {
-#ifndef __mist_os__
-#ifdef __Fuchsia__
+#ifdef __mist_os__
 enum BusType {
   kUnknown = bind_fuchsia_acpi::BIND_ACPI_BUS_TYPE_UNKNOWN,
   kPci = bind_fuchsia_acpi::BIND_ACPI_BUS_TYPE_PCI,
   kSpi = bind_fuchsia_acpi::BIND_ACPI_BUS_TYPE_SPI,
   kI2c = bind_fuchsia_acpi::BIND_ACPI_BUS_TYPE_I2C,
 };
-#else
-enum BusType {
-  kUnknown = 0,
-  kPci,
-  kSpi,
-  kI2c,
-};
-#endif  // __Fuchsia__
 #else
 enum BusType {
   kUnknown = 0,

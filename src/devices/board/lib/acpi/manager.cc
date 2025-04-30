@@ -1,3 +1,4 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -86,8 +87,8 @@ acpi::status<> Manager::ConfigureDiscoveredDevices() {
 
           // If this device is a bus, figure out its bus id.
           // For PCI buses, we us the BBN ("BIOS Bus Number") from ACPI.
-          // For other buses, we simply have a counter of the number of that kind
-          // of bus we've encountered.
+          // For other buses, we simply have a counter of the number of that
+          // kind of bus we've encountered.
           uint32_t bus_id;
           if (type == BusType::kPci) {
             // The first PCI bus we encounter is special.
@@ -207,7 +208,7 @@ acpi::status<bool> Manager::DiscoverDevice(ACPI_HANDLE handle) {
     return result.take_error();
   }
   UniquePtr<ACPI_DEVICE_INFO> info = std::move(result.value());
-  std::string name(reinterpret_cast<char*>(&info->Name), sizeof(info->Name));
+  std::string_view name(reinterpret_cast<char*>(&info->Name), sizeof(info->Name));
 
   // TODO(https://fxbug.dev/42160841): newer versions of ACPICA return this from GetObjectInfo().
   auto state_result = acpi_->EvaluateObject(handle, "_STA", std::nullopt);

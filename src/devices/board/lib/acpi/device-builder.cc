@@ -23,9 +23,6 @@
 
 #define LOCAL_TRACE 0
 
-// Define operator new/delete for the kernel context
-void* operator new(unsigned long size) { return malloc(size); }
-
 namespace acpi {
 
 acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, acpi::Manager* manager,
@@ -43,20 +40,22 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, acpi::Manager* m
 
   // TODO(https://fxbug.dev/42158705): Handle other resources like serial buses.
   auto result = acpi->WalkResources(
-      handle_, "_CRS", [this, acpi, manager, &callback](ACPI_RESOURCE* res) -> acpi::status<> {
-        fbl::AllocChecker ac;
-        ACPI_HANDLE bus_parent = nullptr;
-        BusType type = BusType::kUnknown;
-        DeviceChildEntry entry;
-        const char* bus_id_prop;
-        if (resource_is_spi(res)) {
-          type = BusType::kSpi;
-          auto result = resource_parse_spi(acpi, handle_, res, &bus_parent);
-          if (result.is_error()) {
-            LTRACEF("Failed to parse SPI resource: %d\n", result.error_value());
-            return result.take_error();
-          }
-          bus_id_prop = bind_fuchsia::SPI_BUS_ID.data();
+      handle_, "_CRS",
+      util::allocate_function(
+          [this, acpi, manager, &callback](ACPI_RESOURCE* res) -> acpi::status<> {
+            fbl::AllocChecker ac;
+            ACPI_HANDLE bus_parent = nullptr;
+            BusType type = BusType::kUnknown;
+            DeviceChildEntry entry;
+            const char* bus_id_prop;
+            if (resource_is_spi(res)) {
+              type = BusType::kSpi;
+              auto result = resource_parse_spi(acpi, handle_, res, &bus_parent);
+              if (result.is_error()) {
+                LTRACEF("Failed to parse SPI resource: %d\n", result.error_value());
+                return result.take_error();
+              }
+              bus_id_prop = bind_fuchsia::SPI_BUS_ID.data();
 #if 0
           entry = result.value();
           bus_id_prop = /*bind_fuchsia::SPI_BUS_ID.c_str()*/ "fuchsia.BIND_SPI_BUS_ID";
@@ -67,14 +66,14 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, acpi::Manager* m
               &ac);
           ZX_ASSERT(ac.check());
 #endif
-        } else if (resource_is_i2c(res)) {
-          type = BusType::kI2c;
-          auto result = resource_parse_i2c(acpi, handle_, res, &bus_parent);
-          if (result.is_error()) {
-            LTRACEF("Failed to parse I2C resource: %d\n", result.error_value());
-            return result.take_error();
-          }
-          bus_id_prop = bind_fuchsia::I2C_BUS_ID.data();
+            } else if (resource_is_i2c(res)) {
+              type = BusType::kI2c;
+              auto result = resource_parse_i2c(acpi, handle_, res, &bus_parent);
+              if (result.is_error()) {
+                LTRACEF("Failed to parse I2C resource: %d\n", result.error_value());
+                return result.take_error();
+              }
+              bus_id_prop = bind_fuchsia::I2C_BUS_ID.data();
 #if 0
           entry = result.value();
           bus_id_prop = /*bind_fuchsia::I2C_BUS_ID.c_str()*/ "fuchsia.BIND_I2C_BUS_ID";
@@ -84,21 +83,21 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, acpi::Manager* m
               &ac);
           ZX_ASSERT(ac.check());
 #endif
-        } else if (resource_is_irq(res)) {
-          irq_count_++;
-        }
+            } else if (resource_is_irq(res)) {
+              irq_count_++;
+            }
 
-        if (bus_parent) {
-          size_t bus_index = callback(bus_parent, type, entry);
-          DeviceBuilder* b = manager->LookupDevice(bus_parent);
-          buses_.push_back(ktl::move(std::pair<DeviceBuilder*, size_t>(b, bus_index)), &ac);
-          ZX_ASSERT(ac.check());
-          str_props_.push_back(OwnedStringProp(bus_id_prop, b->GetBusId()), &ac);
-          ZX_ASSERT(ac.check());
-          has_address_ = true;
-        }
-        return acpi::ok();
-      });
+            if (bus_parent) {
+              size_t bus_index = callback(bus_parent, type, entry);
+              DeviceBuilder* b = manager->LookupDevice(bus_parent);
+              buses_.push_back(ktl::move(std::pair<DeviceBuilder*, size_t>(b, bus_index)), &ac);
+              ZX_ASSERT(ac.check());
+              str_props_.push_back(OwnedStringProp(bus_id_prop, b->GetBusId()), &ac);
+              ZX_ASSERT(ac.check());
+              has_address_ = true;
+            }
+            return acpi::ok();
+          }));
 
   if (result.is_error() && result.zx_status_value() != ZX_ERR_NOT_FOUND) {
     return result.take_error();
@@ -190,14 +189,18 @@ zx::result<zx_device_t*> DeviceBuilder::Build(acpi::Manager* manager) {
     }
     device_args.SetBusMetadata(std::move(*metadata), bus_type_, GetBusId());
   }
-  auto device = std::make_unique<Device>(std::move(device_args));
+
+  fbl::AllocChecker ac;
+  auto device = fbl::make_unique_checked<Device>(&ac, std::move(device_args));
+  if (!ac.check()) {
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
 
   // Narrow our custom type down to zx_device_str_prop_t.
   // Any strings in zx_device_str_prop_t will still point at their equivalents
   // in the original str_props_ array.
   fbl::Vector<zx_device_str_prop_t> str_props_for_ddkadd;
   for (auto& str_prop : str_props_) {
-    fbl::AllocChecker ac;
     str_props_for_ddkadd.push_back(str_prop, &ac);
     ZX_ASSERT(ac.check());
   }

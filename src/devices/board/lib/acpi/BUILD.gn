@@ -6,11 +6,9 @@
 shared_public_deps = [
   "//src/devices/bind/fuchsia:fuchsia_cpp",
   "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
-
-  #"//src/devices/lib/iommu",
   "//third_party/acpica",
   "//vendor/misttech/src/lib/ddktl",
-  "//vendor/misttech/zircon/kernel/lib/mistos/util",
+  "//vendor/misttech/zircon/kernel/lib/mistos/util:headers",
 ]
 
 # See https://github.com/acpica/acpica/pull/856. This is technically incorrect, but necessary
@@ -36,9 +34,6 @@ shared_deps = [
 ]
 
 shared_fuchsia_deps = [
-  #"//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp",
-  #"//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_cpp",
-  #"//src/devices/lib/acpi",
   "//src/devices/pci/lib/pci",
   "//vendor/misttech/src/lib/ddk:ddk-deprecated-binding-headers",
   "//zircon/system/ulib/zircon-internal",

@@ -93,7 +93,12 @@ zx_status_t AcpiPciroot::PcirootWriteConfig32(const pci_bdf_t* address, uint16_t
 zx_status_t AcpiPciroot::Create(PciRootHost* root_host, AcpiPciroot::Context ctx,
                                 zx_device_t* parent, const char* name,
                                 fbl::Vector<pci_bdf_t> acpi_bdfs) {
-  auto pciroot = new AcpiPciroot(root_host, std::move(ctx), parent, name, std::move(acpi_bdfs));
+  fbl::AllocChecker ac;
+  auto pciroot =
+      new (&ac) AcpiPciroot(root_host, std::move(ctx), parent, name, std::move(acpi_bdfs));
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
   return pciroot->DdkAdd(ddk::DeviceAddArgs(name).set_proto_id(ZX_PROTOCOL_PCIROOT)
                          /*.set_inspect_vmo(pciroot->inspect().DuplicateVmo())*/);
 }

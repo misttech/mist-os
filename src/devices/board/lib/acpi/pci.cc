@@ -450,11 +450,16 @@ zx_status_t pci_root_host_init(zx_device_t* parent, acpi::Acpi* acpi) {
 #ifdef __aarch64__
     io_type = PCI_ADDRESS_SPACE_MEMORY;
 #endif
-    RootHost = std::make_unique<PciRootHost>(
+    fbl::AllocChecker ac;
+    RootHost = fbl::make_unique_checked<PciRootHost>(
+        &ac,
         fbl::ImportFromRawPtr<ResourceDispatcher>((ResourceDispatcher*)get_msi_resource(parent)),
         fbl::ImportFromRawPtr<ResourceDispatcher>((ResourceDispatcher*)get_mmio_resource(parent)),
         fbl::ImportFromRawPtr<ResourceDispatcher>((ResourceDispatcher*)get_ioport_resource(parent)),
         io_type);
+    if (!ac.check()) {
+      return ZX_ERR_NO_MEMORY;
+    }
   }
 
   zx_status_t st = read_mcfg_table(&RootHost->mcfgs());
