@@ -26,7 +26,7 @@ type SuccessValue = struct {};
 
 // [START errors]
 // Only erroneous statuses are listed
-type MyErrorCode = strict enum {
+type MyErrorCode = flexible enum {
     MISSING_FOO = 1; // avoid using 0
     NO_BAR = 2;
 };
