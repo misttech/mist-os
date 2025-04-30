@@ -1218,9 +1218,7 @@ class AsyncMain:
         exec_env = self._exec_env
         assert exec_env is not None
 
-        if tests.has_device_test() and await has_device_connected(
-            exec_env, recorder, parent=build_id
-        ):
+        if tests.has_device_test():
             try:
                 if self._has_tests_in_base(tests):
                     recorder.emit_info_message(
