@@ -10,6 +10,7 @@
 #include <lib/fit/defer.h>
 #include <lib/trace/event.h>
 #include <vk_dispatch_table_helper.h>
+
 #include <vulkan/vulkan_core.h>
 
 // May need to fall back to `buffer_collection_token` instead of `buffer_collection_token2`
@@ -457,7 +458,8 @@ bool ImagePipeSurfaceAsync::CreateImage(VkDevice device, VkLayerDispatchTable* p
         result = FlatlandClient()->SetImageDestinationSize(
             {{info.image_id}, {extent.width, extent.height}});
 
-        assert(alpha_flags == VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR || alpha_flags == VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR);
+        assert(alpha_flags == VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR ||
+               alpha_flags == VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR);
         auto blend_mode = alpha_flags == VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR
                               ? fuchsia_ui_composition::BlendMode::kSrc
                               : fuchsia_ui_composition::BlendMode::kSrcOver;
@@ -513,7 +515,7 @@ void ImagePipeSurfaceAsync::RemoveImage(uint32_t image_id) {
   });
 }
 
-void ImagePipeSurfaceAsync::PresentImage(uint32_t image_id,
+void ImagePipeSurfaceAsync::PresentImage(bool immediate, uint32_t image_id,
                                          std::vector<std::unique_ptr<PlatformEvent>> acquire_fences,
                                          std::vector<std::unique_ptr<PlatformEvent>> release_fences,
                                          VkQueue queue) {
@@ -540,9 +542,9 @@ void ImagePipeSurfaceAsync::PresentImage(uint32_t image_id,
 
   queue_.push_back({image_id, std::move(acquire_events), std::move(release_fence_signalers)});
 
-  async::PostTask(loop_.dispatcher(), [this]() {
+  async::PostTask(loop_.dispatcher(), [this, immediate]() {
     std::lock_guard<std::mutex> lock(mutex_);
-    PresentNextImageLocked();
+    PresentNextImageLocked(immediate);
   });
 }
 
@@ -550,7 +552,7 @@ SupportedImageProperties& ImagePipeSurfaceAsync::GetSupportedImageProperties() {
   return supported_image_properties_;
 }
 
-void ImagePipeSurfaceAsync::PresentNextImageLocked() {
+void ImagePipeSurfaceAsync::PresentNextImageLocked(bool immediate) {
   if (queue_.empty())
     return;
   TRACE_DURATION("gfx", "ImagePipeSurfaceAsync::PresentNextImageLocked");
@@ -574,6 +576,8 @@ void ImagePipeSurfaceAsync::PresentNextImageLocked() {
     // previous frame's |release_fences|.
     previous_present_release_fence_signalers_.swap(present.release_fences);
 
+    bool squashable = immediate;
+
     // To guarantee FIFO mode, we can't have Scenic drop any of our frames.
     // We accomplish that by setting unsquashable flag.
     fuchsia_ui_composition::PresentArgs present_args;
@@ -581,23 +585,24 @@ void ImagePipeSurfaceAsync::PresentNextImageLocked() {
     present_args.requested_presentation_time(0)
         .acquire_fences(std::move(present.acquire_fences))
         .release_fences(std::move(release_events))
-        .unsquashable(true);
+        .unsquashable(!squashable);
 
     OneWayResult result = FlatlandClient()->SetContent({kRootTransform, {present.image_id}});
     if (result.is_error()) {
       fprintf(stderr, "%s: SetContent failed: %s\n", kTag,
               result.error_value().FormatDescription().c_str());
     }
-    flatland_connection_->Present(std::move(present_args),
-                                  // Called on the async loop.
-                                  [this, release_fences = std::move(present.release_fences)](
-                                      zx_time_t actual_presentation_time) {
-                                    std::lock_guard<std::mutex> lock(mutex_);
-                                    for (auto& fence : release_fences) {
-                                      fence->reset();
-                                    }
-                                    PresentNextImageLocked();
-                                  });
+    flatland_connection_->Present(
+        std::move(present_args),
+        // Called on the async loop.
+        [this, immediate,
+         release_fences = std::move(present.release_fences)](zx_time_t actual_presentation_time) {
+          std::lock_guard<std::mutex> lock(mutex_);
+          for (auto& fence : release_fences) {
+            fence->reset();
+          }
+          PresentNextImageLocked(immediate);
+        });
   }
 
   queue_.erase(queue_.begin());

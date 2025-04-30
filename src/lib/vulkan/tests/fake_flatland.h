@@ -7,9 +7,13 @@
 #include <fuchsia/ui/composition/cpp/fidl_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/cpp/task.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/binding.h>
+#include <lib/zx/time.h>
+#include <zircon/errors.h>
 
+#include <atomic>
 #include <set>
 
 #include <gtest/gtest.h>
@@ -42,7 +46,7 @@ class FakeFlatland : public fuchsia::ui::composition::testing::Allocator_TestBas
         allocator_binding_(this, std::move(allocator_request), loop_.dispatcher()),
         flatland_binding_(this, std::move(flatland_request), loop_.dispatcher()),
         should_present_(should_present) {
-    loop_.StartThread();
+    loop_.StartThread("fake flatland");
   }
 
   ~FakeFlatland() { loop_.Shutdown(); }
@@ -157,34 +161,79 @@ class FakeFlatland : public fuchsia::ui::composition::testing::Allocator_TestBas
     image_on_root_transform_ = content_id.value;
   }
 
+  static bool squashable(const fuchsia::ui::composition::PresentArgs& args) {
+    return !args.has_unsquashable() || !args.unsquashable();
+  }
+
   // |fuchsia::ui::composition::testing::Flatland|
   void Present(fuchsia::ui::composition::PresentArgs args) override {
     std::unique_lock<std::mutex> lock(mutex_);
 
+    ASSERT_EQ(args.acquire_fences().size(), 1U);
     acquire_fences_.insert(ZirconIdFromHandle(args.acquire_fences()[0].get()));
 
     zx_signals_t pending;
     zx_status_t status = args.acquire_fences()[0].wait_one(
         ZX_EVENT_SIGNALED, zx::deadline_after(zx::sec(10)), &pending);
 
-    if (status == ZX_OK) {
-      if (should_present_) {
-        if (!args.release_fences().empty()) {
-          args.release_fences()[0].signal(0, ZX_EVENT_SIGNALED);
-        }
-        // Run OnNextFrameBegin callback.
-        fuchsia::ui::composition::OnNextFrameBeginValues values;
-        values.set_additional_present_credits(1);
-        flatland_binding_.events().OnNextFrameBegin(std::move(values));
+    if (status != ZX_OK || !should_present_) {
+      presented_.push_back({image_on_root_transform_, status});
+      return;
+    }
 
-        // Run OnFramePresented callback.
-        fuchsia::scenic::scheduling::FramePresentedInfo frame_presented_info;
-        fuchsia::scenic::scheduling::PresentReceivedInfo received_info;
-        frame_presented_info.presentation_infos.emplace_back(std::move(received_info));
-        flatland_binding_.events().OnFramePresented(std::move(frame_presented_info));
+    pending_present_count_++;
+    if (!squashable(args) || pending_present_count_ == 1) {
+      static zx::time last_present_time;
+      zx::time current_time = zx::clock::get_monotonic();
+      zx::duration time_since_last_present = current_time - last_present_time;
+      zx::duration time_to_next_vsync = zx::usec(16666) - time_since_last_present;
+      if (time_to_next_vsync < zx::duration(0)) {
+        time_to_next_vsync = zx::duration(0);
+      }
+      last_present_time = current_time + time_to_next_vsync;
+
+      zx_status_t status = async::PostDelayedTask(
+          loop_.dispatcher(),
+          [this, args = std::move(args)]() mutable {
+            PresentImpl(image_on_root_transform_, std::move(args));
+          },
+          time_to_next_vsync);
+      // Loop may be shutting down.
+      EXPECT_TRUE(status == ZX_OK || status == ZX_ERR_BAD_STATE);
+    } else {
+      dropped_frame_count_ += 1;
+      if (!args.release_fences().empty()) {
+        args.release_fences()[0].signal(0, ZX_EVENT_SIGNALED);
       }
     }
-    presented_.push_back({image_on_root_transform_, status});
+  }
+
+  void PresentImpl(uint64_t image_id, fuchsia::ui::composition::PresentArgs args) {
+    std::unique_lock<std::mutex> lock(mutex_);
+
+    if (!args.release_fences().empty()) {
+      args.release_fences()[0].signal(0, ZX_EVENT_SIGNALED);
+    }
+
+    bool first_time = presented_.empty();
+
+    // When the client is sending squashable presents assume they're trying to maximize fps,
+    // so allow lots of present credits.
+    uint32_t present_credits = (first_time && squashable(args)) ? 10 : pending_present_count_;
+
+    // Run OnNextFrameBegin callback.
+    fuchsia::ui::composition::OnNextFrameBeginValues values;
+    values.set_additional_present_credits(present_credits);
+    flatland_binding_.events().OnNextFrameBegin(std::move(values));
+
+    pending_present_count_ = 0;
+    presented_.push_back({image_id, ZX_OK});
+
+    // Run OnFramePresented callback.
+    fuchsia::scenic::scheduling::FramePresentedInfo frame_presented_info;
+    fuchsia::scenic::scheduling::PresentReceivedInfo received_info;
+    frame_presented_info.presentation_infos.emplace_back(std::move(received_info));
+    flatland_binding_.events().OnFramePresented(std::move(frame_presented_info));
   }
 
   uint32_t presented_count() {
@@ -196,6 +245,8 @@ class FakeFlatland : public fuchsia::ui::composition::testing::Allocator_TestBas
     std::unique_lock<std::mutex> lock(mutex_);
     return static_cast<uint32_t>(acquire_fences_.size());
   }
+
+  int dropped_frame_count() { return dropped_frame_count_.load(); }
 
   struct Presented {
     uint64_t image_id;
@@ -211,10 +262,12 @@ class FakeFlatland : public fuchsia::ui::composition::testing::Allocator_TestBas
   std::set<zx_koid_t> registered_koids;
   std::set<uint64_t> registered_images;
   uint64_t image_on_root_transform_ = 0;
-  bool should_present_;
+  const bool should_present_;
   std::mutex mutex_;
   std::vector<Presented> presented_;
   std::set<uint64_t> acquire_fences_;
+  int pending_present_count_ = 0;
+  std::atomic_int dropped_frame_count_ = 0;
 };
 
 void GetFakeFlatlandInjectedToLib(std::unique_ptr<FakeFlatland>* flatland, bool should_present) {

@@ -112,13 +112,17 @@ class TestSurface {
                                                                     present_modes.data()));
 
     bool found_fifo = false;
+    bool found_immediate = false;
     for (auto mode : present_modes) {
       if (mode == VK_PRESENT_MODE_FIFO_KHR) {
         found_fifo = true;
-        break;
+      }
+      if (mode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
+        found_immediate = true;
       }
     }
     EXPECT_TRUE(found_fifo);
+    EXPECT_EQ(found_immediate, !use_framebuffer_);
 
     vkDestroySurfaceKHR(vk_instance_, surface, nullptr);
   }
@@ -141,8 +145,7 @@ TEST(Surface, CreateFramebufferSurfaceDynamicSymbol) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   loop.StartThread();
   // Perform a backtrace if the test takes too long to try to diagnose https://fxbug.dev/42060352
-  async::PostDelayedTask(
-      loop.dispatcher(), []() { backtrace_request_all_threads(); }, zx::sec(20));
+  async::PostDelayedTask(loop.dispatcher(), []() { backtrace_request_all_threads(); }, zx::sec(20));
 
   TestSurface(true).CreateSurface(true);
   // Cancels the backtrace request if it hasn't yet executed.

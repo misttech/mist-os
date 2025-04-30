@@ -68,6 +68,23 @@ class ImagePipeSurface {
   virtual bool GetSize(uint32_t* width_out, uint32_t* height_out) { return false; }
 
   virtual bool IsLost() { return false; }
+
+  // Vulkan defines immediate as presentation that doesn't wait for the vblank period to update
+  // the current image; so, switching buffers can result in tearing.
+  // Importantly, with immediate update, the previous image should also become immediately
+  // available for reuse, making this mode useful for measuring maximum render rate.
+  //
+  // Flatland and display drivers don't support unsynchronized updates, so we approximate
+  // it by ignoring fences.  This allows the client to reuse an image before its release
+  // semaphores are signaled, so the client doesn't wait to acquire a swapchain buffer.
+  // We also send a fake acquire fence to remove any associated delays.
+  //
+  // The difference is in the amount of tearing:
+  // - spec: less tearing, just the transition from one complete image to another
+  // - implementation: more tearing, the visible image may be incomplete
+  //
+  virtual bool SupportsImmediatePresentMode() { return false; }
+
   // Adds an image resource to image pipe.
   virtual bool CreateImage(VkDevice device, VkLayerDispatchTable* pDisp, VkFormat format,
                            VkImageUsageFlags usage, VkSwapchainCreateFlagsKHR swapchain_flags,
@@ -78,7 +95,7 @@ class ImagePipeSurface {
   // Removes an image resource from the pipe.
   virtual void RemoveImage(uint32_t image_id) = 0;
   // Enqueues the specified image for presentation.
-  virtual void PresentImage(uint32_t image_id,
+  virtual void PresentImage(bool immediate, uint32_t image_id,
                             std::vector<std::unique_ptr<PlatformEvent>> acquire_fences,
                             std::vector<std::unique_ptr<PlatformEvent>> release_fences,
                             VkQueue queue) = 0;
@@ -113,22 +130,25 @@ class ImagePipeSurface {
   virtual VkResult GetPresentModes(VkPhysicalDevice physicalDevice,
                                    VkLayerInstanceDispatchTable* dispatch_table, uint32_t* pCount,
                                    VkPresentModeKHR* pPresentModes) {
-    constexpr int kPresentModeCount = 1;
-    constexpr VkPresentModeKHR kPresentModes[kPresentModeCount] = {VK_PRESENT_MODE_FIFO_KHR};
+    std::vector<VkPresentModeKHR> present_modes{VK_PRESENT_MODE_FIFO_KHR};
+
+    if (SupportsImmediatePresentMode()) {
+      present_modes.push_back(VK_PRESENT_MODE_IMMEDIATE_KHR);
+    }
 
     if (!pPresentModes) {
-      *pCount = kPresentModeCount;
+      *pCount = static_cast<uint32_t>(present_modes.size());
       return VK_SUCCESS;
     }
 
     VkResult result = VK_SUCCESS;
-    if (*pCount < kPresentModeCount) {
+    if (*pCount < present_modes.size()) {
       result = VK_INCOMPLETE;
     } else {
-      *pCount = kPresentModeCount;
+      *pCount = static_cast<uint32_t>(present_modes.size());
     }
 
-    memcpy(pPresentModes, kPresentModes, (*pCount) * sizeof(VkPresentModeKHR));
+    memcpy(pPresentModes, present_modes.data(), (*pCount) * sizeof(VkPresentModeKHR));
     return result;
   }
 
