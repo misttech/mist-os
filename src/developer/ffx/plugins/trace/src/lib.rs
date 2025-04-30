@@ -500,6 +500,7 @@ async fn stop_tracing(
     skip_symbolization: bool,
     no_verify_trace: bool,
 ) -> Result<()> {
+    writer.line("Trace completed! Copying trace from device...")?;
     let res = proxy.stop_recording(&output).await?;
     let (_target, output_file) = match res {
         Ok((target, output_file, categories, stop_result)) => {
@@ -512,6 +513,7 @@ async fn stop_tracing(
             let skip_symbolization =
                 skip_symbolization || !expanded_categories.contains(&"kernel:ipc".to_string());
             if !no_verify_trace || !skip_symbolization {
+                writer.line("Post Processing Trace...")?;
                 let warnings = process_trace_file(
                     &output_file,
                     &output_file,
@@ -1364,6 +1366,7 @@ Current tracing status:
         .await;
         let output = test_buffers.into_stdout_str();
         let regex_str = "Tracing categories: \\[\\]...\n\
+            Trace completed! Copying trace from device...\n\
             Results written to /([^/]+/)+?foober.fxt\n\
             Upload to https://ui.perfetto.dev/#!/ to view.";
         let want = Regex::new(regex_str).unwrap();
@@ -1397,6 +1400,7 @@ Current tracing status:
         let output = test_buffers.into_stdout_str();
         let regex_str = "Tracing categories: \\[\\]...\n\
             Press <enter> to stop trace.\n\
+            Trace completed! Copying trace from device...\n\
             Results written to /([^/]+/)+?foober.fxt\n\
             Upload to https://ui.perfetto.dev/#!/ to view.";
         let want = Regex::new(regex_str).unwrap();
@@ -1430,6 +1434,7 @@ Current tracing status:
         let output = test_buffers.into_stdout_str();
         let regex_str = "Tracing categories: \\[\\]...\n\
             Press <enter> to stop trace.\n\
+            Trace completed! Copying trace from device...\n\
             Results written to /([^/]+/)+?foober.fxt\n\
             Upload to https://ui.perfetto.dev/#!/ to view.";
         let want = Regex::new(regex_str).unwrap();
