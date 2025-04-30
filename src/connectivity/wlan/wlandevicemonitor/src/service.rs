@@ -225,11 +225,11 @@ async fn handle_single_new_iface(
 }
 
 fn list_phys(phys: &PhyMap) -> Vec<u16> {
-    phys.get_snapshot().iter().map(|(phy_id, _)| *phy_id).collect()
+    phys.get_snapshot().keys().copied().collect()
 }
 
 fn list_ifaces(ifaces: &IfaceMap) -> Vec<u16> {
-    ifaces.get_snapshot().iter().map(|(iface_id, _)| *iface_id).collect()
+    ifaces.get_snapshot().keys().copied().collect()
 }
 
 fn get_dev_path(phys: &PhyMap, phy_id: u16) -> Option<String> {
