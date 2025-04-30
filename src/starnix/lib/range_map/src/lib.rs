@@ -1666,9 +1666,10 @@ where
         Iter { forward, backward, root: &self.node }
     }
 
-    /// Iterate over the ranges in the map, starting at the first range starting after or at the given point.
-    pub fn iter_starting_at(&self, key: K) -> impl Iterator<Item = (&Range<K>, &V)> {
-        self.range(key..).filter(move |(range, _)| key <= range.start)
+    /// Find the first range in the map that starts at or after the given key.
+    pub fn find_at_or_after(&self, key: K) -> Option<(&Range<K>, &V)> {
+        let mut iter = self.range(key..).filter(move |(range, _)| key <= range.start);
+        iter.next()
     }
 }
 
@@ -1754,14 +1755,14 @@ mod test {
 
         assert!(iter.next().is_none());
 
-        let mut iter = map.iter_starting_at(10);
-        assert_eq!(iter.next().expect("missing elem"), (&(10..34), &-14));
-        let mut iter = map.iter_starting_at(11);
-        assert_eq!(iter.next().expect("missing elem"), (&(74..92), &-12));
-        let mut iter = map.iter_starting_at(74);
-        assert_eq!(iter.next().expect("missing elem"), (&(74..92), &-12));
-        let mut iter = map.iter_starting_at(75);
-        assert_eq!(iter.next(), None);
+        let entry = map.find_at_or_after(10);
+        assert_eq!(entry.expect("missing elem"), (&(10..34), &-14));
+        let entry = map.find_at_or_after(11);
+        assert_eq!(entry.expect("missing elem"), (&(74..92), &-12));
+        let entry = map.find_at_or_after(74);
+        assert_eq!(entry.expect("missing elem"), (&(74..92), &-12));
+        let entry = map.find_at_or_after(75);
+        assert_eq!(entry, None);
 
         assert_eq!(map.range(..9).collect::<Vec<_>>(), vec![]);
         assert_eq!(map.range(..34).collect::<Vec<_>>(), vec![(&(10..34), &-14)]);
@@ -2043,7 +2044,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    fn test_large_insert_and_iter_starting_at() {
+    fn test_large_insert_and_range() {
         let mut map = RangeMap::<u32, i32>::default();
         let num_entries = 1000;
 
@@ -2055,9 +2056,9 @@ mod test {
             map.insert(start..end, value);
         }
 
-        // Verify iter_starting_at()
+        // Verify range(start_point..)
         let start_point = 5000;
-        let mut iter = map.iter_starting_at(start_point);
+        let mut iter = map.range(start_point..);
         while let Some((range, _)) = iter.next() {
             assert!(range.start >= start_point);
         }

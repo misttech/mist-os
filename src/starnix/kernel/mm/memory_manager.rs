@@ -1951,7 +1951,7 @@ impl MemoryManagerState {
     /// If such a mapping exists, this function returns the address at which that mapping starts
     /// and the mapping itself.
     fn next_mapping_if_growsdown(&self, addr: UserAddress) -> Option<(UserAddress, &Mapping)> {
-        match self.mappings.iter_starting_at(addr).next() {
+        match self.mappings.find_at_or_after(addr) {
             Some((range, mapping)) => {
                 if range.contains(&addr) {
                     // |addr| is already contained within a mapping, nothing to grow.
@@ -4399,8 +4399,7 @@ impl SequenceFileSource for ProcMapsFile {
             return Ok(None);
         };
         let state = mm.state.read();
-        let mut iter = state.mappings.iter_starting_at(cursor);
-        if let Some((range, map)) = iter.next() {
+        if let Some((range, map)) = state.mappings.find_at_or_after(cursor) {
             write_map(&task, sink, range, map)?;
             return Ok(Some(range.end));
         }
@@ -4431,8 +4430,7 @@ impl SequenceFileSource for ProcSmapsFile {
             return Ok(None);
         };
         let state = mm.state.read();
-        let mut iter = state.mappings.iter_starting_at(cursor);
-        if let Some((range, map)) = iter.next() {
+        if let Some((range, map)) = state.mappings.find_at_or_after(cursor) {
             write_map(&task, sink, range, map)?;
 
             let size_kb = (range.end.ptr() - range.start.ptr()) / 1024;
