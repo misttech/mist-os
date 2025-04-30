@@ -6,10 +6,12 @@ use super::iio_file::{IioDirectory0, IioDirectory1};
 use super::power_supply_file::{BatteryPowerSupply, BmsPowerSupply, UsbPowerSupply};
 use super::qbg_battery_file::create_battery_profile_device;
 use super::qbg_file::{create_qbg_device, QbgClassDirectory};
+use super::utils::connect_to_device;
 use starnix_core::device::kobject::DeviceMetadata;
 use starnix_core::device::DeviceMode;
 use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::CurrentTask;
+use starnix_logging::log_warn;
 use starnix_sync::{FileOpsCore, LockBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
 
@@ -17,6 +19,15 @@ pub fn hvdcp_opti_init<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask
 where
     L: LockBefore<FileOpsCore>,
 {
+    if let Err(e) = connect_to_device() {
+        // hvdcp_opti only supported on Sorrel. Let it fail.
+        log_warn!(
+            "Could not connect to hvdcp_opti server {}. This is expected on everything but Sorrel.",
+            e
+        );
+        return;
+    }
+
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
 
