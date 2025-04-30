@@ -1337,7 +1337,7 @@ mod tests {
     #[test_case(1023 => Verdict::Drop; "privileged port 1023 blocked")]
     #[test_case(53 => Verdict::Drop; "privileged port 53 blocked")]
     fn block_privileged_ports_except_ssh_http<I: TestIpExt>(port: u16) -> Verdict {
-        fn tcp_port_rule<I: IpExt>(
+        fn tcp_port_rule<I: FilterIpExt>(
             src_port: Option<PortMatcher>,
             dst_port: Option<PortMatcher>,
             action: Action<I, FakeDeviceClass, ()>,
@@ -1355,7 +1355,7 @@ mod tests {
             )
         }
 
-        fn default_filter_rules<I: IpExt>() -> Routine<I, FakeDeviceClass, ()> {
+        fn default_filter_rules<I: FilterIpExt>() -> Routine<I, FakeDeviceClass, ()> {
             Routine {
                 rules: vec![
                     // pass in proto tcp to port 22;

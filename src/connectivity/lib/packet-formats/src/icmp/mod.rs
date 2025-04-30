@@ -209,6 +209,15 @@ pub trait IcmpPacketTypeRaw<B: SplitByteSliceMut, I: Ip>:
     fn update_checksum_header_field_u16(&mut self, old: u16, new: u16) {
         self.update_checksum_header_field(U16::new(old), U16::new(new))
     }
+
+    /// Recalculates and attempts to write a checksum for this packet.
+    ///
+    /// Returns whether the checksum was successfully calculated and written. In
+    /// the false case, self is left unmodified.
+    fn try_write_checksum(&mut self, src_addr: I::Addr, dst_addr: I::Addr) -> bool;
+
+    /// Returns a mutable reference to the body of this packet.
+    fn message_body_mut(&mut self) -> &mut B;
 }
 
 impl<B: SplitByteSliceMut> IcmpPacketTypeRaw<B, Ipv4> for Icmpv4PacketRaw<B> {
@@ -218,6 +227,14 @@ impl<B: SplitByteSliceMut> IcmpPacketTypeRaw<B, Ipv4> for Icmpv4PacketRaw<B> {
 
     fn update_checksum_header_field<F: IntoBytes + Immutable>(&mut self, old: F, new: F) {
         crate::icmpv4_dispatch!(self: raw, p => p.update_checksum_header_field(old, new))
+    }
+
+    fn try_write_checksum(&mut self, src_addr: Ipv4Addr, dst_addr: Ipv4Addr) -> bool {
+        crate::icmpv4_dispatch!(self: raw, p => p.try_write_checksum(src_addr, dst_addr))
+    }
+
+    fn message_body_mut(&mut self) -> &mut B {
+        crate::icmpv4_dispatch!(self: raw, p => p.message_body_mut())
     }
 }
 
@@ -232,6 +249,14 @@ impl<B: SplitByteSliceMut> IcmpPacketTypeRaw<B, Ipv6> for Icmpv6PacketRaw<B> {
 
     fn update_checksum_header_field<F: IntoBytes + Immutable>(&mut self, old: F, new: F) {
         crate::icmpv6_dispatch!(self: raw, p => p.update_checksum_header_field(old, new))
+    }
+
+    fn try_write_checksum(&mut self, src_addr: Ipv6Addr, dst_addr: Ipv6Addr) -> bool {
+        crate::icmpv6_dispatch!(self: raw, p => p.try_write_checksum(src_addr, dst_addr))
+    }
+
+    fn message_body_mut(&mut self) -> &mut B {
+        crate::icmpv6_dispatch!(self: raw, p => p.message_body_mut())
     }
 }
 
@@ -253,6 +278,14 @@ impl<I: IcmpIpExt, B: SplitByteSliceMut, M: IcmpMessage<I>> IcmpPacketTypeRaw<B,
     fn update_checksum_header_field<F: IntoBytes + Immutable>(&mut self, old: F, new: F) {
         let checksum = &mut self.header.prefix.checksum;
         *checksum = internet_checksum::update(*checksum, old.as_bytes(), new.as_bytes());
+    }
+
+    fn try_write_checksum(&mut self, src_addr: I::Addr, dst_addr: I::Addr) -> bool {
+        self.try_write_checksum(src_addr, dst_addr)
+    }
+
+    fn message_body_mut(&mut self) -> &mut B {
+        self.message_body_mut()
     }
 }
 
@@ -456,6 +489,11 @@ impl<I: IcmpIpExt, B: SplitByteSliceMut, M: IcmpMessage<I>> IcmpPacketRaw<I, B, 
     /// Get the mutable ICMP message.
     pub fn message_mut(&mut self) -> &mut M {
         &mut self.header.message
+    }
+
+    /// Get the mutable message body of the ICMP message.
+    pub fn message_body_mut(&mut self) -> &mut B {
+        &mut self.message_body
     }
 
     /// Attempts to calculate and write a Checksum for this [`IcmpPacketRaw`].

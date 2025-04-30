@@ -466,7 +466,7 @@ mod tests {
     }
 
     impl Protocol {
-        fn ip_proto<I: IpExt>(&self) -> Option<I::Proto> {
+        fn ip_proto<I: FilterIpExt>(&self) -> Option<I::Proto> {
             match self {
                 Self::Tcp => <&FakeTcpSegment as TransportPacketExt<I>>::proto(),
                 Self::Udp => <&FakeUdpPacket as TransportPacketExt<I>>::proto(),

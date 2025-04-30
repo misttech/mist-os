@@ -1750,6 +1750,11 @@ impl<B> TruncatingSerializer<B> {
     pub fn buffer(&self) -> &B {
         &self.buffer
     }
+
+    /// Provides mutable access to the inner buffer.
+    pub fn buffer_mut(&mut self) -> &mut B {
+        &mut self.buffer
+    }
 }
 
 impl<B: GrowBuffer + ShrinkBuffer> Serializer for TruncatingSerializer<B> {
