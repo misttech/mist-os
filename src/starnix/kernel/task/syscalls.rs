@@ -1997,9 +1997,9 @@ mod arch32 {
         sys_setgid as sys_arch32_setgid32, sys_setgroups as sys_arch32_setgroups32,
         sys_setns as sys_arch32_setns, sys_setpgid as sys_arch32_setpgid,
         sys_setpriority as sys_arch32_setpriority, sys_setresgid as sys_arch32_setresgid32,
-        sys_setresuid as sys_arch32_setresuid32, sys_setrlimit as sys_arch32_setrlimit,
-        sys_setsid as sys_arch32_setsid, sys_syslog as sys_arch32_syslog,
-        sys_unshare as sys_arch32_unshare,
+        sys_setresuid as sys_arch32_setresuid32, sys_setreuid as sys_arch32_setreuid,
+        sys_setrlimit as sys_arch32_setrlimit, sys_setsid as sys_arch32_setsid,
+        sys_syslog as sys_arch32_syslog, sys_unshare as sys_arch32_unshare,
     };
 }
 

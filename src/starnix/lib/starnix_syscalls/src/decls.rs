@@ -200,6 +200,7 @@ macro_rules! for_each_arch_arch32_syscall {
             setitimer,
             setresgid32,
             setresuid32,
+            setreuid32,
             setrlimit,
             settimeofday,
             shmat,
