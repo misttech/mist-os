@@ -37,9 +37,6 @@ mod tests;
 /// Root directory of all HCI devices
 const HCI_DEVICE_CLASS_PATH: &str = "/dev/class/bt-hci";
 
-/// Maximum amount of observed bytes in a single PacketObserver::observe
-const MAX_DATA_PER_OBSERVE: usize = 50_000;
-
 /// A `DeviceId` represents the name of a host device within the HCI_DEVICE_CLASS_PATH.
 pub(crate) type DeviceId = String;
 
@@ -178,25 +175,19 @@ async fn handle_client_request(
                 packets.extend(log.lock().iter_mut().map(|e| (&*e).to_fidl()));
             }
 
-            for (device, mut packets) in dev_packets.into_iter() {
+            for (device, packets) in dev_packets.into_iter() {
                 info!("Dumping {} packets from {} to new client..", packets.len(), device);
                 // The FIDL protocol can only send 64KiB in a message.
-                // don't send too much data at once.  We limit to 50KB for convenience to avoid
-                // calculating wire protocol overhead for now.
-                while packets.len() > 0 {
-                    let mut send_size = 0;
-                    let idx = packets
-                        .iter()
-                        .position(|packet| {
-                            send_size += packet.data.as_ref().map_or(0, Vec::len);
-                            send_size > MAX_DATA_PER_OBSERVE
-                        })
-                        .unwrap_or(packets.len());
-                    let packets_left = packets.split_off(idx);
+                // Don't send too much data at once.
+                // Max size of a packet is:
+                // 16 (table header) + (5 * 16) (envelope headers) +
+                //  (1 + 2 + 8 + 4 + (16 + 300)) (data) = 427
+                // So we can put 100 packets in a single message with some overhead.
+                for chunk in packets.chunks(100) {
                     if let Err(e) = client
                         .observe(&DevicePackets {
                             host_device: Some(device.clone()),
-                            packets: Some(packets),
+                            packets: Some(chunk.to_vec()),
                             ..Default::default()
                         })
                         .await
@@ -204,7 +195,6 @@ async fn handle_client_request(
                         warn!("Failed to send a previously observed packet to client: {e:?}");
                         return Ok(true);
                     }
-                    packets = packets_left;
                 }
             }
 
