@@ -10,6 +10,7 @@
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
 #include <mistos/hardware/pciroot/cpp/banjo.h>
+#include <trace.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls.h>
@@ -24,6 +25,8 @@
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 #include <region-alloc/region-alloc.h>
+
+#define LOCAL_TRACE 0
 
 // RootHost monitors eventpairs handed out across the PcirootProtocol to
 // be kept aware of resource allocations to downstream processes that have
@@ -40,12 +43,12 @@ zx::result<zx_paddr_t> PciRootHost::Allocate(AllocationType type, uint32_t kind,
                                              size_t size,
                                              fbl::RefPtr<ResourceDispatcher>* out_resource,
                                              fbl::RefPtr<EventPairDispatcher>* out_endpoint) {
-#if 0
   fbl::AutoLock lock(&lock_);
   RegionAllocator* allocator = nullptr;
   const char* allocator_name = nullptr;
   uint32_t rsrc_kind = 0;
-  zx::unowned_resource rsrc = mmio_resource_->borrow();
+  // fbl::RefPtr<ResourceDispatcher> rsrc;
+  //  zx::unowned_resource rsrc = mmio_resource_->borrow();
 
   if (type == kIo) {
     allocator = &io_alloc_;
@@ -55,7 +58,7 @@ zx::result<zx_paddr_t> PciRootHost::Allocate(AllocationType type, uint32_t kind,
       rsrc_kind = ZX_RSRC_KIND_MMIO;
     } else {
       rsrc_kind = ZX_RSRC_KIND_IOPORT;
-      rsrc = ioport_resource_->borrow();
+      // rsrc = ioport_resource_;
     }
   } else if (type == kMmio32) {
     allocator = &mmio32_alloc_;
@@ -88,22 +91,28 @@ zx::result<zx_paddr_t> PciRootHost::Allocate(AllocationType type, uint32_t kind,
   }
 
   if (st != ZX_OK) {
+    LTRACEF("failed to allocate %s %#lx-%#lx: %d\n", allocator_name, base, base + size, st);
     return zx::error(st);
   }
 
   uint64_t new_base = region_uptr->base;
   size_t new_size = region_uptr->size;
   // Names will be generated in the format of: PCI [Mm]io[32|64]
-  std::array<char, ZX_MAX_NAME_LEN> name = {};
-  snprintf(name.data(), name.size(), "PCI %s", allocator_name);
+  char name[ZX_MAX_NAME_LEN];
+  snprintf(name, ZX_MAX_NAME_LEN, "PCI %s", allocator_name);
 
   // Craft a resource handle for the request. All information for the allocation that the
   // caller needs is held in the resource, so we don't need explicitly pass back other parameters.
-  st = zx::resource::create(*rsrc, rsrc_kind | ZX_RSRC_FLAG_EXCLUSIVE, new_base, new_size,
-                            name.data(), name.size(), out_resource);
+  zx_rights_t rights;
+  KernelHandle<ResourceDispatcher> handle;
+  st = ResourceDispatcher::Create(&handle, &rights, rsrc_kind, new_base, new_size,
+                                  ZX_RSRC_FLAG_EXCLUSIVE, name);
   if (st != ZX_OK) {
+    LTRACEF("Failed to create resource for %s { %#lx - %#lx }: %d\n", name, new_base,
+            new_base + new_size, st);
     return zx::error(st);
   }
+  *out_resource = handle.release();
 
   // Cache the allocated region's values for output later before the uptr is moved.
   st = RecordAllocation(std::move(region_uptr), out_endpoint);
@@ -113,9 +122,8 @@ zx::result<zx_paddr_t> PciRootHost::Allocate(AllocationType type, uint32_t kind,
 
   // Discard the lifecycle aspect of the returned pointer, we'll be tracking it on the bus
   // side of things.
+  LTRACEF("assigned %s %#lx-%#lx to PciRoot.", allocator_name, new_base, new_base + new_size);
   return zx::ok(new_base);
-#endif
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
 constexpr uint64_t kU32Max = std::numeric_limits<uint32_t>::max();
@@ -134,38 +142,43 @@ zx::result<> PciRootHost::AddMmioRange(zx_paddr_t base, size_t size) {
 }
 
 void PciRootHost::ProcessQueue() {
-  /*zx_port_packet packet;
-  while (eventpair_port_.wait(zx::deadline_after(zx::msec(20)), &packet) == ZX_OK) {
+  zx_port_packet packet;
+  while (eventpair_port_->Dequeue(Deadline::after_mono(ZX_MSEC(20)), &packet) == ZX_OK) {
     if (packet.type == ZX_PKT_TYPE_SIGNAL_ONE) {
       // An eventpair downstream has died meaning that some resources need
       // to be freedom up based on its key.
       ZX_ASSERT(packet.signal.observed == ZX_EVENTPAIR_PEER_CLOSED);
       allocations_.erase(packet.key);
     }
-  }*/
+  }
 }
 
 zx_status_t PciRootHost::RecordAllocation(RegionAllocator::Region::UPtr region,
                                           fbl::RefPtr<EventPairDispatcher>* out_endpoint) {
-#if 0
-  zx::eventpair root_host_endpoint;
-  zx_status_t st = zx::eventpair::create(0, &root_host_endpoint, out_endpoint);
+  KernelHandle<EventPairDispatcher> root_host_endpoint, endpoint;
+  zx_rights_t rights;
+  zx_status_t st = EventPairDispatcher::Create(&root_host_endpoint, &endpoint, &rights);
   if (st != ZX_OK) {
     return st;
   }
+  *out_endpoint = endpoint.release();
 
   // If |out_endpoint| is closed we can reap the resource allocation given to the bus driver.
   uint64_t key = ++alloc_key_cnt_;
-  st = root_host_endpoint.wait_async(eventpair_port_, key, ZX_EVENTPAIR_PEER_CLOSED, 0);
+  fbl::RefPtr<EventPairDispatcher> ep = root_host_endpoint.dispatcher();
+  auto h = Handle::Make(ktl::move(root_host_endpoint), rights);
+  st = eventpair_port_->MakeObserver(0, h.get(), key, ZX_EVENTPAIR_PEER_CLOSED);
   if (st != ZX_OK) {
     return st;
   }
 
   // Storing the same |key| value allows us to track the eventpair peer closure
   // through the packet sent back on the port.
+  fbl::AllocChecker ac;
   allocations_[key] =
-      std::make_unique<WindowAllocation>(std::move(root_host_endpoint), std::move(region));
+      fbl::make_unique_checked<WindowAllocation>(&ac, std::move(ep), std::move(region));
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
   return ZX_OK;
-#endif
-  return ZX_ERR_NOT_SUPPORTED;
 }

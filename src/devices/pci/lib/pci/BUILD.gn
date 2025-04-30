@@ -31,9 +31,8 @@ zx_library("pci") {
     "//zircon/kernel/object:headers",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/region-alloc",
+    "//vendor/misttech/zircon/kernel/lib/mistos/util:headers",
   ]
-
-  configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
 }
 
 test("pci-roothost") {

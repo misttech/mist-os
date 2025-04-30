@@ -10,6 +10,7 @@
 // #include <lib/zx/port.h>
 #include <lib/zx/result.h>
 // #include <lib/zx/thread.h>
+#include <lib/mistos/util/allocator.h>
 #include <mistos/hardware/pciroot/cpp/banjo.h>
 #include <stdint.h>
 #include <string.h>
@@ -17,8 +18,8 @@
 #include <zircon/errors.h>
 // #include <zircon/syscalls/port.h>
 
+#include <map>
 #include <memory>
-// #include <unordered_map>
 #include <utility>
 
 #include <fbl/mutex.h>
@@ -66,12 +67,27 @@ class PciRootHost {
         mmio_resource_(std::move(unowned_mmio)),
         ioport_resource_(std::move(unowned_ioport)),
         io_type_(io_type) {
-    // ZX_ASSERT(zx::port::create(0, &eventpair_port_) == ZX_OK);
+    KernelHandle<PortDispatcher> handle;
+    zx_rights_t rights;
+    ZX_ASSERT(PortDispatcher::Create(0, &handle, &rights) == ZX_OK);
+    eventpair_port_ = handle.release();
   }
 
   zx_status_t AllocateMsi(uint32_t count, fbl::RefPtr<MsiDispatcher>* msi) {
     printf("AllocateMsi: count: %u\n", count);
-    // return zx::msi::allocate(*msi_resource_, count, msi);
+    fbl::RefPtr<MsiAllocation> alloc;
+    zx_status_t status;
+    if ((status = MsiAllocation::Create(count, &alloc)) != ZX_OK) {
+      return status;
+    }
+
+    zx_rights_t rights;
+    KernelHandle<MsiDispatcher> alloc_handle;
+    if ((status = MsiDispatcher::Create(ktl::move(alloc), &alloc_handle, &rights)) != ZX_OK) {
+      return status;
+    }
+
+    *msi = alloc_handle.release();
     return ZX_OK;
   }
 
@@ -173,9 +189,10 @@ class PciRootHost {
   };
   // The handle key is the handle value of the contained |host_peer| eventpair to keep from
   // needing to track our own unique IDs. Handle values are already unique.
-  //uint64_t alloc_key_cnt_ __TA_GUARDED(lock_) = 0;
-  // std::unordered_map<uint64_t, std::unique_ptr<WindowAllocation>> allocations_
-  // __TA_GUARDED(lock_);
+  uint64_t alloc_key_cnt_ __TA_GUARDED(lock_) = 0;
+  std::map<uint64_t, std::unique_ptr<WindowAllocation>, std::less<>,
+           util::Allocator<std::pair<const uint64_t, std::unique_ptr<WindowAllocation>>>>
+      allocations_ __TA_GUARDED(lock_);
 
   fbl::Mutex lock_;
   fbl::RefPtr<PortDispatcher> eventpair_port_ __TA_GUARDED(lock_);

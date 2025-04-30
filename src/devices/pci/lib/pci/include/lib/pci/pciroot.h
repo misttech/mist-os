@@ -163,10 +163,20 @@ class PcirootBase : public PcirootInspect {
   zx_status_t PcirootAllocateMsi(uint32_t msi_count, bool can_target_64bit,
                                  uint8_t* out_allocation_list, size_t allocation_count,
                                  size_t* out_allocation_actual) {
+    ZX_ASSERT(allocation_count == 1);
+
     // AllocateMsi already uses platform specific MSI impleemnation methods and
     // syscalls, so this likely suits most platforms.
-    // return root_host_->AllocateMsi(msi_cnt, allocation);
-    return ZX_ERR_NOT_SUPPORTED;
+    fbl::RefPtr<MsiDispatcher> msi;
+    zx_status_t status = root_host_->AllocateMsi(msi_count, &msi);
+    if (status != ZX_OK) {
+      return status;
+    }
+
+    out_allocation_list = reinterpret_cast<uint8_t*>(fbl::ExportToRawPtr(&msi));
+    ZX_ASSERT(out_allocation_list != nullptr);
+    *out_allocation_actual = 1;
+    return ZX_OK;
   }
 
   // Allocate out of the IO / MMIO32 allocators if required, otherwise try to use whichever
@@ -176,10 +186,17 @@ class PcirootBase : public PcirootInspect {
                                      size_t resource_count, size_t* out_resource_actual,
                                      uint8_t* out_token_list, size_t token_count,
                                      size_t* out_token_actual) {
-#if 0
+    ZX_ASSERT(resource_count == 1);
+    ZX_ASSERT(token_count == 1);
+    fbl::RefPtr<ResourceDispatcher> out_resource;
+    fbl::RefPtr<EventPairDispatcher> out_eventpair;
     if (type == PCI_ADDRESS_SPACE_IO) {
-      auto result = root_host_->AllocateIoWindow(in_base, size, out_resource, out_eventpair);
+      auto result = root_host_->AllocateIoWindow(in_base, size, &out_resource, &out_eventpair);
       if (result.is_ok()) {
+        out_resource_list = reinterpret_cast<uint8_t*>(fbl::ExportToRawPtr(&out_resource));
+        ZX_ASSERT(out_resource_list != nullptr);
+        out_token_list = reinterpret_cast<uint8_t*>(fbl::ExportToRawPtr(&out_eventpair));
+        ZX_ASSERT(out_token_list != nullptr);
         AddAllocatedIoRegion(ralloc_region_t{.base = result.value(), .size = size});
         *out_base = result.value();
       }
@@ -187,22 +204,28 @@ class PcirootBase : public PcirootInspect {
     }
 
     if (!low) {
-      auto result = root_host_->AllocateMmio64Window(in_base, size, out_resource, out_eventpair);
+      auto result = root_host_->AllocateMmio64Window(in_base, size, &out_resource, &out_eventpair);
       if (result.is_ok()) {
+        out_resource_list = reinterpret_cast<uint8_t*>(fbl::ExportToRawPtr(&out_resource));
+        ZX_ASSERT(out_resource_list != nullptr);
+        out_token_list = reinterpret_cast<uint8_t*>(fbl::ExportToRawPtr(&out_eventpair));
+        ZX_ASSERT(out_token_list != nullptr);
         AddAllocatedMmioRegion(ralloc_region_t{.base = result.value(), .size = size});
         *out_base = result.value();
       }
       return result.status_value();
     }
 
-    auto result = root_host_->AllocateMmio32Window(in_base, size, out_resource, out_eventpair);
+    auto result = root_host_->AllocateMmio32Window(in_base, size, &out_resource, &out_eventpair);
     if (result.is_ok()) {
+      out_resource_list = reinterpret_cast<uint8_t*>(fbl::ExportToRawPtr(&out_resource));
+      ZX_ASSERT(out_resource_list != nullptr);
+      out_token_list = reinterpret_cast<uint8_t*>(fbl::ExportToRawPtr(&out_eventpair));
+      ZX_ASSERT(out_token_list != nullptr);
       AddAllocatedMmioRegion(ralloc_region_t{.base = result.value(), .size = size});
       *out_base = result.value();
     }
     return result.status_value();
-#endif
-    return ZX_ERR_NOT_SUPPORTED;
   }
 
  private:
