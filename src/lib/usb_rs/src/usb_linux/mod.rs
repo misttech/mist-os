@@ -429,7 +429,7 @@ impl InterfaceInner {
         if let BufferAction::CopyOut(buf) = buffer_action {
             // SAFETY: As above.
             unsafe {
-                buf[..actual_length].copy_from_slice(&(*urb.buf.get())[..actual_length]);
+                buf[..actual_length].copy_from_slice(&(&(*urb.buf.get()))[..actual_length]);
             }
         }
 
