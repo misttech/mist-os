@@ -33,11 +33,11 @@ include /src/virtualization/OWNERS
 include /third_party/rust_crates/vendor/chrono-0.4.34/OWNERS
 include /third_party/rust_crates/vendor/euclid-0.22.1/OWNERS
 include /third_party/rust_crates/vendor/float-cmp-0.8.0/OWNERS
-include /third_party/rust_crates/vendor/num-0.4.0/OWNERS
-include /third_party/rust_crates/vendor/num-bigint-0.4.3/OWNERS
-include /third_party/rust_crates/vendor/num-complex-0.4.0/OWNERS
-include /third_party/rust_crates/vendor/num-integer-0.1.44/OWNERS
-include /third_party/rust_crates/vendor/num-iter-0.1.42/OWNERS
-include /third_party/rust_crates/vendor/num-rational-0.4.0/OWNERS
+include /third_party/rust_crates/vendor/num-0.4.3/OWNERS
+include /third_party/rust_crates/vendor/num-bigint-0.4.6/OWNERS
+include /third_party/rust_crates/vendor/num-complex-0.4.6/OWNERS
+include /third_party/rust_crates/vendor/num-integer-0.1.46/OWNERS
+include /third_party/rust_crates/vendor/num-iter-0.1.45/OWNERS
+include /third_party/rust_crates/vendor/num-rational-0.4.2/OWNERS
 include /third_party/rust_crates/vendor/proptest-1.5.0/OWNERS
 include /tools/zedmon/OWNERS

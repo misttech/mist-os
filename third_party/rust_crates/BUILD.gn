@@ -607,7 +607,7 @@ group("nu-ansi-term") {
 }
 
 group("num") {
-  public_deps = [ ":num-v0_4_0" ]
+  public_deps = [ ":num-v0_4_3" ]
 }
 
 group("num-derive") {
@@ -10096,35 +10096,35 @@ rust_library("nu-ansi-term-v0_46_0") {
   applicable_licenses = [ ":nu-ansi-term-v0_46_0.license" ]
 }
 
-license("num-v0_4_0.license") {
+license("num-v0_4_3.license") {
   public_package_name = "num"
   license_files = [
-    "//third_party/rust_crates/vendor/num-0.4.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/num-0.4.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/num-0.4.3/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/num-0.4.3/LICENSE-MIT",
   ]
 }
 
-rust_library("num-v0_4_0") {
+rust_library("num-v0_4_3") {
   crate_name = "num"
-  crate_root = "//third_party/rust_crates/vendor/num-0.4.0/src/lib.rs"
-  output_name = "num-bbbc48fd5d807e0a"
+  crate_root = "//third_party/rust_crates/vendor/num-0.4.3/src/lib.rs"
+  output_name = "num-5d5e2d7481f49f6"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":num-bigint-v0_4_3" ]
-  deps += [ ":num-complex-v0_4_0" ]
-  deps += [ ":num-integer-v0_1_44" ]
-  deps += [ ":num-iter-v0_1_42" ]
-  deps += [ ":num-rational-v0_4_0" ]
+  deps += [ ":num-bigint-v0_4_6" ]
+  deps += [ ":num-complex-v0_4_6" ]
+  deps += [ ":num-integer-v0_1_46" ]
+  deps += [ ":num-iter-v0_1_45" ]
+  deps += [ ":num-rational-v0_4_2" ]
   deps += [ ":num-traits-v0_2_19" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=bbbc48fd5d807e0a",
-    "-Cextra-filename=-bbbc48fd5d807e0a",
+    "--edition=2021",
+    "-Cmetadata=5d5e2d7481f49f6",
+    "-Cextra-filename=-5d5e2d7481f49f6",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"num-bigint\"",
     "--cfg=feature=\"rand\"",
@@ -10133,25 +10133,25 @@ rust_library("num-v0_4_0") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":num-v0_4_0.license" ]
+  applicable_licenses = [ ":num-v0_4_3.license" ]
 }
 
-license("num-bigint-v0_4_3.license") {
+license("num-bigint-v0_4_6.license") {
   public_package_name = "num_bigint"
   license_files = [
-    "//third_party/rust_crates/vendor/num-bigint-0.4.3/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/num-bigint-0.4.3/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/num-bigint-0.4.6/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/num-bigint-0.4.6/LICENSE-MIT",
   ]
 }
 
-rust_library("num-bigint-v0_4_3") {
+rust_library("num-bigint-v0_4_6") {
   crate_name = "num_bigint"
-  crate_root = "//third_party/rust_crates/vendor/num-bigint-0.4.3/src/lib.rs"
-  output_name = "num_bigint-362cd991252bf6d3"
+  crate_root = "//third_party/rust_crates/vendor/num-bigint-0.4.6/src/lib.rs"
+  output_name = "num_bigint-a0b1cf6d507a51f7"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":num-integer-v0_1_44" ]
+  deps += [ ":num-integer-v0_1_46" ]
   deps += [ ":num-traits-v0_2_19" ]
   deps += [ ":rand-v0_8_4" ]
 
@@ -10159,9 +10159,9 @@ rust_library("num-bigint-v0_4_3") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=362cd991252bf6d3",
-    "-Cextra-filename=-362cd991252bf6d3",
+    "--edition=2021",
+    "-Cmetadata=a0b1cf6d507a51f7",
+    "-Cextra-filename=-a0b1cf6d507a51f7",
     "--cfg=feature=\"rand\"",
     "--cfg=feature=\"std\"",
     "--cfg=u64_digit",
@@ -10173,7 +10173,7 @@ rust_library("num-bigint-v0_4_3") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":num-bigint-v0_4_3.license" ]
+  applicable_licenses = [ ":num-bigint-v0_4_6.license" ]
 }
 
 license("num-bigint-dig-v0_8_4.license") {
@@ -10195,8 +10195,8 @@ rust_library("num-bigint-dig-v0_8_4") {
   deps += [ ":libm-v0_2_1" ]
   deps += [ ":zeroize-v1_8_1" ]
   deps += [ ":lazy_static-v1_4_0" ]
-  deps += [ ":num-integer-v0_1_44" ]
-  deps += [ ":num-iter-v0_1_42" ]
+  deps += [ ":num-integer-v0_1_46" ]
+  deps += [ ":num-iter-v0_1_45" ]
   deps += [ ":num-traits-v0_2_19" ]
   deps += [ ":rand-v0_8_4" ]
   deps += [ ":smallvec-v1_14_0" ]
@@ -10220,18 +10220,18 @@ rust_library("num-bigint-dig-v0_8_4") {
   applicable_licenses = [ ":num-bigint-dig-v0_8_4.license" ]
 }
 
-license("num-complex-v0_4_0.license") {
+license("num-complex-v0_4_6.license") {
   public_package_name = "num_complex"
   license_files = [
-    "//third_party/rust_crates/vendor/num-complex-0.4.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/num-complex-0.4.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/num-complex-0.4.6/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/num-complex-0.4.6/LICENSE-MIT",
   ]
 }
 
-rust_library("num-complex-v0_4_0") {
+rust_library("num-complex-v0_4_6") {
   crate_name = "num_complex"
-  crate_root = "//third_party/rust_crates/vendor/num-complex-0.4.0/src/lib.rs"
-  output_name = "num_complex-2c955e71eec8ce6e"
+  crate_root = "//third_party/rust_crates/vendor/num-complex-0.4.6/src/lib.rs"
+  output_name = "num_complex-272b96fec1947b1b"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -10242,9 +10242,9 @@ rust_library("num-complex-v0_4_0") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=2c955e71eec8ce6e",
-    "-Cextra-filename=-2c955e71eec8ce6e",
+    "--edition=2021",
+    "-Cmetadata=272b96fec1947b1b",
+    "-Cextra-filename=-272b96fec1947b1b",
     "--cfg=feature=\"rand\"",
     "--cfg=feature=\"std\"",
     "--cfg=has_i128",
@@ -10253,7 +10253,7 @@ rust_library("num-complex-v0_4_0") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":num-complex-v0_4_0.license" ]
+  applicable_licenses = [ ":num-complex-v0_4_6.license" ]
 }
 
 license("num_cpus-v1_16_0.license") {
@@ -10326,18 +10326,18 @@ rust_proc_macro("num-derive-v0_4_2") {
   applicable_licenses = [ ":num-derive-v0_4_2.license" ]
 }
 
-license("num-integer-v0_1_44.license") {
+license("num-integer-v0_1_46.license") {
   public_package_name = "num_integer"
   license_files = [
-    "//third_party/rust_crates/vendor/num-integer-0.1.44/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/num-integer-0.1.44/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/num-integer-0.1.46/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/num-integer-0.1.46/LICENSE-MIT",
   ]
 }
 
-rust_library("num-integer-v0_1_44") {
+rust_library("num-integer-v0_1_46") {
   crate_name = "num_integer"
-  crate_root = "//third_party/rust_crates/vendor/num-integer-0.1.44/src/lib.rs"
-  output_name = "num_integer-2a84ff8675296986"
+  crate_root = "//third_party/rust_crates/vendor/num-integer-0.1.46/src/lib.rs"
+  output_name = "num_integer-d8ba58f200c18754"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -10347,9 +10347,9 @@ rust_library("num-integer-v0_1_44") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=2a84ff8675296986",
-    "-Cextra-filename=-2a84ff8675296986",
+    "--edition=2018",
+    "-Cmetadata=d8ba58f200c18754",
+    "-Cextra-filename=-d8ba58f200c18754",
     "--cfg=feature=\"i128\"",
     "--cfg=feature=\"std\"",
     "--cfg=has_i128",
@@ -10357,34 +10357,34 @@ rust_library("num-integer-v0_1_44") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":num-integer-v0_1_44.license" ]
+  applicable_licenses = [ ":num-integer-v0_1_46.license" ]
 }
 
-license("num-iter-v0_1_42.license") {
+license("num-iter-v0_1_45.license") {
   public_package_name = "num_iter"
   license_files = [
-    "//third_party/rust_crates/vendor/num-iter-0.1.42/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/num-iter-0.1.42/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/num-iter-0.1.45/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/num-iter-0.1.45/LICENSE-MIT",
   ]
 }
 
-rust_library("num-iter-v0_1_42") {
+rust_library("num-iter-v0_1_45") {
   crate_name = "num_iter"
-  crate_root = "//third_party/rust_crates/vendor/num-iter-0.1.42/src/lib.rs"
-  output_name = "num_iter-a257411d06b07f30"
+  crate_root = "//third_party/rust_crates/vendor/num-iter-0.1.45/src/lib.rs"
+  output_name = "num_iter-afdb69516c40764a"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":num-integer-v0_1_44" ]
+  deps += [ ":num-integer-v0_1_46" ]
   deps += [ ":num-traits-v0_2_19" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=a257411d06b07f30",
-    "-Cextra-filename=-a257411d06b07f30",
+    "--edition=2018",
+    "-Cmetadata=afdb69516c40764a",
+    "-Cextra-filename=-afdb69516c40764a",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"i128\"",
     "--cfg=feature=\"std\"",
@@ -10393,35 +10393,35 @@ rust_library("num-iter-v0_1_42") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":num-iter-v0_1_42.license" ]
+  applicable_licenses = [ ":num-iter-v0_1_45.license" ]
 }
 
-license("num-rational-v0_4_0.license") {
+license("num-rational-v0_4_2.license") {
   public_package_name = "num_rational"
   license_files = [
-    "//third_party/rust_crates/vendor/num-rational-0.4.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/num-rational-0.4.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/num-rational-0.4.2/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/num-rational-0.4.2/LICENSE-MIT",
   ]
 }
 
-rust_library("num-rational-v0_4_0") {
+rust_library("num-rational-v0_4_2") {
   crate_name = "num_rational"
-  crate_root = "//third_party/rust_crates/vendor/num-rational-0.4.0/src/lib.rs"
-  output_name = "num_rational-dcc88f7010610c33"
+  crate_root = "//third_party/rust_crates/vendor/num-rational-0.4.2/src/lib.rs"
+  output_name = "num_rational-b9b1bc3711cc8cbc"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":num-bigint-v0_4_3" ]
-  deps += [ ":num-integer-v0_1_44" ]
+  deps += [ ":num-bigint-v0_4_6" ]
+  deps += [ ":num-integer-v0_1_46" ]
   deps += [ ":num-traits-v0_2_19" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=dcc88f7010610c33",
-    "-Cextra-filename=-dcc88f7010610c33",
+    "--edition=2021",
+    "-Cmetadata=b9b1bc3711cc8cbc",
+    "-Cextra-filename=-b9b1bc3711cc8cbc",
     "--cfg=feature=\"num-bigint\"",
     "--cfg=feature=\"num-bigint-std\"",
     "--cfg=feature=\"std\"",
@@ -10430,7 +10430,7 @@ rust_library("num-rational-v0_4_0") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":num-rational-v0_4_0.license" ]
+  applicable_licenses = [ ":num-rational-v0_4_2.license" ]
 }
 
 license("num-traits-v0_2_19.license") {
@@ -11782,7 +11782,7 @@ rust_library("png-v0_14_0") {
   deps += [ ":bitflags-v1_3_2" ]
   deps += [ ":deflate-v0_7_19" ]
   deps += [ ":inflate-v0_4_5" ]
-  deps += [ ":num-iter-v0_1_42" ]
+  deps += [ ":num-iter-v0_1_45" ]
 
   rustenv = []
 
@@ -13698,7 +13698,7 @@ rust_library("rsa-v0_9_7") {
   deps += [ ":zeroize-v1_8_1" ]
   deps += [ ":const-oid-v0_9_6" ]
   deps += [ ":digest-v0_10_7" ]
-  deps += [ ":num-integer-v0_1_44" ]
+  deps += [ ":num-integer-v0_1_46" ]
   deps += [ ":num-traits-v0_2_19" ]
   deps += [ ":pkcs1-v0_7_5" ]
   deps += [ ":pkcs8-v0_10_2" ]

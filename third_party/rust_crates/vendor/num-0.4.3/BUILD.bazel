@@ -6,7 +6,6 @@
 #     fx update-rustc-third-party
 ###############################################################################
 
-load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
 load("@rules_rust//rust:defs.bzl", "rust_library")
 load("@rules_license//rules:license.bzl", "license")
 load("@rules_license//rules:package_info.bzl", "package_info")
@@ -21,9 +20,9 @@ package(
 
 package_info(
     name = "package_info",
-    package_name = "num-bigint-dig",
-    package_url = "https://github.com/dignifiedquire/num-bigint",
-    package_version = "0.8.4",
+    package_name = "num",
+    package_url = "https://github.com/rust-num/num",
+    package_version = "0.4.3",
 )
 
 license(
@@ -36,7 +35,7 @@ license(
 )
 
 rust_library(
-    name = "num_bigint_dig",
+    name = "num",
     srcs = glob(
         include = ["**/*.rs"],
         allow_empty = False,
@@ -54,10 +53,10 @@ rust_library(
         ],
     ),
     crate_features = [
-        "i128",
-        "prime",
+        "default",
+        "num-bigint",
         "rand",
-        "zeroize",
+        "std",
     ],
     crate_root = "src/lib.rs",
     edition = "2021",
@@ -66,7 +65,7 @@ rust_library(
     ],
     tags = [
         "cargo-bazel",
-        "crate-name=num-bigint-dig",
+        "crate-name=num",
         "manual",
         "noclippy",
         "norustfmt",
@@ -77,78 +76,13 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "0.8.4",
+    version = "0.4.3",
     deps = [
-        "//third_party/rust_crates/ask2patch/byteorder",
-        "//third_party/rust_crates/forks/libm",
-        "//third_party/rust_crates/forks/num-bigint-dig:build_script_build",
-        "//third_party/rust_crates/forks/zeroize",
-        "//third_party/rust_crates/vendor/lazy_static-1.4.0:lazy_static",
+        "//third_party/rust_crates/vendor/num-bigint-0.4.6:num_bigint",
+        "//third_party/rust_crates/vendor/num-complex-0.4.6:num_complex",
         "//third_party/rust_crates/vendor/num-integer-0.1.46:num_integer",
         "//third_party/rust_crates/vendor/num-iter-0.1.45:num_iter",
+        "//third_party/rust_crates/vendor/num-rational-0.4.2:num_rational",
         "//third_party/rust_crates/vendor/num-traits-0.2.19:num_traits",
-        "//third_party/rust_crates/vendor/rand-0.8.4:rand",
-        "//third_party/rust_crates/vendor/smallvec-1.14.0:smallvec",
     ],
-)
-
-cargo_build_script(
-    name = "_bs",
-    srcs = glob(
-        include = ["**/*.rs"],
-        allow_empty = False,
-    ),
-    compile_data = glob(
-        include = ["**"],
-        allow_empty = True,
-        exclude = [
-            "**/* *",
-            "**/*.rs",
-            ".tmp_git_root/**/*",
-            "BUILD",
-            "BUILD.bazel",
-            "WORKSPACE",
-            "WORKSPACE.bazel",
-        ],
-    ),
-    crate_features = [
-        "i128",
-        "prime",
-        "rand",
-        "zeroize",
-    ],
-    crate_name = "build_script_build",
-    crate_root = "build.rs",
-    data = glob(
-        include = ["**"],
-        allow_empty = True,
-        exclude = [
-            "**/* *",
-            ".tmp_git_root/**/*",
-            "BUILD",
-            "BUILD.bazel",
-            "WORKSPACE",
-            "WORKSPACE.bazel",
-        ],
-    ),
-    edition = "2021",
-    pkg_name = "num-bigint-dig",
-    rustc_flags = [
-        "--cap-lints=allow",
-    ],
-    tags = [
-        "cargo-bazel",
-        "crate-name=num-bigint-dig",
-        "manual",
-        "noclippy",
-        "norustfmt",
-    ],
-    version = "0.8.4",
-    visibility = ["//visibility:private"],
-)
-
-alias(
-    name = "build_script_build",
-    actual = ":_bs",
-    tags = ["manual"],
 )
