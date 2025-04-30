@@ -51,15 +51,10 @@ zx_library("platform-bus-x86-driver") {
     "//sdk/banjo/mistos.hardware.pciroot:mistos.hardware.pciroot_banjo_cpp",
     "//src/devices/board/lib/acpi",
     "//src/devices/pci/lib/pci",
-
-    #
-    "//vendor/misttech/src/lib/ddk",
-
-    #"//zircon/kernel/lib/init",
-    #"//zircon/kernel/lib/kpci",
     "//zircon/kernel/phys:handoff",
 
-    #
+    # Vendor
+    "//vendor/misttech/src/lib/ddk",
     "//vendor/misttech/src/lib/ddk:ddk-deprecated-binding-headers",
     "//vendor/misttech/src/lib/ddktl",
   ]
