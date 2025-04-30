@@ -30,6 +30,7 @@
 #include <utility>
 
 #include "src/cobalt/bin/app/cobalt_app.h"
+#include "src/cobalt/bin/app/utils.h"
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/log_settings_command_line.h"
 #include "src/public/cobalt_config.h"
@@ -306,11 +307,7 @@ int main(int argc, const char** argv) {
         product = build_info.product_config();
       }
 
-      if (!build_info.has_version() || build_info.version().empty()) {
-        version = "<version not specified>";
-      } else {
-        version = build_info.version();
-      }
+      version = cobalt::GetSystemVersion(build_info);
     }
   }
 

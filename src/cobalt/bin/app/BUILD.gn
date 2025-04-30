@@ -207,6 +207,7 @@ cc_test_executable("cobalt_app_unittests") {
     "diagnostics_impl_test.cc",
     "metric_event_logger_impl_test.cc",
     "user_consent_watcher_test.cc",
+    "utils_test.cc",
   ]
   deps = [
     ":lib",
