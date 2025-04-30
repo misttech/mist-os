@@ -117,6 +117,9 @@ type Options = resource table {
 
     /// If true, expose fuchsia.hardware.block.volume.Service for the ramdisk.
     5: publish bool;
+
+    /// If unspecified, there is no maximum.
+    6: max_transfer_blocks uint32;
 };
 
 open protocol Controller {

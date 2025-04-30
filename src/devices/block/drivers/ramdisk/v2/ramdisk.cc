@@ -226,7 +226,7 @@ void Ramdisk::OnRequests(cpp20::span<block_server::Request> requests) TA_NO_THRE
         }
       } break;
       case block_server::Operation::Tag::Trim:
-        block_server_.SendReply(request.request_id, zx::error(ZX_ERR_NOT_SUPPORTED));
+        status = ZX_ERR_NOT_SUPPORTED;
         break;
       case block_server::Operation::Tag::CloseVmo:
         ZX_PANIC("Unexpected operation");

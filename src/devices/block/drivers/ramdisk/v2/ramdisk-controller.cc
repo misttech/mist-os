@@ -101,6 +101,9 @@ void RamdiskController::Create(CreateRequestView request, CreateCompleter::Sync&
       .block_count = block_count,
       .block_size = block_size,
   };
+  if (request->has_max_transfer_blocks()) {
+    partition_info.max_transfer_size = request->max_transfer_blocks() * block_size;
+  }
 
   static std::atomic<int> counter = 0;
 

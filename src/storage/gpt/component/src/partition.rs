@@ -26,10 +26,10 @@ impl block_server::async_interface::Interface for PartitionBackend {
         &self,
         session_manager: Arc<SessionManager<Self>>,
         stream: fblock::SessionRequestStream,
-        offset_map: Option<OffsetMap>,
+        offset_map: OffsetMap,
         block_size: u32,
     ) -> Result<(), Error> {
-        if offset_map.is_some() {
+        if offset_map.is_empty() {
             // For now, we don't support double-passthrough.  We could as needed for nested GPT.
             // If we support this, we can remove I/O and vmoid management from this struct.
             return session_manager.serve_session(stream, offset_map, block_size).await;

@@ -185,13 +185,21 @@ impl Interface for Data {
         if let Some(observer) = self.observer.as_ref() {
             observer.read(device_block_offset, block_count, vmo, vmo_offset);
         }
-        vmo.write(
-            &self.data.read_to_vec(
-                device_block_offset * self.block_size as u64,
-                block_count as u64 * self.block_size as u64,
-            )?,
-            vmo_offset,
-        )
+        if let Some(max) = self.max_transfer_blocks.as_ref() {
+            // Requests should be split up by the core library
+            assert!(block_count <= max.get());
+        }
+        if device_block_offset + block_count as u64 > self.block_count {
+            Err(zx::Status::OUT_OF_RANGE)
+        } else {
+            vmo.write(
+                &self.data.read_to_vec(
+                    device_block_offset * self.block_size as u64,
+                    block_count as u64 * self.block_size as u64,
+                )?,
+                vmo_offset,
+            )
+        }
     }
 
     async fn write(
@@ -210,10 +218,18 @@ impl Interface for Data {
                 WriteAction::Fail => return Err(zx::Status::IO),
             }
         }
-        self.data.write(
-            &vmo.read_to_vec(vmo_offset, block_count as u64 * self.block_size as u64)?,
-            device_block_offset * self.block_size as u64,
-        )
+        if let Some(max) = self.max_transfer_blocks.as_ref() {
+            // Requests should be split up by the core library
+            assert!(block_count <= max.get());
+        }
+        if device_block_offset + block_count as u64 > self.block_count {
+            Err(zx::Status::OUT_OF_RANGE)
+        } else {
+            self.data.write(
+                &vmo.read_to_vec(vmo_offset, block_count as u64 * self.block_size as u64)?,
+                device_block_offset * self.block_size as u64,
+            )
+        }
     }
 
     async fn flush(&self, _trace_flow_id: Option<NonZero<u64>>) -> Result<(), zx::Status> {
@@ -232,6 +248,10 @@ impl Interface for Data {
         if let Some(observer) = self.observer.as_ref() {
             observer.trim(device_block_offset, block_count);
         }
-        Ok(())
+        if device_block_offset + block_count as u64 > self.block_count {
+            Err(zx::Status::OUT_OF_RANGE)
+        } else {
+            Ok(())
+        }
     }
 }

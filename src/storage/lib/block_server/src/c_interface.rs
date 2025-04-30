@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{IntoSessionManager, OffsetMap, Operation, RequestTracking, SessionHelper};
+use super::{
+    DecodeResult, IntoSessionManager, OffsetMap, Operation, RequestTracking, SessionHelper,
+};
 use anyhow::Error;
 use block_protocol::{BlockFifoRequest, BlockFifoResponse};
 use fidl::endpoints::RequestStream;
@@ -65,7 +67,11 @@ impl SessionManager {
     }
 
     fn complete_request(&self, request_id: RequestId, status: zx::Status) {
-        let request = self.active_requests.lock().remove(request_id.0);
+        let request = self
+            .active_requests
+            .lock()
+            .try_remove(request_id.0)
+            .unwrap_or_else(|| panic!("Invalid request id {}", request_id.0));
         request.session.send_reply(request.request_tracking, status);
     }
 
@@ -95,7 +101,7 @@ impl super::SessionManager for SessionManager {
     async fn open_session(
         self: Arc<Self>,
         mut stream: fblock::SessionRequestStream,
-        offset_map: Option<OffsetMap>,
+        offset_map: OffsetMap,
         block_size: u32,
     ) -> Result<(), Error> {
         let (helper, fifo) = SessionHelper::new(self.clone(), offset_map, block_size)?;
@@ -235,7 +241,7 @@ impl Session {
 
             // Process pending reads.
             match self.fifo.read_uninit(&mut requests) {
-                Ok(valid_requests) => self.handle_requests(valid_requests.iter()),
+                Ok(valid_requests) => self.handle_requests(valid_requests.iter_mut()),
                 Err(zx::Status::SHOULD_WAIT) => {
                     let mut signals =
                         zx::Signals::OBJECT_READABLE | zx::Signals::USER_0 | zx::Signals::USER_1;
@@ -260,7 +266,7 @@ impl Session {
         }
     }
 
-    fn handle_requests<'a>(&self, requests: impl Iterator<Item = &'a BlockFifoRequest>) {
+    fn handle_requests<'a>(&self, requests: impl Iterator<Item = &'a mut BlockFifoRequest>) {
         let mut c_requests: [MaybeUninit<Request>; MAX_REQUESTS] =
             unsafe { MaybeUninit::uninit().assume_init() };
         let mut count = 0;
@@ -272,22 +278,53 @@ impl Session {
             .and_then(Weak::upgrade)
             .unwrap();
         for request in requests {
-            if let Some(r) = self.helper.decode_fifo_request(request) {
-                let operation = match r.operation {
-                    Ok(Operation::CloseVmo) => {
-                        self.send_reply(r.request_tracking, zx::Status::OK);
-                        continue;
+            let mut in_split = false;
+            loop {
+                if count >= MAX_REQUESTS {
+                    unsafe {
+                        (self.manager.callbacks.on_requests)(
+                            self.manager.callbacks.context,
+                            c_requests[0].as_mut_ptr(),
+                            count,
+                        );
                     }
-                    Ok(operation) => operation,
-                    Err(status) => {
-                        self.send_reply(r.request_tracking, status);
-                        continue;
+                    count = 0;
+                }
+                match self.helper.decode_fifo_request(request, in_split) {
+                    DecodeResult::Ok(decoded_request) => {
+                        if let Operation::CloseVmo = decoded_request.operation {
+                            self.send_reply(decoded_request.request_tracking, zx::Status::OK);
+                            break;
+                        }
+                        let c_request = self.manager.start_request(
+                            this.clone(),
+                            decoded_request.request_tracking,
+                            decoded_request.operation,
+                            decoded_request.vmo,
+                        );
+                        c_requests[count].write(c_request);
+                        count += 1;
+                        break;
                     }
-                };
-                let c_request =
-                    self.manager.start_request(this.clone(), r.request_tracking, operation, r.vmo);
-                c_requests[count].write(c_request);
-                count += 1;
+                    DecodeResult::Split(decoded_request) => {
+                        let c_request = self.manager.start_request(
+                            this.clone(),
+                            decoded_request.request_tracking,
+                            decoded_request.operation,
+                            decoded_request.vmo,
+                        );
+                        c_requests[count].write(c_request);
+                        count += 1;
+                        in_split = true;
+                    }
+                    DecodeResult::InvalidRequest(tracking, status) => {
+                        self.send_reply(tracking, status);
+                        break;
+                    }
+                    DecodeResult::IgnoreRequest => {
+                        break;
+                    }
+                }
             }
         }
         if count > 0 {

@@ -112,5 +112,6 @@ group("tests") {
   deps = [
     ":block_server_cc_tests_package",
     ":block_server_tests",
+    "integration:tests",
   ]
 }

@@ -1,4 +1,4 @@
-// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use anyhow::{anyhow, Error};
@@ -32,12 +32,17 @@ pub enum DeviceInfo {
 }
 
 impl DeviceInfo {
+    fn max_transfer_blocks(&self) -> Option<NonZero<u32>> {
+        match self {
+            Self::Block(BlockInfo { max_transfer_blocks, .. }) => max_transfer_blocks.clone(),
+            Self::Partition(PartitionInfo { max_transfer_blocks, .. }) => {
+                max_transfer_blocks.clone()
+            }
+        }
+    }
+
     fn max_transfer_size(&self, block_size: u32) -> u32 {
-        let max_blocks = match self {
-            Self::Block(BlockInfo { max_transfer_blocks, .. }) => max_transfer_blocks,
-            Self::Partition(PartitionInfo { max_transfer_blocks, .. }) => max_transfer_blocks,
-        };
-        if let Some(max_blocks) = max_blocks {
+        if let Some(max_blocks) = self.max_transfer_blocks() {
             max_blocks.get() * block_size
         } else {
             MAX_TRANSFER_UNBOUNDED
@@ -93,14 +98,14 @@ impl FifoMessageGroup {
     }
 }
 
-#[derive(Default)]
-struct FifoMessageGroups(Mutex<BTreeMap<u16, FifoMessageGroup>>);
-
 // Keeps track of all the group requests that are currently being processed
+#[derive(Default)]
+struct FifoMessageGroups(Mutex<BTreeMap<GroupOrRequest, FifoMessageGroup>>);
+
 impl FifoMessageGroups {
     /// Completes a request and returns a response to be sent if it's the last outstanding request
     /// for this group.
-    fn complete(&self, group_id: u16, status: zx::Status) -> Option<BlockFifoResponse> {
+    fn complete(&self, group_id: GroupOrRequest, status: zx::Status) -> Option<BlockFifoResponse> {
         let mut map = self.0.lock();
         let Entry::Occupied(mut o) = map.entry(group_id) else { unreachable!() };
         let group = o.get_mut();
@@ -114,7 +119,7 @@ impl FifoMessageGroups {
                 return Some(BlockFifoResponse {
                     status,
                     reqid,
-                    group: group_id,
+                    group: group_id.group_id(),
                     ..Default::default()
                 });
             }
@@ -156,34 +161,56 @@ impl std::convert::TryFrom<fblock::BlockOffsetMapping> for BlockOffsetMapping {
     }
 }
 
-/// Remaps the offset of block requests based on an internal map.
+/// Remaps the offset of block requests based on an internal map, and truncates long requests.
 /// TODO(https://fxbug.dev/402515764): For now, this just supports a single entry in the map, which
 /// is all that is required for GPT partitions.  If we want to support this for FVM, we will need
 /// to support multiple entries, which requires changing the block server to support request
 /// splitting.
 pub struct OffsetMap {
-    mapping: BlockOffsetMapping,
+    mapping: Option<BlockOffsetMapping>,
+    max_transfer_blocks: Option<NonZero<u32>>,
 }
 
 impl OffsetMap {
-    pub fn new(mapping: BlockOffsetMapping) -> Self {
-        Self { mapping }
+    /// An OffsetMap that remaps requests.
+    pub fn new(mapping: BlockOffsetMapping, max_transfer_blocks: Option<NonZero<u32>>) -> Self {
+        Self { mapping: Some(mapping), max_transfer_blocks }
     }
 
-    /// Adjusts the requested range, returning the new dev_offset.
-    /// Returns false if the request would exceed the range known to OffsetMap.
-    pub fn adjust_request(&self, dev_offset: u64, length: u64) -> Option<u64> {
-        if length == 0 {
-            return None;
+    /// An OffsetMap that just enforces maximum request sizes.
+    pub fn empty(max_transfer_blocks: Option<NonZero<u32>>) -> Self {
+        Self { mapping: None, max_transfer_blocks }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.mapping.is_some()
+    }
+
+    /// Adjusts the requested range, returning the new range.
+    /// Returns None if the request would exceed the ranges known to OffsetMap.
+    pub fn adjust_request(&self, dev_offset: u64, length: u32, is_rw: bool) -> Option<(u64, u32)> {
+        // Only apply max_transfer_blocks to RW requests.
+        let length = if is_rw {
+            if let Some(max) = self.max_transfer_blocks {
+                std::cmp::min(max.get(), length)
+            } else {
+                length
+            }
+        } else {
+            length
+        };
+        let end = dev_offset.checked_add(length as u64)?;
+        if let Some(mapping) = &self.mapping {
+            if mapping.source_block_offset > dev_offset
+                || end > mapping.source_block_offset + mapping.length
+            {
+                return None;
+            }
+            let delta = dev_offset - mapping.source_block_offset;
+            Some((mapping.target_block_offset + delta, length))
+        } else {
+            Some((dev_offset, length))
         }
-        let end = dev_offset.checked_add(length)?;
-        if self.mapping.source_block_offset > dev_offset
-            || end > self.mapping.source_block_offset + self.mapping.length
-        {
-            return None;
-        }
-        let delta = dev_offset - self.mapping.source_block_offset;
-        Some(self.mapping.target_block_offset + delta)
     }
 }
 
@@ -198,11 +225,11 @@ pub trait SessionManager: 'static {
     /// Creates a new session to handle `stream`.
     /// The returned future should run until the session completes, for example when the client end
     /// closes.
-    /// If `offset_map` is set, it will be used to remap the dev_offset of FIFO requests.
+    /// `offset_map`, will be used to adjust the block offset/length of FIFO requests.
     fn open_session(
         self: Arc<Self>,
         stream: fblock::SessionRequestStream,
-        offset_map: Option<OffsetMap>,
+        offset_map: OffsetMap,
         block_size: u32,
     ) -> impl Future<Output = Result<(), Error>> + Send;
 
@@ -311,39 +338,49 @@ impl<SM: SessionManager> BlockServer<SM> {
                 responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fvolume::VolumeRequest::OpenSession { session, control_handle: _ } => {
-                return Ok(Some(self.session_manager.clone().open_session(
-                    session.into_stream(),
-                    None,
-                    self.block_size,
-                )));
+                match self.device_info().await {
+                    Ok(info) => {
+                        return Ok(Some(self.session_manager.clone().open_session(
+                            session.into_stream(),
+                            OffsetMap::empty(info.max_transfer_blocks()),
+                            self.block_size,
+                        )));
+                    }
+                    Err(status) => session.close_with_epitaph(status)?,
+                }
             }
             fvolume::VolumeRequest::OpenSessionWithOffsetMap {
                 session,
                 offset_map,
                 initial_mappings,
                 control_handle: _,
-            } => {
-                if offset_map.is_some() || initial_mappings.as_ref().is_none_or(|m| m.len() != 1) {
-                    // TODO(https://fxbug.dev/402515764): Support multiple mappings and
-                    // dynamic querying for FVM as needed.  A single static map is
-                    // sufficient for GPT.
-                    session.close_with_epitaph(zx::Status::NOT_SUPPORTED)?;
-                    return Ok(None);
-                }
-                let initial_mapping = match initial_mappings.unwrap().pop().unwrap().try_into() {
-                    Ok(m) => m,
-                    Err(status) => {
-                        session.close_with_epitaph(status)?;
+            } => match self.device_info().await {
+                Ok(info) => {
+                    if offset_map.is_some()
+                        || initial_mappings.as_ref().is_none_or(|m| m.len() != 1)
+                    {
+                        // TODO(https://fxbug.dev/402515764): Support multiple mappings and
+                        // dynamic querying for FVM as needed.  A single static map is
+                        // sufficient for GPT.
+                        session.close_with_epitaph(zx::Status::NOT_SUPPORTED)?;
                         return Ok(None);
                     }
-                };
-                let offset_map = OffsetMap::new(initial_mapping);
-                return Ok(Some(self.session_manager.clone().open_session(
-                    session.into_stream(),
-                    Some(offset_map),
-                    self.block_size,
-                )));
-            }
+                    let initial_mapping = match initial_mappings.unwrap().pop().unwrap().try_into()
+                    {
+                        Ok(m) => m,
+                        Err(status) => {
+                            session.close_with_epitaph(status)?;
+                            return Ok(None);
+                        }
+                    };
+                    return Ok(Some(self.session_manager.clone().open_session(
+                        session.into_stream(),
+                        OffsetMap::new(initial_mapping, info.max_transfer_blocks()),
+                        self.block_size,
+                    )));
+                }
+                Err(status) => session.close_with_epitaph(status)?,
+            },
             fvolume::VolumeRequest::GetTypeGuid { responder } => match self.device_info().await {
                 Ok(info) => {
                     if let DeviceInfo::Partition(partition_info) = info.as_ref() {
@@ -468,7 +505,7 @@ impl<SM: SessionManager> BlockServer<SM> {
 
 struct SessionHelper<SM: SessionManager> {
     session_manager: Arc<SM>,
-    offset_map: Option<OffsetMap>,
+    offset_map: OffsetMap,
     block_size: u32,
     peer_fifo: zx::Fifo<BlockFifoResponse, BlockFifoRequest>,
     vmos: Mutex<BTreeMap<u16, Arc<zx::Vmo>>>,
@@ -478,7 +515,7 @@ struct SessionHelper<SM: SessionManager> {
 impl<SM: SessionManager> SessionHelper<SM> {
     fn new(
         session_manager: Arc<SM>,
-        offset_map: Option<OffsetMap>,
+        offset_map: OffsetMap,
         block_size: u32,
     ) -> Result<(Self, zx::Fifo<BlockFifoRequest, BlockFifoResponse>), zx::Status> {
         let (peer_fifo, fifo) = zx::Fifo::create(16)?;
@@ -554,12 +591,29 @@ impl<SM: SessionManager> SessionHelper<SM> {
         status: zx::Status,
     ) -> Option<BlockFifoResponse> {
         match request.group_or_request {
-            GroupOrRequest::Group(group_id) => {
-                let response = self.message_groups.complete(group_id, status);
+            group @ GroupOrRequest::Group(_) => {
+                let response = self.message_groups.complete(group, status);
                 fuchsia_trace::duration!(
                     c"storage",
                     c"block_server::finish_transaction_in_group",
-                    "group" => u32::from(group_id),
+                    "group" => group.id(),
+                    "group_completed" => response.is_some(),
+                    "status" => status.into_raw());
+                if let Some(trace_flow_id) = request.trace_flow_id {
+                    fuchsia_trace::flow_step!(
+                        c"storage",
+                        c"block_server::finish_transaction",
+                        trace_flow_id.get().into()
+                    );
+                }
+                response
+            }
+            group @ GroupOrRequest::OneShotGroup(_) => {
+                let response = self.message_groups.complete(group, status);
+                fuchsia_trace::duration!(
+                    c"storage",
+                    c"block_server::finish_transaction_in_oneshot_group",
+                    "group" => group.id(),
                     "group_completed" => response.is_some(),
                     "status" => status.into_raw());
                 if let Some(trace_flow_id) = request.trace_flow_id {
@@ -586,57 +640,115 @@ impl<SM: SessionManager> SessionHelper<SM> {
         }
     }
 
-    fn decode_fifo_request(&self, request: &BlockFifoRequest) -> Option<DecodedRequest> {
+    // Decodes `request`.  If the request is a continuation of a DecodeResult::Split, `is_split`
+    // should be set.
+    fn decode_fifo_request(
+        &self,
+        request: &mut BlockFifoRequest,
+        mut is_split: bool,
+    ) -> DecodeResult {
         let flags = BlockIoFlag::from_bits_truncate(request.command.flags);
-        let is_group = flags.contains(BlockIoFlag::GROUP_ITEM);
-        let last_in_group = flags.contains(BlockIoFlag::GROUP_LAST);
-        let mut op_code =
-            BlockOpcode::from_primitive(request.command.opcode).ok_or(zx::Status::INVALID_ARGS);
+        let old_length = request.length;
+        let mut operation = BlockOpcode::from_primitive(request.command.opcode)
+            .ok_or(zx::Status::INVALID_ARGS)
+            .and_then(|code| {
+                let op = match code {
+                    BlockOpcode::Read => Operation::Read {
+                        device_block_offset: request.dev_offset,
+                        block_count: request.length,
+                        _unused: 0,
+                        vmo_offset: request
+                            .vmo_offset
+                            .checked_mul(self.block_size as u64)
+                            .ok_or(zx::Status::OUT_OF_RANGE)?,
+                    },
+                    BlockOpcode::Write => Operation::Write {
+                        device_block_offset: request.dev_offset,
+                        block_count: request.length,
+                        options: if flags.contains(BlockIoFlag::FORCE_ACCESS) {
+                            WriteOptions::FORCE_ACCESS
+                        } else {
+                            WriteOptions::empty()
+                        },
+                        vmo_offset: request
+                            .vmo_offset
+                            .checked_mul(self.block_size as u64)
+                            .ok_or(zx::Status::OUT_OF_RANGE)?,
+                    },
+                    BlockOpcode::Flush => Operation::Flush,
+                    BlockOpcode::Trim => Operation::Trim {
+                        device_block_offset: request.dev_offset,
+                        block_count: request.length,
+                    },
+                    BlockOpcode::CloseVmo => Operation::CloseVmo,
+                };
+                op.validate_and_adjust_range(&self.offset_map)
+            });
 
-        let group_or_request = if is_group {
+        let sub_request_length =
+            if let Ok(Operation::Read { block_count, .. } | Operation::Write { block_count, .. }) =
+                &operation
+            {
+                if *block_count < old_length {
+                    Some(*block_count)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+        is_split |= sub_request_length.is_some();
+
+        let group_or_request = if flags.contains(BlockIoFlag::GROUP_ITEM) {
+            GroupOrRequest::Group(request.group)
+        } else if is_split {
+            GroupOrRequest::OneShotGroup(request.reqid)
+        } else {
+            GroupOrRequest::Request(request.reqid)
+        };
+
+        if group_or_request.is_group() {
+            let finishes_group = (!flags.contains(BlockIoFlag::GROUP_ITEM)
+                || flags.contains(BlockIoFlag::GROUP_LAST))
+                && (!is_split || sub_request_length.is_none());
             let mut groups = self.message_groups.0.lock();
-            let group = groups.entry(request.group).or_insert_with(|| FifoMessageGroup::new());
+            let group = groups.entry(group_or_request).or_insert_with(|| FifoMessageGroup::new());
             if group.req_id.is_some() {
                 // We have already received a request tagged as last.
                 if group.status == zx::Status::OK {
                     group.status = zx::Status::INVALID_ARGS;
                 }
-                return None;
+                return DecodeResult::IgnoreRequest;
             }
-            if last_in_group {
+            if finishes_group {
                 group.req_id = Some(request.reqid);
                 // If the group has had an error, there is no point trying to issue this request.
                 if group.status != zx::Status::OK {
-                    op_code = Err(group.status);
+                    operation = Err(group.status);
                 }
             } else if group.status != zx::Status::OK {
                 // The group has already encountered an error, so there is no point trying to issue
                 // this request.
-                return None;
+                return DecodeResult::IgnoreRequest;
             }
             group.count += 1;
-            GroupOrRequest::Group(request.group)
+            group_or_request
         } else {
             GroupOrRequest::Request(request.reqid)
         };
+        let request_tracking = RequestTracking {
+            group_or_request,
+            trace_flow_id: NonZero::new(request.trace_flow_id),
+        };
 
-        let mut vmo_offset = 0;
-        let vmo = match op_code {
-            Ok(BlockOpcode::Read) | Ok(BlockOpcode::Write) => (|| {
-                if request.length == 0 {
-                    return Err(zx::Status::INVALID_ARGS);
-                }
-                vmo_offset = request
-                    .vmo_offset
-                    .checked_mul(self.block_size as u64)
-                    .ok_or(zx::Status::OUT_OF_RANGE)?;
-                self.vmos
-                    .lock()
-                    .get(&request.vmoid)
-                    .cloned()
-                    .map_or(Err(zx::Status::IO), |vmo| Ok(Some(vmo)))
-            })(),
-            Ok(BlockOpcode::CloseVmo) => self
+        let vmo = match &operation {
+            Ok(Operation::Read { .. } | Operation::Write { .. }) => self
+                .vmos
+                .lock()
+                .get(&request.vmoid)
+                .cloned()
+                .map_or(Err(zx::Status::IO), |vmo| Ok(Some(vmo))),
+            Ok(Operation::CloseVmo) => self
                 .vmos
                 .lock()
                 .remove(&request.vmoid)
@@ -644,42 +756,24 @@ impl<SM: SessionManager> SessionHelper<SM> {
             _ => Ok(None),
         }
         .unwrap_or_else(|e| {
-            op_code = Err(e);
+            operation = Err(e);
             None
         });
 
-        let operation = op_code.map(|code| match code {
-            BlockOpcode::Read => Operation::Read {
-                device_block_offset: request.dev_offset,
-                block_count: request.length,
-                _unused: 0,
-                vmo_offset,
-            },
-            BlockOpcode::Write => Operation::Write {
-                device_block_offset: request.dev_offset,
-                block_count: request.length,
-                options: if flags.contains(BlockIoFlag::FORCE_ACCESS) {
-                    WriteOptions::FORCE_ACCESS
-                } else {
-                    WriteOptions::empty()
-                },
-                vmo_offset,
-            },
-            BlockOpcode::Flush => Operation::Flush,
-            BlockOpcode::Trim => Operation::Trim {
-                device_block_offset: request.dev_offset,
-                block_count: request.length,
-            },
-            BlockOpcode::CloseVmo => Operation::CloseVmo,
-        });
-        if let Ok(operation) = operation.as_ref() {
+        let operation = match operation {
+            Ok(operation) => operation,
+            Err(status) => return DecodeResult::InvalidRequest(request_tracking, status),
+        };
+
+        {
             use fuchsia_trace::ArgValue;
             static CACHE: AtomicU64 = AtomicU64::new(0);
             if let Some(context) =
                 fuchsia_trace::TraceCategoryContext::acquire_cached(c"storage", &CACHE)
             {
                 let trace_args_with_group = [
-                    ArgValue::of("group", u32::from(group_or_request.group_id())),
+                    ArgValue::of("group", u32::from(group_or_request.id())),
+                    ArgValue::of("oneshot", group_or_request.is_oneshot()),
                     ArgValue::of("opcode", operation.trace_label()),
                 ];
                 let trace_args = [ArgValue::of("opcode", operation.trace_label())];
@@ -700,22 +794,22 @@ impl<SM: SessionManager> SessionHelper<SM> {
                 if let Some(trace_flow_id) = trace_flow_id.clone() {
                     fuchsia_trace::flow_step(
                         &context,
-                        c"block_server::start_trnsaction",
+                        c"block_server::start_transaction",
                         trace_flow_id.get().into(),
                         &[],
                     );
                 }
             }
         }
-        Some(DecodedRequest::new(
-            RequestTracking {
-                group_or_request,
-                trace_flow_id: NonZero::new(request.trace_flow_id),
-            },
-            operation,
-            vmo,
-            self.offset_map.as_ref(),
-        ))
+
+        if let Some(sub_request_length) = sub_request_length {
+            request.dev_offset += sub_request_length as u64;
+            request.vmo_offset += sub_request_length as u64;
+            request.length -= sub_request_length;
+            DecodeResult::Split(DecodedRequest { request_tracking, operation, vmo })
+        } else {
+            DecodeResult::Ok(DecodedRequest { request_tracking, operation, vmo })
+        }
     }
 
     fn take_vmos(&self) -> BTreeMap<u16, Arc<zx::Vmo>> {
@@ -724,23 +818,28 @@ impl<SM: SessionManager> SessionHelper<SM> {
 }
 
 #[derive(Debug)]
-struct DecodedRequest {
-    request_tracking: RequestTracking,
-    operation: Result<Operation, zx::Status>,
-    vmo: Option<Arc<zx::Vmo>>,
+enum DecodeResult {
+    // The request was successfully decoded and should be submitted.
+    Ok(DecodedRequest),
+    // The request was successfully decoded and should be submitted, but a sub-request was split off
+    // because the request was too big.  The caller should call decode_fifo_request again (with the
+    // same request) until Ok is returned.
+    Split(DecodedRequest),
+    // The request was invalid, and we should send the status back to the client (unless ignored).
+    InvalidRequest(RequestTracking, zx::Status),
+    // The request shouldn't be submitted, but we should not send any status to the client. This
+    // occurs when a request is part of a group, and the request is invalid or the group already
+    // failed.  The entire group will latch an error, but we won't send that error back until the
+    // group completes.
+    IgnoreRequest,
 }
 
-impl DecodedRequest {
-    fn new(
-        request_tracking: RequestTracking,
-        operation: Result<Operation, zx::Status>,
-        vmo: Option<Arc<zx::Vmo>>,
-        offset_map: Option<&OffsetMap>,
-    ) -> Self {
-        let operation =
-            operation.and_then(|operation| operation.validate_and_adjust_range(offset_map));
-        Self { request_tracking, operation, vmo }
-    }
+#[derive(Debug)]
+struct DecodedRequest {
+    request_tracking: RequestTracking,
+    // Operation is now guaranteed to be Ok when wrapped in DecodeResult::Ok.
+    operation: Operation,
+    vmo: Option<Arc<zx::Vmo>>,
 }
 
 /// cbindgen:no-export
@@ -775,32 +874,33 @@ pub enum Operation {
 }
 
 impl Operation {
-    // Adjusts the operation's block range via `OffsetMap`.  If the request would exceed the range
-    // known to the map, or is otherwise invalid, returns an error.
+    // Adjusts the operation's block range via `OffsetMap` and `maximum_transfer_size`.  If the
+    // request would exceed the range known to the map, or is otherwise invalid, returns an error.
+    // Returns the original length of the request on success, so the caller can determine if the
+    // operation was truncated (due to fragmented extents or exceeding the max transfer size).
     fn validate_and_adjust_range(
         mut self,
-        offset_map: Option<&OffsetMap>,
+        offset_map: &OffsetMap,
     ) -> Result<Operation, zx::Status> {
-        let adjust_offset = |dev_offset, length| {
+        let adjust_fn = |dev_offset, length, is_rw| {
             // For compatibility with the C++ server, always ensure the length is nonzero
             if length == 0 {
                 return Err(zx::Status::INVALID_ARGS);
             }
-            if let Some(offset_map) = offset_map {
-                offset_map.adjust_request(dev_offset, length as u64).ok_or(zx::Status::OUT_OF_RANGE)
-            } else {
-                Ok(dev_offset)
-            }
+            offset_map.adjust_request(dev_offset, length, is_rw).ok_or(zx::Status::OUT_OF_RANGE)
         };
         match &mut self {
             Operation::Read { device_block_offset, block_count, .. } => {
-                *device_block_offset = adjust_offset(*device_block_offset, *block_count)?;
+                (*device_block_offset, *block_count) =
+                    adjust_fn(*device_block_offset, *block_count, true)?;
             }
             Operation::Write { device_block_offset, block_count, .. } => {
-                *device_block_offset = adjust_offset(*device_block_offset, *block_count)?;
+                (*device_block_offset, *block_count) =
+                    adjust_fn(*device_block_offset, *block_count, true)?;
             }
             Operation::Trim { device_block_offset, block_count, .. } => {
-                *device_block_offset = adjust_offset(*device_block_offset, *block_count)?;
+                (*device_block_offset, *block_count) =
+                    adjust_fn(*device_block_offset, *block_count, false)?;
             }
             _ => {}
         }
@@ -823,25 +923,37 @@ pub struct RequestTracking {
     trace_flow_id: Option<NonZero<u64>>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum GroupOrRequest {
     Group(u16),
+    // A one-shot group is an ad-hoc group created to split up a large request.  The ID is the
+    // original request ID.
+    OneShotGroup(u32),
     Request(u32),
 }
 
 impl GroupOrRequest {
     fn is_group(&self) -> bool {
-        if let Self::Group(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, Self::Group(_) | Self::OneShotGroup(_))
     }
 
+    fn is_oneshot(&self) -> bool {
+        matches!(self, Self::OneShotGroup(_))
+    }
+
+    // Note that OneShotGroups will not report a group_id.
     fn group_id(&self) -> u16 {
         match self {
             Self::Group(id) => *id,
-            Self::Request(_) => 0,
+            Self::Request(_) | Self::OneShotGroup(_) => 0,
+        }
+    }
+
+    fn id(&self) -> u32 {
+        match self {
+            Self::Group(id) => *id as u32,
+            Self::Request(id) => *id,
+            Self::OneShotGroup(id) => *id,
         }
     }
 }
@@ -1545,7 +1657,7 @@ mod tests {
                         }
                     )
                     .await,
-                    Err(zx::Status::INVALID_ARGS)
+                    Err(zx::Status::OUT_OF_RANGE)
                 );
 
                 // WRITE
@@ -1577,7 +1689,7 @@ mod tests {
                         }
                     )
                     .await,
-                    Err(zx::Status::INVALID_ARGS)
+                    Err(zx::Status::OUT_OF_RANGE)
                 );
 
                 // CLOSE VMO

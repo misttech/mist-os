@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use super::{
-    DecodedRequest, DeviceInfo, IntoSessionManager, OffsetMap, Operation, SessionHelper,
-    FIFO_MAX_REQUESTS,
+    DecodeResult, DecodedRequest, DeviceInfo, IntoSessionManager, OffsetMap, Operation,
+    SessionHelper, FIFO_MAX_REQUESTS,
 };
 use anyhow::Error;
 use block_protocol::{BlockFifoRequest, BlockFifoResponse, WriteOptions};
@@ -42,7 +42,7 @@ pub trait Interface: Send + Sync + Unpin + 'static {
         &self,
         session_manager: Arc<SessionManager<Self>>,
         stream: fblock::SessionRequestStream,
-        offset_map: Option<OffsetMap>,
+        offset_map: OffsetMap,
         block_size: u32,
     ) -> impl Future<Output = Result<(), Error>> + Send {
         // By default, serve the session rather than forwarding/proxying it.
@@ -179,7 +179,7 @@ impl<I: Interface + ?Sized> SessionManager<I> {
     pub async fn serve_session(
         self: Arc<Self>,
         stream: fblock::SessionRequestStream,
-        offset_map: Option<OffsetMap>,
+        offset_map: OffsetMap,
         block_size: u32,
     ) -> Result<(), Error> {
         let (helper, fifo) = SessionHelper::new(self.clone(), offset_map, block_size)?;
@@ -247,8 +247,10 @@ async fn run_fifo<I: Interface + ?Sized>(
     loop {
         let new_requests = {
             // We provide some flow control by limiting how many in-flight requests we will allow.
+            // Due to request splitting, there might be more active requests than there are request
+            // slots.
             let pending_requests = active_requests.len() + responses.len();
-            let count = requests.len() - pending_requests;
+            let count = requests.len().saturating_sub(pending_requests);
             let mut receive_requests = pin!(if count == 0 {
                 Fuse::terminated()
             } else {
@@ -285,19 +287,52 @@ async fn run_fifo<I: Interface + ?Sized>(
                 }
             )
         };
+
+        let process_request =
+            async |interface: &Arc<I>,
+                   helper: &Arc<SessionHelper<SessionManager<I>>>,
+                   decoded_request: DecodedRequest| {
+                let tracking = decoded_request.request_tracking;
+                let status = process_fifo_request(interface.clone(), decoded_request).await.into();
+                helper.finish_fifo_request(tracking, status)
+            };
         // NB: It is very important that there are no `await`s for the rest of the loop body, as
         // otherwise active requests might become stalled.
-        for request in &requests[..new_requests] {
-            if let Some(decoded_request) =
-                helper.decode_fifo_request(unsafe { request.assume_init_ref() })
-            {
-                let interface = interface.clone();
-                let helper = helper.clone();
-                active_requests.push(async move {
-                    let tracking = decoded_request.request_tracking;
-                    let status = process_fifo_request(interface, decoded_request).await.into();
-                    helper.finish_fifo_request(tracking, status)
-                });
+        let mut i = 0;
+        let mut in_split = false;
+        while i < new_requests {
+            let request = &mut requests[i];
+            i += 1;
+            match helper.decode_fifo_request(unsafe { request.assume_init_mut() }, in_split) {
+                DecodeResult::Ok(decoded_request) => {
+                    in_split = false;
+                    if let Operation::CloseVmo = decoded_request.operation {
+                        if let Some(vmo) = decoded_request.vmo {
+                            interface.on_detach_vmo(vmo.as_ref());
+                        }
+                        responses.extend(
+                            helper.finish_fifo_request(
+                                decoded_request.request_tracking,
+                                zx::Status::OK,
+                            ),
+                        );
+                    } else {
+                        active_requests.push(process_request(&interface, &helper, decoded_request));
+                    }
+                }
+                DecodeResult::Split(decoded_request) => {
+                    active_requests.push(process_request(&interface, &helper, decoded_request));
+                    // Re-process the request
+                    in_split = true;
+                    i -= 1;
+                }
+                DecodeResult::InvalidRequest(tracking, status) => {
+                    in_split = false;
+                    responses.extend(helper.finish_fifo_request(tracking, status));
+                }
+                DecodeResult::IgnoreRequest => {
+                    in_split = false;
+                }
             }
         }
     }
@@ -311,7 +346,7 @@ impl<I: Interface + ?Sized> super::SessionManager for SessionManager<I> {
     async fn open_session(
         self: Arc<Self>,
         stream: fblock::SessionRequestStream,
-        offset_map: Option<OffsetMap>,
+        offset_map: OffsetMap,
         block_size: u32,
     ) -> Result<(), Error> {
         self.interface.clone().open_session(self, stream, offset_map, block_size).await
@@ -357,7 +392,7 @@ async fn process_fifo_request<I: Interface + ?Sized>(
     r: DecodedRequest,
 ) -> Result<(), zx::Status> {
     let trace_flow_id = r.request_tracking.trace_flow_id;
-    match r.operation? {
+    match r.operation {
         Operation::Read { device_block_offset, block_count, _unused, vmo_offset } => {
             interface
                 .read(
@@ -386,10 +421,8 @@ async fn process_fifo_request<I: Interface + ?Sized>(
             interface.trim(device_block_offset, block_count, trace_flow_id).await
         }
         Operation::CloseVmo => {
-            if let Some(vmo) = &r.vmo {
-                interface.on_detach_vmo(vmo);
-            }
-            Ok(())
+            // Handled in main request loop
+            unreachable!()
         }
     }
 }
