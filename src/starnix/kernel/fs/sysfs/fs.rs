@@ -79,7 +79,6 @@ impl SysFs {
             // TODO(https://fxbug.dev/399181238): Remove Nmfs once the system has migrated to using
             // the updated `fuchsia_network_monitor_fs` name.
             dir.subdir(current_task, "nmfs", 0o755, |_| ());
-            dir.subdir(current_task, "fuchsia_network_monitor_fs", 0o755, |_| ());
             dir.subdir(current_task, "pstore", 0o755, |_| ());
         });
 
