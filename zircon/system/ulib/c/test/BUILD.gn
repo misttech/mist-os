@@ -7,6 +7,7 @@ import("//build/test.gni")
 import("//build/testing/boot_tests/kernel_zbi_test.gni")
 import("//build/testing/boot_tests/zbi_test_executable.gni")
 import("//build/testing/environments.gni")
+import("//zircon/kernel/params.gni")
 import("../libc.gni")
 
 group("test") {
@@ -39,6 +40,17 @@ group("boot_tests") {
 # We want to run these tests on every kind of hardware as well as emulators.
 libc_test_specs = {
   environments = all_fuchsia_envs
+}
+
+# This includes additional environments that other standalone tests that
+# depend on libc will run, but which cannot go in libc_test_specs because
+# they can't all run a full system for component tests.
+boot_test_specs = {
+  forward_variables_from(libc_test_specs, "*")
+
+  environments += kernel_test_environments
+  environments -= kernel_test_environments
+  environments += kernel_test_environments
 }
 
 libc_component_tests = []
@@ -228,6 +240,8 @@ zbi_test_executable("libc-unittests-standalone") {
 
 kernel_zbi_test("boot-libc-unittests") {
   deps = [ ":libc-unittests-standalone" ]
+
+  forward_variables_from(boot_test_specs, "*")
 
   # TODO(https://fxbug.dev/42076755) Remove timeout when llvm-libc functions are optimized.
   if (target_cpu == "riscv64") {
