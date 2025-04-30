@@ -92,7 +92,7 @@ use crate::internal::raw::counters::RawIpSocketCounters;
 use crate::internal::raw::{RawIpSocketHandler, RawIpSocketMap, RawIpSocketsBindingsTypes};
 use crate::internal::reassembly::{
     FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
-    FragmentablePacket, IpPacketFragmentCache,
+    FragmentablePacket, IpPacketFragmentCache, ReassemblyIpExt,
 };
 use crate::internal::routing::rules::{Rule, RuleAction, RuleInput, RulesTable};
 use crate::internal::routing::{
@@ -760,6 +760,7 @@ pub trait IpLayerIpExt:
     + IpDeviceIpExt
     + IpAddressIdExt
     + IpCountersIpExt
+    + ReassemblyIpExt
 {
     /// IP Address status.
     type AddressStatus: Debug;
