@@ -45,14 +45,14 @@ void PrepFakeSag(
       });
 }
 
-// Run an `ManagedWakeLease` test with a fake SAG where the fake SAG and the
+// Run an `ManualWakeLease` test with a fake SAG where the fake SAG and the
 // client run on their own threads. `client_operations` will be run on the
-// thread that owns the `ManagedWakeLease` while `sag_operations` will be run on
+// thread that owns the `ManualWakeLease` while `sag_operations` will be run on
 // the fake SAG thread. These operations are run concurrently so if one needs
 // to run before the other they must have internal synchronization. It is
 // expect that `client_operations` will quit the `Loop` before it completes.
-void DoManagedWakeLeaseTest(
-    const std::function<void(std::shared_ptr<fdf_power::ManagedWakeLease>, async::Loop&)>&
+void DoManualWakeLeaseTest(
+    const std::function<void(std::shared_ptr<fdf_power::ManualWakeLease>, async::Loop&)>&
         client_operations,
     const std::function<void(std::shared_ptr<SystemActivityGovernor>)>& sag_operations) {
   async::Loop server_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
@@ -82,24 +82,23 @@ void DoManagedWakeLeaseTest(
     zx::channel client = sag_endpoints.client.TakeChannel();
 
     // Tell the client to do its work.
-    async::PostTask(
-        client_loop.dispatcher(), [&client_loop, &server_loop, client = std::move(client),
-                                   &sag_server, client_operations, sag_operations]() mutable {
-          std::shared_ptr<fdf_power::ManagedWakeLease> op =
-              std::make_shared<fdf_power::ManagedWakeLease>(
-                  client_loop.dispatcher(), "test-operation",
-                  fidl::ClientEnd<fuchsia_power_system::ActivityGovernor>(std::move(client)));
+    async::PostTask(client_loop.dispatcher(), [&client_loop, &server_loop,
+                                               client = std::move(client), &sag_server,
+                                               client_operations, sag_operations]() mutable {
+      std::shared_ptr<fdf_power::ManualWakeLease> op = std::make_shared<fdf_power::ManualWakeLease>(
+          client_loop.dispatcher(), "test-operation",
+          fidl::ClientEnd<fuchsia_power_system::ActivityGovernor>(std::move(client)));
 
-          // We want to test what ManagedWakeLease does while the system is resumed,
-          // so have the server send the resume event.
-          async::PostTask(server_loop.dispatcher(),
-                          [&sag_server, sag_operations]() { sag_operations(sag_server); });
+      // We want to test what ManualWakeLease does while the system is resumed,
+      // so have the server send the resume event.
+      async::PostTask(server_loop.dispatcher(),
+                      [&sag_server, sag_operations]() { sag_operations(sag_server); });
 
-          // Trigger the start of the atomic operation.
-          async::PostTask(client_loop.dispatcher(), [op, &client_loop, client_operations]() {
-            client_operations(op, client_loop);
-          });
-        });
+      // Trigger the start of the atomic operation.
+      async::PostTask(client_loop.dispatcher(), [op, &client_loop, client_operations]() {
+        client_operations(op, client_loop);
+      });
+    });
   });
 
   // The client will quit its loop after doing its work, so wait for it.
@@ -118,12 +117,12 @@ void DoManagedWakeLeaseTest(
   server_loop.JoinThreads();
 }
 
-// Waits for the ManagedWakeLease to observe a suspension signal, then runs
+// Waits for the ManualWakeLease to observe a suspension signal, then runs
 // `do_after_suspend`.
-void DoOperationAfterSuspend(const std::shared_ptr<fdf_power::ManagedWakeLease>& op,
-                             async::Loop& loop,
-                             const std::function<void(std::shared_ptr<fdf_power::ManagedWakeLease>,
-                                                      async::Loop&)>& do_after_suspend) {
+void DoOperationAfterSuspend(
+    const std::shared_ptr<fdf_power::ManualWakeLease>& op, async::Loop& loop,
+    const std::function<void(const std::shared_ptr<fdf_power::ManualWakeLease>&, async::Loop&)>&
+        do_after_suspend) {
   if (op->IsResumed()) {
     async::PostDelayedTask(
         loop.dispatcher(),
@@ -141,9 +140,9 @@ void DoOperationAfterSuspend(const std::shared_ptr<fdf_power::ManagedWakeLease>&
 // |do_after_suspended| runs once |op| reports it considers the system
 // suspended.
 void StartOperationWhenResumedThenSuspend(
-    const std::shared_ptr<fdf_power::ManagedWakeLease>& op, async::Loop& client_loop,
+    const std::shared_ptr<fdf_power::ManualWakeLease>& op, async::Loop& client_loop,
     const std::shared_ptr<SystemActivityGovernor>& sag, async::Loop& server_loop,
-    const std::function<void(std::shared_ptr<fdf_power::ManagedWakeLease>, async::Loop&)>&
+    const std::function<void(std::shared_ptr<fdf_power::ManualWakeLease>, async::Loop&)>&
         do_after_suspended) {
   if (!op->IsResumed()) {
     async::PostDelayedTask(
@@ -161,18 +160,19 @@ void StartOperationWhenResumedThenSuspend(
   DoOperationAfterSuspend(op, client_loop, do_after_suspended);
 }
 
-void CheckLeaseAcquired(const std::shared_ptr<fdf_power::ManagedWakeLease>& op, async::Loop& loop) {
+void CheckLeaseAcquired(const std::shared_ptr<fdf_power::ManualWakeLease>& op, async::Loop& loop) {
   EXPECT_TRUE(op->End().is_ok());
   loop.Quit();
 }
 
 }  // namespace
 
-// Create an ManagedWakeLease and allow it to observe a resume signal. Then
+// Create an ManualWakeLease and allow it to observe a resume signal. Then
 // check that no actual lease is taken.
-TEST_F(WakeLeaseTest, TestManagedWakeLeaseWhenResumed) {
-  std::function<void(std::shared_ptr<fdf_power::ManagedWakeLease>, async::Loop&)> test_func =
-      [&test_func](const std::shared_ptr<fdf_power::ManagedWakeLease>& op, async::Loop& loop) {
+TEST_F(WakeLeaseTest, TestManualWakeLeaseWhenResumed) {
+  const std::function<void(const std::shared_ptr<fdf_power::ManualWakeLease>&, async::Loop&)>
+      test_func = [&test_func](const std::shared_ptr<fdf_power::ManualWakeLease>& op,
+                               async::Loop& loop) {
         if (!op->IsResumed()) {
           async::PostDelayedTask(
               loop.dispatcher(), [op, &loop, &test_func]() { test_func(op, loop); }, zx::msec(100));
@@ -183,15 +183,15 @@ TEST_F(WakeLeaseTest, TestManagedWakeLeaseWhenResumed) {
         loop.Quit();
       };
 
-  DoManagedWakeLeaseTest(
+  DoManualWakeLeaseTest(
       test_func, [](const std::shared_ptr<SystemActivityGovernor>& sag) { sag->SendResume(); });
 }
 
-// After the ManagedWakeLease is created, have it observe a resume and then
+// After the ManualWakeLease is created, have it observe a resume and then
 // verify it works as expected when the operation starts and ends.
-TEST_F(WakeLeaseTest, TestManagedWakeLeaseStartAndEndAfterResumeIsObserved) {
-  std::function<void(std::shared_ptr<fdf_power::ManagedWakeLease>, async::Loop&)> test_func =
-      [&test_func](const std::shared_ptr<fdf_power::ManagedWakeLease>& op, async::Loop& loop) {
+TEST_F(WakeLeaseTest, TestManualWakeLeaseStartAndEndAfterResumeIsObserved) {
+  std::function<void(std::shared_ptr<fdf_power::ManualWakeLease>, async::Loop&)> test_func =
+      [&test_func](const std::shared_ptr<fdf_power::ManualWakeLease>& op, async::Loop& loop) {
         // Wait for us to be in a resumed state so the atomic op obesrved the
         // system state change
         if (!op->IsResumed()) {
@@ -208,40 +208,40 @@ TEST_F(WakeLeaseTest, TestManagedWakeLeaseStartAndEndAfterResumeIsObserved) {
         loop.Quit();
       };
 
-  DoManagedWakeLeaseTest(
+  DoManualWakeLeaseTest(
       test_func, [](const std::shared_ptr<SystemActivityGovernor>& sag) { sag->SendResume(); });
 }
 
-// Test ManagedWakeLease when it starts while the system is suspended. Also
+// Test ManualWakeLease when it starts while the system is suspended. Also
 // check that duplicate `Start` calls result in taking only one lease.
-TEST_F(WakeLeaseTest, TestManagedWakeLeaseWhenSuspended) {
-  std::function<void(std::shared_ptr<fdf_power::ManagedWakeLease>, async::Loop&)> test_func =
-      [](const std::shared_ptr<fdf_power::ManagedWakeLease>& op, async::Loop& loop) {
+TEST_F(WakeLeaseTest, TestManualWakeLeaseWhenSuspended) {
+  std::function<void(std::shared_ptr<fdf_power::ManualWakeLease>, async::Loop&)> test_func =
+      [](const std::shared_ptr<fdf_power::ManualWakeLease>& op, async::Loop& loop) {
         EXPECT_FALSE(op->IsResumed());
         EXPECT_TRUE(op->Start());
         EXPECT_FALSE(op->Start());
         loop.Quit();
       };
-  DoManagedWakeLeaseTest(test_func, [](const std::shared_ptr<SystemActivityGovernor>& sag) {});
+  DoManualWakeLeaseTest(test_func, [](const std::shared_ptr<SystemActivityGovernor>& sag) {});
 }
 
-// Checks that when we are suspended we can start an ManagedWakeLease and then
+// Checks that when we are suspended we can start an ManualWakeLease and then
 // end it without error.
-TEST_F(WakeLeaseTest, TestManagedWakeLeaseStartAndEndWhileSuspended) {
-  std::function<void(std::shared_ptr<fdf_power::ManagedWakeLease>, async::Loop&)> test_func =
-      [](const std::shared_ptr<fdf_power::ManagedWakeLease>& op, async::Loop& loop) {
+TEST_F(WakeLeaseTest, TestManualWakeLeaseStartAndEndWhileSuspended) {
+  std::function<void(std::shared_ptr<fdf_power::ManualWakeLease>, async::Loop&)> test_func =
+      [](const std::shared_ptr<fdf_power::ManualWakeLease>& op, async::Loop& loop) {
         EXPECT_FALSE(op->IsResumed());
         EXPECT_TRUE(op->Start());
         EXPECT_TRUE(op->End().is_ok());
         loop.Quit();
       };
-  DoManagedWakeLeaseTest(test_func, [](const std::shared_ptr<SystemActivityGovernor>& sag) {});
+  DoManualWakeLeaseTest(test_func, [](const std::shared_ptr<SystemActivityGovernor>& sag) {});
 }
 
-// Tests what happens happens when an ManagedWakeLease observes a resume signal
-// and then we start an ManagedWakeLease. We expect no lease is taken. After
+// Tests what happens happens when an ManualWakeLease observes a resume signal
+// and then we start an ManualWakeLease. We expect no lease is taken. After
 // verifying that, send a suspend signal which should trigger the
-// ManagedWakeLease to claim a wake lease. We then verify that a wake lease was
+// ManualWakeLease to claim a wake lease. We then verify that a wake lease was
 // actually taken.
 TEST_F(WakeLeaseTest, TestManagedWakeLeaseWhenResumedThenSuspend) {
   async::Loop server_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
@@ -273,12 +273,11 @@ TEST_F(WakeLeaseTest, TestManagedWakeLeaseWhenResumedThenSuspend) {
     // Tell the client to do its work.
     async::PostTask(client_loop.dispatcher(), [&client_loop, &server_loop,
                                                client = std::move(client), &sag_server]() mutable {
-      std::shared_ptr<fdf_power::ManagedWakeLease> op =
-          std::make_shared<fdf_power::ManagedWakeLease>(
-              client_loop.dispatcher(), "test-operation",
-              fidl::ClientEnd<fuchsia_power_system::ActivityGovernor>(std::move(client)));
+      std::shared_ptr<fdf_power::ManualWakeLease> op = std::make_shared<fdf_power::ManualWakeLease>(
+          client_loop.dispatcher(), "test-operation",
+          fidl::ClientEnd<fuchsia_power_system::ActivityGovernor>(std::move(client)));
 
-      // We want to test what ManagedWakeLease does while the system is resumed,
+      // We want to test what ManualWakeLease does while the system is resumed,
       // so have the server send the resume event.
       async::PostTask(server_loop.dispatcher(), [&sag_server]() { sag_server->SendResume(); });
 
@@ -354,7 +353,7 @@ TEST_F(WakeLeaseTest, SharedWakeLeaseProviderTest) {
       // the SharedWakeLease after all strong pointers to it were
       // dropped.
       fdf_power::SharedWakeLease* old_addr = op1.get();
-      std::shared_ptr<fdf_power::WakeLease> first_lease = op1->GetWakeLease();
+      std::shared_ptr<fdf_power::TimeoutWakeLease> first_lease = op1->GetWakeLease();
       op1.reset();
       op2.reset();
 
@@ -369,7 +368,7 @@ TEST_F(WakeLeaseTest, SharedWakeLeaseProviderTest) {
 
       // The fdf_power::WakeLease should be the same, even though the
       // SharedWakeLease changed.
-      std::shared_ptr<fdf_power::WakeLease> second_lease = op3->GetWakeLease();
+      std::shared_ptr<fdf_power::TimeoutWakeLease> second_lease = op3->GetWakeLease();
       EXPECT_EQ(first_lease, second_lease);
 
       client_loop.Quit();
@@ -402,8 +401,8 @@ TEST_F(WakeLeaseTest, TestWakeLeaseTimeouts) {
   // because it was deposited, but we are also suspended, because it hasn't
   // been told otherwise. Neat!
 
-  fdf_power::WakeLease test_lease = fdf_power::WakeLease(async_get_default_dispatcher(),
-                                                         "test-lease", std::move(endpoints.client));
+  fdf_power::TimeoutWakeLease test_lease = fdf_power::TimeoutWakeLease(
+      async_get_default_dispatcher(), "test-lease", std::move(endpoints.client));
 
   EXPECT_EQ(test_lease.GetNextTimeout(), ZX_TIME_INFINITE);
   zx::eventpair h1, h2, h3;

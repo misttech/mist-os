@@ -20,6 +20,7 @@
 #include <lib/driver/power/cpp/testing/fake_topology.h>
 #include <lib/driver/power/cpp/testing/fidl_bound_server.h>
 #include <lib/driver/power/cpp/testing/scoped_background_loop.h>
+#include <lib/driver/power/cpp/wake-lease.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>

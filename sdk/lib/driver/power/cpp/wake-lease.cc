@@ -16,6 +16,12 @@ namespace fdf_power {
 WakeLease::WakeLease(async_dispatcher_t* dispatcher, std::string_view lease_name,
                      fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag_client,
                      inspect::Node* parent_node, bool log)
+    : TimeoutWakeLease(dispatcher, lease_name, std::move(sag_client), parent_node, log) {}
+
+TimeoutWakeLease::TimeoutWakeLease(
+    async_dispatcher_t* dispatcher, std::string_view lease_name,
+    fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag_client, inspect::Node* parent_node,
+    bool log)
     : dispatcher_(dispatcher), lease_name_(lease_name), log_(log) {
   if (sag_client) {
     sag_client_.Bind(std::move(sag_client));
@@ -51,7 +57,7 @@ WakeLease::WakeLease(async_dispatcher_t* dispatcher, std::string_view lease_name
   }
 }
 
-bool WakeLease::HandleInterrupt(zx::duration timeout) {
+bool TimeoutWakeLease::HandleInterrupt(zx::duration timeout) {
   // Only acquire a wake lease if the system state is appropriate.
   if (!system_suspended_) {
     // If we don't acquire a wake lease, store the time we would have held it
@@ -67,9 +73,9 @@ bool WakeLease::HandleInterrupt(zx::duration timeout) {
   return AcquireWakeLease(timeout);
 }
 
-zx_time_t WakeLease::GetNextTimeout() { return lease_task_.last_deadline().get(); }
+zx_time_t TimeoutWakeLease::GetNextTimeout() { return lease_task_.last_deadline().get(); }
 
-bool WakeLease::AcquireWakeLease(zx::duration timeout) {
+bool TimeoutWakeLease::AcquireWakeLease(zx::duration timeout) {
   if (lease_) {
     // If already holding a lease, cancel the current timeout.
     lease_task_.Cancel();
@@ -128,7 +134,7 @@ bool WakeLease::AcquireWakeLease(zx::duration timeout) {
   return true;
 }
 
-void WakeLease::DepositWakeLease(zx::eventpair wake_lease, zx::time timeout_deadline) {
+void TimeoutWakeLease::DepositWakeLease(zx::eventpair wake_lease, zx::time timeout_deadline) {
   if (lease_) {
     if (timeout_deadline < lease_task_.last_deadline()) {
       // If the current lease out lives the new one, don't need to do anything.
@@ -144,7 +150,7 @@ void WakeLease::DepositWakeLease(zx::eventpair wake_lease, zx::time timeout_dead
   lease_task_.PostForTime(dispatcher_, timeout_deadline);
 }
 
-zx::result<zx::eventpair> WakeLease::TakeWakeLease() {
+zx::result<zx::eventpair> TimeoutWakeLease::TakeWakeLease() {
   lease_task_.Cancel();
   wake_lease_held_.Set(false);
   if (!lease_.is_valid()) {
@@ -153,7 +159,7 @@ zx::result<zx::eventpair> WakeLease::TakeWakeLease() {
   return zx::ok(std::move(lease_));
 }
 
-zx::result<zx::eventpair> WakeLease::GetWakeLeaseCopy() {
+zx::result<zx::eventpair> TimeoutWakeLease::GetWakeLeaseCopy() {
   if (!lease_.is_valid()) {
     return zx::error(ZX_ERR_BAD_HANDLE);
   }
@@ -162,17 +168,17 @@ zx::result<zx::eventpair> WakeLease::GetWakeLeaseCopy() {
   return zx::ok(std::move(clone));
 }
 
-void WakeLease::OnResume(OnResumeCompleter::Sync& completer) {
+void TimeoutWakeLease::OnResume(OnResumeCompleter::Sync& completer) {
   SetSuspended(false);
   completer.Reply();
 }
 
-void WakeLease::OnSuspendStarted(OnSuspendStartedCompleter::Sync& completer) {
+void TimeoutWakeLease::OnSuspendStarted(OnSuspendStartedCompleter::Sync& completer) {
   SetSuspended(true);
   completer.Reply();
 }
 
-void WakeLease::SetSuspended(bool suspended) {
+void TimeoutWakeLease::SetSuspended(bool suspended) {
   // Do a quick return when we're resumed, because we don't have much to do.
   if (!suspended) {
     system_suspended_ = false;
@@ -192,7 +198,7 @@ void WakeLease::SetSuspended(bool suspended) {
   system_suspended_ = true;
 }
 
-void WakeLease::handle_unknown_method(
+void TimeoutWakeLease::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernorListener> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
   if (log_) {
@@ -200,7 +206,7 @@ void WakeLease::handle_unknown_method(
   }
 }
 
-void WakeLease::HandleTimeout() {
+void TimeoutWakeLease::HandleTimeout() {
   if (log_) {
     fdf::info("Dropping the wake lease due to not receiving any wake events.");
   }
@@ -208,7 +214,7 @@ void WakeLease::HandleTimeout() {
   wake_lease_held_.Set(false);
 }
 
-void WakeLease::ResetSagClient() {
+void TimeoutWakeLease::ResetSagClient() {
   sag_client_ = {};
   wake_lease_grabbable_.Set(false);
 }

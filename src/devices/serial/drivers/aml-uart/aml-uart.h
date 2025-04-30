@@ -113,7 +113,7 @@ class AmlUart : public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
   async::IrqMethod<AmlUart, &AmlUart::HandleIrq> irq_handler_{this};
 
   bool power_control_enabled_;
-  std::optional<fdf_power::WakeLease> wake_lease_;
+  std::optional<fdf_power::TimeoutWakeLease> wake_lease_;
 };
 
 }  // namespace serial

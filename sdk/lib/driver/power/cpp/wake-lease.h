@@ -20,13 +20,13 @@ namespace fdf_power {
 // Wrapper around usage of fuchsia.power.system/ActivityGovernor.AcquireWakeLease. The wrapper
 // reduces wake lease creation by allow callers to set timeout after which to drop the lease and
 // provides mechanisms to extend that timeout.
-class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernorListener> {
+class TimeoutWakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernorListener> {
  public:
   // If |log| is set to true, logs will be emitted when acquiring leases and when lease times out.
   // An invalid |sag_client| will result in silently disabling wake lease acquisition.
-  WakeLease(async_dispatcher_t* dispatcher, std::string_view lease_name,
-            fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag_client,
-            inspect::Node* parent_node = nullptr, bool log = false);
+  TimeoutWakeLease(async_dispatcher_t* dispatcher, std::string_view lease_name,
+                   fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag_client,
+                   inspect::Node* parent_node = nullptr, bool log = false);
 
   // Ensure that the system stays awake until the timeout is reached. To accomplish this we either:
   //   * obtain a wake lease immediately if the system is currently suspended
@@ -96,7 +96,7 @@ class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernor
   // suspension.
   zx::time prevent_sleep_before_ = zx::time::infinite_past();
 
-  async::TaskClosureMethod<WakeLease, &WakeLease::HandleTimeout> lease_task_{this};
+  async::TaskClosureMethod<TimeoutWakeLease, &TimeoutWakeLease::HandleTimeout> lease_task_{this};
   zx::eventpair lease_;
 
   inspect::UintProperty total_lease_acquisitions_;
@@ -107,25 +107,32 @@ class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernor
   inspect::UintProperty wake_lease_last_refreshed_timestamp_;
 };
 
+class WakeLease : public TimeoutWakeLease {
+ public:
+  WakeLease(async_dispatcher_t* dispatcher, std::string_view lease_name,
+            fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag_client,
+            inspect::Node* parent_node = nullptr, bool log = false);
+};
+
 // This is probably not the implementation you're looking for, consider using
-// `SharedWakeLeaseProvider`. `ManagedWakeLease` may be appropriate if
+// `SharedWakeLeaseProvider`. `ManualWakeLease` may be appropriate if
 // `SharedWakeLeaseProvider` does not fit your needs.
 //
-// ManagedWakeLease can be used to prevent the system from suspending. After a
+// ManualWakeLease can be used to prevent the system from suspending. After a
 // call to `Start()` returns the system will keep running until after `End()`
 // is called or the instance is dropped. Users can use the same instance to
 // perform multiple atomic operations, for example by calling `Start()` after
 // `End()`.
 //
-// If doing multiple atomic operations, a single `ManagedWakeLease` can have
+// If doing multiple atomic operations, a single `ManualWakeLease` can have
 // performance advantages over using a WakeLease directly because the
-// `ManagedWakeLease` monitors system state over its lifetime, allowing it to
+// `ManualWakeLease` monitors system state over its lifetime, allowing it to
 // avoid certain operations vs a series of shorter-lived `WakeLease` instances.
-class ManagedWakeLease {
+class ManualWakeLease {
  public:
-  ManagedWakeLease(async_dispatcher_t* dispatcher, std::string_view name,
-                   fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag,
-                   inspect::Node* parent_node = nullptr, bool log = false)
+  ManualWakeLease(async_dispatcher_t* dispatcher, std::string_view name,
+                  fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag,
+                  inspect::Node* parent_node = nullptr, bool log = false)
       : fdf_lease_(dispatcher, name, std::move(sag), parent_node, log) {}
 
   // Start an atomic operation. The system is guaranteed to stay running until
@@ -144,7 +151,7 @@ class ManagedWakeLease {
   bool IsResumed() { return fdf_lease_.IsResumed(); }
 
  private:
-  WakeLease fdf_lease_;
+  TimeoutWakeLease fdf_lease_;
 };
 
 // `SharedWakeLease` wraps a WakeLease. When `SharedWakeLease`
@@ -152,15 +159,15 @@ class ManagedWakeLease {
 // dropped.
 class SharedWakeLease {
  public:
-  explicit SharedWakeLease(const std::shared_ptr<WakeLease>& lease) : lease_(lease) {}
+  explicit SharedWakeLease(const std::shared_ptr<TimeoutWakeLease>& lease) : lease_(lease) {}
   zx::result<zx::eventpair> GetDuplicateLeaseHandle() { return lease_->GetWakeLeaseCopy(); }
   // Intended for testing, gets a shared pointer to the wrapped
   // fdf_power::WakeLease object.
-  std::shared_ptr<WakeLease> GetWakeLease() { return lease_; }
+  std::shared_ptr<TimeoutWakeLease> GetWakeLease() { return lease_; }
   ~SharedWakeLease() { zx::result<zx::eventpair> obsolete_lease = lease_->TakeWakeLease(); }
 
  private:
-  std::shared_ptr<WakeLease> lease_;
+  std::shared_ptr<TimeoutWakeLease> lease_;
 };
 
 // This class is **not** threadsafe! `SharedWakeLeaseProvider` and
@@ -182,19 +189,19 @@ class SharedWakeLease {
 // state while they exist.
 //
 // The main difference between the shared pointer to a `SharedWakeLease`
-// from `SharedWakeLeaseProvider` and an `ManagedWakeLease` is that with
+// from `SharedWakeLeaseProvider` and an `ManualWakeLease` is that with
 // `SharedWakeLease` we get long-lived system state monitoring and
-// ergonomic RAII management of the actual lease. With `ManagedWakeLease` you
+// ergonomic RAII management of the actual lease. With `ManualWakeLease` you
 // can get long-lived system state monitoring with `End` calls and sacrifice
 // RAII ergonomics **or** get RAII ergonomics, but lose system state knowledge
-// after the `ManagedWakeLease` is destroyed.
+// after the `ManualWakeLease` is destroyed.
 class SharedWakeLeaseProvider {
  public:
   SharedWakeLeaseProvider(async_dispatcher_t* dispatcher, std::string_view name,
                           fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag,
                           inspect::Node* parent_node = nullptr, bool log = false)
-      : fdf_lease_(
-            std::make_shared<WakeLease>(dispatcher, name, std::move(sag), parent_node, log)) {}
+      : fdf_lease_(std::make_shared<TimeoutWakeLease>(dispatcher, name, std::move(sag), parent_node,
+                                                      log)) {}
   std::shared_ptr<SharedWakeLease> StartOperation() {
     // SharedWakeLeaseProvider works by holding and owning a
     // fdf_power::WakeLease and creating, but not owning, a SharedWakeLease.
@@ -219,7 +226,7 @@ class SharedWakeLeaseProvider {
 
  private:
   std::weak_ptr<SharedWakeLease> atomic_op_;
-  std::shared_ptr<WakeLease> fdf_lease_;
+  std::shared_ptr<TimeoutWakeLease> fdf_lease_;
 };
 
 }  // namespace fdf_power

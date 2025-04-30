@@ -86,7 +86,7 @@ class InputReport : public fidl::WireServer<fuchsia_input_report::InputDevice>,
   fidl::WireSyncClient<fuchsia_hardware_input::Device> input_device_;
   fidl::WireClient<fuchsia_hardware_input::DeviceReportsReader> dev_reader_;
 
-  fdf_power::WakeLease wake_lease_;
+  fdf_power::TimeoutWakeLease wake_lease_;
 
   std::vector<std::unique_ptr<hid_input_report::Device>> devices_;
 

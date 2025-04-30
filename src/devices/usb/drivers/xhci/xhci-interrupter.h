@@ -84,7 +84,7 @@ class Interrupter {
   async::Irq irq_handler_;
   libsync::Completion irq_shutdown_completion_;
 
-  std::optional<fdf_power::WakeLease> wake_lease_;
+  std::optional<fdf_power::TimeoutWakeLease> wake_lease_;
 
   // published inspect data
   inspect::Node inspect_root_;
