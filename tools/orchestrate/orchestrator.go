@@ -269,10 +269,6 @@ func (r *TestOrchestrator) flashDevice(productDir string) error {
 }
 
 func (r *TestOrchestrator) startEmulator(productDir string) error {
-	// Wait up to 5 minutes for the emulator to start up.
-	// This helps with local test reproduction workflows where the host machine
-	// does not have kvm enabled.
-
 	emu_name := fmt.Sprintf("fuchsia-emulator-%d", os.Getpid())
 
 	if _, err := r.ffx.RunCmdSync(
@@ -282,8 +278,13 @@ func (r *TestOrchestrator) startEmulator(productDir string) error {
 		"--net",
 		"user",
 		"--headless",
+
+		// Wait up to 5 minutes for the emulator to start up.
+		// This helps with local test reproduction workflows where the host machine
+		// does not have kvm enabled.
 		"--startup-timeout",
 		"300",
+
 		"--name",
 		emu_name,
 	); err != nil {
@@ -291,10 +292,7 @@ func (r *TestOrchestrator) startEmulator(productDir string) error {
 	}
 
 	// Set the emulator as the default
-	_, err := r.ffx.RunCmdSync("target", "default", "set", emu_name)
-	if err != nil {
-		return fmt.Errorf("ffx target default set to emulator: %w", err)
-	}
+	r.ffx.SetDefaultTarget(&emu_name)
 
 	return nil
 }

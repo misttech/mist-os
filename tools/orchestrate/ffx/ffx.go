@@ -54,9 +54,10 @@ var XDG_ENV_VARS = [...]string{
 // Ffx defines settings for ffx commands.
 type Ffx struct {
 	// Dir is the working directory for ffx, and where it writes files.
-	Dir         string
-	bin         string
-	sslCertPath string
+	Dir           string
+	bin           string
+	sslCertPath   string
+	defaultTarget *string
 }
 
 // Option for creating Ffx.
@@ -180,6 +181,21 @@ func (f *Ffx) ApplyEnv(env []string) ([]string, error) {
 		return nil, fmt.Errorf("os.Getwd: %v", err)
 	}
 	env = append(env, "FFX_ISOLATE_DIR="+f.Dir, "FUCHSIA_ANALYTICS_DISABLED=1")
+
+	// Unset FUCHSIA_DEVICE_ADDR and maybe override FUCHSIA_NODENAME.
+	for idx, val := range env {
+		if strings.HasPrefix(val, "FUCHSIA_DEVICE_ADDR=") {
+			for ; idx < len(env)-1; idx++ {
+				env[idx] = env[idx+1]
+			}
+			env = env[:len(env)-1]
+			break
+		}
+	}
+	if f.defaultTarget != nil {
+		env = append(env, "FUCHSIA_NODENAME="+*f.defaultTarget)
+	}
+
 	if f.sslCertPath != "" {
 		env = append(env, "SSL_CERT_FILE="+f.sslCertPath)
 	}
@@ -248,7 +264,18 @@ func (f *Ffx) Close() error {
 	return os.RemoveAll(f.Dir)
 }
 
-// GetDefaultTarget fetches the default ffx target.
+// SetDefaultTarget sets the default ffx target.
+// If nil, it's inherited from the $FUCHSIA_NODENAME environment variable.
+func (f *Ffx) SetDefaultTarget(target *string) {
+	if target == nil {
+		log.Printf("Default target unset")
+	} else {
+		log.Printf("Default target set: %s", *target)
+	}
+	f.defaultTarget = target
+}
+
+// GetDefaultTarget gets the effective default ffx target.
 func (f *Ffx) GetDefaultTarget() (string, error) {
 	defaultName, err := f.RunCmdSync("target", "default", "get")
 	if err != nil {
@@ -321,7 +348,6 @@ func writeConfigFile(configPath string, opt Option, socketPath string) error {
 
 // isRunning returns true if the package server is currently running and responds to HTTP requests.
 func (f *Ffx) IsPackageServerRunning(repoName string) (bool, error) {
-
 	args := []string{"--machine", "json", "repository", "server", "list"}
 	out, err := f.RunCmdSync(args...)
 	if err != nil {
