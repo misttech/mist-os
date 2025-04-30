@@ -1085,7 +1085,10 @@ mod tests {
 
     #[fuchsia::test]
     fn no_update_invalid_rtc() {
-        let mut executor = fasync::TestExecutor::new();
+        let real_boot_now = zx::MonotonicInstant::get();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
+        executor.set_fake_time(real_boot_now.into());
+
         let (clock, initial_update_ticks) = create_clock();
         let rtc = FakeRtc::valid(INVALID_RTC_TIME);
         let diagnostics = Arc::new(FakeDiagnostics::new());
@@ -1109,14 +1112,19 @@ mod tests {
             r,
             b,
         ));
-        let _ = executor.run_until_stalled(&mut fut);
+        let _ignore = run_in_fake_time(
+            &mut executor,
+            &mut fut,
+            // Only run long enough to drain `time_source` above.
+            fasync::MonotonicDuration::from_millis(1),
+        );
 
         // Checking that the clock has not been updated yet
         assert_eq!(initial_update_ticks, clock.get_details().unwrap().last_value_update_ticks);
         assert_eq!(rtc.last_set(), None);
 
         // Checking that the correct diagnostic events were logged.
-        diagnostics.assert_events(&[
+        diagnostics.assert_events_prefix(&[
             Event::Initialized { clock_state: InitialClockState::NotSet },
             Event::InitializeRtc {
                 outcome: InitializeRtcOutcome::InvalidBeforeBackstop,
@@ -1168,7 +1176,7 @@ mod tests {
         assert_eq!(rtc.last_set(), None);
 
         // Checking that the correct diagnostic events were logged.
-        diagnostics.assert_events(&[
+        diagnostics.assert_events_prefix(&[
             Event::Initialized { clock_state: InitialClockState::NotSet },
             // RTC time was invalid...
             Event::InitializeRtc {
@@ -1187,7 +1195,11 @@ mod tests {
 
     #[fuchsia::test]
     fn no_update_valid_rtc() {
-        let mut executor = fasync::TestExecutor::new();
+        // Start from the system time. Required to work around backstop time issues.
+        let real_boot_now = zx::MonotonicInstant::get();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
+        executor.set_fake_time(real_boot_now.into());
+
         let (clock, initial_update_ticks) = create_clock();
         let rtc = FakeRtc::valid(VALID_RTC_TIME);
         let diagnostics = Arc::new(FakeDiagnostics::new());
@@ -1211,7 +1223,8 @@ mod tests {
             r,
             b,
         ));
-        let _ = executor.run_until_stalled(&mut fut);
+        let _ignore =
+            run_in_fake_time(&mut executor, &mut fut, fasync::MonotonicDuration::from_millis(1));
 
         // Checking that the clock was updated to use the valid RTC time.
         assert!(clock.get_details().unwrap().last_value_update_ticks > initial_update_ticks);
@@ -1219,7 +1232,7 @@ mod tests {
         assert_eq!(rtc.last_set(), None);
 
         // Checking that the correct diagnostic events were logged.
-        diagnostics.assert_events(&[
+        diagnostics.assert_events_prefix(&[
             Event::Initialized { clock_state: InitialClockState::NotSet },
             Event::InitializeRtc {
                 outcome: InitializeRtcOutcome::Succeeded,
@@ -1232,7 +1245,9 @@ mod tests {
 
     #[fuchsia::test]
     fn no_update_clock_already_running() {
-        let mut executor = fasync::TestExecutor::new();
+        let real_boot_now = zx::MonotonicInstant::get();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
+        executor.set_fake_time(real_boot_now.into());
 
         // Create a clock and set it slightly after backstop
         let (clock, _) = create_clock();
@@ -1266,14 +1281,20 @@ mod tests {
             r,
             b,
         ));
-        let _ = executor.run_until_stalled(&mut fut);
+        let _ignore = run_in_fake_time(
+            &mut executor,
+            &mut fut,
+            // Only run long enough to drain the single sample from `time_source`.
+            fasync::MonotonicDuration::from_millis(1),
+        );
 
         // Checking that neither the clock nor the RTC were updated.
         assert_eq!(clock.get_details().unwrap().last_value_update_ticks, initial_update_ticks);
         assert_eq!(rtc.last_set(), None);
 
         // Checking that the correct diagnostic events were logged.
-        diagnostics.assert_events(&[
+        // After these events, we expect a number of bogus status reports.
+        diagnostics.assert_events_prefix(&[
             Event::Initialized { clock_state: InitialClockState::PreviouslySet },
             Event::InitializeRtc { outcome: InitializeRtcOutcome::ReadNotAttempted, time: None },
             Event::TimeSourceStatus { role: Role::Primary, status: ftexternal::Status::Network },

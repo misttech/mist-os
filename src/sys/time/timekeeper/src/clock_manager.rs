@@ -633,6 +633,9 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                         allow_timekeeper_to_update_rtc,
                         &adjust_decision).await;
 
+                    // Don't use the initial sampling delay in next loop iterations.
+                    first_delay.take();
+
                     // Used as a test-only hook.
                     if let Some(ref mut test_signaler) = self.sample_test_signaler {
                         if let Err(ref e) = test_signaler.send(()).await {
@@ -686,8 +689,6 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                     }
                 },
             }
-            // Don't use the initial sampling delay in next loop iterations.
-            first_delay.take();
         } // loop
     }
 
@@ -1490,15 +1491,15 @@ mod tests {
     #[fuchsia::test]
     fn subsequent_updates_accepted() {
         // Start from the system time.
-        let real_boot_now = zx::MonotonicInstant::get();
+        let real_mono_now = zx::MonotonicInstant::get();
 
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time((real_boot_now + zx::MonotonicDuration::from_nanos(1000)).into());
+        executor.set_fake_time((real_mono_now + zx::MonotonicDuration::from_nanos(1000)).into());
         let (ts, mut tr) = mpsc::channel(2);
 
         let clock = create_clock();
         let diagnostics = Arc::new(FakeDiagnostics::new());
-        let reference = zx::BootInstant::from_nanos(executor.now().into_nanos());
+        let reference = zx::BootInstant::from_nanos(executor.boot_now().into_nanos());
         let config = make_test_config();
         let clock_manager = create_clock_manager(
             Arc::clone(&clock),
@@ -1544,12 +1545,16 @@ mod tests {
         // Since we used the same covariance for the first two samples the offset in the Kalman
         // filter is roughly midway between the sample offsets, but slight closer to the second
         // because oscillator uncertainty.
-        let expected_offset = zx::BootDuration::from_nanos(1666500000080699);
+        let expected_offset_min = zx::BootDuration::from_nanos(1666500000080699);
+        let expected_offset_max = zx::BootDuration::from_nanos(1666700000080699);
 
         // Check that the clock has been updated. The UTC should be bounded by the expected offset
         // added to the reference window in which the calculation took place.
-        assert_geq!(updated_utc.into_nanos(), (reference_before + expected_offset).into_nanos());
-        assert_leq!(updated_utc.into_nanos(), (reference_after + expected_offset).into_nanos());
+        assert_geq!(
+            updated_utc.into_nanos(),
+            (reference_before + expected_offset_min).into_nanos()
+        );
+        assert_leq!(updated_utc.into_nanos(), (reference_after + expected_offset_max).into_nanos());
 
         // Check that the correct diagnostic events were logged.
         diagnostics.assert_events(&[
@@ -1564,7 +1569,7 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: *TEST_TRACK,
                 reference,
-                utc: UtcInstant::from_nanos((reference + expected_offset).into_nanos()),
+                utc: UtcInstant::from_nanos((reference + expected_offset_min).into_nanos()),
                 sqrt_covariance: zx::BootDuration::from_nanos(62225396),
             },
             Event::FrequencyWindowDiscarded {
@@ -1817,16 +1822,15 @@ mod tests {
         // Start from the system time. Required to work around backstop time issues.
         let real_boot_now = zx::MonotonicInstant::get();
         let mut executor = fasync::TestExecutor::new_with_fake_time();
+        executor.set_fake_time(real_boot_now.into());
 
-        let fake_now = real_boot_now + zx::MonotonicDuration::from_nanos(1000);
-        executor.set_fake_time(fake_now.into());
+        debug!("executor_boot_now: {:?}; executor_now: {:?}", executor.boot_now(), executor.now());
 
         let clock = create_clock();
         let diagnostics = Arc::new(FakeDiagnostics::new());
         let reference = zx::BootInstant::from_nanos(executor.now().into_nanos());
 
         let config = make_test_config_with_fn(|mut config| {
-            config.first_sampling_delay_sec = 5;
             config.first_sampling_delay_sec = 10;
 
             // Don't forbid any user time adjustment.
@@ -1876,7 +1880,7 @@ mod tests {
             clock_manager.maintain_clock(cmd_rx, b).await;
         });
 
-        // Run in fake time to get the proposed sample, but not enough to get an actual sample.
+        debug!("Run in fake time to get the adjustment, but not an external sample.");
         let _ignore = run_in_fake_time(
             &mut executor,
             &mut run_fut,
@@ -1884,15 +1888,24 @@ mod tests {
         );
         assert_geq!(clock.read().unwrap(), proposed_utc);
 
-        // Run in fake time a little while longer, to get another sample.
+        debug!("Run in fake time a little while longer, to get an external sample.");
         let _ignore = run_in_fake_time(
             &mut executor,
             &mut run_fut,
-            fasync::MonotonicDuration::from_millis(9),
+            fasync::MonotonicDuration::from_seconds(11),
         );
-        // Verify that the time did *not* move resulting from a widely different external
-        // time sample. This means that user-provided time remains.
-        assert_leq!(clock.read().unwrap(), proposed_utc + UtcDuration::from_millis(9));
+        // Verify that the time did *not* move resulting from a widely different external time
+        // sample. This means that user-provided time remains.  `clock` is a real clock, so it will
+        // progress on its own!
+        let actual = clock.read().unwrap();
+        let expected = proposed_utc + UtcDuration::from_seconds(40);
+        assert!(
+            actual <= expected,
+            "\n\tclock_read: {:?}\n\texpected: {:?}\n\tdiff: {:?}",
+            actual,
+            expected,
+            actual - expected,
+        );
         Ok(())
     }
 }
