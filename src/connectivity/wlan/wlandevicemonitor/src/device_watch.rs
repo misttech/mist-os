@@ -65,7 +65,7 @@ pub fn watch_phy_devices(
                 Ok(Some(NewPhyDevice {
                     id,
                     proxy,
-                    device_path: format!("{}/{}", device_directory, filename),
+                    device_path: format!("{device_directory}/{filename}"),
                 }))
             })())
         }))
@@ -163,7 +163,7 @@ mod tests {
                         info!("device connector got connect request");
                     }
                     Err(e) => {
-                        panic!("Unexpected error in device connector {:?}", e);
+                        panic!("Unexpected error in device connector {e:?}");
                     }
                 }
             }

@@ -46,7 +46,7 @@ impl From<ftest::RealmOptions> for RealmOptions {
             let triage_configs = other.triage_configs.take().unwrap();
             for contents in triage_configs {
                 config_file_count += 1;
-                let config_file_name = format!("{}.triage", config_file_count);
+                let config_file_name = format!("{config_file_count}.triage");
                 realm_opts.add_config_file(config_file_name, contents);
             }
         }

@@ -110,7 +110,7 @@ async fn serve_phy(
     let r = event_stream.map_ok(|_| ()).try_collect::<()>().await;
     phys.remove(&id);
     if let Err(e) = r {
-        let msg = format!("error reading from FIDL channel of phy #{}: {}", id, e);
+        let msg = format!("error reading from FIDL channel of phy #{id}: {e}");
         error!("{}", msg);
         inspect_log!(inspect_tree.device_events.lock(), msg: msg);
     }

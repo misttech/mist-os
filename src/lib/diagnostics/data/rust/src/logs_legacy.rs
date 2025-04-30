@@ -21,7 +21,7 @@ impl From<&Data<Logs>> for LogMessage {
         let file = data.metadata.file.as_ref();
         let line = data.metadata.line.as_ref();
         if let (Some(file), Some(line)) = (file, line) {
-            msg = format!("[{}({})] {}", file, line, msg);
+            msg = format!("[{file}({line})] {msg}");
         }
 
         let tags = match &data.metadata.tags {
@@ -56,7 +56,7 @@ pub fn format_log_message(data: &Data<Logs>) -> String {
     let file = data.metadata.file.as_ref();
     let line = data.metadata.line.as_ref();
     if let (Some(file), Some(line)) = (file, line) {
-        msg = format!("[{}({})] {}", file, line, msg);
+        msg = format!("[{file}({line})] {msg}");
     }
     msg
 }

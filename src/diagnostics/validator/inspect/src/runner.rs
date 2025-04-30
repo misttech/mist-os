@@ -20,11 +20,11 @@ pub async fn run_all_trials() -> results::Results {
                     match puppet.publish().await {
                         Ok(validate::TestResult::Ok) => {}
                         Ok(result) => {
-                            results.error(format!("Publish reported {:?}", result));
+                            results.error(format!("Publish reported {result:?}"));
                             return results;
                         }
                         Err(e) => {
-                            results.error(format!("Publish error: {:?}", e));
+                            results.error(format!("Publish error: {e:?}"));
                             return results;
                         }
                     }

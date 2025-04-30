@@ -36,7 +36,7 @@ impl<'a> ActionContext<'a> {
         let fetcher = FileDataFetcher::new(diagnostic_data);
         let mut action_results = ActionResults::new();
         fetcher.errors().iter().for_each(|e| {
-            action_results.errors.push(format!("[DEBUG: BAD DATA] {}", e));
+            action_results.errors.push(format!("[DEBUG: BAD DATA] {e}"));
         });
         ActionContext {
             actions,
@@ -250,14 +250,14 @@ impl Gauge {
                 Some(format) if format.as_str() == "percentage" => {
                     format!("{:.2}%", value * 100.0f64)
                 }
-                _ => format!("{}", value),
+                _ => format!("{value}"),
             },
             MetricValue::Int(value) => match &self.format {
                 Some(format) if format.as_str() == "percentage" => format!("{}%", value * 100),
-                _ => format!("{}", value),
+                _ => format!("{value}"),
             },
             MetricValue::Problem(Problem::Ignore(_)) => "N/A".to_string(),
-            value => format!("{:?}", value),
+            value => format!("{value:?}"),
         }
     }
 }
@@ -303,7 +303,7 @@ impl Action {
     ) -> Action {
         let value = ValueSource {
             metric: Metric::Eval(ExpressionContext {
-                raw_expression: format!("'{}'", raw_value),
+                raw_expression: format!("'{raw_value}'"),
                 parsed_expression: ExpressionTree::Value(MetricValue::String(raw_value.clone())),
             }),
             cached_value: RefCell::new(Some(MetricValue::String(raw_value))),
@@ -409,22 +409,17 @@ impl ActionContext<'_> {
             MetricValue::Problem(Problem::Ignore(_)) => (),
             MetricValue::Problem(Problem::Missing(reason)) => {
                 self.action_results.infos.push(format!(
-                    "[MISSING] In config '{}::{}': (need boolean trigger) {:?}",
-                    namespace, name, reason,
+                    "[MISSING] In config '{namespace}::{name}': (need boolean trigger) {reason:?}",
                 ));
             }
             MetricValue::Problem(problem) => {
                 self.action_results.errors.push(format!(
-                    "[ERROR] In config '{}::{}': (need boolean trigger): {:?}",
-                    namespace, name, problem,
+                    "[ERROR] In config '{namespace}::{name}': (need boolean trigger): {problem:?}",
                 ));
             }
             other => {
                 self.action_results.errors.push(format!(
-                    "[DEBUG: BAD CONFIG] Unexpected value type in config '{}::{}' (need boolean trigger): {}",
-                    namespace,
-                    name,
-                    other,
+                    "[DEBUG: BAD CONFIG] Unexpected value type in config '{namespace}::{name}' (need boolean trigger): {other}",
                 ));
             }
         };
@@ -444,14 +439,13 @@ impl ActionContext<'_> {
                     }
                     Err(ref bad_type) => {
                         self.action_results.errors.push(format!(
-                            "Bad interval in config '{}::{}': {:?}",
-                            namespace, name, bad_type,
+                            "Bad interval in config '{namespace}::{name}': {bad_type:?}",
                         ));
                         inspect_logger::log_error(
                             "Bad interval",
                             namespace,
                             name,
-                            &format!("{:?}", interval),
+                            &format!("{interval:?}"),
                         );
                     }
                 }
@@ -463,22 +457,21 @@ impl ActionContext<'_> {
                     "Snapshot trigger not boolean",
                     namespace,
                     name,
-                    &format!("{:?}", reason),
+                    &format!("{reason:?}"),
                 );
                 self.action_results
                     .infos
-                    .push(format!("[MISSING] In config '{}::{}': {:?}", namespace, name, reason,));
+                    .push(format!("[MISSING] In config '{namespace}::{name}': {reason:?}",));
             }
             other => {
                 inspect_logger::log_error(
                     "Bad config: Unexpected value type (need boolean)",
                     namespace,
                     name,
-                    &format!("{}", other),
+                    &format!("{other}"),
                 );
                 self.action_results.errors.push(format!(
-                    "Bad config: Unexpected value type in config '{}::{}' (need boolean): {}",
-                    namespace, name, other,
+                    "Bad config: Unexpected value type in config '{namespace}::{name}' (need boolean): {other}",
                 ));
             }
         };
@@ -489,10 +482,10 @@ impl ActionContext<'_> {
         let value = self.metric_state.eval_action_metric(namespace, &action.value);
         match value {
             MetricValue::Problem(Problem::Ignore(_)) => {
-                self.action_results.broken_gauges.push(format!("{}: N/A", name));
+                self.action_results.broken_gauges.push(format!("{name}: N/A"));
             }
             MetricValue::Problem(problem) => {
-                self.action_results.broken_gauges.push(format!("{}: {:?}", name, problem));
+                self.action_results.broken_gauges.push(format!("{name}: {problem:?}"));
             }
             value => {
                 self.action_results.gauges.push(format!(

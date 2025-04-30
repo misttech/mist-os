@@ -24,22 +24,22 @@ impl DefineSubsystemConfiguration<ICUConfig> for IcuSubsystem {
                     source: context.get_resource("metaZones.res"),
                     destination: format!("tzdata/icu/{DATA_VERSION}/{FORMAT}/metaZones.res"),
                 })
-                .context(format!("Providing metaZones.res to {}", package))?
+                .context(format!("Providing metaZones.res to {package}"))?
                 .config_data(FileEntry {
                     source: context.get_resource("timezoneTypes.res"),
                     destination: format!("tzdata/icu/{DATA_VERSION}/{FORMAT}/timezoneTypes.res"),
                 })
-                .context(format!("Providing timezoneTypes.res to {}", package))?
+                .context(format!("Providing timezoneTypes.res to {package}"))?
                 .config_data(FileEntry {
                     source: context.get_resource("zoneinfo64.res"),
                     destination: format!("tzdata/icu/{DATA_VERSION}/{FORMAT}/zoneinfo64.res"),
                 })
-                .context(format!("Providing zoneinfo64.res to {}", package))?
+                .context(format!("Providing zoneinfo64.res to {package}"))?
                 .config_data(FileEntry {
                     source: context.get_resource("revision.txt"),
                     destination: "tzdata/revision.txt".to_string(),
                 })
-                .context(format!("Providing revision.txt to {}", package))?;
+                .context(format!("Providing revision.txt to {package}"))?;
         }
 
         Ok(())

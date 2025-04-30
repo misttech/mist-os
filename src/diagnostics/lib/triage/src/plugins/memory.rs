@@ -61,8 +61,7 @@ impl Plugin for MemoryPlugin {
                             None => {
                                 results.push(Action::new_synthetic_error(
                                     format!(
-                                        "[DEBUG: BAD DATA] Could not parse '{}' as a valid size. Something is wrong with the output of memory_monitor.",
-                                        value,
+                                        "[DEBUG: BAD DATA] Could not parse '{value}' as a valid size. Something is wrong with the output of memory_monitor.",
                                     ),
                                     "Tools>ffx>Profile>Memory".to_string(),
                                 ));

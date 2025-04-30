@@ -173,7 +173,7 @@ impl TryFrom<u8> for Nl80211Cmd {
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match Self::from_u8(value) {
             Some(val) => Ok(val),
-            None => Err(DecodeError::from(format!("Invalid NL80211 command: {}", value))),
+            None => Err(DecodeError::from(format!("Invalid NL80211 command: {value}"))),
         }
     }
 }

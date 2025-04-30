@@ -37,8 +37,7 @@ impl DefineSubsystemConfiguration<FontsConfig> for FontsSubsystem {
                 )?;
 
                 let font_manifest = format!(
-                    "/fonts/data/assets/{}_all.hermetic_assets.font_manifest.json",
-                    font_collection_name
+                    "/fonts/data/assets/{font_collection_name}_all.hermetic_assets.font_manifest.json"
                 );
                 builder.set_config_capability(
                     "fuchsia.fonts.FontManifest",

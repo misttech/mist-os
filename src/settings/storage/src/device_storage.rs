@@ -276,10 +276,10 @@ impl DeviceStorage {
         let flush_result = stash_proxy.flush().await;
         match flush_result {
             Ok(Err(err)) => {
-                Self::handle_flush_failure(inspect_handle, setting_key, format!("{:?}", err)).await;
+                Self::handle_flush_failure(inspect_handle, setting_key, format!("{err:?}")).await;
             }
             Err(err) => {
-                Self::handle_flush_failure(inspect_handle, setting_key, format!("{:?}", err)).await;
+                Self::handle_flush_failure(inspect_handle, setting_key, format!("{err:?}")).await;
             }
             _ => {}
         }

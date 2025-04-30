@@ -48,7 +48,7 @@ impl Display for RequestId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "[{},", self.connection_id)?;
         match self.request_id {
-            Some(v) => write!(f, "{}]", v),
+            Some(v) => write!(f, "{v}]"),
             None => write!(f, "xxxx]"),
         }
     }

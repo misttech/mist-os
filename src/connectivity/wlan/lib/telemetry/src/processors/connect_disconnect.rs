@@ -123,7 +123,7 @@ impl From<&fidl_sme::DisconnectSource> for InspectDisconnectSource {
         match disconnect_source {
             fidl_sme::DisconnectSource::User(reason) => Self {
                 source: "user".to_string(),
-                reason: format!("{:?}", reason),
+                reason: format!("{reason:?}"),
                 mlme_event_name: None,
             },
             fidl_sme::DisconnectSource::Ap(cause) => Self {

@@ -21,7 +21,7 @@ impl PartialEq<MetricEvent> for Event {
         let payload_value = match other.payload {
             MetricEventPayload::Count(event_count) => event_count as i64,
             MetricEventPayload::IntegerValue(value) => value,
-            _ => panic!("Only should be observing Occurrence or Integer; got {:?}", other),
+            _ => panic!("Only should be observing Occurrence or Integer; got {other:?}"),
         };
         other.metric_id == self.id && payload_value == self.value && other.event_codes == self.codes
     }

@@ -131,8 +131,7 @@ mod tests {
             message.set_raw_severity(raw);
             assert!(
                 filter.should_send(&message),
-                "got false on should_send with raw_severity={} and level filter with verbosity=15",
-                raw
+                "got false on should_send with raw_severity={raw} and level filter with verbosity=15"
             );
         }
 

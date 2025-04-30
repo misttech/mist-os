@@ -225,14 +225,14 @@ mod tests {
 
         // Run the reaper and make sure the watcher is still there
         if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
-            panic!("future returned an error (1): {:?}", e);
+            panic!("future returned an error (1): {e:?}");
         }
         assert_eq!(1, helper.service.inner.lock().watchers.len());
 
         // Drop the client end of the channel and run the reaper again
         mem::drop(client_end);
         if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
-            panic!("future returned an error (1): {:?}", e);
+            panic!("future returned an error (1): {e:?}");
         }
         assert_eq!(0, helper.service.inner.lock().watchers.len());
     }
@@ -254,7 +254,7 @@ mod tests {
 
             // Run the reaper and make sure the watcher is still there
             if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
-                panic!("future returned an error (1): {:?}", e);
+                panic!("future returned an error (1): {e:?}");
             }
             assert_eq!(active_clients.len(), helper.service.inner.lock().watchers.len());
 
@@ -263,7 +263,7 @@ mod tests {
                 active_clients.retain(|_| rng.gen_bool(0.9));
 
                 if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
-                    panic!("future returned an error (1): {:?}", e);
+                    panic!("future returned an error (1): {e:?}");
                 }
                 assert_eq!(active_clients.len(), helper.service.inner.lock().watchers.len());
             }
@@ -282,7 +282,7 @@ mod tests {
             helper.service.add_watcher(server_end).expect("add_watcher failed");
             active_clients.push(client_end);
             if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
-                panic!("future returned an error (1): {:?}", e);
+                panic!("future returned an error (1): {e:?}");
             }
         }
 
@@ -305,7 +305,7 @@ mod tests {
 
         // Run the server future to propagate the events to FIDL clients
         if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
-            panic!("server future returned an error: {:?}", e);
+            panic!("server future returned an error: {e:?}");
         }
 
         let events = consume_events_until_stalled(proxy.take_event_stream()).await;
@@ -313,15 +313,15 @@ mod tests {
         // Sadly, generated Event struct doesn't implement PartialEq
         match &events[0] {
             &DeviceWatcherEvent::OnPhyAdded { phy_id: 20 } => {}
-            other => panic!("Expected OnPhyAdded(20), got {:?}", other),
+            other => panic!("Expected OnPhyAdded(20), got {other:?}"),
         }
         match &events[1] {
             &DeviceWatcherEvent::OnPhyAdded { phy_id: 30 } => {}
-            other => panic!("Expected OnPhyAdded(30), got {:?}", other),
+            other => panic!("Expected OnPhyAdded(30), got {other:?}"),
         }
         match &events[2] {
             &DeviceWatcherEvent::OnPhyRemoved { phy_id: 20 } => {}
-            other => panic!("Expected OnPhyRemoved(20), got {:?}", other),
+            other => panic!("Expected OnPhyRemoved(20), got {other:?}"),
         }
     }
 
@@ -337,18 +337,18 @@ mod tests {
 
         // Run the server future to propagate the events to FIDL clients
         if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
-            panic!("server future returned an error: {:?}", e);
+            panic!("server future returned an error: {e:?}");
         }
 
         let events = consume_events_until_stalled(proxy.take_event_stream()).await;
         assert_eq!(2, events.len());
         match &events[0] {
             &DeviceWatcherEvent::OnIfaceAdded { iface_id: 50 } => {}
-            other => panic!("Expected OnIfaceAdded(50), got {:?}", other),
+            other => panic!("Expected OnIfaceAdded(50), got {other:?}"),
         }
         match &events[1] {
             &DeviceWatcherEvent::OnIfaceRemoved { iface_id: 50 } => {}
-            other => panic!("Expected OnIfaceRemoved(50), got {:?}", other),
+            other => panic!("Expected OnIfaceRemoved(50), got {other:?}"),
         }
     }
 
@@ -366,7 +366,7 @@ mod tests {
         let (proxy, server_end) = fidl::endpoints::create_proxy();
         helper.service.add_watcher(server_end).expect("add_watcher failed");
         if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
-            panic!("server future returned an error: {:?}", e);
+            panic!("server future returned an error: {e:?}");
         }
 
         // The watcher should only see phy #30 being "added"
@@ -374,7 +374,7 @@ mod tests {
         assert_eq!(1, events.len());
         match &events[0] {
             &DeviceWatcherEvent::OnPhyAdded { phy_id: 30 } => {}
-            other => panic!("Expected OnPhyAdded(30), got {:?}", other),
+            other => panic!("Expected OnPhyAdded(30), got {other:?}"),
         }
     }
 
@@ -392,7 +392,7 @@ mod tests {
         let (proxy, server_end) = fidl::endpoints::create_proxy();
         helper.service.add_watcher(server_end).expect("add_watcher failed");
         if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
-            panic!("server future returned an error: {:?}", e);
+            panic!("server future returned an error: {e:?}");
         }
 
         // The watcher should only see iface #30 being "added"
@@ -400,7 +400,7 @@ mod tests {
         assert_eq!(1, events.len());
         match &events[0] {
             &DeviceWatcherEvent::OnIfaceAdded { iface_id: 30 } => {}
-            other => panic!("Expected OnIfaceAdded(30), got {:?}", other),
+            other => panic!("Expected OnIfaceAdded(30), got {other:?}"),
         }
     }
 
@@ -419,7 +419,7 @@ mod tests {
         let (proxy_two, server_end_two) = fidl::endpoints::create_proxy();
         helper.service.add_watcher(server_end_two).expect("add_watcher failed (2)");
         if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
-            panic!("server future returned an error: {:?}", e);
+            panic!("server future returned an error: {e:?}");
         }
         let events_one = consume_events_until_stalled(proxy_one.take_event_stream()).await;
         assert_eq!(3, events_one.len());
@@ -439,7 +439,7 @@ mod tests {
         let (proxy_one, server_end_one) = fidl::endpoints::create_proxy();
         helper.service.add_watcher(server_end_one).expect("add_watcher failed (1)");
         if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
-            panic!("server future returned an error: {:?}", e);
+            panic!("server future returned an error: {e:?}");
         }
         // Consume events from snapshot upon adding the first watcher
         let events_one = consume_events_until_stalled(proxy_one.take_event_stream()).await;
@@ -449,7 +449,7 @@ mod tests {
         let (proxy_two, server_end_two) = fidl::endpoints::create_proxy();
         helper.service.add_watcher(server_end_two).expect("add_watcher failed (2)");
         if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
-            panic!("server future returned an error: {:?}", e);
+            panic!("server future returned an error: {e:?}");
         }
         // Check that the first watcher did not retrigger a snapshot.
         assert_eq!(consume_events_until_stalled(proxy_one.take_event_stream()).await.len(), 0);
@@ -471,7 +471,7 @@ mod tests {
 
         helper.service.add_watcher(ServerEnd::new(reduced_chan)).expect("add_watcher failed");
         if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
-            panic!("future returned an error (1): {:?}", e);
+            panic!("future returned an error (1): {e:?}");
         }
         assert_eq!(1, helper.service.inner.lock().watchers.len());
 
@@ -480,7 +480,7 @@ mod tests {
 
         // The watcher should be now removed since sending the event fails
         if let Poll::Ready(Err(e)) = TestExecutor::poll_until_stalled(&mut future).await {
-            panic!("future returned an error (1): {:?}", e);
+            panic!("future returned an error (1): {e:?}");
         }
         assert_eq!(0, helper.service.inner.lock().watchers.len());
 
@@ -512,7 +512,7 @@ mod tests {
         let mut events = vec![];
         loop {
             match TestExecutor::poll_until_stalled(&mut stream.try_next()).await {
-                Poll::Ready(Err(e)) => panic!("event stream future returned an error: {:?}", e),
+                Poll::Ready(Err(e)) => panic!("event stream future returned an error: {e:?}"),
                 Poll::Pending | Poll::Ready(Ok(None)) => break events,
                 Poll::Ready(Ok(Some(event))) => events.push(event),
             }
@@ -544,11 +544,11 @@ mod tests {
 
     fn expect_lists_are_identical(a: Vec<DeviceWatcherEvent>, b: Vec<DeviceWatcherEvent>) {
         if a.len() != b.len() {
-            panic!("event lists have different lengths: {:?} != {:?}", a, b);
+            panic!("event lists have different lengths: {a:?} != {b:?}");
         }
         a.iter().zip(b.iter()).for_each(|(x, y)| {
             if !events_are_identical(x, y) {
-                panic!("event lists are not identical: {:?} != {:?}", a, b);
+                panic!("event lists are not identical: {a:?} != {b:?}");
             }
         });
     }

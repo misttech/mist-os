@@ -13,7 +13,7 @@ pub fn reset_unique_names() {
 
 pub fn unique_name(name: &str) -> String {
     let suffix = CURRENT_SUFFIX.fetch_add(1, Ordering::SeqCst);
-    let result = format!("{}:0x{:x}", name, suffix);
+    let result = format!("{name}:0x{suffix:x}");
     result
 }
 
@@ -88,7 +88,7 @@ impl Table {
             let mut row = Row::new(&node_name, node.create_child(&node_name));
             for j in 0..col_count {
                 idx += 1.0;
-                row.add_cell(&format!("({},{})", i, j), (i * j) as i64, 100.0 * idx / total);
+                row.add_cell(&format!("({i},{j})"), (i * j) as i64, 100.0 * idx / total);
             }
             rows.push(row);
         }

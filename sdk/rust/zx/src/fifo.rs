@@ -116,7 +116,7 @@ impl<R: IntoBytes + FromBytes, W: IntoBytes + FromBytes> Fifo<R, W> {
     ///
     /// Wraps
     /// [zx_fifo_read](https://fuchsia.dev/fuchsia-src/reference/syscalls/fifo_read.md).
-    pub fn read_uninit(&self, bytes: &mut [MaybeUninit<R>]) -> Result<&mut [R], Status> {
+    pub fn read_uninit<'a>(&self, bytes: &'a mut [MaybeUninit<R>]) -> Result<&'a mut [R], Status> {
         // SAFETY: the slice is valid to write to for its entire length, and this call will not
         // read from the bytes
         let valid_count = unsafe { self.read_raw(bytes.as_mut_ptr().cast::<R>(), bytes.len())? };

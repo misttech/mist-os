@@ -879,42 +879,42 @@ impl Data<Logs> {
                 LogsProperty::String(
                     key @ (LogsField::Other(_) | LogsField::MsgStructured),
                     value,
-                ) => Some(format!("{}={}", key, value)),
+                ) => Some(format!("{key}={value}")),
                 LogsProperty::Bytes(key @ (LogsField::Other(_) | LogsField::MsgStructured), _) => {
-                    Some(format!("{} = <bytes>", key))
+                    Some(format!("{key} = <bytes>"))
                 }
                 LogsProperty::Int(
                     key @ (LogsField::Other(_) | LogsField::MsgStructured),
                     value,
-                ) => Some(format!("{}={}", key, value)),
+                ) => Some(format!("{key}={value}")),
                 LogsProperty::Uint(
                     key @ (LogsField::Other(_) | LogsField::MsgStructured),
                     value,
-                ) => Some(format!("{}={}", key, value)),
+                ) => Some(format!("{key}={value}")),
                 LogsProperty::Double(
                     key @ (LogsField::Other(_) | LogsField::MsgStructured),
                     value,
-                ) => Some(format!("{}={}", key, value)),
+                ) => Some(format!("{key}={value}")),
                 LogsProperty::Bool(
                     key @ (LogsField::Other(_) | LogsField::MsgStructured),
                     value,
-                ) => Some(format!("{}={}", key, value)),
+                ) => Some(format!("{key}={value}")),
                 LogsProperty::DoubleArray(
                     key @ (LogsField::Other(_) | LogsField::MsgStructured),
                     value,
-                ) => Some(format!("{}={:?}", key, value)),
+                ) => Some(format!("{key}={value:?}")),
                 LogsProperty::IntArray(
                     key @ (LogsField::Other(_) | LogsField::MsgStructured),
                     value,
-                ) => Some(format!("{}={:?}", key, value)),
+                ) => Some(format!("{key}={value:?}")),
                 LogsProperty::UintArray(
                     key @ (LogsField::Other(_) | LogsField::MsgStructured),
                     value,
-                ) => Some(format!("{}={:?}", key, value)),
+                ) => Some(format!("{key}={value:?}")),
                 LogsProperty::StringList(
                     key @ (LogsField::Other(_) | LogsField::MsgStructured),
                     value,
-                ) => Some(format!("{}={:?}", key, value)),
+                ) => Some(format!("{key}={value:?}")),
                 _ => None,
             }))
         });
@@ -1142,7 +1142,7 @@ impl LogTimeDisplayFormat {
                 let seconds = adjusted / NANOS_IN_SECOND;
                 let rem_nanos = (adjusted % NANOS_IN_SECOND) as u32;
                 let formatted = tz.format(seconds, rem_nanos);
-                write!(f, "[{}]", formatted)?;
+                write!(f, "[{formatted}]")?;
             }
         }
         Ok(())
@@ -1243,7 +1243,7 @@ impl fmt::Display for LogTextPresenter<'_> {
             write!(f, " <missing message>")?;
         }
         for kvp in self.payload_keys_strings() {
-            write!(f, " {}", kvp)?;
+            write!(f, " {kvp}")?;
         }
 
         let dropped = self.log.dropped_logs().unwrap_or_default();
@@ -1308,7 +1308,7 @@ impl fmt::Display for LogsField {
             LogsField::MsgStructured => write!(f, "value"),
             LogsField::FilePath => write!(f, "file_path"),
             LogsField::LineNumber => write!(f, "line_number"),
-            LogsField::Other(name) => write!(f, "{}", name),
+            LogsField::Other(name) => write!(f, "{name}"),
         }
     }
 }
@@ -1741,7 +1741,7 @@ mod tests {
 
         assert_eq!(
             "[00012.345678][123][456][moniker][foo,bar] INFO: [some_file.cc(420)] some message test=property value=test",
-            format!("{}", data)
+            format!("{data}")
         )
     }
 
@@ -1767,7 +1767,7 @@ mod tests {
 
         assert_eq!(
             "[00012.345678][123][456][moniker][bar] INFO: [some_file.cc(420)] some message test=property value=test",
-            format!("{}", data)
+            format!("{data}")
         )
     }
 
@@ -1792,7 +1792,7 @@ mod tests {
 
         assert_eq!(
             "[00012.345678][123][456][moniker] INFO: [some_file.cc(420)] some message test=property value=test",
-            format!("{}", data)
+            format!("{data}")
         )
     }
 
@@ -2117,7 +2117,7 @@ mod tests {
         .set_message("some message".to_string())
         .build();
 
-        assert_eq!("[00012.345678][123][456][moniker] INFO: some message", format!("{}", data))
+        assert_eq!("[00012.345678][123][456][moniker] INFO: some message", format!("{data}"))
     }
 
     #[fuchsia::test]

@@ -208,7 +208,7 @@ mod tests {
         });
 
         for i in 0..100 {
-            inspector.root().record_string(format!("testing-{}", i), "testing".repeat(i + 1));
+            inspector.root().record_string(format!("testing-{i}"), "testing".repeat(i + 1));
         }
 
         {
@@ -230,7 +230,7 @@ mod tests {
         });
 
         for i in 101..220 {
-            inspector.root().record_string(format!("testing-{}", i), "testing".repeat(i + 1));
+            inspector.root().record_string(format!("testing-{i}"), "testing".repeat(i + 1));
         }
 
         assert_data_tree!(inspector, root: contains {

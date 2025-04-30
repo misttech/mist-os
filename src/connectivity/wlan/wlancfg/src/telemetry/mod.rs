@@ -143,7 +143,7 @@ impl DisconnectSourceExt for fidl_sme::DisconnectSource {
     fn inspect_string(&self) -> String {
         match self {
             fidl_sme::DisconnectSource::User(reason) => {
-                format!("source: user, reason: {:?}", reason)
+                format!("source: user, reason: {reason:?}")
             }
             fidl_sme::DisconnectSource::Ap(cause) => format!(
                 "source: ap, reason: {:?}, mlme_event_name: {:?}",
@@ -1695,7 +1695,7 @@ impl Telemetry {
                 ssid: request.candidate.network.ssid.to_string(),
                 bssid: request.candidate.bss.bssid.to_string(),
             },
-            reasons: InspectList(request.reasons.iter().map(|reason| format!("{:?}", reason)).collect::<Vec<String>>().as_slice()),
+            reasons: InspectList(request.reasons.iter().map(|reason| format!("{reason:?}")).collect::<Vec<String>>().as_slice()),
             status: result.status_code.into_primitive(),
             original_association_maintained: result.original_association_maintained,
         });
@@ -8382,12 +8382,12 @@ mod tests {
         test_helper.advance_by(zx::MonotonicDuration::from_minutes(5), test_fut.as_mut());
 
         let tags = test_helper.get_persistence_reqs();
-        assert!(tags.contains(&"wlancfg-client-stats-counters".to_string()), "tags: {:?}", tags);
+        assert!(tags.contains(&"wlancfg-client-stats-counters".to_string()), "tags: {tags:?}");
 
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         test_helper.advance_by(zx::MonotonicDuration::from_minutes(5), test_fut.as_mut());
         let tags = test_helper.get_persistence_reqs();
-        assert!(tags.contains(&"wlancfg-client-stats-counters".to_string()), "tags: {:?}", tags);
+        assert!(tags.contains(&"wlancfg-client-stats-counters".to_string()), "tags: {tags:?}");
     }
 
     #[derive(PartialEq)]
@@ -10198,7 +10198,7 @@ mod tests {
                         self.telemetry_svc_stream = Some(telemetry_stream);
                         self.exec.run_until_stalled(test_fut)
                     }
-                    _ => panic!("Unexpected device monitor request: {:?}", req),
+                    _ => panic!("Unexpected device monitor request: {req:?}"),
                 }
             } else {
                 result
@@ -10216,8 +10216,7 @@ mod tests {
             assert_eq!(
                 duration.into_nanos() % STEP_INCREMENT.into_nanos(),
                 0,
-                "duration {:?} is not divisible by STEP_INCREMENT",
-                duration,
+                "duration {duration:?} is not divisible by STEP_INCREMENT",
             );
             const_assert_eq!(
                 TELEMETRY_QUERY_INTERVAL.into_nanos() % STEP_INCREMENT.into_nanos(),
@@ -10360,7 +10359,7 @@ mod tests {
                         .expect("expect sending GetIfaceStats response to succeed");
                 }
                 _ => {
-                    panic!("unexpected request: {:?}", request);
+                    panic!("unexpected request: {request:?}");
                 }
             }
         }
@@ -10382,7 +10381,7 @@ mod tests {
                         .expect("expect sending GetHistogramStats response to succeed");
                 }
                 _ => {
-                    panic!("unexpected request: {:?}", request);
+                    panic!("unexpected request: {request:?}");
                 }
             }
         }

@@ -66,7 +66,7 @@ impl IfacesTree {
         }
 
         let vmo = Arc::new(vmo);
-        let iface_node_name = format!("{}", iface_id);
+        let iface_node_name = format!("{iface_id}");
         let iface_node = tree.parent_node.create_lazy_child(iface_node_name, move || {
             let inspect_vmo_inner_clone = Arc::clone(&vmo);
             async move {
@@ -87,7 +87,7 @@ impl IfacesTree {
             error!("record_destroyed_iface called with missing iface_id {}. Skipping.", iface_id);
             return;
         }
-        let destroyed_node_name = format!("{}", iface_id);
+        let destroyed_node_name = format!("{iface_id}");
 
         if tree.cache_node.is_none() {
             let cache_node = tree.inspector.root().create_child("destroyed_ifaces");

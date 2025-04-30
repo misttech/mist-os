@@ -696,7 +696,7 @@ impl InnerState {
 
     fn unique_link_name(&mut self, prefix: &str) -> String {
         let id = self.next_unique_link_id.fetch_add(1, Ordering::Relaxed);
-        format!("{}-{}", prefix, id)
+        format!("{prefix}-{id}")
     }
 
     pub(crate) fn allocate_link<'a, 'b>(

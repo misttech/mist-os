@@ -58,7 +58,7 @@ struct TeeManagerConfig {
 }
 
 fn create_name(name: &str) -> Result<cml::Name, anyhow::Error> {
-    cml::Name::new(name).with_context(|| format!("Invalid name: {}", name))
+    cml::Name::new(name).with_context(|| format!("Invalid name: {name}"))
 }
 
 fn define_global_platform_tee_configuration(
@@ -116,7 +116,7 @@ fn create_tee_manager(
     // in the board configuration, as a protocol with a specific name format.
     let protocols: Vec<Option<cml::OneOrMany<cml::Name>>> = tee_trusted_app_guids
         .iter()
-        .map(|guid| create_name(&format!("fuchsia.tee.Application.{}", guid)))
+        .map(|guid| create_name(&format!("fuchsia.tee.Application.{guid}")))
         .collect::<Result<Vec<cml::Name>, anyhow::Error>>()?
         .iter()
         .map(|name| Some(cml::OneOrMany::One(name.clone())))
@@ -165,7 +165,7 @@ fn create_tee_manager(
     };
     builder
         .compiled_package(destination.clone(), def)
-        .with_context(|| format!("Inserting compiled package: {}", destination))?;
+        .with_context(|| format!("Inserting compiled package: {destination}"))?;
 
     Ok(())
 }
@@ -235,7 +235,7 @@ fn create_tee_clients(
 
         for guid in &tee_client.guids {
             // Expose the guids from tee_manager to the component in question
-            let guid_protocol_name = create_name(&format!("fuchsia.tee.Application.{}", guid))?;
+            let guid_protocol_name = create_name(&format!("fuchsia.tee.Application.{guid}"))?;
             offer.push(cml::Offer {
                 protocol: Some(guid_protocol_name.into()),
                 ..cml::Offer::empty(
@@ -269,10 +269,7 @@ fn create_tee_clients(
                 builder
                     .package(package_name.as_ref())
                     .config_data(FileEntry { source: value.clone(), destination: key.into() })
-                    .context(format!(
-                        "Adding config data file {} to package {}",
-                        key, package_name
-                    ))?;
+                    .context(format!("Adding config data file {key} to package {package_name}"))?;
             }
 
             // Route the config-data subdir named with the package-name to this component
@@ -350,7 +347,7 @@ fn create_tee_clients(
 
     builder
         .compiled_package(destination.clone(), def)
-        .with_context(|| format!("Inserting compiled package: {}", destination))?;
+        .with_context(|| format!("Inserting compiled package: {destination}"))?;
     builder.core_shard(&context.get_resource("tee-clients.core_shard.cml"));
 
     Ok(())

@@ -603,7 +603,7 @@ mod tests {
 
         // Add a file to the archive
         std::fs::write(&host_path_to_add, contents_to_add)
-            .context(format!("writing contents to file: {}", host_path_to_add))
+            .context(format!("writing contents to file: {host_path_to_add}"))
             .unwrap();
 
         cmd_package_archive_add(PackageArchiveAddCommand {

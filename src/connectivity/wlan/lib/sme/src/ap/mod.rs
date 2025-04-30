@@ -466,12 +466,11 @@ fn validate_radio_cfg(
     // TODO(https://fxbug.dev/42174927): We shouldn't expect to only start an AP in the US. The regulatory
     // enforcement for the channel should apply at a lower layer.
     if !channel.is_valid_in_us() {
-        return Err(StartResult::InvalidArguments(format!("Invalid US channel {}", channel)));
+        return Err(StartResult::InvalidArguments(format!("Invalid US channel {channel}")));
     }
     if channel.is_dfs() {
         return Err(StartResult::InvalidArguments(format!(
-            "DFS channels not supported: {}",
-            channel
+            "DFS channels not supported: {channel}"
         )));
     }
 
@@ -484,8 +483,7 @@ fn validate_radio_cfg(
             Cbw::Cbw20 => (),
             _ => {
                 return Err(StartResult::InvalidArguments(format!(
-                    "PHY type {:?} not supported on channel {}",
-                    phy, channel
+                    "PHY type {phy:?} not supported on channel {channel}"
                 )))
             }
         },
@@ -494,8 +492,7 @@ fn validate_radio_cfg(
                 Cbw::Cbw20 | Cbw::Cbw40 | Cbw::Cbw40Below => (),
                 _ => {
                     return Err(StartResult::InvalidArguments(format!(
-                        "HT-mode not supported for channel {}",
-                        channel
+                        "HT-mode not supported for channel {channel}"
                     )))
                 }
             }
@@ -503,8 +500,7 @@ fn validate_radio_cfg(
             match band_cap.ht_cap.as_ref() {
                 None => {
                     return Err(StartResult::InvalidArguments(format!(
-                        "No HT capabilities: {}",
-                        channel
+                        "No HT capabilities: {channel}"
                     )))
                 }
                 Some(ht_cap) => {
@@ -517,8 +513,7 @@ fn validate_radio_cfg(
                         && channel.cbw != Cbw::Cbw20
                     {
                         return Err(StartResult::InvalidArguments(format!(
-                            "20 MHz band capabilities does not support channel {}",
-                            channel
+                            "20 MHz band capabilities does not support channel {channel}"
                         )));
                     }
                 }
@@ -528,8 +523,7 @@ fn validate_radio_cfg(
             match channel.cbw {
                 Cbw::Cbw160 | Cbw::Cbw80P80 { .. } => {
                     return Err(StartResult::InvalidArguments(format!(
-                        "Supported for channel {} in VHT mode not available",
-                        channel
+                        "Supported for channel {channel} in VHT mode not available"
                     )))
                 }
                 _ => (),
@@ -537,15 +531,13 @@ fn validate_radio_cfg(
 
             if !channel.is_5ghz() {
                 return Err(StartResult::InvalidArguments(format!(
-                    "VHT only supported on 5 GHz channels: {}",
-                    channel
+                    "VHT only supported on 5 GHz channels: {channel}"
                 )));
             }
 
             if band_cap.vht_cap.is_none() {
                 return Err(StartResult::InvalidArguments(format!(
-                    "No VHT capabilities: {}",
-                    channel
+                    "No VHT capabilities: {channel}"
                 )));
             }
         }
@@ -555,10 +547,10 @@ fn validate_radio_cfg(
         | fidl_common::WlanPhyType::Cdmg
         | fidl_common::WlanPhyType::Cmmg
         | fidl_common::WlanPhyType::He => {
-            return Err(StartResult::InvalidArguments(format!("Unsupported PHY type: {:?}", phy)))
+            return Err(StartResult::InvalidArguments(format!("Unsupported PHY type: {phy:?}")))
         }
         fidl_common::WlanPhyTypeUnknown!() => {
-            return Err(StartResult::InvalidArguments(format!("Unknown PHY type: {:?}", phy)))
+            return Err(StartResult::InvalidArguments(format!("Unknown PHY type: {phy:?}")))
         }
     }
 
@@ -713,7 +705,7 @@ impl InfraBss {
 
         client.handle_disassoc_ind(&mut self.ctx, &mut self.aid_map);
         if client.associated() {
-            panic!("client {} didn't disassociate? this should never happen!", peer_addr)
+            panic!("client {peer_addr} didn't disassociate? this should never happen!")
         } else {
             info!("client {} disassociated", peer_addr);
         }
@@ -967,7 +959,7 @@ mod tests {
                 }
             }
             Err(other) => {
-                panic!("Unexpected StartResult value: {:?}", other);
+                panic!("Unexpected StartResult value: {other:?}");
             }
         }
     }

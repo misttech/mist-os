@@ -116,7 +116,7 @@ impl TestHelper {
                     self.telemetry_svc_stream = Some(telemetry_stream);
                     self.exec.run_until_stalled(test_fut)
                 }
-                _ => panic!("Unexpected device monitor request: {:?}", req),
+                _ => panic!("Unexpected device monitor request: {req:?}"),
             }
         } else {
             result
@@ -170,7 +170,7 @@ impl TestHelper {
                     .expect("expect sending QueryTelemetrySupport response to succeed");
             }
             _ => {
-                panic!("unexpected request: {:?}", request);
+                panic!("unexpected request: {request:?}");
             }
         }
         self.exec.run_until_stalled(test_fut)
@@ -202,7 +202,7 @@ impl TestHelper {
                     .expect("expect sending GetIfaceStats response to succeed");
             }
             _ => {
-                panic!("unexpected request: {:?}", request);
+                panic!("unexpected request: {request:?}");
             }
         }
         self.exec.run_until_stalled(test_fut)

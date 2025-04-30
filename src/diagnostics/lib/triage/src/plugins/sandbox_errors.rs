@@ -37,8 +37,7 @@ impl Plugin for SandboxErrorsPlugin {
 
         for (name, service) in error_tuples.iter() {
             results.push(Action::new_synthetic_warning(format!(
-                "[WARNING]: {} tried to use {}, which was not declared in its sandbox",
-                name, service
+                "[WARNING]: {name} tried to use {service}, which was not declared in its sandbox",
             )));
         }
         results

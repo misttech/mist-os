@@ -78,14 +78,14 @@ pub struct DumpCommand {}
 pub fn parse_time(value: &str) -> Result<DetailedDateTime, String> {
     parse_date_string(value, Local::now(), Dialect::Us)
         .map(|time| DetailedDateTime { time, is_now: value == "now" })
-        .map_err(|e| format!("invalid date string: {}", e))
+        .map_err(|e| format!("invalid date string: {e}"))
 }
 
 /// Parses a duration from a string. The input is in seconds
 /// and the output is a Rust duration.
 pub fn parse_seconds_string_as_duration(value: &str) -> Result<Duration, String> {
     Ok(Duration::from_secs(
-        value.parse().map_err(|e| format!("value '{}' is not a number: {}", value, e))?,
+        value.parse().map_err(|e| format!("value '{value}' is not a number: {e}"))?,
     ))
 }
 
@@ -109,9 +109,7 @@ impl std::str::FromStr for TimeFormat {
             "local" => Ok(TimeFormat::Local),
             "utc" => Ok(TimeFormat::Utc),
             "boot" => Ok(TimeFormat::Boot),
-            _ => {
-                Err(format!("'{}' is not a valid value: must be one of 'local', 'utc', 'boot'", s))
-            }
+            _ => Err(format!("'{s}' is not a valid value: must be one of 'local', 'utc', 'boot'")),
         }
     }
 }

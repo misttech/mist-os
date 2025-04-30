@@ -29,7 +29,7 @@ impl Puppet {
         let (logs, mut errors) = reader.snapshot_then_subscribe().unwrap().split_streams();
         let task = Task::spawn(async move {
             if let Some(e) = errors.next().await {
-                panic!("error in subscription: {}", e);
+                panic!("error in subscription: {e}");
             }
         });
         Ok(Self { proxy, _info: info, _reader_errors_task: task, logs })

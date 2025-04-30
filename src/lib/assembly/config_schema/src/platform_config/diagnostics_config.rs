@@ -235,8 +235,8 @@ pub enum UrlOrMoniker {
 impl std::fmt::Display for UrlOrMoniker {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Url(u) => write!(f, "{}", u),
-            Self::Moniker(m) => write!(f, "{}", m),
+            Self::Url(u) => write!(f, "{u}"),
+            Self::Moniker(m) => write!(f, "{m}"),
         }
     }
 }
@@ -265,10 +265,7 @@ impl<'de> Deserialize<'de> for UrlOrMoniker {
         } else if Moniker::from_str(&variant).is_ok() {
             Ok(UrlOrMoniker::Moniker(variant))
         } else {
-            Err(D::Error::custom(format_args!(
-                "Expected a moniker or url. {} was neither",
-                variant
-            )))
+            Err(D::Error::custom(format_args!("Expected a moniker or url. {variant} was neither",)))
         }
     }
 }

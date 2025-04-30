@@ -166,7 +166,7 @@ impl MockRealmQueryBuilderInner {
                     ..
                 }) => Capability::Protocol(Protocol {
                     name: Some(name.clone()),
-                    source_path: Some(format!("/svc/{}", name)),
+                    source_path: Some(format!("/svc/{name}")),
                     ..Protocol::default()
                 }),
                 Expose::Dictionary(ExposeDictionary {
@@ -588,7 +588,7 @@ impl MockDir {
                     };
                     responder.send(Status::OK.into_raw(), &entries).unwrap();
                 }
-                x => panic!("unsupported request: {:?}", x),
+                x => panic!("unsupported request: {x:?}"),
             }
         }
     }
@@ -617,7 +617,7 @@ impl MockDir {
                     };
                     responder.send(Status::OK.into_raw(), &entries).unwrap();
                 }
-                x => panic!("unsupported request: {:?}", x),
+                x => panic!("unsupported request: {x:?}"),
             }
         }
     }

@@ -107,7 +107,7 @@ impl DefineSubsystemConfiguration<SwdConfig> for SwdSubsystemConfig {
             })?;
             builder.package("pkg-resolver").config_data(FileEntry {
                 source: tuf_config.clone(),
-                destination: format!("repositories/{}", filename),
+                destination: format!("repositories/{filename}"),
             })?;
         }
 
@@ -189,9 +189,9 @@ impl SwdSubsystemConfig {
 
         let write_config = |name: &str, value: serde_json::Value| -> Result<Utf8PathBuf> {
             let path = gendir.join(name);
-            let file = File::create(&path).with_context(|| format!("Creating config: {}", name))?;
+            let file = File::create(&path).with_context(|| format!("Creating config: {name}"))?;
             serde_json::to_writer_pretty(file, &value)
-                .with_context(|| format!("Writing config: {}", name))?;
+                .with_context(|| format!("Writing config: {name}"))?;
             Ok(path)
         };
 

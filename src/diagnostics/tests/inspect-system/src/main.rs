@@ -149,7 +149,7 @@ async fn handle_run(
             Ok(_) => ftest::Status::Passed,
             Err(e) => {
                 let mut stderr_tx = fasync::Socket::from_socket(stderr_tx);
-                stderr_tx.write_all(format!("Test failed: {:?}", e).as_bytes()).await.ok();
+                stderr_tx.write_all(format!("Test failed: {e:?}").as_bytes()).await.ok();
                 ftest::Status::Failed
             }
         };
@@ -167,7 +167,7 @@ async fn handle_run(
 async fn handle_invocation(moniker: &str, stdout: zx::Socket) -> Result<(), Error> {
     let mut stdout = fasync::Socket::from_socket(stdout);
 
-    stdout.write_all(format!("Processing {}\n", moniker).as_bytes()).await.ok();
+    stdout.write_all(format!("Processing {moniker}\n").as_bytes()).await.ok();
     let proxy: ArchiveAccessorProxy = fuchsia_component::client::connect_to_protocol_at_path::<
         ArchiveAccessorMarker,
     >("/svc/fuchsia.diagnostics.RealArchiveAccessor")?;
@@ -176,7 +176,7 @@ async fn handle_invocation(moniker: &str, stdout: zx::Socket) -> Result<(), Erro
 
     let mut selectors = vec![];
     for value in ArchiveReader::inspect()
-        .add_selector(format!("{}:root", moniker))
+        .add_selector(format!("{moniker}:root"))
         .retry(RetryConfig::never())
         .with_archive(proxy)
         .with_timeout(MonotonicDuration::from_seconds(15))
@@ -233,7 +233,7 @@ async fn handle_invocation(moniker: &str, stdout: zx::Socket) -> Result<(), Erro
                 stream_mode: Some(StreamMode::Snapshot),
                 format: Some(Format::Json),
                 client_selector_configuration: Some(ClientSelectorConfiguration::Selectors(vec![
-                    SelectorArgument::RawSelector(format!("{}:root", moniker)),
+                    SelectorArgument::RawSelector(format!("{moniker}:root")),
                 ])),
                 ..Default::default()
             },

@@ -144,11 +144,11 @@ fn build_signature(snapshot: SnapshotTrigger, mode: Mode) -> String {
             error!("{}", message);
         }
     }
-    let mut signature = format!("{}{}", SIGNATURE_PREFIX, sanitized);
+    let mut signature = format!("{SIGNATURE_PREFIX}{sanitized}");
     if signature.len() > fidl_fuchsia_feedback::MAX_CRASH_SIGNATURE_LENGTH as usize {
         let new_signature =
             signature.chars().take(MAX_CRASH_SIGNATURE_LENGTH as usize).collect::<String>();
-        let message = format!("Signature '{}' truncated to '{}'", signature, new_signature);
+        let message = format!("Signature '{signature}' truncated to '{new_signature}'");
         if mode == Mode::IntegrationTest {
             warn!("{}", message);
         } else {
@@ -372,7 +372,7 @@ mod test {
         let raw_1_result = zx::MonotonicDuration::from_nanos(1);
         let short_time = format!("Nanos({})", MINIMUM_CHECK_TIME_NANOS - 1);
         let short_time_result = zx::MonotonicDuration::from_nanos(MINIMUM_CHECK_TIME_NANOS - 1);
-        let minimum_time = format!("Nanos({})", MINIMUM_CHECK_TIME_NANOS);
+        let minimum_time = format!("Nanos({MINIMUM_CHECK_TIME_NANOS})");
         let minimum_time_result = zx::MonotonicDuration::from_nanos(MINIMUM_CHECK_TIME_NANOS);
         let long_time = format!("Nanos({})", MINIMUM_CHECK_TIME_NANOS + 1);
         let long_time_result = zx::MonotonicDuration::from_nanos(MINIMUM_CHECK_TIME_NANOS + 1);

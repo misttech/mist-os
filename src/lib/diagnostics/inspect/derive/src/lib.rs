@@ -321,11 +321,11 @@ impl<B: fmt::Debug> Render for DebugMarker<B> {
     type Data = StringProperty;
 
     fn create(base: &Self::Base, parent: &Node, name: impl AsRef<str>) -> Self::Data {
-        parent.create_string(name.as_ref(), format!("{:?}", base))
+        parent.create_string(name.as_ref(), format!("{base:?}"))
     }
 
     fn update(base: &Self::Base, data: &mut Self::Data) {
-        data.set(&format!("{:?}", base));
+        data.set(&format!("{base:?}"));
     }
 }
 

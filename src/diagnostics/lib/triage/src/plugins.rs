@@ -37,7 +37,7 @@ pub trait Plugin {
                 },
                 Action::Gauge(Gauge { tag: Some(tag), value, .. }) => {
                     if let Some(MetricValue::String(raw_value)) = value.cached_value.into_inner() {
-                        results.gauges.push(format!("{}: {}", tag, raw_value));
+                        results.gauges.push(format!("{tag}: {raw_value}"));
                     }
                 }
                 _ => (),

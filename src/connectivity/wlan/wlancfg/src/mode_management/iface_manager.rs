@@ -2037,7 +2037,7 @@ mod tests {
             match exec.run_until_stalled(&mut connect_fut) {
                 Poll::Ready(connect_result) => match connect_result {
                     Ok(_) => {}
-                    Err(e) => panic!("failed to connect with {}", e),
+                    Err(e) => panic!("failed to connect with {e}"),
                 },
                 Poll::Pending => panic!("expected the connect request to finish"),
             };
@@ -2097,7 +2097,7 @@ mod tests {
             match exec.run_until_stalled(&mut connect_fut) {
                 Poll::Ready(connect_result) => match connect_result {
                     Ok(_) => {}
-                    Err(e) => panic!("failed to connect with {}", e),
+                    Err(e) => panic!("failed to connect with {e}"),
                 },
                 Poll::Pending => panic!("expected the connect request to finish"),
             };

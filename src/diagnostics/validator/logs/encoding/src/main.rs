@@ -85,8 +85,7 @@ async fn serve_results(mut stream: ValidateResultsIteratorRequestStream) {
                             result: Some(ValidateResult::Failure(TestFailure {
                                 test_name: test_name.to_string(),
                                 reason: format!(
-                                    "Expected: {:#04X?}, actual: {:#04X?}",
-                                    expected, buffer
+                                    "Expected: {expected:#04X?}, actual: {buffer:#04X?}"
                                 ),
                             })),
                             ..ValidateResultsIteratorGetNextResponse::default()

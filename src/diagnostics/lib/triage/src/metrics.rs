@@ -37,10 +37,10 @@ pub(crate) enum Metric {
 impl std::fmt::Display for Metric {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Metric::Selector(s) => write!(f, "{:?}", s),
-            Metric::Eval(s) => write!(f, "{}", s),
+            Metric::Selector(s) => write!(f, "{s:?}"),
+            Metric::Eval(s) => write!(f, "{s}"),
             #[cfg(test)]
-            Metric::Hardcoded(value) => write!(f, "{:?}", value),
+            Metric::Hardcoded(value) => write!(f, "{value:?}"),
         }
     }
 }
@@ -360,14 +360,13 @@ impl<'a> MetricState<'a> {
         }
         if variable.includes_namespace() {
             return syntax_error(format!(
-                "Name {} not in test values and refers outside the file",
-                name
+                "Name {name} not in test values and refers outside the file",
             ));
         }
         match self.metrics.get(namespace) {
-            None => internal_bug(format!("BUG! Bad namespace '{}'", namespace)),
+            None => internal_bug(format!("BUG! Bad namespace '{namespace}'")),
             Some(metric_map) => match metric_map.get(name) {
-                None => syntax_error(format!("Metric '{}' Not Found in '{}'", name, namespace)),
+                None => syntax_error(format!("Metric '{name}' Not Found in '{namespace}'")),
                 Some(value_source) => {
                     let resolved_value: MetricValue;
                     {
@@ -376,8 +375,7 @@ impl<'a> MetricState<'a> {
                             None => {
                                 resolved_value = match &value_source.metric {
                                     Metric::Selector(_) => missing(format!(
-                                        "Selector {} can't be used in tests; please supply a value",
-                                        name
+                                        "Selector {name} can't be used in tests; please supply a value",
                                     )),
                                     Metric::Eval(expression) => {
                                         self.evaluate(namespace, &expression.parsed_expression)
@@ -407,11 +405,10 @@ impl<'a> MetricState<'a> {
     ) -> MetricValue {
         if let Some((real_namespace, real_name)) = name.name_parts(namespace) {
             match self.metrics.get(real_namespace) {
-                None => syntax_error(format!("Bad namespace '{}'", real_namespace)),
+                None => syntax_error(format!("Bad namespace '{real_namespace}'")),
                 Some(metric_map) => match metric_map.get(real_name) {
                     None => syntax_error(format!(
-                        "Metric '{}' Not Found in '{}'",
-                        real_name, real_namespace
+                        "Metric '{real_name}' Not Found in '{real_namespace}'",
                     )),
                     Some(value_source) => {
                         if let Some(cached_value) = value_source.cached_value.borrow().as_ref() {
@@ -491,7 +488,7 @@ impl<'a> MetricState<'a> {
     fn evaluate_value(&self, namespace: &str, expression: &str) -> MetricValue {
         match parse::parse_expression(expression, namespace) {
             Ok(expr) => self.evaluate(namespace, &expr),
-            Err(e) => syntax_error(format!("Expression parse error\n{}", e)),
+            Err(e) => syntax_error(format!("Expression parse error\n{e}")),
         }
     }
 
@@ -499,7 +496,7 @@ impl<'a> MetricState<'a> {
     pub(crate) fn evaluate_math(expr: &str) -> MetricValue {
         let tree = match ExpressionContext::try_from_expression_with_default_namespace(expr) {
             Ok(expr_context) => expr_context.parsed_expression,
-            Err(err) => return syntax_error(format!("Failed to parse '{}': {}", expr, err)),
+            Err(err) => return syntax_error(format!("Failed to parse '{expr}': {err}")),
         };
         Self::evaluate_const_expression(&tree)
     }
@@ -604,7 +601,7 @@ impl<'a> MetricState<'a> {
         let regex = match Regex::new(&regex) {
             Ok(v) => v,
             Err(_) => {
-                return syntax_error(format!("Could not parse `{}` as regex", regex));
+                return syntax_error(format!("Could not parse `{regex}` as regex"));
             }
         };
 
@@ -682,16 +679,14 @@ impl<'a> MetricState<'a> {
     ) -> Result<(Box<Lambda>, Vec<MetricValue>), MetricValue> {
         if operands.is_empty() {
             return Err(syntax_error(format!(
-                "{} needs a function in its first argument",
-                function_name
+                "{function_name} needs a function in its first argument",
             )));
         }
         let lambda = match self.evaluate(namespace, &operands[0]) {
             MetricValue::Lambda(lambda) => lambda,
             _ => {
                 return Err(syntax_error(format!(
-                    "{} needs a function in its first argument",
-                    function_name
+                    "{function_name} needs a function in its first argument",
                 )))
             }
         };
@@ -841,8 +836,7 @@ impl<'a> MetricState<'a> {
                     MetricValue::Bool(false) => None,
                     MetricValue::Problem(problem) => Some(MetricValue::Problem(problem)),
                     bad_type => Some(value_error(format!(
-                        "Bad value {:?} from filter function should be Boolean",
-                        bad_type
+                        "Bad value {bad_type:?} from filter function should be Boolean",
                     ))),
                 })
                 .collect(),
@@ -874,7 +868,7 @@ impl<'a> MetricState<'a> {
                     _ => MetricValue::Problem(Self::important_problem(errors)),
                 }
             }
-            bad => value_error(format!("CountProperties only works on vectors, not {}", bad)),
+            bad => value_error(format!("CountProperties only works on vectors, not {bad}")),
         }
     }
 
@@ -901,7 +895,7 @@ impl<'a> MetricState<'a> {
                     _ => MetricValue::Problem(Self::important_problem(errors)),
                 }
             }
-            bad => value_error(format!("CountChildren only works on vectors, not {}", bad)),
+            bad => value_error(format!("CountChildren only works on vectors, not {bad}")),
         }
     }
 
@@ -921,13 +915,12 @@ impl<'a> MetricState<'a> {
             MetricValue::Int(value) => MetricValue::Int(value * multiplier),
             MetricValue::Float(value) => match safe_float_to_int(value * (multiplier as f64)) {
                 None => value_error(format!(
-                    "Time conversion needs 1 numeric argument; couldn't convert {}",
-                    value
+                    "Time conversion needs 1 numeric argument; couldn't convert {value}",
                 )),
                 Some(value) => MetricValue::Int(value),
             },
             MetricValue::Problem(oops) => MetricValue::Problem(oops),
-            bad => value_error(format!("Time conversion needs 1 numeric argument, not {}", bad)),
+            bad => value_error(format!("Time conversion needs 1 numeric argument, not {bad}")),
         }
     }
 
@@ -1005,7 +998,7 @@ impl<'a> MetricState<'a> {
         operands: &[ExpressionTree],
     ) -> MetricValue {
         if operands.len() != 2 {
-            return syntax_error(format!("Bad arg list {:?} for binary operator", operands));
+            return syntax_error(format!("Bad arg list {operands:?} for binary operator"));
         }
         let operand_values =
             operands.iter().map(|operand| self.evaluate(namespace, operand)).collect::<Vec<_>>();
@@ -1035,7 +1028,7 @@ impl<'a> MetricState<'a> {
         let mut result: bool = match unwrap_for_math(&first) {
             MetricValue::Bool(value) => *value,
             MetricValue::Problem(p) => return MetricValue::Problem(p.clone()),
-            bad => return value_error(format!("{:?} is not boolean", bad)),
+            bad => return value_error(format!("{bad:?} is not boolean")),
         };
         for operand in operands[1..].iter() {
             match (result, short_circuit_behavior) {
@@ -1051,7 +1044,7 @@ impl<'a> MetricState<'a> {
             result = match unwrap_for_math(&nth) {
                 MetricValue::Bool(value) => function(result, *value),
                 MetricValue::Problem(p) => return MetricValue::Problem(p.clone()),
-                bad => return value_error(format!("{:?} is not boolean", bad)),
+                bad => return value_error(format!("{bad:?} is not boolean")),
             }
         }
         MetricValue::Bool(result)
@@ -1068,7 +1061,7 @@ impl<'a> MetricState<'a> {
             MetricValue::Bool(true) => MetricValue::Bool(false),
             MetricValue::Bool(false) => MetricValue::Bool(true),
             MetricValue::Problem(p) => MetricValue::Problem(p.clone()),
-            bad => value_error(format!("{:?} not boolean", bad)),
+            bad => value_error(format!("{bad:?} not boolean")),
         }
     }
 
@@ -1196,7 +1189,7 @@ mod test {
     macro_rules! assert_problem {
         ($missing:expr, $message:expr) => {
             match $missing {
-                MetricValue::Problem(problem) => assert_eq!(format!("{:?}", problem), $message),
+                MetricValue::Problem(problem) => assert_eq!(format!("{problem:?}"), $message),
                 oops => {
                     // TODO: Add $missing to println, it currently returns a generics error.
                     println!("Non problem type {:?}", oops);
@@ -1684,20 +1677,20 @@ mod test {
         let dbz = "ValueError: Division by zero";
         assert_problem!(eval!("CountProperties([1, 2, 3/0])"), dbz);
         assert_problem!(eval!("CountProperties([1/0, 2, 3/0])"), dbz);
-        assert_problem!(eval!("CountProperties([1/?0, 2, 3/?0])"), format!("Ignore: {}", dbz));
+        assert_problem!(eval!("CountProperties([1/?0, 2, 3/?0])"), format!("Ignore: {dbz}"));
         assert_problem!(eval!("CountProperties([1/0, 2, 3/?0])"), dbz);
         // And() short-circuits so it will only see the first error
         assert_problem!(eval!("And(1 > 0, 3/0 > 0)"), dbz);
         assert_problem!(eval!("And(1/0 > 0, 3/0 > 0)"), dbz);
-        assert_problem!(eval!("And(1/?0 > 0, 3/?0 > 0)"), format!("Ignore: {}", dbz));
-        assert_problem!(eval!("And(1/?0 > 0, 3/0 > 0)"), format!("Ignore: {}", dbz));
+        assert_problem!(eval!("And(1/?0 > 0, 3/?0 > 0)"), format!("Ignore: {dbz}"));
+        assert_problem!(eval!("And(1/?0 > 0, 3/0 > 0)"), format!("Ignore: {dbz}"));
         assert_problem!(eval!("1 == 3/0"), dbz);
         assert_problem!(eval!("1/0 == 3/0"), dbz);
-        assert_problem!(eval!("1/?0 == 3/?0"), format!("Ignore: {}", dbz));
+        assert_problem!(eval!("1/?0 == 3/?0"), format!("Ignore: {dbz}"));
         assert_problem!(eval!("1/?0 == 3/0"), dbz);
         assert_problem!(eval!("1 + 3/0"), dbz);
         assert_problem!(eval!("1/0 + 3/0"), dbz);
-        assert_problem!(eval!("1/?0 + 3/?0"), format!("Ignore: {}", dbz));
+        assert_problem!(eval!("1/?0 + 3/?0"), format!("Ignore: {dbz}"));
         assert_problem!(eval!("1/?0 + 3/0"), dbz);
     }
 

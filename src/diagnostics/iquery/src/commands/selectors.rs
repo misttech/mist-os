@@ -85,7 +85,7 @@ impl Serialize for SelectorsResult {
                     item,
                     selectors::SelectorDisplayOptions::never_wrap_in_quotes(),
                 )
-                .map_err(|e| S::Error::custom(format!("failed to serialize: {:#?}", e)))
+                .map_err(|e| S::Error::custom(format!("failed to serialize: {e:#?}")))
             })
             .collect::<Result<Vec<_>, _>>()?;
         stringified.sort();

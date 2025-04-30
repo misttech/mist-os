@@ -109,13 +109,10 @@ impl DefineSubsystemConfiguration<PlatformSysmemConfig> for SysmemConfig {
                                          field_name: &str,
                                          config_capability_name_suffix: &str|
              -> anyhow::Result<()> {
-                let fixed_capability = format!(
-                    "{}{}{}",
-                    CAPABILITY_PREFIX, FIXED_CAPABILITY, config_capability_name_suffix
-                );
+                let fixed_capability =
+                    format!("{CAPABILITY_PREFIX}{FIXED_CAPABILITY}{config_capability_name_suffix}");
                 let percent_capability = format!(
-                    "{}{}{}",
-                    CAPABILITY_PREFIX, PERCENT_CAPABILITY, config_capability_name_suffix
+                    "{CAPABILITY_PREFIX}{PERCENT_CAPABILITY}{config_capability_name_suffix}"
                 );
 
                 builder
@@ -231,9 +228,9 @@ fn load_and_merge_pixel_format_costs_files(
     let mut format_costs_to_process = vec![];
     for format_costs_filepath in sources {
         let file_bytes = std::fs::read(format_costs_filepath)
-            .with_context(|| format!("reading {}", format_costs_filepath))?;
+            .with_context(|| format!("reading {format_costs_filepath}"))?;
         let mut format_costs = fidl::unpersist::<fidl_fuchsia_sysmem2::FormatCosts>(&file_bytes)
-            .with_context(|| format!("load_and_merge_pixel_format_costs_files fidl::unpersist failed - see also fuchsia.sysmem2.FormatCosts and fidl::persist - file: {}", format_costs_filepath))?;
+            .with_context(|| format!("load_and_merge_pixel_format_costs_files fidl::unpersist failed - see also fuchsia.sysmem2.FormatCosts and fidl::persist - file: {format_costs_filepath}"))?;
         let mut format_costs_to_check = format_costs.format_costs.take().unwrap_or_else(Vec::new);
         for format_cost in &format_costs_to_check {
             let key = format_cost

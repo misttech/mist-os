@@ -161,8 +161,7 @@ impl<D: Decoder + ?Sized> DecoderExt for D {
         assert!(
             align_of::<T>() <= CHUNK_SIZE,
             "attempted to take a slot for a type with an alignment higher \
-             than {}",
-            CHUNK_SIZE,
+             than {CHUNK_SIZE}",
         );
 
         let count = size_of::<T>().div_ceil(CHUNK_SIZE);
@@ -179,8 +178,7 @@ impl<D: Decoder + ?Sized> DecoderExt for D {
         assert!(
             align_of::<T>() <= CHUNK_SIZE,
             "attempted to take a slice slot for a type with an alignment \
-             higher than {}",
-            CHUNK_SIZE,
+             higher than {CHUNK_SIZE}",
         );
 
         let count = (size_of::<T>() * len).div_ceil(CHUNK_SIZE);

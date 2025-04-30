@@ -23,10 +23,10 @@ async fn main() -> Result<(), Error> {
     let provider = ArchiveAccessorProvider::new(realm_query);
     match command_line.execute(&provider).await {
         Ok(result) => {
-            println!("{}", result);
+            println!("{result}");
         }
         Err(err) => {
-            eprintln!("{}", err);
+            eprintln!("{err}");
             std::process::exit(1);
         }
     }

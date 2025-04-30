@@ -772,7 +772,7 @@ mod test {
         .await
         .unwrap_err();
 
-        let err_string = format!("{:?}", err);
+        let err_string = format!("{err:?}");
         assert!(err_string.contains("--api-level"), "Wrong error message: {err_string}");
     }
 
@@ -812,7 +812,7 @@ mod test {
         .unwrap_err();
 
         // Ensure the error mentions the API level.
-        let err_string = format!("{:?}", err);
+        let err_string = format!("{err:?}");
         assert!(err_string.contains("3221225472"), "Wrong error message: {err_string}");
     }
 
@@ -851,7 +851,7 @@ mod test {
         .await
         .unwrap_err();
 
-        let err_string = format!("{:?}", err);
+        let err_string = format!("{err:?}");
         assert!(
             err_string.contains("no longer supports API level 6"),
             "Wrong error message: {err_string}"

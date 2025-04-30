@@ -206,7 +206,7 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
                     source: thread_roles_file.clone(),
                     destination: BootfsDestination::ThreadRoles(filename),
                 })
-                .with_context(|| format!("Adding thread roles file: {}", thread_roles_file))?;
+                .with_context(|| format!("Adding thread roles file: {thread_roles_file}"))?;
         }
 
         Ok(())

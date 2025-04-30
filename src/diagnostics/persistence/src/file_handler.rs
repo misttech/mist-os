@@ -146,7 +146,7 @@ pub fn forget_old_data(config: &Config) {
 // Write a VMO's contents to the appropriate file.
 pub(crate) fn write(service_name: &ServiceName, tag: &Tag, data: &PersistSchema) {
     // /cache/ may be deleted any time. It's OK to try to create CURRENT_PATH if it already exists.
-    let path = format!("{}/{}", CURRENT_PATH, service_name);
+    let path = format!("{CURRENT_PATH}/{service_name}");
     if let Err(e) = fs::create_dir_all(&path) {
         warn!("Could not create directory {}: {:?}", path, e);
     }
@@ -157,7 +157,7 @@ pub(crate) fn write(service_name: &ServiceName, tag: &Tag, data: &PersistSchema)
             return;
         }
     };
-    if let Err(e) = fs::write(format!("{}/{}", path, tag), data) {
+    if let Err(e) = fs::write(format!("{path}/{tag}"), data) {
         warn!("Could not write file {}/{}: {:?}", path, tag, e);
     }
 }

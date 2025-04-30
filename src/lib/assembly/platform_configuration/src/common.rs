@@ -733,7 +733,7 @@ impl PackageConfigBuilder for PackageConfiguration {
                     source: source.clone(),
                     destination: destination.into(),
                 })
-                .with_context(|| format!("setting {}", destination))?;
+                .with_context(|| format!("setting {destination}"))?;
             }
         }
         Ok(self)

@@ -547,12 +547,12 @@ impl types::ScannedCandidate {
             scoring_functions::score_bss_scanned_candidate(self.clone()),
             if !self.bss.is_compatible() { ", NOT compatible" } else { "" },
             if recent_failure_count > 0 {
-                format!(", {} recent failures", recent_failure_count)
+                format!(", {recent_failure_count} recent failures")
             } else {
                 "".to_string()
             },
             if recent_short_connection_count > 0 {
-                format!(", {} recent short disconnects", recent_short_connection_count)
+                format!(", {recent_short_connection_count} recent short disconnects")
             } else {
                 "".to_string()
             },

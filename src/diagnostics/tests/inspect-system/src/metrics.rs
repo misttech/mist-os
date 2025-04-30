@@ -47,7 +47,7 @@ impl MetricSet {
         for (key, values) in self.metrics.iter() {
             if let Some(type_hint) = self.type_hints.get(*key) {
                 perf_result.push(FuchsiaPerfBenchmarkResult {
-                    label: format!("{}/{}", key, test_case),
+                    label: format!("{key}/{test_case}"),
                     test_suite: "fuchsia.system_inspect_metrics".to_string(),
                     unit: type_hint.unit.to_string(),
                     values: values.clone(),

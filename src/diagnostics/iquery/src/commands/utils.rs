@@ -99,7 +99,7 @@ pub async fn process_fuzzy_inputs<P: DiagnosticsProvider>(
                     //   A) Be a component that isn't running; therefore the selector being
                     //      right or wrong is irrelevant
                     //   B) Already be sanitized by the caller
-                    let selector_string = format!("{}:root", value);
+                    let selector_string = format!("{value}:root");
                     results.push(
                         selectors::parse_verbose(&selector_string)
                             .map_err(|e| Error::ParseSelector(selector_string, e.into()))?,
@@ -171,8 +171,7 @@ fn add_tree_name(selector: &mut Selector, tree_name: String) -> Result<(), Error
             TreeNames::__SourceBreaking { unknown_ordinal } => {
                 let unknown_ordinal = *unknown_ordinal;
                 return Err(Error::InvalidSelector(format!(
-                    "selector had invalid TreeNames variant {unknown_ordinal}: {:?}",
-                    selector,
+                    "selector had invalid TreeNames variant {unknown_ordinal}: {selector:?}",
                 )));
             }
         },

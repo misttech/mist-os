@@ -38,10 +38,10 @@ impl DefineSubsystemConfiguration<(&RecoveryConfig, &VolumeConfig)> for Recovery
                 .context("getting gen dir for factory-reset-trigger config file")?
                 .join("forced-fdr-channel-indices.config");
             let config_file = File::create(&config_file_path).with_context(|| {
-                format!("Creating factory-reset-trigger config file: {}", config_file_path)
+                format!("Creating factory-reset-trigger config file: {config_file_path}")
             })?;
             serde_json::to_writer_pretty(config_file, &config).with_context(|| {
-                format!("Writing factory-reset-trigger config file: {}", config_file_path)
+                format!("Writing factory-reset-trigger config file: {config_file_path}")
             })?;
 
             builder

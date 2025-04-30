@@ -1362,7 +1362,7 @@ fn test_autoconnect_to_saved_network() {
         [1] => {
             debug!("Probabilistic active scan not selected. Proceeding with connection.");
         }
-        _ => panic!("Unexpected channel set for active scan: {:?}", active_scan_channels),
+        _ => panic!("Unexpected channel set for active scan: {active_scan_channels:?}"),
     }
 
     // Expect to get an SME request for state machine creation.
@@ -2005,7 +2005,7 @@ fn reject_connect_requests(
                     assert!(responder.send(Ok(())).is_ok());
                     *state_machine_sme_stream = Some(sme_server.into_stream());
                 }
-                other => panic!("Unexpected DeviceMonitor operation: {:?}", other),
+                other => panic!("Unexpected DeviceMonitor operation: {other:?}"),
             }
             continue;
         }
@@ -2018,7 +2018,7 @@ fn reject_connect_requests(
                     let vmo = write_vmo(scan_results.clone()).expect("failed to write VMO");
                     responder.send(Ok(vmo)).expect("failed to send scan data");
                 }
-                other => panic!("Only scans were expected from the IfaceManager SME: {:?}", other),
+                other => panic!("Only scans were expected from the IfaceManager SME: {other:?}"),
             }
 
             continue;
@@ -2050,7 +2050,7 @@ fn reject_connect_requests(
                     Some(Ok(fidl_sme::ClientSmeRequest::Disconnect { responder, .. })) => {
                         responder.send().expect("failed to send disconnect response");
                     }
-                    other => panic!("Unexpected SME operation: {:?}", other),
+                    other => panic!("Unexpected SME operation: {other:?}"),
                 }
                 *state_machine_sme_stream = Some(sme_stream);
                 continue;

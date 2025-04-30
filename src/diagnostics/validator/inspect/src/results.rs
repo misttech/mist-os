@@ -144,7 +144,7 @@ impl Results {
     pub fn to_json(&self) -> String {
         match serde_json::to_string(self) {
             Ok(string) => string,
-            Err(e) => format!("{{error: \"Converting to json: {:?}\"}}", e),
+            Err(e) => format!("{{error: \"Converting to json: {e:?}\"}}"),
         }
     }
 
@@ -179,12 +179,12 @@ impl Results {
             println!("SUCCESS on all tests!");
         }
         for message in self.messages.iter() {
-            println!("{}", message);
+            println!("{message}");
         }
         if !self.unimplemented.is_empty() {
             println!("\nUnimplemented:");
             for info in self.unimplemented.iter() {
-                println!("  {}", info);
+                println!("  {info}");
             }
         }
         if !self.metrics.is_empty() {

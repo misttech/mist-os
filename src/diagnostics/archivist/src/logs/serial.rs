@@ -155,7 +155,7 @@ impl<'a, S: Write> SerialWriter<'a, S> {
                 if this.denied_tags.contains(tag) {
                     return Ok(());
                 }
-                write!(&mut this, "{}", tag)?;
+                write!(&mut this, "{tag}")?;
                 if i < tags.len() - 1 {
                     write!(&mut this, ", ")?;
                 }
@@ -165,7 +165,7 @@ impl<'a, S: Write> SerialWriter<'a, S> {
         write!(&mut this, "] {}: ", log.severity())?;
         let mut pending_message_parts = [Cow::Borrowed(log.msg().unwrap_or(""))]
             .into_iter()
-            .chain(log.payload_keys_strings().map(|s| Cow::Owned(format!(" {}", s))));
+            .chain(log.payload_keys_strings().map(|s| Cow::Owned(format!(" {s}"))));
         let mut pending_str = None;
 
         loop {

@@ -300,7 +300,7 @@ impl SmeClientIface {
         // If the power broker is available, initialize our power element
         let power_element_context = if let Some(topology) = pb_topology_svc {
             let valid_levels: Vec<u8> = StaIfacePowerLevel::iter().map(|it| it as u8).collect();
-            let element_name = format!("wlanix-sta-iface-{}-supplicant-power", iface_id);
+            let element_name = format!("wlanix-sta-iface-{iface_id}-supplicant-power");
 
             // We assume the driver starts out with no power savings. The higher level applications
             // don't rely on this, it's only for reporting to the PB, so even if it's wrong it won't

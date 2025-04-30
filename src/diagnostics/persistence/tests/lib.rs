@@ -430,7 +430,7 @@ impl TestRealm {
     async fn new() -> Self {
         let name = {
             let id: u64 = rand::thread_rng().gen();
-            format!("auto-{:x}", id)
+            format!("auto-{id:x}")
         };
         let fs = mock_filesystems::TestFs::new();
         TestRealm::new_with_fs(name, fs).await
@@ -744,7 +744,7 @@ fn expected_stored_data(realm: &RealmInstance, number: Option<i32>) -> String {
     let (persist_size, variant) = match number {
         None => (base_size, "".to_string()),
         Some(number) => {
-            let variant = format!("\"optional\": {},", number);
+            let variant = format!("\"optional\": {number},");
             (base_size + variant.len() - 1, variant)
         }
     };

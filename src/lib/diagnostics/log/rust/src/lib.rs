@@ -26,7 +26,7 @@ pub use implementation::*;
 pub(crate) fn install_panic_hook(prefix: Option<&'static str>) {
     let previous_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        let message = format!("{}", info);
+        let message = format!("{info}");
         let prefix = prefix.unwrap_or("PANIC");
         log::logger().log(
             &log::RecordBuilder::new()

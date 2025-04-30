@@ -1083,9 +1083,7 @@ a:b:c
             let parsed_selector = parse_selector::<VerboseError>(selector).unwrap();
             assert!(
                 match_component_moniker_against_selector(&moniker, &parsed_selector).unwrap(),
-                "Selector {:?} failed to match {:?}",
-                selector,
-                moniker
+                "Selector {selector:?} failed to match {moniker:?}"
             );
         }
 
@@ -1102,9 +1100,7 @@ a:b:c
             let parsed_selector = parse_selector::<VerboseError>(selector).unwrap();
             assert!(
                 !match_component_moniker_against_selector(&moniker, &parsed_selector).unwrap(),
-                "Selector {:?} matched {:?}, but was expected to fail",
-                selector,
-                moniker
+                "Selector {selector:?} matched {moniker:?}, but was expected to fail"
             );
         }
     }

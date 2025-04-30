@@ -105,7 +105,7 @@ async fn handle_controller_stream(stream: ControllerRequestStream, state: Arc<Mu
         })
         .await
         .context("Failed to serve request stream")
-        .unwrap_or_else(|e| eprintln!("Error encountered: {:?}", e));
+        .unwrap_or_else(|e| eprintln!("Error encountered: {e:?}"));
 }
 
 async fn handle_listener_stream(stream: ListenerRequestStream, state: Arc<Mutex<ServerState>>) {
@@ -125,5 +125,5 @@ async fn handle_listener_stream(stream: ListenerRequestStream, state: Arc<Mutex<
         })
         .await
         .context("Failed to serve request stream")
-        .unwrap_or_else(|e| eprintln!("Error encountered: {:?}", e));
+        .unwrap_or_else(|e| eprintln!("Error encountered: {e:?}"));
 }

@@ -23,9 +23,8 @@ pub(crate) fn add_build_type_config_data(
         BuildType::UserDebug => "userdebug",
         BuildType::User => "user",
     };
-    let gendir =
-        context.get_gendir().context(format!("Getting gendir for {} subsystem", package))?;
-    let filepath = gendir.join(format!("{}_build_type", package));
+    let gendir = context.get_gendir().context(format!("Getting gendir for {package} subsystem"))?;
+    let filepath = gendir.join(format!("{package}_build_type"));
     let mut file = File::create(&filepath).with_context(|| format!("Opening {}", &filepath))?;
     file.write_all(build_type.as_bytes()).with_context(|| format!("Writing {}", &filepath))?;
     builder
@@ -65,7 +64,7 @@ fn render_cml_template(
 ) -> anyhow::Result<String> {
     // Gather the data to render the cml template.
     let url = AbsoluteComponentUrl::parse(product_component_url)
-        .with_context(|| format!("Parsing component_url: {}", product_component_url))?;
+        .with_context(|| format!("Parsing component_url: {product_component_url}"))?;
     let package_name = match url.package_url() {
         Unpinned(unpinned) => unpinned.name(),
         Pinned(pinned) => pinned.as_unpinned().name(),

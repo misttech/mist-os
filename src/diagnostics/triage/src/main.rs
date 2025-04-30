@@ -11,7 +11,7 @@ use triage_app_lib::Options;
 /// Reports an [Error] to stdout and logs at "error" level.
 fn report_failure(e: Error) {
     error!("Triage failed: {:?}", e);
-    println!("Triage failed: {:?}", e);
+    println!("Triage failed: {e:?}");
 }
 
 fn run_app() -> Result<i32, Error> {

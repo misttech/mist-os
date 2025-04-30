@@ -126,12 +126,12 @@ fn check_failure(
 ) -> bool {
     match actions.get(namespace) {
         None => {
-            println!("Namespace {} not found in trial {}", action_name, trial_name);
+            println!("Namespace {action_name} not found in trial {trial_name}");
             true
         }
         Some(action_map) => match action_map.get(action_name) {
             None => {
-                println!("Action {} not found in trial {}", action_name, trial_name);
+                println!("Action {action_name} not found in trial {trial_name}");
                 true
             }
             Some(action) => {
@@ -139,7 +139,7 @@ fn check_failure(
                     Action::Alert(properties) => &properties.trigger,
                     Action::Snapshot(properties) => &properties.trigger,
                     _ => {
-                        println!("Action {:?} cannot be tested", action);
+                        println!("Action {action:?} cannot be tested");
                         return true;
                     }
                 };
@@ -147,8 +147,8 @@ fn check_failure(
                     MetricValue::Bool(actual) if actual == expected => false,
                     other => {
                         println!(
-                            "Test {} failed: trigger '{}' of action {} returned {:?}, expected {}",
-                            trial_name, trigger, action_name, other, expected
+                            "Test {trial_name} failed: trigger '{trigger}' of action \
+                            {action_name} returned {other:?}, expected {expected}",
                         );
                         true
                     }

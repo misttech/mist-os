@@ -200,26 +200,26 @@ fn create_time_series_for_gauge<S: InspectSender>(
 ) -> Option<InspectedTimeMatrix<i64>> {
     match statistic {
         fidl_stats::GaugeStatistic::Min => Some(time_matrix_client.inspect_time_matrix(
-            format!("{}.min", gauge_name),
+            format!("{gauge_name}.min"),
             TimeMatrix::<Min<i64>, Constant>::new(SamplingProfile::balanced(), Constant::default()),
         )),
         fidl_stats::GaugeStatistic::Max => Some(time_matrix_client.inspect_time_matrix(
-            format!("{}.max", gauge_name),
+            format!("{gauge_name}.max"),
             TimeMatrix::<Max<i64>, Constant>::new(SamplingProfile::balanced(), Constant::default()),
         )),
         fidl_stats::GaugeStatistic::Sum => Some(time_matrix_client.inspect_time_matrix(
-            format!("{}.sum", gauge_name),
+            format!("{gauge_name}.sum"),
             TimeMatrix::<Sum<i64>, Constant>::new(SamplingProfile::balanced(), Constant::default()),
         )),
         fidl_stats::GaugeStatistic::Last => Some(time_matrix_client.inspect_time_matrix(
-            format!("{}.last", gauge_name),
+            format!("{gauge_name}.last"),
             TimeMatrix::<Last<i64>, Constant>::new(
                 SamplingProfile::balanced(),
                 Constant::default(),
             ),
         )),
         fidl_stats::GaugeStatistic::Mean => Some(time_matrix_client.inspect_time_matrix(
-            format!("{}.mean", gauge_name),
+            format!("{gauge_name}.mean"),
             TimeMatrix::<ArithmeticMean<i64>, Constant>::new(
                 SamplingProfile::balanced(),
                 Constant::default(),
@@ -691,7 +691,7 @@ mod tests {
         // Verify that no telemetry request is made now that the iface is destroyed
         match test_helper.exec.run_until_stalled(&mut telemetry_svc_req_fut) {
             Poll::Ready(Ok(None)) => (),
-            other => panic!("unexpected variant: {:?}", other),
+            other => panic!("unexpected variant: {other:?}"),
         }
     }
 

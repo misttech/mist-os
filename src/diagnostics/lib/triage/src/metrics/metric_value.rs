@@ -81,14 +81,14 @@ impl Eq for MetricValue {}
 impl std::fmt::Display for MetricValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MetricValue::Int(n) => write!(f, "Int({})", n),
-            MetricValue::Float(n) => write!(f, "Float({})", n),
-            MetricValue::Bool(n) => write!(f, "Bool({})", n),
-            MetricValue::String(n) => write!(f, "String({})", n),
-            MetricValue::Vector(n) => write!(f, "Vector({:?})", n),
-            MetricValue::Bytes(n) => write!(f, "Bytes({:?})", n),
-            MetricValue::Problem(p) => write!(f, "{:?}", p),
-            MetricValue::Lambda(n) => write!(f, "Fn({:?})", n),
+            MetricValue::Int(n) => write!(f, "Int({n})"),
+            MetricValue::Float(n) => write!(f, "Float({n})"),
+            MetricValue::Bool(n) => write!(f, "Bool({n})"),
+            MetricValue::String(n) => write!(f, "String({n})"),
+            MetricValue::Vector(n) => write!(f, "Vector({n:?})"),
+            MetricValue::Bytes(n) => write!(f, "Bytes({n:?})"),
+            MetricValue::Problem(p) => write!(f, "{p:?}"),
+            MetricValue::Lambda(n) => write!(f, "Fn({n:?})"),
             MetricValue::Node => write!(f, "Node"),
         }
     }
@@ -177,23 +177,23 @@ impl From<&JsonValue> for MetricValue {
 impl std::fmt::Debug for Problem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Problem::Missing(s) => write!(f, "Missing: {}", s),
+            Problem::Missing(s) => write!(f, "Missing: {s}"),
             Problem::Ignore(problems) => {
                 if problems.len() == 1 {
                     write!(f, "Ignore: {:?}", problems[0])
                 } else {
                     write!(f, "Ignore: [")?;
                     for problem in problems.iter() {
-                        write!(f, "{:?}; ", problem)?;
+                        write!(f, "{problem:?}; ")?;
                     }
                     write!(f, "]")
                 }
             }
-            Problem::SyntaxError(s) => write!(f, "SyntaxError: {}", s),
-            Problem::ValueError(s) => write!(f, "ValueError: {}", s),
-            Problem::InternalBug(s) => write!(f, "InternalBug: {}", s),
-            Problem::UnhandledType(s) => write!(f, "UnhandledType: {}", s),
-            Problem::EvaluationError(s) => write!(f, "EvaluationError: {}", s),
+            Problem::SyntaxError(s) => write!(f, "SyntaxError: {s}"),
+            Problem::ValueError(s) => write!(f, "ValueError: {s}"),
+            Problem::InternalBug(s) => write!(f, "InternalBug: {s}"),
+            Problem::UnhandledType(s) => write!(f, "UnhandledType: {s}"),
+            Problem::EvaluationError(s) => write!(f, "EvaluationError: {s}"),
         }
     }
 }

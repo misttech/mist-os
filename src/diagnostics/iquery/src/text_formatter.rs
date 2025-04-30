@@ -19,7 +19,7 @@ pub fn format<W>(w: &mut W, path: &str, diagnostics_hierarchy: DiagnosticsHierar
 where
     W: fmt::Write,
 {
-    writeln!(w, "{}:", path)?;
+    writeln!(w, "{path}:")?;
     output_hierarchy(w, &diagnostics_hierarchy, 1)
 }
 
@@ -83,17 +83,15 @@ where
 
     for property in &diagnostics_hierarchy.properties {
         match property {
-            Property::String(name, value) => writeln!(w, "{}{} = {}", value_indent, name, value)?,
-            Property::Int(name, value) => writeln!(w, "{}{} = {}", value_indent, name, value)?,
-            Property::Uint(name, value) => writeln!(w, "{}{} = {}", value_indent, name, value)?,
-            Property::Double(name, value) => {
-                writeln!(w, "{}{} = {:.6}", value_indent, name, value)?
-            }
+            Property::String(name, value) => writeln!(w, "{value_indent}{name} = {value}")?,
+            Property::Int(name, value) => writeln!(w, "{value_indent}{name} = {value}")?,
+            Property::Uint(name, value) => writeln!(w, "{value_indent}{name} = {value}")?,
+            Property::Double(name, value) => writeln!(w, "{value_indent}{name} = {value:.6}")?,
             Property::Bytes(name, array) => {
                 let byte_str = array.to_hex(HEX_DISPLAY_CHUNK_SIZE);
                 writeln!(w, "{}{} = Binary:\n{}", value_indent, name, byte_str.trim())?;
             }
-            Property::Bool(name, value) => writeln!(w, "{}{} = {}", value_indent, name, value)?,
+            Property::Bool(name, value) => writeln!(w, "{value_indent}{name} = {value}")?,
             Property::IntArray(name, array) => output_array(w, &value_indent, name, array)?,
             Property::UintArray(name, array) => output_array(w, &value_indent, name, array)?,
             Property::DoubleArray(name, array) => output_array(w, &value_indent, name, array)?,
@@ -105,13 +103,13 @@ where
                     .iter()
                     .fold(length_of_brackets, |acc, v| acc + v.len() + length_of_comma_space);
                 if total_len < max_line_length {
-                    writeln!(w, "{}{} = {:?}", value_indent, name, list)?;
+                    writeln!(w, "{value_indent}{name} = {list:?}")?;
                 } else {
-                    writeln!(w, "{}{} = [", value_indent, name)?;
+                    writeln!(w, "{value_indent}{name} = [")?;
                     for v in list {
-                        writeln!(w, r#"{}"{}","#, array_broken_line_indent, v)?;
+                        writeln!(w, r#"{array_broken_line_indent}"{v}","#)?;
                     }
-                    writeln!(w, "{}]", value_indent)?;
+                    writeln!(w, "{value_indent}]")?;
                 }
             }
         }
@@ -363,7 +361,7 @@ impl NumberFormat for i64 {
         match *self {
             i64::MAX => "<max>".to_string(),
             std::i64::MIN => "<min>".to_string(),
-            x => format!("{}", x),
+            x => format!("{x}"),
         }
     }
 }
@@ -372,7 +370,7 @@ impl NumberFormat for u64 {
     fn format(&self) -> String {
         match *self {
             u64::MAX => "<max>".to_string(),
-            x => format!("{}", x),
+            x => format!("{x}"),
         }
     }
 }
@@ -381,7 +379,7 @@ impl NumberFormat for usize {
     fn format(&self) -> String {
         match *self {
             std::usize::MAX => "<max>".to_string(),
-            x => format!("{}", x),
+            x => format!("{x}"),
         }
     }
 }
@@ -393,7 +391,7 @@ impl NumberFormat for f64 {
         } else if *self == f64::MIN || *self == f64::NEG_INFINITY {
             "-inf".to_string()
         } else {
-            format!("{}", self)
+            format!("{self}")
         }
     }
 }

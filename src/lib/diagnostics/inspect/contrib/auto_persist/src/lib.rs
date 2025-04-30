@@ -134,12 +134,10 @@ pub fn create_persistence_req_sender(
             match resp {
                 Ok(PersistResult::Queued) => continue,
                 Ok(other) => log_error(format!(
-                    "Persistence Service returned an error for tag {}: {:?}",
-                    tag_name, other
+                    "Persistence Service returned an error for tag {tag_name}: {other:?}"
                 )),
                 Err(e) => log_error(format!(
-                    "Failed to send request to Persistence Service for tag {}: {}",
-                    tag_name, e
+                    "Failed to send request to Persistence Service for tag {tag_name}: {e}"
                 )),
             }
         }
@@ -191,11 +189,11 @@ mod tests {
         // Nothing has happened yet, so these futures should be Pending
         match exec.run_until_stalled(&mut req_forwarder_fut) {
             Poll::Pending => (),
-            other => panic!("unexpected variant: {:?}", other),
+            other => panic!("unexpected variant: {other:?}"),
         };
         match exec.run_until_stalled(&mut persistence_stream.next()) {
             Poll::Pending => (),
-            other => panic!("unexpected variant: {:?}", other),
+            other => panic!("unexpected variant: {other:?}"),
         };
 
         assert!(req_sender.try_send("some-tag".to_string()).is_ok());
@@ -203,14 +201,14 @@ mod tests {
         // req_forwarder_fut still Pending because it's a loop
         match exec.run_until_stalled(&mut req_forwarder_fut) {
             Poll::Pending => (),
-            other => panic!("unexpected variant: {:?}", other),
+            other => panic!("unexpected variant: {other:?}"),
         };
         // There should be a message in the stream now
         match exec.run_until_stalled(&mut persistence_stream.next()) {
             Poll::Ready(Some(Ok(DataPersistenceRequest::Persist { tag, .. }))) => {
                 assert_eq!(tag, "some-tag")
             }
-            other => panic!("unexpected variant: {:?}", other),
+            other => panic!("unexpected variant: {other:?}"),
         };
     }
 

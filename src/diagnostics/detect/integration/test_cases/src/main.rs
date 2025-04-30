@@ -251,7 +251,7 @@ impl From<ftest::TriageDetectEventsEvent> for TestEvent {
                 product_name,
                 program_name,
             } => TestEvent::CrashReportingProductRegistration { product_name, program_name },
-            _ => panic!("unknown event {:?}", event),
+            _ => panic!("unknown event {event:?}"),
         }
     }
 }

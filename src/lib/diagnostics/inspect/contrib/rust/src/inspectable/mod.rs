@@ -212,11 +212,11 @@ where
     V: std::fmt::Debug,
 {
     fn new<'a>(value: &V, node: &Node, name: impl Into<Cow<'a, str>>) -> Self {
-        Self { debug_string: node.create_string(name, format!("{:?}", value)) }
+        Self { debug_string: node.create_string(name, format!("{value:?}")) }
     }
 
     fn watch(&mut self, value: &V) {
-        self.debug_string.set(&format!("{:?}", value))
+        self.debug_string.set(&format!("{value:?}"))
     }
 }
 
