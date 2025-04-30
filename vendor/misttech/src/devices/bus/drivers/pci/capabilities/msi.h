@@ -4,7 +4,6 @@
 #ifndef SRC_DEVICES_BUS_DRIVERS_PCI_CAPABILITIES_MSI_H_
 #define SRC_DEVICES_BUS_DRIVERS_PCI_CAPABILITIES_MSI_H_
 
-//#include <lib/ddk/debug.h>
 #include <zircon/assert.h>
 
 #include <hwreg/bitfields.h>
@@ -45,7 +44,7 @@ class MsiCapability : public Capability {
       case 0b101:
         return 32;
     }
-    //zxlogf(ERROR, "Invalid mm_capable value read: %#x\n", reg_value);
+    dprintf(CRITICAL, "Invalid mm_capable value read: %#x\n", reg_value);
     return 1;
   }
 

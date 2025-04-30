@@ -34,8 +34,16 @@ zx_status_t Bus::UnlinkDevice(pci::Device* device) {
 
 zx_status_t Bus::AllocateMsi(uint32_t count, fbl::RefPtr<MsiAllocation>* msi) {
   fbl::AutoLock _(&devices_lock_);
-  // return pciroot().AllocateMsi(count, false, msi);
-  return ZX_ERR_NOT_SUPPORTED;
+
+  uint8_t allocation_list[1];
+  size_t allocation_actual = 0;
+  zx_status_t status = pciroot().AllocateMsi(count, false, allocation_list, 1, &allocation_actual);
+  if (status != ZX_OK) {
+    return status;
+  }
+  ZX_ASSERT(allocation_actual == 1);
+  *msi = fbl::ImportFromRawPtr(reinterpret_cast<MsiAllocation*>(allocation_list[0]));
+  return ZX_OK;
 }
 
 zx_status_t Bus::GetBti(const pci::Device* device, uint32_t index,
@@ -44,8 +52,17 @@ zx_status_t Bus::GetBti(const pci::Device* device, uint32_t index,
     return ZX_ERR_INVALID_ARGS;
   }
   fbl::AutoLock devices_lock(&devices_lock_);
-  // return pciroot().GetBti(device->packed_addr(), index, bti);
-  return ZX_ERR_NOT_SUPPORTED;
+  uint8_t allocation_list[1];
+  size_t allocation_actual = 0;
+  zx_status_t status =
+      pciroot().GetBti(device->packed_addr(), index, allocation_list, 1, &allocation_actual);
+  if (status != ZX_OK) {
+    return status;
+  }
+  ZX_ASSERT(allocation_actual == 1);
+  *bti = fbl::ImportFromRawPtr(
+      reinterpret_cast<BusTransactionInitiatorDispatcher*>(allocation_list[0]));
+  return ZX_OK;
 }
 
 zx_status_t Bus::AddToSharedIrqList(pci::Device* device, uint32_t vector) {

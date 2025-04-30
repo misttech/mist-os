@@ -4,9 +4,6 @@
 
 #include "vendor/misttech/src/devices/bus/drivers/pci/bridge.h"
 
-#include <assert.h>
-// #include <err.h>
-#include <inttypes.h>
 #include <limits.h>
 #include <string.h>
 #include <trace.h>
@@ -28,9 +25,8 @@
 namespace pci {
 
 // Bridges rely on most of the protected Device members when they can
-Bridge::Bridge(zx_device_t* parent, std::unique_ptr<Config>&& config,
-               UpstreamNode* upstream, BusDeviceInterface* bdi /*, inspect::Node node*/,
-               uint8_t mbus_id)
+Bridge::Bridge(zx_device_t* parent, std::unique_ptr<Config>&& config, UpstreamNode* upstream,
+               BusDeviceInterface* bdi /*, inspect::Node node*/, uint8_t mbus_id)
     : pci::Device(parent, std::move(config), upstream, bdi /*, std::move(node)*/,
                   /*is_bridge=*/true,
                   /*has_acpi=*/false),

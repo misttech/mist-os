@@ -1,3 +1,4 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -6,8 +7,6 @@
 #define VENDOR_MISTTECH_SRC_DEVICES_BUS_DRIVERS_PCI_ALLOCATION_H_
 
 #include <mistos/hardware/pciroot/cpp/banjo.h>
-// #include <lib/ddk/debug.h>
-// #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>

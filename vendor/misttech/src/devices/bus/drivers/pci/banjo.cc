@@ -1,10 +1,10 @@
 
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #include <lib/ddk/binding.h>
-// #include <lib/ddk/debug.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/interrupt.h>
@@ -16,6 +16,7 @@
 #include <zircon/errors.h>
 #include <zircon/status.h>
 // TODO(fxbug.dev/33713): Stop depending on the types in this file.
+#include <trace.h>
 #include <zircon/syscalls/pci.h>
 #include <zircon/types.h>
 
@@ -25,9 +26,6 @@
 
 #include "vendor/misttech/src/devices/bus/drivers/pci/common.h"
 #include "vendor/misttech/src/devices/bus/drivers/pci/device.h"
-// #include "vendor/misttech/src/devices/bus/drivers/pci/proxy_rpc.h"
-
-#include <trace.h>
 
 #define LOCAL_TRACE 0
 

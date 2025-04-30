@@ -6,16 +6,12 @@
 #ifndef SRC_DEVICES_BUS_DRIVERS_PCI_BUS_H_
 #define SRC_DEVICES_BUS_DRIVERS_PCI_BUS_H_
 
-// #include <fidl/fuchsia.hardware.pci/cpp/natural_types.h>
-// #include <lib/ddk/device.h>
-// #include <lib/inspect/cpp/inspector.h>
-// #include <lib/inspect/cpp/vmo/types.h>
+#include <lib/ddk/device.h>
+#include <lib/mistos/util/allocator.h>
 #include <lib/mmio/mmio.h>
 #include <lib/stdcompat/span.h>
-#include <lib/zx/interrupt.h>
-// #include <lib/zx/msi.h>
-// #include <lib/zx/thread.h>
-#include <lib/mistos/util/allocator.h>
+#include <mistos/hardware/pci/cpp/banjo.h>
+#include <mistos/hardware/pciroot/cpp/banjo.h>
 #include <zircon/compiler.h>
 #include <zircon/syscalls/port.h>
 
@@ -24,16 +20,11 @@
 #include <memory>
 
 #include <ddktl/device.h>
-#include <kernel/thread.h>
-// #include <ddktl/fidl.h>
-// #include <ddktl/metadata_server.h>
-#include <mistos/hardware/pci/cpp/banjo.h>
-#include <mistos/hardware/pciroot/cpp/banjo.h>
-
 #include <ddktl/protocol/empty-protocol.h>
 #include <fbl/intrusive_double_list.h>
 #include <fbl/intrusive_wavl_tree.h>
 #include <fbl/vector.h>
+#include <kernel/thread.h>
 #include <object/port_dispatcher.h>
 
 #include "vendor/misttech/src/devices/bus/drivers/pci/bus_device_interface.h"

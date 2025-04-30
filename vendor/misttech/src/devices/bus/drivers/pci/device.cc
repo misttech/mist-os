@@ -6,12 +6,8 @@
 #include "vendor/misttech/src/devices/bus/drivers/pci/device.h"
 
 #include <assert.h>
-// #include <err.h>
-// #include <fidl/fuchsia.io/cpp/wire.h>
-// #include <inttypes.h>
-// #include <lib/ddk/binding_driver.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/fit/defer.h>
-// #include <lib/inspect/cpp/inspector.h>
 #include <lib/mistos/util/allocator.h>
 #include <lib/zx/interrupt.h>
 #include <string.h>
@@ -227,13 +223,6 @@ zx_status_t Device::InitLocked() {
     return result.status_value();
   }
 
-#if 0
-  zx::result result = FidlDevice::Create(parent_, this);
-  if (result.is_error()) {
-    return result.status_value();
-  }
-#endif
-
   disable.cancel();
   return ZX_OK;
 }
@@ -406,8 +395,8 @@ void Device::ProbeBars() {
   for (uint32_t bar_id = 0; bar_id < bar_count_; bar_id++) {
     auto result = ProbeBar(bar_id);
     if (result.is_error()) {
-      LTRACEF("[%s] Skipping bar %u due to probing error: %s\n", cfg_->addr(), bar_id,
-              result.status_string());
+      LTRACEF("[%s] Skipping bar %u due to probing error: %d\n", cfg_->addr(), bar_id,
+              result.status_value());
       continue;
     }
 
@@ -521,8 +510,8 @@ zx::result<> Device::AllocateBars() {
   for (auto bar_id : bar_allocation_order) {
     if (bars_[bar_id]) {
       if (auto result = AllocateBar(bar_id); result.is_error()) {
-        LTRACEF("[%s] failed to allocate bar %u: %s\n", cfg_->addr(), bar_id,
-                result.status_string());
+        LTRACEF("[%s] failed to allocate bar %u: %d\n", cfg_->addr(), bar_id,
+                result.status_value());
         return result.take_error();
       }
     }

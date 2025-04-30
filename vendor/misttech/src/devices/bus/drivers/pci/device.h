@@ -9,11 +9,7 @@
 #include <assert.h>
 #include <mistos/hardware/pci/c/banjo.h>
 #include <mistos/hardware/pci/cpp/banjo.h>
-//  #include <lib/component/outgoing/cpp/outgoing_directory.h>
 // #include <lib/device-protocol/pci.h>
-//  #include <lib/fdf/cpp/dispatcher.h>
-//  #include <lib/inspect/cpp/inspector.h>
-//  #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <sys/types.h>
 #include <zircon/compiler.h>
@@ -403,7 +399,6 @@ class Device : public fbl::WAVLTreeContainable<fbl::RefPtr<pci::Device>>,
   Capabilities caps_ __TA_GUARDED(dev_lock_){};
   Irqs irqs_ __TA_GUARDED(dev_lock_){.mode = PCI_INTERRUPT_MODE_DISABLED};
 
-  // fbl::RefPtr<Device> parent_;
   zx_device_t* parent_;
   // Inspect inspect_;
 };

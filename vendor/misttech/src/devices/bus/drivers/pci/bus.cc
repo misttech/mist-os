@@ -1,19 +1,17 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #include "vendor/misttech/src/devices/bus/drivers/pci/bus.h"
 
-// #include <fidl/mistos.hardware.pci/cpp/natural_types.h>
-#include <mistos/hardware/pciroot/c/banjo.h>
-// #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-// #include <lib/ddk/metadata.h>
-// #include <lib/ddk/platform-defs.h>
+#include <lib/ddk/metadata.h>
+#include <lib/ddk/platform-defs.h>
 #include <lib/mmio/mmio.h>
-// #include <lib/pci/hw.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/time.h>
+#include <mistos/hardware/pciroot/c/banjo.h>
 #include <trace.h>
 #include <zircon/errors.h>
 #include <zircon/hw/pci.h>
@@ -22,24 +20,21 @@
 #include <algorithm>
 #include <list>
 
-#include <object/port_dispatcher.h>
-// #include <thread>
-
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
 #include <fbl/auto_lock.h>
 #include <fbl/vector.h>
+#include <object/port_dispatcher.h>
 
 #include "vendor/misttech/src/devices/bus/drivers/pci/bridge.h"
 #include "vendor/misttech/src/devices/bus/drivers/pci/config.h"
 #include "vendor/misttech/src/devices/bus/drivers/pci/device.h"
 
-#define LOCAL_TRACE 2
+#define LOCAL_TRACE 0
 
 namespace pci {
 
 zx_status_t pci_bus_bind(void* ctx, zx_device_t* parent) {
-  printf("parent: %p\n", parent);
   pciroot_protocol_t pciroot = {};
   zx_status_t status = device_get_protocol(parent, ZX_PROTOCOL_PCIROOT, &pciroot);
   if (status != ZX_OK) {
