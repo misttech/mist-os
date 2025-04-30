@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use bstr::BStr;
-use serde::Serialize;
+use serde::de::Visitor;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt;
+use std::fmt::Write;
 use zerocopy::{FromBytes, Immutable, KnownLayout};
 use zx_types::ZX_MAX_NAME_LEN;
 
@@ -15,17 +18,7 @@ use zx_types::ZX_MAX_NAME_LEN;
 
 /// Zircon resource name with a maximum length of `ZX_MAX_NAME_LEN - 1`.
 #[derive(
-    Default,
-    Eq,
-    Hash,
-    FromBytes,
-    Immutable,
-    KnownLayout,
-    PartialEq,
-    PartialOrd,
-    Ord,
-    Serialize,
-    Clone,
+    Default, Eq, Hash, FromBytes, Immutable, KnownLayout, PartialEq, PartialOrd, Ord, Clone,
 )]
 pub struct ZXName([u8; ZX_MAX_NAME_LEN]);
 
@@ -103,10 +96,89 @@ impl From<&ZXName> for ZXName {
     }
 }
 
+/// Serializes as an utf-8 string replacing invalid utf-8 sequences
+/// with `\x` followed by the hex byte value. `\` are escaped as `\\`
+impl Serialize for ZXName {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut res = String::new();
+        for chunk in self.as_bstr().utf8_chunks() {
+            for ch in chunk.valid().chars() {
+                match ch {
+                    '\\' => {
+                        write!(res, "\\\\").unwrap();
+                    }
+                    _ => res.push(ch),
+                }
+            }
+            for byte in chunk.invalid() {
+                write!(res, "\\x{:02X}", byte).unwrap();
+            }
+        }
+        serializer.serialize_str(&res)
+    }
+}
+
+/// Deserializes a byte sequence from the utf-8 representation.
+impl<'de> Deserialize<'de> for ZXName {
+    fn deserialize<D>(deserializer: D) -> Result<ZXName, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ZXNameVisitor;
+
+        impl<'de> Visitor<'de> for ZXNameVisitor {
+            type Value = ZXName;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("an string")
+            }
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                let mut result = Vec::new();
+                let mut chars = v.as_bytes().iter();
+                loop {
+                    match chars.next() {
+                        None => break,
+                        Some(b'\\') => match chars.next() {
+                            None => return Err(E::custom("Character expected after '\\' escape")),
+                            Some(b'x') => result.push(
+                                u8::from_str_radix(
+                                    str::from_utf8(&[
+                                        *chars.next().ok_or_else(|| {
+                                            E::custom("Hex characters expected after '\\x'")
+                                        })?,
+                                        *chars.next().ok_or_else(|| {
+                                            E::custom("Hex characters expected after '\\x'")
+                                        })?,
+                                    ])
+                                    .map_err(|_| E::custom("Invalid utf-8 sequence after '\\x'"))?,
+                                    16,
+                                )
+                                .map_err(|_| E::custom("Invalid hex pair after '\\x'"))?,
+                            ),
+                            Some(v) => result.push(*v),
+                        },
+                        Some(u) => {
+                            result.push(*u);
+                        }
+                    }
+                }
+                Ok(ZXName::from_bytes_lossy(&result))
+            }
+        }
+        deserializer.deserialize_str(ZXNameVisitor {})
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use rand::Rng;
     #[test]
     fn empty_name() {
         for empty in [
@@ -157,5 +229,43 @@ mod tests {
     fn not_utf8() {
         let data: [u8; 2] = [0xff, 0xff];
         assert_eq!("\u{FFFD}\u{FFFD}", ZXName::from_bytes_lossy(&data).to_string());
+    }
+
+    #[test]
+    fn test_serialize() {
+        assert_eq!("\"abc\"", serde_json::to_string(&ZXName::from_string_lossy("abc")).unwrap());
+        assert_eq!(
+            "\"\\n\\t\\r'\\\"\\\\\\\\\"",
+            serde_json::to_string(&ZXName::from_string_lossy("\n\t\r'\"\\")).unwrap()
+        );
+        assert_eq!(
+            r#""aĀ(\\xC3)""#,
+            serde_json::to_string(&ZXName::from_bytes_lossy(&[b'a', 0xc4, 0x80, b'(', 0xc3, b')']))
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_deserialize() {
+        assert!(format!("{:?}", serde_json::from_str::<ZXName>(r#""\\""#))
+            .contains("Character expected after '\\\\'"));
+        assert!(format!("{:?}", serde_json::from_str::<ZXName>(r#""\\x""#))
+            .contains("Hex characters expected after"));
+        assert!(format!("{:?}", serde_json::from_str::<ZXName>(r#""\\x1""#))
+            .contains("Hex characters expected after"));
+        assert!(format!("{:?}", serde_json::from_str::<ZXName>(r#""\\x1x""#))
+            .contains("Invalid hex pair after"));
+    }
+
+    #[test]
+    fn test_fuzz_serialize() {
+        let mut rng = rand::thread_rng();
+        for _ in 0..100000 {
+            let byte_vec: Vec<u8> = (0..rng.gen_range(0..32)).map(|_| rng.gen::<u8>()).collect();
+            let before = ZXName::from_bytes_lossy(&byte_vec);
+            let json = serde_json::to_string(&before).unwrap();
+            let after: ZXName = serde_json::from_str(&json).expect("deserialization works");
+            assert_eq!(before, after);
+        }
     }
 }

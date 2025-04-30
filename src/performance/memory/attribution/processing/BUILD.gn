@@ -25,7 +25,11 @@ rustc_library("processing") {
     "//third_party/rust_crates:zerocopy",
   ]
 
-  test_deps = [ "//third_party/rust_crates:pretty_assertions" ]
+  test_deps = [
+    "//third_party/rust_crates:pretty_assertions",
+    "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:serde_json",
+  ]
 
   sources = [
     "src/digest.rs",
