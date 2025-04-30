@@ -192,7 +192,6 @@ where
     let nodename = std::env::var("FUCHSIA_NODENAME").unwrap();
 
     isolate.ffx(&["target", "add", &addr]).await.expect("add target");
-    isolate.ffx(&["target", "default", "set", &nodename]).await.expect("add target");
 
     let (launched_component, component_connector) =
         launch(case_name, &nodename, node, &isolate).await.expect("launch component");
