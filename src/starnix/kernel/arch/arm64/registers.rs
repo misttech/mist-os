@@ -98,6 +98,9 @@ impl RegisterState {
         } else {
             SYSCALL_ARM_INSTRUCTION_SIZE_BYTES
         };
+        if self.is_arch32() {
+            self.real_registers.r[15] -= instruction_size;
+        }
         self.real_registers.pc -= instruction_size;
     }
 
