@@ -1,7 +1,7 @@
 // Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use anyhow::{bail, ensure, Error};
+use anyhow::{bail, ensure, Context, Error};
 use f2fs_reader::{F2fsReader, FileType, Flags, InlineFlags, Inode, BLOCK_SIZE};
 use fxfs::filesystem::{FxFilesystemBuilder, OpenFxFilesystem};
 use fxfs::object_handle::{ObjectHandle, ObjectProperties};
@@ -103,7 +103,9 @@ async fn recursively_migrate(
 
         // Both directories and files can have xattr.
         for xattr in &inode.xattr {
-            let mut name = format!("{:?}", xattr.index).as_bytes().to_vec();
+            // In f2fs, each xattr has an index byte that acts as a sort of namespace.
+            // We will capture these verbatim and wire them into starnix.
+            let mut name = vec![xattr.index as u8];
             name.extend_from_slice(&xattr.name);
             transaction.add(
                 dir.store().store_object_id(),
@@ -289,14 +291,22 @@ async fn recursively_verify(
 
         match entry.file_type {
             FileType::Directory => {
-                let new_dir = Directory::open_unchecked(
+                let dir = Directory::open_unchecked(
                     dir.owner().clone(),
                     object_id,
                     wrapping_key_id,
                     casefold,
                 );
 
-                let fxfs_properties = new_dir.get_properties().await?;
+                for xattr in &inode.xattr {
+                    let mut name = vec![xattr.index as u8];
+                    name.extend_from_slice(&xattr.name);
+                    let fxfs_xattr_value =
+                        dir.get_extended_attribute(name).await.context("xattr read")?;
+                    assert_eq!(&fxfs_xattr_value, xattr.value.as_ref());
+                }
+
+                let fxfs_properties = dir.get_properties().await?;
                 let object_attributes = inode_to_object_attributes(&inode, 0);
                 let f2fs_properties = ObjectProperties {
                     refs: 1,
@@ -317,7 +327,7 @@ async fn recursively_verify(
                     "entry {entry:?}, inode header: {h:?}"
                 );
 
-                Box::pin(recursively_verify(f2fs, fxfs, entry.ino, new_dir)).await.unwrap();
+                Box::pin(recursively_verify(f2fs, fxfs, entry.ino, dir)).await.unwrap();
             }
             FileType::RegularFile => {
                 let handle = ObjectStore::open_object(
@@ -327,6 +337,14 @@ async fn recursively_verify(
                     None,
                 )
                 .await?;
+
+                for xattr in &inode.xattr {
+                    let mut name = vec![xattr.index as u8];
+                    name.extend_from_slice(&xattr.name);
+                    let fxfs_xattr_value =
+                        handle.get_extended_attribute(name).await.context("xattr read")?;
+                    assert_eq!(&fxfs_xattr_value, xattr.value.as_ref());
+                }
 
                 let fxfs_properties = handle.get_properties().await?;
                 let f2fs_allocated_size = if let Some(data) = inode.inline_data.as_ref() {
