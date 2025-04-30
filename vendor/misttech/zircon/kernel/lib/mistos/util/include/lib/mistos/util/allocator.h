@@ -52,6 +52,21 @@ struct Allocator {
   }
 };
 
+template <typename F>
+auto allocate_function(F&& f) {
+  // Allocate the lambda or function object with a custom allocator
+  using FuncType = std::decay_t<F>;
+  using allocator_t = Allocator<FuncType>;
+
+  allocator_t alloc;
+  FuncType* func_ptr = alloc.allocate(1);
+  new (func_ptr) FuncType(std::forward<F>(f));  // placement-new
+
+  return [func_ptr](auto&&... args) -> decltype(auto) {
+    return (*func_ptr)(std::forward<decltype(args)>(args)...);
+  };
+}
+
 }  // namespace util
 
 #endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_ALLOCATOR_H_
