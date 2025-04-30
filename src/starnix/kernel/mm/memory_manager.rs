@@ -1587,9 +1587,21 @@ impl MemoryManagerState {
                         track_stub!(TODO("https://fxbug.dev/322874202"), "MADV_SEQUENTIAL");
                         return error!(EINVAL);
                     }
-                    MADV_FREE => {
-                        track_stub!(TODO("https://fxbug.dev/322874202"), "MADV_FREE");
+                    MADV_FREE if !mapping.flags().contains(MappingFlags::ANONYMOUS) => {
+                        track_stub!(
+                            TODO("https://fxbug.dev/411748419"),
+                            "MADV_FREE with file-backed mapping"
+                        );
                         return error!(EINVAL);
+                    }
+                    MADV_FREE if mapping.flags().contains(MappingFlags::LOCKED) => {
+                        return error!(EINVAL);
+                    }
+                    MADV_FREE => {
+                        track_stub!(TODO("https://fxbug.dev/411748419"), "MADV_FREE");
+                        // TODO(https://fxbug.dev/411748419) For now, treat MADV_FREE like
+                        // MADV_DONTNEED as a stopgap until we have proper support.
+                        zx::VmoOp::ZERO
                     }
                     MADV_REMOVE => {
                         track_stub!(TODO("https://fxbug.dev/322874202"), "MADV_REMOVE");
