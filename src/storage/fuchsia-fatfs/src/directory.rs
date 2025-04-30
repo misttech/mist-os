@@ -182,7 +182,10 @@ impl FatDirectory {
     }
 
     /// Borrow the underlying fatfs `Dir` that corresponds to this directory.
+    // TODO(https://fxbug.dev/414761492): document or remove this `#[allow]`
+    #[allow(clippy::mut_from_ref)]
     pub(crate) fn borrow_dir_mut<'a>(&self, fs: &'a FatFilesystemInner) -> Option<&mut Dir<'a>> {
+        // TODO(https://fxbug.dev/414760817): document unsafe usage
         unsafe { self.dir.get().as_mut() }.unwrap().borrow_mut(fs)
     }
 

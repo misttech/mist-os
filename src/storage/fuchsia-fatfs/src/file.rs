@@ -88,8 +88,10 @@ impl FatFile {
     }
 
     /// Borrow the underlying Fatfs File mutably.
+    // TODO(https://fxbug.dev/414761492): document or remove this `#[allow]`
+    #[allow(clippy::mut_from_ref)]
     pub(crate) fn borrow_file_mut<'a>(&self, fs: &'a FatFilesystemInner) -> Option<&mut File<'a>> {
-        // Safe because the file is protected by the lock on fs.
+        // SAFETY: Safe because the file is protected by the lock on fs.
         unsafe { self.file.get().as_mut() }.unwrap().borrow_mut(fs)
     }
 
