@@ -321,7 +321,7 @@ impl MockRealmQuery {
                     let res = self.mapping.get(&query_moniker.to_string()).unwrap();
                     responder.send(Ok(&res.to_instance())).unwrap();
                 }
-                fsys2_f::RealmQueryRequest::DeprecatedOpen {
+                fsys2_f::RealmQueryRequest::Open {
                     moniker,
                     dir_type,
                     object,

@@ -390,7 +390,13 @@ open protocol Directory {
     });
 
     /// DEPRECATED - Use `fuchsia.io/Directory.Open` instead.
-    // TODO(https://fxbug.dev/324080864): Mark this as removed at NEXT when we ship API level 27.
+    //
+    // TODO(https://fxbug.dev/384994764): In an ideal world, we'd be able to say
+    // `removed=27, renamed="DeprecatedOpen"` on `Open` to get this for free,
+    // but unfortunately that doesn't work.
+    //
+    // TODO(https://fxbug.dev/324081103): Delete (don't just set removed=NEXT)
+    // this method once all API levels below 27 have been retired.
     @available(added=27)
     @selector("fuchsia.io1/Directory.Open")
     flexible DeprecatedOpen(resource struct {

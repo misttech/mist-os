@@ -156,7 +156,7 @@ impl StorageAdmin {
 
         while let Some(request) = stream.try_next().await? {
             match request {
-                fsys::StorageAdminRequest::DeprecatedOpenComponentStorage {
+                fsys::StorageAdminRequest::OpenComponentStorage {
                     relative_moniker,
                     flags,
                     mode,

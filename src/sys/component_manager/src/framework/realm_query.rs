@@ -103,7 +103,7 @@ impl RealmQuery {
                     let result = construct_namespace(&model, &scope_moniker, &moniker).await;
                     responder.send(result)
                 }
-                fsys::RealmQueryRequest::DeprecatedOpen {
+                fsys::RealmQueryRequest::Open {
                     moniker,
                     dir_type,
                     flags,
